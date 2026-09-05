@@ -399,7 +399,7 @@ impl RichString {
             }
             reserve(&mut runs, count, "comment rich-string runs")?;
             let mut previous = None;
-            for chunk in data[offset..end].chunks_exact(4) {
+            for chunk in data[offset..end].as_chunks::<4>().0.iter() {
                 let character_index = u16::from_le_bytes([chunk[0], chunk[1]]);
                 if usize::from(character_index) >= text_len
                     || previous.is_some_and(|value| character_index <= value)
@@ -442,7 +442,7 @@ impl RichString {
             }
             let mut previous_phonetic = None;
             let mut previous_base_end = None;
-            for chunk in data[offset..runs_end].chunks_exact(6) {
+            for chunk in data[offset..runs_end].as_chunks::<6>().0.iter() {
                 let phonetic_character_index = u16::from_le_bytes([chunk[0], chunk[1]]);
                 let base_character_index = u16::from_le_bytes([chunk[2], chunk[3]]);
                 let base_character_count = u16::from_le_bytes([chunk[4], chunk[5]]);

@@ -102,7 +102,9 @@ fn parse_lp_wide_string(data: &[u8], record_type: u16) -> Result<String> {
         return Err(invalid(record_type, "LPWideString length mismatch"));
     }
     let units: Vec<u16> = data[2..]
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
         .collect();
     String::from_utf16(&units)
@@ -798,7 +800,9 @@ impl Mdb {
             ));
         }
         let entries = body
-            .chunks_exact(MDIR_LEN)
+            .as_chunks::<MDIR_LEN>()
+            .0
+            .iter()
             .map(|chunk| MdxMetadataDir {
                 info_index: read_i32(chunk, 0),
                 metadata_index: read_u32(chunk, 4),

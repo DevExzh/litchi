@@ -659,7 +659,9 @@ pub fn validate_eot_facet(bytes: &[u8], limits: Limits) -> crate::package::Resul
             .get(name_start..cursor)
             .ok_or_else(|| Error::Corrupted("EOT name is truncated".into()))?;
         if char::decode_utf16(
-            name.chunks_exact(2)
+            name.as_chunks::<2>()
+                .0
+                .iter()
                 .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
         )
         .any(|value| value.is_err())

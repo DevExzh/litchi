@@ -293,7 +293,7 @@ pub(crate) fn validate_record_header(
 pub(crate) fn decode_printable_unicode(data: &[u8]) -> Result<String> {
     let mut units = Vec::with_capacity(data.len() / 2);
     let mut terminated = false;
-    for bytes in data.chunks_exact(2) {
+    for bytes in data.as_chunks::<2>().0.iter() {
         let unit = u16::from_le_bytes([bytes[0], bytes[1]]);
         if terminated {
             if unit != 0 {

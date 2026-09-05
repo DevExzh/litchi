@@ -180,7 +180,11 @@ impl TapParser<'_> {
                 "DOC cell border color array does not match the row".to_string(),
             ));
         }
-        for (cell, colorref) in tap.cell_properties.iter_mut().zip(operand.chunks_exact(4)) {
+        for (cell, colorref) in tap
+            .cell_properties
+            .iter_mut()
+            .zip(operand.as_chunks::<4>().0.iter())
+        {
             let (border, direct) = match operation {
                 0x1A => (&mut cell.borders.top, &mut cell.direct_style.border_top),
                 0x1B => (&mut cell.borders.left, &mut cell.direct_style.border_left),
@@ -192,7 +196,7 @@ impl TapParser<'_> {
                 _ => unreachable!(),
             };
             *direct = true;
-            if colorref == [0xFF; 4] {
+            if *colorref == [0xFF; 4] {
                 *border = None;
             } else {
                 let color = Self::parse_colorref(colorref)?;

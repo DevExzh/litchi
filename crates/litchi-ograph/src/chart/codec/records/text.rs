@@ -93,10 +93,11 @@ fn parse_string_content(
             resource: "chart string",
         })?;
     if wide {
-        let units = bytes.chunks_exact(2).map(|value| match value {
-            [low, high] => u16::from_le_bytes([*low, *high]),
-            _ => 0,
-        });
+        let units = bytes
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|value| u16::from_le_bytes(*value));
         for value in char::decode_utf16(units) {
             output.push(value.ok().ok_or(Error::InvalidChart {
                 offset: record.offset(),

@@ -207,8 +207,10 @@ pub(super) fn read_codepage_string(
             return Err(invalid(format!("{description} is not terminated UTF-16LE")));
         }
         let end = raw
-            .chunks_exact(2)
-            .position(|pair| pair == [0, 0])
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .position(|pair| *pair == [0, 0])
             .map_or(raw.len(), |terminator_index| terminator_index * 2);
         decode_utf16(&raw[..end], description)?
     } else {
@@ -240,8 +242,10 @@ pub(super) fn read_unicode_string(
             return Err(invalid(format!("{description} is not NUL-terminated")));
         }
         let end = raw
-            .chunks_exact(2)
-            .position(|pair| pair == [0, 0])
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .position(|pair| *pair == [0, 0])
             .map_or(raw.len(), |terminator_index| terminator_index * 2);
         decode_utf16(&raw[..end], description)?
     };
@@ -255,7 +259,9 @@ pub(super) fn decode_utf16(data: &[u8], description: &str) -> Result<String, Ole
     }
     let mut utf8_len = 0usize;
     for decoded in std::char::decode_utf16(
-        data.chunks_exact(2)
+        data.as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
     ) {
         let character = decoded
@@ -267,7 +273,9 @@ pub(super) fn decode_utf16(data: &[u8], description: &str) -> Result<String, Ole
         .try_reserve_exact(utf8_len)
         .map_err(|source| allocation("decoded UTF-16 string", source))?;
     for decoded in std::char::decode_utf16(
-        data.chunks_exact(2)
+        data.as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
     ) {
         let character = decoded

@@ -201,7 +201,7 @@ fn parse_printable(data: &[u8], context: &str) -> Result<String> {
 
 fn parse_utf16_terminated(data: &[u8], context: &str) -> Result<String> {
     let mut units = Vec::with_capacity(data.len() / 2);
-    for bytes in data.chunks_exact(2) {
+    for bytes in data.as_chunks::<2>().0.iter() {
         let unit = u16::from_le_bytes([bytes[0], bytes[1]]);
         if unit == 0 {
             break;
@@ -218,7 +218,7 @@ fn encode_name(name: &str) -> Result<[u8; NAME_BYTES]> {
         return corrupted("bookmarkName must contain 1 through 32 non-null UTF-16 code units");
     }
     let mut data = [0; NAME_BYTES];
-    for (slot, unit) in data.chunks_exact_mut(2).zip(units) {
+    for (slot, unit) in data.as_chunks_mut::<2>().0.iter_mut().zip(units) {
         slot.copy_from_slice(&unit.to_le_bytes());
     }
     Ok(data)

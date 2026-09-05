@@ -1044,7 +1044,9 @@ fn parse_criterion(data: &[u8], range: ListObjectRange) -> Result<AutoFilter12Cr
             } else {
                 char::decode_utf16(
                     data[23..]
-                        .chunks_exact(2)
+                        .as_chunks::<2>()
+                        .0
+                        .iter()
                         .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
                 )
                 .collect::<Result<String, _>>()

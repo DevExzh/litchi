@@ -1,0 +1,274 @@
+[
+  {
+    "original_path": "checks/baseline-facade-tests.log",
+    "original_bytes": 35902,
+    "original_sha256": "e07c2f0fd395bf71efb7520a64e37bb34a221e833269cdcebceb7f5d89a75890",
+    "stored_path": "checks/baseline-facade-tests.log.gz",
+    "stored_bytes": 6095,
+    "stored_sha256": "c9484a5c0d47db7d11f6a775d7852e720710a89d024a944809f4975ec7062129"
+  },
+  {
+    "original_path": "checks/baseline-odp-locked.log",
+    "original_bytes": 1531,
+    "original_sha256": "22228223924f8c85e696f1c9ba41420219bc6b7c913239b8b28c3da3bc33045a",
+    "stored_path": "checks/baseline-odp-locked.log.gz",
+    "stored_bytes": 651,
+    "stored_sha256": "1d298a37f990dff9c6f024282eeba2dca686106beac2ad27e81da41852367da7"
+  },
+  {
+    "original_path": "checks/baseline-odp.log",
+    "original_bytes": 265,
+    "original_sha256": "5a416f56bb9adca0b96d74757816e03cd3cb6388f8e388d995d2774a90661574",
+    "stored_path": "checks/baseline-odp.log.gz",
+    "stored_bytes": 197,
+    "stored_sha256": "bed216a196f19939d2571fac2940892dda4e2910cc4258fffb4e3bf8b405f3f0"
+  },
+  {
+    "original_path": "checks/baseline-odt-locked.log",
+    "original_bytes": 1177,
+    "original_sha256": "2271bba1c3a50dc134157804dd3c20a65a8d30e7c654ac0690c157543d3ca8be",
+    "stored_path": "checks/baseline-odt-locked.log.gz",
+    "stored_bytes": 564,
+    "stored_sha256": "ca624602a28d2528ae43c5e652a5db16fa75e7bb0be9b94751e7e73e865ec219"
+  },
+  {
+    "original_path": "checks/baseline-odt.log",
+    "original_bytes": 265,
+    "original_sha256": "5a416f56bb9adca0b96d74757816e03cd3cb6388f8e388d995d2774a90661574",
+    "stored_path": "checks/baseline-odt.log.gz",
+    "stored_bytes": 197,
+    "stored_sha256": "bed216a196f19939d2571fac2940892dda4e2910cc4258fffb4e3bf8b405f3f0"
+  },
+  {
+    "original_path": "checks/baseline-xlsb-locked.log",
+    "original_bytes": 2338,
+    "original_sha256": "4bf0abf227070db70e62d528c2601772c357c44ac7f4426fa08ce96a3fb0b3c6",
+    "stored_path": "checks/baseline-xlsb-locked.log.gz",
+    "stored_bytes": 754,
+    "stored_sha256": "0d15ae529c55faf753f2136ead18fc9bfe766f012c39e8cff7ae326790ac9fee"
+  },
+  {
+    "original_path": "checks/baseline-xlsb.log",
+    "original_bytes": 265,
+    "original_sha256": "5a416f56bb9adca0b96d74757816e03cd3cb6388f8e388d995d2774a90661574",
+    "stored_path": "checks/baseline-xlsb.log.gz",
+    "stored_bytes": 197,
+    "stored_sha256": "bed216a196f19939d2571fac2940892dda4e2910cc4258fffb4e3bf8b405f3f0"
+  },
+  {
+    "original_path": "checks/boundaries.log",
+    "original_bytes": 684,
+    "original_sha256": "b6f38b040ac7308af6ec280e204ed817e3c708cdde84d2566f0b5d74758aeeaf",
+    "stored_path": "checks/boundaries.log.gz",
+    "stored_bytes": 255,
+    "stored_sha256": "47bc24b362c2d527d2550fd6efef22751d4d4a4efba50b0b2f6d8f7b0fc8b443"
+  },
+  {
+    "original_path": "checks/changed-rust-format.log",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_path": "checks/changed-rust-format.log.gz",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  {
+    "original_path": "checks/claims.log",
+    "original_bytes": 44,
+    "original_sha256": "33241d1f0ca4f8fba95a039a967f9a5bc41f100a24e94b576942d2e7c4615fc8",
+    "stored_path": "checks/claims.log.gz",
+    "stored_bytes": 64,
+    "stored_sha256": "213fceee167de45140392729d792e56798bb0cf20777a6c69664d40c361352ec"
+  },
+  {
+    "original_path": "checks/corrected-odp-tests.log",
+    "original_bytes": 1181,
+    "original_sha256": "5e9f0fc7dc2ac0601ef024cce8a810b5db2522dd67ea1f61bf9e145e657342e0",
+    "stored_path": "checks/corrected-odp-tests.log.gz",
+    "stored_bytes": 539,
+    "stored_sha256": "379830fe58c73a92d74ba5c436cf480af16d8f15408d3bdb5ff605aad41c5644"
+  },
+  {
+    "original_path": "checks/corrected-odt-tests.log",
+    "original_bytes": 885,
+    "original_sha256": "7d76a4108ca41a5d6aee014d36c0f13195033ea200a1a7632d56ee9e8a9c5d62",
+    "stored_path": "checks/corrected-odt-tests.log.gz",
+    "stored_bytes": 433,
+    "stored_sha256": "0a3956dfb1a05d7d818e27af2975c9aa01fc6abb2a82c3ab6f3e865d8c85180b"
+  },
+  {
+    "original_path": "checks/corrected-tests-clippy.log",
+    "original_bytes": 1479,
+    "original_sha256": "d9461541feddbc623012c5cf1514828b9c5d0a7bc457ca09387b889daf0144eb",
+    "stored_path": "checks/corrected-tests-clippy.log.gz",
+    "stored_bytes": 377,
+    "stored_sha256": "f051b4e45af1fff084b40ae4f7920806f9107a5f96af25fd5996fb4efceb5a0e"
+  },
+  {
+    "original_path": "checks/corrected-xlsb-tests.log",
+    "original_bytes": 1070,
+    "original_sha256": "75569ef90ec81a69e803fc1e2c4a096e4d0f46fb87b69f45f2abf620cd7954d9",
+    "stored_path": "checks/corrected-xlsb-tests.log.gz",
+    "stored_bytes": 564,
+    "stored_sha256": "5b591830b6a3fc8c9214629ca37b098c23b7dcf164bcbe6641de731b3d239785"
+  },
+  {
+    "original_path": "checks/crud-index.log",
+    "original_bytes": 123,
+    "original_sha256": "8a6e2202ee0ae9691a0727a1a9f1ff420c32db2c4fbc4346ba6a57fe24c2220b",
+    "stored_path": "checks/crud-index.log.gz",
+    "stored_bytes": 128,
+    "stored_sha256": "9ad6f851cc0c31766916e170175627691d3532529c9f2cde4db900b5c05d6ce0"
+  },
+  {
+    "original_path": "checks/facade-clippy.log",
+    "original_bytes": 19916,
+    "original_sha256": "ce646bf59e173852e02a561fc9ae86e020472e09e6af1ffac13770d58a781e5e",
+    "stored_path": "checks/facade-clippy.log.gz",
+    "stored_bytes": 3633,
+    "stored_sha256": "dccc07a4cbce864cbb107abf87eccb7e0a146ecddb6c8547710b963579842dbe"
+  },
+  {
+    "original_path": "checks/facade-doc.log",
+    "original_bytes": 2898,
+    "original_sha256": "52f605b0bdfb7219036b6c4602b36965b01eff8225883759c15caf4063de3961",
+    "stored_path": "checks/facade-doc.log.gz",
+    "stored_bytes": 507,
+    "stored_sha256": "591247bfd13f5a821316fd9580ae12c5ffbacaaf33cec34f8590a637adca8d85"
+  },
+  {
+    "original_path": "checks/facade-test.log",
+    "original_bytes": 51278,
+    "original_sha256": "6fe8cb08c65224b4ea8a747ec303238c913b5cbff80b99b4852a9e1d2a37d1d3",
+    "stored_path": "checks/facade-test.log.gz",
+    "stored_bytes": 8796,
+    "stored_sha256": "b063c927419cd8e4a8c161fd81a5216f5beca053399e391597daae188ab60f70"
+  },
+  {
+    "original_path": "checks/native-resave-strict.log",
+    "original_bytes": 249,
+    "original_sha256": "a2d17753dc07dcccfde20067766050abe0e689d37af5341aed1c3f3df751869a",
+    "stored_path": "checks/native-resave-strict.log.gz",
+    "stored_bytes": 181,
+    "stored_sha256": "2edc8744fac0f52a8d295567d478c146bb7974dda60c7c1efc2ab34dd74f304e"
+  },
+  {
+    "original_path": "checks/non-iwork-clippy-diagnostic-1.log",
+    "original_bytes": 13530,
+    "original_sha256": "85f08ca243043f95d60f33e738e5fbb13ccee4769a01c8090fb149757e1c3c17",
+    "stored_path": "checks/non-iwork-clippy-diagnostic-1.log.gz",
+    "stored_bytes": 2876,
+    "stored_sha256": "913cb40783d9c67cab6bc4a5668e08d4fc895c2c1508d726cdd501d23fd23b5e"
+  },
+  {
+    "original_path": "checks/non-iwork-clippy-diagnostic-2.log",
+    "original_bytes": 3882,
+    "original_sha256": "92daf6417ac7b02fbd9e7d7f34bf31e78a9942e2c50f37941d90f0a1134641e8",
+    "stored_path": "checks/non-iwork-clippy-diagnostic-2.log.gz",
+    "stored_bytes": 996,
+    "stored_sha256": "485f3ed47b0233781682f352b74b8737c7d422753be387a4d4fa942869992cd8"
+  },
+  {
+    "original_path": "checks/non-iwork-clippy-diagnostic-final.log",
+    "original_bytes": 147,
+    "original_sha256": "a9b04bbbf90f8edcf7073cb8337a58afdb7b4792167d753f34215e6a4fd595be",
+    "stored_path": "checks/non-iwork-clippy-diagnostic-final.log.gz",
+    "stored_bytes": 139,
+    "stored_sha256": "44d13a6e6446b711055f3b5d5b618a328f1fd6d03ab304d151af32acbff4c315"
+  },
+  {
+    "original_path": "checks/non-iwork-clippy-initial.log",
+    "original_bytes": 9679,
+    "original_sha256": "5b88954bc7c806ed25579217e19292d9ecc9e0b7b869b0cb599aeda857f4b69b",
+    "stored_path": "checks/non-iwork-clippy-initial.log.gz",
+    "stored_bytes": 1986,
+    "stored_sha256": "d4b7ca8fb3937ec929b9808e546dd39228e6b07958c8b0c0073ddcc33ff83931"
+  },
+  {
+    "original_path": "checks/non-iwork-clippy-migrated.log",
+    "original_bytes": 19646,
+    "original_sha256": "19d75814920cc4713dc530d46ef9b49b0895949c05fdd99ccde635dd8729682e",
+    "stored_path": "checks/non-iwork-clippy-migrated.log.gz",
+    "stored_bytes": 2934,
+    "stored_sha256": "9096ff1f7de0be763778a733f45c8aa01eba075225e609c6ba922f71274478f5"
+  },
+  {
+    "original_path": "checks/non-iwork-full-tests-final.log",
+    "original_bytes": 1422556,
+    "original_sha256": "dd1e96fb3ff81854ab3ffe0964f0516bbf5b3af96b5a7a71926427dbe0461b1c",
+    "stored_path": "checks/non-iwork-full-tests-final.log.gz",
+    "stored_bytes": 265291,
+    "stored_sha256": "f3e6005336c201f03488480bd2c7a21e295cd5727b188c3f36f6114e72380d77"
+  },
+  {
+    "original_path": "checks/non-iwork-full-tests.log",
+    "original_bytes": 224,
+    "original_sha256": "8c39be0ece75bd48de52799fdefe3aef3bbef4fabb8913fc4ffa16fe8d202927",
+    "stored_path": "checks/non-iwork-full-tests.log.gz",
+    "stored_bytes": 198,
+    "stored_sha256": "52184aef50088274b73082a16d890497de7a43f00d70b40bca757b92c42bc50e"
+  },
+  {
+    "original_path": "checks/non-iwork-rustdoc.log",
+    "original_bytes": 5710,
+    "original_sha256": "5b34e5d49290e5f0a800ed8e72231c5502f78a4d4b2d10b103c97965b37e1881",
+    "stored_path": "checks/non-iwork-rustdoc.log.gz",
+    "stored_bytes": 698,
+    "stored_sha256": "1356a7dc1b8a03b6d42cb1ad949343215517128f73d4c0466b844eaf02db1240"
+  },
+  {
+    "original_path": "checks/perf-baseline-strict.log",
+    "original_bytes": 22012,
+    "original_sha256": "01a7c4d68da813a023bd5fa0008251dc456a5cc3cd6274a1699363a2c3bd9bc6",
+    "stored_path": "checks/perf-baseline-strict.log.gz",
+    "stored_bytes": 4120,
+    "stored_sha256": "bc1125a63677b98d0467e8d00a99f04358df5f4e3adbe0cc664f73ce6f996b44"
+  },
+  {
+    "original_path": "checks/perf-xls-tests.log",
+    "original_bytes": 3202,
+    "original_sha256": "fac61e8ba597e7ef4e40b0c1e456d23ae95f3b76e6ee819df9ccaa8a1b0c9749",
+    "stored_path": "checks/perf-xls-tests.log.gz",
+    "stored_bytes": 750,
+    "stored_sha256": "5ccb81352577ec2b95c88e70f469f670347b66e4d7e4afbe640833cf5f498c0a"
+  },
+  {
+    "original_path": "checks/pptx-all-features-tests.log",
+    "original_bytes": 89778,
+    "original_sha256": "6c42d02fe9021572e4f9940c701002dc3f2f39f556e9d85b22bb19dbe24f3dcc",
+    "stored_path": "checks/pptx-all-features-tests.log.gz",
+    "stored_bytes": 18153,
+    "stored_sha256": "1d60a36c210b809d24b8bd15fd768dc7f8f1a24694e3e7f75ca79a25b7fc6c79"
+  },
+  {
+    "original_path": "checks/pptx-opc-clippy.log",
+    "original_bytes": 1296,
+    "original_sha256": "014a87b45346c0b29534a939c3bff8116024fe7d08e254e773e2b225cd4cd5c3",
+    "stored_path": "checks/pptx-opc-clippy.log.gz",
+    "stored_bytes": 302,
+    "stored_sha256": "806fb2c4725f374f459149c78d923a68ee35fb8cdbabdf1661461de719782015"
+  },
+  {
+    "original_path": "checks/pptx-opc-rustdoc.log",
+    "original_bytes": 236,
+    "original_sha256": "f1e401bbd036a35b1b29ea4a8a3aa1fcc385a915551d90eee2994d8227b668cf",
+    "stored_path": "checks/pptx-opc-rustdoc.log.gz",
+    "stored_bytes": 176,
+    "stored_sha256": "f1618640edf012e0630ff2dca9c5fd389203c2886307cec8f80bf139d81db401"
+  },
+  {
+    "original_path": "checks/strict-44-packages.log",
+    "original_bytes": 3664,
+    "original_sha256": "5c2fdde0c0e04810a41a81965361c196e593eb2bef9fb5a05471ef4c987edfbf",
+    "stored_path": "checks/strict-44-packages.log.gz",
+    "stored_bytes": 521,
+    "stored_sha256": "a486ecfaf603a11c6aa609b5c004eb8ec1c7e4221a734d2adfac228065abae6e"
+  },
+  {
+    "original_path": "checks/strict-odf-layout-debt.log",
+    "original_bytes": 1781,
+    "original_sha256": "828c7eb1171a9b6c375db8f18cf1dd9e55abc5ecb161e0646e4cf47c91ba75e8",
+    "stored_path": "checks/strict-odf-layout-debt.log.gz",
+    "stored_bytes": 719,
+    "stored_sha256": "4a9eae89a0e80ddfbca8832676c00be9fe5f7f8b4229e78db991cdb1e45a84e1"
+  }
+]

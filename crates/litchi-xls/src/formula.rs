@@ -116,7 +116,7 @@ impl FormulaContext {
             return Err("EXTERNSHEET length does not match cXTI");
         }
 
-        for entry in data[2..].chunks_exact(6) {
+        for entry in data[2..].as_chunks::<6>().0.iter() {
             self.extern_sheets.push(ExternSheetRef {
                 sup_book: u16::from_le_bytes([entry[0], entry[1]]),
                 first_sheet: i16::from_le_bytes([entry[2], entry[3]]),
@@ -289,7 +289,9 @@ fn parse_biff_unicode_string(data: &[u8], offset: usize) -> Option<(String, usiz
         bytes.iter().map(|byte| char::from(*byte)).collect()
     } else {
         let units = bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units).ok()?
@@ -834,7 +836,9 @@ impl<'a> FormulaDecoder<'a> {
             let bytes = self.take(byte_count)?;
             for result in char::decode_utf16(
                 bytes
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
             ) {
                 let character = result.map_err(|_error| ())?;

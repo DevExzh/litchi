@@ -75,7 +75,9 @@ impl DefinedNameSlot {
             name_bytes.iter().map(|byte| char::from(*byte)).collect()
         } else {
             let units: Vec<u16> = name_bytes
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
                 .collect();
             String::from_utf16(&units)
@@ -422,7 +424,9 @@ fn parse_xl_name_unicode(
         bytes.iter().map(|byte| char::from(*byte)).collect()
     } else {
         let units = bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units).map_err(|_error| {
@@ -462,7 +466,9 @@ fn parse_no_cch_string(data: &[u8], offset: usize, count: usize) -> Result<(Stri
         bytes.iter().map(|byte| char::from(*byte)).collect()
     } else {
         let units = bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units).map_err(|_error| {

@@ -751,7 +751,9 @@ fn append_external_utf16(bytes: &[u8], offset: usize, output: &mut String) -> Re
 
 fn external_utf16_units(bytes: &[u8]) -> impl Iterator<Item = u16> + '_ {
     bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
 }
 

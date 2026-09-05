@@ -1043,10 +1043,8 @@ fn decode_utf16(data: &[u8], field: &str) -> Result<String> {
         return Err(invalid(format!("{field} has an odd byte length")));
     }
     let mut units = Vec::with_capacity(data.len() / 2);
-    for chunk in data.chunks_exact(2) {
-        let bytes = <[u8; 2]>::try_from(chunk)
-            .map_err(|_error| invalid(format!("{field} has an invalid UTF-16 unit")))?;
-        units.push(u16::from_le_bytes(bytes));
+    for chunk in data.as_chunks::<2>().0.iter() {
+        units.push(u16::from_le_bytes(*chunk));
     }
     char::decode_utf16(units)
         .collect::<Result<String, _>>()

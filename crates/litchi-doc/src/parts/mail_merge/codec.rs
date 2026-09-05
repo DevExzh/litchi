@@ -85,7 +85,9 @@ fn decode_utf16(bytes: &[u8], context: &str) -> Result<String> {
         return Err(corrupted(format!("{context} has an odd byte length")));
     }
     let units: Vec<u16> = bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
         .collect();
     String::from_utf16(&units).map_err(|_| corrupted(format!("{context} is not valid UTF-16")))
@@ -255,7 +257,7 @@ impl SortColumnAndDirection {
             return Err(corrupted("sort key list exceeds three items"));
         }
         let mut keys = Vec::with_capacity(data.len() / SORT_KEY_LEN);
-        for chunk in data.chunks_exact(SORT_KEY_LEN) {
+        for chunk in data.as_chunks::<SORT_KEY_LEN>().0.iter() {
             let column = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
             if column > MAX_COLUMN_INDEX {
                 return Err(corrupted("SortColumnAndDirection.iColumn is out of range"));

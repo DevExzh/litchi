@@ -79,7 +79,7 @@ impl<'a> Reader<'a> {
         values
             .try_reserve_exact(units)
             .map_err(|source| allocation("user-defined hyperlink UTF-16", source))?;
-        for code_unit_bytes in bytes.chunks_exact(2) {
+        for code_unit_bytes in bytes.as_chunks::<2>().0.iter() {
             values.push(u16::from_le_bytes([code_unit_bytes[0], code_unit_bytes[1]]));
         }
         if values.last().copied() != Some(0) {
@@ -419,7 +419,7 @@ fn decode_utf16(bytes: &[u8], field: &str) -> Result<String, OleError> {
     values
         .try_reserve_exact(bytes.len() / 2)
         .map_err(|source| allocation("user-defined hyperlink UTF-16", source))?;
-    for pair in bytes.chunks_exact(2) {
+    for pair in bytes.as_chunks::<2>().0.iter() {
         values.push(u16::from_le_bytes([pair[0], pair[1]]));
     }
     if values.last().copied() != Some(0) {

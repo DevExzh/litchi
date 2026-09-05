@@ -52,7 +52,9 @@ impl Name {
             .map_err(|_err| Error::InvalidFormat("SlideNameAtom allocation failed".into()))?;
         units.extend(
             bytes
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
         );
         let value = String::from_utf16(&units)

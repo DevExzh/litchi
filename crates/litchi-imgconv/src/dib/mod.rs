@@ -1260,20 +1260,28 @@ mod tests {
     #[test]
     fn enforces_all_relevant_limits() {
         let data = tiny_rgb24();
-        let mut limits = DibLimits::default();
-        limits.max_input_bytes = data.len() - 1;
+        let limits = DibLimits {
+            max_input_bytes: data.len() - 1,
+            ..DibLimits::default()
+        };
         assert!(Dib::parse(&data, limits).is_err());
 
-        let mut limits = DibLimits::default();
-        limits.max_width = 1;
+        let limits = DibLimits {
+            max_width: 1,
+            ..DibLimits::default()
+        };
         assert!(Dib::parse(&data, limits).is_err());
 
-        let mut limits = DibLimits::default();
-        limits.max_pixels = 1;
+        let limits = DibLimits {
+            max_pixels: 1,
+            ..DibLimits::default()
+        };
         assert!(Dib::parse(&data, limits).is_err());
 
-        let mut limits = DibLimits::default();
-        limits.max_output_bytes = 10;
+        let limits = DibLimits {
+            max_output_bytes: 10,
+            ..DibLimits::default()
+        };
         let parsed = Dib::parse(&data, limits).unwrap();
         assert!(parsed.to_bmp().is_err());
     }

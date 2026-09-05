@@ -1603,13 +1603,15 @@ impl Presentation {
                         // UTF-16LE name
                         let chars: Vec<u16> = sub
                             .data
-                            .chunks_exact(2)
+                            .as_chunks::<2>()
+                            .0
+                            .iter()
                             .map(|c| u16::from_le_bytes([c[0], c[1]]))
                             .collect();
                         name = String::from_utf16_lossy(&chars);
                     } else if sub.record_type == RecordType::NamedShowSlides {
                         // Array of u32 slide IDs (0x100 + slide_index)
-                        for chunk in sub.data.chunks_exact(4) {
+                        for chunk in sub.data.as_chunks::<4>().0.iter() {
                             let slide_id =
                                 u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
                             // Convert slide ID (0x100+index) back to 0-based index

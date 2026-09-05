@@ -539,7 +539,7 @@ fn decode_printable(bytes: &[u8], field: &str) -> Result<String> {
         )));
     }
     let mut units = Vec::with_capacity(bytes.len() / 2);
-    for pair in bytes.chunks_exact(2) {
+    for pair in bytes.as_chunks::<2>().0.iter() {
         let unit = u16::from_le_bytes([pair[0], pair[1]]);
         if unit == 0 {
             break;

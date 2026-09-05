@@ -304,7 +304,7 @@ impl SourceBackedSlideOrderEdit {
             xml: self.working,
             bindings: self.bindings,
             relationships: self.source.relationships.clone(),
-            source_version: self.source.source_version.clone(),
+            source_version: self.source.source_version,
             lineage: self.source.lineage.clone(),
             context: self.source.context.clone(),
         };
@@ -669,7 +669,7 @@ fn clone_bindings(bindings: &[SlideOrderBinding]) -> Result<Vec<SlideOrderBindin
     Ok(cloned)
 }
 
-fn binding_refs<'a>(bindings: &'a [SlideOrderBinding]) -> Result<Vec<(u32, &'a str)>> {
+fn binding_refs(bindings: &[SlideOrderBinding]) -> Result<Vec<(u32, &str)>> {
     let mut refs = Vec::new();
     refs.try_reserve_exact(bindings.len())
         .map_err(|source| Error::Allocation {

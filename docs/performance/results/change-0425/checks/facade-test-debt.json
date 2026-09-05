@@ -1,0 +1,34 @@
+{
+  "change": 425,
+  "status": "all six failures reproduced at baseline; facade gate remains open",
+  "baseline_revision": "340cc91ae2bdec338dfe7682b4b5d8c219a2d288",
+  "scope_difference": "candidate ran full facade tests and doctests; baseline ran only the two failing targets",
+  "summaries": {
+    "facade-test": {
+      "failed_test_names": [
+        "document::doc::tests::filesystem_odt_does_not_hide_malformed_ooxml_catalog",
+        "document::doc::tests::owned_odt_bytes_do_not_hide_malformed_ooxml_catalog",
+        "sheet::adapters::xlsx::tests::source_bytes_catalog_and_selection_defer_corrupt_unselected_payload",
+        "sheet::workbook::source_xlsb_path_tests::xlsb_dynamic_open_rejects_known_xlsx_without_reopening_path",
+        "sheet::workbook::tests::test_workbook_formulas_xls",
+        "document_limit_arbitration::ordinary_odt_uses_native_policy_but_polyglot_honors_docx_input_limit"
+      ],
+      "passed": 455,
+      "failed": 6,
+      "ignored": 11
+    },
+    "baseline-facade-tests": {
+      "failed_test_names": [
+        "document::doc::tests::filesystem_odt_does_not_hide_malformed_ooxml_catalog",
+        "document::doc::tests::owned_odt_bytes_do_not_hide_malformed_ooxml_catalog",
+        "sheet::adapters::xlsx::tests::source_bytes_catalog_and_selection_defer_corrupt_unselected_payload",
+        "sheet::workbook::source_xlsb_path_tests::xlsb_dynamic_open_rejects_known_xlsx_without_reopening_path",
+        "sheet::workbook::tests::test_workbook_formulas_xls",
+        "document_limit_arbitration::ordinary_odt_uses_native_policy_but_polyglot_honors_docx_input_limit"
+      ],
+      "passed": 360,
+      "failed": 6,
+      "ignored": 0
+    }
+  }
+}

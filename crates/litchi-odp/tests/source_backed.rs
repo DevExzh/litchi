@@ -211,7 +211,7 @@ fn content_with_body(body: &str) -> String {
     )
 }
 
-fn oversized_content_package() -> Vec<u8> {
+fn oversized_content_package() -> (Vec<u8>, (u64, u64)) {
     let content = content_with_body(
         r#"<draw:page><draw:frame><draw:text-box><text:p>small</text:p></draw:text-box></draw:frame></draw:page>"#,
     );
@@ -227,6 +227,7 @@ fn oversized_content_package() -> Vec<u8> {
         .write_deflated("META-INF/manifest.xml", manifest.as_bytes())
         .unwrap();
     let mut bytes = archive.finish_to_bytes().unwrap();
+    let content_range = member_range(&bytes, b"content.xml");
     let name = b"content.xml";
     let declared_size = u32::try_from(256 * 1024 * 1024 + 1).unwrap();
     let central_offset = bytes
@@ -238,7 +239,7 @@ fn oversized_content_package() -> Vec<u8> {
         })
         .unwrap();
     bytes[central_offset + 24..central_offset + 28].copy_from_slice(&declared_size.to_le_bytes());
-    bytes
+    (bytes, content_range)
 }
 
 fn encrypted_oversized_content_package() -> Vec<u8> {
@@ -425,8 +426,7 @@ fn source_facade_applies_physical_source_limits() {
 
 #[test]
 fn source_facade_rejects_oversized_content_before_materialization() {
-    let bytes = oversized_content_package();
-    let content_range = member_range(&bytes, b"content.xml");
+    let (bytes, content_range) = oversized_content_package();
     let source = Arc::new(CountingSource::new(bytes));
 
     assert!(matches!(

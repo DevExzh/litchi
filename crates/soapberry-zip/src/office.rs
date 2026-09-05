@@ -11820,13 +11820,11 @@ mod tests {
         bytes[eocd_offset + 10..eocd_offset + 12].copy_from_slice(&1000u16.to_le_bytes());
 
         let error = ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED)
-            .err()
-            .expect("inflated EOCD count must be rejected");
+            .expect_err("inflated EOCD count must be rejected");
         assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
 
         let error = indexed_archive_result(bytes, ArchiveLimits::UNBOUNDED)
-            .err()
-            .expect("inflated EOCD count must be rejected");
+            .expect_err("inflated EOCD count must be rejected");
         assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
     }
 

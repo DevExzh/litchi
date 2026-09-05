@@ -648,7 +648,9 @@ fn is_pp10_tag(record: &Record) -> Result<bool> {
     }
     let units = name
         .data
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect::<Vec<_>>();
     Ok(String::from_utf16(&units).ok().as_deref() == Some("___PPT10"))
@@ -696,7 +698,11 @@ fn parse_reviewer_name(data: &[u8]) -> Result<(String, usize)> {
         return corrupted("invalid ReviewerNameAtom");
     }
     let mut units = Vec::with_capacity(byte_len / 2);
-    for chunk in data[RECORD_HEADER_SIZE..total_len].chunks_exact(2) {
+    for chunk in data[RECORD_HEADER_SIZE..total_len]
+        .as_chunks::<2>()
+        .0
+        .iter()
+    {
         units.push(u16::from_le_bytes([chunk[0], chunk[1]]));
     }
     let name = String::from_utf16(&units)

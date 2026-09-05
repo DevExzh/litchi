@@ -35,7 +35,9 @@ pub(crate) fn parse_short_string(data: &[u8], _encoding: &Encoding) -> Result<St
     if high_byte {
         // UTF-16LE
         let utf16: Vec<u16> = string_data
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
         String::from_utf16(&utf16)
@@ -75,7 +77,9 @@ pub(crate) fn parse_string_record(data: &[u8], _encoding: &Encoding) -> Result<S
 
     if high_byte {
         let utf16_data: Vec<u16> = string_data
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
         String::from_utf16(&utf16_data)
@@ -137,7 +141,7 @@ pub(crate) fn decode_string_record(
         first_segment = false;
         if high_byte {
             let mut consumed = 0usize;
-            for pair in chunk.chunks_exact(2) {
+            for pair in chunk.as_chunks::<2>().0.iter() {
                 if chars_left == 0 {
                     break;
                 }

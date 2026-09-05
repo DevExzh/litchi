@@ -169,7 +169,9 @@ fn parse_names(data: &[u8]) -> Result<Vec<String>> {
             .get(offset..end)
             .ok_or_else(|| PackageError::Corrupted("bookmark name is truncated".to_string()))?;
         let units = bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         let name = String::from_utf16(&units)

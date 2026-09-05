@@ -43,7 +43,7 @@ fn stored_field_keyword(
         .ok_or_else(|| invalid("DOC field instruction exceeds its story"))?;
 
     let mut keyword = String::new();
-    for pair in bytes.chunks_exact(2) {
+    for pair in bytes.as_chunks::<2>().0.iter() {
         let unit = u16::from_le_bytes([pair[0], pair[1]]);
         if keyword.is_empty() && matches!(unit, 0x0009..=0x000D | 0x0020) {
             continue;

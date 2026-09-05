@@ -261,15 +261,12 @@ impl<'a> Cursor<'a> {
             .ok_or_else(|| Error::InvalidData("DV string size overflow".to_string()))?;
         let characters = self.take(character_bytes)?;
         let value = if wide {
-            let mut chunks = characters.chunks_exact(2);
+            let (chunks, remainder) = characters.as_chunks::<2>();
             let mut utf16 = Vec::with_capacity(units);
-            for bytes in &mut chunks {
-                let bytes: [u8; 2] = bytes.try_into().map_err(|_error| {
-                    Error::InvalidData("DV string contains invalid UTF-16".to_string())
-                })?;
-                utf16.push(u16::from_le_bytes(bytes));
+            for bytes in chunks {
+                utf16.push(u16::from_le_bytes(*bytes));
             }
-            if !chunks.remainder().is_empty() {
+            if !remainder.is_empty() {
                 return invalid("DV string contains invalid UTF-16".to_string());
             }
             String::from_utf16(&utf16).map_err(|_error| {

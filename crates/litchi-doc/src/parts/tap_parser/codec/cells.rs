@@ -290,7 +290,11 @@ impl TapParser<'_> {
                 "DOC cell border-type array has an invalid size for the row".to_string(),
             ));
         }
-        for (cell, types) in tap.cell_properties.iter_mut().zip(operand.chunks_exact(4)) {
+        for (cell, types) in tap
+            .cell_properties
+            .iter_mut()
+            .zip(operand.as_chunks::<4>().0.iter())
+        {
             let top = Self::parse_border_type(types[0], true)?;
             let left = Self::parse_border_type(types[1], true)?;
             let bottom = Self::parse_border_type(types[2], true)?;

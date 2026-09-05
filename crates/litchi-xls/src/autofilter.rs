@@ -310,7 +310,9 @@ pub fn parse_autofilter(data: &[u8]) -> Result<AutoFilterColumn> {
             if str_offset + byte_count <= data.len() {
                 let s = if is_utf16 {
                     let words: Vec<u16> = data[str_offset..str_offset + byte_count]
-                        .chunks_exact(2)
+                        .as_chunks::<2>()
+                        .0
+                        .iter()
                         .map(|c| u16::from_le_bytes([c[0], c[1]]))
                         .collect();
                     String::from_utf16_lossy(&words)
@@ -336,7 +338,9 @@ pub fn parse_autofilter(data: &[u8]) -> Result<AutoFilterColumn> {
             if str_offset + byte_count <= data.len() {
                 let s = if is_utf16 {
                     let words: Vec<u16> = data[str_offset..str_offset + byte_count]
-                        .chunks_exact(2)
+                        .as_chunks::<2>()
+                        .0
+                        .iter()
                         .map(|c| u16::from_le_bytes([c[0], c[1]]))
                         .collect();
                     String::from_utf16_lossy(&words)

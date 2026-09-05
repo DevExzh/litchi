@@ -38,7 +38,9 @@ fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
 
 fn decode_utf16(data: &[u8], context: &str) -> Result<String> {
     char::decode_utf16(
-        data.chunks_exact(2)
+        data.as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
     )
     .collect::<std::result::Result<String, _>>()

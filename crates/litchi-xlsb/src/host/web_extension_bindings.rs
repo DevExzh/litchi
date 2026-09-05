@@ -939,13 +939,11 @@ fn parse_wide_string_exact(data: &[u8]) -> Result<String> {
         found: data.len(),
     })?;
     let units = encoded
-        .chunks_exact(2)
-        .map(|bytes| {
-            <[u8; 2]>::try_from(bytes)
-                .map(u16::from_le_bytes)
-                .map_err(|_| invalid("BrtWebExtension.appRef", "invalid UTF-16 unit"))
-        })
-        .collect::<Result<Vec<_>>>()?;
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|bytes| u16::from_le_bytes(*bytes))
+        .collect::<Vec<_>>();
     String::from_utf16(&units)
         .map_err(|_| invalid("BrtWebExtension.appRef", "invalid UTF-16 string"))
 }

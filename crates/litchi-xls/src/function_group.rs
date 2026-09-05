@@ -283,7 +283,9 @@ fn parse_unicode_string(record_type: u16, data: &[u8]) -> Result<String> {
         })?;
     if wide {
         let units = encoded
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| read_u16(chunk, 0))
             .collect::<Result<Vec<_>>>()?;
         String::from_utf16(&units).map_err(|error| Error::InvalidRecord {

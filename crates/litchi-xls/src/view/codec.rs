@@ -227,7 +227,7 @@ pub(super) fn parse_selection(data: &[u8]) -> Result<Selection> {
     let range_data = data
         .get(9..)
         .ok_or_else(|| invalid(SELECTION_RECORD_TYPE, "truncated SELECTION ranges"))?;
-    for chunk in range_data.chunks_exact(6) {
+    for chunk in range_data.as_chunks::<6>().0.iter() {
         let range = Range {
             first_row: read_u16(chunk, 0, SELECTION_RECORD_TYPE, "SELECTION.first_row")?,
             last_row: read_u16(chunk, 2, SELECTION_RECORD_TYPE, "SELECTION.last_row")?,

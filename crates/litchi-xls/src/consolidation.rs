@@ -539,7 +539,9 @@ fn parse_file(c: &mut Cursor<'_>, count: usize) -> Result<ConsolidationFile> {
     )?;
     let encoded_path = if wide {
         let units = raw
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|p| u16::from_le_bytes([p[0], p[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
@@ -626,7 +628,9 @@ impl<'a> Cursor<'a> {
         let raw = self.take(count * if wide { 2 } else { 1 })?;
         if wide {
             let units = raw
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|p| u16::from_le_bytes([p[0], p[1]]))
                 .collect::<Vec<_>>();
             String::from_utf16(&units)

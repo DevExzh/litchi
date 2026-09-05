@@ -556,7 +556,9 @@ fn opens_version_3_files_with_an_uninitialized_stream_size_high_word() {
         "fixture must use version 3 512-byte sectors"
     );
     let has_high_word = FIXTURE[SECTOR_SIZE_V3..]
-        .chunks_exact(DIRENTRY_SIZE)
+        .as_chunks::<DIRENTRY_SIZE>()
+        .0
+        .iter()
         .any(|entry| entry[DIRENTRY_SIZE - 4..].iter().any(|&byte| byte != 0));
     assert!(
         has_high_word,

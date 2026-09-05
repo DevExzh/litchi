@@ -11,7 +11,9 @@ pub(super) fn is_ppt10_tag_name(record: &Record) -> bool {
         && record.data.len() == 16
         && record
             .data
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
             .eq(PPT10)
 }

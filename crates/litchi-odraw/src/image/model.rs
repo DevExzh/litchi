@@ -545,7 +545,9 @@ impl<'data> Name<'data> {
     pub fn to_string(self) -> Result<String> {
         char::decode_utf16(
             self.bytes[..self.bytes.len() - 2]
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
         )
         .collect::<core::result::Result<String, _>>()

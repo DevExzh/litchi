@@ -1282,7 +1282,7 @@ fn decode_hex(input: &str, limit: usize) -> Result<Vec<u8>, Error> {
     output
         .try_reserve(output_len)
         .map_err(|_error| allocation_error("durable picture payload", output_len))?;
-    for pair in input.as_bytes().chunks_exact(2) {
+    for pair in input.as_bytes().as_chunks::<2>().0.iter() {
         let high = pair.first().copied().and_then(hex_nibble).ok_or_else(|| {
             Error::DurablePatch("invalid picture payload hexadecimal".to_string())
         })?;

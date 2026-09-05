@@ -165,7 +165,7 @@ fn bounded_image_resolver(limits: RasterLimits) -> usvg::ImageHrefResolver<'stat
 }
 
 fn demultiply_rgba(pixels: &mut [u8]) {
-    for pixel in pixels.chunks_exact_mut(4) {
+    for pixel in pixels.as_chunks_mut::<4>().0.iter_mut() {
         let alpha = pixel[3];
         if alpha == 0 {
             pixel[..3].fill(0);

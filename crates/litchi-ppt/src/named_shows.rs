@@ -175,7 +175,7 @@ fn parse_named_show(record: &Record) -> Result<NamedShow> {
             ));
         }
         let mut ids = Vec::with_capacity(count);
-        for bytes in slides.data.chunks_exact(4) {
+        for bytes in slides.data.as_chunks::<4>().0.iter() {
             let id = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
             validate_slide_id_ref(id)?;
             ids.push(id);
@@ -198,7 +198,7 @@ fn parse_name(record: &Record) -> Result<String> {
         ));
     }
     let mut units = Vec::with_capacity(record.data.len() / 2);
-    for bytes in record.data.chunks_exact(2) {
+    for bytes in record.data.as_chunks::<2>().0.iter() {
         let unit = u16::from_le_bytes([bytes[0], bytes[1]]);
         if unit == 0 {
             break;

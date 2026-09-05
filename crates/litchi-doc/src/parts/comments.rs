@@ -251,7 +251,7 @@ fn parse_extended_metadata(
 
     let mut metadata = Vec::with_capacity(comment_count);
     let mut parent_deltas = Vec::with_capacity(comment_count);
-    for record in data.chunks_exact(ATRD_POST10_SIZE) {
+    for record in data.as_chunks::<ATRD_POST10_SIZE>().0.iter() {
         let packed_time = litchi_core::binary::read_u32_le(record, 0).map_err(|error| {
             PackageError::Corrupted(format!("invalid ATRDPost10 DTTM: {error}"))
         })?;
@@ -621,7 +621,9 @@ fn decode_utf16(data: &[u8], field: &str) -> Result<String> {
         )));
     }
     let units = data
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
         .collect::<Vec<_>>();
     String::from_utf16(&units)

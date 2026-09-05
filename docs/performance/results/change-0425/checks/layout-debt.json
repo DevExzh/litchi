@@ -1,0 +1,12 @@
+{
+  "change": 425,
+  "compiler_source": "checks/non-iwork-clippy-migrated.log",
+  "disposition": "Keep inline borrowed archive representation unchanged; boxing would add allocation and requires measured ownership review. Diagnostic category exemption is not a strict gate pass.",
+  "largest_variant_minimum_bytes": 312,
+  "lint": "clippy::large_enum_variant",
+  "other_variant_minimum_bytes": 8,
+  "path": "crates/litchi-odf-common/src/package/model.rs",
+  "same_as_baseline": true,
+  "sha256": "d71f1c9fb2297f394fc1d0db7e680bc4c5c97af34964404e72b478e050d98bab",
+  "status": "open"
+}

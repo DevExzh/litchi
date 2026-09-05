@@ -852,7 +852,7 @@ impl<R: Read + Seek> OleFile<R> {
             self.read_sector_into(sector_id, sector_data)?;
 
             // Parse sector as array of u32 (little-endian) - use chunks for efficiency
-            for chunk in sector_data.chunks_exact(4) {
+            for chunk in sector_data.as_chunks::<4>().0.iter() {
                 let entry = read_u32_le(chunk, "FAT entry")?;
                 try_push(&mut fat, entry, "FAT entries")?;
             }
@@ -916,7 +916,7 @@ impl<R: Read + Seek> OleFile<R> {
         // aggregate byte buffer the same size as the complete MiniFAT.
         for sector in sectors {
             self.read_sector_into(sector, sector_data)?;
-            for chunk in sector_data.chunks_exact(4) {
+            for chunk in sector_data.as_chunks::<4>().0.iter() {
                 let entry = read_u32_le(chunk, "MiniFAT entry")?;
                 try_push(&mut minifat, entry, "MiniFAT entries")?;
             }
@@ -1184,7 +1184,7 @@ impl<R: Read + Seek> OleFile<R> {
             dir_data.len() / DIRENTRY_SIZE,
             "validated directory entries",
         )?;
-        for (sid, data) in dir_data.chunks_exact(DIRENTRY_SIZE).enumerate() {
+        for (sid, data) in dir_data.as_chunks::<DIRENTRY_SIZE>().0.iter().enumerate() {
             let entry_sid = u32::try_from(sid).map_err(|_err| {
                 OleError::CorruptedFile("CFB directory contains too many entries".to_string())
             })?;
@@ -1330,7 +1330,7 @@ impl<R: Read + Seek> OleFile<R> {
             )));
         }
         let mut name_utf16 = SmallVec::<[u16; 32]>::with_capacity(name_len / 2);
-        for pair in raw.name[..name_len].chunks_exact(2) {
+        for pair in raw.name[..name_len].as_chunks::<2>().0.iter() {
             name_utf16.push(u16::from_le_bytes([pair[0], pair[1]]));
         }
         // Some classic Mac Excel writers store SID 0 as the two-byte sequence
@@ -2898,7 +2898,9 @@ fn decode_utf16le(bytes: &[u8]) -> Result<String, OleError> {
         .map_err(|source| OleError::allocation("decoded CFB directory name", source))?;
     for value in std::char::decode_utf16(
         bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
     ) {
         decoded.push(value.unwrap_or('\u{FFFD}'));

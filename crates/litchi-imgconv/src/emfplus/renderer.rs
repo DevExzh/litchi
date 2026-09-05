@@ -911,7 +911,7 @@ fn bezier_path(points: &[Point]) -> SvgPath {
         return path;
     };
     path.push(SvgPathCommand::MoveTo(svg_point(*first)));
-    for chunk in points[1..].chunks_exact(3) {
+    for chunk in points[1..].as_chunks::<3>().0.iter() {
         path.push(SvgPathCommand::CubicTo {
             first: svg_point(chunk[0]),
             second: svg_point(chunk[1]),

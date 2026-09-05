@@ -23,7 +23,9 @@ pub(super) fn validate_name(raw: &[u8]) -> Result<()> {
         });
     }
     let units = raw
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
         .collect::<Vec<_>>();
     if units.len() > MAX_NAME_UNITS + 1 || units.last().copied() != Some(0) {

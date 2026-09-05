@@ -1845,7 +1845,7 @@ fn retain_runs(source: &[u8], character_count: usize) -> Result<Vec<u8>> {
     }
     let terminal = source.len() - 8;
     let mut output = Vec::new();
-    for run in source[..terminal].chunks_exact(8) {
+    for run in source[..terminal].as_chunks::<8>().0.iter() {
         let index = usize::from(u16::from_le_bytes([run[0], run[1]]));
         if index <= character_count {
             output.extend_from_slice(run);

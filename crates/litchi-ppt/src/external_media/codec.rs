@@ -759,7 +759,9 @@ fn parse_path(record: &Record) -> Result<String> {
     }
     let units = record
         .data
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect::<Vec<_>>();
     if units.contains(&0) {

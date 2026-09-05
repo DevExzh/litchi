@@ -336,7 +336,9 @@ fn parse_utf16(data: &[u8]) -> Result<String> {
         ));
     }
     let units: Vec<u16> = data
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect();
     String::from_utf16(&units)

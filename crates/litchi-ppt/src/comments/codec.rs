@@ -221,7 +221,7 @@ fn parse_string(
         )));
     }
     let mut units = Vec::with_capacity(record.data.len() / 2);
-    for bytes in record.data.chunks_exact(2) {
+    for bytes in record.data.as_chunks::<2>().0.iter() {
         let unit = u16::from_le_bytes([bytes[0], bytes[1]]);
         if unit == 0 {
             break;

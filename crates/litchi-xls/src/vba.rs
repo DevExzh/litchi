@@ -441,7 +441,9 @@ pub(crate) fn parse_code_name(data: &[u8]) -> Result<String> {
         data[3..].iter().map(|byte| char::from(*byte)).collect()
     } else {
         let units: Vec<u16> = data[3..]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
         String::from_utf16(&units).map_err(|_error| Error::InvalidRecord {

@@ -527,7 +527,7 @@ pub(super) fn derive_secret(password: &str, salt: &[u8; 16]) -> Zeroizing<[u8; 5
     );
     let initial_hash = Zeroizing::new(<[u8; 16]>::from(Md5::digest(password_bytes.as_slice())));
     let mut intermediate = Zeroizing::new([0u8; 336]);
-    for chunk in intermediate.chunks_exact_mut(21) {
+    for chunk in intermediate.as_chunks_mut::<21>().0.iter_mut() {
         chunk[..5].copy_from_slice(&initial_hash[..5]);
         chunk[5..].copy_from_slice(salt);
     }

@@ -147,7 +147,9 @@ impl AutoShapeGeometry {
         let segment_info: Vec<u16> = extract_segment_info(props)
             .map(|segments| {
                 segments
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|segment| u16::from_le_bytes([segment[0], segment[1]]))
                     .collect()
             })

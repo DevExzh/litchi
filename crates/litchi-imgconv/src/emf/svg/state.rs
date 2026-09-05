@@ -618,10 +618,12 @@ mod tests {
 
     #[test]
     fn world_transform_precedes_page_mapping() {
-        let mut dc = DeviceContext::default();
-        dc.map_mode = 8;
-        dc.window_ext = (10, 10);
-        dc.viewport_ext = (100, 100);
+        let mut dc = DeviceContext {
+            map_mode: 8,
+            window_ext: (10, 10),
+            viewport_ext: (100, 100),
+            ..DeviceContext::default()
+        };
         dc.world_transform.dx = 2.0;
         assert_eq!(dc.transform_point(1.0, 1.0), (30.0, 10.0));
     }

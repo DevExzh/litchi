@@ -848,7 +848,9 @@ fn decode_macro_name(data: &[u8], max_bytes: usize) -> Result<String> {
         return corrupted("MacroNameAtom length must be even");
     }
     let units = data
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
         .collect::<Vec<_>>();
     let visible = units
@@ -906,7 +908,7 @@ fn parse_unicode_string(data: &[u8]) -> Result<String> {
         ));
     }
     let mut units = Vec::with_capacity(data.len() / 2);
-    for bytes in data.chunks_exact(2) {
+    for bytes in data.as_chunks::<2>().0.iter() {
         let unit = u16::from_le_bytes([bytes[0], bytes[1]]);
         if unit == 0 {
             break;

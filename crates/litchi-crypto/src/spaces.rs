@@ -953,7 +953,7 @@ impl<'a> SliceReader<'a> {
         }
         let bytes = self.take(byte_len)?;
         let mut units = Vec::with_capacity(byte_len / 2);
-        for pair in bytes.chunks_exact(2) {
+        for pair in bytes.as_chunks::<2>().0.iter() {
             units.push(u16::from_le_bytes([pair[0], pair[1]]));
         }
         let value =
@@ -1511,7 +1511,7 @@ fn parse_clsid(value: &str) -> Result<Option<[u8; 16]>, Error> {
     bytes[..4].copy_from_slice(&data1.to_le_bytes());
     bytes[4..6].copy_from_slice(&data2.to_le_bytes());
     bytes[6..8].copy_from_slice(&data3.to_le_bytes());
-    for (index, pair) in fields[3].as_bytes().chunks_exact(2).enumerate() {
+    for (index, pair) in fields[3].as_bytes().as_chunks::<2>().0.iter().enumerate() {
         bytes[8 + index] = u8::from_str_radix(
             std::str::from_utf8(pair)
                 .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?,
@@ -1519,7 +1519,7 @@ fn parse_clsid(value: &str) -> Result<Option<[u8; 16]>, Error> {
         )
         .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?;
     }
-    for (index, pair) in fields[4].as_bytes().chunks_exact(2).enumerate() {
+    for (index, pair) in fields[4].as_bytes().as_chunks::<2>().0.iter().enumerate() {
         bytes[10 + index] = u8::from_str_radix(
             std::str::from_utf8(pair)
                 .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?,

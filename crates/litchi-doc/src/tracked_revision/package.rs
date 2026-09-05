@@ -1123,7 +1123,9 @@ impl RevisionEditor {
                     .get(offset..offset + byte_count)
                     .ok_or_else(|| corrupted("Unicode piece exceeds WordDocument"))?;
                 let units = bytes
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|value| u16::from_le_bytes([value[0], value[1]]))
                     .collect::<Vec<_>>();
                 output.push_str(
@@ -1422,7 +1424,9 @@ impl RevisionEditor {
                 .get_mut(offset..offset + count * 2)
                 .ok_or_else(|| corrupted("story replacement exceeds WordDocument"))?;
             for (slot, unit) in bytes
-                .chunks_exact_mut(2)
+                .as_chunks_mut::<2>()
+                .0
+                .iter_mut()
                 .zip(units[copied..copied + count].iter().copied())
             {
                 slot.copy_from_slice(&unit.to_le_bytes());

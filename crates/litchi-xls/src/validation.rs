@@ -826,13 +826,11 @@ fn parse_bound_sheet(data: &[u8]) -> Option<(u32, SheetType)> {
     }
     let name = data.get(8..)?;
     if wide {
-        let mut pairs = name.chunks_exact(2);
-        let mut units = pairs
-            .by_ref()
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
+        let (pairs, remainder) = name.as_chunks::<2>();
+        let units = pairs.iter().map(|pair| u16::from_le_bytes(*pair));
         let mut first = None;
         let mut last = None;
-        for decoded in std::char::decode_utf16(units.by_ref()) {
+        for decoded in std::char::decode_utf16(units) {
             let character = decoded.ok()?;
             if first.is_none() {
                 first = Some(character);
@@ -845,7 +843,7 @@ fn parse_bound_sheet(data: &[u8]) -> Option<(u32, SheetType)> {
                 return None;
             }
         }
-        if !pairs.remainder().is_empty() || first == Some('\'') || last == Some('\'') {
+        if !remainder.is_empty() || first == Some('\'') || last == Some('\'') {
             return None;
         }
     } else {
@@ -1140,14 +1138,10 @@ fn valid_file_sharing(data: &[u8]) -> bool {
 }
 
 fn valid_utf16le(data: &[u8]) -> bool {
-    let mut units = data.chunks_exact(2);
-    let valid = std::char::decode_utf16(
-        units
-            .by_ref()
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
-    )
-    .all(|value| value.is_ok());
-    valid && units.remainder().is_empty()
+    let (pairs, remainder) = data.as_chunks::<2>();
+    let valid = std::char::decode_utf16(pairs.iter().map(|pair| u16::from_le_bytes(*pair)))
+        .all(|value| value.is_ok());
+    valid && remainder.is_empty()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -1482,7 +1476,7 @@ fn unicode_span(data: &[u8], offset: usize, count: usize) -> Option<(usize, Unic
     let mut all_nul = count == 1;
     let mut all_space = count == 1;
     if wide {
-        for pair in encoded.chunks_exact(2) {
+        for pair in encoded.as_chunks::<2>().0.iter() {
             let value = u16::from_le_bytes([pair[0], pair[1]]);
             all_nul &= value == 0;
             all_space &= value == u16::from(b' ');

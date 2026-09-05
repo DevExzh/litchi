@@ -651,7 +651,7 @@ fn fixed_hex<const N: usize>(v: &str, name: &str) -> Result<[u8; N]> {
         return Err(invalid(format!("invalid {name}")));
     }
     let mut out = [0; N];
-    for (x, pair) in out.iter_mut().zip(v.as_bytes().chunks_exact(2)) {
+    for (x, pair) in out.iter_mut().zip(v.as_bytes().as_chunks::<2>().0.iter()) {
         let pair = std::str::from_utf8(pair).map_err(xml_error)?;
         *x = u8::from_str_radix(pair, 16).map_err(xml_error)?;
     }

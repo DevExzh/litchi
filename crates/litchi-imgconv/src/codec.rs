@@ -1028,9 +1028,13 @@ fn wmf_with_header<'data>(
     output.extend_from_slice(&bounds.3.to_le_bytes());
     output.extend_from_slice(&1440u16.to_le_bytes());
     output.extend_from_slice(&0u32.to_le_bytes());
-    let checksum = output[..20].chunks_exact(2).fold(0u16, |sum, bytes| {
-        sum ^ u16::from_le_bytes([bytes[0], bytes[1]])
-    });
+    let checksum = output[..20]
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .fold(0u16, |sum, bytes| {
+            sum ^ u16::from_le_bytes([bytes[0], bytes[1]])
+        });
     output.extend_from_slice(&checksum.to_le_bytes());
     output.extend_from_slice(&data);
     Ok(Cow::Owned(output))

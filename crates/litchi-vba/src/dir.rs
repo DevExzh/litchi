@@ -770,7 +770,9 @@ fn decode_utf16(bytes: &[u8], field: &'static str) -> Result<String, Error> {
         return Err(invalid(format!("{field} byte length is not even")));
     }
     let code_units = bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
     let mut value = String::with_capacity(bytes.len() / 2);
     for decoded_unit in char::decode_utf16(code_units) {

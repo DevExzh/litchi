@@ -411,8 +411,8 @@ impl TextExtractor {
                     &text_data[..text_data.len() & !1] // Truncate to even length
                 };
 
-                for chunk in utf16_data.chunks_exact(2) {
-                    let code_unit = read_u16_le(chunk, 0).unwrap_or(0);
+                for chunk in utf16_data.as_chunks::<2>().0.iter() {
+                    let code_unit = u16::from_le_bytes(*chunk);
                     text.push(code_unit);
                 }
             }

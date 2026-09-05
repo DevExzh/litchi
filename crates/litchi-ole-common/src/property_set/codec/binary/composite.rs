@@ -213,8 +213,10 @@ fn read_lpwstr(reader: &mut ValueReader<'_>, description: &str) -> Result<String
     let byte_len = checked_mul(units, 2, description)?;
     let raw = reader.take(byte_len, description)?;
     let end = raw
-        .chunks_exact(2)
-        .position(|pair| pair == [0, 0])
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .position(|pair| *pair == [0, 0])
         .map(|terminator_index| terminator_index * 2)
         .ok_or_else(|| invalid(format!("{description} is not UTF-16LE terminated")))?;
     let value = decode_utf16(&raw[..end], description)?;

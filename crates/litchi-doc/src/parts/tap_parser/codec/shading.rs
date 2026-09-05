@@ -17,7 +17,7 @@ impl TapParser<'_> {
         }
 
         // Parse shading descriptors for each cell
-        for (i, descriptor) in bytes.chunks_exact(2).enumerate() {
+        for (i, descriptor) in bytes.as_chunks::<2>().0.iter().enumerate() {
             let shd = binary_to_doc_result(read_u16_le(descriptor, 0))?;
             if shd == u16::MAX {
                 tap.cell_properties[i].shading = None;
@@ -71,7 +71,7 @@ impl TapParser<'_> {
                 "DOC table Shd array exceeds its cell chunk".to_string(),
             ));
         }
-        for (offset, bytes) in operand.chunks_exact(10).enumerate() {
+        for (offset, bytes) in operand.as_chunks::<10>().0.iter().enumerate() {
             Self::apply_full_shading(&mut tap.cell_properties[first_cell + offset], bytes, raw)?;
         }
         Ok(())

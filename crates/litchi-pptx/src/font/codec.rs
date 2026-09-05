@@ -708,7 +708,9 @@ pub(super) fn eot_utf16(value: &[u8], cursor: &mut usize, limit: usize, name: &s
         )));
     }
     let words = data
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]));
     if char::decode_utf16(words).any(|character| character.is_err()) {
         return Err(invalid(format!("EOT {name} name contains invalid UTF-16")));

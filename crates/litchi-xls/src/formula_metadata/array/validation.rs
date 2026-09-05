@@ -849,7 +849,9 @@ fn validate_ser_ar(extra: &[u8], position: usize) -> Result<usize> {
             }
             if width == 2 {
                 let valid = extra[position + 4..end]
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
                 if char::decode_utf16(valid).any(|value| value.is_err()) {
                     return Err(invalid("SerStr contains invalid UTF-16"));

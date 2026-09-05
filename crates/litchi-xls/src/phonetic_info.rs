@@ -230,7 +230,7 @@ impl PhoneticInfo {
             });
         }
         let mut ranges = Vec::with_capacity(range_count);
-        for chunk in data[HEADER_LEN..].chunks_exact(REF8_LEN) {
+        for chunk in data[HEADER_LEN..].as_chunks::<REF8_LEN>().0.iter() {
             ranges.push(PhoneticRange::new(
                 u16::from_le_bytes([chunk[0], chunk[1]]),
                 u16::from_le_bytes([chunk[2], chunk[3]]),

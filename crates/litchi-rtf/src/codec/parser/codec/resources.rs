@@ -648,12 +648,11 @@ impl<'a> Parser<'a> {
                         ));
                     }
                     let mut panose = [0u8; 10];
-                    for (byte, pair) in panose.iter_mut().zip(compact.as_bytes().chunks_exact(2)) {
-                        let &[high, low] = pair else {
-                            return Err(RtfError::MalformedDocument(
-                                "invalid RTF panose payload".to_string(),
-                            ));
-                        };
+                    for (byte, pair) in panose
+                        .iter_mut()
+                        .zip(compact.as_bytes().as_chunks::<2>().0.iter())
+                    {
+                        let &[high, low] = pair;
                         let high = Self::hex_nibble(high).ok_or_else(|| {
                             RtfError::MalformedDocument("invalid RTF panose payload".to_string())
                         })?;

@@ -380,7 +380,9 @@ fn parse_xl_unicode_string(
         chars.iter().map(|byte| char::from(*byte)).collect()
     } else {
         let units = chars
-            .chunks_exact(UTF16_CHAR_BYTES)
+            .as_chunks::<UTF16_CHAR_BYTES>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]));
         char::decode_utf16(units)
             .collect::<Result<String, _>>()

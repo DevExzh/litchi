@@ -278,8 +278,10 @@ impl<'a> Cursor<'a> {
             .ok_or_else(|| validation::corrupted(format!("{what} is truncated")))?;
         self.offset += byte_len;
         let units: Vec<u16> = bytes
-            .chunks_exact(2)
-            .map(|chunk| u16::from_le_bytes(chunk.try_into().expect("length checked")))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|chunk| u16::from_le_bytes(*chunk))
             .collect();
         let text = String::from_utf16(&units)
             .map_err(|_| validation::corrupted(format!("{what} is not valid UTF-16")))?;
@@ -319,8 +321,10 @@ impl<'a> Cursor<'a> {
                 .ok_or_else(|| validation::corrupted(format!("{what} is truncated")))?;
             self.offset += byte_len;
             let units: Vec<u16> = bytes
-                .chunks_exact(2)
-                .map(|chunk| u16::from_le_bytes(chunk.try_into().expect("length checked")))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|chunk| u16::from_le_bytes(*chunk))
                 .collect();
             items.push(
                 String::from_utf16(&units)

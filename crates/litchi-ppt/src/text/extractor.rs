@@ -35,7 +35,9 @@ pub fn from_utf16le_lossy(bytes: &[u8]) -> String {
     }
 
     let code_units = bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
         .take_while(|&code_unit| code_unit != 0)
         .collect::<Vec<_>>();

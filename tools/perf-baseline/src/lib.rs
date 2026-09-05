@@ -25428,13 +25428,15 @@ fn cfb_workbook_chain(
     directory: &[u8],
 ) -> Result<(Vec<u32>, u64), Box<dyn Error>> {
     let mut workbook = None;
-    for entry in directory.chunks_exact(128) {
+    for entry in directory.as_chunks::<128>().0.iter() {
         let name_length = usize::from(u16::from_le_bytes([entry[64], entry[65]]));
         if !(2..=64).contains(&name_length) || name_length % 2 != 0 {
             continue;
         }
         let code_units = entry[..name_length - 2]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
             .collect::<Vec<_>>();
         let name = String::from_utf16_lossy(&code_units);
@@ -25469,7 +25471,9 @@ fn cfb_directory_entry_name(entry: &[u8]) -> Option<String> {
         return None;
     }
     let code_units = entry[..name_length - 2]
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
         .collect::<Vec<_>>();
     Some(String::from_utf16_lossy(&code_units))
@@ -25485,7 +25489,7 @@ fn cfb_opaque_payload_ranges(
     let mini_stream_cutoff = u64::from(cfb_read_u32(archive, 56, "mini stream cutoff")?);
     let mut opaque_ranges = Vec::new();
     let mut root_mini_stream = None;
-    for entry in directory.chunks_exact(128) {
+    for entry in directory.as_chunks::<128>().0.iter() {
         let object_type = entry[66];
         let start = u32::from_le_bytes([entry[116], entry[117], entry[118], entry[119]]);
         let size = u64::from_le_bytes([
@@ -25549,7 +25553,9 @@ fn parse_xls_bound_sheets(workbook: &[u8]) -> Result<(u64, Vec<XlsBoundSheet>), 
                 payload
                     .get(8..8 + byte_length)
                     .ok_or("XLS Unicode sheet name exceeds BoundSheet8")?
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
                     .collect::<Vec<_>>()
             } else {
@@ -56485,7 +56491,8 @@ mod tests {
 
     use crate::{
         PPTX_CROSS_COPY_INSERTION_POSITION, PptxSourceBackedCrossCopyLifecycleExpectation,
-        relationship_type, rewrite_pptx_archive_member, run_pptx_source_backed_cross_copy_lifecycle,
+        relationship_type, rewrite_pptx_archive_member,
+        run_pptx_source_backed_cross_copy_lifecycle,
         verify_pptx_source_backed_cross_copy_lifecycle_gates,
         verify_pptx_source_backed_lifecycle_output,
     };
