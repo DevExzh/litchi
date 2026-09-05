@@ -24788,6 +24788,9 @@ fn validate_xls_measured_operation(
     Ok(())
 }
 
+/// Measures the eager and source-backed XLS open/query regions with the same
+/// timer and allocator brackets. Corpus construction, source setup, and all
+/// oracle, locality, and lifecycle validation remain outside both regions.
 fn run_xls_source_backed_case(
     case: Case,
     corpus: &Corpus,
@@ -24814,6 +24817,7 @@ fn run_xls_source_backed_case(
         _ => return Err("unsupported XLS source-backed case".into()),
     };
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     let mut measured_digests = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
@@ -24823,13 +24827,14 @@ fn run_xls_source_backed_case(
                 | Case::XlsSourceBackedOpenListWorksheets
                 | Case::XlsSourceBackedOpenOneCell
         );
-        let (duration, operation, metrics, evidence) = if source_case {
+        let (duration, operation, metrics, evidence, allocation_metrics) = if source_case {
             let source = Arc::new(InstrumentedSource::new_xls(
                 corpus.archive.clone(),
                 layout.ranges.clone(),
             ));
             let source_read_at: Arc<dyn ReadAt> = source.clone();
             let source_version_before = source.version()?;
+            let allocation_region = allocation_metrics::begin();
             let started = Instant::now();
             let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(source_read_at)?;
             let operation = match case {
@@ -24860,6 +24865,10 @@ fn run_xls_source_backed_case(
                 _ => return Err("invalid source-backed XLS case".into()),
             };
             let duration = started.elapsed();
+            let allocation_metrics = match allocation_region.finish() {
+                Some(sample) => Some(sample),
+                None => Some(allocation_metrics::unavailable_sample()),
+            };
             if case == Case::XlsSourceBackedOpen
                 && workbook.worksheet_names()? != layout.worksheet_names
             {
@@ -24905,9 +24914,10 @@ fn run_xls_source_backed_case(
                 archive_sha256: layout.archive_sha256.clone(),
                 workbook_stream_sha256: layout.workbook_stream_sha256.clone(),
             };
-            (duration, operation, metrics, evidence)
+            (duration, operation, metrics, evidence, allocation_metrics)
         } else {
             let owned = corpus.archive.clone();
+            let allocation_region = allocation_metrics::begin();
             let started = Instant::now();
             let workbook = litchi_xls::Workbook::new(Cursor::new(owned))?;
             let operation = match case {
@@ -24946,6 +24956,10 @@ fn run_xls_source_backed_case(
                 _ => return Err("invalid eager XLS source-backed case".into()),
             };
             let duration = started.elapsed();
+            let allocation_metrics = match allocation_region.finish() {
+                Some(sample) => Some(sample),
+                None => Some(allocation_metrics::unavailable_sample()),
+            };
             if case == Case::XlsSemanticOpen {
                 let names = workbook
                     .sheets()
@@ -24985,7 +24999,13 @@ fn run_xls_source_backed_case(
                 archive_sha256: layout.archive_sha256.clone(),
                 workbook_stream_sha256: layout.workbook_stream_sha256.clone(),
             };
-            (duration, operation, SourceSnapshot::default(), evidence)
+            (
+                duration,
+                operation,
+                SourceSnapshot::default(),
+                evidence,
+                allocation_metrics,
+            )
         };
         validate_xls_measured_operation(&operation, &layout)?;
         let digest = xls_operation_digest(&operation, &layout);
@@ -24997,6 +25017,11 @@ fn run_xls_source_backed_case(
         }
         if iteration >= warmup_iterations {
             measured_digests.push(digest);
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns: elapsed_ns(duration)?,
+                process_metrics: None,
+                allocation_metrics,
+            });
         }
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
@@ -25008,6 +25033,8 @@ fn run_xls_source_backed_case(
     }
     let mut output = result(case, corpus, elapsed, None);
     output.output_sha256 = Some(expected_digest);
+    output.operation_metrics =
+        Some(operation_metrics::from_in_process_observations_without_sink(&observations)?);
     if source_case_for_case(case) {
         output.source = boxed_source(source_summary);
     }
@@ -57268,6 +57295,23 @@ mod tests {
             eager_open.output_sha256, source_open.output_sha256,
             "eager/source open corpus identity"
         );
+        for measured in [&eager_open, &source_open] {
+            let operation = measured
+                .operation_metrics
+                .as_ref()
+                .expect("XLS lifecycle operation metrics");
+            assert_eq!(operation.sample_count, measured.elapsed_ns.samples.len());
+            assert_eq!(operation.sample_indices, measured.elapsed_ns.sample_order);
+            let allocation = operation
+                .allocation
+                .as_ref()
+                .expect("normal XLS lifecycle allocator status");
+            assert_eq!(
+                allocation.status,
+                super::operation_metrics::MetricStatus::Unavailable
+            );
+            assert!(allocation.allocation_calls.values.is_none());
+        }
         let source = source_open
             .source
             .as_ref()
