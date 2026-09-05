@@ -16,6 +16,14 @@
       "stored_path": "heaptrack/candidate/stderr.log.gz",
       "stored_bytes": 227,
       "stored_sha256": "4cda61d9c7603a08ef7e4e901ae3232acd77b3565bbc8b4727120a3350e63b2e"
+    },
+    {
+      "raw_path": "test-focused.log",
+      "raw_bytes": 53540,
+      "raw_sha256": "362612dde67519332921343094c21b3013e0cca0a265a8a1f2714dd32acc05be",
+      "stored_path": "test-focused.log.gz",
+      "stored_bytes": 11330,
+      "stored_sha256": "20c3e0e4ca21be3ca673025291de1b5c948d1b3d205ea89873dfdebdb7a74b09"
     }
   ]
 }
