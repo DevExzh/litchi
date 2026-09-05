@@ -1,0 +1,18 @@
+{
+  "source_after": {
+    "revision": "e4d477466718a8fad38cd55b9babe0b826e7f3a7",
+    "status": ""
+  },
+  "reports": [
+    {
+      "label": "b1-guards",
+      "cases": [
+        "xlsx_source_backed_cell_values_one_edit_save",
+        "xlsx_eager_cell_values_one_edit_save"
+      ],
+      "samples": 500,
+      "warmup": 20,
+      "status": "passed"
+    }
+  ]
+}

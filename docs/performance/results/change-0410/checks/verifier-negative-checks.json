@@ -1,0 +1,78 @@
+{
+  "checks": [
+    {
+      "actual": {
+        "exit_code": 2,
+        "output_file_exists": false,
+        "stderr": "litchi-goal-0410-verify: FAIL: a1-normal.xlsx_file_selected_cell: sample order must be a complete permutation\n",
+        "stdout": ""
+      },
+      "command": {
+        "argv": [
+          "python3",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0410/verify-capture.py",
+          "--root",
+          "/tmp/litchi-goal-0410-negative-fixtures/bad-sample-order",
+          "--output",
+          "/tmp/litchi-goal-0410-negative-fixtures/bad-sample-order/negative-replay-output.json"
+        ],
+        "cwd": "/home/zhuhe/code/litchi"
+      },
+      "expected_rejection": "sample order must be a complete permutation",
+      "fixture_file_sha256": "c7553e815daa2eddd3e708d7c40c5bd74abc945db935111a8f2745abdbb357eb",
+      "fixture_root": "/tmp/litchi-goal-0410-negative-fixtures/bad-sample-order",
+      "mutation": {
+        "effect": "sets position 0 to 257 (the value originally at position 1), duplicating 257 and omitting original sample index 469",
+        "file": "a1-normal.json",
+        "json_pointer": "/results/0/elapsed_ns/sample_order/0",
+        "operation": "set to the previous value at /results/0/elapsed_ns/sample_order/1"
+      },
+      "name": "duplicate-sample-order"
+    },
+    {
+      "actual": {
+        "exit_code": 2,
+        "output_file_exists": false,
+        "stderr": "litchi-goal-0410-verify: FAIL: a1-normal: filesystem elapsed samples do not match elapsed sample order\n",
+        "stdout": ""
+      },
+      "command": {
+        "argv": [
+          "python3",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0410/verify-capture.py",
+          "--root",
+          "/tmp/litchi-goal-0410-negative-fixtures/bad-raw-elapsed",
+          "--output",
+          "/tmp/litchi-goal-0410-negative-fixtures/bad-raw-elapsed/negative-replay-output.json"
+        ],
+        "cwd": "/home/zhuhe/code/litchi"
+      },
+      "expected_rejection": "filesystem elapsed samples do not match elapsed sample order",
+      "fixture_file_sha256": "2c117921811a644d18009739e9dc8a284fa622084dbaf25241decd9d3b33eb84",
+      "fixture_root": "/tmp/litchi-goal-0410-negative-fixtures/bad-raw-elapsed",
+      "mutation": {
+        "effect": "raw child elapsed no longer matches elapsed_ns.samples via sample_order",
+        "file": "a1-normal.json",
+        "json_pointer": "/filesystem_evidence/0/samples/0/elapsed_ns",
+        "operation": "increment by 1 ns"
+      },
+      "name": "raw-elapsed-mismatch"
+    }
+  ],
+  "description": "Read-only verifier rejection checks against completed 0410 capture copies; no benchmark or Cargo invocation.",
+  "reproduction": {
+    "command": [
+      "python3",
+      "/tmp/litchi-goal-0410-verifier-negative-checks.py"
+    ],
+    "path": "/tmp/litchi-goal-0410-verifier-negative-checks.py",
+    "sha256": "47e936459d48a95bfaaacf9f4eda2c0ee046dffb71f737561f46a2ae21a328db"
+  },
+  "schema": "0410-verifier-negative-checks-v1",
+  "source_capture_root": "/tmp/litchi-goal-0410-capture",
+  "verifier": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0410/verify-capture.py",
+    "sha256": "ee7bf9a9de738e2061806361c8138b68a81f6b73815999ddd89a9e67b0c1218a"
+  },
+  "workload_rerun": false
+}

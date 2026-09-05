@@ -59,6 +59,26 @@ source edit/save harness also fixes previously unconfigured member ranges;
 corrected compressed overlap includes untouched raw publication and must not
 be read as semantic decoding. No speedup is claimed by 0409.
 
+## Change 0410 update
+
+The MCE stream ownership change in
+[0410](changes/0410-mce-attribute-name-reuse.md) reuses validated expanded
+attribute names for the selected XLSX cell path. On the fixed 9,216-cell,
+17-member corpus, the primary ABBA p50 candidate-minus-control deltas are
+`-3.9447%` and `-4.1373%`; operation-local allocation calls fall from 81,918
+to 77,212 and allocated bytes from 10,690,444 to 10,309,094. The seventh
+strict-registry claim entry is present, with the strict checker passing all
+seven claims.
+
+The residual profile places `clone_bounded_name_part` at 10.91% of selected
+leaf weight and `parse_element` at 5.89% self / 23.42% inclusive. These are
+sampled selected-path attribution figures, not paired CPU evidence. The eager
+guard remains descriptive: its initial p50 movement is adverse at +0.53% /
++5.66%, while a repeat is lower by 1.106% / 0.505% but both roles drift by
+roughly 5–6%; the edit claim is withheld. The eager fixture does not traverse
+the changed MCE stream, so this review cannot establish an eager no-regression
+result. The broad goal remains open.
+
 ## Change 0402 update
 
 The selected-source validation loop in

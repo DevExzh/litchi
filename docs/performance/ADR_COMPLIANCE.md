@@ -1,5 +1,23 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0410: bounded MCE attribute ownership reuse
+
+[0410](changes/0410-mce-attribute-name-reuse.md) replaces temporary owned names
+with borrowed duplicate-check keys and moves admitted attribute names into
+semantic events after the existing checks. It stays in the shared grammar
+owner under ADRs 0001/0002/0010/0011/0024; public callback ownership,
+namespace/error ordering and resource limits remain intact under ADRs
+0005/0006. Snapshot/edit/patch contracts under ADR 0003 do not change. The
+scoped clean ABBA, allocation vectors, residual CPU profile, callback lifetime
+and exact-limit tests supply ADR 0008 evidence. No dependency, runtime, pool,
+unsafe code or public API is added. The claim covers only the named warm XLSX
+selected query; variable eager edit/save guard results remain explicit.
+
+The separate OPC correction removes a duplicate verified replacement read and
+keeps signed-change refusal ahead of unrelated planning. Managed topology
+reservations remain charged to the caller budget, with refusal before output.
+This correctness repair is outside the MCE measured revisions.
+
 ## Change 0408: explicit serial materialization accounting
 
 [0408](changes/0408-opc-materialization-evidence.md) adds caller-owned reports

@@ -1,0 +1,53 @@
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `test` profile [unoptimized] target(s) in 14.23s
+     Running tests/source_backed_row_visibility.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_row_visibility-586106faef766287)
+
+running 16 tests
+test canonical_requests_are_exact_noops ... ok
+test public_snapshot_distinguishes_missing_and_visible_row_owners ... ok
+test xml_boolean_forms_and_self_closing_layout_state_are_owned_narrowly ... ok
+test managed_one_under_budget_refuses_before_selected_worksheet_io ... ok
+test stale_package_and_source_revision_are_refused_without_output ... ok
+test managed_exact_noop_publication_is_byte_exact_and_releases_budget ... ok
+test managed_editor_retains_payload_closure_and_releases_budget ... ok
+test managed_editor_adopts_an_indexed_package_and_releases_budget ... ok
+test managed_source_revision_is_refused_before_output ... ok
+test managed_signature_noop_and_changed_protection_contracts_remain_fail_closed ... FAILED
+test batch_changes_only_hidden_owners_and_exact_inverse_restores_source ... ok
+test duplicate_missing_and_oversized_batches_are_atomic ... ok
+test managed_changed_publication_preserves_unknown_members_and_releases_budget ... FAILED
+test managed_cancellation_is_checked_before_snapshot_and_stream_output ... ok
+test unsafe_xml_macros_and_signatures_fail_closed ... ok
+test changed_publication_reuses_matched_provenance_without_selected_reload ... FAILED
+
+failures:
+
+---- managed_signature_noop_and_changed_protection_contracts_remain_fail_closed stdout ----
+
+thread 'managed_signature_noop_and_changed_protection_contracts_remain_fail_closed' (1269132) panicked at crates/litchi-xlsx/tests/source_backed_row_visibility.rs:774:5:
+assertion failed: matches!(editor.publish_commit_to_stream(&mut output, &commit),
+    Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy)))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- managed_changed_publication_preserves_unknown_members_and_releases_budget stdout ----
+
+thread 'managed_changed_publication_preserves_unknown_members_and_releases_budget' (1269126) panicked at crates/litchi-xlsx/tests/source_backed_row_visibility.rs:707:10:
+called `Result::unwrap()` on an `Err` value: Package(Execution(ResourceLimit(ResourceLimit { resource: Memory, observed: 1692, limit: 696, scope: "xlsx-row-visibility-managed-test" })))
+
+---- changed_publication_reuses_matched_provenance_without_selected_reload stdout ----
+
+thread 'changed_publication_reuses_matched_provenance_without_selected_reload' (1269122) panicked at crates/litchi-xlsx/tests/source_backed_row_visibility.rs:330:10:
+called `Result::unwrap()` on an `Err` value: Package(IoError(Custom { kind: Other, error: "selected worksheet payload read rejected" }))
+
+
+failures:
+    changed_publication_reuses_matched_provenance_without_selected_reload
+    managed_changed_publication_preserves_unknown_members_and_releases_budget
+    managed_signature_noop_and_changed_protection_contracts_remain_fail_closed
+
+test result: FAILED. 13 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+error: test failed, to rerun pass `-p litchi-xlsx --test source_backed_row_visibility`

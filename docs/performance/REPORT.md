@@ -1,5 +1,39 @@
 # Performance program phase report
 
+## Current evidence update: change 0410
+
+[0410](changes/0410-mce-attribute-name-reuse.md) measures a narrow MCE
+expanded-attribute ownership reuse on the XLSX selected-cell selector. The
+fixed corpus is four 48×48 sheets (9,216 cells), 17 ZIP members and 4 MiB of
+media; Rust/Cargo/Rustdoc 1.98.1 release binaries ran on CPU 2 with one worker,
+warm fresh children, 20 warmups and 500 samples per ABBA leg. The timed scope
+is prepared sheet selection plus the exact M29 read.
+
+Primary p50 candidate-minus-control changes are `-3.9447%` and `-4.1373%`.
+Operation-local allocator calls move from 81,918 to 77,212 and allocated bytes
+from 10,690,444 to 10,309,094. The strict registry now has a seventh claim
+entry for this bounded selector/corpus/build; the strict checker passes all
+seven claims. These measurements do not authorize a general XLSX or workspace
+claim.
+
+The initial eager edit/save guard is adverse at +0.53% / +5.66% p50 elapsed
+time. A diagnostic repeat is lower by 1.106% / 0.505%, but both roles show
+roughly 5–6% same-role drift, so the edit claim is withheld and the adverse
+initial result is retained. The eager fixture does not execute the changed MCE
+path; that explains the scope of attribution but does not establish that eager
+behavior has no regression. The selected-path residual profile reports
+10.91% name-part leaf weight and `parse_element` at 5.89% self / 23.42%
+inclusive; these are sampled attribution, not paired CPU reduction.
+
+The final all-feature run passes 1,918 tests across the three crates. OPC/common
+warning-denied Clippy passes after two preexisting test-lint fixes;
+XLSX all-target Clippy remains blocked by 9 library diagnostics and 28
+library-test diagnostics, including 19 additional test diagnostics. The full
+performance goal remains open. The [0410 evidence bundle](results/change-0410/)
+retains the clean build identities, ABBA reports, allocator captures, profile
+attribution, and gate logs. Rustdoc, crate-boundary, and scoped-format checks
+pass.
+
 ## Current evidence update: change 0409
 
 [0409](changes/0409-xlsx-profile-and-range-accounting.md) extends current evidence to XLSX selected-cell queries

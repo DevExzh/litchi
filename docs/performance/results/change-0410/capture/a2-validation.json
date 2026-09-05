@@ -1,0 +1,36 @@
+{
+  "source_after": {
+    "revision": "972dc25be0dbd6690c74429839a48288d637e2d5",
+    "status": ""
+  },
+  "reports": [
+    {
+      "label": "a2-normal",
+      "cases": [
+        "xlsx_file_selected_cell"
+      ],
+      "samples": 500,
+      "warmup": 20,
+      "status": "passed"
+    },
+    {
+      "label": "a2-guards",
+      "cases": [
+        "xlsx_source_backed_cell_values_one_edit_save",
+        "xlsx_eager_cell_values_one_edit_save"
+      ],
+      "samples": 500,
+      "warmup": 20,
+      "status": "passed"
+    },
+    {
+      "label": "a2-allocator",
+      "cases": [
+        "xlsx_file_selected_cell"
+      ],
+      "samples": 30,
+      "warmup": 3,
+      "status": "passed"
+    }
+  ]
+}

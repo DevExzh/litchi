@@ -1,0 +1,170 @@
+[
+  {
+    "compressed_path": "latency/a1-normal.json.zst",
+    "path": "latency/a1-normal.json",
+    "bytes": 1311821,
+    "sha256": "1f7bad17b6bfaeb873ab48e1dea8dc67ae16bce96e7892c6ced2efc6dcf29e24"
+  },
+  {
+    "compressed_path": "latency/b1-normal.json.zst",
+    "path": "latency/b1-normal.json",
+    "bytes": 1311900,
+    "sha256": "4924d87682fa4d96536cec6cee2cb089897f4df011bd6b00ca96fe1fe5191ce0"
+  },
+  {
+    "compressed_path": "latency/b2-normal.json.zst",
+    "path": "latency/b2-normal.json",
+    "bytes": 1311902,
+    "sha256": "5c35cb4a557e6fa55013eedffd83dbec1bc6b32710f34feca5d9350ecb27fa3a"
+  },
+  {
+    "compressed_path": "latency/a2-normal.json.zst",
+    "path": "latency/a2-normal.json",
+    "bytes": 1311837,
+    "sha256": "2321e731ad4d40abb7e510c7c27663e9ea4c279bbfd900d1c3671824d472c8b1"
+  },
+  {
+    "compressed_path": "capture/0410-verification.json.zst",
+    "path": "capture/0410-verification.json",
+    "bytes": 68067,
+    "sha256": "53659d88524e40834270ccbd5862e72cd5a11ee9a381328c0765c1cd50b5d661"
+  },
+  {
+    "compressed_path": "capture/a1-allocator.json.zst",
+    "path": "capture/a1-allocator.json",
+    "bytes": 119702,
+    "sha256": "c11f7a81b2e115daa3ac1f905853b88949c1f87d082313f1b999365ac81729bb"
+  },
+  {
+    "compressed_path": "capture/a1-guards.json.zst",
+    "path": "capture/a1-guards.json",
+    "bytes": 1103222,
+    "sha256": "460d621b3bb2d76094a532cfecc81918d8a3f1e8149c198abcd6e3a003b55f85"
+  },
+  {
+    "compressed_path": "capture/a1-normal.json.zst",
+    "path": "capture/a1-normal.json",
+    "bytes": 1311821,
+    "sha256": "1f7bad17b6bfaeb873ab48e1dea8dc67ae16bce96e7892c6ced2efc6dcf29e24"
+  },
+  {
+    "compressed_path": "capture/a2-allocator.json.zst",
+    "path": "capture/a2-allocator.json",
+    "bytes": 119702,
+    "sha256": "4376327eac7ffc2b56ed25c2f095916c712578d03cf7d4c5776d44934379c44f"
+  },
+  {
+    "compressed_path": "capture/a2-guards.json.zst",
+    "path": "capture/a2-guards.json",
+    "bytes": 1103228,
+    "sha256": "8077da74eb69159283629ccac85ced9f96bf21dab274db8d9cfe6aac93d30c04"
+  },
+  {
+    "compressed_path": "capture/a2-normal.json.zst",
+    "path": "capture/a2-normal.json",
+    "bytes": 1311837,
+    "sha256": "2321e731ad4d40abb7e510c7c27663e9ea4c279bbfd900d1c3671824d472c8b1"
+  },
+  {
+    "compressed_path": "capture/b1-allocator.json.zst",
+    "path": "capture/b1-allocator.json",
+    "bytes": 119701,
+    "sha256": "d802bfa2ef7669539e9c900ee43bfab543d5657c49435b05ac52426f9b16e732"
+  },
+  {
+    "compressed_path": "capture/b1-guards.json.zst",
+    "path": "capture/b1-guards.json",
+    "bytes": 1103231,
+    "sha256": "ab7de03f8fbd788d9a45e1090c6a92f1c431ba3fb77fbe0d513160fd19d99c90"
+  },
+  {
+    "compressed_path": "capture/b1-normal.json.zst",
+    "path": "capture/b1-normal.json",
+    "bytes": 1311900,
+    "sha256": "4924d87682fa4d96536cec6cee2cb089897f4df011bd6b00ca96fe1fe5191ce0"
+  },
+  {
+    "compressed_path": "capture/b2-allocator.json.zst",
+    "path": "capture/b2-allocator.json",
+    "bytes": 119705,
+    "sha256": "5be37dfe7066d9401db8a5ad9a4a25b2a40e3c9f561336d2e744090bcd11ddc9"
+  },
+  {
+    "compressed_path": "capture/b2-guards.json.zst",
+    "path": "capture/b2-guards.json",
+    "bytes": 1103232,
+    "sha256": "03df3119bebddee665029b3bea453d7f8320f18039037938291d4ec137df68c7"
+  },
+  {
+    "compressed_path": "capture/b2-normal.json.zst",
+    "path": "capture/b2-normal.json",
+    "bytes": 1311902,
+    "sha256": "5c35cb4a557e6fa55013eedffd83dbec1bc6b32710f34feca5d9350ecb27fa3a"
+  },
+  {
+    "compressed_path": "capture/guards-summary.json.zst",
+    "path": "capture/guards-summary.json",
+    "bytes": 1237602,
+    "sha256": "b33de4597f0c16a4f68e6bcf3e0c6f069e91f2c541cf8214800a81e6f06b5292"
+  },
+  {
+    "compressed_path": "guard-recheck/a1-guards.json.zst",
+    "path": "guard-recheck/a1-guards.json",
+    "bytes": 1103222,
+    "sha256": "db09b054d46e9f3f1220f6f492057a07da9354049f26a42db48183f8ba9d92d5"
+  },
+  {
+    "compressed_path": "guard-recheck/a2-guards.json.zst",
+    "path": "guard-recheck/a2-guards.json",
+    "bytes": 1103221,
+    "sha256": "5ee0e9fd8d0e8ee44840ab10356ce044269bbbc7f1103ed52f4d57901983cb03"
+  },
+  {
+    "compressed_path": "guard-recheck/b1-guards.json.zst",
+    "path": "guard-recheck/b1-guards.json",
+    "bytes": 1103228,
+    "sha256": "8b4340091c5fc4921a3588308335a6ad64017d8fbbe8b7f853e3a125a82a34ab"
+  },
+  {
+    "compressed_path": "guard-recheck/b2-guards.json.zst",
+    "path": "guard-recheck/b2-guards.json",
+    "bytes": 1103230,
+    "sha256": "1a35ea5bc03beb3643179253ab5ba4033f92c7acddede8ea4c68c5c30b6ea41b"
+  },
+  {
+    "compressed_path": "guard-recheck/summary.json.zst",
+    "path": "guard-recheck/summary.json",
+    "bytes": 1237364,
+    "sha256": "88691c2fcec1466031e4fb3fa4581947612e6189832d46488820788872689a47"
+  },
+  {
+    "compressed_path": "profile/perf-script-no-inline.stdout.zst",
+    "path": "profile/perf-script-no-inline.stdout",
+    "bytes": 211588615,
+    "sha256": "60e54fb9950af19cd7124441e7fd883edc317afc1e7bec3ad3298badff13fcbc"
+  },
+  {
+    "compressed_path": "profile/perf.data.zst",
+    "path": "profile/perf.data",
+    "bytes": 16209656,
+    "sha256": "53c229b2a96f0532f0607f55ee5b3359aa70973788d03bde0a019e6b4761dec7"
+  },
+  {
+    "compressed_path": "profile/selected-allocator.json.zst",
+    "path": "profile/selected-allocator.json",
+    "bytes": 119701,
+    "sha256": "d802bfa2ef7669539e9c900ee43bfab543d5657c49435b05ac52426f9b16e732"
+  },
+  {
+    "compressed_path": "profile/selected-normal.json.zst",
+    "path": "profile/selected-normal.json",
+    "bytes": 1311900,
+    "sha256": "4924d87682fa4d96536cec6cee2cb089897f4df011bd6b00ca96fe1fe5191ce0"
+  },
+  {
+    "compressed_path": "profile/selected-perf-record.json.zst",
+    "path": "profile/selected-perf-record.json",
+    "bytes": 793903,
+    "sha256": "cbf0aac1fe81e24e2cc57a22696236bab46add19df061d43a239824481c3ca42"
+  }
+]

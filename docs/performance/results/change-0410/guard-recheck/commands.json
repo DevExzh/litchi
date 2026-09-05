@@ -1,0 +1,178 @@
+[
+  {
+    "label": "a1-checkout",
+    "argv": [
+      "git",
+      "checkout",
+      "--detach",
+      "972dc25be0dbd6690c74429839a48288d637e2d5"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:46:55.292736+00:00",
+    "wall_seconds": 0.01079108999692835,
+    "exit_code": 0
+  },
+  {
+    "label": "a1-guards",
+    "argv": [
+      "taskset",
+      "-c",
+      "2",
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/tmp/litchi-goal-0410-guard-recheck/a1-guards.time.txt",
+      "/tmp/litchi-goal-0410-binaries/control/litchi-perf-baseline",
+      "--case",
+      "xlsx_source_backed_cell_values_one_edit_save,xlsx_eager_cell_values_one_edit_save",
+      "--filesystem-cache",
+      "warm",
+      "--xlsx-cell-crud-shape",
+      "medium",
+      "--samples",
+      "500",
+      "--warmup",
+      "20",
+      "--json",
+      "/tmp/litchi-goal-0410-guard-recheck/a1-guards.json",
+      "--corpus-manifest",
+      "/tmp/litchi-goal-0410-guard-recheck/a1-guards.catalog.json"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:46:55.678502+00:00",
+    "wall_seconds": 37.090523342005326,
+    "exit_code": 0
+  },
+  {
+    "label": "b1-checkout",
+    "argv": [
+      "git",
+      "checkout",
+      "--detach",
+      "e4d477466718a8fad38cd55b9babe0b826e7f3a7"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:47:33.269367+00:00",
+    "wall_seconds": 0.010692189011024311,
+    "exit_code": 0
+  },
+  {
+    "label": "b1-guards",
+    "argv": [
+      "taskset",
+      "-c",
+      "2",
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/tmp/litchi-goal-0410-guard-recheck/b1-guards.time.txt",
+      "/tmp/litchi-goal-0410-binaries/candidate/litchi-perf-baseline",
+      "--case",
+      "xlsx_source_backed_cell_values_one_edit_save,xlsx_eager_cell_values_one_edit_save",
+      "--filesystem-cache",
+      "warm",
+      "--xlsx-cell-crud-shape",
+      "medium",
+      "--samples",
+      "500",
+      "--warmup",
+      "20",
+      "--json",
+      "/tmp/litchi-goal-0410-guard-recheck/b1-guards.json",
+      "--corpus-manifest",
+      "/tmp/litchi-goal-0410-guard-recheck/b1-guards.catalog.json"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:47:33.642302+00:00",
+    "wall_seconds": 37.001090452002245,
+    "exit_code": 0
+  },
+  {
+    "label": "b2-checkout",
+    "argv": [
+      "git",
+      "checkout",
+      "--detach",
+      "e4d477466718a8fad38cd55b9babe0b826e7f3a7"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:48:11.151277+00:00",
+    "wall_seconds": 0.011068591004004702,
+    "exit_code": 0
+  },
+  {
+    "label": "b2-guards",
+    "argv": [
+      "taskset",
+      "-c",
+      "2",
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/tmp/litchi-goal-0410-guard-recheck/b2-guards.time.txt",
+      "/tmp/litchi-goal-0410-binaries/candidate/litchi-perf-baseline",
+      "--case",
+      "xlsx_source_backed_cell_values_one_edit_save,xlsx_eager_cell_values_one_edit_save",
+      "--filesystem-cache",
+      "warm",
+      "--xlsx-cell-crud-shape",
+      "medium",
+      "--samples",
+      "500",
+      "--warmup",
+      "20",
+      "--json",
+      "/tmp/litchi-goal-0410-guard-recheck/b2-guards.json",
+      "--corpus-manifest",
+      "/tmp/litchi-goal-0410-guard-recheck/b2-guards.catalog.json"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:48:11.528544+00:00",
+    "wall_seconds": 36.313766065999516,
+    "exit_code": 0
+  },
+  {
+    "label": "a2-checkout",
+    "argv": [
+      "git",
+      "checkout",
+      "--detach",
+      "972dc25be0dbd6690c74429839a48288d637e2d5"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:48:48.356278+00:00",
+    "wall_seconds": 0.011362402990926057,
+    "exit_code": 0
+  },
+  {
+    "label": "a2-guards",
+    "argv": [
+      "taskset",
+      "-c",
+      "2",
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/tmp/litchi-goal-0410-guard-recheck/a2-guards.time.txt",
+      "/tmp/litchi-goal-0410-binaries/control/litchi-perf-baseline",
+      "--case",
+      "xlsx_source_backed_cell_values_one_edit_save,xlsx_eager_cell_values_one_edit_save",
+      "--filesystem-cache",
+      "warm",
+      "--xlsx-cell-crud-shape",
+      "medium",
+      "--samples",
+      "500",
+      "--warmup",
+      "20",
+      "--json",
+      "/tmp/litchi-goal-0410-guard-recheck/a2-guards.json",
+      "--corpus-manifest",
+      "/tmp/litchi-goal-0410-guard-recheck/a2-guards.catalog.json"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:48:48.729669+00:00",
+    "wall_seconds": 36.032001721003326,
+    "exit_code": 0
+  }
+]

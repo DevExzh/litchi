@@ -1,0 +1,78 @@
+    Checking const-oid v0.9.6
+    Checking generic-array v0.14.9
+    Checking getrandom v0.2.17
+    Checking base64ct v1.6.0
+    Checking rand_core v0.6.4
+    Checking pem-rfc7468 v0.7.0
+    Checking libm v0.2.16
+    Checking flagset v0.4.7
+    Checking zerocopy v0.8.56
+    Checking crypto-common v0.1.6
+    Checking block-buffer v0.10.4
+    Checking ff v0.13.1
+    Checking base16ct v0.2.0
+    Checking group v0.13.0
+    Checking crypto-bigint v0.5.5
+    Checking der v0.7.10
+    Checking num-traits v0.2.19
+    Checking digest v0.10.7
+    Checking chrono v0.4.45
+    Checking spki v0.7.3
+    Checking cpufeatures v0.2.17
+    Checking signature v2.2.0
+    Checking pkcs8 v0.10.2
+    Checking hmac v0.12.1
+    Checking sec1 v0.7.3
+    Checking num-integer v0.1.47
+    Checking elliptic-curve v0.13.8
+    Checking spin v0.9.9
+    Checking lazy_static v1.5.0
+    Checking num-iter v0.1.46
+    Checking rfc6979 v0.4.0
+    Checking sha2 v0.10.9
+    Checking ecdsa v0.16.9
+    Checking primeorder v0.13.6
+    Checking pkcs1 v0.7.5
+    Checking sha1 v0.10.7
+    Checking p256 v0.13.2
+    Checking x509-cert v0.2.5
+    Checking ppv-lite86 v0.2.21
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking rand_chacha v0.3.1
+    Checking rand v0.8.8
+    Checking num-bigint-dig v0.8.6
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking rsa v0.9.10
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+error: the following explicit lifetimes could be elided: 'data
+   --> crates/litchi-opc/tests/phys_pkg_borrowed.rs:279:30
+    |
+279 | fn borrow_stored_from_source<'data>(source: &'data [u8]) -> &'data [u8] {
+    |                              ^^^^^           ^^^^^           ^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_lifetimes
+    = note: `-D clippy::needless-lifetimes` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::needless_lifetimes)]`
+help: elide the lifetimes
+    |
+279 - fn borrow_stored_from_source<'data>(source: &'data [u8]) -> &'data [u8] {
+279 + fn borrow_stored_from_source(source: &[u8]) -> &[u8] {
+    |
+
+error: could not compile `litchi-opc` (test "phys_pkg_borrowed") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: using `chunks_exact` with a constant chunk size
+     --> crates/litchi-opc/src/source_backed.rs:14906:28
+      |
+14906 |         for pair in events.chunks_exact(2) {
+      |                            ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+      = note: `-D clippy::chunks-exact-to-as-chunks` implied by `-D clippy::all`
+      = help: to override `-D clippy::all` add `#[allow(clippy::chunks_exact_to_as_chunks)]`
+
+error: could not compile `litchi-opc` (lib test) due to 1 previous error

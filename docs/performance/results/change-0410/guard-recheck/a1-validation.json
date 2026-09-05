@@ -1,0 +1,18 @@
+{
+  "source_after": {
+    "revision": "972dc25be0dbd6690c74429839a48288d637e2d5",
+    "status": ""
+  },
+  "reports": [
+    {
+      "label": "a1-guards",
+      "cases": [
+        "xlsx_source_backed_cell_values_one_edit_save",
+        "xlsx_eager_cell_values_one_edit_save"
+      ],
+      "samples": 500,
+      "warmup": 20,
+      "status": "passed"
+    }
+  ]
+}
