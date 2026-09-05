@@ -242,6 +242,10 @@ pub(crate) struct AllocationMetrics {
     pub peak_live_bytes_before: MetricVector,
     /// Absolute process high-water live bytes after the timed operation.
     pub peak_live_bytes_after: MetricVector,
+    /// Maximum absolute process live bytes observed during this operation's
+    /// allocator region, including the entry live-byte snapshot. This is
+    /// independent from the process-lifetime high-water vectors above.
+    pub region_peak_live_bytes: MetricVector,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -649,6 +653,7 @@ fn allocation_metrics(
             live_bytes_after: absent(status),
             peak_live_bytes_before: absent(status),
             peak_live_bytes_after: absent(status),
+            region_peak_live_bytes: absent(status),
         }));
     }
 
@@ -688,6 +693,9 @@ fn allocation_metrics(
         })?,
         peak_live_bytes_after: measured("peak_live_bytes_after", |sample| {
             sample.peak_live_bytes_after
+        })?,
+        region_peak_live_bytes: measured("region_peak_live_bytes", |sample| {
+            sample.region_peak_live_bytes
         })?,
     }))
 }
@@ -1462,6 +1470,7 @@ mod tests {
             live_bytes_after: Some(1_036),
             peak_live_bytes_before: Some(1_010),
             peak_live_bytes_after: Some(1_046),
+            region_peak_live_bytes: Some(1_046),
         }
     }
 
@@ -1524,6 +1533,10 @@ mod tests {
             live_bytes_after: Some(after),
             peak_live_bytes_before: Some(before + 10),
             peak_live_bytes_after: Some(after + 10),
+            // The operation-region maximum is intentionally below the
+            // process-lifetime after high-water to prove the vectors are
+            // independent while still covering the entry/after live values.
+            region_peak_live_bytes: Some(after + 4),
         };
         let mut first = sample(0, "warm", 20, Some(metrics()));
         first.allocation_metrics = Some(allocation(7, 100, 1_000, 1_036));
@@ -1548,12 +1561,20 @@ mod tests {
             Value::from(vec![1_052_u64, 1_036])
         );
         assert_eq!(
+            json["region_peak_live_bytes"]["values"],
+            Value::from(vec![1_056_u64, 1_040])
+        );
+        assert_eq!(
             allocation.peak_live_bytes_before.values,
             Some(vec![1_046, 1_010])
         );
         assert_eq!(
             allocation.peak_live_bytes_after.values,
             Some(vec![1_062, 1_046])
+        );
+        assert_eq!(
+            allocation.region_peak_live_bytes.values,
+            Some(vec![1_056, 1_040])
         );
     }
 
@@ -1575,6 +1596,7 @@ mod tests {
             live_bytes_after: None,
             peak_live_bytes_before: None,
             peak_live_bytes_after: None,
+            region_peak_live_bytes: None,
         });
         let error = aggregate(&[measured.clone(), overflow], "warm", &[10, 20]).unwrap_err();
         assert!(error.to_string().contains("status or scope"));
@@ -1586,6 +1608,19 @@ mod tests {
             .peak_live_bytes_after = None;
         let error = aggregate(&[measured.clone()], "warm", &[10]).unwrap_err();
         assert!(error.to_string().contains("peak_live_bytes_after"));
+
+        measured
+            .allocation_metrics
+            .as_mut()
+            .unwrap()
+            .peak_live_bytes_after = Some(1_046);
+        measured
+            .allocation_metrics
+            .as_mut()
+            .unwrap()
+            .region_peak_live_bytes = None;
+        let error = aggregate(&[measured.clone()], "warm", &[10]).unwrap_err();
+        assert!(error.to_string().contains("region_peak_live_bytes"));
 
         measured.allocation_metrics = None;
         let mut present = sample(1, "warm", 20, Some(metrics()));
@@ -1610,6 +1645,7 @@ mod tests {
             live_bytes_after: None,
             peak_live_bytes_before: None,
             peak_live_bytes_after: None,
+            region_peak_live_bytes: None,
         });
         let envelope = aggregate(&[sample], "warm", &[10]).unwrap();
         let allocation = envelope.allocation.unwrap();
@@ -1618,6 +1654,41 @@ mod tests {
         let json = serde_json::to_value(allocation).unwrap();
         assert_eq!(json["status"], "overflow");
         assert!(json["allocation_calls"].get("values").is_none());
+    }
+
+    #[test]
+    fn allocation_unavailable_omits_region_peak_vector_with_explicit_scope() {
+        let mut sample = sample(0, "warm", 10, Some(metrics()));
+        sample.allocation_metrics = Some(crate::allocation_metrics::Sample {
+            status: crate::allocation_metrics::Status::Unavailable,
+            scope: crate::allocation_metrics::Scope::OperationGlobalSystemAllocator,
+            allocation_calls: None,
+            deallocation_calls: None,
+            reallocation_calls: None,
+            failed_allocation_calls: None,
+            allocated_bytes: None,
+            deallocated_bytes: None,
+            live_bytes_before: None,
+            live_bytes_after: None,
+            peak_live_bytes_before: None,
+            peak_live_bytes_after: None,
+            region_peak_live_bytes: None,
+        });
+        let envelope = aggregate(&[sample], "warm", &[10]).unwrap();
+        let allocation = envelope.allocation.unwrap();
+        assert_eq!(allocation.status, MetricStatus::Unavailable);
+        assert_eq!(
+            allocation.region_peak_live_bytes.status,
+            MetricStatus::Unavailable
+        );
+        assert_eq!(
+            allocation.region_peak_live_bytes.scope,
+            super::ALLOCATION_SCOPE
+        );
+        assert!(allocation.region_peak_live_bytes.values.is_none());
+        let json = serde_json::to_value(allocation).unwrap();
+        assert_eq!(json["region_peak_live_bytes"]["status"], "unavailable");
+        assert!(json["region_peak_live_bytes"].get("values").is_none());
     }
 
     #[test]
