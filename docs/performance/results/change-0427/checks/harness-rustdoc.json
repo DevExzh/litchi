@@ -1,0 +1,42 @@
+{
+  "change": 427,
+  "argv": [
+    "cargo",
+    "doc",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--all-features",
+    "--no-deps"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+  "driver_sha256": "d4acf2e82061cd079d9a033fd092d86236fd07fea0a5794ccde2f3d7445a90dd",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "started_utc": "2026-09-05T20:58:39.011236+00:00",
+  "source_before": {
+    "path": "sources/518c71da3ccc0c15dd0abbebc089f84f86d19c2ed7682964fca15f1ece900027.json",
+    "sha256": "518c71da3ccc0c15dd0abbebc089f84f86d19c2ed7682964fca15f1ece900027",
+    "files": 6629
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T20:58:45.703171+00:00",
+  "source_after": {
+    "path": "sources/518c71da3ccc0c15dd0abbebc089f84f86d19c2ed7682964fca15f1ece900027.json",
+    "sha256": "518c71da3ccc0c15dd0abbebc089f84f86d19c2ed7682964fca15f1ece900027",
+    "files": 6629
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/harness-rustdoc.log",
+    "bytes": 364,
+    "sha256": "4e36b72facae5c810450d2074c96885ba2a8782817064a140af663af36407a80"
+  }
+}

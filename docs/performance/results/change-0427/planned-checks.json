@@ -1,0 +1,23 @@
+[
+  {
+    "tag": "retention-unit-tests",
+    "argv": ["cargo", "test", "--locked", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--all-features", "--lib", "pptx_retention", "--", "--test-threads=1"]
+  },
+  {
+    "tag": "harness-tests",
+    "argv": ["cargo", "test", "--locked", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--all-features", "--lib", "--bin", "litchi-perf-baseline-alloc", "--no-fail-fast", "--", "--test-threads=1"]
+  },
+  {
+    "tag": "harness-strict",
+    "expected_prior_debt": 29,
+    "argv": ["cargo", "clippy", "--locked", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--all-features", "--all-targets", "--no-deps", "--", "-D", "warnings"]
+  },
+  {
+    "tag": "harness-rustdoc",
+    "argv": ["cargo", "doc", "--locked", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--all-features", "--no-deps"]
+  },
+  {
+    "tag": "debug-binaries",
+    "argv": ["cargo", "build", "--locked", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--all-features", "--bin", "litchi-perf-baseline", "--bin", "litchi-perf-baseline-alloc"]
+  }
+]

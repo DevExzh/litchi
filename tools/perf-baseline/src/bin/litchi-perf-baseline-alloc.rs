@@ -215,5 +215,18 @@ mod allocator {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     litchi_perf_baseline::allocation_metrics::enable();
-    litchi_perf_baseline::run()
+    let retention_args = {
+        let mut args = std::env::args_os();
+        let _executable = args.next();
+        match args.next() {
+            Some(subcommand) if subcommand == std::ffi::OsStr::new("retention") => {
+                Some(args.collect::<Vec<_>>())
+            },
+            _ => None,
+        }
+    };
+    match retention_args {
+        Some(args) => litchi_perf_baseline::pptx_retention::run_from_args(args),
+        None => litchi_perf_baseline::run(),
+    }
 }

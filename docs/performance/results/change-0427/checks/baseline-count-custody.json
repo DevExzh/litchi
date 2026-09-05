@@ -1,0 +1,21 @@
+{
+  "status": "reproduced",
+  "revision": "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+  "argv": [
+    "cargo",
+    "test",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--all-features",
+    "--lib",
+    "selectable_case_count_matches_current_enumeration",
+    "--",
+    "--test-threads=1"
+  ],
+  "exit_code": 101,
+  "baseline_lib_sha256": "0ba81aa389eac1c97a179c2770c45f2aef9ece4cd979270a2857229a42aab9db",
+  "restored_lib_sha256": "1829a9e440015f3f6599aedddb6a68cbdad78bd42d2044e7ecd6db11f62eef56",
+  "restored_exactly": true,
+  "scope": "Exact prior lib.rs; new retention module is unreachable in this lib-only target."
+}

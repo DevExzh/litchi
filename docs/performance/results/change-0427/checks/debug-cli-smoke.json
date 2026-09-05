@@ -1,0 +1,37 @@
+{
+  "change": 427,
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0427/smoke.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+  "driver_sha256": "d4acf2e82061cd079d9a033fd092d86236fd07fea0a5794ccde2f3d7445a90dd",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "started_utc": "2026-09-05T20:59:09.276911+00:00",
+  "source_before": {
+    "path": "sources/518c71da3ccc0c15dd0abbebc089f84f86d19c2ed7682964fca15f1ece900027.json",
+    "sha256": "518c71da3ccc0c15dd0abbebc089f84f86d19c2ed7682964fca15f1ece900027",
+    "files": 6629
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T21:01:53.061042+00:00",
+  "source_after": {
+    "path": "sources/518c71da3ccc0c15dd0abbebc089f84f86d19c2ed7682964fca15f1ece900027.json",
+    "sha256": "518c71da3ccc0c15dd0abbebc089f84f86d19c2ed7682964fca15f1ece900027",
+    "files": 6629
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/debug-cli-smoke.log",
+    "bytes": 14192,
+    "sha256": "0d0b9b6a3650de12ef3b914adb146e6e758a09e2d8dc13ceb16b95e39d79c24e"
+  }
+}

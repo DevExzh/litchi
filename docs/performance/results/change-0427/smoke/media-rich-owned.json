@@ -1,0 +1,209 @@
+{
+  "schema": "pptx_retention_v1",
+  "api": "owned",
+  "corpus": "media-rich",
+  "corpus_manifest": {
+    "name": "pptx_cross_copy_media_rich_lifecycle",
+    "generator": "litchi-pptx-cross-slide-copy-evidence-v1",
+    "package_format": "PPTX/OPC/ZIP",
+    "shape": "media-rich",
+    "payload_kind": "deterministic-incompressible-media-and-slide-text",
+    "compression": "deflate",
+    "entry_count": 31,
+    "archive_member_count": 49,
+    "entry_bytes": 76,
+    "uncompressed_payload_bytes": 16866277,
+    "archive_bytes": 16814664,
+    "archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+    "target_entry": "source-slide:2/destination-slide:1/position:1",
+    "target_payload_bytes": 76,
+    "target_payload_sha256": "9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa",
+    "xlsx": null
+  },
+  "samples": 1,
+  "warmup": 0,
+  "source_revision": "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+  "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+  "source_archive_bytes": 16815621,
+  "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+  "destination_archive_bytes": 16814664,
+  "expected_output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+  "expected_output_bytes": 33599873,
+  "corpus_gates_verified": true,
+  "all_iteration_output_bytes_verified": true,
+  "checked_iteration_count": 1,
+  "binary_sha256": "c142f5d2f71b96caa124c848351c6dfbc579f182d540085ff54ee550d5d83489",
+  "current_exe": "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+  "binary_bytes": 685956128,
+  "allocator": "CountingSystemAllocator(std::alloc::System)",
+  "instrumentation": "system_allocator_operation_scoped",
+  "allocator_counter_revision": "serialized_region_peak_v3",
+  "callback_scope": "global allocator callbacks after System returns; process-wide across threads; excludes RSS, object-owned memory, allocator-internal realloc overlap, and latency",
+  "ownership_scope": "phase labels describe retained handles at callback-order boundaries; live bytes are process-global allocator counters and are not object-retention measurements",
+  "phases": [
+    {
+      "label": "baseline_before_inputs",
+      "live_owners": "region acquired; corpus bytes remain outside the lifecycle; no input clones or sink"
+    },
+    {
+      "label": "prepared_inputs_and_sink",
+      "live_owners": "owned source and destination input Vec clones, bounded sink, and reserved sink capacity"
+    },
+    {
+      "label": "opened_documents",
+      "live_owners": "owned source and destination Packages plus their opened presentation handles"
+    },
+    {
+      "label": "planned",
+      "live_owners": "opened source/destination handles and the validated cross-copy plan"
+    },
+    {
+      "label": "published",
+      "live_owners": "opened packages, plan, publication result, and sink containing the exact output"
+    },
+    {
+      "label": "drop_result",
+      "live_owners": "opened packages, plan, and exact output sink after the publication result is released"
+    },
+    {
+      "label": "drop_plan",
+      "live_owners": "opened packages and exact output sink after the plan is released"
+    },
+    {
+      "label": "drop_document_handles",
+      "live_owners": "exact output sink remains after source and destination Packages and opened handles are released"
+    },
+    {
+      "label": "drop_sink",
+      "live_owners": "no lifecycle-owned input, document, plan, publication result, or sink handles; process baseline may differ"
+    }
+  ],
+  "samples_raw": [
+    {
+      "sample_index": 0,
+      "baseline_before_inputs": {
+        "allocation_calls": 370224,
+        "deallocation_calls": 329268,
+        "reallocation_calls": 40919,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 2399718213,
+        "deallocated_bytes": 2330812962,
+        "live_bytes": 68905251,
+        "peak_live_bytes": 812689543,
+        "overflowed": false,
+        "observer_invalid": false
+      },
+      "prepared_inputs_and_sink": {
+        "allocation_calls": 370227,
+        "deallocation_calls": 329268,
+        "reallocation_calls": 40919,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 2500613780,
+        "deallocated_bytes": 2330812962,
+        "live_bytes": 169800818,
+        "peak_live_bytes": 812689543,
+        "overflowed": false,
+        "observer_invalid": false
+      },
+      "opened_documents": {
+        "allocation_calls": 384636,
+        "deallocation_calls": 339624,
+        "reallocation_calls": 42551,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 2539048346,
+        "deallocated_bytes": 2335310063,
+        "live_bytes": 203738283,
+        "peak_live_bytes": 812689543,
+        "overflowed": false,
+        "observer_invalid": false
+      },
+      "planned": {
+        "allocation_calls": 401135,
+        "deallocation_calls": 353386,
+        "reallocation_calls": 45147,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 2704506287,
+        "deallocated_bytes": 2500754142,
+        "live_bytes": 203752145,
+        "peak_live_bytes": 812689543,
+        "overflowed": false,
+        "observer_invalid": false
+      },
+      "published": {
+        "allocation_calls": 429942,
+        "deallocation_calls": 378216,
+        "reallocation_calls": 48224,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 2870594191,
+        "deallocated_bytes": 2633162105,
+        "live_bytes": 237432086,
+        "peak_live_bytes": 812689543,
+        "overflowed": false,
+        "observer_invalid": false
+      },
+      "drop_result": {
+        "allocation_calls": 429942,
+        "deallocation_calls": 378838,
+        "reallocation_calls": 48224,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 2870594191,
+        "deallocated_bytes": 2633208460,
+        "live_bytes": 237385731,
+        "peak_live_bytes": 812689543,
+        "overflowed": false,
+        "observer_invalid": false
+      },
+      "drop_plan": {
+        "allocation_calls": 429942,
+        "deallocation_calls": 378979,
+        "reallocation_calls": 48224,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 2870594191,
+        "deallocated_bytes": 2633222322,
+        "live_bytes": 237371869,
+        "peak_live_bytes": 812689543,
+        "overflowed": false,
+        "observer_invalid": false
+      },
+      "drop_document_handles": {
+        "allocation_calls": 429942,
+        "deallocation_calls": 381680,
+        "reallocation_calls": 48224,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 2870594191,
+        "deallocated_bytes": 2734423658,
+        "live_bytes": 136170533,
+        "peak_live_bytes": 812689543,
+        "overflowed": false,
+        "observer_invalid": false
+      },
+      "drop_sink": {
+        "allocation_calls": 429942,
+        "deallocation_calls": 381681,
+        "reallocation_calls": 48224,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 2870594191,
+        "deallocated_bytes": 2801688940,
+        "live_bytes": 68905251,
+        "peak_live_bytes": 812689543,
+        "overflowed": false,
+        "observer_invalid": false
+      },
+      "retention_probe": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 59718,
+        "deallocation_calls": 52413,
+        "reallocation_calls": 7305,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 470875978,
+        "deallocated_bytes": 470875978,
+        "live_bytes_before": 68905251,
+        "live_bytes_after": 68905251,
+        "peak_live_bytes_before": 812689543,
+        "peak_live_bytes_after": 812689543,
+        "retention_probe_region_peak_live_bytes": 272715183
+      }
+    }
+  ]
+}

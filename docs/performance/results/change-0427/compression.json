@@ -1,0 +1,100 @@
+{
+  "checks/baseline-selector-count.log.gz": {
+    "original_bytes": 1507,
+    "original_path": "checks/baseline-selector-count.log",
+    "original_sha256": "fe522585125e6204df9f69db3e1f497afca5f44b7ee64c62e9375615322e7ca1",
+    "stored_bytes": 819,
+    "stored_sha256": "e0cc39bd7d990948bb3b0aa0dce81768706e847b8166d3038a77be7ead10be86"
+  },
+  "checks/boundaries.log.gz": {
+    "original_bytes": 684,
+    "original_path": "checks/boundaries.log",
+    "original_sha256": "b6f38b040ac7308af6ec280e204ed817e3c708cdde84d2566f0b5d74758aeeaf",
+    "stored_bytes": 255,
+    "stored_sha256": "47bc24b362c2d527d2550fd6efef22751d4d4a4efba50b0b2f6d8f7b0fc8b443"
+  },
+  "checks/claims.log.gz": {
+    "original_bytes": 44,
+    "original_path": "checks/claims.log",
+    "original_sha256": "33241d1f0ca4f8fba95a039a967f9a5bc41f100a24e94b576942d2e7c4615fc8",
+    "stored_bytes": 64,
+    "stored_sha256": "213fceee167de45140392729d792e56798bb0cf20777a6c69664d40c361352ec"
+  },
+  "checks/crud-index.log.gz": {
+    "original_bytes": 123,
+    "original_path": "checks/crud-index.log",
+    "original_sha256": "8a6e2202ee0ae9691a0727a1a9f1ff420c32db2c4fbc4346ba6a57fe24c2220b",
+    "stored_bytes": 128,
+    "stored_sha256": "9ad6f851cc0c31766916e170175627691d3532529c9f2cde4db900b5c05d6ce0"
+  },
+  "checks/debug-binaries.log.gz": {
+    "original_bytes": 160,
+    "original_path": "checks/debug-binaries.log",
+    "original_sha256": "360b926b27555e3ac9c21c15f39633b4af3b699fe4efa03c10424590e77e3757",
+    "stored_bytes": 146,
+    "stored_sha256": "f550236c925b294b0ddfe1ee57e8081d6346c4340aad421ccb1cab7570cd4bb3"
+  },
+  "checks/debug-cli-smoke.log.gz": {
+    "original_bytes": 14192,
+    "original_path": "checks/debug-cli-smoke.log",
+    "original_sha256": "0d0b9b6a3650de12ef3b914adb146e6e758a09e2d8dc13ceb16b95e39d79c24e",
+    "stored_bytes": 1029,
+    "stored_sha256": "8afdd489b88cc37ea06617b6b0fdf3e8cfdb256d87d566a705d73314920c0178"
+  },
+  "checks/harness-rustdoc.log.gz": {
+    "original_bytes": 364,
+    "original_path": "checks/harness-rustdoc.log",
+    "original_sha256": "4e36b72facae5c810450d2074c96885ba2a8782817064a140af663af36407a80",
+    "stored_bytes": 198,
+    "stored_sha256": "575ac4b90c5353a33be871dbe163d531ae75eb83953a4004529056e7b6c5fa75"
+  },
+  "checks/harness-strict.log.gz": {
+    "original_bytes": 19675,
+    "original_path": "checks/harness-strict.log",
+    "original_sha256": "435735bd003a3b4d0e4355d1d8b14307467c8ae842d95c61ce1ee4896a91ebb1",
+    "stored_bytes": 3845,
+    "stored_sha256": "2a6c27555b0bfcc6615dbd75b6ccdc924f88cc327b35866a576c1d19fa809ae9"
+  },
+  "checks/harness-tests.log.gz": {
+    "original_bytes": 25850,
+    "original_path": "checks/harness-tests.log",
+    "original_sha256": "153b254b4227f885cd9e6de40c14ef146c4954effb4c1b59beafa67edb17171b",
+    "stored_bytes": 6188,
+    "stored_sha256": "94376661ce14e37bfcc0dfd5a3e0e54be7fd923008000a6d1d69e1f99f5d75dc"
+  },
+  "checks/retention-unit-tests.log.gz": {
+    "original_bytes": 963,
+    "original_path": "checks/retention-unit-tests.log",
+    "original_sha256": "2f1dfb2e127d96de270c236ea2fef25e45dcfee76a4054b3c671e92c06f6a318",
+    "stored_bytes": 472,
+    "stored_sha256": "429600d8e4bd3b6753763cf450a2e5b1fec790ccf85b2f3765176498cc9ee70f"
+  },
+  "checks/rustfmt-final.log.gz": {
+    "original_bytes": 466,
+    "original_path": "checks/rustfmt-final.log",
+    "original_sha256": "6fb6cc46e02e5b393b69d167fa49250169e2c1b5841d1bae3c9ebbb429f24040",
+    "stored_bytes": 265,
+    "stored_sha256": "9f49cf2980dc16e4824923afff8d5fcedcb27638fb7b6f573c1a4623b954f3eb"
+  },
+  "checks/rustfmt-verified.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/rustfmt-verified.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/selector-count-corrected.log.gz": {
+    "original_bytes": 456,
+    "original_path": "checks/selector-count-corrected.log",
+    "original_sha256": "b72394e61c29810f82fba310b844a7cad62bed56d26b288d22ae05764633547c",
+    "stored_bytes": 309,
+    "stored_sha256": "00d1537e99def6a5ed5d7ea6f00d1b37200ee94572b3556b5f8dfbd3c7dfc466"
+  },
+  "checks/smoke-replay-final.log.gz": {
+    "original_bytes": 4534,
+    "original_path": "checks/smoke-replay-final.log",
+    "original_sha256": "4875128a486977a2a5573abfc22e44e30c89969c23afa7c22efef212bb071099",
+    "stored_bytes": 373,
+    "stored_sha256": "fa8acf5bf9e1416a972436e7aa3d1b9e78d1099e515daaf7a1af0eadca479c62"
+  }
+}

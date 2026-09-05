@@ -1,0 +1,16 @@
+{
+  "baseline-selector-count": "pass",
+  "boundaries": "pass",
+  "claims": "pass",
+  "crud-index": "pass",
+  "debug-binaries": "pass",
+  "debug-cli-smoke": "pass",
+  "harness-rustdoc": "pass",
+  "harness-strict": "failed",
+  "harness-tests": "failed",
+  "retention-unit-tests": "pass",
+  "rustfmt-final": "failed",
+  "rustfmt-verified": "pass",
+  "selector-count-corrected": "pass",
+  "smoke-replay-final": "pass"
+}
