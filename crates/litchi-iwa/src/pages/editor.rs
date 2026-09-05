@@ -97,6 +97,9 @@ const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
 const PAGES_SECTION_TEMPLATE_RECURSION_LIMIT: u32 = 8;
 const PAGES_SECTION_TEMPLATE_FIELD_MULTIPLIER: usize = 8;
 const PAGES_SECTION_TEMPLATE_WORK_MULTIPLIER: usize = 32;
+const PAGES_DOCUMENT_ROOT_RECURSION_LIMIT: u32 = 8;
+const PAGES_DOCUMENT_ROOT_FIELD_MULTIPLIER: usize = 8;
+const PAGES_DOCUMENT_ROOT_WORK_MULTIPLIER: usize = 64;
 
 use litchi_pages::header_footer::{HeaderFooterSelector, Kind, Template};
 pub use types::{PagesDrawableTextInfo, PagesSectionInfo, RemovedPagesTextBox};
@@ -3055,6 +3058,19 @@ struct DiscoveredPagesSectionTemplate {
     footers: Vec<u64>,
 }
 
+/// The root facts consumed by body-anchored Pages graph discovery.
+///
+/// Keep this projection deliberately small: graph reads need only the
+/// drawable z-order and theme identifiers plus the optional body-margin scalar.
+/// Creation, mutation, and reachability paths continue to use the complete
+/// `DocumentArchive` projection where they need its other fields.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct PagesDocumentRootFacts {
+    drawables_zorder: Option<u64>,
+    theme: Option<u64>,
+    left_margin: Option<f32>,
+}
+
 impl PagesSectionGraph {
     fn removal_order(&self) -> Vec<u64> {
         let mut result = vec![self.section_id];
@@ -4926,6 +4942,81 @@ fn root_document_body(package: &IWorkPackage) -> Result<DocumentBodySnapshot> {
     .map_err(|error| Error::InvalidFormat(format!("Invalid Pages root body references: {error}")))
 }
 
+/// Read the narrow root projection needed by body-anchored graph discovery.
+///
+/// The parsed archive is borrowed for the duration of the focused Buffa
+/// decode, and only the scalar facts needed by callers leave this
+/// function. This avoids allocating a generated `DocumentArchive` on every
+/// image, audio, movie, chart, or shape graph read while retaining the
+/// complete Prost route for mutation and broader reachability operations.
+fn pages_document_root_facts(package: &IWorkPackage) -> Result<PagesDocumentRootFacts> {
+    let limits = package.limits();
+    package.with_parsed_archive(DOCUMENT_ARCHIVE_NAME, |archive| {
+        let object = archive.object(DOCUMENT_OBJECT_ID).ok_or_else(|| {
+            Error::InvalidFormat(format!("Pages root object {DOCUMENT_OBJECT_ID} is missing"))
+        })?;
+        let payload = object
+            .messages
+            .iter()
+            .find(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)
+            .map(|message| message.data.as_slice())
+            .ok_or_else(|| {
+                Error::InvalidFormat("Pages root has no TP.DocumentArchive payload".to_owned())
+            })?;
+        pages_document_root_facts_from_payload(payload, limits)
+    })
+}
+
+fn pages_document_root_facts_from_payload(
+    source: &[u8],
+    limits: PackageLimits,
+) -> Result<PagesDocumentRootFacts> {
+    let snapshot = pages_body_codec::decode_document_root(
+        source,
+        pages_document_root_decode_options(limits, source),
+    )
+    .map_err(|error| Error::InvalidFormat(format!("Invalid Pages root graph facts: {error}")))?;
+    Ok(PagesDocumentRootFacts {
+        drawables_zorder: snapshot
+            .drawables_zorder()
+            .map(|reference| reference.identifier().get()),
+        theme: snapshot
+            .theme()
+            .map(|reference| reference.identifier().get()),
+        left_margin: snapshot.left_margin(),
+    })
+}
+
+fn pages_document_root_decode_options(
+    limits: PackageLimits,
+    source: &[u8],
+) -> PagesBodyDecodeOptions {
+    let stream_limit = limits
+        .max_iwa_stream_bytes()
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let archive_limit = limits
+        .archive_limits()
+        .max_archive_bytes()
+        .min(limits.archive_limits().max_message_bytes())
+        .min(stream_limit)
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let max_input_bytes = source.len().max(1).min(archive_limit);
+    let max_fields = source
+        .len()
+        .saturating_mul(PAGES_DOCUMENT_ROOT_FIELD_MULTIPLIER)
+        .clamp(1, WireLimits::MAX_FIELDS);
+    let max_work_bytes = source
+        .len()
+        .saturating_mul(PAGES_DOCUMENT_ROOT_WORK_MULTIPLIER)
+        .clamp(1, WireLimits::MAX_REWRITE_WORK);
+    PagesBodyDecodeOptions::new(
+        max_input_bytes,
+        max_fields,
+        max_work_bytes,
+        PAGES_DOCUMENT_ROOT_RECURSION_LIMIT,
+    )
+}
+
 fn root_document(package: &IWorkPackage) -> Result<DocumentArchive> {
     let archive = package.archive(DOCUMENT_ARCHIVE_NAME)?;
     let object = archive.object(DOCUMENT_OBJECT_ID).ok_or_else(|| {
@@ -5357,6 +5448,107 @@ mod section_template_discovery_tests {
                 "malformed section-template source should fail: {source:?}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod document_root_facts_tests {
+    use super::*;
+    use crate::protobuf::{tsa, tsk, tsp};
+
+    fn reference(identifier: u64) -> tsp::Reference {
+        tsp::Reference {
+            identifier,
+            ..Default::default()
+        }
+    }
+
+    fn root() -> DocumentArchive {
+        DocumentArchive {
+            super_: tsa::DocumentArchive {
+                super_: tsk::DocumentArchive::default(),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    fn varint(mut value: u64) -> Vec<u8> {
+        let mut encoded = Vec::new();
+        loop {
+            let mut byte = (value & 0x7f) as u8;
+            value >>= 7;
+            if value != 0 {
+                byte |= 0x80;
+            }
+            encoded.push(byte);
+            if value == 0 {
+                return encoded;
+            }
+        }
+    }
+
+    fn append_unknown_varint(source: &mut Vec<u8>, field: u32, value: u64) {
+        source.extend(varint(u64::from(field) << 3));
+        source.extend(varint(value));
+    }
+
+    fn append_length_delimited(source: &mut Vec<u8>, field: u32, value: &[u8]) {
+        source.extend(varint((u64::from(field) << 3) | 2));
+        source.extend(varint(value.len() as u64));
+        source.extend_from_slice(value);
+    }
+
+    #[test]
+    fn root_facts_copy_selected_values_and_ignore_unknown_fields() {
+        let mut document = root();
+        document.drawables_zorder = Some(reference(44));
+        document.theme = Some(reference(55));
+        document.left_margin = Some(12.5);
+        let mut source = document.encode_to_vec();
+        append_unknown_varint(&mut source, 99, 7);
+        let before = source.clone();
+
+        let facts = pages_document_root_facts_from_payload(&source, PackageLimits::default())
+            .expect("bounded root facts");
+
+        assert_eq!(facts.drawables_zorder, Some(44));
+        assert_eq!(facts.theme, Some(55));
+        assert_eq!(facts.left_margin, Some(12.5));
+        assert_eq!(source, before);
+    }
+
+    #[test]
+    fn root_facts_preserve_optional_absence_defaults() {
+        let source = root().encode_to_vec();
+        let facts = pages_document_root_facts_from_payload(&source, PackageLimits::default())
+            .expect("bounded root facts");
+
+        assert_eq!(facts.drawables_zorder, None);
+        assert_eq!(facts.theme, None);
+        assert_eq!(facts.left_margin, None);
+        assert_eq!(facts.left_margin.unwrap_or_default(), 0.0);
+    }
+
+    #[test]
+    fn root_facts_enforce_the_caller_message_byte_limit() {
+        let source = root().encode_to_vec();
+        let archive = PackageLimits::default()
+            .archive_limits()
+            .with_message_bytes(source.len() - 1)
+            .expect("valid message ceiling");
+        let limits = PackageLimits::default()
+            .with_archive_limits(archive)
+            .expect("valid package limits");
+        assert!(pages_document_root_facts_from_payload(&source, limits).is_err());
+    }
+
+    #[test]
+    fn root_facts_reject_zero_selected_reference() {
+        let mut source = root().encode_to_vec();
+        append_length_delimited(&mut source, 20, &[0x08, 0x00]);
+
+        assert!(pages_document_root_facts_from_payload(&source, PackageLimits::default()).is_err());
     }
 }
 

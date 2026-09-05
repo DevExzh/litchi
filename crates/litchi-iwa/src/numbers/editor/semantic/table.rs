@@ -1284,9 +1284,52 @@ impl NumbersEditor {
         row: usize,
         column: usize,
     ) -> Result<bool> {
+        let current = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;
+        if !matches!(&current, DataFormat::Custom(_)) {
+            return match current {
+                DataFormat::Automatic => Ok(false),
+                _ => Err(Error::InvalidFormat(
+                    "Cannot reset Custom format from a non-Custom cell".to_owned(),
+                )),
+            };
+        }
+
+        // The focused owner is admitted only for an exact source carrying the
+        // rooted TN.DocumentArchive field-9 registry edge.  Legacy builder
+        // packages keep the registry under the TSA field-12 edge; preserving
+        // that profile through the compatibility writer is required for both
+        // in-memory builder snapshots and their reopened bytes.  A present
+        // but malformed field-9 edge remains a focused terminal error.
+        if self.package.source_is_exact() && has_focused_custom_registry_edge(self)? {
+            let location = focused_data_format_owner_is_eligible(
+                self,
+                table_id,
+                row,
+                column,
+                &current,
+                &DataFormat::Automatic,
+            )?
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "focused Numbers owner rejected the existing Custom format".to_owned(),
+                )
+            })?;
+            *self = commit_exact_focused_data_format_with_location(
+                self,
+                table_id,
+                row,
+                column,
+                &current,
+                &DataFormat::Automatic,
+                location,
+            )?;
+            return Ok(true);
+        }
+
         let mut staged = self.package.clone();
-        let changed =
-            cell_data_format::reset_cell_custom_format(&mut staged, table_id, row, column)?;
+        // The Custom family was checked above; avoid decoding it again in
+        // the compatibility convenience wrapper.
+        let changed = cell_data_format::reset_cell_data_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
@@ -3437,6 +3480,81 @@ mod focused_custom_tests {
     }
 
     #[test]
+    fn exact_custom_reset_uses_focused_owner_and_preserves_registry_value_and_locality() {
+        let source_bytes = include_bytes!(
+            "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
+        );
+        let position = CellPosition::new(0, 0);
+        let source = FocusedNumbersPackage::from_bytes(source_bytes).expect("focused source");
+        let before_value = source
+            .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
+            .expect("original focused cell")
+            .storage()
+            .value()
+            .cloned();
+        let original = NumbersEditor::from_bytes(source_bytes).expect("exact editor");
+
+        let mut editor = original.clone();
+        assert!(
+            editor
+                .reset_table_cell_custom_format(4, 0, 0)
+                .expect("focused custom reset")
+        );
+        assert_eq!(
+            editor
+                .table_cell_data_format(4, 0, 0)
+                .expect("focused reset format"),
+            DataFormat::Automatic
+        );
+        assert_eq!(
+            editor
+                .table_cell_custom_format(4, 0, 0)
+                .expect("focused reset custom"),
+            None
+        );
+        let reset = FocusedNumbersPackage::from_bytes(&editor.to_bytes().expect("reset bytes"))
+            .expect("focused reset package");
+        assert_eq!(
+            reset
+                .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
+                .expect("reset focused cell")
+                .storage()
+                .value()
+                .cloned(),
+            before_value
+        );
+        assert!(
+            reset
+                .table_cell_custom_format(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    CellPosition::new(0, 1),
+                )
+                .expect("shared registry after focused reset")
+                .is_some()
+        );
+        assert_eq!(
+            editor.package().entry("Index/Unrelated.iwa"),
+            original.package().entry("Index/Unrelated.iwa")
+        );
+        assert_eq!(
+            editor.package().entry("Data/data-format-sentinel.bin"),
+            original.package().entry("Data/data-format-sentinel.bin")
+        );
+
+        let before_noop = editor.to_bytes().expect("automatic bytes");
+        assert!(
+            !editor
+                .reset_table_cell_custom_format(4, 0, 0)
+                .expect("automatic reset no-op")
+        );
+        assert_eq!(
+            editor.to_bytes().expect("automatic no-op bytes"),
+            before_noop
+        );
+    }
+
+    #[test]
     fn builder_custom_reopen_keeps_compatibility_profile() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_dimensions(2, 2)
@@ -3455,6 +3573,19 @@ mod focused_custom_tests {
         editor
             .set_table_cell_data_format(table_id, 0, 0, initial.clone().into())
             .expect("builder custom format");
+
+        let mut source_built_reset = editor.clone();
+        assert!(
+            source_built_reset
+                .reset_table_cell_custom_format(table_id, 0, 0)
+                .expect("source-built custom reset")
+        );
+        assert_eq!(
+            source_built_reset
+                .table_cell_data_format(table_id, 0, 0)
+                .expect("source-built reset format"),
+            DataFormat::Automatic
+        );
 
         let source_bytes = editor.to_bytes().expect("builder bytes");
         let mut reopened = NumbersEditor::from_bytes(&source_bytes).expect("reopened builder");
@@ -3512,6 +3643,39 @@ mod focused_custom_tests {
                 .expect("builder no-op retained source")
                 .as_ptr(),
             source_pointer
+        );
+
+        let mut reset_clone = reopened.clone();
+        assert!(
+            reset_clone
+                .reset_table_cell_custom_format(table_id, 0, 0)
+                .expect("builder custom reset")
+        );
+        assert_eq!(
+            reset_clone
+                .table_cell_custom_format(table_id, 0, 0)
+                .expect("builder reset read"),
+            None
+        );
+        assert_eq!(
+            reset_clone
+                .table_cell_data_format(table_id, 0, 0)
+                .expect("builder reset format"),
+            DataFormat::Automatic
+        );
+
+        let mut non_custom = reopened.clone();
+        non_custom
+            .set_table_cell_data_format(table_id, 0, 0, DataFormat::Number(Number::default()))
+            .expect("builder Number format");
+        let non_custom_bytes = non_custom.to_bytes().expect("Number source bytes");
+        let error = non_custom
+            .reset_table_cell_custom_format(table_id, 0, 0)
+            .expect_err("Number reset must reject non-Custom format");
+        assert!(error.to_string().contains("non-Custom cell"));
+        assert_eq!(
+            non_custom.to_bytes().expect("Number source unchanged"),
+            non_custom_bytes
         );
 
         reopened
@@ -3625,6 +3789,20 @@ mod focused_custom_tests {
             before
         );
         let error = actual
+            .reset_table_cell_custom_format(4, 0, 0)
+            .expect_err("malformed focused custom reset must refuse");
+        assert!(
+            error
+                .to_string()
+                .contains("focused Numbers cell data-format")
+        );
+        assert_eq!(
+            actual
+                .to_bytes()
+                .expect("malformed source unchanged after reset"),
+            before
+        );
+        let error = actual
             .set_table_cell_data_format(4, 0, 0, custom_number("Rejected", "#,##0;(#,##0)").into())
             .expect_err("malformed focused graph must refuse");
         assert!(
@@ -3679,6 +3857,18 @@ mod focused_custom_tests {
             );
             assert_eq!(editor.to_bytes().expect("unchanged source"), bytes);
         }
+        let error = editor
+            .reset_table_cell_custom_format(4, 0, 0)
+            .expect_err("present malformed edge reset is terminal");
+        assert!(
+            error
+                .to_string()
+                .contains("focused Numbers cell data-format")
+        );
+        assert_eq!(
+            editor.to_bytes().expect("unchanged source after reset"),
+            bytes
+        );
     }
 
     #[test]
