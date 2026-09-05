@@ -25,6 +25,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "pages_body_table_hidden_axes"
+path = "fuzz_targets/pages_body_table_hidden_axes.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

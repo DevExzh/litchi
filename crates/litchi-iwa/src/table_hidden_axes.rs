@@ -9,7 +9,10 @@ use crate::package_metadata::{next_object_identifier, set_package_last_object_id
 use crate::protobuf::{tsce, tsp, tst};
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
+use litchi_iwa_common::wire::parse_wire_view;
+use litchi_iwa_protos::table_info_codec;
 
 impl From<litchi_iwa_common::table::axis::Error> for crate::Error {
     fn from(error: litchi_iwa_common::table::axis::Error) -> Self {
@@ -17,8 +20,14 @@ impl From<litchi_iwa_common::table::axis::Error> for crate::Error {
     }
 }
 
-const TABLE_INFO_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
+// TableInfo uses the modern 6000 envelope and the historical 6003 envelope.
+// Keep this admission set independent from `TABLE_MODEL_MESSAGE_TYPES`: 6001
+// is the canonical TableModel payload, while 6003 is not a model role.
+const TABLE_INFO_MESSAGE_TYPES: &[u32] = &[6_000, 6_003];
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
+const TABLE_UID_MAP_MESSAGE_TYPES: &[u32] = &[6_200, 6_267];
+const TABLE_INFO_LEGACY_MESSAGE_TYPE: u32 = 6_003;
+const TABLE_INFO_PROJECTION_RECURSION_LIMIT: u32 = 64;
 const TABLE_INFO_HIDDEN_STATES_UUID_FIELD: u32 = 8;
 const TABLE_MODEL_HIDDEN_ROWS_FIELD: u32 = 14;
 const TABLE_MODEL_HIDDEN_COLUMNS_FIELD: u32 = 15;
@@ -309,6 +318,66 @@ impl HiddenStateObjectIds {
     }
 }
 
+/// Decode one table-info candidate only after validating its admitted wire
+/// shape.  Type 6003 is the sole compatibility exception: historical payloads
+/// can omit the empty Drawable `super` envelope, so a temporary prefix is used
+/// for the strict codec while the original bytes remain the generated decode
+/// source and the later rewrite authority.
+fn decode_table_info_candidate(message: &RawMessage) -> Result<Option<tst::TableInfoArchive>> {
+    if !TABLE_INFO_MESSAGE_TYPES.contains(&message.type_) {
+        return Ok(None);
+    }
+
+    let compatibility = if message.type_ == TABLE_INFO_LEGACY_MESSAGE_TYPE {
+        let view = match parse_wire_view(message.data.as_slice()) {
+            Ok(view) => view,
+            Err(_) => return Ok(None),
+        };
+        if view.fields().any(|field| field.number() == 1) {
+            None
+        } else {
+            let capacity = message.data.len().checked_add(2).ok_or_else(|| {
+                Error::InvalidFormat(
+                    "iWork legacy table-info projection source size overflowed".to_owned(),
+                )
+            })?;
+            if capacity > WireLimits::MAX_INPUT_BYTES {
+                return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                    kind: litchi_iwa_common::LimitKind::InputBytes,
+                    observed: capacity,
+                    limit: WireLimits::MAX_INPUT_BYTES,
+                }));
+            }
+            let mut prefixed = Vec::new();
+            prefixed.try_reserve_exact(capacity).map_err(|_error| {
+                Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                    resource: "iWork legacy table-info projection source",
+                    amount: capacity,
+                })
+            })?;
+            prefixed.extend_from_slice(&[0x0a, 0x00]);
+            prefixed.extend_from_slice(message.data.as_slice());
+            Some(prefixed)
+        }
+    } else {
+        None
+    };
+    let source = compatibility.as_deref().unwrap_or(message.data.as_slice());
+    let options = table_info_codec::DecodeOptions::new(
+        source.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        source.len().clamp(1, WireLimits::MAX_FIELDS),
+        source
+            .len()
+            .saturating_mul(4)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        TABLE_INFO_PROJECTION_RECURSION_LIMIT,
+    );
+    if table_info_codec::decode_table_info(source, options).is_err() {
+        return Ok(None);
+    }
+    Ok(tst::TableInfoArchive::decode(message.data.as_slice()).ok())
+}
+
 struct TableHiddenGraph {
     model_object_id: u64,
     model_archive: String,
@@ -349,8 +418,7 @@ fn table_hidden_graph(package: &IWorkPackage, model_object_id: u64) -> Result<Ta
                     )));
                 }
                 if object_id != model_object_id
-                    && TABLE_INFO_MESSAGE_TYPES.contains(&message.type_)
-                    && let Ok(info) = tst::TableInfoArchive::decode(message.data.as_slice())
+                    && let Some(info) = decode_table_info_candidate(message)?
                     && info.table_model.identifier == model_object_id
                     && info_match
                         .replace((
@@ -366,8 +434,13 @@ fn table_hidden_graph(package: &IWorkPackage, model_object_id: u64) -> Result<Ta
                         "iWork table model {model_object_id} has multiple table-info owners"
                     )));
                 }
-                if let Ok(map) = tst::ColumnRowUidMapArchive::decode(message.data.as_slice()) {
-                    uid_maps.insert(object_id, map);
+                if TABLE_UID_MAP_MESSAGE_TYPES.contains(&message.type_)
+                    && let Ok(map) = tst::ColumnRowUidMapArchive::decode(message.data.as_slice())
+                    && uid_maps.insert(object_id, map).is_some()
+                {
+                    return Err(Error::InvalidFormat(format!(
+                        "iWork axis UID map object {object_id} has multiple native payloads"
+                    )));
                 }
                 if message.type_ == 4_008
                     && let Ok(owner) =
@@ -403,6 +476,11 @@ fn table_hidden_graph(package: &IWorkPackage, model_object_id: u64) -> Result<Ta
             "iWork table info {info_object_id} has no formula-owner UUID"
         ))
     })?;
+    if is_zero_uuid(&formula_owner_uid) {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table info {info_object_id} has a zero formula-owner UUID"
+        )));
+    }
     let uid_map_id = info
         .view_column_row_uids
         .as_ref()
@@ -435,6 +513,7 @@ fn table_hidden_graph(package: &IWorkPackage, model_object_id: u64) -> Result<Ta
             .map_err(|_| Error::InvalidFormat("iWork column count exceeds usize".to_owned()))?,
         "column",
     )?;
+    validate_cross_axis_uuid_identity(&row_uids, &column_uids)?;
     Ok(TableHiddenGraph {
         model_object_id,
         model_archive,
@@ -449,6 +528,34 @@ fn table_hidden_graph(package: &IWorkPackage, model_object_id: u64) -> Result<Ta
         formula_owner_uid,
         row_uids,
         column_uids,
+    })
+}
+
+#[cfg(test)]
+pub(crate) struct TableHiddenGraphSnapshot {
+    pub(crate) model_message_type: u32,
+    pub(crate) info_message_type: u32,
+    pub(crate) row_count: usize,
+    pub(crate) column_count: usize,
+    pub(crate) info_archive: String,
+    pub(crate) info_object_id: u64,
+    pub(crate) info_message_index: usize,
+}
+
+#[cfg(test)]
+pub(crate) fn table_hidden_graph_snapshot(
+    package: &IWorkPackage,
+    model_object_id: u64,
+) -> Result<TableHiddenGraphSnapshot> {
+    let graph = table_hidden_graph(package, model_object_id)?;
+    Ok(TableHiddenGraphSnapshot {
+        model_message_type: graph.model_message_type,
+        info_message_type: graph.info_message_type,
+        row_count: graph.row_uids.len(),
+        column_count: graph.column_uids.len(),
+        info_archive: graph.info_archive,
+        info_object_id: graph.info_object_id,
+        info_message_index: graph.info_message_index,
     })
 }
 
@@ -475,6 +582,11 @@ fn physical_uids(
         let uid = sorted.get(stable_index).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork {axis} UID map references a missing UUID"))
         })?;
+        if is_zero_uuid(uid) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork {axis} UID map contains a zero UUID"
+            )));
+        }
         let expected_index = u32::try_from(index)
             .map_err(|_| Error::InvalidFormat(format!("iWork {axis} index exceeds u32")))?;
         if index_for_uid.get(stable_index).copied() != Some(expected_index)
@@ -487,6 +599,35 @@ fn physical_uids(
         physical.push(*uid);
     }
     Ok(physical)
+}
+
+fn validate_cross_axis_uuid_identity(
+    row_uids: &[tsp::Uuid],
+    column_uids: &[tsp::Uuid],
+) -> Result<()> {
+    let capacity = row_uids
+        .len()
+        .checked_add(column_uids.len())
+        .ok_or_else(|| Error::InvalidFormat("iWork table axis UUID count overflowed".to_owned()))?;
+    let mut seen = HashSet::new();
+    seen.try_reserve(capacity).map_err(|_| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "iWork table axis UUID identity",
+            amount: capacity,
+        })
+    })?;
+    for uid in row_uids.iter().chain(column_uids) {
+        if !seen.insert((uid.lower, uid.upper)) {
+            return Err(Error::InvalidFormat(
+                "iWork table row and column UID maps share a UUID".to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+const fn is_zero_uuid(uuid: &tsp::Uuid) -> bool {
+    uuid.lower == 0 && uuid.upper == 0
 }
 
 fn hidden_axes_from_graph(graph: &TableHiddenGraph) -> Result<HiddenAxes> {
@@ -511,6 +652,12 @@ fn hidden_axes_from_graph(graph: &TableHiddenGraph) -> Result<HiddenAxes> {
             graph.info_object_id
         ))
     })?;
+    if is_zero_uuid(active_uuid) {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table info {} has a zero active hidden-state UUID",
+            graph.info_object_id
+        )));
+    }
     let active = unique_active_state(owner, active_uuid)?;
     let mut axes = Vec::new();
     read_extent(
@@ -1040,5 +1187,42 @@ mod tests {
                 upper: 200,
             }
         );
+    }
+
+    #[test]
+    fn legacy_table_info_projection_accepts_sparse_and_rejects_malformed_super() {
+        let sparse = RawMessage {
+            type_: TABLE_INFO_LEGACY_MESSAGE_TYPE,
+            data: vec![0x12, 0x02, 0x08, 0x2a],
+        };
+        let decoded = decode_table_info_candidate(&sparse)
+            .unwrap()
+            .expect("sparse legacy TableInfo should retain compatibility");
+        assert_eq!(decoded.table_model.identifier, 42);
+
+        let malformed = RawMessage {
+            type_: TABLE_INFO_LEGACY_MESSAGE_TYPE,
+            // A present field 1 must be the required length-delimited
+            // Drawable envelope; a scalar field must not claim ownership.
+            data: vec![0x08, 0x01, 0x12, 0x02, 0x08, 0x2a],
+        };
+        assert!(decode_table_info_candidate(&malformed).unwrap().is_none());
+    }
+
+    #[test]
+    fn axis_uid_validation_rejects_zero_and_cross_axis_aliases() {
+        let zero = tsp::Uuid::default();
+        assert!(physical_uids(&[zero], &[0], &[0], 1, "row").is_err());
+
+        let row = tsp::Uuid {
+            lower: 7,
+            upper: 11,
+        };
+        let column = tsp::Uuid {
+            lower: 13,
+            upper: 17,
+        };
+        assert!(validate_cross_axis_uuid_identity(&[row], &[column]).is_ok());
+        assert!(validate_cross_axis_uuid_identity(&[row], &[row]).is_err());
     }
 }

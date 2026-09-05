@@ -362,6 +362,10 @@ mod tests {
     use crate::keynote::KeynoteDocumentBuilder;
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
     use litchi_keynote::slide::audio::Options as SlideAudioOptions;
+    use litchi_keynote::slide::media::{
+        MediaLoopMode as KeynoteMediaLoopMode,
+        MediaPlaybackSettings as KeynoteMediaPlaybackSettings, MediaVolume as KeynoteMediaVolume,
+    };
     use litchi_keynote::{MovieSelector, Package as KeynotePackage, SlideSelector};
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-audio";
@@ -375,6 +379,23 @@ mod tests {
             aspect_ratio_locked: Some(true),
             accessibility_description: Some(description.to_owned()),
         }
+    }
+
+    fn keynote_playback(value: MediaPlaybackSettings) -> KeynoteMediaPlaybackSettings {
+        KeynoteMediaPlaybackSettings {
+            start_time: value.start_time,
+            end_time: value.end_time,
+            poster_time: value.poster_time,
+            loop_mode: value
+                .loop_mode
+                .map(|mode| KeynoteMediaLoopMode::from_raw(mode.as_raw())),
+            volume: value.volume.map(|volume| {
+                KeynoteMediaVolume::new(volume.as_f32())
+                    .expect("common playback volume is already validated")
+            }),
+        }
+        .canonicalize()
+        .expect("common playback values are valid Keynote settings")
     }
 
     #[test]
@@ -420,7 +441,7 @@ mod tests {
         let commit = package
             .edit_slide_movie_playback_settings(SlideSelector::index(0), MovieSelector::index(0))
             .unwrap()
-            .set(changed_playback.try_into().unwrap())
+            .set(keynote_playback(changed_playback))
             .unwrap()
             .commit()
             .unwrap();
@@ -435,7 +456,7 @@ mod tests {
         let commit = package
             .edit_slide_movie_playback_settings(SlideSelector::index(0), MovieSelector::index(0))
             .unwrap()
-            .set(created.playback.try_into().unwrap())
+            .set(keynote_playback(created.playback))
             .unwrap()
             .commit()
             .unwrap();

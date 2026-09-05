@@ -1,0 +1,98 @@
+// Narrow, read-only Buffa projection for the Pages body-table hidden-state
+// graph.  The repeated state collections intentionally stay out of this
+// schema: the handwritten codec streams them from caller-owned bytes so a
+// hostile archive cannot turn a lazy view into an input-width allocation.
+//
+// This is a projection of TSP/TSTArchives.proto, not a second authoritative
+// native schema.  The build script pins every declaration below to the
+// canonical schemas before compiling the private sidecar.
+syntax = "proto2";
+package LitchiIwaPagesHiddenStateProjection;
+
+message Uuid {
+  required uint64 lower = 1;
+  required uint64 upper = 2;
+}
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message CFUUIDArchive {
+  optional bytes uuid_bytes = 1;
+  optional uint32 uuid_w0 = 2;
+  optional uint32 uuid_w1 = 3;
+  optional uint32 uuid_w2 = 4;
+  optional uint32 uuid_w3 = 5;
+}
+
+// These roots have separate audited strict codecs. Only their identity
+// envelopes are projected here; collection fields stay on those codecs.
+message FormulaOwnerDependenciesArchive {
+  required bytes formula_owner_uid = 1;
+  required uint32 internal_formula_owner_id = 2;
+  optional uint32 owner_kind = 3;
+  optional bytes formula_owner = 11;
+  optional bytes base_owner_uid = 12;
+}
+
+message ColumnRowUidMapArchive {
+}
+
+message HiddenStateFormulaOwnerArchive {
+  optional bytes owner_id = 1;
+  optional bool needs_to_update_filter_set_for_import = 3;
+}
+
+message FilterSetArchive {
+  optional int32 type = 1;
+  optional bool is_enabled = 2;
+  optional bool needs_formula_rewrite_for_import = 4;
+}
+
+message TableInfoArchive {
+  optional bytes super = 1;
+  optional bytes table_model = 2;
+  optional bytes view_column_row_uids = 6;
+  optional bytes hidden_states_uuid = 8;
+}
+
+message TableModelArchive {
+  optional uint32 number_of_rows = 6;
+  optional uint32 number_of_columns = 7;
+  optional uint32 number_of_hidden_rows = 14;
+  optional uint32 number_of_hidden_columns = 15;
+  optional bytes hidden_state_formula_owner_for_columns = 34;
+  optional bytes hidden_state_formula_owner_for_rows = 35;
+  optional uint32 number_of_user_hidden_rows = 41;
+  optional uint32 number_of_user_hidden_columns = 42;
+  optional uint32 number_of_filtered_rows = 40;
+  optional bytes base_column_row_uids = 46;
+  optional bytes hidden_states_owner = 70;
+}
+
+message HiddenStatesOwnerArchive {
+  required bytes owner_uid = 1;
+}
+
+message HiddenStatesArchive {
+  required bytes hidden_states_uid = 1;
+  required bytes column_hidden_state_extent = 2;
+  required bytes row_hidden_state_extent = 3;
+}
+
+message HiddenStateExtentArchive {
+  required bytes hidden_state_extent_uid = 1;
+  required int32 row_or_column_direction = 3;
+  optional bool needs_to_update_filter_set_for_import = 6;
+  optional bytes filter_set = 8;
+}
+
+message RowOrColumnState {
+  required bytes row_or_column_uid = 1;
+  optional bool user_hidden = 2;
+  optional bool filtered = 3;
+  optional bool pivot_hidden = 4;
+}

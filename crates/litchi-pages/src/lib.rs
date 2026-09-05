@@ -101,6 +101,11 @@ pub use package::{
     BodyTableHeaderSettingsLimitKind, BodyTableHeaderSettingsPatch,
 };
 pub use package::{
+    BodyTableHiddenAxesCommit, BodyTableHiddenAxesDiagnostics, BodyTableHiddenAxesEdit,
+    BodyTableHiddenAxesError, BodyTableHiddenAxesLimitKind, BodyTableHiddenAxesPatch,
+    BodyTableHiddenAxesPath,
+};
+pub use package::{
     BodyTableLockCommit, BodyTableLockDiagnostics, BodyTableLockEdit, BodyTableLockError,
     BodyTableLockLimitKind, BodyTableLockPatch,
 };

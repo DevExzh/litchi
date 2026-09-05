@@ -68,6 +68,43 @@ declarations, 227 canonical edges, 11 development-only edges, 11 ordered migrati
 not evidence that the concrete format owners or the monolith deletion gate are complete; the
 focused Keynote physical-sort slice closes no debt or gate.
 
+The Pages matrix now records a bounded existing body-table hidden-axis owner. Its public surface
+uses `BodyTableSelector` (checked position or exact visible name) with archive-free
+`table::hidden_axes::{AxisIndex, HiddenAxes}` values and
+`Package::{body_table_hidden_axes, edit_body_table_hidden_axes, apply_body_table_hidden_axes}`
+transactions. The strict source-backed route validates one role-qualified `TableInfoArchive`
+(current type 6000 or qualified legacy type 6003) and `TableModelArchive` (current type 6001 or
+qualified legacy type 6000), then the canonical type-6267 row/column UID map (qualified legacy
+type 6200 is admitted only through its legacy route), type-4008 formula-owner links, active
+hidden-state UUID, and directional extents before exposing only user-hidden row/column positions. Bounds, duplicates, malformed or
+ambiguous ownership, stale UUIDs, bad UID maps, unsupported pivot/dependency graphs, locked
+tables, and finite wire/archive limits fail closed. On admitted existing-owner rewrites,
+filtered/pivot markers and unknown native fields remain preserved; unsupported pivot/dependency
+topologies refuse changed edits. An absent hidden-state owner reads as empty, an empty request is
+an exact source no-op, and a nonempty absent-owner request returns `UnsupportedDependency` or
+`UnsupportedSource` without publication. Existing-owner commits are copy-on-write,
+candidate-reopened, local to the selected component, invalidate the three canonical root previews,
+and provide exact source-bound apply/inverse patches. This remains visibility metadata, not
+cell/formula, filter/pivot, sorting, or row/column topology support.
+
+The Pages raw-ID `PagesEditor` hidden-axis route and the shared Numbers/Keynote adapter remain
+migration-host compatibility until creation parity and native mutation gates pass. Focused Pages
+graph, codec, identity/COW, and concurrency tests cover the E1 source/self-round-trip contract. The
+checked-in [`body-table-visible.pages`](../test-data/iwork/pages/body-table-visible.pages) fixture
+is a native Pages 14.4 baseline: its visible body table is 5 by 4 with a body marker. Disposable
+Computer Use copies were saved, closed, and reopened without repair; the focused package save path
+also produced byte-identical output for the visible-table/no-op operation. The checked-in fixture
+contains no user-hidden axes, so it supplies native visible-table/no-op baseline evidence, not
+positive hidden-axis E2 or E3/E4 mutation evidence. The registered hidden-axis fuzz target
+exercises bounded descriptors with checked-in valid, malformed, ownership, and limit seeds; current
+fuzz verification is tracked with ADR 0008. An earlier exploratory Pages 14.4 attempt logged an NSCocoa
+MissingObject/TSPersistence Import document error for a generated candidate; save/close timed out,
+no reopen occurred, and AppleScript table creation stalled without GUI inspection. That older
+attempt remains negative exploratory history and gives no hidden-axis E2 or E3/E4 promotion. The
+focused route remains terminal on unsupported native shapes, with no fallback to the migration
+host. This owner does not change the 64/238/227/11/11 topology/debt inventory or any ADR 0028
+deletion gate.
+
 The Numbers matrix now records bounded existing-cell Number, Percentage, Currency, Scientific,
 Fraction, Text, Date & Time, Duration, and document-scoped Custom display-format owners. Text support is
 limited to focused E1 owner evidence plus checked-in native-fixture E2 read/no-op evidence and has

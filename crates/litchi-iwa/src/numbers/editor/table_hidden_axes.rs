@@ -42,6 +42,7 @@ impl NumbersEditor {
 mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
+    use crate::table_hidden_axes::table_hidden_graph_snapshot;
     use crate::table_hidden_axes::{
         FILTER_SET_MESSAGE_TYPE, HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE,
     };
@@ -100,6 +101,54 @@ mod tests {
                 .table_hidden_axes(test_table_selector(&editor, table_id))
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn legacy_table_info_type_6003_keeps_canonical_model_and_axis_graph() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(4, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let hidden = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).unwrap();
+
+        editor
+            .set_table_hidden_axes(test_table_selector(&editor, table_id), &hidden)
+            .unwrap();
+
+        let graph = table_hidden_graph_snapshot(&editor.package, table_id).unwrap();
+        // Source-built Numbers tables use the canonical type-6001 model while
+        // retaining the canonical type-6000 TableInfo envelope.
+        assert_eq!(graph.model_message_type, 6_001);
+        assert_eq!(graph.info_message_type, 6_000);
+        assert_eq!(graph.row_count, 4);
+        assert_eq!(graph.column_count, 3);
+
+        let info_archive = graph.info_archive.clone();
+        let info_object_id = graph.info_object_id;
+        let info_message_index = graph.info_message_index;
+        editor
+            .package
+            .update_archive(&info_archive, |archive| {
+                let object = archive.object_mut(info_object_id).ok_or_else(|| {
+                    Error::InvalidFormat("Numbers table-info owner disappeared".to_owned())
+                })?;
+                let message = object.messages[info_message_index].clone();
+                let data = crate::wire::patch_length_delimited_field(&message.data, 1, true, None)?;
+                object.replace_message(info_message_index, RawMessage { type_: 6_003, data })?;
+                Ok(())
+            })
+            .unwrap();
+
+        let legacy_graph = table_hidden_graph_snapshot(&editor.package, table_id).unwrap();
+        assert_eq!(legacy_graph.model_message_type, 6_001);
+        assert_eq!(legacy_graph.info_message_type, 6_003);
+        assert_eq!(legacy_graph.row_count, 4);
+        assert_eq!(legacy_graph.column_count, 3);
+        assert_eq!(
+            read_native_table_hidden_axes(&editor.package, table_id).unwrap(),
+            hidden
         );
     }
 

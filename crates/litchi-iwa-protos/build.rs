@@ -11,7 +11,8 @@ use sha2::{Digest, Sha256};
 mod production_codec_guard;
 
 use production_codec_guard::{
-    FORBIDDEN_BUFFA_OWNERSHIP_MARKERS, FORBIDDEN_PROST_CODEC_MARKERS, production_codec_source,
+    FORBIDDEN_BUFFA_OWNERSHIP_MARKERS, FORBIDDEN_PROST_CODEC_MARKERS, has_forbidden_codec_marker,
+    production_codec_source,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -111,6 +112,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/pages_document_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_page_layout_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_section_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_hidden_state_codec.rs");
+    println!("cargo:rerun-if-changed=src/buffa-projections/TSTPagesHiddenStateProjection.proto");
+    println!("cargo:rerun-if-changed=src/protos/TSPMessages.proto");
+    println!("cargo:rerun-if-changed=src/protos/TSTArchives.proto");
+    println!("cargo:rerun-if-changed=src/protos/TSCEArchives.proto");
     println!("cargo:rerun-if-changed=src/production_codec_guard.rs");
     println!("cargo:rerun-if-changed=src/table_info_codec.rs");
     println!("cargo:rerun-if-changed=src/table_appearance_codec.rs");
@@ -233,6 +239,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_formula_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_native_message_provenance(proto_directory)?;
     enforce_pages_body_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_pages_hidden_state_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_media_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_drawable_parent_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_movie_caption_projection_provenance(proto_directory, buffa_projection_directory)?;
@@ -1207,6 +1214,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile()?;
     enforce_pages_body_projection_budget(&buffa_pages_body_out_directory)?;
 
+    // Pages body-table hidden-state discovery needs only the singular scalar
+    // envelopes. Repeated hidden-state/extents/state records remain on the
+    // handwritten bounded router so an archive cannot turn a lazy view into
+    // an input-width allocation. Source bytes stay authoritative for every
+    // rewrite.
+    let buffa_pages_hidden_state_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-pages-hidden-state");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSTPagesHiddenStateProjection.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_pages_hidden_state_out_directory)
+        .include_file("iwa_pages_hidden_state_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_pages_hidden_state_projection_budget(&buffa_pages_hidden_state_out_directory)?;
+
     // Pages media discovery needs only the audio-only discriminator from the
     // shared MovieArchive. Keep the complete media graph and every unrelated
     // field on the caller-owned raw/prost compatibility path.
@@ -1522,6 +1551,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "TSTTableInfoArchive.proto",
             1010,
             "93d7d29b24f2e279e5d62a900142890e99417ce0caa098cbf65d3dbb47088c3c",
+        ),
+        (
+            "TSTPagesHiddenStateProjection.proto",
+            3043,
+            "a95c09076d1d35556287828365a21049f37f839b1289f7f2f591457cf649b713",
         ),
         (
             "TSTTableTitleSettingsArchive.proto",
@@ -1863,6 +1897,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_pages_body_generated {",
         ),
         (
+            "src/pages_hidden_state_codec.rs",
+            "crate::buffa_pages_hidden_state_generated::",
+            "mod buffa_pages_hidden_state_generated {",
+        ),
+        (
             "src/pages_media_codec.rs",
             "crate::buffa_pages_media_generated::",
             "mod buffa_pages_media_generated {",
@@ -2073,8 +2112,12 @@ fn rust_declaration_item(declaration: &str) -> Option<&str> {
 /// inside a literal is rejected. `production_codec_source` removes complete
 /// `#[cfg(test)]` items before the lexical pass.
 fn rust_code_marker_count(source: &str, marker: &str) -> usize {
+    rust_code_marker_offsets(source, marker).len()
+}
+
+fn rust_code_marker_offsets(source: &str, marker: &str) -> Vec<usize> {
     if marker.is_empty() {
-        return 0;
+        return Vec::new();
     }
 
     let production = production_codec_source(source);
@@ -2124,16 +2167,153 @@ fn rust_code_marker_count(source: &str, marker: &str) -> usize {
 
     source
         .match_indices(marker)
-        .filter(|(start, _)| {
-            let Some(end) = start.checked_add(marker.len()) else {
-                return false;
-            };
-            marker_start.get(*start).copied().unwrap_or(false)
+        .filter_map(|(start, _)| {
+            let end = start.checked_add(marker.len())?;
+            (marker_start.get(start).copied().unwrap_or(false)
                 && code
-                    .get(*start..end)
-                    .is_some_and(|span| span.iter().all(|is_code| *is_code))
+                    .get(start..end)
+                    .is_some_and(|span| span.iter().all(|is_code| *is_code)))
+            .then_some(start)
         })
-        .count()
+        .collect()
+}
+
+/// Count one exact Rust string literal in production code. Unlike a marker
+/// count, this intentionally matches the literal token itself: generated
+/// include paths are strings, but a comment or another literal containing the
+/// same text must not satisfy the private-module boundary.
+fn rust_string_literal_count(source: &str, expected: &str) -> usize {
+    let production = production_codec_source(source);
+    let source = production.as_ref();
+    let bytes = source.as_bytes();
+    let expected = expected.as_bytes();
+    let mut count = 0usize;
+    let mut cursor = 0usize;
+    while cursor < bytes.len() {
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'/') {
+            cursor = bytes[cursor..]
+                .iter()
+                .position(|byte| *byte == b'\n')
+                .map_or(bytes.len(), |offset| cursor + offset + 1);
+            continue;
+        }
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+            cursor = rust_block_comment_end(bytes, cursor);
+            continue;
+        }
+        let Some(end) = rust_route_literal_end(bytes, cursor) else {
+            cursor += 1;
+            continue;
+        };
+        if bytes.get(cursor..end) == Some(expected) {
+            count = count.saturating_add(1);
+        }
+        cursor = end;
+    }
+    count
+}
+
+/// Check a marker within the body of the one function carrying `declaration`.
+/// This keeps strict wrapper/cross-check pairs associated without depending on
+/// item order or line layout.  The small brace scanner skips comments and Rust
+/// literals so fixture text cannot manufacture a function boundary.
+fn rust_function_body_contains_marker(source: &str, declaration: &str, marker: &str) -> bool {
+    let production = production_codec_source(source);
+    let source = production.as_ref();
+    let Some(start) = rust_code_marker_offsets(source, declaration)
+        .first()
+        .copied()
+    else {
+        return false;
+    };
+    let signature_start = start.saturating_add(declaration.len());
+    let Some(opening_brace) = rust_code_opening_brace(source, signature_start) else {
+        return false;
+    };
+    let Some(end) = rust_braced_item_end(source, opening_brace) else {
+        return false;
+    };
+    rust_code_marker_count(&source[opening_brace..end], marker) != 0
+}
+
+fn rust_code_opening_brace(source: &str, mut cursor: usize) -> Option<usize> {
+    let bytes = source.as_bytes();
+    while cursor < bytes.len() {
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'/') {
+            cursor = bytes[cursor..]
+                .iter()
+                .position(|byte| *byte == b'\n')
+                .map_or(bytes.len(), |offset| cursor + offset + 1);
+            continue;
+        }
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+            cursor = rust_block_comment_end(bytes, cursor);
+            continue;
+        }
+        if let Some(end) = rust_route_literal_end(bytes, cursor) {
+            cursor = end;
+            continue;
+        }
+        if bytes[cursor] == b'{' {
+            return Some(cursor);
+        }
+        cursor += 1;
+    }
+    None
+}
+
+fn rust_braced_item_end(source: &str, opening_brace: usize) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let mut depth = 0usize;
+    let mut cursor = opening_brace;
+    while cursor < bytes.len() {
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'/') {
+            cursor = bytes[cursor..]
+                .iter()
+                .position(|byte| *byte == b'\n')
+                .map_or(bytes.len(), |offset| cursor + offset + 1);
+            continue;
+        }
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+            cursor = rust_block_comment_end(bytes, cursor);
+            continue;
+        }
+        if let Some(end) = rust_route_literal_end(bytes, cursor) {
+            cursor = end;
+            continue;
+        }
+        match bytes[cursor] {
+            b'{' => depth = depth.checked_add(1)?,
+            b'}' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return cursor.checked_add(1);
+                }
+            },
+            _ => {},
+        }
+        cursor += 1;
+    }
+    None
+}
+
+fn rust_block_comment_end(bytes: &[u8], mut cursor: usize) -> usize {
+    let mut depth = 0usize;
+    while cursor < bytes.len() {
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+            depth = depth.saturating_add(1);
+            cursor += 2;
+        } else if bytes.get(cursor) == Some(&b'*') && bytes.get(cursor + 1) == Some(&b'/') {
+            depth = depth.saturating_sub(1);
+            cursor += 2;
+            if depth == 0 {
+                return cursor;
+            }
+        } else {
+            cursor += 1;
+        }
+    }
+    cursor
 }
 
 /// Return the end of a Rust string, byte string, raw string, character, or
@@ -6398,6 +6578,586 @@ fn enforce_pages_body_projection_provenance(
     Ok(())
 }
 
+fn enforce_pages_hidden_state_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    // Keep the hidden-axis sidecar tied to the native archive declarations.
+    // The selected repeated fields are intentionally represented as opaque
+    // envelopes here; the handwritten codec owns their bounded traversal and
+    // source-preserving rewrite semantics.
+    const TABLE_INFO_FIELDS: [&str; 4] = [
+        "required .TSD.DrawableArchive super = 1;",
+        "required .TSP.Reference tableModel = 2;",
+        "optional .TSP.Reference view_column_row_uids = 6;",
+        "optional .TSP.UUID hidden_states_uuid = 8;",
+    ];
+    const TABLE_MODEL_FIELDS: [&str; 11] = [
+        "required uint32 number_of_rows = 6;",
+        "required uint32 number_of_columns = 7;",
+        "optional uint32 number_of_hidden_rows = 14;",
+        "optional uint32 number_of_hidden_columns = 15;",
+        "optional .TSP.Reference hidden_state_formula_owner_for_columns = 34;",
+        "optional .TSP.Reference hidden_state_formula_owner_for_rows = 35;",
+        "optional uint32 number_of_filtered_rows = 40;",
+        "optional uint32 number_of_user_hidden_rows = 41;",
+        "optional uint32 number_of_user_hidden_columns = 42;",
+        "optional .TSP.Reference base_column_row_uids = 46;",
+        "optional .TST.HiddenStatesOwnerArchive hidden_states_owner = 70;",
+    ];
+    const OWNER_FIELDS: [&str; 2] = [
+        "required .TSP.UUID owner_uid = 1;",
+        "repeated .TST.HiddenStatesArchive hidden_states = 2;",
+    ];
+    const HIDDEN_STATES_FIELDS: [&str; 3] = [
+        "required .TSP.UUID hidden_states_uid = 1;",
+        "required .TST.HiddenStateExtentArchive column_hidden_state_extent = 2;",
+        "required .TST.HiddenStateExtentArchive row_hidden_state_extent = 3;",
+    ];
+    const EXTENT_FIELDS: [&str; 5] = [
+        "required .TSP.UUID hidden_state_extent_uid = 1;",
+        "repeated .TST.HiddenStateExtentArchive.RowOrColumnState base_hidden_states = 2;",
+        "required .TST.HiddenStateExtentArchive.RowOrColumnDirection row_or_column_direction = 3;",
+        "optional bool needs_to_update_filter_set_for_import = 6 [default = false];",
+        "optional .TSP.Reference filter_set = 8;",
+    ];
+    const ROW_STATE_FIELDS: [&str; 4] = [
+        "required .TSP.UUID row_or_column_uid = 1;",
+        "optional bool user_hidden = 2;",
+        "optional bool filtered = 3;",
+        "optional bool pivot_hidden = 4;",
+    ];
+    const UID_MAP_FIELDS: [&str; 6] = [
+        "repeated .TSP.UUID sorted_column_uids = 1;",
+        "repeated uint32 column_index_for_uid = 2;",
+        "repeated uint32 column_uid_for_index = 3;",
+        "repeated .TSP.UUID sorted_row_uids = 4;",
+        "repeated uint32 row_index_for_uid = 5;",
+        "repeated uint32 row_uid_for_index = 6;",
+    ];
+    const FORMULA_OWNER_DEPENDENCY_FIELDS: [&str; 5] = [
+        "required .TSP.UUID formula_owner_uid = 1;",
+        "required uint32 internal_formula_owner_id = 2;",
+        "optional uint32 owner_kind = 3 [default = 0];",
+        "optional .TSP.Reference formula_owner = 11;",
+        "optional .TSP.UUID base_owner_uid = 12;",
+    ];
+    const HIDDEN_FORMULA_OWNER_FIELDS: [&str; 2] = [
+        "optional .TSP.CFUUIDArchive owner_id = 1;",
+        "optional bool needs_to_update_filter_set_for_import = 3 [default = false];",
+    ];
+    const FILTER_SET_FIELDS: [&str; 4] = [
+        "optional .TST.FilterSetArchive.FilterSetType type = 1 [default = FilterSetArchiveTypeAll];",
+        "optional bool is_enabled = 2 [default = true];",
+        "optional bool needs_formula_rewrite_for_import = 4 [default = false];",
+        "repeated uint32 filter_offsets = 5;",
+    ];
+    const CFUUID_FIELDS: [&str; 5] = [
+        "optional bytes uuid_bytes = 1;",
+        "optional uint32 uuid_w0 = 2;",
+        "optional uint32 uuid_w1 = 3;",
+        "optional uint32 uuid_w2 = 4;",
+        "optional uint32 uuid_w3 = 5;",
+    ];
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaPagesHiddenStateProjection;\n\
+message Uuid {\n\
+required uint64 lower = 1;\n\
+required uint64 upper = 2;\n\
+}\n\
+message Reference {\n\
+required uint64 identifier = 1;\n\
+optional int32 deprecated_type = 2;\n\
+optional bool deprecated_is_external = 3;\n\
+}\n\
+message CFUUIDArchive {\n\
+optional bytes uuid_bytes = 1;\n\
+optional uint32 uuid_w0 = 2;\n\
+optional uint32 uuid_w1 = 3;\n\
+optional uint32 uuid_w2 = 4;\n\
+optional uint32 uuid_w3 = 5;\n\
+}\n\
+message FormulaOwnerDependenciesArchive {\n\
+required bytes formula_owner_uid = 1;\n\
+required uint32 internal_formula_owner_id = 2;\n\
+optional uint32 owner_kind = 3;\n\
+optional bytes formula_owner = 11;\n\
+optional bytes base_owner_uid = 12;\n\
+}\n\
+message ColumnRowUidMapArchive {\n\
+}\n\
+message HiddenStateFormulaOwnerArchive {\n\
+optional bytes owner_id = 1;\n\
+optional bool needs_to_update_filter_set_for_import = 3;\n\
+}\n\
+message FilterSetArchive {\n\
+optional int32 type = 1;\n\
+optional bool is_enabled = 2;\n\
+optional bool needs_formula_rewrite_for_import = 4;\n\
+}\n\
+message TableInfoArchive {\n\
+optional bytes super = 1;\n\
+optional bytes table_model = 2;\n\
+optional bytes view_column_row_uids = 6;\n\
+optional bytes hidden_states_uuid = 8;\n\
+}\n\
+message TableModelArchive {\n\
+optional uint32 number_of_rows = 6;\n\
+optional uint32 number_of_columns = 7;\n\
+optional uint32 number_of_hidden_rows = 14;\n\
+optional uint32 number_of_hidden_columns = 15;\n\
+optional bytes hidden_state_formula_owner_for_columns = 34;\n\
+optional bytes hidden_state_formula_owner_for_rows = 35;\n\
+optional uint32 number_of_user_hidden_rows = 41;\n\
+optional uint32 number_of_user_hidden_columns = 42;\n\
+optional uint32 number_of_filtered_rows = 40;\n\
+optional bytes base_column_row_uids = 46;\n\
+optional bytes hidden_states_owner = 70;\n\
+}\n\
+message HiddenStatesOwnerArchive {\n\
+required bytes owner_uid = 1;\n\
+}\n\
+message HiddenStatesArchive {\n\
+required bytes hidden_states_uid = 1;\n\
+required bytes column_hidden_state_extent = 2;\n\
+required bytes row_hidden_state_extent = 3;\n\
+}\n\
+message HiddenStateExtentArchive {\n\
+required bytes hidden_state_extent_uid = 1;\n\
+required int32 row_or_column_direction = 3;\n\
+optional bool needs_to_update_filter_set_for_import = 6;\n\
+optional bytes filter_set = 8;\n\
+}\n\
+message RowOrColumnState {\n\
+required bytes row_or_column_uid = 1;\n\
+optional bool user_hidden = 2;\n\
+optional bool filtered = 3;\n\
+optional bool pivot_hidden = 4;\n\
+}";
+    const EXPECTED_PROJECTION_BYTES: usize = 3_043;
+    const EXPECTED_PROJECTION_DIGEST: &str =
+        "a95c09076d1d35556287828365a21049f37f839b1289f7f2f591457cf649b713";
+    // Hash the complete selected native message blocks in addition to checking
+    // individual fields.  This keeps a compatible-looking field spelling from
+    // silently changing defaults, nested declarations, or unknown-field
+    // topology without coupling this guard to declaration order in the source
+    // files.  Formatting-only changes intentionally require an explicit
+    // provenance review because the source itself is part of the contract.
+    const EXPECTED_NATIVE_MESSAGE_DIGESTS: [(&str, &str); 13] = [
+        (
+            "TSP.UUID",
+            "b5cd8b21efc69c6af171a822ad50c1745a6bba1e46a9c9956b12c849e8843b7c",
+        ),
+        (
+            "TSP.Reference",
+            "f6738dbdfeb79896b045e8666fca563ab3e73238568468a7062834b9dcbe02fc",
+        ),
+        (
+            "TSP.CFUUIDArchive",
+            "47e505d0be05e21c6d1f4822f332a209945295d1f7fcc6070ca68d2f452f0ddd",
+        ),
+        (
+            "TST.TableInfoArchive",
+            "85bb994a30962432c2e0ae65acfddb3b06c570e29716b34e87cd3d1493f779c4",
+        ),
+        (
+            "TST.TableModelArchive",
+            "638757a1e084067397c6e02c3dafc46e5613915d729efdd2e2ddb0c040e2e91b",
+        ),
+        (
+            "TST.HiddenStatesOwnerArchive",
+            "7749832b0634b14eb36fa4e3709ba1a7480afb0b584c80014a05e81f73e624db",
+        ),
+        (
+            "TST.HiddenStatesArchive",
+            "2f8d1ae25ba8e51c41ae0fe177232dd4a871f9a49c4b86691d82a16c4aeabf9f",
+        ),
+        (
+            "TST.HiddenStateExtentArchive",
+            "a6607ac6455dbde6702628a236101e3dd96776ec80110c9dee0f4e8892010f11",
+        ),
+        (
+            "TST.HiddenStateExtentArchive.RowOrColumnState",
+            "9e8b4938390a59f05b574d71242eda207ab77fc7a2a73cd3da6698a1907e80dc",
+        ),
+        (
+            "TST.ColumnRowUIDMapArchive",
+            "a08dd613500ecf8e347f5acc0aa72d2a3bdd2749d6bd066d18e4242c34090120",
+        ),
+        (
+            "TST.HiddenStateFormulaOwnerArchive",
+            "0a7a126909e2ce14345fcdd0c66a686373460def0250229e0348f30c8016b9b5",
+        ),
+        (
+            "TST.FilterSetArchive",
+            "ed7923e10de43f377c192d6c32aabe11cca9a67a0d2949ec3d4ca6ccbb8e206d",
+        ),
+        (
+            "TSCE.FormulaOwnerDependenciesArchive",
+            "317cb5316938889f128486f18c5fa7d6940d1392a5f59486dba30c19053979e9",
+        ),
+    ];
+    const PRIVATE_MODULE_DECLARATION: &str = "mod buffa_pages_hidden_state_generated {";
+    const PRIVATE_INCLUDE_PATH: &str =
+        "\"/buffa-pages-hidden-state/iwa_pages_hidden_state_buffa_protos.rs\"";
+    const ROUTER_DECLARATIONS: [&str; 39] = [
+        "const TABLE_INFO_SUPER_FIELD: u32 = 1;",
+        "const TABLE_INFO_MODEL_FIELD: u32 = 2;",
+        "const TABLE_INFO_VIEW_UIDS_FIELD: u32 = 6;",
+        "const TABLE_INFO_HIDDEN_STATES_UUID_FIELD: u32 = 8;",
+        "const TABLE_MODEL_ROWS_FIELD: u32 = 6;",
+        "const TABLE_MODEL_COLUMNS_FIELD: u32 = 7;",
+        "const TABLE_MODEL_HIDDEN_ROWS_FIELD: u32 = 14;",
+        "const TABLE_MODEL_HIDDEN_COLUMNS_FIELD: u32 = 15;",
+        "const TABLE_MODEL_COLUMN_FORMULA_OWNER_FIELD: u32 = 34;",
+        "const TABLE_MODEL_ROW_FORMULA_OWNER_FIELD: u32 = 35;",
+        "const TABLE_MODEL_USER_HIDDEN_ROWS_FIELD: u32 = 41;",
+        "const TABLE_MODEL_USER_HIDDEN_COLUMNS_FIELD: u32 = 42;",
+        "const TABLE_MODEL_HIDDEN_STATES_OWNER_FIELD: u32 = 70;",
+        "const UUID_LOWER_FIELD: u32 = 1;",
+        "const UUID_UPPER_FIELD: u32 = 2;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;",
+        "const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;",
+        "const OWNER_UID_FIELD: u32 = 1;",
+        "const OWNER_STATES_FIELD: u32 = 2;",
+        "const STATE_UID_FIELD: u32 = 1;",
+        "const STATE_COLUMN_EXTENT_FIELD: u32 = 2;",
+        "const STATE_ROW_EXTENT_FIELD: u32 = 3;",
+        "const EXTENT_UID_FIELD: u32 = 1;",
+        "const EXTENT_BASE_STATES_FIELD: u32 = 2;",
+        "const EXTENT_DIRECTION_FIELD: u32 = 3;",
+        "const EXTENT_NEEDS_FILTER_UPDATE_FIELD: u32 = 6;",
+        "const EXTENT_FILTER_SET_FIELD: u32 = 8;",
+        "const ROW_STATE_UID_FIELD: u32 = 1;",
+        "const ROW_STATE_USER_HIDDEN_FIELD: u32 = 2;",
+        "const ROW_STATE_FILTERED_FIELD: u32 = 3;",
+        "const ROW_STATE_PIVOT_HIDDEN_FIELD: u32 = 4;",
+        "const MAX_RECURSION: u32 = 64;",
+        "pub fn decode_table_info(",
+        "pub fn decode_table_model(",
+        "pub fn decode_hidden_states_owner(",
+        "pub fn decode_hidden_state_extent(",
+        "pub fn decode_row_or_column_state(",
+        "pub fn rewrite_table_info(",
+    ];
+    const REWRITE_DECLARATIONS: [&str; 9] = [
+        "pub fn rewrite_table_model(",
+        "pub fn rewrite_hidden_states_owner(",
+        "pub fn rewrite_hidden_state_extent(",
+        "pub fn rewrite_row_or_column_state(",
+        "pub fn prepare_table_info_rewrite<'source>(",
+        "pub fn prepare_table_model_rewrite<'source>(",
+        "pub fn prepare_hidden_states_owner_rewrite<'source>(",
+        "pub fn prepare_hidden_state_extent_rewrite<'source>(",
+        "pub fn prepare_row_or_column_state_rewrite<'source>(",
+    ];
+    const PREFLIGHT_DECLARATIONS: &[&str] = &[
+        "fn scan_fields(",
+        "fn parse_uuid<'source>(",
+        "fn parse_reference(",
+        "fn parse_table_info<'source>(",
+        "fn parse_table_model<'source>(",
+        "fn parse_owner<'source>(",
+        "fn parse_hidden_states<'source>(",
+        "fn parse_extent<'source>(",
+        "fn parse_row_state<'source>(",
+        "fn cross_check_uuid(",
+        "fn cross_check_reference(",
+        "fn cross_check_table_info(",
+        "fn cross_check_table_model(",
+        "fn cross_check_owner(",
+        "fn cross_check_extent(",
+        "fn cross_check_row_state(",
+        "fn parse_formula_owner_dependencies(",
+        "fn cross_check_formula_owner_dependencies(",
+        "fn parse_hidden_state_formula_owner(",
+        "fn cross_check_hidden_state_formula_owner(",
+        "fn parse_filter_set(",
+        "fn cross_check_filter_set(",
+        "fn parse_cfuuid(",
+        "fn cross_check_cfuuid(",
+    ];
+    const LAZY_VIEW_DECLARATIONS: &[&str] = &[
+        "projection::UuidLazyView<'_>",
+        "projection::ReferenceLazyView<'_>",
+        "projection::TableInfoArchiveLazyView<'_>",
+        "projection::TableModelArchiveLazyView<'_>",
+        "projection::HiddenStatesOwnerArchiveLazyView<'_>",
+        "projection::HiddenStateExtentArchiveLazyView<'_>",
+        "projection::RowOrColumnStateLazyView<'_>",
+    ];
+    const DEPENDENCY_ROUTER_DECLARATIONS: &[&str] = &[
+        "const TABLE_MODEL_FILTERED_ROWS_FIELD: u32 = 40;",
+        "const TABLE_MODEL_BASE_COLUMN_ROW_UIDS_FIELD: u32 = 46;",
+        "const FORMULA_OWNER_UID_FIELD: u32 = 1;",
+        "const FORMULA_OWNER_INTERNAL_ID_FIELD: u32 = 2;",
+        "const FORMULA_OWNER_KIND_FIELD: u32 = 3;",
+        "const FORMULA_OWNER_REFERENCE_FIELD: u32 = 11;",
+        "const FORMULA_OWNER_BASE_UID_FIELD: u32 = 12;",
+        "const HIDDEN_FORMULA_OWNER_ID_FIELD: u32 = 1;",
+        "const HIDDEN_FORMULA_OWNER_NEEDS_UPDATE_FIELD: u32 = 3;",
+        "const FILTER_SET_TYPE_FIELD: u32 = 1;",
+        "const FILTER_SET_ENABLED_FIELD: u32 = 2;",
+        "const FILTER_SET_NEEDS_FORMULA_REWRITE_FIELD: u32 = 4;",
+        "const FILTER_SET_OFFSETS_FIELD: u32 = 5;",
+        "pub const COLUMN_ROW_UID_MAP_MESSAGE_TYPE: u32 = 6_267;",
+        "pub const LEGACY_COLUMN_ROW_UID_MAP_MESSAGE_TYPE: u32 = 6_200;",
+        "pub const FORMULA_OWNER_DEPENDENCIES_MESSAGE_TYPE: u32 = 4_008;",
+        "pub const HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE: u32 = 6_204;",
+        "pub const FILTER_SET_MESSAGE_TYPE: u32 = 6_220;",
+        "pub fn validate_column_row_uid_map_message_type(",
+        "pub fn qualify_column_row_uid_map(",
+        "pub fn decode_formula_owner_dependencies(",
+        "pub fn decode_formula_owner_dependencies_with_report(",
+        "pub fn decode_hidden_state_formula_owner(",
+        "pub fn decode_hidden_state_formula_owner_with_report(",
+        "pub fn decode_filter_set(",
+        "pub fn decode_filter_set_with_report(",
+    ];
+    const DEPENDENCY_LAZY_VIEW_DECLARATIONS: &[&str] = &[
+        "projection::FormulaOwnerDependenciesArchiveLazyView<'_>",
+        "projection::HiddenStateFormulaOwnerArchiveLazyView<'_>",
+        "projection::FilterSetArchiveLazyView<'_>",
+        "projection::CFUUIDArchiveLazyView<'_>",
+    ];
+    // Keep each public report-producing wrapper tied to its own strict
+    // preflight/cross-check pair.  These checks are deliberately set-based:
+    // implementation order is free to evolve, while a wrapper cannot become a
+    // raw generated-view shortcut without a build failure.
+    const STRICT_WRAPPER_CALLS: [(&str, &str); 8] = [
+        (
+            "pub fn decode_table_info_with_report(",
+            "cross_check_table_info(source, &parsed, options)?;",
+        ),
+        (
+            "pub fn decode_table_model_with_report(",
+            "cross_check_table_model(source, &parsed, options)?;",
+        ),
+        (
+            "pub fn decode_hidden_states_owner_with_report(",
+            "cross_check_owner(source, &parsed, options)?;",
+        ),
+        (
+            "pub fn decode_hidden_state_extent_with_report(",
+            "cross_check_extent(source, &parsed, options)?;",
+        ),
+        (
+            "pub fn decode_row_or_column_state_with_report(",
+            "cross_check_row_state(source, &parsed, options)?;",
+        ),
+        (
+            "pub fn decode_formula_owner_dependencies_with_report(",
+            "cross_check_formula_owner_dependencies(source, &parsed, options)?;",
+        ),
+        (
+            "pub fn decode_hidden_state_formula_owner_with_report(",
+            "cross_check_hidden_state_formula_owner(source, &parsed, options)?;",
+        ),
+        (
+            "pub fn decode_filter_set_with_report(",
+            "cross_check_filter_set(source, &parsed, options)?;",
+        ),
+    ];
+    const PRODUCTION_CORE_MARKERS: &[&str] = &[
+        "pub struct DecodeOptions",
+        "pub struct DecodeReport",
+        "pub struct RewriteExecutionLimits",
+        "pub struct RewriteExecutionRequirements",
+        "pub struct PreparedRewrite<'source>",
+        "fn validate_input(source: &[u8], options: DecodeOptions)",
+        "fn check_execution_limits(",
+        "fn measure_rewrite(",
+        "fn emit_rewrite(",
+    ];
+
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let tst = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
+    let tsce = fs::read_to_string(proto_directory.join("TSCEArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSTPagesHiddenStateProjection.proto"))?;
+    let codec = fs::read_to_string("src/pages_hidden_state_codec.rs")?;
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let expected_schema = PROJECTION_SCHEMA
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let projection_digest = sha256_hex(&projection);
+    let Some(uuid) = proto_message_block(&tsp, "UUID") else {
+        return Err("hidden-state provenance lost TSP.UUID".into());
+    };
+    let Some(reference) = proto_message_block(&tsp, "Reference") else {
+        return Err("hidden-state provenance lost TSP.Reference".into());
+    };
+    let Some(table_info) = proto_message_block(&tst, "TableInfoArchive") else {
+        return Err("hidden-state provenance lost TST.TableInfoArchive".into());
+    };
+    let Some(table_model) = proto_message_block(&tst, "TableModelArchive") else {
+        return Err("hidden-state provenance lost TST.TableModelArchive".into());
+    };
+    let Some(owner) = proto_message_block(&tst, "HiddenStatesOwnerArchive") else {
+        return Err("hidden-state provenance lost TST.HiddenStatesOwnerArchive".into());
+    };
+    let Some(hidden_states) = proto_message_block(&tst, "HiddenStatesArchive") else {
+        return Err("hidden-state provenance lost TST.HiddenStatesArchive".into());
+    };
+    let Some(extent) = proto_message_block(&tst, "HiddenStateExtentArchive") else {
+        return Err("hidden-state provenance lost TST.HiddenStateExtentArchive".into());
+    };
+    let Some(row_state) = proto_nested_message_block(&tst, "RowOrColumnState") else {
+        return Err("hidden-state provenance lost nested RowOrColumnState".into());
+    };
+    let Some(uid_map) = proto_message_block(&tst, "ColumnRowUIDMapArchive") else {
+        return Err("hidden-state provenance lost TST.ColumnRowUIDMapArchive".into());
+    };
+    let Some(formula_owner_dependencies) =
+        proto_message_block(&tsce, "FormulaOwnerDependenciesArchive")
+    else {
+        return Err("hidden-state provenance lost TSCE.FormulaOwnerDependenciesArchive".into());
+    };
+    let Some(hidden_formula_owner) = proto_message_block(&tst, "HiddenStateFormulaOwnerArchive")
+    else {
+        return Err("hidden-state provenance lost TST.HiddenStateFormulaOwnerArchive".into());
+    };
+    let Some(filter_set) = proto_message_block(&tst, "FilterSetArchive") else {
+        return Err("hidden-state provenance lost TST.FilterSetArchive".into());
+    };
+    let Some(cfuuid) = proto_message_block(&tsp, "CFUUIDArchive") else {
+        return Err("hidden-state provenance lost TSP.CFUUIDArchive".into());
+    };
+    let native_message_blocks = [
+        ("TSP.UUID", uuid),
+        ("TSP.Reference", reference),
+        ("TSP.CFUUIDArchive", cfuuid),
+        ("TST.TableInfoArchive", table_info),
+        ("TST.TableModelArchive", table_model),
+        ("TST.HiddenStatesOwnerArchive", owner),
+        ("TST.HiddenStatesArchive", hidden_states),
+        ("TST.HiddenStateExtentArchive", extent),
+        ("TST.HiddenStateExtentArchive.RowOrColumnState", row_state),
+        ("TST.ColumnRowUIDMapArchive", uid_map),
+        ("TST.HiddenStateFormulaOwnerArchive", hidden_formula_owner),
+        ("TST.FilterSetArchive", filter_set),
+        (
+            "TSCE.FormulaOwnerDependenciesArchive",
+            formula_owner_dependencies,
+        ),
+    ];
+    for ((name, block), (expected_name, expected_digest)) in native_message_blocks
+        .iter()
+        .zip(EXPECTED_NATIVE_MESSAGE_DIGESTS.iter())
+    {
+        if name != expected_name {
+            return Err(format!(
+                "hidden-state native message digest table mispaired {name} with {expected_name}"
+            )
+            .into());
+        }
+        let digest = sha256_hex(block);
+        if digest != *expected_digest {
+            return Err(format!(
+                "hidden-state native message {name} digest {digest} does not match reviewed digest {expected_digest}"
+            )
+            .into());
+        }
+    }
+    if !TABLE_INFO_FIELDS
+        .iter()
+        .all(|field| proto_field(table_info, field) == 1)
+        || !TABLE_MODEL_FIELDS
+            .iter()
+            .all(|field| proto_field(table_model, field) == 1)
+        || !OWNER_FIELDS
+            .iter()
+            .all(|field| proto_field(owner, field) == 1)
+        || !HIDDEN_STATES_FIELDS
+            .iter()
+            .all(|field| proto_field(hidden_states, field) == 1)
+        || !EXTENT_FIELDS
+            .iter()
+            .all(|field| proto_field(extent, field) == 1)
+        || !ROW_STATE_FIELDS
+            .iter()
+            .all(|field| proto_field(row_state, field) == 1)
+        || !UID_MAP_FIELDS
+            .iter()
+            .all(|field| proto_field(uid_map, field) == 1)
+        || !FORMULA_OWNER_DEPENDENCY_FIELDS
+            .iter()
+            .all(|field| proto_field(formula_owner_dependencies, field) == 1)
+        || !HIDDEN_FORMULA_OWNER_FIELDS
+            .iter()
+            .all(|field| proto_field(hidden_formula_owner, field) == 1)
+        || !FILTER_SET_FIELDS
+            .iter()
+            .all(|field| proto_field(filter_set, field) == 1)
+        || !CFUUID_FIELDS
+            .iter()
+            .all(|field| proto_field(cfuuid, field) == 1)
+        || projection_schema != expected_schema
+        || projection_digest != EXPECTED_PROJECTION_DIGEST
+        || projection.len() != EXPECTED_PROJECTION_BYTES
+        || projection_schema.contains("repeated ")
+        || !has_exact_private_module_declaration(&lib, PRIVATE_MODULE_DECLARATION)
+        || rust_code_marker_count(&lib, PRIVATE_MODULE_DECLARATION) != 1
+        || rust_string_literal_count(&lib, PRIVATE_INCLUDE_PATH) != 1
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .chain(DEPENDENCY_ROUTER_DECLARATIONS.iter())
+            .chain(REWRITE_DECLARATIONS.iter())
+            .all(|marker| rust_code_marker_count(&codec, marker) == 1)
+        || !PREFLIGHT_DECLARATIONS
+            .iter()
+            .all(|marker| rust_code_marker_count(&codec, marker) == 1)
+        || !PRODUCTION_CORE_MARKERS
+            .iter()
+            .all(|marker| rust_code_marker_count(&codec, marker) == 1)
+        || !STRICT_WRAPPER_CALLS.iter().all(|(wrapper, call)| {
+            rust_code_marker_count(&codec, wrapper) == 1
+                && rust_function_body_contains_marker(
+                    &codec,
+                    wrapper,
+                    "validate_input(source, options)?;",
+                )
+                && rust_function_body_contains_marker(&codec, wrapper, call)
+        })
+        || !LAZY_VIEW_DECLARATIONS
+            .iter()
+            .chain(DEPENDENCY_LAZY_VIEW_DECLARATIONS.iter())
+            // The owner envelope is intentionally reused by the table-model
+            // and standalone owner cross-checks. Every generated type must be
+            // exercised, while legitimate repeated call sites are allowed.
+            .all(|marker| rust_code_marker_count(&codec, marker) >= 1)
+        || rust_code_marker_count(&codec, "options.buffa().decode_lazy_view(")
+            < LAZY_VIEW_DECLARATIONS.len() + DEPENDENCY_LAZY_VIEW_DECLARATIONS.len()
+        || rust_code_marker_count(&codec, "decode_view(") != 0
+        || has_forbidden_codec_marker(&codec)
+        || FORBIDDEN_PROST_CODEC_MARKERS
+            .iter()
+            .any(|fragment| rust_code_marker_count(&codec, fragment) != 0)
+        || FORBIDDEN_BUFFA_OWNERSHIP_MARKERS
+            .iter()
+            .any(|fragment| rust_code_marker_count(&codec, fragment) != 0)
+        || rust_code_marker_count(&codec, "RepeatedView") != 0
+        || rust_code_marker_count(&codec, "LazyRepeatedView") != 0
+        || rust_code_marker_count(&codec, "OwnedView") != 0
+    {
+        return Err(
+            "Pages hidden-state projection/codec drifted from canonical TSP/TST message digests/contracts, lost handwritten preflight before private lazy Buffa views, exposed generated repeated storage, or introduced Prost/owned-view production ingress"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 fn enforce_pages_media_projection_provenance(
     proto_directory: &Path,
     projection_directory: &Path,
@@ -8429,6 +9189,29 @@ fn enforce_table_info_projection_budget(directory: &Path) -> Result<(), Box<dyn 
         .into());
     }
     Ok(())
+}
+
+fn enforce_pages_hidden_state_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: &[&str] = &[
+        "LitchiIwaPagesHiddenStateProjection.mod.rs",
+        "TSTPagesHiddenStateProjection.__lazy_view.rs",
+        "TSTPagesHiddenStateProjection.__view.rs",
+        "TSTPagesHiddenStateProjection.rs",
+        "iwa_pages_hidden_state_buffa_protos.rs",
+    ];
+
+    // Buffa 0.9.1 emits this exact five-file scalar/envelope closure. The
+    // repeated hidden-state records remain handwritten, so an exact aggregate
+    // digest catches both schema widening and generator drift.
+    enforce_exact_buffa_projection_budget(
+        directory,
+        "Pages hidden-state projection",
+        EXPECTED_FILES,
+        427_026,
+        0,
+        0,
+        "72c30b51bacf13de1e5948b6d2f7bf986e7a90131e93bc6bd63030d1d558d92a",
+    )
 }
 
 fn enforce_numbers_names_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {

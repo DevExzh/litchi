@@ -4927,6 +4927,227 @@ def add_pages_table_appearance_canonical_scaffold(
             (root / corpus).mkdir(parents=True, exist_ok=True)
 
 
+def add_pages_table_hidden_axes_canonical_scaffold(
+    root: Path,
+    *,
+    include_codec: bool = True,
+    include_fuzz: bool = True,
+    include_tests: bool = True,
+) -> None:
+    """Install a complete synthetic Pages body-table hidden-axis owner."""
+
+    semantic = root / boundaries.PAGES_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction {\n"
+        "    pub use crate::package::body_table_hidden_axes::{\n"
+        "        BodyTableHiddenAxesCommit as Commit,\n"
+        "        BodyTableHiddenAxesDiagnostics as Diagnostics,\n"
+        "        BodyTableHiddenAxesEdit as Edit,\n"
+        "        BodyTableHiddenAxesError as Error,\n"
+        "        BodyTableHiddenAxesLimitKind as LimitKind,\n"
+        "        BodyTableHiddenAxesPatch as Patch,\n"
+        "        BodyTableHiddenAxesPath as Path,\n"
+        "    };\n"
+        "}\n"
+        "pub use litchi_iwa_common::table::axis::{AxisIndex, Error, HiddenAxes, Result};\n",
+        encoding="utf-8",
+    )
+    selector = root / boundaries.PAGES_TABLE_HIDDEN_AXES_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text(
+        "pub struct BodyTableSelector<'a> { name: &'a str }\n"
+        "impl<'a> BodyTableSelector<'a> { pub fn name(name: &'a str) -> Self { Self { name } } }\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES
+        )
+        + "const UID_MAP_MESSAGE_TYPE: u32 = 6_267;\n"
+        "const LEGACY_UID_MAP_MESSAGE_TYPE: u32 = 6_200;\n"
+        "fn validate_uid_map_type(message_type: u32) {\n"
+        "    let allow_legacy = message_type == LEGACY_UID_MAP_MESSAGE_TYPE;\n"
+        "    let _ = (message_type, allow_legacy, UID_MAP_MESSAGE_TYPE);\n"
+        "}\n"
+        + "impl Package {\n"
+        "    pub fn body_table_hidden_axes<'table>(&self, selector: impl Into<BodyTableSelector<'table>>) -> Result<HiddenAxes, BodyTableHiddenAxesError> { let _ = selector; todo!() }\n"
+        "    pub fn edit_body_table_hidden_axes<'table>(&self, selector: impl Into<BodyTableSelector<'table>>) -> Result<BodyTableHiddenAxesEdit, BodyTableHiddenAxesError> { let _ = selector; todo!() }\n"
+        "    pub fn apply_body_table_hidden_axes(&self, patch: &BodyTableHiddenAxesPatch) -> Result<BodyTableHiddenAxesCommit, BodyTableHiddenAxesError> { let _ = patch; todo!() }\n"
+        "}\n"
+        "impl BodyTableHiddenAxesEdit {\n"
+        "    pub fn set(self, hidden: HiddenAxes) -> Self { let _ = hidden; self }\n"
+        "    pub fn clear(self) -> Self { self }\n"
+        "    pub fn reset(self) -> Self { self }\n"
+        "    pub fn commit(self) -> Result<BodyTableHiddenAxesCommit, BodyTableHiddenAxesError> { todo!() }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    lib = root / boundaries.PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[0]
+    package = root / boundaries.PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[1]
+    table = root / boundaries.PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[2]
+    lib.parent.mkdir(parents=True, exist_ok=True)
+    lib.write_text(
+        "pub mod table;\n"
+        "pub use selector::BodyTableSelector;\n"
+        "pub use package::{"
+        + ", ".join(boundaries.PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES)
+        + "};\n",
+        encoding="utf-8",
+    )
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text(
+        "mod body_table_hidden_axes;\n"
+        "pub use body_table_hidden_axes::{"
+        + ", ".join(boundaries.PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES)
+        + "};\n",
+        encoding="utf-8",
+    )
+    table.write_text("pub mod hidden_axes;\n", encoding="utf-8")
+
+    # The focused owner and the migration-host compatibility route coexist
+    # until the native changed-edit gate closes.  Keep the host fixture here
+    # so focused facade tests exercise the same retained-debt topology as the
+    # live workspace.
+    host = root / boundaries.IWA_PAGES_TABLE_HIDDEN_AXES_HOST_SOURCE
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        "use crate::table_hidden_axes::{table_hidden_axes, set_table_hidden_axes};\n"
+        "pub fn table_hidden_axes(model_object_id: u64) {\n"
+        "    crate::table_hidden_axes::table_hidden_axes(self.package(), model_object_id);\n"
+        "}\n"
+        "pub fn set_table_hidden_axes(model_object_id: u64) {\n"
+        "    crate::table_hidden_axes::set_table_hidden_axes(self.package(), model_object_id);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    host_module = root / boundaries.IWA_PAGES_TABLES_MODULE_SOURCE
+    host_module.parent.mkdir(parents=True, exist_ok=True)
+    host_module.write_text("mod hidden_axes;\n", encoding="utf-8")
+    host_tests = root / boundaries.IWA_PAGES_TABLE_HIDDEN_AXES_HOST_TEST_SOURCE
+    host_tests.parent.mkdir(parents=True, exist_ok=True)
+    host_tests.write_text(
+        "#[test]\n"
+        "fn retained_pages_hidden_axes_route() {\n"
+        "    editor.table_hidden_axes(model_object_id);\n"
+        "    editor.set_table_hidden_axes(model_object_id);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    host_example = root / boundaries.IWA_PAGES_TABLE_HIDDEN_AXES_HOST_EXAMPLE
+    host_example.parent.mkdir(parents=True, exist_ok=True)
+    host_example.write_text(
+        "fn create_numbers() { editor.table_hidden_axes(selector); }\n"
+        "fn create_pages() {\n"
+        "    editor.set_table_hidden_axes(model_object_id, &hidden);\n"
+        "    PagesEditor::open(output)?.table_hidden_axes(model_object_id)?;\n"
+        "}\n"
+        "fn create_keynote() { editor.set_table_hidden_axes(selector, &hidden); }\n",
+        encoding="utf-8",
+    )
+
+    if include_codec:
+        codec = root / boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE
+        codec.parent.mkdir(parents=True, exist_ok=True)
+        type_apis = {
+            api
+            for api in boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_REQUIRED_APIS
+            if api[:1].isupper()
+        }
+        api_lines = []
+        for api in boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_REQUIRED_APIS:
+            if api in type_apis:
+                api_lines.append(f"pub struct {api};\n")
+            else:
+                api_lines.append(f"pub fn {api}() {{}}\n")
+        codec.write_text(
+            "".join(api_lines)
+            + "pub const COLUMN_ROW_UID_MAP_MESSAGE_TYPE: u32 = 6_267;\n"
+            + "pub const LEGACY_COLUMN_ROW_UID_MAP_MESSAGE_TYPE: u32 = 6_200;\n"
+            + "fn validate_column_row_uid_map_message_type(message_type: u32) {\n"
+            + "    let allow_legacy = message_type == LEGACY_COLUMN_ROW_UID_MAP_MESSAGE_TYPE;\n"
+            + "    let _ = (message_type, allow_legacy, COLUMN_ROW_UID_MAP_MESSAGE_TYPE);\n"
+            + "}\n"
+            + "fn markers() { unknown overlong preflight canonical duplicate decode_lazy_view execution_requirements execute max_input_bytes max_output_bytes max_fields max_work_bytes max_allocations max_retained_bytes max_scratch_bytes; }\n"
+            + "#[cfg(test)] mod tests { #[test] fn strict_hidden_axes_roundtrip() {} }\n",
+            encoding="utf-8",
+        )
+        codec_lib = root / boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_PUBLIC_SOURCE
+        codec_lib.parent.mkdir(parents=True, exist_ok=True)
+        codec_lib.write_text(
+            "#[doc(hidden)]\n"
+            "mod buffa_pages_hidden_state_generated {\n"
+            "    include!(concat!(env!(\"OUT_DIR\"), \"/buffa-pages-hidden-state/iwa_pages_hidden_state_buffa_protos.rs\"));\n"
+            "}\n"
+            "#[doc(hidden)]\n"
+            "pub mod pages_hidden_state_codec;\n",
+            encoding="utf-8",
+        )
+        projection = root / boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_PROJECTION_SOURCE
+        projection.parent.mkdir(parents=True, exist_ok=True)
+        projection.write_text(
+            'syntax = "proto2";\n'
+            "package LitchiIwaPagesHiddenStateProjection;\n"
+            "message Uuid { required uint64 lower = 1; required uint64 upper = 2; }\n"
+            "message Reference { required uint64 identifier = 1; }\n"
+            "message TableInfoArchive { optional bytes hidden_states_uuid = 8; }\n"
+            "message TableModelArchive { optional bytes hidden_states_owner = 70; }\n"
+            "message HiddenStatesOwnerArchive { required bytes owner_uid = 1; }\n"
+            "message HiddenStatesArchive { required bytes hidden_states_uid = 1; }\n"
+            "message HiddenStateExtentArchive { required int32 row_or_column_direction = 3; }\n"
+            "message RowOrColumnState { optional bool user_hidden = 2; optional bool filtered = 3; optional bool pivot_hidden = 4; }\n",
+            encoding="utf-8",
+        )
+    if include_tests:
+        for test_path in boundaries.PAGES_TABLE_HIDDEN_AXES_TEST_SOURCES:
+            test = root / test_path
+            test.parent.mkdir(parents=True, exist_ok=True)
+            test.write_text(
+                "#[test]\n"
+                "fn exercises_body_table_hidden_axes_owner() {\n"
+                f"    const UID_MAP_MESSAGE_TYPE: u32 = {boundaries.PAGES_TABLE_HIDDEN_AXES_UID_MAP_MESSAGE_TYPE};\n"
+                "    body_table_hidden_axes(); edit_body_table_hidden_axes(); apply_body_table_hidden_axes();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+    if include_fuzz:
+        for fuzz_path in boundaries.PAGES_TABLE_HIDDEN_AXES_FUZZ_SOURCES:
+            fuzz = root / fuzz_path
+            fuzz.parent.mkdir(parents=True, exist_ok=True)
+            fuzz.write_text(
+                "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+                "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+                encoding="utf-8",
+            )
+        for corpus in boundaries.PAGES_TABLE_HIDDEN_AXES_FUZZ_CORPORA:
+            (root / corpus).mkdir(parents=True, exist_ok=True)
+
+
+def add_pages_table_hidden_axes_shared_helper_scaffold(root: Path) -> None:
+    """Install the retained Numbers/Keynote compatibility helper routes."""
+
+    shared = root / boundaries.PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_SOURCE
+    shared.parent.mkdir(parents=True, exist_ok=True)
+    shared.write_text(
+        "pub(crate) fn table_hidden_axes() {}\n"
+        "pub(crate) fn set_table_hidden_axes() {}\n",
+        encoding="utf-8",
+    )
+    for host_path in (
+        boundaries.PAGES_TABLE_HIDDEN_AXES_NUMBERS_HOST_SOURCE,
+        boundaries.PAGES_TABLE_HIDDEN_AXES_KEYNOTE_HOST_SOURCE,
+    ):
+        host = root / host_path
+        host.parent.mkdir(parents=True, exist_ok=True)
+        host.write_text(
+            "use crate::table_hidden_axes::{table_hidden_axes, set_table_hidden_axes};\n",
+            encoding="utf-8",
+        )
+
+
 def add_pages_header_footer_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.PAGES_HEADER_FOOTER_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -25476,6 +25697,549 @@ fn rewrite_movie_title_operation(
             "+ audit_pages_table_appearance_resource_source_topology()",
         ):
             self.assertIn(expression, main_source)
+
+    def test_pages_table_hidden_axes_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_HIDDEN_AXES_SOURCE,
+            Path("crates/litchi-iwa/src/pages/editor/tables/hidden_axes.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_HIDDEN_AXES_METHODS,
+            ("table_hidden_axes", "set_table_hidden_axes"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE,
+            Path("crates/litchi-pages/src/package/body_table_hidden_axes.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_PACKAGE_METHODS,
+            (
+                "body_table_hidden_axes",
+                "edit_body_table_hidden_axes",
+                "apply_body_table_hidden_axes",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES,
+            (
+                "BodyTableHiddenAxesEdit",
+                "BodyTableHiddenAxesPatch",
+                "BodyTableHiddenAxesCommit",
+                "BodyTableHiddenAxesDiagnostics",
+                "BodyTableHiddenAxesError",
+                "BodyTableHiddenAxesLimitKind",
+                "BodyTableHiddenAxesPath",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_SEMANTIC_TYPES,
+            ("AxisIndex", "HiddenAxes"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE,
+            Path("crates/litchi-iwa-protos/src/pages_hidden_state_codec.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_PROJECTION_SOURCE,
+            Path(
+                "crates/litchi-iwa-protos/src/buffa-projections/"
+                "TSTPagesHiddenStateProjection.proto"
+            ),
+        )
+        self.assertEqual(boundaries.PAGES_TABLE_HIDDEN_AXES_UID_MAP_MESSAGE_TYPE, 6267)
+        self.assertEqual(boundaries.PAGES_TABLE_HIDDEN_AXES_WRONG_UID_MAP_MESSAGE_TYPE, 6005)
+        self.assertEqual(boundaries.PAGES_TABLE_HIDDEN_AXES_LEGACY_UID_MAP_MESSAGE_TYPE, 6200)
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_ALIAS_MODULE,
+            "pages_hidden_axes_codec",
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_SOURCE,
+            Path("crates/litchi-iwa/src/table_hidden_axes.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_NUMBERS_HOST_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/editor/table_hidden_axes.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_KEYNOTE_HOST_SOURCE,
+            Path("crates/litchi-iwa/src/keynote/editor/slide_tables/hidden_axes.rs"),
+        )
+
+    def test_pages_table_hidden_axes_boundary_is_dormant_until_private_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_pages_table_hidden_axes_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_hidden_axes_source_topology(root),
+                [],
+            )
+            package = root / boundaries.PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[1]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text("mod body_table_hidden_axes;\n", encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_pages_table_hidden_axes_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_pages_table_hidden_axes_requires_canonical_types_and_methods(self) -> None:
+        for missing in boundaries.PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_pages_table_hidden_axes_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE
+                    owner.write_text(
+                        owner.read_text(encoding="utf-8").replace(
+                            f"pub struct {missing};\n", "", 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
+                    self.assertTrue(
+                        any(f"missing canonical type {missing}:" in item for item in violations),
+                        violations,
+                    )
+        for missing in boundaries.PAGES_TABLE_HIDDEN_AXES_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_pages_table_hidden_axes_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE
+                    source = re.sub(
+                        rf"\s+pub fn {re.escape(missing)}\b[^{{]*\{{[^}}]*\}}",
+                        "",
+                        owner.read_text(encoding="utf-8"),
+                        count=1,
+                    )
+                    owner.write_text(source, encoding="utf-8")
+                    violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
+                    self.assertTrue(
+                        any(f"Package method is missing {missing}:" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_pages_table_hidden_axes_requires_selector_semantics_modules_codec_and_tests(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE
+            semantic.write_text("pub mod other;\n", encoding="utf-8")
+            selector = root / boundaries.PAGES_TABLE_HIDDEN_AXES_SELECTOR_SOURCE
+            selector.write_text("pub struct OtherSelector;\n", encoding="utf-8")
+            table = root / boundaries.PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[2]
+            table.write_text("pub mod other;\n", encoding="utf-8")
+            codec = root / boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE
+            codec.unlink()
+            projection = root / boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_PROJECTION_SOURCE
+            projection.unlink()
+            integration = root / boundaries.PAGES_TABLE_HIDDEN_AXES_TEST_SOURCES[0]
+            integration.unlink()
+            fuzz = root / boundaries.PAGES_TABLE_HIDDEN_AXES_FUZZ_SOURCES[0]
+            fuzz.unlink()
+            (root / boundaries.PAGES_TABLE_HIDDEN_AXES_FUZZ_CORPORA[0]).rmdir()
+            violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
+            for name in boundaries.PAGES_TABLE_HIDDEN_AXES_SEMANTIC_TYPES:
+                self.assertTrue(
+                    any(f"semantic API is missing {name}" in item for item in violations),
+                    violations,
+                )
+            self.assertTrue(any("missing table::hidden_axes::transaction" in item for item in violations), violations)
+            self.assertTrue(any("missing canonical BodyTableSelector" in item for item in violations), violations)
+            self.assertTrue(any("missing canonical table::hidden_axes module" in item for item in violations), violations)
+            self.assertTrue(any("missing strict hidden codec source" in item for item in violations), violations)
+            self.assertTrue(any("missing Buffa projection" in item for item in violations), violations)
+            self.assertTrue(any("missing integration test" in item for item in violations), violations)
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+            self.assertTrue(any("missing fuzz corpus" in item for item in violations), violations)
+
+    def test_focused_pages_table_hidden_axes_requires_selector_first_edit_and_apply_patch(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            source = source.replace(
+                "pub fn body_table_hidden_axes<'table>(&self, selector: impl Into<BodyTableSelector<'table>>)",
+                "pub fn body_table_hidden_axes<'table>(&self, model_object_id: u64)",
+            )
+            source = source.replace(
+                "pub fn edit_body_table_hidden_axes<'table>(&self, selector: impl Into<BodyTableSelector<'table>>)",
+                "pub fn edit_body_table_hidden_axes<'table>(&self, model_object_id: u64)",
+            )
+            source = source.replace(
+                "pub fn apply_body_table_hidden_axes(&self, patch: &BodyTableHiddenAxesPatch)",
+                "pub fn apply_body_table_hidden_axes(&self, patch: &Patch)",
+            )
+            source = source.replace("    pub fn clear(self)", "    pub fn clear_hidden_axes(self)")
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
+            self.assertTrue(any("body_table_hidden_axes must accept selector-first" in item for item in violations), violations)
+            self.assertTrue(any("edit_body_table_hidden_axes must accept selector-first" in item for item in violations), violations)
+            self.assertTrue(any("apply method must accept BodyTableHiddenAxesPatch" in item for item in violations), violations)
+            self.assertTrue(any("edit is missing clear" in item for item in violations), violations)
+
+    def test_focused_pages_table_hidden_axes_rejects_numbers_uid_map_message(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            integration = root / boundaries.PAGES_TABLE_HIDDEN_AXES_TEST_SOURCES[0]
+            integration.write_text(
+                integration.read_text(encoding="utf-8").replace("6267", "6_005"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
+            self.assertTrue(
+                any("must not use Numbers table-data message type 6005" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_pages_table_hidden_axes_rejects_numbers_uid_map_in_owner_or_codec(self) -> None:
+        for relative in (
+            boundaries.PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE,
+            boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE,
+        ):
+            with self.subTest(relative=relative):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_pages_table_hidden_axes_canonical_scaffold(root)
+                    path = root / relative
+                    path.write_text(
+                        path.read_text(encoding="utf-8").replace(
+                            "6_267", "6_005", 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
+                    self.assertTrue(
+                        any(
+                            "source uses the forbidden Numbers table-data UID-map message type 6005"
+                            in item
+                            and str(relative) in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
+    def test_focused_pages_table_hidden_axes_requires_explicit_legacy_opt_in(self) -> None:
+        for relative in (
+            boundaries.PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE,
+            boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE,
+        ):
+            with self.subTest(relative=relative):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_pages_table_hidden_axes_canonical_scaffold(root)
+                    path = root / relative
+                    path.write_text(
+                        path.read_text(encoding="utf-8").replace(
+                            "allow_legacy", "allow_legacy_disabled"
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
+                    self.assertTrue(
+                        any(
+                            "must qualify legacy UID-map support through an explicit allow_legacy path"
+                            in item
+                            and str(relative) in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
+    def test_focused_pages_table_hidden_axes_rejects_owner_creation_helpers(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE
+            with owner.open("a", encoding="utf-8") as stream:
+                stream.write("\nfn allocate_ids() {}\n")
+            violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
+            self.assertTrue(
+                any("forbidden owner-creation helper allocate_ids" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_pages_table_hidden_axes_rejects_codec_alias_module(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            codec_lib = root / boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_PUBLIC_SOURCE
+            with codec_lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use pages_hidden_state_codec as pages_hidden_axes_codec;\n"
+                )
+            violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
+            self.assertTrue(
+                any(
+                    "retains its retired alias module pages_hidden_axes_codec" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_focused_pages_table_hidden_axes_rejects_leaks_aliases_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type TableHiddenAxesPatch = BodyTableHiddenAxesPatch;\n"
+                + "pub fn raw_hidden_axes(model_id: u64, source_bytes: &[u8], wire: WireView, archive: Archive, generated: GeneratedProjection, buffa: BuffaView, prost: prost_types::MessageInfo) {}\n"
+                + "// pub fn decoy(model_id: u64, bytes: &[u8]) -> ArchiveObject {}\n"
+                + 'const DOC: &str = "pub fn decoy(model_id: u64, bytes: &[u8])";\n'
+                + "#[cfg(test)]\n"
+                + "pub fn test_only(model_id: u64, bytes: &[u8]) -> ArchiveObject {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[0]
+            with lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use package::*;\n"
+                    "pub use package::BodyTableHiddenAxesPatch as HiddenAxesPatch;\n"
+                    "pub mod body_table_hidden_axes;\n"
+                )
+            table = root / boundaries.PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[2]
+            with table.open("a", encoding="utf-8") as stream:
+                stream.write("pub use hidden_axes::*;\n")
+            violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
+            for fragment in (
+                "flat alias TableHiddenAxesPatch",
+                "raw parameter model_id: u64",
+                "raw byte slice &[u8]",
+                "wire type WireView",
+                "archive/IWA type Archive",
+                "generated type GeneratedProjection",
+                "protobuf type BuffaView",
+                "protobuf type prost",
+                "protobuf type prost_types",
+                "retains root aliases via glob",
+                "exposes duplicate module",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("decoy" in item or "test_only" in item for item in violations), violations)
+
+    def test_focused_pages_table_hidden_axes_rejects_codec_prost_and_projection_repeated_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            codec = root / boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "fn bad() { let _ = prost::Message::decode(bytes); let _ = encode_to_vec(); }\n",
+                encoding="utf-8",
+            )
+            projection = root / boundaries.PAGES_TABLE_HIDDEN_AXES_CODEC_PROJECTION_SOURCE
+            with projection.open("a", encoding="utf-8") as stream:
+                stream.write("message Bad { repeated bytes generated = 1; }\n")
+            violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
+            self.assertTrue(any("forbidden generated/Prost encoding" in item for item in violations), violations)
+            self.assertTrue(any("must not expose repeated generated fields" in item for item in violations), violations)
+
+    def test_iwa_pages_table_hidden_axes_audit_retains_host_and_keeps_numbers_keynote(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            add_pages_table_hidden_axes_shared_helper_scaffold(root)
+            examples = root / boundaries.IWA_PAGES_TABLE_HIDDEN_AXES_EXAMPLE_ROOT
+            examples.mkdir(parents=True, exist_ok=True)
+            (examples / "create_numbers_hidden.rs").write_text(
+                "editor.table_hidden_axes(); editor.set_table_hidden_axes();\n",
+                encoding="utf-8",
+            )
+            (examples / "create_keynote_hidden.rs").write_text(
+                "editor.table_hidden_axes(); editor.set_table_hidden_axes();\n",
+                encoding="utf-8",
+            )
+            (examples / "create_iwork_hidden_tables.rs").write_text(
+                "fn create_numbers() { editor.table_hidden_axes(); }\n"
+                "fn create_pages() {\n"
+                "    editor.set_table_hidden_axes(model_object_id, &hidden);\n"
+                "    PagesEditor::open(output)?.table_hidden_axes(model_object_id)?;\n"
+                "}\n"
+                "fn create_keynote() { editor.set_table_hidden_axes(); }\n",
+                encoding="utf-8",
+            )
+            numbers_host = root / "crates/litchi-iwa/src/numbers/editor/table_hidden_axes.rs"
+            numbers_host.parent.mkdir(parents=True, exist_ok=True)
+            numbers_host.write_text(
+                "use crate::table_hidden_axes::{table_hidden_axes, set_table_hidden_axes};\n"
+                "pub fn table_hidden_axes(selector: TableSelector) {}\n"
+                "pub fn set_table_hidden_axes(selector: TableSelector, hidden: &HiddenAxes) {}\n",
+                encoding="utf-8",
+            )
+            keynote_host = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/hidden_axes.rs"
+            keynote_host.parent.mkdir(parents=True, exist_ok=True)
+            keynote_host.write_text(
+                "use crate::table_hidden_axes::{table_hidden_axes, set_table_hidden_axes};\n"
+                "pub fn slide_table_hidden_axes(selector: SlideTableSelector) {}\n"
+                "pub fn set_slide_table_hidden_axes(selector: SlideTableSelector, hidden: &HiddenAxes) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_table_hidden_axes_source_topology(root)
+            self.assertEqual([], violations)
+
+            host = root / boundaries.IWA_PAGES_TABLE_HIDDEN_AXES_HOST_SOURCE
+            host.unlink()
+            tables = root / boundaries.IWA_PAGES_TABLES_MODULE_SOURCE
+            tables.unlink()
+            host_tests = root / boundaries.IWA_PAGES_TABLE_HIDDEN_AXES_HOST_TEST_SOURCE
+            host_tests.unlink()
+            (examples / "create_iwork_hidden_tables.rs").unlink()
+            violations = boundaries.audit_iwa_pages_table_hidden_axes_source_topology(root)
+            for fragment in (
+                "migration-host source is missing",
+                "migration-host module is missing",
+                "migration-host test source is missing",
+                "migration-host example is missing",
+            ):
+                self.assertTrue(any(fragment in item for item in violations), violations)
+            self.assertFalse(any("create_numbers_hidden.rs" in item for item in violations), violations)
+            self.assertFalse(any("create_keynote_hidden.rs" in item for item in violations), violations)
+            self.assertFalse(any("numbers/editor/table_hidden_axes.rs" in item for item in violations), violations)
+            self.assertFalse(any("keynote/editor/slide_tables/hidden_axes.rs" in item for item in violations), violations)
+
+    def test_iwa_pages_table_hidden_axes_requires_shared_helper_and_host_adapters(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            add_pages_table_hidden_axes_shared_helper_scaffold(root)
+            shared = root / boundaries.PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_SOURCE
+            shared.unlink()
+            numbers = root / boundaries.PAGES_TABLE_HIDDEN_AXES_NUMBERS_HOST_SOURCE
+            numbers.write_text(
+                "// crate::table_hidden_axes::{table_hidden_axes, set_table_hidden_axes}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_table_hidden_axes_source_topology(root)
+            self.assertTrue(
+                any("shared Numbers/Keynote table-hidden-axes helper is missing" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("Numbers table-hidden-axes host must retain the shared helper import" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_pages_table_hidden_axes_retained_host_rejects_facade_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            add_pages_table_hidden_axes_shared_helper_scaffold(root)
+            host = root / boundaries.IWA_PAGES_TABLE_HIDDEN_AXES_HOST_SOURCE
+            host.write_text(
+                host.read_text(encoding="utf-8").replace(
+                    "crate::table_hidden_axes::set_table_hidden_axes",
+                    "litchi_pages::Package::body_table_hidden_axes",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_table_hidden_axes_source_topology(root)
+            self.assertTrue(
+                any(
+                    "must call the shared table-hidden-axes executor: "
+                    in item
+                    and "set_table_hidden_axes" in item
+                    for item in violations
+                ),
+                violations,
+            )
+            self.assertTrue(
+                any("must not fallback through the focused litchi-pages facade" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_pages_table_hidden_axes_rejects_migration_host_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE
+            with owner.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "\nfn hidden_axes_host_fallback() {\n"
+                    "    let _ = litchi_iwa::PagesEditor::table_hidden_axes;\n"
+                    "    let _ = litchi_pages::Package::body_table_hidden_axes;\n"
+                    "    crate::table_hidden_axes::table_hidden_axes(package, model_object_id);\n"
+                    "}\n"
+                )
+            violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
+            self.assertGreaterEqual(
+                sum("must not fallback through the migration host" in item for item in violations),
+                3,
+                violations,
+            )
+
+    def test_iwa_pages_table_hidden_axes_masks_cfg_test_comments_and_literals(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            add_pages_table_hidden_axes_shared_helper_scaffold(root)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/tables/other.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "// pub fn table_hidden_axes(model_object_id: u64) {}\n"
+                'const DOC: &str = "editor.table_hidden_axes(model_id)";\n'
+                "#[cfg(test)]\n"
+                "pub fn table_hidden_axes(model_object_id: u64) {}\n"
+                "#[cfg(test)]\n"
+                "fn call_only() { editor.set_table_hidden_axes(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_hidden_axes_source_topology(root),
+                [],
+            )
+
+    def test_iwa_pages_table_hidden_axes_masks_qualified_cfg_test_items_and_keeps_cfg_any_visible(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_hidden_axes_canonical_scaffold(root)
+            add_pages_table_hidden_axes_shared_helper_scaffold(root)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/tables/qualified.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "#[cfg(test)]\n"
+                "pub unsafe extern \"C\" fn table_hidden_axes(model_object_id: u64) {}\n"
+                "#[cfg(test)]\n"
+                "macro_rules! retired_call { () => { editor.set_table_hidden_axes(); } }\n"
+                "#[cfg(all(test, feature = \"oracle\"))]\n"
+                "pub(crate) fn all_test_only() { editor.table_hidden_axes(); }\n"
+                "#[cfg(any(test, feature = \"oracle\"))]\n"
+                "fn production_reachable() { editor.table_hidden_axes(); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_table_hidden_axes_source_topology(root)
+            self.assertTrue(
+                any(
+                    "duplicate litchi-iwa Pages table-hidden-axes migration-host call table_hidden_axes"
+                    in item
+                    for item in violations
+                ),
+                violations,
+            )
+            self.assertTrue(
+                any("qualified.rs:8" in item for item in violations),
+                violations,
+            )
+            self.assertFalse(
+                any("qualified.rs:2" in item or "qualified.rs:4" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_pages_table_hidden_axes_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn("+ audit_iwa_pages_table_hidden_axes_source_topology()", main_source)
+        self.assertIn("+ audit_pages_table_hidden_axes_facade_source_topology()", main_source)
 
     def test_pages_header_footer_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(

@@ -8,6 +8,7 @@ mod body_footnote;
 pub(crate) mod body_table_appearance;
 pub(crate) mod body_table_dimension;
 pub(crate) mod body_table_headers;
+pub(crate) mod body_table_hidden_axes;
 pub(crate) mod body_table_name;
 pub(crate) mod body_table_sort;
 pub(crate) mod body_table_title;
@@ -72,6 +73,11 @@ pub use body_table_headers::{
     BodyTableHeaderSettingsCommit, BodyTableHeaderSettingsDiagnostics, BodyTableHeaderSettingsEdit,
     BodyTableHeaderSettingsError, BodyTableHeaderSettingsInvalidReason,
     BodyTableHeaderSettingsLimitKind, BodyTableHeaderSettingsPatch,
+};
+pub use body_table_hidden_axes::{
+    BodyTableHiddenAxesCommit, BodyTableHiddenAxesDiagnostics, BodyTableHiddenAxesEdit,
+    BodyTableHiddenAxesError, BodyTableHiddenAxesLimitKind, BodyTableHiddenAxesPatch,
+    BodyTableHiddenAxesPath,
 };
 pub use body_table_name::{
     BodyTableNameCommit, BodyTableNameDiagnostics, BodyTableNameEdit, BodyTableNameError,

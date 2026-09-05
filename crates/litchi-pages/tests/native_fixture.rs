@@ -47,3 +47,31 @@ fn native_pages_fixture_opens_from_path_and_bytes() -> Result<(), Box<dyn std::e
     assert_eq!(from_bytes.stats(), package.stats());
     Ok(())
 }
+
+#[test]
+fn native_visible_body_table_is_preserved_without_claiming_hidden_axis_support()
+-> Result<(), Box<dyn std::error::Error>> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/pages/body-table-visible.pages");
+    let bytes = std::fs::read(&path)?;
+    let package = Package::open(&path)?;
+    assert!(package.text()?.contains("Pages hidden-axis native oracle"));
+    let mut output = Vec::new();
+    package.write_to(&mut output)?;
+    assert_eq!(output, bytes);
+    // Apple's current model version and formula-owner metadata differ from
+    // the focused operation's admitted profile. Keep that refusal explicit
+    // until native changed-edit parity justifies widening the profile.
+    assert!(matches!(
+        package.body_table_hidden_axes(0usize),
+        Err(litchi_pages::BodyTableHiddenAxesError::InvalidSource)
+    ));
+    assert!(matches!(
+        package.edit_body_table_hidden_axes(0usize),
+        Err(litchi_pages::BodyTableHiddenAxesError::InvalidSource)
+    ));
+    let mut after_refusal = Vec::new();
+    package.write_to(&mut after_refusal)?;
+    assert_eq!(after_refusal, bytes);
+    Ok(())
+}
