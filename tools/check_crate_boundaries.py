@@ -4194,6 +4194,20 @@ IWA_KEYNOTE_SLIDE_DISCOVERY_FORBIDDEN_PATTERNS = (
             r"\bdecode_type\s*::<\s*TableInfoArchive\b"
         ),
     ),
+    (
+        "DocumentArchive::decode",
+        re.compile(
+            r"\bDocumentArchive\s*::\s*decode\s*\(|"
+            r"\bdecode_type\s*::<\s*DocumentArchive\b"
+        ),
+    ),
+    (
+        "ShowArchive::decode",
+        re.compile(
+            r"\bShowArchive\s*::\s*decode\s*\(|"
+            r"\bdecode_type\s*::<\s*ShowArchive\b"
+        ),
+    ),
 )
 IWA_KEYNOTE_SLIDE_DISCOVERY_SELECTED_INFO_CALLBACKS = frozenset(
     {"decode_catalog_table_info"}
@@ -12225,6 +12239,68 @@ PAGES_DOCUMENT_PUBLIC_MARKERS = frozenset(
 )
 PAGES_PACKAGE_SOURCE = PAGES_SOURCE_ROOT / "package.rs"
 PAGES_PACKAGE_MANIFEST = Path("crates/litchi-pages/Cargo.toml")
+# Pages body discovery is a hot path in the retained compatibility host.  Its
+# source payload is now projected by the focused package, so keep this
+# function scoped separately from the host's mutation and verification code,
+# which still legitimately decodes ``StorageArchive`` values.
+IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE = IWA_PAGES_EDITOR_SOURCE
+IWA_PAGES_BODY_STORAGE_DISCOVERY_FUNCTION = "body_storage_for_discovery"
+IWA_PAGES_BODY_STORAGE_DISCOVERY_CALL = re.compile(
+    r"\b(?:litchi_pages[ \t\r\n]*::[ \t\r\n]*)?"
+    r"__pages_body_storage_discovery[ \t\r\n]*\("
+)
+IWA_PAGES_BODY_STORAGE_DISCOVERY_STORAGE_ALIAS = re.compile(
+    r"\bStorageArchive[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
+    r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b"
+)
+IWA_PAGES_BODY_STORAGE_DISCOVERY_FORBIDDEN_PATTERNS = (
+    (
+        "StorageArchive::decode",
+        re.compile(
+            r"\bStorageArchive[ \t\r\n]*::[ \t\r\n]*decode"
+            r"[ \t\r\n]*\("
+        ),
+    ),
+    (
+        "generated StorageArchive type",
+        re.compile(
+            r"\bStorageArchive\b(?![ \t\r\n]*::[ \t\r\n]*decode\b)"
+        ),
+    ),
+)
+# Section-template discovery is migrating independently from Pages mutation
+# and clone preparation.  Keep this ratchet dormant until ``discover_structure``
+# claims the existing strict header/footer projection; once active, generated
+# section-template values must not be materialized on that discovery path.
+IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_FUNCTION = "discover_structure"
+IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_HELPER_FUNCTION = (
+    "pages_section_template_for_discovery"
+)
+IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_CODEC_CALL = re.compile(
+    r"\b(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
+    r"pages_header_footer_codec[ \t\r\n]*::[ \t\r\n]*"
+    r"decode_section_template(?:_with_report)?[ \t\r\n]*\("
+)
+IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_STORAGE_ALIAS = re.compile(
+    r"\bSectionTemplateArchive[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
+    r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b"
+)
+IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_FORBIDDEN_PATTERNS = (
+    (
+        "SectionTemplateArchive::decode",
+        re.compile(
+            r"\bSectionTemplateArchive[ \t\r\n]*::[ \t\r\n]*decode"
+            r"[ \t\r\n]*\("
+        ),
+    ),
+    (
+        "generated SectionTemplateArchive type",
+        re.compile(
+            r"\bSectionTemplateArchive\b(?![ \t\r\n]*::"
+            r"[ \t\r\n]*decode\b)"
+        ),
+    ),
+)
 PAGES_PACKAGE_TEST_MODULE = re.compile(
     r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]",
     re.MULTILINE,
@@ -40311,22 +40387,29 @@ def audit_iwa_keynote_slide_table_discovery_source_topology(
     for source in production.values():
         code = _mask_rust_non_code(source)
         for match in re.finditer(
-            r"\b(?:TableModelArchive|TableInfoArchive)\b"
+            r"\b(?:DocumentArchive|ShowArchive|TableModelArchive|TableInfoArchive)\b"
             r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
             r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
             code,
         ):
             alias = match.group("alias")
-            original = (
-                "TableModelArchive"
-                if "TableModelArchive" in match.group(0)
-                else "TableInfoArchive"
+            original = next(
+                name
+                for name in (
+                    "DocumentArchive",
+                    "ShowArchive",
+                    "TableModelArchive",
+                    "TableInfoArchive",
+                )
+                if name in match.group(0)
             )
             generated_alias_patterns.append(
                 (
                     f"{original} alias {alias}::decode",
                     re.compile(
-                        rf"\b(?:r#)?{re.escape(alias)}\s*::\s*decode\s*\("
+                        rf"\b(?:r#)?{re.escape(alias)}\s*::\s*decode\s*\(|"
+                        rf"\b(?:decode_type|decode_unique(?:_any)?)\s*::<\s*"
+                        rf"(?:[^>]*::\s*)?(?:r#)?{re.escape(alias)}\b"
                     ),
                 )
             )
@@ -43446,6 +43529,147 @@ def audit_pages_package_output_api_source_topology(root: Path = ROOT) -> list[st
             f"{PAGES_PACKAGE_OUTPUT_EXPORT_SOURCE}"
         )
 
+    return sorted(set(violations))
+
+
+def audit_iwa_pages_body_storage_discovery_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep Pages body discovery on the focused projection boundary.
+
+    The retained Pages editor still decodes ``StorageArchive`` values for
+    mutation and post-write verification.  Body discovery is a separate
+    read-only hot path, however, and must retain only the compact projection
+    supplied by ``litchi-pages``.  Inspect this one production function so the
+    broader compatibility code remains available without allowing an eager
+    archive decode to return to discovery.
+    """
+
+    path = root / IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE
+    if not path.is_file():
+        return []
+
+    masked_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    function = _rust_named_function_body(
+        masked_source, IWA_PAGES_BODY_STORAGE_DISCOVERY_FUNCTION
+    )
+    if function is None:
+        return []
+    body, body_offset = function
+    production_code = _mask_rust_non_code(body)
+    violations: list[str] = []
+
+    forbidden = list(IWA_PAGES_BODY_STORAGE_DISCOVERY_FORBIDDEN_PATTERNS)
+    source_code = _mask_rust_non_code(masked_source)
+    for alias_match in IWA_PAGES_BODY_STORAGE_DISCOVERY_STORAGE_ALIAS.finditer(
+        source_code
+    ):
+        alias = alias_match.group("alias")
+        forbidden.append(
+            (
+                f"StorageArchive alias {alias}::decode",
+                re.compile(
+                    rf"\b(?:r#)?{re.escape(alias)}[ \t\r\n]*::"
+                    r"[ \t\r\n]*decode[ \t\r\n]*\(|"
+                    rf"\b(?:decode_type|decode_unique(?:_any)?)\s*::<\s*"
+                    rf"(?:[^>]*::\s*)?(?:r#)?{re.escape(alias)}\b"
+                ),
+            )
+        )
+
+    if IWA_PAGES_BODY_STORAGE_DISCOVERY_CALL.search(production_code) is None:
+        violations.append(
+            "litchi-iwa Pages body discovery is missing the focused "
+            "__pages_body_storage_discovery projection call: "
+            f"{IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE}"
+        )
+
+    for label, pattern in forbidden:
+        for match in pattern.finditer(production_code):
+            line_number = masked_source.count(
+                "\n", 0, body_offset + match.start()
+            ) + 1
+            violations.append(
+                "litchi-iwa Pages body discovery production source uses "
+                f"{label}: {IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_pages_section_template_discovery_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep Pages section-template discovery on the lazy header/footer codec.
+
+    ``discover_structure`` still has legitimate generated template decodes in
+    mutation and clone-preparation helpers elsewhere in the editor.  The
+    check activates only when the discovery function adopts the focused
+    ``pages_header_footer_codec`` route, then scopes the eager-read ban to
+    that function so those unrelated compatibility paths remain available.
+    """
+
+    path = root / IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE
+    if not path.is_file():
+        return []
+
+    masked_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    functions = _rust_top_level_function_bodies(masked_source)
+    root_function = functions.get(IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_FUNCTION)
+    if root_function is None:
+        return []
+    root_body, root_offset = root_function
+    helper_function = functions.get(IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_HELPER_FUNCTION)
+    helper_is_called = helper_function is not None and re.search(
+        rf"\b(?:r#)?{re.escape(IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_HELPER_FUNCTION)}"
+        r"[ \t\r\n]*\(",
+        root_body,
+    ) is not None
+    scoped_functions = [(root_body, root_offset)]
+    if helper_is_called:
+        scoped_functions.append(helper_function)
+
+    # A pre-migration source tree remains valid until the production function
+    # explicitly claims the focused projection, either inline or through its
+    # dedicated helper.
+    if not any(
+        IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_CODEC_CALL.search(
+            _mask_rust_non_code(body)
+        )
+        for body, _offset in scoped_functions
+    ):
+        return []
+
+    forbidden = list(IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_FORBIDDEN_PATTERNS)
+    source_code = _mask_rust_non_code(masked_source)
+    for alias_match in IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_STORAGE_ALIAS.finditer(
+        source_code
+    ):
+        alias = alias_match.group("alias")
+        forbidden.append(
+            (
+                f"SectionTemplateArchive alias {alias}::decode",
+                re.compile(
+                    rf"\b(?:r#)?{re.escape(alias)}[ \t\r\n]*::"
+                    r"[ \t\r\n]*decode[ \t\r\n]*\(|"
+                    rf"\b(?:decode_type|decode_unique(?:_any)?)\s*::<\s*"
+                    rf"(?:[^>]*::\s*)?(?:r#)?{re.escape(alias)}\b"
+                ),
+            )
+        )
+
+    violations: list[str] = []
+    for body, body_offset in scoped_functions:
+        production_body = _mask_rust_non_code(body)
+        for label, pattern in forbidden:
+            for match in pattern.finditer(production_body):
+                line_number = masked_source.count(
+                    "\n", 0, body_offset + match.start()
+                ) + 1
+                violations.append(
+                    "litchi-iwa Pages section-template discovery production source "
+                    f"uses {label}: {IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE}:{line_number}"
+                )
     return sorted(set(violations))
 
 
@@ -56220,6 +56444,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_document_source_topology()
         + audit_numbers_document_public_api()
         + audit_iwa_pages_document_source_topology()
+        + audit_iwa_pages_body_storage_discovery_source_topology()
+        + audit_iwa_pages_section_template_discovery_source_topology()
         + audit_pages_document_public_api()
         + audit_pages_package_output_api_source_topology()
         + audit_iwork_atomic_publication()

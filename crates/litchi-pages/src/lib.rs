@@ -77,7 +77,10 @@ pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES
 pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
-pub use package::{__is_valid_pages_text_storage, __semantic_document_from_prepared_source};
+pub use package::{
+    __is_valid_pages_text_storage, __pages_body_storage_discovery,
+    __semantic_document_from_prepared_source, BodyStorageDiscovery,
+};
 pub use package::{
     BodyDrawableOrderCommit, BodyDrawableOrderDiagnostics, BodyDrawableOrderEdit,
     BodyDrawableOrderError, BodyDrawableOrderLimitKind, BodyDrawableOrderPatch,

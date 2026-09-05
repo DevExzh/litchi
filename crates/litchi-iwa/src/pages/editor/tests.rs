@@ -21,6 +21,59 @@ use litchi_pages::section::{PageNumber, PageNumbering, Start};
 use litchi_pages::{Package as PagesPackage, SectionSelector, TextSpan};
 
 #[test]
+fn native_unicode_body_discovery_preserves_sections_and_exact_source() {
+    let source = std::fs::read(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/pages/body-sections-unicode.pages"),
+    )
+    .expect("native two-section Pages fixture");
+    let editor = PagesEditor::from_bytes(&source).expect("native Pages discovery");
+    let text = editor.body_text().expect("native body text");
+    let first = "Pages borrowed body 😀\nFirst section marker.";
+    let second = "Second section marker — end.";
+    assert!(text.starts_with(first));
+    assert!(text.contains(second));
+    assert_eq!(editor.sections().len(), 2);
+    assert_eq!(editor.sections()[0].character_index, 0);
+    let second_byte = text.find(second).expect("second marker");
+    assert_eq!(
+        usize::try_from(editor.sections()[1].character_index).expect("section position"),
+        text[..second_byte].encode_utf16().count(),
+    );
+    assert_eq!(editor.to_bytes().expect("unchanged native package"), source);
+}
+
+#[test]
+fn body_discovery_defers_malformed_footnotes_without_relaxing_section_validation() {
+    let mut source = StorageArchive {
+        text: vec!["a😀b".to_owned()],
+        table_section: Some(ObjectAttributeTable {
+            entries: vec![ObjectAttribute {
+                character_index: 0,
+                object: Some(Reference {
+                    identifier: 42,
+                    ..Reference::default()
+                }),
+            }],
+        }),
+        ..StorageArchive::default()
+    }
+    .encode_to_vec();
+    // A malformed optional footnote table is qualified only by the footnote
+    // editor. Discovery must leave these exact caller-owned bytes intact.
+    source.extend_from_slice(&[0x82, 0x01, 0x01, 0xff]);
+    let before = source.clone();
+    let discovery = body_storage_for_discovery(&source).expect("deferred footnote validation");
+    assert_eq!(discovery.utf16_len(), 4);
+    assert_eq!(discovery.into_section_references(), [(0, 42)]);
+    assert_eq!(source, before);
+
+    // Footnote deferral cannot hide a malformed section table.
+    source.extend_from_slice(&[0x8a, 0x01, 0x01, 0xff]);
+    assert!(body_storage_for_discovery(&source).is_none());
+}
+
+#[test]
 fn pages_native_discriminants_are_typed_and_lossless() {
     for (raw, value) in [
         (0, Start::NextPage),

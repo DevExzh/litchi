@@ -16,6 +16,9 @@ use litchi_iwa_protos::pages_drawable_order_codec::{
     DecodeOptions as PagesDrawableOrderDecodeOptions,
     WireResourceLimit as PagesDrawableOrderWireResourceLimit,
 };
+use litchi_iwa_protos::pages_header_footer_codec::{
+    self as pages_header_footer_codec, DecodeOptions as PagesHeaderFooterDecodeOptions,
+};
 use litchi_iwa_protos::pages_movie_caption_codec::{
     self as pages_movie_caption_codec, CaptionInfoWrite,
     DecodeOptions as PagesMovieCaptionDecodeOptions,
@@ -91,6 +94,9 @@ const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
 const DRAWABLE_ATTACHMENT_MESSAGE_TYPE: u32 = 2003;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3097;
 const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
+const PAGES_SECTION_TEMPLATE_RECURSION_LIMIT: u32 = 8;
+const PAGES_SECTION_TEMPLATE_FIELD_MULTIPLIER: usize = 8;
+const PAGES_SECTION_TEMPLATE_WORK_MULTIPLIER: usize = 32;
 
 use litchi_pages::header_footer::{HeaderFooterSelector, Kind, Template};
 pub use types::{PagesDrawableTextInfo, PagesSectionInfo, RemovedPagesTextBox};
@@ -3037,6 +3043,18 @@ struct DiscoveredPagesSection {
     odd_template_id: Option<u64>,
 }
 
+/// The narrow section-template projection retained by Pages discovery.
+///
+/// Discovery only needs the header/footer storage identifiers.  The source
+/// payload remains authoritative and is decoded with the bounded Buffa
+/// projection below; graph and mutation paths that need the other native
+/// fields continue to use [`SectionTemplateArchive`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DiscoveredPagesSectionTemplate {
+    headers: Vec<u64>,
+    footers: Vec<u64>,
+}
+
 impl PagesSectionGraph {
     fn removal_order(&self) -> Vec<u64> {
         let mut result = vec![self.section_id];
@@ -4397,8 +4415,7 @@ fn pages_section_name(payload: &[u8]) -> Result<Option<&str>> {
 /// storage.  Keep the generated archive value out of this hot path: the
 /// existing bounded text-wire owner performs strict known-tree validation and
 /// one private Buffa text projection, while the caller-owned payload remains
-/// untouched.  The body storage is still decoded below when its section table
-/// is required for host graph checks.
+/// untouched. Body discovery below retains only its length and section edges.
 fn is_valid_pages_text_storage(payload: &[u8]) -> bool {
     litchi_pages::__is_valid_pages_text_storage(payload)
 }
@@ -4410,16 +4427,78 @@ fn is_valid_pages_text_storage(payload: &[u8]) -> bool {
 /// malformed field-16 payload must not prevent discovery of the body's text
 /// and section table.  Remove that one optional table only from the temporary
 /// discovery copy; the package payload is never changed.
-fn body_storage_for_discovery(payload: &[u8]) -> Option<StorageArchive> {
-    if is_valid_pages_text_storage(payload) {
-        return StorageArchive::decode(payload).ok();
+fn body_storage_for_discovery(payload: &[u8]) -> Option<litchi_pages::BodyStorageDiscovery> {
+    if let Ok(discovery) = litchi_pages::__pages_body_storage_discovery(payload) {
+        return Some(discovery);
     }
     let without_footnotes =
         patch_length_delimited_field(payload, BODY_FOOTNOTE_TABLE_FIELD, true, None).ok()?;
-    if !is_valid_pages_text_storage(&without_footnotes) {
-        return None;
+    litchi_pages::__pages_body_storage_discovery(&without_footnotes).ok()
+}
+
+fn pages_section_template_decode_options(source: &[u8]) -> PagesHeaderFooterDecodeOptions {
+    PagesHeaderFooterDecodeOptions::new(
+        source.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        source
+            .len()
+            .saturating_mul(2)
+            .clamp(1, WireLimits::MAX_OUTPUT_BYTES),
+        source
+            .len()
+            .saturating_mul(PAGES_SECTION_TEMPLATE_FIELD_MULTIPLIER)
+            .clamp(1, WireLimits::MAX_FIELDS),
+        source
+            .len()
+            .saturating_mul(PAGES_SECTION_TEMPLATE_WORK_MULTIPLIER)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        PAGES_SECTION_TEMPLATE_RECURSION_LIMIT,
+        source.len().clamp(1, WireLimits::MAX_FIELDS),
+    )
+}
+
+/// Decode the header/footer identifiers needed by Pages structure discovery.
+///
+/// This deliberately retains only the two repeated identifier lists.  The
+/// section-template payload remains source-owned, and fields outside those
+/// lists (including the legacy drawable and page-template fields) stay opaque
+/// to this narrow route.  Full graph and mutation paths continue to use the
+/// generated [`SectionTemplateArchive`] projection.
+fn pages_section_template_for_discovery(source: &[u8]) -> Result<DiscoveredPagesSectionTemplate> {
+    let snapshot = pages_header_footer_codec::decode_section_template(
+        source,
+        pages_section_template_decode_options(source),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Invalid Pages section-template discovery payload: {error}"
+        ))
+    })?;
+
+    let header_count = snapshot.header_count();
+    let footer_count = snapshot.footer_count();
+    let mut headers = Vec::new();
+    headers.try_reserve_exact(header_count).map_err(|_error| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "Pages section-template header identifiers",
+            amount: header_count,
+        })
+    })?;
+    for identifier in snapshot.header_identifiers() {
+        headers.push(identifier);
     }
-    StorageArchive::decode(without_footnotes.as_slice()).ok()
+
+    let mut footers = Vec::new();
+    footers.try_reserve_exact(footer_count).map_err(|_error| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "Pages section-template footer identifiers",
+            amount: footer_count,
+        })
+    })?;
+    for identifier in snapshot.footer_identifiers() {
+        footers.push(identifier);
+    }
+
+    Ok(DiscoveredPagesSectionTemplate { headers, footers })
 }
 
 fn pages_section_settings(payload: &[u8]) -> Result<SectionSettingsSnapshot<'_>> {
@@ -4922,7 +5001,7 @@ fn discover_structure(
                     },
                     SECTION_TEMPLATE_MESSAGE_TYPE => {
                         if let Ok(template) =
-                            SectionTemplateArchive::decode(message.data.as_slice())
+                            pages_section_template_for_discovery(message.data.as_slice())
                         {
                             insert_unique(
                                 &mut templates,
@@ -4953,13 +5032,8 @@ fn discover_structure(
     if let Some(reference) = document.initial_section() {
         section_references.push((0, reference.identifier().get()));
     }
-    if let Some(table) = body.table_section {
-        section_references.extend(table.entries.into_iter().filter_map(|entry| {
-            entry
-                .object
-                .map(|reference| (entry.character_index, reference.identifier))
-        }));
-    }
+    let body_length = body.utf16_len();
+    section_references.extend(body.into_section_references());
     section_references.sort_unstable();
     section_references.dedup();
     if section_references
@@ -4971,11 +5045,6 @@ fn discover_structure(
             section_references[0].0
         )));
     }
-    let body_length = body
-        .text
-        .iter()
-        .map(|text| text.encode_utf16().count())
-        .sum::<usize>();
     let mut seen_sections = HashSet::new();
     for (index, (character_index, section_id)) in section_references.iter().enumerate() {
         let character_index_usize = usize::try_from(*character_index).map_err(|_| {
@@ -5033,11 +5102,11 @@ fn discover_structure(
                 (Kind::Header, &template.headers),
                 (Kind::Footer, &template.footers),
             ] {
-                for (slot, reference) in references.iter().enumerate() {
-                    if !writable_storages.contains(&reference.identifier) {
+                for (slot, &storage_id) in references.iter().enumerate() {
+                    if !writable_storages.contains(&storage_id) {
                         return Err(Error::InvalidFormat(format!(
                             "Pages {kind:?} storage {} is missing or invalid",
-                            reference.identifier
+                            storage_id
                         )));
                     }
                     locations.push(HeaderFooterLocation {
@@ -5048,7 +5117,7 @@ fn discover_structure(
                         template: template_kind,
                         kind,
                         slot,
-                        storage_id: crate::text::native_storage_id(reference.identifier)?,
+                        storage_id: crate::text::native_storage_id(storage_id)?,
                     });
                 }
             }
@@ -5158,6 +5227,136 @@ mod strict_selector_tests {
             PagesEditor::set_drawable_comment_reply;
         let _: fn(&mut PagesEditor, DrawableId, StorageId) -> Result<()> =
             PagesEditor::remove_drawable_comment_reply;
+    }
+}
+
+#[cfg(test)]
+mod section_template_discovery_tests {
+    use super::*;
+
+    fn varint(mut value: u64) -> Vec<u8> {
+        let mut encoded = Vec::new();
+        loop {
+            let mut byte = (value & 0x7f) as u8;
+            value >>= 7;
+            if value != 0 {
+                byte |= 0x80;
+            }
+            encoded.push(byte);
+            if value == 0 {
+                return encoded;
+            }
+        }
+    }
+
+    fn field_varint(number: u32, value: u64) -> Vec<u8> {
+        let mut encoded = varint(u64::from(number) << 3);
+        encoded.extend(varint(value));
+        encoded
+    }
+
+    fn field_bytes(number: u32, value: &[u8]) -> Vec<u8> {
+        let mut encoded = varint((u64::from(number) << 3) | 2);
+        encoded.extend(varint(value.len() as u64));
+        encoded.extend_from_slice(value);
+        encoded
+    }
+
+    fn reference(
+        identifier: u64,
+        deprecated_type: Option<u64>,
+        deprecated_is_external: Option<bool>,
+    ) -> Vec<u8> {
+        let mut encoded = field_varint(1, identifier);
+        if let Some(value) = deprecated_type {
+            encoded.extend(field_varint(2, value));
+        }
+        if let Some(value) = deprecated_is_external {
+            encoded.extend(field_varint(3, u64::from(value)));
+        }
+        let nested_unknown = [
+            field_varint(1, 17),
+            field_bytes(2, b"preserve this nested field"),
+        ]
+        .concat();
+        encoded.extend(field_bytes(99, &nested_unknown));
+        encoded
+    }
+
+    fn template(headers: &[Vec<u8>], footers: &[Vec<u8>], tail: &[u8]) -> Vec<u8> {
+        let mut encoded = Vec::new();
+        for header in headers {
+            encoded.extend(field_bytes(1, header));
+        }
+        encoded.extend_from_slice(tail);
+        for footer in footers {
+            encoded.extend(field_bytes(2, footer));
+        }
+        encoded
+    }
+
+    #[test]
+    fn bounded_projection_collects_many_deprecated_references_and_preserves_source() {
+        let headers = (0_u32..96)
+            .map(|index| {
+                reference(
+                    1_000 + u64::from(index),
+                    (index % 3 == 0).then_some(u64::MAX),
+                    Some(index % 2 == 0),
+                )
+            })
+            .collect::<Vec<_>>();
+        let footers = (0_u32..64)
+            .map(|index| {
+                reference(
+                    2_000 + u64::from(index),
+                    (index % 4 == 0).then_some(7),
+                    (index % 2 == 1).then_some(true),
+                )
+            })
+            .collect::<Vec<_>>();
+        let opaque_fields = [
+            field_bytes(3, &field_varint(1, 900)),
+            field_bytes(4, &field_bytes(1, b"opaque page-template payload")),
+            field_bytes(99, b"unknown root bytes"),
+        ]
+        .concat();
+        let source = template(&headers, &footers, &opaque_fields);
+        let before = source.clone();
+
+        let projection = pages_section_template_for_discovery(&source)
+            .expect("bounded section-template projection");
+
+        assert_eq!(
+            projection.headers,
+            (0_u32..96)
+                .map(|index| 1_000 + u64::from(index))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            projection.footers,
+            (0_u32..64)
+                .map(|index| 2_000 + u64::from(index))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(source, before);
+    }
+
+    #[test]
+    fn malformed_reference_projection_fails_closed() {
+        let malformed = [
+            field_bytes(1, &field_varint(1, 0)),
+            field_bytes(1, &field_varint(2, 1)),
+            field_bytes(1, &[0x08, 0x01, 0x08, 0x02]),
+            field_bytes(1, &[0x08, 0x01, 0x18, 0x02]),
+            field_varint(1, 1),
+        ];
+        for source in malformed {
+            assert!(
+                pages_section_template_for_discovery(&source).is_err(),
+                "malformed section-template source should fail: {source:?}"
+            );
+        }
     }
 }
 

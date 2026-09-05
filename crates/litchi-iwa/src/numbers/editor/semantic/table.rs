@@ -206,9 +206,19 @@ fn focused_set_data_format(
             source.edit_table_cell_text_format(sheet, table, position),
             *value
         ),
-        DataFormat::Custom(_) => Err(Error::InvalidFormat(
-            "Custom formats remain owned by the Numbers compatibility writer".to_owned(),
-        )),
+        DataFormat::Custom(value) => {
+            let commit = source
+                .edit_table_cell_custom_format(sheet, table, position)
+                .map_err(focused_data_format_error)?
+                .set(value.clone())
+                .commit()
+                .map_err(focused_data_format_error)?;
+            if commit.patch().is_noop() {
+                Ok(None)
+            } else {
+                focused_package_to_editor(commit.package(), source_len).map(Some)
+            }
+        },
         DataFormat::Checkbox(_)
         | DataFormat::StarRating(_)
         | DataFormat::Slider(_)
@@ -286,9 +296,19 @@ fn focused_clear_data_format(
         DataFormat::Text(_) => {
             commit_clear!(source.edit_table_cell_text_format(sheet, table, position))
         },
-        DataFormat::Custom(_) => Err(Error::InvalidFormat(
-            "Custom formats remain owned by the Numbers compatibility writer".to_owned(),
-        )),
+        DataFormat::Custom(_) => {
+            let commit = source
+                .edit_table_cell_custom_format(sheet, table, position)
+                .map_err(focused_data_format_error)?
+                .clear()
+                .commit()
+                .map_err(focused_data_format_error)?;
+            if commit.patch().is_noop() {
+                Ok(None)
+            } else {
+                focused_package_to_editor(commit.package(), source_len).map(Some)
+            }
+        },
         DataFormat::Checkbox(_)
         | DataFormat::StarRating(_)
         | DataFormat::Slider(_)
@@ -423,6 +443,51 @@ fn is_focused_data_format(format: &DataFormat) -> bool {
     focused_data_format_family(format).is_some()
 }
 
+fn is_focused_custom_data_format(format: &DataFormat) -> bool {
+    matches!(format, DataFormat::Custom(_))
+}
+
+/// Distinguish the legacy registry route before selecting a focused owner.
+/// Builder packages retain their registry in the TSA base and omit the TN
+/// document's field 9. The compatibility reader has already qualified their
+/// unique registry. Any present field 9 selects focused validation, including
+/// malformed or duplicated references; a focused error never falls back.
+fn has_focused_custom_registry_edge(editor: &NumbersEditor) -> Result<bool> {
+    editor
+        .package
+        .with_parsed_archive("Index/Document.iwa", |archive| {
+            let mut documents = archive
+                .objects
+                .iter()
+                .filter(|object| object.archive_info.identifier == Some(1))
+                .flat_map(|object| object.messages.iter())
+                .filter(|message| message.type_ == 1);
+            let document = documents.next().ok_or_else(|| {
+                Error::InvalidFormat("Numbers Custom-format document is missing".to_owned())
+            })?;
+            if documents.next().is_some() {
+                return Err(Error::InvalidFormat(
+                    "Numbers Custom-format document is ambiguous".to_owned(),
+                ));
+            }
+            let limits = litchi_iwa_common::WireLimits::default()
+                .with_input_bytes(document.data.len().max(1))?
+                .with_fields(document.data.len().max(1))?;
+            let view =
+                litchi_iwa_common::wire::WireView::parse_with_limits(&document.data, limits)?;
+            Ok(view.fields().any(|field| field.number() == 9))
+        })
+}
+
+fn same_custom_format_family(left: &Custom, right: &Custom) -> bool {
+    matches!(
+        (left, right),
+        (Custom::Number(_), Custom::Number(_))
+            | (Custom::Text(_), Custom::Text(_))
+            | (Custom::DateTime(_), Custom::DateTime(_))
+    )
+}
+
 /// Select the focused owner only for an operation represented by that owner.
 ///
 /// Cross-family display-format changes remain a compatibility-host concern;
@@ -432,12 +497,18 @@ fn is_focused_data_format(format: &DataFormat) -> bool {
 /// interactive control to one of those families by staging a typed clear and
 /// target set. Other cross-family conversions remain compatibility-host work.
 fn uses_focused_data_format_owner(current: &DataFormat, requested: &DataFormat) -> bool {
-    // Custom formats still carry package-level registry and cleanup metadata
-    // that the focused owner does not publish. Keep every transition that
-    // mentions Custom on the compatibility writer, including the
-    // exact-source reset path.
-    if matches!(current, DataFormat::Custom(_)) || matches!(requested, DataFormat::Custom(_)) {
-        return false;
+    // The focused Custom owner handles only an existing Custom entry in the
+    // same family, or clearing an existing Custom entry.  Generic authoring
+    // and cross-family conversions keep the compatibility writer because
+    // they may need broader format-list and cell-storage semantics.
+    match (current, requested) {
+        (DataFormat::Custom(current), DataFormat::Custom(requested)) => {
+            return same_custom_format_family(current, requested);
+        },
+        (DataFormat::Custom(_), DataFormat::Automatic) => return true,
+        (_, DataFormat::Custom(_)) => return false,
+        (DataFormat::Custom(_), _) => return false,
+        _ => {},
     }
     if matches!(requested, DataFormat::Automatic) {
         return is_focused_data_format(current);
@@ -532,7 +603,10 @@ fn commit_exact_focused_data_format_with_location(
         position,
         source_len,
     } = location;
-    if !is_focused_data_format(current) && !matches!(current, DataFormat::Automatic) {
+    if !is_focused_data_format(current)
+        && !is_focused_custom_data_format(current)
+        && !matches!(current, DataFormat::Automatic)
+    {
         return Err(Error::InvalidFormat(
             "focused Numbers owner does not admit the current cell format".to_owned(),
         ));
@@ -545,6 +619,34 @@ fn commit_exact_focused_data_format_with_location(
             return Ok(editor.clone());
         };
         verify_focused_data_format(&candidate, table_id, row, column, &DataFormat::Automatic)?;
+        return Ok(candidate);
+    }
+    if let DataFormat::Custom(requested) = requested {
+        let DataFormat::Custom(current) = current else {
+            return Err(Error::InvalidFormat(
+                "focused Numbers owner does not admit Custom-format authoring".to_owned(),
+            ));
+        };
+        if !same_custom_format_family(current, requested) {
+            return Err(Error::InvalidFormat(
+                "focused Numbers owner does not admit a cross-family Custom-format conversion"
+                    .to_owned(),
+            ));
+        }
+        let requested_format = DataFormat::Custom(requested.clone());
+        let candidate = focused_set_data_format(
+            &source,
+            sheet,
+            table,
+            position,
+            source_len,
+            &requested_format,
+        )?;
+        let Some(candidate) = candidate else {
+            verify_focused_data_format(editor, table_id, row, column, &requested_format)?;
+            return Ok(editor.clone());
+        };
+        verify_focused_data_format(&candidate, table_id, row, column, &requested_format)?;
         return Ok(candidate);
     }
     let Some(requested_family) = focused_data_format_family(requested) else {
@@ -1049,9 +1151,18 @@ impl NumbersEditor {
     ) -> Result<()> {
         let source_built = !self.package.source_is_exact();
         let current = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;
-        if !source_built && current == format && !is_focused_data_format(&format) {
+        let legacy_custom_registry = !source_built
+            && is_focused_custom_data_format(&current)
+            && uses_focused_data_format_owner(&current, &format)
+            && !has_focused_custom_registry_edge(self)?;
+        if !source_built
+            && current == format
+            && !is_focused_data_format(&format)
+            && (!is_focused_custom_data_format(&format) || legacy_custom_registry)
+        {
             // Preserve exact-source no-op bytes for formats without an
-            // eligible focused owner: Automatic, NumeralSystem, and Custom.
+            // eligible focused owner: Automatic, NumeralSystem, and legacy
+            // Custom registries without the TN document edge.
             // Re-running the native writer here would needlessly allocate a
             // new package and can normalize inherited automatic metadata.
             return Ok(());
@@ -1060,12 +1171,12 @@ impl NumbersEditor {
             && current == format
             && is_focused_data_format(&format)
         {
-            // A focused no-op still has to enter the focused transaction
-            // so malformed family metadata keeps its terminal refusal
+            // A focused no-op still has to enter the focused transaction so
+            // malformed family metadata keeps its terminal refusal
             // semantics and a valid no-op can retain the exact source. Shape
             // admission is intentionally skipped for this forced validation.
             Some(focused_cell_location(self, table_id, row, column)?)
-        } else if !source_built {
+        } else if !source_built && !legacy_custom_registry {
             focused_data_format_owner_is_eligible(self, table_id, row, column, &current, &format)?
         } else {
             None
@@ -3120,5 +3231,483 @@ impl NumbersEditor {
         IWorkPackage::from_bytes(&bytes)?;
         self.package = staged;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod focused_custom_tests {
+
+    use super::*;
+    use crate::numbers::cell::CellValue;
+    use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
+    use litchi_numbers::cell::data_format::custom::{
+        Custom, Name, Number as CustomNumber, NumberPattern, Text as CustomText,
+    };
+    use litchi_numbers::{CellPosition, SheetSelector, TableSelector};
+    use prost::Message as _;
+
+    fn custom_number(name: &str, pattern: &str) -> Custom {
+        Custom::Number(CustomNumber::new(
+            Name::try_new(name).expect("valid custom name"),
+            NumberPattern::try_new(pattern).expect("valid custom pattern"),
+        ))
+    }
+
+    #[test]
+    fn exact_custom_same_family_replacement_clear_and_noop_use_focused_owner() {
+        let source_bytes = include_bytes!(
+            "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
+        );
+        let source = FocusedNumbersPackage::from_bytes(source_bytes).expect("focused source");
+        let position = CellPosition::new(0, 0);
+        let before_value = source
+            .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
+            .expect("original focused cell")
+            .storage()
+            .value()
+            .cloned();
+        let replacement = custom_number("Signed Integer", "#,##0;(#,##0)");
+        let direct = source
+            .edit_table_cell_custom_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                position,
+            )
+            .expect("focused custom edit")
+            .set(replacement.clone())
+            .commit()
+            .expect("focused custom replacement");
+        assert_eq!(
+            direct
+                .package()
+                .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
+                .expect("direct replacement cell")
+                .storage()
+                .value()
+                .cloned(),
+            before_value
+        );
+
+        let mut actual = NumbersEditor::from_bytes(source_bytes).expect("exact editor");
+        // The focused fixture intentionally omits the appearance dependency
+        // required by `NumbersEditor::tables`; its table-model object is still
+        // the stable native table id used by the cell APIs.
+        let table_id = 4;
+        assert!(matches!(
+            actual
+                .table_cell_data_format(table_id, 0, 0)
+                .expect("original format read"),
+            DataFormat::Custom(Custom::Number(_))
+        ));
+        actual
+            .set_table_cell_data_format(table_id, 0, 0, replacement.clone().into())
+            .expect("host custom replacement");
+        let host_replacement_bytes = actual.to_bytes().expect("host replacement bytes");
+        let host_replacement =
+            FocusedNumbersPackage::from_bytes(&host_replacement_bytes).expect("host focused");
+        assert_eq!(
+            actual
+                .table_cell_data_format(table_id, 0, 0)
+                .expect("replacement read"),
+            DataFormat::Custom(replacement.clone())
+        );
+        assert_eq!(
+            host_replacement
+                .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
+                .expect("host replacement cell")
+                .storage()
+                .value()
+                .cloned(),
+            before_value
+        );
+        assert_eq!(
+            host_replacement
+                .table_cell_custom_format(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    position,
+                )
+                .expect("host replacement custom"),
+            Some(replacement.clone())
+        );
+        assert!(
+            host_replacement
+                .table_cell_custom_format(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    CellPosition::new(0, 1),
+                )
+                .expect("shared registry custom")
+                .is_some()
+        );
+        let original_editor = NumbersEditor::from_bytes(source_bytes).expect("original editor");
+        assert_eq!(
+            actual.package().entry("Index/Unrelated.iwa"),
+            original_editor.package().entry("Index/Unrelated.iwa")
+        );
+        assert_eq!(
+            actual.package().entry("Data/data-format-sentinel.bin"),
+            original_editor
+                .package()
+                .entry("Data/data-format-sentinel.bin")
+        );
+
+        let before_noop = actual.to_bytes().expect("replacement source bytes");
+        let source_pointer = actual
+            .package()
+            .exact_source_bytes()
+            .expect("focused replacement source")
+            .as_ptr();
+        actual
+            .set_table_cell_data_format(table_id, 0, 0, replacement.into())
+            .expect("host custom no-op");
+        assert_eq!(actual.to_bytes().expect("host no-op bytes"), before_noop);
+        assert_eq!(
+            actual
+                .package()
+                .exact_source_bytes()
+                .expect("focused no-op source")
+                .as_ptr(),
+            source_pointer
+        );
+
+        let replacement_source =
+            FocusedNumbersPackage::from_bytes(&before_noop).expect("focused replacement source");
+        let direct_clear = replacement_source
+            .edit_table_cell_custom_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                position,
+            )
+            .expect("focused custom clear edit")
+            .clear()
+            .commit()
+            .expect("focused custom clear");
+        assert_eq!(
+            direct_clear
+                .package()
+                .table_cell_custom_format(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    position,
+                )
+                .expect("direct clear custom"),
+            None
+        );
+        actual
+            .set_table_cell_data_format(table_id, 0, 0, DataFormat::Automatic)
+            .expect("host custom clear");
+        let host_clear = actual.to_bytes().expect("host clear bytes");
+        let host_clear = FocusedNumbersPackage::from_bytes(&host_clear).expect("clear focused");
+        assert_eq!(
+            actual
+                .table_cell_data_format(table_id, 0, 0)
+                .expect("clear read"),
+            DataFormat::Automatic
+        );
+        assert_eq!(
+            host_clear
+                .table_cell_custom_format(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    position,
+                )
+                .expect("host clear custom"),
+            None
+        );
+        assert!(
+            host_clear
+                .table_cell_custom_format(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    CellPosition::new(0, 1),
+                )
+                .expect("shared registry after clear")
+                .is_some()
+        );
+        assert_eq!(
+            host_clear
+                .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
+                .expect("host clear cell")
+                .storage()
+                .value()
+                .cloned(),
+            before_value
+        );
+    }
+
+    #[test]
+    fn builder_custom_reopen_keeps_compatibility_profile() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(2, 2)
+            .build()
+            .expect("builder source");
+        let table_id = editor.tables().expect("builder table")[0].id();
+        crate::numbers::editor::set_cell_fixture(
+            &mut editor,
+            table_id,
+            0,
+            0,
+            CellValue::number(42.0).expect("finite test number"),
+        )
+        .expect("builder cell value");
+        let initial = custom_number("Builder Integer", "#,##0");
+        editor
+            .set_table_cell_data_format(table_id, 0, 0, initial.clone().into())
+            .expect("builder custom format");
+
+        let source_bytes = editor.to_bytes().expect("builder bytes");
+        let mut reopened = NumbersEditor::from_bytes(&source_bytes).expect("reopened builder");
+        assert_eq!(
+            reopened
+                .table_cell_custom_format(table_id, 0, 0)
+                .expect("builder custom read"),
+            Some(initial)
+        );
+
+        let replacement = custom_number("Builder Signed Integer", "#,##0;(#,##0)");
+        reopened
+            .set_table_cell_data_format(table_id, 0, 0, replacement.clone().into())
+            .expect("builder custom replacement");
+        assert_eq!(
+            reopened
+                .table_cell_custom_format(table_id, 0, 0)
+                .expect("builder replacement read"),
+            Some(replacement.clone())
+        );
+        let before_value =
+            FocusedNumbersPackage::from_bytes(&reopened.to_bytes().expect("replacement bytes"))
+                .expect("focused builder replacement")
+                .table_cell(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    CellPosition::new(0, 0),
+                )
+                .expect("builder replacement cell")
+                .storage()
+                .value()
+                .cloned();
+        assert_eq!(
+            before_value,
+            Some(CellValue::number(42.0).expect("finite expected number"))
+        );
+
+        let before_noop = reopened.to_bytes().expect("builder no-op source");
+        let source_pointer = reopened
+            .package()
+            .exact_source_bytes()
+            .expect("builder no-op source bytes")
+            .as_ptr();
+        reopened
+            .set_table_cell_data_format(table_id, 0, 0, replacement.clone().into())
+            .expect("builder exact no-op");
+        assert_eq!(
+            reopened.to_bytes().expect("builder no-op bytes"),
+            before_noop
+        );
+        assert_eq!(
+            reopened
+                .package()
+                .exact_source_bytes()
+                .expect("builder no-op retained source")
+                .as_ptr(),
+            source_pointer
+        );
+
+        reopened
+            .set_table_cell_data_format(table_id, 0, 0, DataFormat::Automatic)
+            .expect("builder custom clear");
+        assert_eq!(
+            reopened
+                .table_cell_custom_format(table_id, 0, 0)
+                .expect("builder clear read"),
+            None
+        );
+        let cleared =
+            FocusedNumbersPackage::from_bytes(&reopened.to_bytes().expect("builder clear bytes"))
+                .expect("focused builder clear");
+        assert_eq!(
+            cleared
+                .table_cell(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    CellPosition::new(0, 0),
+                )
+                .expect("builder clear cell")
+                .storage()
+                .value()
+                .cloned(),
+            Some(CellValue::number(42.0).expect("finite expected number"))
+        );
+    }
+
+    #[test]
+    fn focused_custom_malformed_refcount_refuses_after_admission() {
+        let source_bytes = include_bytes!(
+            "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
+        );
+        let mut malformed = NumbersEditor::from_bytes(source_bytes).expect("focused source");
+        malformed
+            .package
+            .update_archive("Index/Tables.iwa", |archive| {
+                let format_list_type =
+                    litchi_iwa_protos::tst::table_data_list::ListType::Format as i32;
+                let mut segment_ids = Vec::new();
+                {
+                    let object = archive.object_mut(5).expect("format sidecar");
+                    let message = object
+                        .messages
+                        .iter_mut()
+                        .find(|message| {
+                            message.type_ == 6_005
+                                && litchi_iwa_protos::tst::TableDataList::decode(
+                                    message.data.as_slice(),
+                                )
+                                .map(|list| list.list_type == format_list_type)
+                                .unwrap_or(false)
+                        })
+                        .expect("format list message");
+                    let mut list =
+                        litchi_iwa_protos::tst::TableDataList::decode(message.data.as_slice())
+                            .expect("format list payload");
+                    if let Some(entry) = list.entries.iter_mut().next() {
+                        entry.refcount = 1;
+                        message.data = list.encode_to_vec();
+                        return Ok(());
+                    }
+                    segment_ids.extend(list.segments.iter().map(|reference| reference.identifier));
+                }
+                for segment_id in segment_ids {
+                    let object = archive.object_mut(segment_id).expect("format segment");
+                    let Some(message) = object.messages.iter_mut().find(|message| {
+                        message.type_ == 6_005
+                            && litchi_iwa_protos::tst::TableDataList::decode(
+                                message.data.as_slice(),
+                            )
+                            .map(|list| list.list_type == format_list_type)
+                            .unwrap_or(false)
+                    }) else {
+                        continue;
+                    };
+                    let mut list =
+                        litchi_iwa_protos::tst::TableDataList::decode(message.data.as_slice())
+                            .expect("format segment payload");
+                    if let Some(entry) = list.entries.iter_mut().next() {
+                        entry.refcount = 1;
+                        message.data = list.encode_to_vec();
+                        return Ok(());
+                    }
+                }
+                Err(Error::InvalidFormat(
+                    "format fixture has no mutable format-list entry".to_owned(),
+                ))
+            })
+            .expect("malformed source mutation");
+        let malformed_bytes = malformed.to_bytes().expect("malformed bytes");
+        let mut actual = NumbersEditor::from_bytes(&malformed_bytes).expect("malformed editor");
+        let current = actual
+            .table_cell_data_format(4, 0, 0)
+            .expect("malformed custom read");
+        assert!(matches!(&current, &DataFormat::Custom(Custom::Number(_))));
+        let before = actual.to_bytes().expect("malformed source baseline");
+        let error = actual
+            .set_table_cell_data_format(4, 0, 0, current.clone())
+            .expect_err("malformed focused custom no-op must refuse");
+        assert!(
+            error
+                .to_string()
+                .contains("focused Numbers cell data-format")
+        );
+        assert_eq!(
+            actual
+                .to_bytes()
+                .expect("malformed source unchanged after no-op"),
+            before
+        );
+        let error = actual
+            .set_table_cell_data_format(4, 0, 0, custom_number("Rejected", "#,##0;(#,##0)").into())
+            .expect_err("malformed focused graph must refuse");
+        assert!(
+            error
+                .to_string()
+                .contains("focused Numbers cell data-format")
+        );
+        assert_eq!(
+            actual.to_bytes().expect("malformed source unchanged"),
+            before
+        );
+    }
+
+    #[test]
+    fn malformed_present_registry_edge_cannot_select_legacy_custom_writer() {
+        let source_bytes = include_bytes!(
+            "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
+        );
+        let mut malformed = NumbersEditor::from_bytes(source_bytes).expect("focused source");
+        malformed
+            .package
+            .update_archive("Index/Document.iwa", |archive| {
+                let object = archive.object_mut(1).expect("document object");
+                let message = object
+                    .messages
+                    .iter_mut()
+                    .find(|message| message.type_ == 1)
+                    .expect("document message");
+                // A duplicate registry edge must remain on strict focused admission.
+                message.data.extend_from_slice(&[0x4a, 0x02, 0x08, 0x01]);
+                Ok(())
+            })
+            .expect("duplicate registry edge");
+        let bytes = malformed.to_bytes().expect("malformed source bytes");
+        let mut editor = NumbersEditor::from_bytes(&bytes).expect("discovery defers registry");
+        assert!(has_focused_custom_registry_edge(&editor).expect("present edge"));
+        let current = editor
+            .table_cell_data_format(4, 0, 0)
+            .expect("legacy custom read");
+        for requested in [
+            current,
+            DataFormat::Automatic,
+            custom_number("Rejected", "0.00").into(),
+        ] {
+            let error = editor
+                .set_table_cell_data_format(4, 0, 0, requested)
+                .expect_err("present malformed edge is terminal");
+            assert!(
+                error
+                    .to_string()
+                    .contains("focused Numbers cell data-format")
+            );
+            assert_eq!(editor.to_bytes().expect("unchanged source"), bytes);
+        }
+    }
+
+    #[test]
+    fn focused_custom_owner_selection_preserves_family_boundaries() {
+        let number = custom_number("Signed Integer", "#,##0;(#,##0)");
+        let other_number = custom_number("Grouped Integer", "#,##0");
+        let text = Custom::Text(
+            CustomText::try_new(Name::try_new("Text Prefix").unwrap(), "ID: ", "").unwrap(),
+        );
+
+        assert!(uses_focused_data_format_owner(
+            &DataFormat::Custom(number.clone()),
+            &DataFormat::Custom(other_number),
+        ));
+        assert!(uses_focused_data_format_owner(
+            &DataFormat::Custom(number.clone()),
+            &DataFormat::Automatic,
+        ));
+        assert!(!uses_focused_data_format_owner(
+            &DataFormat::Custom(number.clone()),
+            &DataFormat::Custom(text.clone()),
+        ));
+        assert!(!uses_focused_data_format_owner(
+            &DataFormat::Automatic,
+            &DataFormat::Custom(number.clone()),
+        ));
+        assert!(!uses_focused_data_format_owner(
+            &DataFormat::Custom(number),
+            &DataFormat::Number(Number::default()),
+        ));
     }
 }

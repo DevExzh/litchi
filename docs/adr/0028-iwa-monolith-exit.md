@@ -8095,10 +8095,12 @@ owner. The strict route then proves canonical UID permutations, directional
 extents, and the selected dependency edges.
 
 The complete type-4008 -> type-6204/type-6220 dependency closure is admitted
-only for an existing hidden-state owner. An ownerless table reads empty and
-permits an exact empty no-op; it does not provide a basis for creating that
-closure. The `TableInfoArchive` active UUID selects one uniquely matching
-stored view for reads. A changed edit refuses
+for an existing hidden-state owner. An ownerless table reads empty and
+permits an exact empty no-op. A qualified exact `Indexed` source now has the
+bounded owner-creation path recorded in the later publication-primitives
+follow-up; `NativeVisible` and unsupported producer shapes remain read/no-op
+only. The `TableInfoArchive` active UUID selects one uniquely matching stored
+view for reads. A changed edit refuses
 multiple stored views, even when the active UUID is unambiguous, because the
 inactive views cannot yet be proven byte-preserved. It projects only
 user-hidden positions. The strict codec uses a singular-field Buffa sidecar
@@ -8112,11 +8114,12 @@ candidate reopen/readback, exact apply/inverse patches, and source conflict
 fences. Malformed, duplicate, stale, dangling, ambiguous, out-of-bounds,
 finite-limit, pivot, and unsupported-dependency inputs fail closed. For an
 exact, unlocked source with no owner, an empty request remains an exact
-source no-op and a nonempty request is refused as `UnsupportedDependency`
-because owner creation is unsupported. A non-exact source reports
-`UnsupportedSource` before the absent-owner check. `TableLocked` takes
-precedence for a changed edit on a locked selected table; exact no-ops on a
-locked table remain allowed subject to read/graph admission. This is
+source no-op. Qualified exact `Indexed` requests use the bounded owner
+creation path recorded below; `NativeVisible` and unsupported producer shapes
+return `UnsupportedDependency`. A non-exact source reports `UnsupportedSource`
+before the absent-owner check. `TableLocked` takes precedence for a changed
+edit on a locked selected table; exact no-ops on a locked table remain allowed
+subject to read/graph admission. This is
 visibility metadata only and does not add cell/formula, filter/pivot, sort,
 or row/column topology CRUD.
 
@@ -8186,9 +8189,12 @@ narrow path does not promise acceptance parity with the full Prost decoder.
 
 The Pages raw-ID `PagesEditor::{table_hidden_axes, set_table_hidden_axes}`
 route, its tests, and the mixed example remain migration-host compatibility.
-Retirement is deferred because the focused owner refuses absent-owner creation
-and has no native changed-edit parity evidence. The shared hidden-axis helper
-also preserves Numbers/Keynote compatibility, Numbers sort restoration, and
+Retirement remains deferred because `NativeVisible` changed edits still return
+`UnsupportedDependency`, native changed-edit parity is unproven, and the
+migration host still carries compatibility behavior. Qualified `Indexed`
+absent-owner creation is now owned by the focused route; it does not authorize
+raw-ID retirement or broaden native scope. The shared hidden-axis helper also
+preserves Numbers/Keynote compatibility, Numbers sort restoration, and
 row/column-deletion cleanup. Focused refusals remain terminal; supported format
 facades never fall back to the host. Existing functionality is retained until
 ADR 0028's parity and native gates permit removal.
@@ -8249,14 +8255,15 @@ must agree with the host's format reader before publication.
 A focused compatibility regression keeps the host
 conversion behavior aligned with the focused Number owner.
 
-Pages absent hidden-state owner creation remains unsupported. An experimental
-`Indexed` creation path was excluded after review and a sanitizer probe found
-candidate validation failures. Before this path can publish, it needs
-codec-owned scratch/depth accounting, a registry and reference-aware identifier
-census, bounded archive append work, and exact creation/inverse metadata
-locality checks. The ownerless nonempty-row corpus seed remains a useful
-regression input for that work. No experimental creation code or relaxed
-execution limits are retained by this follow-up.
+The preceding exploratory review recorded an excluded `Indexed` creation path
+after a sanitizer probe found candidate-validation failures. That statement is
+historical and is superseded by the bounded implementation in the later
+publication-primitives follow-up. Its listed prerequisites—codec-owned
+scratch/depth accounting, registry and reference-aware identifier census,
+bounded archive append work, and exact creation/inverse metadata locality—are
+now represented by the committed implementation. The ownerless nonempty-row
+corpus seed remains a useful regression input, and no relaxed execution limits
+are retained.
 
 The codec investigation reproduced an appended-owner rewrite whose declared
 scratch requirement was 1,695 bytes while candidate verification needed 1,960;
@@ -8355,3 +8362,65 @@ The harness retains independent helper-count, selected-table locality, exact
 inverse, and one-under resource checks. Workspace lint, all 860 boundary-policy
 tests, and the current tree scan pass; topology remains 64 packages, 238
 internal dependency declarations, and 11 ordered migration debts.
+
+## 2026-09-05 follow-up: focused discovery and Custom-format delegation
+
+The migration-host Pages discovery path now uses the focused
+`BodyStorageDiscovery` projection instead of materializing a complete
+`TSWP.StorageArchive`. It retains only validated body UTF-16 length and
+compact section references. Strict source-borrowed text-wire qualification
+remains authoritative, and each selected section entry uses the existing
+bounded Buffa projection. The malformed optional footnote field-16 fallback
+remains deferred and temporary; malformed section data still fails closed.
+
+Pages section-template discovery also uses the bounded Buffa header/footer
+codec and fallibly retains only the two identifier vectors. Unrelated
+drawable and page-template fields remain opaque on this discovery route;
+full graph and mutation operations retain their existing projections.
+
+Computer Use authored the checked-in
+[`body-sections-unicode.pages`](../../test-data/iwork/pages/body-sections-unicode.pages)
+fixture in Pages 14.4 from a Blank document: the first section contains
+`Pages borrowed body 😀\nFirst section marker.`, `Insert > Section Break` starts
+the second section, and it contains `Second section marker — end.`. The
+document was saved, closed, reopened with both section markers and no repair
+prompt, and closed again. Its SHA-256 is
+`8d26202b6a184c92e8c232d4886ba64ce6efb929bfe30818e506a24b041c6a22`.
+Three focused native-fixture tests pass, including exact output for this
+two-section source; the filtered `pages::editor` host suite reports 205
+passing tests, including the Unicode source, malformed-footnote deferral, and
+two section-template projections. Seven focused text-storage projection tests
+also pass. This is bounded discovery and read/no-op evidence; it adds no
+native mutation-parity claim.
+
+The Pages section-boundary projection rejects a noncanonical deprecated
+`Reference.type` value outside signed `i32` (including positive `2^31`) before
+any narrowing that could reproduce permissive text-wire or older Prost
+truncation. Canonical negative signed-`i32` encodings and explicit `false`
+remain supported.
+
+The Keynote catalog's document/show root reads now use the existing bounded
+Buffa projections. The focused `slide_tables` suite reports 52 passing tests,
+including 21 graph tests. Its template-identifier helper requires the
+`KN.super`/`TSA.super` base preflight; ignored optional graph payloads remain
+opaque. Complete generated document/show materialization and full Prost
+acceptance parity are not claimed. Numbers exact-source existing-cell
+`Custom` same-family Number/Text/Date & Time replacement and no-op, together
+with `Custom` -> `Automatic` clear, now delegate to the focused owner.
+Authoring, cross-family, and source-built cases remain on the compatibility
+writer. An absent legacy root-field-9 registry uses explicit compatibility
+preselection; a present malformed or duplicate field-9 registry remains a
+strict terminal refusal. The synthetic `custom-focused.numbers` fixture is
+E1 evidence only, not native evidence. Five focused tests pass, covering
+replacement, shared-registry/value/locality, no-op `Arc` and exact-byte
+identity, malformed-refcount no-op terminal behavior, duplicate field-9
+terminal behavior, and actual-builder `Custom` serialize/reopen
+replacement/no-op/clear/value checks. This bounded evidence does not claim
+native Numbers mutation parity.
+
+Workspace formatting, library lint, all-feature library/integration tests,
+and doc tests pass. Boundary verification reports 873 passing
+policy tests and a valid scanner census of 64 packages, 238 declarations, and
+11 ordered debts. No workspace package, manifest edge, ordered migration debt,
+migration-host item, or deletion gate is removed or closed; the monolithic
+`litchi-iwa` crate remains.

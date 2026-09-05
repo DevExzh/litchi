@@ -11,7 +11,10 @@ use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::table::appearance::{
     Appearance as CommonTableAppearance, Banding, GridlineVisibility, Gridlines, RowSizing,
 };
-use litchi_iwa_protos::{table_appearance_codec, table_info_codec, table_model_discovery_codec};
+use litchi_iwa_protos::{
+    keynote_document_codec, keynote_show_codec, table_appearance_codec, table_info_codec,
+    table_model_discovery_codec,
+};
 
 #[derive(Debug, Clone)]
 pub(super) struct SlideTableGraph {
@@ -174,32 +177,34 @@ fn focused_table_appearance(
 
 /// Resolve the root slide objects through the bounded catalog.
 ///
-/// The returned slide value is deliberately short-lived and owns only the
-/// selected root projection.  The catalog retains object slots and message
-/// descriptors, not the package's decompressed payloads.
+/// The document's show edge and the selected show slide edge use the focused
+/// generated-free projections. The returned slide value is deliberately
+/// short-lived and owns only the selected slide projection. The catalog
+/// retains object slots and message descriptors, not the package's decompressed
+/// payloads.
 pub(super) fn catalog_slide_context(
     package: &IWorkPackage,
     catalog: &mut KeynoteObjectCatalog,
     slide_index: usize,
 ) -> Result<CatalogSlideContext> {
-    let document: kn::DocumentArchive = catalog
-        .decode_type(package, 1, DOCUMENT_MESSAGE_TYPE, "KN.DocumentArchive")
-        .map_err(map_catalog_error)?;
-    let show: kn::ShowArchive = catalog
-        .decode_type(
+    let show_identifier = catalog
+        .with_message_data_type(
             package,
-            document.show.identifier,
-            SHOW_MESSAGE_TYPE,
-            "KN.ShowArchive",
+            1,
+            DOCUMENT_MESSAGE_TYPE,
+            "KN.DocumentArchive",
+            decode_catalog_document_show_identifier,
         )
         .map_err(map_catalog_error)?;
-    let node_reference = show.slide_tree.slides.get(slide_index).ok_or_else(|| {
-        Error::ParseError(format!(
-            "Keynote slide index {slide_index} is out of range for {} slides",
-            show.slide_tree.slides.len()
-        ))
-    })?;
-    let node_identifier = node_reference.identifier;
+    let node_identifier = catalog
+        .with_message_data_type(
+            package,
+            show_identifier,
+            SHOW_MESSAGE_TYPE,
+            "KN.ShowArchive",
+            |source| decode_catalog_slide_identifier(source, slide_index),
+        )
+        .map_err(map_catalog_error)?;
     let node: kn::SlideNodeArchive = catalog
         .decode_type(package, node_identifier, 4, "KN.SlideNodeArchive")
         .map_err(map_catalog_error)?;
@@ -222,11 +227,54 @@ pub(super) fn catalog_slide_context(
     })
 }
 
+fn decode_catalog_document_show_identifier(
+    source: &[u8],
+) -> std::result::Result<u64, KeynoteObjectCatalogError> {
+    // This host projection only needs the required KN/TSA envelope and show
+    // edge. Optional document graph tables stay opaque to preserve the
+    // bounded lazy path's ownership reduction.
+    let options = keynote_document_options(source);
+    keynote_document_codec::decode_template_identifier(source, options).map_err(|error| {
+        KeynoteObjectCatalogError::InvalidSource(format!(
+            "malformed KN.DocumentArchive payload: {error}"
+        ))
+    })?;
+    keynote_document_codec::decode_show_identifier(source, options).map_err(|error| {
+        KeynoteObjectCatalogError::InvalidSource(format!(
+            "malformed KN.DocumentArchive payload: {error}"
+        ))
+    })
+}
+
+fn decode_catalog_slide_identifier(
+    source: &[u8],
+    slide_index: usize,
+) -> std::result::Result<u64, KeynoteObjectCatalogError> {
+    let reference = keynote_show_codec::decode_slide_reference_at(
+        source,
+        slide_index,
+        keynote_show_options(source),
+    )
+    .map_err(|error| {
+        KeynoteObjectCatalogError::InvalidSource(format!(
+            "malformed KN.ShowArchive payload: {error}"
+        ))
+    })?;
+    reference
+        .map(|reference| reference.identifier())
+        .ok_or_else(|| {
+            KeynoteObjectCatalogError::InvalidSource(format!(
+                "Keynote slide index {slide_index} is out of range in KN.ShowArchive"
+            ))
+        })
+}
+
 /// Resolve one table using an already-decoded catalog slide context.
 ///
 /// Listing passes this context for every drawable on the selected slide.  It
-/// is intentionally a separate helper so the root/show/node/slide semantic
-/// decodes remain constant when a slide contains many tables.
+/// is intentionally a separate helper so the root/show lazy projections and
+/// node/slide semantic decodes remain constant when a slide contains many
+/// tables.
 pub(super) fn slide_table_graph_from_catalog_context(
     editor: &KeynoteEditor,
     catalog: &mut KeynoteObjectCatalog,
@@ -730,6 +778,28 @@ fn table_info_options(source: &[u8]) -> table_info_codec::DecodeOptions {
     )
 }
 
+fn keynote_document_options(source: &[u8]) -> keynote_document_codec::DecodeOptions {
+    let source_bytes = source.len().clamp(1, WireLimits::MAX_INPUT_BYTES);
+    keynote_document_codec::DecodeOptions::new(source_bytes, 64)
+        .with_max_fields(source_bytes.min(WireLimits::MAX_FIELDS))
+        .with_max_work_bytes(
+            source_bytes
+                .saturating_mul(8)
+                .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        )
+}
+
+fn keynote_show_options(source: &[u8]) -> keynote_show_codec::DecodeOptions {
+    let source_bytes = source.len().clamp(1, WireLimits::MAX_INPUT_BYTES);
+    keynote_show_codec::DecodeOptions::new(source_bytes, source_bytes, 64)
+        .with_max_fields(source_bytes.min(WireLimits::MAX_FIELDS))
+        .with_max_work_bytes(
+            source_bytes
+                .saturating_mul(8)
+                .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        )
+}
+
 fn table_model_options(source: &[u8]) -> table_model_discovery_codec::DecodeOptions {
     table_model_discovery_codec::DecodeOptions::for_source(source)
 }
@@ -893,6 +963,60 @@ mod tests {
         let mut output = Vec::new();
         varint_field(1, identifier, &mut output);
         output
+    }
+
+    #[test]
+    fn catalog_root_edges_use_bounded_generated_free_projections() {
+        let show_reference = reference_payload(77);
+        let mut document = Vec::new();
+        // The document projection requires the KN/TSA super envelopes before
+        // reading the show edge.  Keep this synthetic payload at that minimal
+        // valid boundary so the test exercises the same contract as a real
+        // document while leaving optional graph tables opaque.
+        bytes_field(3, &[0x0a, 0x00], &mut document);
+        bytes_field(2, &show_reference, &mut document);
+        assert_eq!(
+            decode_catalog_document_show_identifier(&document).expect("show identifier"),
+            77
+        );
+
+        let mut missing_base = Vec::new();
+        bytes_field(2, &show_reference, &mut missing_base);
+        assert!(decode_catalog_document_show_identifier(&missing_base).is_err());
+
+        let mut malformed_base = Vec::new();
+        bytes_field(3, &[], &mut malformed_base);
+        bytes_field(2, &show_reference, &mut malformed_base);
+        assert!(decode_catalog_document_show_identifier(&malformed_base).is_err());
+
+        let show = kn::ShowArchive {
+            theme: reference(90),
+            slide_tree: kn::SlideTreeArchive {
+                slides: vec![reference(88)],
+                ..Default::default()
+            },
+            size: tsp::Size {
+                width: 1_024.0,
+                height: 768.0,
+            },
+            stylesheet: reference(91),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        assert_eq!(
+            decode_catalog_slide_identifier(&show, 0).expect("selected slide identifier"),
+            88
+        );
+        assert!(
+            decode_catalog_slide_identifier(&show, 1)
+                .expect_err("out-of-range slide")
+                .to_string()
+                .contains("out of range")
+        );
+
+        let mut duplicate_document = document.clone();
+        bytes_field(2, &show_reference, &mut duplicate_document);
+        assert!(decode_catalog_document_show_identifier(&duplicate_document).is_err());
     }
 
     fn appearance_model_payload(

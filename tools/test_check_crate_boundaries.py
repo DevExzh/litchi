@@ -22142,6 +22142,83 @@ fn rewrite_movie_title_operation(
                 violations,
             )
 
+    def test_iwa_keynote_slide_table_discovery_rejects_eager_root_show_reads(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_discovery_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[1]
+            source = graph.read_text(encoding="utf-8").replace(
+                "    decode_table_projection(bytes);\n",
+                "    decode_table_projection(bytes);\n"
+                "    eager_root_show_reads(bytes);\n",
+                1,
+            )
+            source += (
+                "fn eager_root_show_reads(bytes: &[u8]) {\n"
+                "    let _ = DocumentArchive::decode(bytes);\n"
+                "    let _ = ShowArchive::decode(bytes);\n"
+                "}\n"
+            )
+            graph.write_text(source, encoding="utf-8")
+
+            violations = (
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                )
+            )
+
+            self.assertTrue(
+                any("DocumentArchive::decode" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("ShowArchive::decode" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_keynote_slide_table_discovery_rejects_eager_root_show_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_discovery_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[1]
+            source = graph.read_text(encoding="utf-8").replace(
+                "    decode_table_projection(bytes);\n",
+                "    decode_table_projection(bytes);\n"
+                "    eager_root_show_aliases(bytes);\n",
+                1,
+            )
+            source += (
+                "use DocumentArchive as DocumentAlias;\n"
+                "use ShowArchive as ShowAlias;\n"
+                "fn eager_root_show_aliases(bytes: &[u8]) {\n"
+                "    let _ = DocumentAlias::decode(bytes);\n"
+                "    let _ = ShowAlias::decode(bytes);\n"
+                "}\n"
+            )
+            graph.write_text(source, encoding="utf-8")
+
+            violations = (
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                )
+            )
+
+            self.assertTrue(
+                any(
+                    "DocumentArchive alias DocumentAlias::decode" in item
+                    for item in violations
+                ),
+                violations,
+            )
+            self.assertTrue(
+                any("ShowArchive alias ShowAlias::decode" in item for item in violations),
+                violations,
+            )
+
     def test_iwa_keynote_slide_table_discovery_rejects_generated_decode_aliases(
         self,
     ) -> None:
@@ -23192,6 +23269,239 @@ fn rewrite_movie_title_operation(
                 boundaries.audit_pages_package_no_eager_prost_source_topology(root),
                 [],
             )
+
+    def test_iwa_pages_body_discovery_requires_focused_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn body_storage_for_discovery(payload: &[u8]) -> Option<BodyStorageDiscovery> {\n"
+                "    let without_footnotes = patch_length_delimited_field(payload);\n"
+                "    without_footnotes.ok()\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_iwa_pages_body_storage_discovery_source_topology(root)
+            )
+
+            self.assertTrue(
+                any("missing the focused" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_pages_body_discovery_rejects_eager_storage_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn body_storage_for_discovery(payload: &[u8]) -> Option<BodyStorageDiscovery> {\n"
+                "    if let Ok(discovery) = litchi_pages::__pages_body_storage_discovery(payload) {\n"
+                "        return Some(discovery);\n"
+                "    }\n"
+                "    let _ = StorageArchive::decode(payload);\n"
+                "    None\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_iwa_pages_body_storage_discovery_source_topology(root)
+            )
+
+            self.assertTrue(
+                any("StorageArchive::decode" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_pages_body_discovery_rejects_storage_archive_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use StorageArchive as EagerStorage;\n"
+                "fn body_storage_for_discovery(payload: &[u8]) -> Option<BodyStorageDiscovery> {\n"
+                "    let _ = litchi_pages::__pages_body_storage_discovery(payload);\n"
+                "    let _ = EagerStorage::decode(payload);\n"
+                "    None\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_iwa_pages_body_storage_discovery_source_topology(root)
+            )
+
+            self.assertTrue(
+                any("StorageArchive alias EagerStorage::decode" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_pages_body_discovery_masks_non_code_storage_archive_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn body_storage_for_discovery(payload: &[u8]) -> Option<BodyStorageDiscovery> {\n"
+                "    // StorageArchive::decode(payload)\n"
+                '    let note = "StorageArchive";\n'
+                "    let _ = note;\n"
+                "    litchi_pages::__pages_body_storage_discovery(payload).ok()\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_body_storage_discovery_source_topology(root),
+                [],
+            )
+
+    def test_iwa_pages_body_discovery_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_pages_body_storage_discovery_source_topology()",
+            main_source,
+        )
+
+    def test_iwa_pages_section_template_discovery_is_dormant_before_codec_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn discover_structure(payload: &[u8]) {\n"
+                "    let _ = SectionTemplateArchive::decode(payload);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_section_template_discovery_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_pages_section_template_discovery_rejects_eager_archive_after_activation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn discover_structure(payload: &[u8]) {\n"
+                "    let _ = pages_header_footer_codec::decode_section_template(payload);\n"
+                "    let _ = SectionTemplateArchive::decode(payload);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_iwa_pages_section_template_discovery_source_topology(
+                    root
+                )
+            )
+
+            self.assertTrue(
+                any("SectionTemplateArchive::decode" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_pages_section_template_discovery_follows_codec_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn discover_structure(payload: &[u8]) {\n"
+                "    pages_section_template_for_discovery(payload);\n"
+                "}\n"
+                "fn pages_section_template_for_discovery(payload: &[u8]) {\n"
+                "    let _ = pages_header_footer_codec::decode_section_template(payload);\n"
+                "    let _ = SectionTemplateArchive::decode(payload);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_iwa_pages_section_template_discovery_source_topology(
+                    root
+                )
+            )
+
+            self.assertTrue(
+                any("SectionTemplateArchive::decode" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_pages_section_template_discovery_rejects_eager_archive_alias(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use SectionTemplateArchive as EagerTemplate;\n"
+                "fn discover_structure(payload: &[u8]) {\n"
+                "    let _ = pages_header_footer_codec::decode_section_template(payload);\n"
+                "    let _ = EagerTemplate::decode(payload);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_iwa_pages_section_template_discovery_source_topology(
+                    root
+                )
+            )
+
+            self.assertTrue(
+                any(
+                    "SectionTemplateArchive alias EagerTemplate::decode" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_iwa_pages_section_template_discovery_masks_non_code_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn discover_structure(payload: &[u8]) {\n"
+                "    // SectionTemplateArchive::decode(payload)\n"
+                '    let note = "SectionTemplateArchive";\n'
+                "    let _ = pages_header_footer_codec::decode_section_template(payload);\n"
+                "    let _ = note;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_section_template_discovery_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_pages_section_template_discovery_audit_is_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_pages_section_template_discovery_source_topology()",
+            main_source,
+        )
 
     def test_pages_output_boundary_inventory_is_exact(self) -> None:
         self.assertEqual(
