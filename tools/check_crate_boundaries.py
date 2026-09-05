@@ -4253,17 +4253,59 @@ IWA_KEYNOTE_SLIDE_DISCOVERY_STRICT_INFO_PROJECTION = re.compile(
     r"\btable_info_codec\s*::\s*decode_table_info\s*\("
 )
 
-# Wave102 keeps listing-time table appearance reads on the bounded, borrowed
-# catalog path. The native table_appearance module remains an intentional
-# compatibility/mutation owner, so this ratchet follows only helpers reachable
-# from the production ``slide_tables`` listing root. It is dormant until the
-# listing path claims the strict appearance projection.
+# Listing-time table appearance reads stay on the bounded, borrowed catalog
+# path. The retired shared host module is no longer a compatibility owner, so
+# this ratchet follows only helpers reachable from the production
+# ``slide_tables`` listing root. The focused package seam is checked by the
+# appearance source-topology audit below.
 IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES = (
     IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables.rs",
     IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables" / "graph.rs",
     IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables" / "appearance.rs",
-    IWA_KEYNOTE_SOURCE_ROOT.parent / "table_appearance.rs",
 )
+# The catalog listing path is now delegated to a focused, feature-gated
+# package owner.  These are deliberately exact inventories: the host may
+# provide the physical callback implementation, but no second public/native
+# appearance API may be added under a nearby spelling.
+KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_OWNER = Path(
+    "crates/litchi-keynote/src/package/catalog_table_appearance.rs"
+)
+KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_SEAMS = (
+    "__CatalogTableAppearanceSource",
+    "__catalog_table_style_edges",
+    "__catalog_table_appearance",
+)
+KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_SEAM_DECLARATIONS = {
+    "__CatalogTableAppearanceSource": re.compile(
+        r"(?ms)^[ \t]*#[ \t]*\[[ \t]*cfg\s*\(\s*feature\s*=\s*"
+        r"\"internal-iwork-source\"\s*\)[ \t]*\][ \t]*\n"
+        r"^[ \t]*#[ \t]*\[[ \t]*doc\s*\(\s*hidden\s*\)[ \t]*\][ \t]*\n"
+        r"^[ \t]*pub\s+trait\s+__CatalogTableAppearanceSource\b"
+    ),
+    "__catalog_table_style_edges": re.compile(
+        r"(?ms)^[ \t]*#[ \t]*\[[ \t]*cfg\s*\(\s*feature\s*=\s*"
+        r"\"internal-iwork-source\"\s*\)[ \t]*\][ \t]*\n"
+        r"^[ \t]*#[ \t]*\[[ \t]*doc\s*\(\s*hidden\s*\)[ \t]*\][ \t]*\n"
+        r"^[ \t]*pub\s+fn\s+__catalog_table_style_edges\b"
+    ),
+    "__catalog_table_appearance": re.compile(
+        r"(?ms)^[ \t]*#[ \t]*\[[ \t]*cfg\s*\(\s*feature\s*=\s*"
+        r"\"internal-iwork-source\"\s*\)[ \t]*\][ \t]*\n"
+        r"^[ \t]*#[ \t]*\[[ \t]*doc\s*\(\s*hidden\s*\)[ \t]*\][ \t]*\n"
+        r"^[ \t]*pub\s+fn\s+__catalog_table_appearance\b"
+    ),
+}
+KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables" / "graph.rs"
+)
+KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_SEAM_CALLS = {
+    "__catalog_table_style_edges": re.compile(
+        r"\blitchi_keynote\s*::\s*__catalog_table_style_edges\s*\("
+    ),
+    "__catalog_table_appearance": re.compile(
+        r"\blitchi_keynote\s*::\s*__catalog_table_appearance\s*\("
+    ),
+}
 IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_ROOT_FUNCTION = "slide_tables"
 IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_ACTIVATION = re.compile(
     r"\b(?:keynote_table_appearance_codec|table_appearance_codec|"
@@ -6066,6 +6108,30 @@ NUMBERS_TABLE_APPEARANCE_SEMANTIC_SOURCE = Path(
 )
 NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE = Path(
     "crates/litchi-numbers/src/package/table_appearance.rs"
+)
+# Source-built Numbers catalogs still enter through the monolithic host.  The
+# only raw-ID/borrowed-payload exception is the explicitly hidden seam below;
+# keeping its declaration exact prevents a second public/native appearance API
+# from being smuggled into the focused crate.
+NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM = (
+    "__table_appearance_from_source_built"
+)
+NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_DECLARATION = re.compile(
+    r"(?ms)^[ \t]*#[ \t]*\[[ \t]*cfg\s*\(\s*feature\s*=\s*"
+    r"\"internal-iwork-source\"\s*\)[ \t]*\][ \t]*\n"
+    r"^[ \t]*#[ \t]*\[[ \t]*doc\s*\(\s*hidden\s*\)[ \t]*\][ \t]*\n"
+    rf"^[ \t]*pub\s+fn\s+{re.escape(NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM)}\b"
+)
+NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_HOST_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "workbook.rs"
+)
+NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_CALL = re.compile(
+    rf"\b(?:litchi_numbers\s*::\s*)?Package\s*::\s*"
+    rf"{re.escape(NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM)}\s*\("
+)
+NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_SIGNATURE = re.compile(
+    rf"\bpub\s+fn\s+{re.escape(NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM)}"
+    r"\s*(?:<|\()"
 )
 NUMBERS_TABLE_APPEARANCE_OWNER_HELPER_ROOT = Path(
     "crates/litchi-numbers/src/package/table_appearance"
@@ -13861,6 +13927,81 @@ IWA_PAGES_README_TABLE_APPEARANCE_CALLS = (
 PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE = PAGES_SOURCE_ROOT / "table" / "appearance.rs"
 PAGES_TABLE_APPEARANCE_OWNER_SOURCE = (
     PAGES_SOURCE_ROOT / "package" / "body_table_appearance.rs"
+)
+# Read-only catalog appearance discovery uses a feature-gated focused owner;
+# keep the host's raw catalog callback edge explicit and narrow.  The owner
+# module is gated in package.rs/lib.rs, so its hidden declarations need the
+# exact names below but do not repeat an item-level cfg attribute.
+PAGES_TABLE_APPEARANCE_SOURCE_OWNER = Path(
+    "crates/litchi-pages/src/package/catalog_body_table_appearance.rs"
+)
+PAGES_TABLE_APPEARANCE_SOURCE_SEAMS = (
+    "__CatalogBodyTableAppearanceSource",
+    "__catalog_body_table_style_edges",
+    "__catalog_body_table_appearance",
+)
+PAGES_TABLE_APPEARANCE_SOURCE_SEAM_DECLARATIONS = {
+    "__CatalogBodyTableAppearanceSource": re.compile(
+        r"(?ms)^[ \t]*#[ \t]*\[[ \t]*doc\s*\(\s*hidden\s*\)[ \t]*\][ \t]*\n"
+        r"^[ \t]*pub\s+trait\s+__CatalogBodyTableAppearanceSource\b"
+    ),
+    "__catalog_body_table_style_edges": re.compile(
+        r"(?ms)^[ \t]*#[ \t]*\[[ \t]*doc\s*\(\s*hidden\s*\)[ \t]*\][ \t]*\n"
+        r"^[ \t]*pub\s+fn\s+__catalog_body_table_style_edges\b"
+    ),
+    "__catalog_body_table_appearance": re.compile(
+        r"(?ms)^[ \t]*#[ \t]*\[[ \t]*doc\s*\(\s*hidden\s*\)[ \t]*\][ \t]*\n"
+        r"^[ \t]*pub\s+fn\s+__catalog_body_table_appearance\b"
+    ),
+}
+PAGES_TABLE_APPEARANCE_SOURCE_PACKAGE = PAGES_SOURCE_ROOT / "package.rs"
+PAGES_TABLE_APPEARANCE_SOURCE_LIB = PAGES_SOURCE_ROOT / "lib.rs"
+PAGES_TABLE_APPEARANCE_SOURCE_MODULE = re.compile(
+    r"(?ms)^[ \t]*#[ \t]*\[[ \t]*cfg\s*\(\s*feature\s*=\s*"
+    r"\"internal-iwork-source\"\s*\)[ \t]*\][ \t]*\n"
+    r"^[ \t]*(?:pub\s+)?mod\s+catalog_body_table_appearance\s*;"
+)
+PAGES_TABLE_APPEARANCE_SOURCE_REEXPORT = re.compile(
+    r"(?ms)^[ \t]*#[ \t]*\[[ \t]*cfg\s*\(\s*feature\s*=\s*"
+    r"\"internal-iwork-source\"\s*\)[ \t]*\][ \t]*\n"
+    r"^[ \t]*#[ \t]*\[[ \t]*doc\s*\(\s*hidden\s*\)[ \t]*\][ \t]*\n"
+    r"^[ \t]*pub\s+use\s+package\s*::\s*\{[^}]*"
+    r"__catalog_body_table_appearance[^}]*\}\s*;"
+)
+PAGES_TABLE_APPEARANCE_SOURCE_PACKAGE_REEXPORT = re.compile(
+    r"(?ms)^[ \t]*#[ \t]*\[[ \t]*cfg\s*\(\s*feature\s*=\s*"
+    r"\"internal-iwork-source\"\s*\)[ \t]*\][ \t]*\n"
+    r"^[ \t]*pub\s+use\s+catalog_body_table_appearance\s*::\s*\{[^}]*"
+    r"__catalog_body_table_appearance[^}]*\}\s*;"
+)
+PAGES_TABLE_APPEARANCE_SOURCE_HOST = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "tables" / "storage.rs"
+)
+PAGES_TABLE_APPEARANCE_SOURCE_SEAM_CALL = re.compile(
+    r"\blitchi_pages\s*::\s*__catalog_body_table_appearance\s*\("
+)
+PAGES_TABLE_APPEARANCE_SOURCE_SEAM_CALLS = {
+    "__catalog_body_table_style_edges": re.compile(
+        r"\blitchi_pages\s*::\s*__catalog_body_table_style_edges\s*\("
+    ),
+    "__catalog_body_table_appearance": PAGES_TABLE_APPEARANCE_SOURCE_SEAM_CALL,
+}
+# The compatibility table-appearance module was removed after all three
+# focused owners acquired their read seams.  Keep the deletion monotonic: a
+# restored file/module or an old host import must fail the boundary scan even
+# when the restored implementation is private.
+RETIRED_IWA_SHARED_TABLE_APPEARANCE_SOURCES = (
+    Path("crates/litchi-iwa/src/table_appearance.rs"),
+    Path("crates/litchi-iwa/src/table_appearance/wire.rs"),
+)
+RETIRED_IWA_SHARED_TABLE_APPEARANCE_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub[ \t]+)?mod[ \t]+table_appearance\b"
+)
+RETIRED_IWA_SHARED_TABLE_APPEARANCE_REFERENCE = re.compile(
+    r"(?<![A-Za-z0-9_])(?:crate|super|self)[ \t\r\n]*::[ \t\r\n]*"
+    r"table_appearance(?:[ \t\r\n]*::|\b)|"
+    r"(?<![A-Za-z0-9_])table_appearance[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:table_appearance|wire)\b"
 )
 PAGES_TABLE_APPEARANCE_OWNER_HELPER_ROOT = (
     PAGES_SOURCE_ROOT / "package" / "body_table_appearance"
@@ -23671,6 +23812,44 @@ def audit_iwa_numbers_table_appearance_source_topology(
         return []
 
     violations: list[str] = []
+    # Source-built packages deliberately remain on the host for compatibility
+    # discovery.  Once the focused owner is active, that route must call the
+    # one hidden borrowed-payload seam; silently reintroducing the old shared
+    # reader would make the migration appear complete while bypassing the
+    # focused bounded decoder.
+    host_path = root / NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_HOST_SOURCE
+    if host_path.is_file():
+        host_source = _mask_rust_cfg_test_items(
+            host_path.read_text(encoding="utf-8")
+        )
+        host_code = _mask_rust_non_code(host_source)
+        if NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_CALL.search(host_code) is None:
+            violations.append(
+                "litchi-iwa Numbers source-built table-appearance route must call "
+                f"{NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM}: "
+                f"{NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_HOST_SOURCE}"
+            )
+
+        owner_path = root / NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+        owner_source = (
+            _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+            if owner_path.is_file()
+            else ""
+        )
+        if (
+            NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_CALL.search(host_code)
+            is not None
+            and NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_DECLARATION.search(
+                owner_source
+            )
+            is None
+        ):
+            violations.append(
+                "focused litchi-numbers table-appearance owner is missing the "
+                "feature-gated hidden source-built seam: "
+                f"{NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE}"
+            )
+
     source_paths = {
         root / path
         for path in RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_SOURCE
@@ -23975,9 +24154,29 @@ def audit_numbers_table_appearance_facade_source_topology(
         production_source = _mask_rust_cfg_test_items(
             path.read_text(encoding="utf-8")
         )
+        has_hidden_source_seam = (
+            path == owner_path
+            and NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_DECLARATION.search(
+                owner_source
+            )
+            is not None
+        )
         for declaration, line_number in _rust_public_declarations(production_source):
             if not _is_numbers_table_appearance_public_declaration(
                 declaration, dedicated_source=dedicated_source
+            ):
+                continue
+            # This is the sole intentional raw-ID/borrowed-byte exception.  It
+            # is only accepted in the canonical private owner and only when
+            # the surrounding source proves both cfg(feature) and doc(hidden).
+            # A similarly named public helper elsewhere remains subject to all
+            # normal facade leak checks.
+            if (
+                has_hidden_source_seam
+                and NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_SIGNATURE.search(
+                    declaration
+                )
+                is not None
             ):
                 continue
             identifiers = [
@@ -36774,6 +36973,73 @@ def audit_iwa_pages_table_appearance_source_topology(root: Path = ROOT) -> list[
         return []
 
     violations: list[str] = []
+    # The package catalog owner is feature-gated at its module and re-export
+    # boundaries.  Once it exists, the host must use both scalar edge and
+    # semantic appearance callbacks; otherwise a local generated decoder can
+    # quietly replace the bounded focused route.
+    catalog_owner_path = root / PAGES_TABLE_APPEARANCE_SOURCE_OWNER
+    if catalog_owner_path.is_file():
+        catalog_source = _mask_rust_cfg_test_items(
+            catalog_owner_path.read_text(encoding="utf-8")
+        )
+        for seam in PAGES_TABLE_APPEARANCE_SOURCE_SEAMS:
+            if (
+                PAGES_TABLE_APPEARANCE_SOURCE_SEAM_DECLARATIONS[seam].search(
+                    catalog_source
+                )
+                is None
+            ):
+                violations.append(
+                    "focused litchi-pages catalog appearance owner is missing "
+                    f"the hidden seam {seam}: {PAGES_TABLE_APPEARANCE_SOURCE_OWNER}"
+                )
+
+        package_path = root / PAGES_TABLE_APPEARANCE_SOURCE_PACKAGE
+        package_source = (
+            _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+            if package_path.is_file()
+            else ""
+        )
+        if PAGES_TABLE_APPEARANCE_SOURCE_MODULE.search(package_source) is None:
+            violations.append(
+                "focused litchi-pages catalog appearance owner module is not "
+                "feature-gated: "
+                f"{PAGES_TABLE_APPEARANCE_SOURCE_PACKAGE}"
+            )
+        if PAGES_TABLE_APPEARANCE_SOURCE_PACKAGE_REEXPORT.search(package_source) is None:
+            violations.append(
+                "focused litchi-pages catalog appearance package re-export is not "
+                "feature-gated: "
+                f"{PAGES_TABLE_APPEARANCE_SOURCE_PACKAGE}"
+            )
+
+        lib_path = root / PAGES_TABLE_APPEARANCE_SOURCE_LIB
+        lib_source = (
+            _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+            if lib_path.is_file()
+            else ""
+        )
+        if PAGES_TABLE_APPEARANCE_SOURCE_REEXPORT.search(lib_source) is None:
+            violations.append(
+                "focused litchi-pages catalog appearance root re-export is not "
+                "feature-gated and hidden: "
+                f"{PAGES_TABLE_APPEARANCE_SOURCE_LIB}"
+            )
+
+        host_path = root / PAGES_TABLE_APPEARANCE_SOURCE_HOST
+        host_source = (
+            _mask_rust_cfg_test_items(host_path.read_text(encoding="utf-8"))
+            if host_path.is_file()
+            else ""
+        )
+        host_code = _mask_rust_non_code(host_source)
+        for seam, call in PAGES_TABLE_APPEARANCE_SOURCE_SEAM_CALLS.items():
+            if call.search(host_code) is None:
+                violations.append(
+                    "litchi-iwa Pages table-appearance host is missing the focused "
+                    f"hidden seam call {seam}: {PAGES_TABLE_APPEARANCE_SOURCE_HOST}"
+                )
+
     source_root = root / IWA_PAGES_SOURCE_ROOT
     if source_root.is_dir():
         for path in sorted(source_root.rglob("*.rs")):
@@ -37308,6 +37574,53 @@ def audit_pages_table_appearance_facade_source_topology(
                         "focused litchi-pages body-table appearance public API retains alternate alias "
                         f"{alias} for {target}: {path.relative_to(root)}:{line_number}"
                     )
+    return sorted(set(violations))
+
+
+def audit_iwa_shared_table_appearance_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the retired monolithic table-appearance route deleted.
+
+    Numbers, Pages, and Keynote retain narrowly scoped source-built callbacks
+    in their focused packages.  The old host module has no remaining owner;
+    this guard therefore checks physical resurrection and production imports
+    while ignoring comments, literals, and cfg(test) compatibility oracles.
+    """
+
+    violations: list[str] = []
+    for relative_path in RETIRED_IWA_SHARED_TABLE_APPEARANCE_SOURCES:
+        path = root / relative_path
+        if path.is_file():
+            violations.append(
+                "retired shared litchi-iwa table-appearance source was restored: "
+                f"{relative_path}"
+            )
+
+    source_root = root / IWA_HOST_SOURCE_ROOT
+    if not source_root.is_dir():
+        return sorted(set(violations))
+
+    for path in sorted(source_root.rglob("*.rs")):
+        if not path.is_file():
+            continue
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        code = _mask_rust_non_code(production_source)
+        for match in RETIRED_IWA_SHARED_TABLE_APPEARANCE_MODULE.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired shared litchi-iwa table-appearance module declaration: "
+                f"{path.relative_to(root)}:{line_number}"
+            )
+        for match in RETIRED_IWA_SHARED_TABLE_APPEARANCE_REFERENCE.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired shared litchi-iwa table-appearance production reference: "
+                f"{path.relative_to(root)}:{line_number}"
+            )
+
     return sorted(set(violations))
 
 
@@ -41466,6 +41779,39 @@ def audit_iwa_keynote_slide_table_appearance_source_topology(
     if not _keynote_slide_table_appearance_owner_present(root):
         return []
     violations: list[str] = []
+    # The catalog read owner is separate from the public slide-table
+    # transaction owner above.  Activate this check once that focused owner
+    # exists so historical boundary fixtures remain dormant, but once the
+    # migration starts require every hidden seam and every host call.
+    catalog_owner_path = root / KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_OWNER
+    catalog_host_path = root / KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST
+    if catalog_owner_path.is_file():
+        catalog_source = (
+            _mask_rust_cfg_test_items(catalog_owner_path.read_text(encoding="utf-8"))
+            if catalog_owner_path.is_file()
+            else ""
+        )
+        for seam in KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_SEAMS:
+            declaration = KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_SEAM_DECLARATIONS[seam]
+            if declaration.search(catalog_source) is None:
+                violations.append(
+                    "focused litchi-keynote catalog appearance owner is missing "
+                    f"the feature-gated hidden seam {seam}: "
+                    f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_OWNER}"
+                )
+
+        if catalog_host_path.is_file():
+            catalog_host_source = _mask_rust_cfg_test_items(
+                catalog_host_path.read_text(encoding="utf-8")
+            )
+            catalog_host_code = _mask_rust_non_code(catalog_host_source)
+            for seam, call in KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_SEAM_CALLS.items():
+                if call.search(catalog_host_code) is None:
+                    violations.append(
+                        "litchi-iwa Keynote catalog appearance host is missing the "
+                        f"focused hidden seam call {seam}: "
+                        f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST}"
+                    )
     source_root = root / IWA_KEYNOTE_SOURCE_ROOT
     if source_root.is_dir():
         for path in sorted(source_root.rglob("*.rs")):
@@ -56886,6 +57232,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_slide_table_appearance_source_topology()
         + audit_keynote_slide_table_appearance_facade_source_topology()
         + audit_keynote_slide_table_appearance_resource_source_topology()
+        + audit_iwa_shared_table_appearance_source_topology()
         + audit_keynote_document_public_api()
         + audit_numbers_identity_boundary_source_topology()
         + audit_numbers_package_no_eager_prost_source_topology()

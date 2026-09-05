@@ -19,7 +19,7 @@ litchi-iwa-protos = { workspace = true }
 litchi-iwa-text = { workspace = true }
 litchi-iwa-text-wire = { workspace = true }
 litchi-keynote = { workspace = true, features = ["internal-iwork-source"] }
-litchi-numbers = { workspace = true }
+litchi-numbers = { workspace = true, features = ["internal-iwork-source"] }
 litchi-numbers-wire = { workspace = true }
 litchi-pages = { workspace = true, features = ["internal-iwork-source"] }
 phf           = { workspace = true }

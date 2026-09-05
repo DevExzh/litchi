@@ -4,6 +4,8 @@
 //! package member in its original byte stream. The archive, Snappy, detection,
 //! and protobuf layers remain in their focused IWA infrastructure crates.
 
+#[cfg(feature = "internal-iwork-source")]
+mod catalog_table_appearance;
 mod chart_axis_support;
 mod edit;
 mod limits;
@@ -84,6 +86,11 @@ use crate::{
     slide::media::{MediaLoopMode, MediaPlaybackSettings, MediaVolume},
     slide::media::{Point as MediaPoint, Size as MediaSize},
     transition::Effect,
+};
+
+#[cfg(feature = "internal-iwork-source")]
+pub use catalog_table_appearance::{
+    __CatalogTableAppearanceSource, __catalog_table_appearance, __catalog_table_style_edges,
 };
 
 pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};

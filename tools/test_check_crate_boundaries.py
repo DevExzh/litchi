@@ -808,6 +808,17 @@ def add_numbers_table_appearance_canonical_scaffold(root: Path) -> None:
         + "fn metadata_save_token_watermark() {}\n"
         + "fn transaction_budget_preflight() {}\n"
         + "fn verify_locality_candidate_reopen() {}\n"
+        + "#[cfg(feature = \"internal-iwork-source\")]\n"
+        + "#[doc(hidden)]\n"
+        + "pub fn __table_appearance_from_source_built(\n"
+        + "    model_payload: &[u8],\n"
+        + "    model_style_identifier: u64,\n"
+        + "    model_style_preset_identifier: Option<u64>,\n"
+        + "    lookup: impl FnMut(u64, SourceBuiltAppearancePayload, &mut dyn FnMut(&[u8])) -> Result<(), Error>,\n"
+        + ") -> Result<Appearance, Error> {\n"
+        + "    let _ = (model_payload, model_style_identifier, model_style_preset_identifier, lookup);\n"
+        + "    todo!()\n"
+        + "}\n"
         + "impl Package {\n"
         + "pub fn table_appearance<'sheet, 'table>(&self, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
@@ -19603,6 +19614,73 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+    def test_keynote_catalog_appearance_hidden_source_seams_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_OWNER,
+            Path("crates/litchi-keynote/src/package/catalog_table_appearance.rs"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_SEAMS,
+            (
+                "__CatalogTableAppearanceSource",
+                "__catalog_table_style_edges",
+                "__catalog_table_appearance",
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_OWNER
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                "pub trait __CatalogTableAppearanceSource {}\n"
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                "pub fn __catalog_table_style_edges(payload: &[u8], limits: WireLimits) {}\n"
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                "pub fn __catalog_table_appearance(source: &mut dyn __CatalogTableAppearanceSource, style_identifier: u64, style_preset_identifier: Option<u64>, limits: WireLimits) {}\n",
+                encoding="utf-8",
+            )
+            host = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn read_catalog() {\n"
+                "    litchi_keynote::__catalog_table_style_edges(payload, limits);\n"
+                "    litchi_keynote::__catalog_table_appearance(source, style, preset, limits);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_appearance_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub fn __catalog_table_appearance",
+                    "pub fn catalog_table_appearance",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_appearance_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "missing the feature-gated hidden seam __catalog_table_appearance"
+                    in item
+                    for item in violations
+                ),
+                violations,
+            )
+
     def test_keynote_slide_table_appearance_boundary_accepts_complete_owner(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -26130,6 +26208,20 @@ fn rewrite_movie_title_operation(
             Path("crates/litchi-pages/src/package/body_table_appearance.rs"),
         )
         self.assertEqual(
+            boundaries.PAGES_TABLE_APPEARANCE_SOURCE_OWNER,
+            Path(
+                "crates/litchi-pages/src/package/catalog_body_table_appearance.rs"
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_APPEARANCE_SOURCE_SEAMS,
+            (
+                "__CatalogBodyTableAppearanceSource",
+                "__catalog_body_table_style_edges",
+                "__catalog_body_table_appearance",
+            ),
+        )
+        self.assertEqual(
             boundaries.PAGES_TABLE_APPEARANCE_PACKAGE_METHODS,
             (
                 "body_table_appearance",
@@ -26169,6 +26261,70 @@ fn rewrite_movie_title_operation(
             self.assertEqual(
                 boundaries.audit_pages_table_appearance_facade_source_topology(root),
                 [],
+            )
+
+    def test_pages_catalog_appearance_hidden_source_seams_are_feature_gated(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_appearance_canonical_scaffold(root)
+
+            owner = root / boundaries.PAGES_TABLE_APPEARANCE_SOURCE_OWNER
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "#[doc(hidden)]\n"
+                "pub trait __CatalogBodyTableAppearanceSource {}\n"
+                "#[doc(hidden)]\n"
+                "pub fn __catalog_body_table_style_edges(payload: &[u8], limits: WireLimits) {}\n"
+                "#[doc(hidden)]\n"
+                "pub fn __catalog_body_table_appearance(source: &mut dyn __CatalogBodyTableAppearanceSource, style_identifier: u64, style_preset_identifier: Option<u64>, limits: WireLimits) {}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.PAGES_TABLE_APPEARANCE_SOURCE_PACKAGE
+            package.write_text(
+                package.read_text(encoding="utf-8")
+                + "#[cfg(feature = \"internal-iwork-source\")]\n"
+                + "mod catalog_body_table_appearance;\n"
+                + "#[cfg(feature = \"internal-iwork-source\")]\n"
+                + "pub use catalog_body_table_appearance::{__CatalogBodyTableAppearanceSource, __catalog_body_table_style_edges, __catalog_body_table_appearance};\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_APPEARANCE_SOURCE_LIB
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "#[cfg(feature = \"internal-iwork-source\")]\n"
+                + "#[doc(hidden)]\n"
+                + "pub use package::{__CatalogBodyTableAppearanceSource, __catalog_body_table_style_edges, __catalog_body_table_appearance};\n",
+                encoding="utf-8",
+            )
+            host = root / boundaries.PAGES_TABLE_APPEARANCE_SOURCE_HOST
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn read_catalog() {\n"
+                "    litchi_pages::__catalog_body_table_style_edges(payload, limits);\n"
+                "    litchi_pages::__catalog_body_table_appearance(source, style, preset, limits);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_appearance_source_topology(root),
+                [],
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub fn __catalog_body_table_style_edges",
+                    "pub fn catalog_body_table_style_edges",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_table_appearance_source_topology(root)
+            self.assertTrue(
+                any(
+                    "missing the hidden seam __catalog_body_table_style_edges" in item
+                    for item in violations
+                ),
+                violations,
             )
 
     def test_focused_pages_table_appearance_requires_canonical_types_and_methods(self) -> None:
@@ -26405,6 +26561,88 @@ fn rewrite_movie_title_operation(
             "+ audit_pages_table_appearance_resource_source_topology()",
         ):
             self.assertIn(expression, main_source)
+
+    def test_iwa_shared_table_appearance_no_resurrection_guard_is_scoped(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_iwa_shared_table_appearance_source_topology(root),
+                [],
+            )
+
+            shared = root / boundaries.RETIRED_IWA_SHARED_TABLE_APPEARANCE_SOURCES[0]
+            wire = root / boundaries.RETIRED_IWA_SHARED_TABLE_APPEARANCE_SOURCES[1]
+            shared.parent.mkdir(parents=True, exist_ok=True)
+            wire.parent.mkdir(parents=True, exist_ok=True)
+            shared.write_text("pub(crate) fn table_appearance() {}\n", encoding="utf-8")
+            wire.write_text("pub(crate) fn decode() {}\n", encoding="utf-8")
+
+            lib = root / boundaries.IWA_FACADE_SOURCE
+            lib.parent.mkdir(parents=True, exist_ok=True)
+            lib.write_text(
+                "pub mod table_appearance;\n"
+                "// crate::table_appearance::table_appearance()\n"
+                'const DOC: &str = "crate::table_appearance::table_appearance()";\n'
+                "#[cfg(test)]\n"
+                "fn test_only() { crate::table_appearance::table_appearance(); }\n",
+                encoding="utf-8",
+            )
+            host = root / boundaries.IWA_HOST_SOURCE_ROOT / "legacy.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "use crate::table_appearance::table_appearance;\n"
+                "fn production() { crate::table_appearance::table_appearance(); }\n"
+                "// crate::table_appearance::table_appearance()\n"
+                "#[cfg(test)]\n"
+                "fn test_only() { crate::table_appearance::table_appearance(); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_shared_table_appearance_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("table_appearance.rs" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("table_appearance/wire.rs" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("module declaration" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("legacy.rs" in item and "production reference" in item for item in violations),
+                violations,
+            )
+
+            shared.unlink()
+            wire.unlink()
+            lib.write_text(
+                "// pub mod table_appearance;\n"
+                'const DOC: &str = "crate::table_appearance::table_appearance()";\n'
+                "#[cfg(test)]\n"
+                "fn test_only() { crate::table_appearance::table_appearance(); }\n",
+                encoding="utf-8",
+            )
+            host.write_text(
+                "// crate::table_appearance::table_appearance()\n"
+                'const DOC: &str = "crate::table_appearance::table_appearance()";\n'
+                "#[cfg(test)]\n"
+                "fn test_only() { crate::table_appearance::table_appearance(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_shared_table_appearance_source_topology(root),
+                [],
+            )
+
+    def test_iwa_shared_table_appearance_guard_is_in_main_dispatch(self) -> None:
+        self.assertIn(
+            "+ audit_iwa_shared_table_appearance_source_topology()",
+            inspect.getsource(boundaries.main),
+        )
 
     def test_pages_table_hidden_axes_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(
@@ -29267,6 +29505,16 @@ fn rewrite_movie_title_operation(
             boundaries.NUMBERS_TABLE_APPEARANCE_PACKAGE_METHODS,
             ("table_appearance", "edit_table_appearance", "apply_table_appearance"),
         )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM,
+            "__table_appearance_from_source_built",
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_HOST_SOURCE,
+            Path(
+                "crates/litchi-iwa/src/numbers/editor/semantic/workbook.rs"
+            ),
+        )
 
     def test_focused_numbers_table_appearance_is_dormant_until_owner_and_codec_exist(
         self,
@@ -29370,7 +29618,8 @@ fn rewrite_movie_title_operation(
                 + "pub type TableAppearanceEdit = Edit;\n"
                 + "pub fn raw_table_appearance(object_id: u64, source_bytes: &[u8], "
                 "wire: WireView, archive: Archive, generated: GeneratedProjection, "
-                "prost: prost_types::MessageInfo) {}\n",
+                "prost: prost_types::MessageInfo) {}\n"
+                + "pub fn __table_appearance_from_source_built_variant(model_style_identifier: u64, source_bytes: &[u8]) {}\n",
                 encoding="utf-8",
             )
             lib = root / boundaries.NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES[0]
@@ -29413,6 +29662,39 @@ fn rewrite_movie_title_operation(
             self.assertEqual(
                 boundaries.audit_numbers_table_appearance_facade_source_topology(root),
                 [],
+            )
+
+    def test_numbers_table_appearance_source_built_seam_is_hidden_and_borrowed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_appearance_canonical_scaffold(root)
+            host = root / boundaries.NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_HOST_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn read_source_built() {\n"
+                "    litchi_numbers::Package::__table_appearance_from_source_built(\n"
+                "        model_payload, model_style_identifier, model_style_preset_identifier, lookup);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_appearance_source_topology(root),
+                [],
+            )
+
+            owner = root / boundaries.NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "#[cfg(feature = \"internal-iwork-source\")]\n", "", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_appearance_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing the feature-gated hidden source-built seam" in item for item in violations),
+                violations,
             )
 
     def test_numbers_table_appearance_host_retirement_is_owner_gated_and_scoped(

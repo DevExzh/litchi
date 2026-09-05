@@ -8,12 +8,11 @@ use super::super::keynote_object_catalog::{
 use super::*;
 use crate::protobuf::tst::TableInfoArchive;
 use litchi_iwa_common::WireLimits;
-use litchi_iwa_common::table::appearance::{
-    Appearance as CommonTableAppearance, Banding, GridlineVisibility, Gridlines, RowSizing,
-};
+use litchi_iwa_common::table::appearance::Appearance as CommonTableAppearance;
+#[cfg(test)]
+use litchi_iwa_common::table::appearance::{Banding, GridlineVisibility, Gridlines, RowSizing};
 use litchi_iwa_protos::{
-    keynote_document_codec, keynote_show_codec, table_appearance_codec, table_info_codec,
-    table_model_discovery_codec,
+    keynote_document_codec, keynote_show_codec, table_info_codec, table_model_discovery_codec,
 };
 
 #[derive(Debug, Clone)]
@@ -135,9 +134,9 @@ fn catalog_table_position(
 
 /// Build the focused package view once for a catalog-backed slide listing.
 ///
-/// The focused package is immutable and internally shares its physical source
-/// through an `Arc`, so retaining this per-slide view avoids reparsing the ZIP
-/// and rebuilding its object index for every table in the same listing.
+/// Constructing this immutable view copies the host's exact source and builds
+/// a focused object index once per listing. Retaining it avoids repeating that
+/// copy and index construction for every table in the same listing.
 fn focused_table_appearance_package(
     package: &IWorkPackage,
 ) -> Result<Option<litchi_keynote::Package>> {
@@ -384,11 +383,12 @@ pub(super) fn slide_table_graph_from_catalog_context(
     let appearance = if let Some(focused) = context.focused_table_appearance_package.as_ref() {
         focused_table_appearance(focused, slide_index, table_position)?
     } else {
-        catalog_table_appearance(
+        catalog_table_appearance_with_limits(
             package,
             catalog,
             model.style_identifier,
             model.style_preset_identifier,
+            catalog_appearance_wire_limits(package)?,
         )?
     };
     Ok(SlideTableGraph {
@@ -503,6 +503,7 @@ fn catalog_table_model_facts(
         },
         _ => unreachable!("table model message counts are nonnegative"),
     };
+    let appearance_limits = catalog_appearance_wire_limits(package)?;
     catalog
         .with_message_data_type(
             package,
@@ -515,11 +516,9 @@ fn catalog_table_model_facts(
                     table_model_options(source),
                 )
                 .map_err(|error| KeynoteObjectCatalogError::InvalidSource(error.to_string()))?;
-                let appearance_model = table_appearance_codec::decode_table_model(
-                    source,
-                    table_appearance_options(source),
-                )
-                .map_err(|error| KeynoteObjectCatalogError::InvalidSource(error.to_string()))?;
+                let (style_identifier, style_preset_identifier) =
+                    litchi_keynote::__catalog_table_style_edges(source, appearance_limits)
+                        .map_err(KeynoteObjectCatalogError::InvalidSource)?;
                 let table_name = facts.table_name();
                 let mut name = String::new();
                 name.try_reserve_exact(table_name.len()).map_err(|_| {
@@ -533,8 +532,8 @@ fn catalog_table_model_facts(
                     name,
                     rows: facts.number_of_rows(),
                     columns: facts.number_of_columns(),
-                    style_identifier: appearance_model.style_identifier(),
-                    style_preset_identifier: appearance_model.style_preset_identifier(),
+                    style_identifier,
+                    style_preset_identifier,
                 })
             },
         )
@@ -544,268 +543,101 @@ fn catalog_table_model_facts(
 const TABLE_STYLE_MESSAGE_TYPE: u32 = 6_003;
 const TABLE_STYLE_PRESET_MESSAGE_TYPE: u32 = 6_008;
 const TABLE_STYLE_NETWORK_MESSAGE_TYPE: u32 = 6_247;
-const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
-const MAX_CATALOG_STYLE_INHERITANCE_DEPTH: usize = 64;
 
-/// Resolve a table's appearance using the already-built object catalog.
-///
-/// The older `crate::table_appearance::table_appearance` helper intentionally
-/// returns owned archives for its compatibility callers.  Listing is a much
-/// hotter path: calling it for every drawable would clone the cached archive
-/// for the model, then scan every IWA member again for each style hop.  Keep
-/// this path catalog-backed and borrow each selected payload only for the
-/// duration of its strict codec callback.  The catalog therefore remains the
-/// single package scan and no parsed archive is retained by this operation.
+struct CatalogAppearanceSource<'a> {
+    package: &'a IWorkPackage,
+    catalog: &'a mut KeynoteObjectCatalog,
+}
+
+impl litchi_keynote::__CatalogTableAppearanceSource for CatalogAppearanceSource<'_> {
+    fn message_type_count(
+        &self,
+        identifier: u64,
+        message_type: u32,
+    ) -> std::result::Result<usize, String> {
+        self.catalog
+            .message_type_count(identifier, message_type)
+            .map_err(|error| error.to_string())
+    }
+
+    fn with_message_data_type<T>(
+        &mut self,
+        identifier: u64,
+        message_type: u32,
+        type_name: &str,
+        read: impl FnOnce(&[u8]) -> std::result::Result<T, String>,
+    ) -> std::result::Result<T, String> {
+        self.catalog
+            .with_message_data_type(
+                self.package,
+                identifier,
+                message_type,
+                type_name,
+                |payload| read(payload).map_err(KeynoteObjectCatalogError::InvalidSource),
+            )
+            .map_err(|error| error.to_string())
+    }
+}
+
+fn catalog_appearance_wire_limits(package: &IWorkPackage) -> Result<WireLimits> {
+    let archive_limits = package.limits().archive_limits();
+    let source_bytes = archive_limits
+        .max_message_bytes()
+        .min(archive_limits.max_archive_bytes())
+        .min(package.limits().max_iwa_stream_bytes())
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    WireLimits::default()
+        .with_input_bytes(source_bytes)
+        .and_then(|limits| {
+            limits.with_fields(
+                source_bytes
+                    .saturating_mul(2)
+                    .clamp(1, WireLimits::MAX_FIELDS),
+            )
+        })
+        .and_then(|limits| {
+            limits.with_rewrite_work(
+                source_bytes
+                    .saturating_mul(8)
+                    .clamp(1, WireLimits::MAX_REWRITE_WORK),
+            )
+        })
+        .map_err(|error| Error::InvalidFormat(format!("invalid table appearance limits: {error}")))
+}
+
+/// Resolve appearance through the focused Keynote semantic owner while the
+/// host retains ownership of the physical catalog only.
+#[cfg(test)]
 fn catalog_table_appearance(
     package: &IWorkPackage,
     catalog: &mut KeynoteObjectCatalog,
     style_identifier: u64,
     style_preset_identifier: Option<u64>,
 ) -> Result<CommonTableAppearance> {
-    let Some(first_style_identifier) = catalog_effective_style_identifier(
+    catalog_table_appearance_with_limits(
         package,
         catalog,
         style_identifier,
         style_preset_identifier,
-    )?
-    else {
-        return Ok(CommonTableAppearance::default());
-    };
-
-    let mut visited = [0_u64; MAX_CATALOG_STYLE_INHERITANCE_DEPTH];
-    let mut current = Some(first_style_identifier);
-    let mut row_banding = None;
-    let mut row_sizing = None;
-    let mut body_horizontal = None;
-    let mut body_vertical = None;
-    let mut header_columns_horizontal = None;
-    let mut header_rows_vertical = None;
-    let mut footer_rows_vertical = None;
-
-    for visited_len in 0..=MAX_CATALOG_STYLE_INHERITANCE_DEPTH {
-        let Some(identifier) = current else {
-            return Ok(catalog_appearance_from_overrides(
-                row_banding,
-                row_sizing,
-                body_horizontal,
-                body_vertical,
-                header_columns_horizontal,
-                header_rows_vertical,
-                footer_rows_vertical,
-            ));
-        };
-        if visited[..visited_len].contains(&identifier) {
-            return Err(Error::InvalidFormat(format!(
-                "iWork table style inheritance cycles at {identifier}"
-            )));
-        }
-        if visited_len == visited.len() {
-            return Err(Error::InvalidFormat(format!(
-                "iWork table style inheritance exceeds {MAX_CATALOG_STYLE_INHERITANCE_DEPTH} levels"
-            )));
-        }
-        visited[visited_len] = identifier;
-
-        validate_catalog_appearance_role(
-            catalog,
-            identifier,
-            TABLE_STYLE_MESSAGE_TYPE,
-            "table style",
-        )?;
-
-        let (parent_identifier, overrides) = catalog
-            .with_message_data_type(
-                package,
-                identifier,
-                TABLE_STYLE_MESSAGE_TYPE,
-                "TableStyleArchive",
-                |source| {
-                    let style = table_appearance_codec::decode_table_style(
-                        source,
-                        table_appearance_options(source),
-                    )
-                    .map_err(|error| KeynoteObjectCatalogError::InvalidSource(error.to_string()))?;
-                    Ok((style.parent_identifier(), style.overrides()))
-                },
-            )
-            .map_err(map_catalog_error)?;
-
-        row_banding = row_banding.or(overrides.row_banding);
-        row_sizing = row_sizing.or(overrides.row_sizing);
-        body_horizontal = body_horizontal.or(overrides.body_horizontal);
-        body_vertical = body_vertical.or(overrides.body_vertical);
-        header_columns_horizontal =
-            header_columns_horizontal.or(overrides.header_columns_horizontal);
-        header_rows_vertical = header_rows_vertical.or(overrides.header_rows_vertical);
-        footer_rows_vertical = footer_rows_vertical.or(overrides.footer_rows_vertical);
-
-        current = parent_identifier.filter(|identifier| *identifier != 0);
-    }
-
-    Err(Error::InvalidFormat(format!(
-        "iWork table style inheritance exceeds {MAX_CATALOG_STYLE_INHERITANCE_DEPTH} levels"
-    )))
+        WireLimits::default(),
+    )
 }
 
-fn catalog_effective_style_identifier(
+fn catalog_table_appearance_with_limits(
     package: &IWorkPackage,
     catalog: &mut KeynoteObjectCatalog,
     style_identifier: u64,
     style_preset_identifier: Option<u64>,
-) -> Result<Option<u64>> {
-    if style_identifier != 0 {
-        // Match the legacy resolver: a concrete model style wins over the
-        // optional preset, so an unused malformed preset cannot poison it.
-        return Ok(Some(style_identifier));
-    }
-    let Some(preset_identifier) = style_preset_identifier else {
-        return Ok(None);
-    };
-    validate_catalog_appearance_role(
-        catalog,
-        preset_identifier,
-        TABLE_STYLE_PRESET_MESSAGE_TYPE,
-        "table style preset",
-    )?;
-    let network_identifier = catalog
-        .with_message_data_type(
-            package,
-            preset_identifier,
-            TABLE_STYLE_PRESET_MESSAGE_TYPE,
-            "TableStylePresetArchive",
-            |source| {
-                let preset = table_appearance_codec::decode_table_style_preset(
-                    source,
-                    table_appearance_options(source),
-                )
-                .map_err(|error| KeynoteObjectCatalogError::InvalidSource(error.to_string()))?;
-                Ok(preset.style_network_identifier())
-            },
-        )
-        .map_err(map_catalog_error)?
-        .filter(|identifier| *identifier != 0)
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "iWork table style preset {preset_identifier} has no style network"
-            ))
-        })?;
-    validate_catalog_appearance_role(
-        catalog,
-        network_identifier,
-        TABLE_STYLE_NETWORK_MESSAGE_TYPE,
-        "table style network",
-    )?;
-    let table_style_identifier = catalog
-        .with_message_data_type(
-            package,
-            network_identifier,
-            TABLE_STYLE_NETWORK_MESSAGE_TYPE,
-            "TableStyleNetworkArchive",
-            |source| {
-                let network = table_appearance_codec::decode_table_style_network(
-                    source,
-                    table_appearance_options(source),
-                )
-                .map_err(|error| KeynoteObjectCatalogError::InvalidSource(error.to_string()))?;
-                Ok(network.table_style_identifier())
-            },
-        )
-        .map_err(map_catalog_error)?;
-    if table_style_identifier == 0 {
-        return Err(Error::InvalidFormat(format!(
-            "iWork table style network {network_identifier} has no table style"
-        )));
-    }
-    Ok(Some(table_style_identifier))
-}
-
-fn validate_catalog_appearance_role(
-    catalog: &KeynoteObjectCatalog,
-    identifier: u64,
-    expected_type: u32,
-    expected_name: &str,
-) -> Result<()> {
-    if catalog
-        .message_type_count(identifier, expected_type)
-        .map_err(map_catalog_error)?
-        != 1
-    {
-        return Err(Error::InvalidFormat(format!(
-            "iWork {expected_name} {identifier} must contain exactly one role payload"
-        )));
-    }
-    for role in [
-        TABLE_STYLE_MESSAGE_TYPE,
-        TABLE_STYLE_PRESET_MESSAGE_TYPE,
-        TABLE_STYLE_NETWORK_MESSAGE_TYPE,
-        TABLE_MODEL_MESSAGE_TYPE,
-    ] {
-        if role != expected_type
-            && catalog
-                .message_type_count(identifier, role)
-                .map_err(map_catalog_error)?
-                != 0
-        {
-            return Err(Error::InvalidFormat(format!(
-                "iWork {expected_name} {identifier} contains an appearance role alias"
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn catalog_appearance_from_overrides(
-    row_banding: Option<bool>,
-    row_sizing: Option<bool>,
-    body_horizontal: Option<bool>,
-    body_vertical: Option<bool>,
-    header_columns_horizontal: Option<bool>,
-    header_rows_vertical: Option<bool>,
-    footer_rows_vertical: Option<bool>,
-) -> CommonTableAppearance {
-    CommonTableAppearance {
-        row_banding: if row_banding.unwrap_or(false) {
-            Banding::Enabled
-        } else {
-            Banding::Disabled
-        },
-        row_sizing: if row_sizing.unwrap_or(false) {
-            RowSizing::FitCellContents
-        } else {
-            RowSizing::Fixed
-        },
-        gridlines: Gridlines {
-            body_horizontal: if body_horizontal.unwrap_or(true) {
-                GridlineVisibility::Visible
-            } else {
-                GridlineVisibility::Hidden
-            },
-            header_columns_horizontal: if header_columns_horizontal.unwrap_or(true) {
-                GridlineVisibility::Visible
-            } else {
-                GridlineVisibility::Hidden
-            },
-            body_vertical: if body_vertical.unwrap_or(true) {
-                GridlineVisibility::Visible
-            } else {
-                GridlineVisibility::Hidden
-            },
-            header_rows_vertical: if header_rows_vertical.unwrap_or(true) {
-                GridlineVisibility::Visible
-            } else {
-                GridlineVisibility::Hidden
-            },
-            footer_rows_vertical: if footer_rows_vertical.unwrap_or(true) {
-                GridlineVisibility::Visible
-            } else {
-                GridlineVisibility::Hidden
-            },
-        },
-    }
-}
-
-fn table_appearance_options(source: &[u8]) -> table_appearance_codec::DecodeOptions {
-    table_appearance_codec::DecodeOptions::for_source(source)
+    limits: WireLimits,
+) -> Result<CommonTableAppearance> {
+    let mut source = CatalogAppearanceSource { package, catalog };
+    litchi_keynote::__catalog_table_appearance(
+        &mut source,
+        style_identifier,
+        style_preset_identifier,
+        limits,
+    )
+    .map_err(Error::InvalidFormat)
 }
 
 fn table_info_options(source: &[u8]) -> table_info_codec::DecodeOptions {
@@ -1362,13 +1194,12 @@ mod tests {
         package
     }
 
-    fn assert_catalog_appearance_matches_legacy(
+    fn assert_catalog_appearance_matches_expected(
         package: &IWorkPackage,
         model_identifier: u64,
+        expected: CommonTableAppearance,
     ) -> CommonTableAppearance {
         let before = package.to_bytes().expect("source bytes");
-        let expected = crate::table_appearance::table_appearance(package, model_identifier)
-            .expect("legacy appearance");
         let mut catalog = KeynoteObjectCatalog::build(package).expect("catalog");
         let facts = catalog_table_model_facts(package, &mut catalog, model_identifier)
             .expect("appearance model facts");
@@ -1382,6 +1213,48 @@ mod tests {
         assert_eq!(actual, expected);
         assert_eq!(package.to_bytes().expect("source bytes"), before);
         actual
+    }
+
+    fn expected_catalog_appearance(values: [bool; 7]) -> CommonTableAppearance {
+        CommonTableAppearance {
+            row_banding: if values[0] {
+                Banding::Enabled
+            } else {
+                Banding::Disabled
+            },
+            row_sizing: if values[1] {
+                RowSizing::FitCellContents
+            } else {
+                RowSizing::Fixed
+            },
+            gridlines: Gridlines {
+                body_horizontal: if values[2] {
+                    GridlineVisibility::Visible
+                } else {
+                    GridlineVisibility::Hidden
+                },
+                body_vertical: if values[3] {
+                    GridlineVisibility::Visible
+                } else {
+                    GridlineVisibility::Hidden
+                },
+                header_columns_horizontal: if values[4] {
+                    GridlineVisibility::Visible
+                } else {
+                    GridlineVisibility::Hidden
+                },
+                header_rows_vertical: if values[5] {
+                    GridlineVisibility::Visible
+                } else {
+                    GridlineVisibility::Hidden
+                },
+                footer_rows_vertical: if values[6] {
+                    GridlineVisibility::Visible
+                } else {
+                    GridlineVisibility::Hidden
+                },
+            },
+        }
     }
 
     fn assert_catalog_appearance_rejected(
@@ -1728,7 +1601,7 @@ mod tests {
     }
 
     #[test]
-    fn catalog_appearance_direct_preset_inherited_and_default_match_legacy() {
+    fn catalog_appearance_direct_preset_inherited_and_default_match_expected() {
         let direct = [
             Some(true),
             Some(true),
@@ -1771,9 +1644,26 @@ mod tests {
                 )],
             ),
         ]);
-        for model_identifier in [42, 43, 44, 45] {
-            assert_catalog_appearance_matches_legacy(&package, model_identifier);
-        }
+        assert_catalog_appearance_matches_expected(
+            &package,
+            42,
+            expected_catalog_appearance([true, true, false, false, true, false, true]),
+        );
+        assert_catalog_appearance_matches_expected(
+            &package,
+            43,
+            expected_catalog_appearance([true, true, true, true, false, true, false]),
+        );
+        assert_catalog_appearance_matches_expected(
+            &package,
+            44,
+            expected_catalog_appearance([true, true, true, true, false, true, false]),
+        );
+        assert_catalog_appearance_matches_expected(
+            &package,
+            45,
+            expected_catalog_appearance([false, false, true, true, true, true, true]),
+        );
     }
 
     #[test]
@@ -1835,6 +1725,41 @@ mod tests {
         );
         assert_eq!(final_stats.peak_live_archives, 1);
         assert_eq!(final_stats.retained_payload_bytes, 0);
+    }
+
+    #[test]
+    fn catalog_appearance_honors_lowered_aggregate_wire_limits() {
+        let package = appearance_package(vec![appearance_style_object(
+            100,
+            None,
+            [Some(true), None, None, None, None, None, None],
+            false,
+        )]);
+        let before = package.to_bytes().expect("source bytes");
+
+        let mut fields_catalog = KeynoteObjectCatalog::build(&package).expect("catalog");
+        let fields = WireLimits::default().with_fields(1).expect("fields limit");
+        assert!(
+            catalog_table_appearance_with_limits(&package, &mut fields_catalog, 100, None, fields,)
+                .is_err()
+        );
+
+        let mut input_catalog = KeynoteObjectCatalog::build(&package).expect("catalog");
+        let input = WireLimits::default()
+            .with_input_bytes(1)
+            .expect("input limit");
+        assert!(
+            catalog_table_appearance_with_limits(&package, &mut input_catalog, 100, None, input,)
+                .is_err()
+        );
+
+        let mut depth_catalog = KeynoteObjectCatalog::build(&package).expect("catalog");
+        let depth = WireLimits::default().with_nesting(1).expect("depth limit");
+        assert!(
+            catalog_table_appearance_with_limits(&package, &mut depth_catalog, 100, None, depth,)
+                .is_err()
+        );
+        assert_eq!(package.to_bytes().expect("source bytes"), before);
     }
 
     #[test]
@@ -1964,6 +1889,7 @@ mod tests {
             vec![
                 (TABLE_STYLE_MESSAGE_TYPE, style_payload.clone()),
                 (TABLE_STYLE_PRESET_MESSAGE_TYPE, preset_payload.clone()),
+                (TABLE_INFO_MESSAGE_TYPE, table_info_payload(42)),
             ],
         )]);
         assert_catalog_appearance_rejected(&style_alias, 100, None);
@@ -1974,6 +1900,7 @@ mod tests {
                 vec![
                     (TABLE_STYLE_PRESET_MESSAGE_TYPE, preset_payload.clone()),
                     (TABLE_STYLE_MESSAGE_TYPE, style_payload.clone()),
+                    (TABLE_INFO_MESSAGE_TYPE, table_info_payload(42)),
                 ],
             ),
             raw_object(
@@ -1993,6 +1920,7 @@ mod tests {
                         TABLE_STYLE_PRESET_MESSAGE_TYPE,
                         appearance_preset_payload(300),
                     ),
+                    (TABLE_INFO_MESSAGE_TYPE, table_info_payload(42)),
                 ],
             ),
         ]);
@@ -2039,13 +1967,21 @@ mod tests {
             appearance_model_object(42, 100, Some(200)),
             appearance_style_object(100, None, complete, false),
         ]);
-        assert_catalog_appearance_matches_legacy(&missing_preset, 42);
+        assert_catalog_appearance_matches_expected(
+            &missing_preset,
+            42,
+            expected_catalog_appearance([true, true, false, false, true, false, true]),
+        );
         let malformed_preset = appearance_package(vec![
             appearance_model_object(42, 100, Some(200)),
             appearance_style_object(100, None, complete, false),
             raw_object(200, vec![(TABLE_STYLE_PRESET_MESSAGE_TYPE, vec![0x1a])]),
         ]);
-        assert_catalog_appearance_matches_legacy(&malformed_preset, 42);
+        assert_catalog_appearance_matches_expected(
+            &malformed_preset,
+            42,
+            expected_catalog_appearance([true, true, false, false, true, false, true]),
+        );
     }
 
     #[test]

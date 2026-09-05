@@ -386,6 +386,11 @@ pub use package::__decode_slide_node_projection;
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::__semantic_document_from_prepared_source;
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use package::{
+    __CatalogTableAppearanceSource, __catalog_table_appearance, __catalog_table_style_edges,
+};
 pub use package::{
     ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
     ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch, ChartAxisTitleCommit,

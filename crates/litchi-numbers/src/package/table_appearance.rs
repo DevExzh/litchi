@@ -30,6 +30,33 @@ const TABLE_STYLE_MESSAGE_TYPE: u32 = 6_003;
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const MAX_INHERITANCE_DEPTH: usize = 64;
 
+/// A native payload requested by the migration-host source-built appearance
+/// bridge.
+///
+/// This type is hidden from the supported Numbers API.  It keeps the bridge
+/// selector-free and lets the host retain ownership of its parsed archive
+/// cache while this crate owns all appearance interpretation.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceBuiltAppearancePayload {
+    /// A `TST.TableStyleArchive` payload.
+    TableStyle,
+    /// A `TST.TableStylePresetArchive` payload.
+    TableStylePreset,
+    /// A `TST.TableStyleNetworkArchive` payload.
+    TableStyleNetwork,
+}
+
+#[cfg(feature = "internal-iwork-source")]
+const SOURCE_BUILT_MAX_PAYLOAD_BYTES: usize = 8 * 1024 * 1024;
+#[cfg(feature = "internal-iwork-source")]
+const SOURCE_BUILT_MAX_FIELDS: usize = 1 << 20;
+#[cfg(feature = "internal-iwork-source")]
+const SOURCE_BUILT_MAX_WORK_BYTES: usize = 64 * 1024 * 1024;
+#[cfg(feature = "internal-iwork-source")]
+const SOURCE_BUILT_MAX_ALLOCATIONS: usize = 256;
+
 /// A content-free location associated with a table-appearance operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -352,6 +379,154 @@ impl Commit {
     }
 }
 
+#[cfg(feature = "internal-iwork-source")]
+#[derive(Debug, Clone, Copy)]
+struct SourceBuiltAppearanceBudget {
+    remaining_input_bytes: usize,
+    remaining_fields: usize,
+    remaining_work: usize,
+    remaining_styles: usize,
+    remaining_allocations: usize,
+}
+
+#[cfg(feature = "internal-iwork-source")]
+impl SourceBuiltAppearanceBudget {
+    const fn new() -> Self {
+        Self {
+            remaining_input_bytes: SOURCE_BUILT_MAX_PAYLOAD_BYTES,
+            remaining_fields: SOURCE_BUILT_MAX_FIELDS,
+            remaining_work: SOURCE_BUILT_MAX_WORK_BYTES,
+            remaining_styles: MAX_INHERITANCE_DEPTH,
+            remaining_allocations: SOURCE_BUILT_MAX_ALLOCATIONS,
+        }
+    }
+
+    fn codec_options(&self, source: &[u8]) -> codec::DecodeOptions {
+        codec::DecodeOptions::new(
+            self.remaining_input_bytes.min(source.len().max(1)),
+            self.remaining_input_bytes.max(1),
+            self.remaining_fields.max(1),
+            self.remaining_work.max(1),
+            u32::try_from(WireLimits::MAX_NESTING).unwrap_or(u32::MAX),
+            self.remaining_styles.max(1),
+        )
+        .with_max_allocations(self.remaining_allocations.max(1))
+    }
+
+    fn charge_input(&mut self, amount: usize, path: Path) -> Result<(), Error> {
+        charge_source_built_budget(
+            &mut self.remaining_input_bytes,
+            SOURCE_BUILT_MAX_PAYLOAD_BYTES,
+            amount,
+            LimitKind::WireBytes,
+            path,
+        )
+    }
+
+    fn charge_fields(&mut self, amount: usize, path: Path) -> Result<(), Error> {
+        charge_source_built_budget(
+            &mut self.remaining_fields,
+            SOURCE_BUILT_MAX_FIELDS,
+            amount,
+            LimitKind::WireFields,
+            path,
+        )
+    }
+
+    fn charge_work(&mut self, amount: usize, path: Path) -> Result<(), Error> {
+        charge_source_built_budget(
+            &mut self.remaining_work,
+            SOURCE_BUILT_MAX_WORK_BYTES,
+            amount,
+            LimitKind::WireWork,
+            path,
+        )
+    }
+
+    fn charge_style(&mut self, path: Path) -> Result<(), Error> {
+        charge_source_built_budget(
+            &mut self.remaining_styles,
+            MAX_INHERITANCE_DEPTH,
+            1,
+            LimitKind::PayloadItems,
+            path,
+        )
+    }
+
+    fn consume_report(&mut self, report: codec::DecodeReport, path: Path) -> Result<(), Error> {
+        self.charge_input(report.input_bytes(), path)?;
+        self.charge_fields(report.fields(), path)?;
+        self.charge_work(report.work_bytes(), path)?;
+        charge_source_built_budget(
+            &mut self.remaining_allocations,
+            SOURCE_BUILT_MAX_ALLOCATIONS,
+            report.allocations(),
+            LimitKind::TransactionWork,
+            path,
+        )
+    }
+}
+
+#[cfg(feature = "internal-iwork-source")]
+fn charge_source_built_budget(
+    remaining: &mut usize,
+    maximum: usize,
+    amount: usize,
+    kind: LimitKind,
+    path: Path,
+) -> Result<(), Error> {
+    if amount > *remaining {
+        let observed = maximum.saturating_sub(*remaining).saturating_add(amount);
+        return Err(Error::LimitExceeded {
+            kind,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+            path,
+        });
+    }
+    *remaining -= amount;
+    Ok(())
+}
+
+#[cfg(feature = "internal-iwork-source")]
+fn merge_source_built_overrides(
+    target: &mut codec::AppearanceOverrides,
+    source: codec::AppearanceOverrides,
+) {
+    if target.row_banding.is_none() {
+        target.row_banding = source.row_banding;
+    }
+    if target.row_sizing.is_none() {
+        target.row_sizing = source.row_sizing;
+    }
+    if target.body_horizontal.is_none() {
+        target.body_horizontal = source.body_horizontal;
+    }
+    if target.body_vertical.is_none() {
+        target.body_vertical = source.body_vertical;
+    }
+    if target.header_columns_horizontal.is_none() {
+        target.header_columns_horizontal = source.header_columns_horizontal;
+    }
+    if target.header_rows_vertical.is_none() {
+        target.header_rows_vertical = source.header_rows_vertical;
+    }
+    if target.footer_rows_vertical.is_none() {
+        target.footer_rows_vertical = source.footer_rows_vertical;
+    }
+}
+
+#[cfg(feature = "internal-iwork-source")]
+const fn source_built_overrides_complete(overrides: codec::AppearanceOverrides) -> bool {
+    overrides.row_banding.is_some()
+        && overrides.row_sizing.is_some()
+        && overrides.body_horizontal.is_some()
+        && overrides.body_vertical.is_some()
+        && overrides.header_columns_horizontal.is_some()
+        && overrides.header_rows_vertical.is_some()
+        && overrides.footer_rows_vertical.is_some()
+}
+
 impl Package {
     /// Read one rooted table's effective appearance.
     pub fn table_appearance<'sheet, 'table>(
@@ -362,6 +537,151 @@ impl Package {
         let mut budget = TransactionBudget::new(self);
         let result = resolve_target_with_budget(self, sheet, table, &mut budget, true);
         Ok(result?.appearance)
+    }
+
+    /// Read a source-built table appearance through a host-owned payload
+    /// lookup.
+    ///
+    /// This is an unstable migration bridge for the legacy iWork coordinator.
+    /// The coordinator keeps its parsed archive cache and invokes `lookup`
+    /// only for the selected style graph; this owner performs all bounded wire
+    /// decoding, preset/network resolution, inheritance, and defaulting. The
+    /// callback receives a consumer instead of a returned byte slice so no
+    /// native payload needs to be cloned or retained between style hops.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    pub fn __table_appearance_from_source_built<LookupError>(
+        model_style_identifier: u64,
+        model_style_preset_identifier: Option<u64>,
+        mut lookup: impl FnMut(
+            u64,
+            SourceBuiltAppearancePayload,
+            &mut dyn FnMut(&[u8]),
+        ) -> Result<(), LookupError>,
+    ) -> Result<Appearance, Error> {
+        let path = Path::Package;
+        let mut budget = SourceBuiltAppearanceBudget::new();
+
+        // Source-built models created by the historical editor may omit both
+        // style edges.  Preserve the established native defaults without
+        // routing that compatibility graph through the exact-source owner.
+        let style_identifier = if model_style_identifier != 0 {
+            model_style_identifier
+        } else {
+            let Some(preset_identifier) =
+                model_style_preset_identifier.filter(|identifier| *identifier != 0)
+            else {
+                return Ok(Appearance::default());
+            };
+
+            let mut decoded_preset = None;
+            let mut consume = |payload: &[u8]| {
+                decoded_preset = Some((|| {
+                    let (preset, report) = codec::decode_table_style_preset_with_report(
+                        payload,
+                        budget.codec_options(payload),
+                    )
+                    .map_err(|error| map_codec_error(error, path))?;
+                    budget.consume_report(report, path)?;
+                    Ok::<_, Error>(preset.style_network_identifier())
+                })());
+            };
+            lookup(
+                preset_identifier,
+                SourceBuiltAppearancePayload::TableStylePreset,
+                &mut consume,
+            )
+            .map_err(|_| Error::InvalidSource { path })?;
+            let network_identifier = decoded_preset
+                .transpose()?
+                .flatten()
+                .filter(|identifier| *identifier != 0)
+                .ok_or(Error::InvalidSource { path })?;
+
+            let mut decoded_network = None;
+            let mut consume = |payload: &[u8]| {
+                decoded_network = Some((|| {
+                    let (network, report) = codec::decode_table_style_network_with_report(
+                        payload,
+                        budget.codec_options(payload),
+                    )
+                    .map_err(|error| map_codec_error(error, path))?;
+                    budget.consume_report(report, path)?;
+                    Ok::<_, Error>(network.table_style_identifier())
+                })());
+            };
+            lookup(
+                network_identifier,
+                SourceBuiltAppearancePayload::TableStyleNetwork,
+                &mut consume,
+            )
+            .map_err(|_| Error::InvalidSource { path })?;
+            decoded_network
+                .transpose()?
+                .filter(|identifier| *identifier != 0)
+                .ok_or(Error::InvalidSource { path })?
+        };
+
+        let mut overrides = codec::AppearanceOverrides::default();
+        let mut visited = [0_u64; MAX_INHERITANCE_DEPTH];
+        let mut current = Some(style_identifier);
+        for visited_len in 0..MAX_INHERITANCE_DEPTH {
+            let Some(identifier) = current else {
+                break;
+            };
+            if visited[..visited_len].contains(&identifier) {
+                return Err(Error::InvalidSource { path });
+            }
+            visited[visited_len] = identifier;
+            budget.charge_style(path)?;
+
+            let mut decoded_style = None;
+            let mut consume = |payload: &[u8]| {
+                decoded_style = Some((|| {
+                    let (snapshot, report) = codec::decode_table_style_with_report(
+                        payload,
+                        budget.codec_options(payload),
+                    )
+                    .map_err(|error| map_codec_error(error, path))?;
+                    budget.consume_report(report, path)?;
+                    Ok::<_, Error>((snapshot.parent_identifier(), snapshot.overrides()))
+                })());
+            };
+            lookup(
+                identifier,
+                SourceBuiltAppearancePayload::TableStyle,
+                &mut consume,
+            )
+            .map_err(|_| Error::InvalidSource { path })?;
+            let (parent_identifier, direct_overrides) = decoded_style
+                .transpose()?
+                .ok_or(Error::InvalidSource { path })?;
+            merge_source_built_overrides(&mut overrides, direct_overrides);
+            if source_built_overrides_complete(overrides) {
+                return Ok(snapshot_appearance(codec::AppearanceSnapshot {
+                    row_banding: overrides.row_banding.unwrap_or(false),
+                    row_sizing: overrides.row_sizing.unwrap_or(false),
+                    body_horizontal: overrides.body_horizontal.unwrap_or(true),
+                    body_vertical: overrides.body_vertical.unwrap_or(true),
+                    header_columns_horizontal: overrides.header_columns_horizontal.unwrap_or(true),
+                    header_rows_vertical: overrides.header_rows_vertical.unwrap_or(true),
+                    footer_rows_vertical: overrides.footer_rows_vertical.unwrap_or(true),
+                }));
+            }
+            current = parent_identifier.filter(|identifier| *identifier != 0);
+        }
+        if current.is_some() {
+            return Err(Error::InvalidSource { path });
+        }
+        Ok(snapshot_appearance(codec::AppearanceSnapshot {
+            row_banding: overrides.row_banding.unwrap_or(false),
+            row_sizing: overrides.row_sizing.unwrap_or(false),
+            body_horizontal: overrides.body_horizontal.unwrap_or(true),
+            body_vertical: overrides.body_vertical.unwrap_or(true),
+            header_columns_horizontal: overrides.header_columns_horizontal.unwrap_or(true),
+            header_rows_vertical: overrides.header_rows_vertical.unwrap_or(true),
+            footer_rows_vertical: overrides.footer_rows_vertical.unwrap_or(true),
+        }))
     }
 
     /// Start a selector-first immutable table-appearance edit.
@@ -2629,5 +2949,309 @@ fn map_core_error(error: litchi_iwa_core::Error, path: Path) -> Error {
             path,
         },
         _ => Error::InvalidSource { path },
+    }
+}
+
+#[cfg(all(test, feature = "internal-iwork-source"))]
+mod source_built_tests {
+    use super::*;
+    use crate::table::appearance::{Banding, GridlineVisibility, Gridlines, RowSizing};
+
+    fn varint(mut value: u64) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        while value >= 0x80 {
+            bytes.push((value as u8) | 0x80);
+            value >>= 7;
+        }
+        bytes.push(value as u8);
+        bytes
+    }
+
+    fn field_varint(field: u32, value: u64) -> Vec<u8> {
+        let mut bytes = varint(u64::from(field) << 3);
+        bytes.extend_from_slice(&varint(value));
+        bytes
+    }
+
+    fn field_bytes(field: u32, payload: &[u8]) -> Vec<u8> {
+        let mut bytes = varint((u64::from(field) << 3) | 2);
+        bytes.extend_from_slice(&varint(payload.len() as u64));
+        bytes.extend_from_slice(payload);
+        bytes
+    }
+
+    fn reference(identifier: u64) -> Vec<u8> {
+        field_varint(1, identifier)
+    }
+
+    fn style_payload(parent: Option<u64>, values: [Option<bool>; 7]) -> Vec<u8> {
+        let mut style_super = Vec::new();
+        if let Some(parent) = parent {
+            style_super.extend_from_slice(&field_bytes(3, &reference(parent)));
+        }
+        let mut properties = Vec::new();
+        for (field, value) in [
+            (1, values[0]),
+            (22, values[1]),
+            (33, values[2]),
+            (34, values[3]),
+            (42, values[4]),
+            (43, values[5]),
+            (44, values[6]),
+        ] {
+            if let Some(value) = value {
+                properties.extend_from_slice(&field_varint(field, u64::from(value)));
+            }
+        }
+        let mut style = field_bytes(1, &style_super);
+        if !properties.is_empty() {
+            style.extend_from_slice(&field_varint(10, 7));
+            style.extend_from_slice(&field_bytes(11, &properties));
+        }
+        style
+    }
+
+    fn preset_payload(network_identifier: u64) -> Vec<u8> {
+        field_bytes(3, &reference(network_identifier))
+    }
+
+    fn network_payload(style_identifier: u64) -> Vec<u8> {
+        let mut network = Vec::new();
+        for field in 1..=8 {
+            network.extend_from_slice(&field_bytes(field, &reference(field as u64 + 100)));
+        }
+        network.extend_from_slice(&field_bytes(9, &reference(style_identifier)));
+        network
+    }
+
+    fn expected(
+        row_banding: Banding,
+        row_sizing: RowSizing,
+        visible: [GridlineVisibility; 5],
+    ) -> Appearance {
+        Appearance {
+            row_banding,
+            row_sizing,
+            gridlines: Gridlines {
+                body_horizontal: visible[0],
+                body_vertical: visible[1],
+                header_columns_horizontal: visible[2],
+                header_rows_vertical: visible[3],
+                footer_rows_vertical: visible[4],
+            },
+        }
+    }
+
+    #[test]
+    fn source_built_missing_style_edges_keep_native_defaults() {
+        let appearance =
+            Package::__table_appearance_from_source_built(0, None, |_, _, _| -> Result<(), ()> {
+                panic!("default appearance must not request a payload")
+            })
+            .expect("missing style edges should use defaults");
+        assert_eq!(appearance, Appearance::default());
+    }
+
+    #[test]
+    fn source_built_inheritance_and_early_completion_are_bounded() {
+        let child = style_payload(Some(8), [Some(true), None, None, None, None, None, None]);
+        let parent = style_payload(
+            None,
+            [
+                None,
+                Some(true),
+                Some(false),
+                Some(false),
+                Some(false),
+                Some(true),
+                Some(false),
+            ],
+        );
+        let appearance =
+            Package::__table_appearance_from_source_built(7, None, |identifier, kind, consume| {
+                assert_eq!(kind, SourceBuiltAppearancePayload::TableStyle);
+                match identifier {
+                    7 => consume(&child),
+                    8 => consume(&parent),
+                    _ => panic!("unexpected style lookup"),
+                }
+                Ok::<_, ()>(())
+            })
+            .expect("parent style should complete inherited appearance");
+        assert_eq!(
+            appearance,
+            expected(
+                Banding::Enabled,
+                RowSizing::FitCellContents,
+                [
+                    GridlineVisibility::Hidden,
+                    GridlineVisibility::Hidden,
+                    GridlineVisibility::Hidden,
+                    GridlineVisibility::Visible,
+                    GridlineVisibility::Hidden,
+                ],
+            )
+        );
+
+        let complete_child = style_payload(
+            None,
+            [
+                Some(false),
+                Some(false),
+                Some(true),
+                Some(true),
+                Some(true),
+                Some(true),
+                Some(true),
+            ],
+        );
+        let appearance =
+            Package::__table_appearance_from_source_built(9, None, |identifier, kind, consume| {
+                assert_eq!(identifier, 9);
+                assert_eq!(kind, SourceBuiltAppearancePayload::TableStyle);
+                consume(&complete_child);
+                Ok::<_, ()>(())
+            })
+            .expect("complete child should not require a dangling parent");
+        assert_eq!(
+            appearance,
+            expected(
+                Banding::Disabled,
+                RowSizing::Fixed,
+                [
+                    GridlineVisibility::Visible,
+                    GridlineVisibility::Visible,
+                    GridlineVisibility::Visible,
+                    GridlineVisibility::Visible,
+                    GridlineVisibility::Visible,
+                ],
+            )
+        );
+    }
+
+    #[test]
+    fn source_built_preset_network_resolves_style_without_direct_edge() {
+        let preset = preset_payload(17);
+        let network = network_payload(9);
+        let style = style_payload(
+            None,
+            [
+                Some(true),
+                Some(true),
+                Some(false),
+                Some(true),
+                Some(false),
+                Some(true),
+                Some(false),
+            ],
+        );
+        let appearance = Package::__table_appearance_from_source_built(
+            0,
+            Some(16),
+            |identifier, kind, consume| {
+                match (identifier, kind) {
+                    (16, SourceBuiltAppearancePayload::TableStylePreset) => consume(&preset),
+                    (17, SourceBuiltAppearancePayload::TableStyleNetwork) => consume(&network),
+                    (9, SourceBuiltAppearancePayload::TableStyle) => consume(&style),
+                    _ => panic!("unexpected preset style lookup"),
+                }
+                Ok::<_, ()>(())
+            },
+        )
+        .expect("preset network should resolve a table style");
+        assert_eq!(
+            appearance,
+            expected(
+                Banding::Enabled,
+                RowSizing::FitCellContents,
+                [
+                    GridlineVisibility::Hidden,
+                    GridlineVisibility::Visible,
+                    GridlineVisibility::Hidden,
+                    GridlineVisibility::Visible,
+                    GridlineVisibility::Hidden,
+                ],
+            )
+        );
+    }
+
+    #[test]
+    fn source_built_cycle_is_rejected() {
+        let first = style_payload(Some(2), [None, None, None, None, None, None, None]);
+        let second = style_payload(Some(1), [None, None, None, None, None, None, None]);
+        let result =
+            Package::__table_appearance_from_source_built(1, None, |identifier, kind, consume| {
+                assert_eq!(kind, SourceBuiltAppearancePayload::TableStyle);
+                match identifier {
+                    1 => consume(&first),
+                    2 => consume(&second),
+                    _ => panic!("unexpected cyclic style lookup"),
+                }
+                Ok::<_, ()>(())
+            });
+        assert!(matches!(
+            result,
+            Err(Error::InvalidSource {
+                path: Path::Package
+            })
+        ));
+    }
+
+    #[test]
+    fn source_built_sixty_four_empty_styles_are_accepted() {
+        let styles = (1_u64..=64)
+            .map(|identifier| {
+                let parent = (identifier < 64).then_some(identifier + 1);
+                style_payload(parent, [None, None, None, None, None, None, None])
+            })
+            .collect::<Vec<_>>();
+        let appearance =
+            Package::__table_appearance_from_source_built(1, None, |identifier, kind, consume| {
+                assert_eq!(kind, SourceBuiltAppearancePayload::TableStyle);
+                let payload = styles
+                    .get(usize::try_from(identifier).expect("test identifier") - 1)
+                    .expect("bounded style lookup");
+                consume(payload);
+                Ok::<_, ()>(())
+            })
+            .expect("64-style inheritance chain should remain within the bound");
+        assert_eq!(appearance, Appearance::default());
+    }
+
+    #[test]
+    fn source_built_sixty_five_style_chain_is_rejected() {
+        let styles = (1_u64..=65)
+            .map(|identifier| {
+                let parent = (identifier < 65).then_some(identifier + 1);
+                style_payload(parent, [None, None, None, None, None, None, None])
+            })
+            .collect::<Vec<_>>();
+        let result =
+            Package::__table_appearance_from_source_built(1, None, |identifier, kind, consume| {
+                assert_eq!(kind, SourceBuiltAppearancePayload::TableStyle);
+                let payload = styles
+                    .get(usize::try_from(identifier).expect("test identifier") - 1)
+                    .expect("bounded style lookup");
+                consume(payload);
+                Ok::<_, ()>(())
+            });
+        assert!(matches!(
+            result,
+            Err(Error::InvalidSource {
+                path: Path::Package
+            })
+        ));
+    }
+
+    #[test]
+    fn source_built_malformed_style_payload_is_rejected() {
+        let result =
+            Package::__table_appearance_from_source_built(1, None, |identifier, kind, consume| {
+                assert_eq!(identifier, 1);
+                assert_eq!(kind, SourceBuiltAppearancePayload::TableStyle);
+                consume(&[0x08]);
+                Ok::<_, ()>(())
+            });
+        assert!(result.is_err(), "malformed style payload must be rejected");
     }
 }
