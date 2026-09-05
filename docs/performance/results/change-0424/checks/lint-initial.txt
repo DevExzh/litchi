@@ -1,0 +1,4 @@
+clippy-strict: running
+clippy-strict: exit 101
+clippy-diagnostic: running
+clippy-diagnostic: exit 101

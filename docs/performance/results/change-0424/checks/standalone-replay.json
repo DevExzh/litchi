@@ -1,0 +1,9 @@
+{
+  "change": 424,
+  "exit_code": 0,
+  "historical_sibling_absent_before": true,
+  "original_worktrees_and_binaries_absent": true,
+  "outer_temporary_export_removed": true,
+  "standalone_bundle_only": true,
+  "status": "pass"
+}

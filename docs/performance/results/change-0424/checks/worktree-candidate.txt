@@ -1,0 +1,3 @@
+Preparing worktree (detached HEAD d18bf7db4)
+Updating files:  91% (15130/16580)Updating files:  92% (15254/16580)Updating files:  93% (15420/16580)Updating files:  94% (15586/16580)Updating files:  95% (15751/16580)Updating files:  96% (15917/16580)Updating files:  97% (16083/16580)Updating files:  98% (16249/16580)Updating files:  99% (16415/16580)Updating files: 100% (16580/16580)Updating files: 100% (16580/16580), done.
+HEAD is now at d18bf7db4 perf(pptx): reuse validated staged cross-copy payloads

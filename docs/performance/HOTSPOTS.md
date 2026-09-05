@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## Change 0424: validated staged PPTX payload reuse
+
+[0424](changes/0424-staged-pptx-payload-reuse.md) shares independently staged
+image/chart bytes after full publication revalidation. The matched media
+lifecycle records −14.266% operation allocation requests and −7.317% mean
+region peak live bytes, with unchanged logical reads and effectively unchanged
+RSS. Both allocator repeats agree; the before/after stack evidence shows the
+publication's second 16 MiB clone absent. Plain requests are unchanged and its
+median is +0.805% / +0.755%, an explicitly accepted diagnostic tradeoff. All
+normal repeat limits pass and no timing/RSS pair crosses the 5% review trigger.
+There is no release latency, physical-copy, managed-budget or post-drop claim.
+The [bundle](results/change-0424/README.md) retains 16 fresh processes, 1,040
+observations and 86 applicable passing Rust tests; existing strict lint debt
+and broader native/range/scaling/CRUD work remain open.
+
 ## Change 0423: matched source-backed PPTX lifecycles
 
 [0423](changes/0423-matched-source-backed-pptx-lifecycles.md) adds plain and
