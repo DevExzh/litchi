@@ -8213,3 +8213,73 @@ item, or deletion gate is removed by this slice. The authoritative topology
 remains 64 workspace packages, 238 internal dependency declarations, 227
 canonical edges, 11 development-only edges, 11 ordered migration debts with
 IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-05 follow-up: catalog-backed discovery and focused format delegation
+
+The migration-host Keynote slide-table graph now resolves through the bounded
+`KeynoteObjectCatalog`. Direct graph resolution and slide listing share the
+same catalog census and selected slide context, so table ownership, role
+multiplicity, and historical table-model aliases are checked through one
+admission path. The selected table model's name and dimensions use the
+bounded Buffa discovery projection, and the catalog-backed appearance walk
+borrows only the selected style payloads. The complete generated table model
+is not materialized for this discovery path; unrelated nested payloads remain
+opaque and the existing migration-host mutation boundary remains in place.
+
+The Pages migration-host table graph now opts into
+`table_info_codec::decode_table_info_with_parent` only at the body-ownership
+boundary. The ordinary TableInfo projection leaves the parent envelope
+opaque; the opt-in projection strictly validates the selected local parent
+reference while retaining the existing bounded model and lock checks. Body
+table attachment anchors are sorted and deduplicated, then checked against a
+single streaming UTF-16 walk. This avoids materializing the full body as a
+UTF-16 unit vector while preserving the native UTF-16 character-index
+contract.
+
+Exact-source existing-cell Number-format updates in `NumbersEditor` now
+delegate same-family formats to the focused `litchi-numbers` transactions and
+reopen the focused result through the host editor. Compatibility conversion
+remains for source-built, cross-family, and unsupported formats; control to
+scalar conversion releases the focused control graph before invoking that
+compatibility writer. Custom formats retain the compatibility writer for their
+package registry and cleanup metadata. The selector bridge borrows retained
+exact source bytes when available and grows candidate buffers fallibly.
+Validated focused no-ops retain the original editor snapshot; changed results
+must agree with the host's format reader before publication.
+A focused compatibility regression keeps the host
+conversion behavior aligned with the focused Number owner.
+
+Pages absent hidden-state owner creation remains unsupported. An experimental
+`Indexed` creation path was excluded after review and a sanitizer probe found
+candidate validation failures. Before this path can publish, it needs
+codec-owned scratch/depth accounting, a registry and reference-aware identifier
+census, bounded archive append work, and exact creation/inverse metadata
+locality checks. The ownerless nonempty-row corpus seed remains a useful
+regression input for that work. No experimental creation code or relaxed
+execution limits are retained by this follow-up.
+
+The codec investigation reproduced an appended-owner rewrite whose declared
+scratch requirement was 1,695 bytes while candidate verification needed 1,960;
+verification then required nesting depth 3 rather than the declared 2. The
+follow-up belongs in `pages_hidden_state_codec::RewriteExecutionRequirements`:
+account for candidate verification scratch, allocations, and depth before
+execution. Increasing caller scratch limits does not close that contract.
+
+The `NativeVisible` profile remains qualified for visible-profile reads and
+exact empty no-ops only. Changed native edits still return
+`BodyTableHiddenAxesError::UnsupportedDependency` before candidate allocation
+or publication; no native changed-edit parity claim is added.
+
+A native Numbers oracle also accepted the focused candidate for one
+existing Number cell with two decimal places and thousands separators. The
+marker remained intact, the cell displayed `42.00`, and the inspector showed
+the requested decimal, minus-sign, and thousands settings. After save, close,
+and reopen, the marker and `42.00` display remained intact without a repair
+prompt. This is operation-specific native
+open/save/close/reopen evidence for that Number-format case; it does not
+promote other format families, arbitrary-producer parity, or monolith exit.
+
+No workspace package, manifest edge, ordered migration debt, migration-host
+item, or deletion gate is removed or closed by this follow-up. The monolithic
+`litchi-iwa` crate remains until the global parity, native, and boundary gates
+in this ADR are satisfied.

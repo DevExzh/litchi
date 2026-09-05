@@ -23,17 +23,31 @@ pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGr
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
-    let body_units = editor.body_text()?.encode_utf16().collect::<Vec<_>>();
+    let attachments = body
+        .table_attachment
+        .as_ref()
+        .map_or(&[][..], |table| table.entries.as_slice());
+    let mut anchor_offsets = Vec::new();
+    anchor_offsets
+        .try_reserve_exact(attachments.len())
+        .map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Pages table attachment anchor offsets",
+                amount: attachments.len(),
+            })
+        })?;
+    anchor_offsets.extend(
+        attachments
+            .iter()
+            .filter(|entry| entry.object.is_some())
+            .map(|entry| entry.character_index),
+    );
+    retain_object_replacement_offsets(&editor.body_text()?, &mut anchor_offsets);
     let mut seen_drawables = HashSet::new();
     let mut seen_models = HashSet::new();
     let mut result = Vec::new();
 
-    for entry in body
-        .table_attachment
-        .as_ref()
-        .into_iter()
-        .flat_map(|table| &table.entries)
-    {
+    for entry in attachments {
         let Some(attachment_reference) = entry.object else {
             continue;
         };
@@ -56,53 +70,49 @@ pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGr
                 drawable.identifier
             ))
         })?;
-        let messages = object
+        let mut messages = object
             .messages
             .iter()
-            .filter(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
-            .collect::<Vec<_>>();
-        if messages.is_empty() {
+            .filter(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE);
+        let Some(message) = messages.next() else {
             continue;
-        }
-        let [message] = messages.as_slice() else {
+        };
+        if messages.next().is_some() {
             return Err(Error::InvalidFormat(format!(
                 "Pages table drawable {} repeats its table-info payload",
                 drawable.identifier
             )));
-        };
-        let table_info = TableInfoArchive::decode(message.data.as_slice())?;
-        if table_info.super_.parent.map(|parent| parent.identifier)
-            != Some(editor.body_storage_id.get())
+        }
+        let table_info = validation::decode_table_info_ownership(&message.data)?;
+        if table_info.parent().map(std::num::NonZeroU64::get) != Some(editor.body_storage_id.get())
         {
             return Err(Error::InvalidFormat(format!(
                 "Pages table drawable {} is not owned by the body",
                 drawable.identifier
             )));
         }
-        if body_units.get(entry.character_index as usize) != Some(&OBJECT_REPLACEMENT_CHARACTER) {
+        if anchor_offsets
+            .binary_search(&entry.character_index)
+            .is_err()
+        {
             return Err(Error::InvalidFormat(format!(
                 "Pages table drawable {} has no object-replacement character",
                 drawable.identifier
             )));
         }
-        let model_id = table_info.table_model.identifier;
+        let model_id = table_info.table_model().identifier().get();
         let model_archive_name = find_object_archive(editor.package(), model_id)?;
         let model_archive = editor.package().archive(&model_archive_name)?;
         let model_object = model_archive.object(model_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Pages table model {model_id} is missing"))
         })?;
-        let models = decode_table_models(
+        let model = decode_unique_table_model(
             model_object
                 .messages
                 .iter()
                 .filter(|message| TABLE_MODEL_MESSAGE_TYPES.contains(&message.type_)),
             model_id,
         )?;
-        let [model] = models.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "Pages table model {model_id} must contain exactly one table-model payload"
-            )));
-        };
         if !seen_drawables.insert(drawable.identifier) || !seen_models.insert(model_id) {
             return Err(Error::InvalidFormat(format!(
                 "Pages table drawable {} or model {model_id} is attached more than once",
@@ -128,6 +138,15 @@ pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGr
                 formula_context_ids.push(reference);
             }
         }
+        let mut name = String::new();
+        name.try_reserve_exact(model.table_name().len())
+            .map_err(|_| {
+                Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                    resource: "Pages body-table name",
+                    amount: model.table_name().len(),
+                })
+            })?;
+        name.push_str(model.table_name());
         result.push(PagesTableGraph {
             attachment_object_id: attachment_reference.identifier,
             formula_context_ids,
@@ -135,7 +154,7 @@ pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGr
                 drawable_object_id: drawable.identifier,
                 model_object_id: model_id,
                 anchor_character_index: entry.character_index as usize,
-                name: model.table_name().to_owned(),
+                name,
                 rows: model.rows() as usize,
                 columns: model.columns() as usize,
                 appearance: legacy_table_appearance_compatibility_read(editor, model_id)?,
@@ -163,6 +182,28 @@ pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGr
     }
     result.sort_by_key(|graph| graph.info.anchor_character_index);
     Ok(result)
+}
+
+/// Check only declared anchors while streaming the text once. Memory scales
+/// with attachment metadata rather than the complete UTF-16 body, including
+/// when the source lists anchors out of order or repeats an offset.
+fn retain_object_replacement_offsets(text: &str, offsets: &mut Vec<u32>) {
+    offsets.sort_unstable();
+    offsets.dedup();
+    let mut units = text.encode_utf16();
+    let mut consumed = 0u64;
+    offsets.retain(|offset| {
+        let offset = u64::from(*offset);
+        let Some(skip) = offset
+            .checked_sub(consumed)
+            .and_then(|value| usize::try_from(value).ok())
+        else {
+            return false;
+        };
+        let unit = units.nth(skip);
+        consumed = offset + 1;
+        unit == Some(OBJECT_REPLACEMENT_CHARACTER)
+    });
 }
 
 pub(crate) fn clone_body_table_attachment(
@@ -282,5 +323,26 @@ pub(crate) fn remove_table_object(
     } else {
         package.replace_archive(archive_name, &archive)?;
         Ok(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::retain_object_replacement_offsets;
+
+    #[test]
+    fn attachment_anchors_use_utf16_positions_and_preserve_out_of_order_queries() {
+        let mut offsets = vec![4, 1, 2, 2, 0, u32::MAX, 3];
+        retain_object_replacement_offsets("😀\u{fffc}A\u{fffc}", &mut offsets);
+        assert_eq!(offsets, [2, 4]);
+    }
+
+    #[test]
+    fn empty_and_out_of_range_attachment_anchors_are_not_validated() {
+        let mut offsets = vec![0, 1, u32::MAX];
+        retain_object_replacement_offsets("", &mut offsets);
+        assert!(offsets.is_empty());
+        retain_object_replacement_offsets("\u{fffc}", &mut offsets);
+        assert!(offsets.is_empty());
     }
 }

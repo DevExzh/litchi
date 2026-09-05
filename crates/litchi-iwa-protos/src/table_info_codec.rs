@@ -16,13 +16,18 @@ use std::{fmt, num::NonZeroU64};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
 
+use crate::buffa_drawable_parent_generated::LitchiIwaProjection as parent_projection;
 use crate::buffa_table_info_generated::LitchiIwaProjection as projection;
 
 const TABLE_SUPER_FIELD: u32 = 1;
 const TABLE_MODEL_FIELD: u32 = 2;
+const DRAWABLE_PARENT_FIELD: u32 = 2;
 const DRAWABLE_LOCKED_FIELD: u32 = 5;
 const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
+const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;
+const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;
 const MAX_RECURSION_LIMIT: u32 = 64;
+const MIN_SIGN_EXTENDED_INT32: u64 = 0xffff_ffff_8000_0000;
 
 /// Explicit finite resource policy for one `TableInfo` model-reference decode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -213,6 +218,7 @@ pub struct TableModelReference {
 pub struct TableInfoSnapshot {
     table_model: TableModelReference,
     locked: Option<bool>,
+    parent: Option<NonZeroU64>,
 }
 
 impl TableInfoSnapshot {
@@ -228,6 +234,18 @@ impl TableInfoSnapshot {
     #[must_use]
     pub const fn locked(self) -> Option<bool> {
         self.locked
+    }
+
+    /// Optional non-zero body/container identifier from
+    /// `TST.TableInfoArchive.super.parent`.
+    ///
+    /// The ordinary [`decode_table_info`] path deliberately leaves this edge
+    /// opaque and returns `None`. Callers that need to prove ownership must
+    /// opt into [`decode_table_info_with_parent`], which strictly validates
+    /// and projects the selected nested reference.
+    #[must_use]
+    pub const fn parent(self) -> Option<NonZeroU64> {
+        self.parent
     }
 }
 
@@ -367,6 +385,7 @@ enum DecodeErrorKind {
     MissingRequired(&'static str),
     DuplicateSingular(&'static str),
     NonCanonical(&'static str),
+    NonLocalReference(&'static str),
     ZeroIdentifier(&'static str),
     FieldLimit { observed: usize, maximum: usize },
     WorkLimit { observed: usize, maximum: usize },
@@ -422,6 +441,12 @@ impl DecodeError {
     const fn noncanonical(reason: &'static str) -> Self {
         Self {
             kind: DecodeErrorKind::NonCanonical(reason),
+        }
+    }
+
+    const fn nonlocal_reference(field: &'static str) -> Self {
+        Self {
+            kind: DecodeErrorKind::NonLocalReference(field),
         }
     }
 
@@ -510,6 +535,15 @@ impl DecodeError {
             return None;
         };
         Some(reason)
+    }
+
+    /// Reference field that disqualified the selected parent as local.
+    #[must_use]
+    pub const fn nonlocal_reference_field(&self) -> Option<&'static str> {
+        let DecodeErrorKind::NonLocalReference(field) = self.kind else {
+            return None;
+        };
+        Some(field)
     }
 
     /// Reference field carrying a forbidden zero identifier, when applicable.
@@ -619,6 +653,9 @@ impl fmt::Display for DecodeError {
             DecodeErrorKind::NonCanonical(reason) => {
                 write!(formatter, "non-canonical protobuf representation: {reason}")
             },
+            DecodeErrorKind::NonLocalReference(field) => {
+                write!(formatter, "{field} is external; expected a local reference")
+            },
             DecodeErrorKind::ZeroIdentifier(field) => write!(formatter, "{field} is zero"),
             DecodeErrorKind::FieldLimit { observed, maximum } => write!(
                 formatter,
@@ -688,18 +725,44 @@ pub fn decode_table_info(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<TableInfoSnapshot, DecodeError> {
+    decode_table_info_selected(source, options, false)
+}
+
+/// Decode model ownership, drawable lock state, and the optional drawable
+/// parent edge from one `TableInfo` payload.
+///
+/// This opt-in variant extends [`decode_table_info`] with the one ownership
+/// edge needed by rooted Pages table discovery. It strictly visits only
+/// `TableInfoArchive.super` field 1, then its `DrawableArchive.parent` field
+/// 2 and local `TSP.Reference` fields. Other `TableInfo` and drawable
+/// metadata remains source-owned and opaque. The parent reference may be
+/// omitted, in which case [`TableInfoSnapshot::parent`] is `None`.
+pub fn decode_table_info_with_parent(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<TableInfoSnapshot, DecodeError> {
+    decode_table_info_selected(source, options, true)
+}
+
+fn decode_table_info_selected(
+    source: &[u8],
+    options: DecodeOptions,
+    select_parent: bool,
+) -> Result<TableInfoSnapshot, DecodeError> {
     validate_decode_input(source, options)?;
     let mut budget = Budget::new(options);
-    decode_table_info_with_budget(source, options, &mut budget)
+    decode_table_info_with_budget(source, options, &mut budget, select_parent)
 }
 
 fn decode_table_info_with_budget(
     source: &[u8],
     options: DecodeOptions,
     budget: &mut Budget,
+    select_parent: bool,
 ) -> Result<TableInfoSnapshot, DecodeError> {
-    let strict = preflight_table_info(source, options, budget)
+    let preflight = preflight_table_info(source, options, budget, select_parent)
         .map_err(|error| error.with_recursion_limit_context(options.recursion_limit))?;
+    let strict = preflight.snapshot;
 
     let view: projection::TableInfoArchiveLazyView<'_> = options
         .buffa()
@@ -730,9 +793,34 @@ fn decode_table_info_with_budget(
         identifier: NonZeroU64::new(model.identifier)
             .ok_or_else(|| DecodeError::zero_identifier("TSP.Reference.identifier"))?,
     };
+    let projected_parent = if select_parent {
+        // The existing TableInfo lazy view has already forced `super` for the
+        // lock projection. Parent ownership uses a second, narrower lazy view
+        // over the same envelope, so reserve that additional traversal before
+        // entering Buffa and before publishing any selected parent facts.
+        budget.charge_message(preflight.super_source.len())?;
+        let parent_drawable: parent_projection::DrawableArchiveLazyView<'_> = options
+            .buffa()
+            .decode_lazy_view(preflight.super_source)
+            .map_err(DecodeError::from)
+            .map_err(|error| error.with_recursion_limit_context(options.recursion_limit))?;
+        let parent_view = parent_drawable
+            .parent
+            .get()
+            .map_err(DecodeError::from)
+            .map_err(|error| error.with_recursion_limit_context(options.recursion_limit))?;
+        parent_view
+            .as_ref()
+            .map(project_parent_reference)
+            .transpose()?
+            .map(|reference| reference.identifier)
+    } else {
+        None
+    };
     let projected = TableInfoSnapshot {
         table_model: projected_model,
         locked: super_.locked,
+        parent: projected_parent,
     };
     if projected != strict {
         return Err(DecodeError::projection());
@@ -1090,8 +1178,12 @@ impl<'source> PreparedTableInfoLockRewrite<'source> {
                 .with_max_scratch_bytes(self.requirements.scratch_bytes);
             validate_decode_input(&output, readback_options)?;
             let mut readback_budget = Budget::new(readback_options);
-            let readback =
-                decode_table_info_with_budget(&output, readback_options, &mut readback_budget)?;
+            let readback = decode_table_info_with_budget(
+                &output,
+                readback_options,
+                &mut readback_budget,
+                false,
+            )?;
             if readback.locked() != self.target_locked
                 || readback.table_model() != self.current.table_model()
             {
@@ -1117,7 +1209,7 @@ pub fn prepare_table_info_lock_rewrite<'source>(
     let write = write.into();
     validate_decode_input(source, options)?;
     let mut budget = Budget::new(options);
-    let current = decode_table_info_with_budget(source, options, &mut budget)?;
+    let current = decode_table_info_with_budget(source, options, &mut budget, false)?;
     if write
         .expected_fingerprint()
         .is_some_and(|expected| expected != table_info_source_fingerprint(source))
@@ -1346,15 +1438,18 @@ impl Budget {
     }
 }
 
-fn preflight_table_info(
-    source: &[u8],
+fn preflight_table_info<'source>(
+    source: &'source [u8],
     options: DecodeOptions,
     budget: &mut Budget,
-) -> Result<TableInfoSnapshot, DecodeError> {
+    select_parent: bool,
+) -> Result<TableInfoPreflight<'source>, DecodeError> {
     budget.charge_message(source.len())?;
     let nested_options = options.descend()?;
     let mut model = None;
     let mut locked = None;
+    let mut parent = None;
+    let mut super_source = None;
     let mut saw_super = false;
     let mut remaining = source;
     while let Some(field) = next_strict_field(&mut remaining, options, budget)? {
@@ -1366,12 +1461,13 @@ fn preflight_table_info(
                     ));
                 }
                 saw_super = true;
+                let super_payload = field.length_delimited()?;
+                super_source = Some(super_payload);
                 budget.max_depth = budget.max_depth.max(2);
-                locked = Some(preflight_drawable(
-                    field.length_delimited()?,
-                    nested_options,
-                    budget,
-                )?);
+                let (drawable_locked, drawable_parent) =
+                    preflight_drawable(super_payload, nested_options, budget, select_parent)?;
+                locked = Some(drawable_locked);
+                parent = drawable_parent;
             },
             TABLE_MODEL_FIELD => {
                 if model.is_some() {
@@ -1392,33 +1488,58 @@ fn preflight_table_info(
     if !saw_super {
         return Err(DecodeError::missing_required("TST.TableInfoArchive.super"));
     }
-    Ok(TableInfoSnapshot {
-        table_model: model
-            .ok_or_else(|| DecodeError::missing_required("TST.TableInfoArchive.table_model"))?,
-        locked: locked.ok_or_else(DecodeError::projection)?,
+    Ok(TableInfoPreflight {
+        snapshot: TableInfoSnapshot {
+            table_model: model
+                .ok_or_else(|| DecodeError::missing_required("TST.TableInfoArchive.table_model"))?,
+            locked: locked.ok_or_else(DecodeError::projection)?,
+            parent,
+        },
+        super_source: super_source.ok_or_else(DecodeError::projection)?,
     })
+}
+
+struct TableInfoPreflight<'source> {
+    snapshot: TableInfoSnapshot,
+    super_source: &'source [u8],
 }
 
 fn preflight_drawable(
     source: &[u8],
     options: DecodeOptions,
     budget: &mut Budget,
-) -> Result<Option<bool>, DecodeError> {
+    select_parent: bool,
+) -> Result<(Option<bool>, Option<NonZeroU64>), DecodeError> {
     budget.charge_message(source.len())?;
     let mut locked = None;
+    let mut parent = None;
     let mut remaining = source;
     while let Some(field) = next_strict_field(&mut remaining, options, budget)? {
-        if field.number != DRAWABLE_LOCKED_FIELD {
-            continue;
+        match field.number {
+            DRAWABLE_LOCKED_FIELD => {
+                if locked.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSD.DrawableArchive.locked",
+                    ));
+                }
+                locked = Some(require_canonical_bool(field.varint()?)?);
+            },
+            DRAWABLE_PARENT_FIELD if select_parent => {
+                if parent.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSD.DrawableArchive.parent",
+                    ));
+                }
+                let parent_options = options.descend()?;
+                parent = Some(
+                    preflight_parent_reference(field.length_delimited()?, parent_options, budget)?
+                        .identifier,
+                );
+            },
+            _ => {},
         }
-        if locked.is_some() {
-            return Err(DecodeError::duplicate_singular(
-                "TSD.DrawableArchive.locked",
-            ));
-        }
-        locked = Some(require_canonical_bool(field.varint()?)?);
     }
-    Ok(locked)
+    Ok((locked, parent))
 }
 
 fn preflight_reference(
@@ -1444,6 +1565,75 @@ fn preflight_reference(
     Ok(TableModelReference {
         identifier: identifier
             .ok_or_else(|| DecodeError::missing_required("TSP.Reference.identifier"))?,
+    })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ParentReferenceFacts {
+    identifier: NonZeroU64,
+}
+
+fn preflight_parent_reference(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<ParentReferenceFacts, DecodeError> {
+    budget.charge_message(source.len())?;
+    let mut identifier = None;
+    let mut saw_deprecated_type = false;
+    let mut deprecated_is_external = None;
+    let mut remaining = source;
+    while let Some(field) = next_strict_field(&mut remaining, options, budget)? {
+        match field.number {
+            REFERENCE_IDENTIFIER_FIELD => {
+                if identifier.is_some() {
+                    return Err(DecodeError::duplicate_singular("TSP.Reference.identifier"));
+                }
+                identifier = Some(
+                    NonZeroU64::new(field.varint()?)
+                        .ok_or_else(|| DecodeError::zero_identifier("TSP.Reference.identifier"))?,
+                );
+            },
+            REFERENCE_DEPRECATED_TYPE_FIELD => {
+                if saw_deprecated_type {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSP.Reference.deprecated_type",
+                    ));
+                }
+                require_canonical_int32(field.varint()?)?;
+                saw_deprecated_type = true;
+            },
+            REFERENCE_DEPRECATED_EXTERNAL_FIELD => {
+                if deprecated_is_external.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSP.Reference.deprecated_is_external",
+                    ));
+                }
+                deprecated_is_external = Some(require_canonical_bool(field.varint()?)?);
+            },
+            _ => {},
+        }
+    }
+    if deprecated_is_external == Some(true) {
+        return Err(DecodeError::nonlocal_reference(
+            "TSP.Reference.deprecated_is_external",
+        ));
+    }
+    Ok(ParentReferenceFacts {
+        identifier: identifier
+            .ok_or_else(|| DecodeError::missing_required("TSP.Reference.identifier"))?,
+    })
+}
+
+fn project_parent_reference(
+    view: &parent_projection::ReferenceLazyView<'_>,
+) -> Result<ParentReferenceFacts, DecodeError> {
+    if !view.has_identifier() {
+        return Err(DecodeError::missing_required("TSP.Reference.identifier"));
+    }
+    Ok(ParentReferenceFacts {
+        identifier: NonZeroU64::new(view.identifier)
+            .ok_or_else(|| DecodeError::zero_identifier("TSP.Reference.identifier"))?,
     })
 }
 
@@ -1904,6 +2094,20 @@ fn require_canonical_bool(value: u64) -> Result<bool, DecodeError> {
     }
 }
 
+fn require_canonical_int32(value: u64) -> Result<i32, DecodeError> {
+    if value <= u64::from(u32::MAX / 2) {
+        return i32::try_from(value).map_err(|_conversion| DecodeError::projection());
+    }
+    if value >= MIN_SIGN_EXTENDED_INT32 {
+        let truncated = u32::try_from(value & u64::from(u32::MAX))
+            .map_err(|_conversion| DecodeError::projection())?;
+        return Ok(i32::from_ne_bytes(truncated.to_ne_bytes()));
+    }
+    Err(DecodeError::noncanonical(
+        "int32 scalar is not sign-extended",
+    ))
+}
+
 #[derive(Clone, Copy, Debug)]
 enum StrictValue<'source> {
     Varint(u64),
@@ -2111,9 +2315,10 @@ mod tests {
 
     use super::{
         Budget, DecodeOptions, RewriteExecutionLimits, TableInfoLockWrite, TableInfoSnapshot,
-        TableModelReference, WireResourceLimit, decode_table_info, decode_table_model_reference,
-        prepare_table_info_lock_rewrite, prepare_table_info_lock_rewrite_with_fingerprint,
-        rewrite_table_info_lock, table_info_source_fingerprint,
+        TableModelReference, WireResourceLimit, decode_table_info, decode_table_info_with_parent,
+        decode_table_model_reference, prepare_table_info_lock_rewrite,
+        prepare_table_info_lock_rewrite_with_fingerprint, rewrite_table_info_lock,
+        table_info_source_fingerprint,
     };
     use crate::{tsd, tsp, tst};
 
@@ -2152,6 +2357,23 @@ mod tests {
         source.extend_from_slice(super_payload);
         source.extend(table_model_field(&[0x08, 0x2a]));
         source
+    }
+
+    fn length_field(number: u8, payload: &[u8]) -> Vec<u8> {
+        let mut field = vec![
+            number << 3 | 2,
+            u8::try_from(payload.len()).expect("small test payload"),
+        ];
+        field.extend_from_slice(payload);
+        field
+    }
+
+    fn table_info_with_parent(parent_payload: &[u8]) -> Vec<u8> {
+        table_info_with_super(&length_field(2, parent_payload))
+    }
+
+    fn parent_options(source: &[u8]) -> DecodeOptions {
+        DecodeOptions::for_source(source)
     }
 
     fn rewrite_options(source: &[u8]) -> DecodeOptions {
@@ -2208,6 +2430,163 @@ mod tests {
             assert_eq!(snapshot.locked(), locked);
         }
         Ok(())
+    }
+
+    #[test]
+    fn parent_projection_is_opt_in_and_keeps_unselected_parent_opaque() {
+        // The ordinary lock/model path must not force or validate the nested
+        // parent reference. This duplicate therefore remains opaque there,
+        // while the ownership path rejects it before lazy projection.
+        let duplicate_identifier = [0x08, 0x2a, 0x08, 0x2b];
+        let source = table_info_with_parent(&duplicate_identifier);
+
+        let ordinary = decode_table_info(&source, parent_options(&source))
+            .expect("ordinary TableInfo projection keeps parent opaque");
+        assert_eq!(ordinary.parent(), None);
+
+        let error = decode_table_info_with_parent(&source, parent_options(&source))
+            .expect_err("selected parent rejects duplicate identifier");
+        assert_eq!(
+            error.duplicate_singular_field(),
+            Some("TSP.Reference.identifier")
+        );
+    }
+
+    #[test]
+    fn parent_projection_preserves_omission_and_projects_nonzero_identifier()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let absent = table_info_with_super(&[]);
+        assert_eq!(
+            decode_table_info_with_parent(&absent, parent_options(&absent))?.parent(),
+            None
+        );
+
+        let reference = tsp::Reference {
+            identifier: 99,
+            deprecated_type: Some(-7),
+            deprecated_is_external: Some(false),
+        }
+        .encode_to_vec();
+        let source = table_info_with_parent(&reference);
+        let snapshot = decode_table_info_with_parent(&source, parent_options(&source))?;
+        assert_eq!(snapshot.parent(), NonZeroU64::new(99));
+        assert_eq!(
+            snapshot.table_model().identifier(),
+            NonZeroU64::new(42).unwrap()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parent_projection_qualifies_selected_edge_and_nested_reference() {
+        let valid_parent = [0x08, 0x2a];
+
+        let duplicate_parent = [
+            length_field(2, &valid_parent),
+            length_field(2, &valid_parent),
+        ]
+        .concat();
+        let duplicate_parent_source = table_info_with_super(&duplicate_parent);
+        let error = decode_table_info_with_parent(
+            &duplicate_parent_source,
+            parent_options(&duplicate_parent_source),
+        )
+        .expect_err("duplicate parent edge");
+        assert_eq!(
+            error.duplicate_singular_field(),
+            Some("TSD.DrawableArchive.parent")
+        );
+
+        for (parent, expected) in [
+            (&[0x10, 0x01][..], Some("TSP.Reference.identifier")),
+            (&[0x08, 0x00][..], None),
+        ] {
+            let error = decode_table_info_with_parent(
+                &table_info_with_parent(parent),
+                parent_options(&table_info_with_parent(parent)),
+            )
+            .expect_err("invalid selected parent reference");
+            if let Some(field) = expected {
+                assert_eq!(error.missing_required_field(), Some(field));
+            } else {
+                assert_eq!(
+                    error.zero_identifier_field(),
+                    Some("TSP.Reference.identifier")
+                );
+            }
+        }
+
+        let duplicate_type = [0x08, 0x2a, 0x10, 0x01, 0x10, 0x02];
+        let error = decode_table_info_with_parent(
+            &table_info_with_parent(&duplicate_type),
+            parent_options(&table_info_with_parent(&duplicate_type)),
+        )
+        .expect_err("duplicate known nested reference field");
+        assert_eq!(
+            error.duplicate_singular_field(),
+            Some("TSP.Reference.deprecated_type")
+        );
+
+        let noncanonical_type = [0x08, 0x2a, 0x10, 0x80, 0x80, 0x80, 0x80, 0x08];
+        let error = decode_table_info_with_parent(
+            &table_info_with_parent(&noncanonical_type),
+            parent_options(&table_info_with_parent(&noncanonical_type)),
+        )
+        .expect_err("noncanonical nested int32");
+        assert_eq!(
+            error.noncanonical_reason(),
+            Some("int32 scalar is not sign-extended")
+        );
+
+        let nonboolean_external = [0x08, 0x2a, 0x18, 0x02];
+        let error = decode_table_info_with_parent(
+            &table_info_with_parent(&nonboolean_external),
+            parent_options(&table_info_with_parent(&nonboolean_external)),
+        )
+        .expect_err("noncanonical nested bool");
+        assert_eq!(
+            error.noncanonical_reason(),
+            Some("bool scalar is not zero or one")
+        );
+
+        let external_parent = [0x08, 0x2a, 0x18, 0x01];
+        let external_source = table_info_with_parent(&external_parent);
+        let error =
+            decode_table_info_with_parent(&external_source, parent_options(&external_source))
+                .expect_err("external nested reference is not a local parent");
+        assert_eq!(
+            error.nonlocal_reference_field(),
+            Some("TSP.Reference.deprecated_is_external")
+        );
+    }
+
+    #[test]
+    fn parent_projection_scans_only_local_super_edge() {
+        // A parent-looking payload under an unrelated TableInfo field is
+        // preservation-owned and must not become the selected body owner.
+        let nested = [0x08, 0x2a];
+        let mut source = table_info_with_super(&[]);
+        source.extend(length_field(3, &length_field(2, &nested)));
+        let snapshot = decode_table_info_with_parent(&source, parent_options(&source))
+            .expect("unrelated envelope remains opaque");
+        assert_eq!(snapshot.parent(), None);
+    }
+
+    #[test]
+    fn parent_projection_charges_selected_nested_reference_budget() {
+        let parent = [0x08, 0x2a];
+        let super_payload = length_field(2, &parent);
+        let source = table_info_with_super(&super_payload);
+        let exact_work =
+            2 * (source.len() + super_payload.len() + parent.len() + 2 + super_payload.len());
+        let exact = DecodeOptions::new(source.len(), 5, exact_work, 2);
+        assert!(decode_table_info_with_parent(&source, exact).is_ok());
+
+        let one_under_fields = DecodeOptions::new(source.len(), 4, exact_work, 2);
+        assert!(decode_table_info_with_parent(&source, one_under_fields).is_err());
+
+        let one_under_work = DecodeOptions::new(source.len(), 5, exact_work - 1, 2);
+        assert!(decode_table_info_with_parent(&source, one_under_work).is_err());
     }
 
     #[test]

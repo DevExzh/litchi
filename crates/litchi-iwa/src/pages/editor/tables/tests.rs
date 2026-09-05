@@ -254,7 +254,7 @@ fn malformed_table_model_payload_is_reported() {
         type_: TABLE_MODEL_MESSAGE_TYPES[0],
         data: vec![0x80],
     }];
-    let error = decode_table_models(messages.iter(), 41).expect_err("malformed payload");
+    let error = decode_unique_table_model(messages.iter(), 41).expect_err("malformed payload");
     assert!(matches!(
         error,
         Error::InvalidFormat(message)
@@ -277,13 +277,40 @@ fn table_model_discovery_projects_borrowed_name_and_dimensions() {
 }
 
 #[test]
-fn table_model_discovery_preserves_payload_multiplicity_for_caller_validation() {
-    let no_messages: [RawMessage; 0] = [];
+fn native_body_table_discovery_preserves_the_source_package() {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/pages/body-table-visible.pages");
+    let source = std::fs::read(path).expect("native visible-table fixture");
+    let editor = PagesEditor::from_bytes(&source).expect("native Pages editor");
+    let tables = editor.tables().expect("bounded native table discovery");
+    assert_eq!(tables.len(), 1);
+    assert_eq!((tables[0].rows, tables[0].columns), (5, 4));
     assert!(
-        decode_table_models(no_messages.iter(), 42)
-            .unwrap()
-            .is_empty()
+        editor
+            .body_text()
+            .expect("native body")
+            .contains("Pages hidden-axis native oracle")
     );
+    assert_eq!(editor.to_bytes().expect("exact source output"), source);
+}
+
+#[test]
+fn table_info_ownership_preserves_typed_nesting_failure() {
+    let mut source = vec![0x7b; 9];
+    source.extend([0x7c; 9]);
+    assert!(matches!(
+        validation::decode_table_info_ownership(&source),
+        Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::Nesting,
+            ..
+        }))
+    ));
+}
+
+#[test]
+fn table_model_discovery_rejects_missing_and_duplicate_payloads_without_collecting() {
+    let no_messages: [RawMessage; 0] = [];
+    assert!(decode_unique_table_model(no_messages.iter(), 42).is_err());
 
     let editor = PagesDocumentBuilder::new()
         .body_table("Duplicate", 2, 2)
@@ -305,12 +332,7 @@ fn table_model_discovery_preserves_payload_multiplicity_for_caller_validation() 
         .clone();
     let messages = [message.clone(), message];
 
-    assert_eq!(
-        decode_table_models(messages.iter(), model_id)
-            .expect("both payloads are independently valid")
-            .len(),
-        2
-    );
+    assert!(decode_unique_table_model(messages.iter(), model_id).is_err());
 }
 
 #[test]

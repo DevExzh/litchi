@@ -11,6 +11,11 @@ use litchi_iwa_common::table::cell::{
     layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment},
 };
 use litchi_iwa_protos::table_dimension_codec as neutral_dimension_codec;
+use litchi_numbers::cell::data_format::number::{DecimalPlaces, NegativeStyle, ThousandsSeparator};
+use litchi_numbers::cell::data_format::numeral_system::{
+    Base, FixedPlaces, NegativeStyle as NumeralSystemNegativeStyle, Places,
+};
+use litchi_numbers::table::CellPosition;
 use litchi_numbers::table::lock::State as FocusedTableLockState;
 use litchi_numbers::table::sort::Order as FocusedSortOrder;
 use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};
@@ -3685,6 +3690,187 @@ fn focused_cell_edit_round_trips_through_legacy_host_reader() {
     let mut restored_bytes = Vec::new();
     restored.package().write_to(&mut restored_bytes).unwrap();
     assert_eq!(restored_bytes, source_bytes);
+}
+
+#[test]
+fn focused_number_format_edit_round_trips_through_legacy_host_writer() {
+    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/basic.numbers");
+    let mut editor = NumbersEditor::open(fixture).unwrap();
+    let table_id = editor.tables().unwrap().remove(0).id();
+    let source_bytes = editor.to_bytes().unwrap();
+    let source = FocusedNumbersPackage::from_bytes(&source_bytes).unwrap();
+    let position = CellPosition::new(2, 1);
+    let number = Number::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+    );
+    let focused_commit = source
+        .edit_table_cell_number_format(SheetSelector::index(0), TableSelector::index(0), position)
+        .unwrap()
+        .set(number)
+        .commit()
+        .unwrap();
+    let mut focused_bytes = Vec::new();
+    focused_commit
+        .package()
+        .write_to(&mut focused_bytes)
+        .unwrap();
+
+    editor
+        .set_table_cell_data_format(table_id, 2, 1, DataFormat::Number(number))
+        .unwrap();
+    let edited_bytes = editor.to_bytes().unwrap();
+    if let Some(path) = std::env::var_os("LITCHI_NUMBERS_HOST_PROBE_OUTPUT") {
+        std::fs::write(path, &edited_bytes).unwrap();
+    }
+    assert_eq!(edited_bytes, focused_bytes);
+    assert_eq!(
+        editor.table_cell_data_format(table_id, 2, 1).unwrap(),
+        DataFormat::Number(number)
+    );
+}
+
+#[test]
+fn exact_focused_data_format_noop_preserves_source_bytes() {
+    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/basic.numbers");
+    let mut editor = NumbersEditor::open(fixture).unwrap();
+    let table_id = editor.tables().unwrap().remove(0).id();
+    let number = Number::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+    );
+    editor
+        .set_table_cell_data_format(table_id, 2, 1, DataFormat::Number(number))
+        .unwrap();
+    let before_noop = editor.to_bytes().unwrap();
+    let before_source = editor
+        .package()
+        .exact_source_bytes()
+        .expect("focused edit retains an exact source snapshot");
+    let before_source_pointer = before_source.as_ptr();
+    let before_source_length = before_source.len();
+
+    editor
+        .set_table_cell_data_format(table_id, 2, 1, DataFormat::Number(number))
+        .unwrap();
+
+    assert_eq!(editor.to_bytes().unwrap(), before_noop);
+    let after_source = editor
+        .package()
+        .exact_source_bytes()
+        .expect("focused no-op retains an exact source snapshot");
+    assert_eq!(after_source.as_ptr(), before_source_pointer);
+    assert_eq!(after_source.len(), before_source_length);
+    assert_eq!(
+        editor.table_cell_data_format(table_id, 2, 1).unwrap(),
+        DataFormat::Number(number)
+    );
+}
+
+#[test]
+fn exact_number_numeral_system_conversions_keep_compatibility_writer() {
+    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/basic.numbers");
+    let mut number_editor = NumbersEditor::open(fixture).unwrap();
+    let table_id = number_editor.tables().unwrap().remove(0).id();
+    let number = Number::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+    );
+    let numeral_system = NumeralSystem::new(
+        Base::HEXADECIMAL,
+        Places::Fixed(FixedPlaces::EIGHT),
+        NumeralSystemNegativeStyle::MinusSign,
+    )
+    .unwrap();
+    number_editor
+        .set_table_cell_data_format(table_id, 2, 1, DataFormat::Number(number))
+        .unwrap();
+    let number_bytes = number_editor.to_bytes().unwrap();
+    let mut expected_numeral = NumbersEditor::from_bytes(&number_bytes).unwrap();
+    super::cell_data_format::set_cell_data_format(
+        &mut expected_numeral.package,
+        table_id,
+        2,
+        1,
+        &DataFormat::NumeralSystem(numeral_system),
+    )
+    .unwrap();
+    let expected_numeral_bytes = expected_numeral.to_bytes().unwrap();
+
+    let mut numeral_editor = NumbersEditor::from_bytes(&number_bytes).unwrap();
+    numeral_editor
+        .set_table_cell_data_format(table_id, 2, 1, DataFormat::NumeralSystem(numeral_system))
+        .unwrap();
+    assert_eq!(numeral_editor.to_bytes().unwrap(), expected_numeral_bytes);
+    assert_eq!(
+        numeral_editor
+            .table_cell_data_format(table_id, 2, 1)
+            .unwrap(),
+        DataFormat::NumeralSystem(numeral_system)
+    );
+
+    let mut expected_number = numeral_editor.clone();
+    super::cell_data_format::set_cell_data_format(
+        &mut expected_number.package,
+        table_id,
+        2,
+        1,
+        &DataFormat::Number(number),
+    )
+    .unwrap();
+    let expected_number_bytes = expected_number.to_bytes().unwrap();
+    numeral_editor
+        .set_table_cell_data_format(table_id, 2, 1, DataFormat::Number(number))
+        .unwrap();
+    assert_eq!(numeral_editor.to_bytes().unwrap(), expected_number_bytes);
+    assert_eq!(
+        numeral_editor
+            .table_cell_data_format(table_id, 2, 1)
+            .unwrap(),
+        DataFormat::Number(number)
+    );
+}
+
+#[test]
+fn exact_control_numeral_system_conversions_keep_compatibility_writer() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_name("Control compatibility")
+        .table_dimensions(3, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap().remove(0).id();
+    editor
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Checkbox(Checkbox))
+        .unwrap();
+    let control_bytes = editor.to_bytes().unwrap();
+    let mut exact = NumbersEditor::from_bytes(&control_bytes).unwrap();
+    let numeral_system = NumeralSystem::new(
+        Base::HEXADECIMAL,
+        Places::Fixed(FixedPlaces::EIGHT),
+        NumeralSystemNegativeStyle::MinusSign,
+    )
+    .unwrap();
+    exact
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::NumeralSystem(numeral_system))
+        .unwrap();
+    assert_eq!(
+        exact.table_cell_data_format(table_id, 1, 1).unwrap(),
+        DataFormat::NumeralSystem(numeral_system)
+    );
+    let mut reopened = NumbersEditor::from_bytes(&exact.to_bytes().unwrap()).unwrap();
+    reopened
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Checkbox(Checkbox))
+        .unwrap();
+    assert_eq!(
+        reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
+        DataFormat::Checkbox(Checkbox)
+    );
 }
 
 #[test]
