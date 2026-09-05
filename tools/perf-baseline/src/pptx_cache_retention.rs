@@ -17,17 +17,17 @@ use serde::Serialize;
 use crate::process_metrics;
 
 const SCHEMA: &str = "pptx_cache_retention_v1";
-const CACHE_LIMIT_BYTES: usize = 64 * 1024 * 1024;
-const CACHE_LIMIT_ENTRIES: usize = 128;
-const MAX_SAMPLES: usize = 1_000;
-const MAX_WARMUP: usize = 1_000;
-const MAX_WRITE: u64 = 64 * 1024;
-const MIB: u64 = 1024 * 1024;
-const GIB: u64 = 1024 * MIB;
-const MEMORY_LIMIT: u64 = 512 * MIB;
-const IO_LIMIT: u64 = 8 * GIB;
-const OBJECT_LIMIT: u64 = 1_000_000;
-const DEPTH_LIMIT: u64 = 256;
+pub(super) const CACHE_LIMIT_BYTES: usize = 64 * 1024 * 1024;
+pub(super) const CACHE_LIMIT_ENTRIES: usize = 128;
+pub(super) const MAX_SAMPLES: usize = 1_000;
+pub(super) const MAX_WARMUP: usize = 1_000;
+pub(super) const MAX_WRITE: u64 = 64 * 1024;
+pub(super) const MIB: u64 = 1024 * 1024;
+pub(super) const GIB: u64 = 1024 * MIB;
+pub(super) const MEMORY_LIMIT: u64 = 512 * MIB;
+pub(super) const IO_LIMIT: u64 = 8 * GIB;
+pub(super) const OBJECT_LIMIT: u64 = 1_000_000;
+pub(super) const DEPTH_LIMIT: u64 = 256;
 
 const CACHE_SCOPE: &str = "content-free source-cache counters and gauges from the public PPTX diagnostics API; unavailable states are explicit; untimed evidence only with no latency, allocator, RSS, or cache-efficiency claim";
 const BUDGET_SCOPE: &str = "independent source and destination managed Budget roots; Memory and Objects are releasable gauges while InputBytes, OutputBytes, and Work are cumulative charges";
@@ -122,7 +122,7 @@ impl From<SourceCacheCounterDelta> for EventDelta {
 /// unavailable owner is represented by `null` fields rather than fabricated
 /// zero counters.  `availability` is the discriminator consumed by reports.
 #[derive(Clone, Debug, Serialize)]
-struct CachePoint {
+pub(super) struct CachePoint {
     availability: &'static str,
     unavailable_reason: Option<&'static str>,
     interval_label: Option<&'static str>,
@@ -158,7 +158,7 @@ struct CachePoint {
 }
 
 impl CachePoint {
-    fn unavailable(reason: &'static str) -> Self {
+    pub(super) fn unavailable(reason: &'static str) -> Self {
         Self {
             availability: "unavailable",
             unavailable_reason: Some(reason),
@@ -238,9 +238,9 @@ impl CachePoint {
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]
-struct BudgetPoint {
-    memory_used: u64,
-    memory_limit: u64,
+pub(super) struct BudgetPoint {
+    pub(super) memory_used: u64,
+    pub(super) memory_limit: u64,
     input_bytes_used: u64,
     input_bytes_limit: u64,
     output_bytes_used: u64,
@@ -253,7 +253,7 @@ struct BudgetPoint {
     depth_limit: u64,
 }
 
-fn budget_point(budget: &Budget) -> BudgetPoint {
+pub(super) fn budget_point(budget: &Budget) -> BudgetPoint {
     BudgetPoint {
         memory_used: budget.used(Resource::Memory),
         memory_limit: budget.limit(Resource::Memory),
@@ -299,14 +299,14 @@ impl ReadPoint {
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]
-struct RssPoint {
+pub(super) struct RssPoint {
     availability: &'static str,
     unavailable_reason: Option<&'static str>,
     rss_bytes: Option<u64>,
     vm_hwm_bytes: Option<u64>,
 }
 
-fn rss_point() -> RssPoint {
+pub(super) fn rss_point() -> RssPoint {
     match process_metrics::Snapshot::read() {
         Ok(snapshot) => RssPoint {
             availability: "available",
@@ -502,12 +502,12 @@ struct NearReport {
 }
 
 #[derive(Clone)]
-struct ManagedContext {
-    budget: Budget,
-    context: ExecutionContext,
+pub(super) struct ManagedContext {
+    pub(super) budget: Budget,
+    pub(super) context: ExecutionContext,
 }
 
-fn managed_context(scope: &'static str) -> Result<ManagedContext, Box<dyn Error>> {
+pub(super) fn managed_context(scope: &'static str) -> Result<ManagedContext, Box<dyn Error>> {
     managed_context_with_limits(scope, MEMORY_LIMIT, IO_LIMIT)
 }
 
@@ -732,7 +732,7 @@ fn validate_budget_gauges(
     Ok(())
 }
 
-fn cache_point(
+pub(super) fn cache_point(
     diagnostics: SourceCacheDiagnostics,
     previous: Option<SourceCacheDiagnostics>,
     budget: &Budget,
@@ -852,7 +852,7 @@ const REPEATED_DROP_RESULT_LABELS: [&str; 3] = ["drop_result_1", "drop_result_2"
 const REPEATED_DROP_PLAN_LABELS: [&str; 3] = ["drop_plan_1", "drop_plan_2", "drop_plan_3"];
 const REPEATED_DROP_SINK_LABELS: [&str; 3] = ["drop_sink_1", "drop_sink_2", "drop_sink_3"];
 
-fn validate_gates(
+pub(super) fn validate_gates(
     corpus: &crate::PptxSourceBackedCrossCopyCorpus,
 ) -> Result<crate::PptxSourceBackedCrossCopyLifecycleGateSummary, Box<dyn Error>> {
     let gates = corpus

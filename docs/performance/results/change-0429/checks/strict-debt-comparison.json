@@ -1,0 +1,97 @@
+{
+  "status": "pass",
+  "baseline_origin": "change-0428/checks/harness-strict-final.log.gz",
+  "baseline_original_sha256": "b5d2db72d5eb2c26189171fff99b00536e5695e4e1a7ef82f738f08e544f3b25",
+  "current_log": "checks/harness-strict-final.log",
+  "current_original_sha256": "db722f454041840d5e92ceed093c5bfa40936f78aa31d729c520b35a20d4dee5",
+  "unique_findings": 17,
+  "same_message_and_source_file_multiset": true,
+  "new_module_findings": 0,
+  "findings": [
+    {
+      "message": "a `Vec` of `Range` that is only one element",
+      "file": "src/lib.rs",
+      "count": 1
+    },
+    {
+      "message": "field assignment outside of initializer for an instance created with Default::default()",
+      "file": "src/docx_story_hyperlinks.rs",
+      "count": 1
+    },
+    {
+      "message": "manual implementation of `.is_multiple_of()`",
+      "file": "src/docx_story_hyperlinks.rs",
+      "count": 4
+    },
+    {
+      "message": "manual implementation of `.is_multiple_of()`",
+      "file": "src/lib.rs",
+      "count": 3
+    },
+    {
+      "message": "redundant field names in struct initialization",
+      "file": "src/filesystem.rs",
+      "count": 1
+    },
+    {
+      "message": "struct update has no effect, all the fields in the struct have already been specified",
+      "file": "src/operation_metrics.rs",
+      "count": 1
+    },
+    {
+      "message": "the following explicit lifetimes could be elided: 'a",
+      "file": "src/filesystem.rs",
+      "count": 1
+    },
+    {
+      "message": "the loop variable `repetition` is only used to index `outcomes`",
+      "file": "src/lib.rs",
+      "count": 2
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "file": "src/filesystem.rs",
+      "count": 3
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "file": "src/lib.rs",
+      "count": 3
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "file": "src/parallel_metrics.rs",
+      "count": 2
+    },
+    {
+      "message": "this `map_or` can be simplified",
+      "file": "src/lib.rs",
+      "count": 1
+    },
+    {
+      "message": "this method chain can be written more clearly with `if .. else ..`",
+      "file": "src/lib.rs",
+      "count": 1
+    },
+    {
+      "message": "this method chain can be written more clearly with `if .. else ..`",
+      "file": "src/xls_numeric.rs",
+      "count": 2
+    },
+    {
+      "message": "useless conversion to the same type: `std::io::Error`",
+      "file": "src/lib.rs",
+      "count": 1
+    },
+    {
+      "message": "useless conversion to the same type: `u64`",
+      "file": "src/lib.rs",
+      "count": 1
+    },
+    {
+      "message": "using `contains()` instead of `iter().any()` is more efficient",
+      "file": "src/filesystem.rs",
+      "count": 1
+    }
+  ]
+}

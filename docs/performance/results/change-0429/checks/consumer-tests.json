@@ -1,0 +1,49 @@
+{
+  "change": 429,
+  "argv": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "litchi-opc",
+    "-p",
+    "litchi-pptx",
+    "--all-features",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+  "driver_sha256": "fe045dd9f3e4128911a377dc44313bcd7ff33c8baf8ed0fb7b45cfcd43c9be9d",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace excluding tools",
+  "started_utc": "2026-09-05T23:21:53.963401+00:00",
+  "source_before": {
+    "path": "sources/dff4ac46351a372c19a0a7f7272a3276d354fc1d26163d783c2a4d21540d2b1b.json",
+    "sha256": "dff4ac46351a372c19a0a7f7272a3276d354fc1d26163d783c2a4d21540d2b1b",
+    "files": 6603
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T23:23:13.913975+00:00",
+  "source_after": {
+    "path": "sources/dff4ac46351a372c19a0a7f7272a3276d354fc1d26163d783c2a4d21540d2b1b.json",
+    "sha256": "dff4ac46351a372c19a0a7f7272a3276d354fc1d26163d783c2a4d21540d2b1b",
+    "files": 6603
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/consumer-tests.log",
+    "bytes": 132733,
+    "sha256": "1f6c30487d4236e0f162446c648e6d498156711a87c653888e178dda7e5db812"
+  },
+  "passed_tests": 1290,
+  "failed_tests": 0,
+  "ignored_tests": 3
+}

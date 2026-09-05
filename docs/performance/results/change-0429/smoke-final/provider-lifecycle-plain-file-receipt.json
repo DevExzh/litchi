@@ -1,0 +1,24 @@
+{
+  "name": "provider-lifecycle-plain-file",
+  "argv": [
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+    "provider-lifecycle",
+    "--corpus",
+    "plain",
+    "--provider",
+    "file",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--source-revision",
+    "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/smoke-final/provider-lifecycle-plain-file.json"
+  ],
+  "exit_code": 0,
+  "status": "pass",
+  "output_sha256": "bb11f5cf73fc6a5dd49add7a027fb3196ab8fe46db403b1e00a6b7336603626e",
+  "existing_output_preserved": true,
+  "existing_output_exit_code": 1
+}

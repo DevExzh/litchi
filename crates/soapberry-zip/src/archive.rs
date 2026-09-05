@@ -2327,23 +2327,34 @@ where
     /// buffer to parse entry headers.
     #[inline]
     pub fn next_entry(&mut self) -> Result<Option<ZipFileHeaderRecord<'_>>, Error> {
-        if self.pos + ZipFileHeaderFixed::SIZE >= self.end {
+        let remaining = self.end - self.pos;
+        if remaining < ZipFileHeaderFixed::SIZE {
             if self.offset >= self.central_dir_end_pos {
-                return Ok(None);
+                return if remaining == 0 {
+                    Ok(None)
+                } else {
+                    Err(Error::from(ErrorKind::Eof))
+                };
             }
 
-            let remaining = self.end - self.pos;
             self.buffer.copy_within(self.pos..self.end, 0);
             let remaining_central = self
                 .central_dir_end_pos
                 .checked_sub(self.offset)
                 .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+            // A short positional read may already have buffered part of the
+            // next fixed header. Refill only its missing bytes, and never
+            // mistake a truncated directory tail for normal exhaustion.
+            let required = ZipFileHeaderFixed::SIZE - remaining;
+            if remaining_central < required as u64 {
+                return Err(Error::from(ErrorKind::Eof));
+            }
             let max_read = usize::try_from(remaining_central)
                 .unwrap_or(usize::MAX)
                 .min(self.buffer.len().saturating_sub(remaining));
             let read = self.archive.reader.read_at_least_at(
                 &mut self.buffer[remaining..][..max_read],
-                ZipFileHeaderFixed::SIZE,
+                required,
                 self.offset,
             )?;
             self.offset += read as u64;

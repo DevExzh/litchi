@@ -1,0 +1,24 @@
+{
+  "name": "provider-lifecycle-media-rich-bytes",
+  "argv": [
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "bytes",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--source-revision",
+    "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/smoke-final/provider-lifecycle-media-rich-bytes.json"
+  ],
+  "exit_code": 0,
+  "status": "pass",
+  "output_sha256": "143ffe05438c2c66daefb958fa4ce79a7e5e5bbee66cba3f161dbb3ab72313f4",
+  "existing_output_preserved": true,
+  "existing_output_exit_code": 1
+}

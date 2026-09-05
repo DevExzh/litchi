@@ -1,0 +1,28 @@
+{
+  "name": "provider-lifecycle-media-rich-short-range",
+  "argv": [
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "range",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--source-revision",
+    "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/smoke-final/provider-lifecycle-media-rich-short-range.json",
+    "--max-range",
+    "4096",
+    "--delay-us",
+    "0"
+  ],
+  "exit_code": 0,
+  "status": "pass",
+  "output_sha256": "180dca03b299eed93b582ba30851b1752f33de4080fa3de01d9e9d38540f9a38",
+  "existing_output_preserved": true,
+  "existing_output_exit_code": 1
+}

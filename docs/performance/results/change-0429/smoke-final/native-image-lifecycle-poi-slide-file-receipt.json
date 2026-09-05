@@ -1,0 +1,24 @@
+{
+  "name": "native-image-lifecycle-poi-slide-file",
+  "argv": [
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+    "native-image-lifecycle",
+    "--fixture",
+    "poi-slide",
+    "--provider",
+    "file",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--source-revision",
+    "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/smoke-final/native-image-lifecycle-poi-slide-file.json"
+  ],
+  "exit_code": 0,
+  "status": "pass",
+  "output_sha256": "ce86f498544e48799d1307c90c6965588877a79de223a1888ff0523af3eb740f",
+  "existing_output_preserved": true,
+  "existing_output_exit_code": 1
+}
