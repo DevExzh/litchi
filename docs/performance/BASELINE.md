@@ -1,5 +1,28 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0413: exact CFB scratch reservation
+
+[0413](changes/0413-cfb-chain-scratch-reservation.md) removes a redundant
+per-sector reservation check after the CFB collector's existing fallible exact
+reservation. The scoped warm XLS ABBA comparison covers nine matched
+open/list/one-cell workflows. Plain-source p50 improves 1.65–3.18% across
+paired comparisons; eager p50 improves 6.95–8.54%. All nine selectors pass the
+p50/mean/p95/p99 direction and drift policy. Allocation counts/bytes and
+logical source I/O remain unchanged.
+
+The few-large CFB open guard is about 3% slower. An initial p99 +5.02% review
+trigger led to a retained follow-up with p99 +3.40%/+3.03%; both original and
+follow-up evidence remain visible. No CFB speedup is claimed. All paired peak
+RSS changes remain below 0.4%. The private change passes 4,004 legacy-format
+tests and 305 CFB default-feature tests/doctests. Six unchanged Rust 1.98
+Clippy chunk-iteration findings require a command-scoped lint exemption.
+
+The strict registry now contains eight claims; `claim-0413-cfb-chain-scratch`
+is limited to the documented corpus, machine, builds and warm serial lifecycle.
+The residual profile still identifies mandatory CFB chain/FAT/ownership work;
+remaining dynamic helper callers require attribution before another change.
+The complete non-iWork goal remains open.
+
 ## Change 0412: XLS observer isolation and plain-source baseline
 
 Change [0412](changes/0412-xls-observer-isolation.md) at committed revision

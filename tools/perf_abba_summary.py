@@ -358,6 +358,51 @@ FIXED_CASE_CORPUS_IDENTITIES: dict[str, dict[str, Any]] = {
         "generator": "litchi-xls-rk-mulrk-publication-v1",
         "shape": "one-rk-one-mulrk",
     },
+    "xls_semantic_open": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+    },
+    "xls_source_backed_open": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+    },
+    "xls_eager_open_list_worksheets": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+    },
+    "xls_source_backed_open_list_worksheets": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+    },
+    "xls_eager_open_one_cell": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+    },
+    "xls_source_backed_open_one_cell": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+    },
+    "xls_owned_source_open": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+    },
+    "xls_owned_source_open_list_worksheets": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+    },
+    "xls_owned_source_open_one_cell": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+    },
     DOCX_SECTION_LAYOUT_CASE: DOCX_SECTION_LAYOUT_FIXED_CORPUS_FIELDS,
 }
 
@@ -1649,6 +1694,13 @@ def _operation_metrics_identity(
         except perf_compare.ComparisonInputError as error:
             raise AbbaSummaryInputError(str(error)) from error
     projected = _operation_metrics_identity_projection(operation_metrics)
+    if (
+        row.get("case") in XLS_LIFECYCLE_CASE_CONTRACTS
+        and row.get("corpus") == XLS_NUMERIC_CORPUS_CONTRACTS["Number"]
+        and operation_metrics.get("alignment")
+        == "elapsed_ns.samples_by_elapsed_then_sample_index"
+    ):
+        projected["sample_indices"] = "<permutation>"
     return _canonical_json(projected, f"{location}.operation_metrics.identity")
 
 
@@ -2939,6 +2991,7 @@ def _validate_report(
     _validate_opc_source_overlay_result_rows(indexed, configuration, label)
     _validate_docx_section_layout_result_rows(indexed, configuration, label)
     _validate_doc_owner_public_phases_result_rows(indexed, configuration, label)
+    _validate_xls_lifecycle_source_summary(indexed, label)
     _validate_xls_numeric_source_summary(indexed, label)
     _validate_xls_numeric_operation_evidence(
         indexed,
@@ -4723,6 +4776,114 @@ XLS_NUMERIC_CORPUS_CONTRACTS = {
         "xlsx": None,
     },
 }
+# These read-only XLS selectors use the same fixed Number corpus as the native
+# edit/save selectors above.  Keep their lifecycle contract separate: the
+# numeric validator below intentionally remains limited to the six native
+# edit/save selectors and their operation evidence envelope.
+XLS_LIFECYCLE_CASE_CONTRACTS: dict[str, dict[str, Any]] = {
+    "xls_semantic_open": {
+        "implementation": "eager",
+        "operation": "open",
+        "source_backed": False,
+    },
+    "xls_source_backed_open": {
+        "implementation": "source-backed",
+        "operation": "open",
+        "source_backed": True,
+    },
+    "xls_eager_open_list_worksheets": {
+        "implementation": "eager",
+        "operation": "open+list",
+        "source_backed": False,
+    },
+    "xls_source_backed_open_list_worksheets": {
+        "implementation": "source-backed",
+        "operation": "open+list",
+        "source_backed": True,
+    },
+    "xls_eager_open_one_cell": {
+        "implementation": "eager",
+        "operation": "open+one-cell",
+        "source_backed": False,
+    },
+    "xls_source_backed_open_one_cell": {
+        "implementation": "source-backed",
+        "operation": "open+one-cell",
+        "source_backed": True,
+    },
+    "xls_owned_source_open": {
+        "implementation": "owned-source",
+        "operation": "open",
+        "source_backed": False,
+    },
+    "xls_owned_source_open_list_worksheets": {
+        "implementation": "owned-source",
+        "operation": "open+list",
+        "source_backed": False,
+    },
+    "xls_owned_source_open_one_cell": {
+        "implementation": "owned-source",
+        "operation": "open+one-cell",
+        "source_backed": False,
+    },
+}
+XLS_LIFECYCLE_OUTPUT_CONTRACTS = {
+    "open": XLS_NUMERIC_CORPUS_CONTRACTS["Number"]["archive_sha256"],
+    "open+list": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505",
+    "open+one-cell": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1",
+}
+XLS_LIFECYCLE_SOURCE_COUNTER_SCOPE = (
+    "caller-provided ReadAt logical ranges: XLS classification catalog v2 "
+    "(sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; "
+    "repeated-read union disabled); actual CFB metadata versus opaque payload"
+)
+XLS_LIFECYCLE_MATERIALIZATION_SCOPE = (
+    "complete archive only; parser-owned Workbook globals/SST are materialized "
+    "but not counted"
+)
+XLS_LIFECYCLE_SOURCE_ROOT_KEYS = frozenset(
+    {
+        "read_calls",
+        "read_bytes",
+        "ordinary_payload_read_calls",
+        "ordinary_payload_read_bytes",
+        "max_in_flight_reads",
+        "xls",
+    }
+)
+XLS_LIFECYCLE_SOURCE_XLS_SCALAR_KEYS = frozenset(
+    {
+        "implementation",
+        "operation",
+        "timing_scope",
+        "source_counter_scope",
+        "materialization_scope",
+        "archive_sha256",
+        "workbook_stream_sha256",
+    }
+)
+XLS_LIFECYCLE_SOURCE_XLS_VECTOR_KEYS = frozenset(
+    {
+        "source_retained_bytes",
+        "complete_archive_materialized_bytes",
+        "parsed_sheet_counts",
+        "parsed_cell_counts",
+        "source_version_checks",
+        "source_version_stability_verified",
+        "cfb_structural_read_calls",
+        "cfb_structural_read_bytes",
+        "workbook_global_read_calls",
+        "workbook_global_read_bytes",
+        "selected_worksheet_read_calls",
+        "selected_worksheet_read_bytes",
+        "unselected_worksheet_read_calls",
+        "unselected_worksheet_read_bytes",
+        "opaque_payload_read_calls",
+        "opaque_payload_read_bytes",
+        "open_reads_zero_worksheet_payload",
+        "selected_query_reads_only_selected_worksheet",
+    }
+)
 XLS_NUMERIC_WORKBOOK_SIZE_CONTRACTS = {
     "Number": {"source_workbook_bytes": 80_946, "target_workbook_bytes": 80_946},
     "RK+MulRK": {"source_workbook_bytes": 1_665, "target_workbook_bytes": 1_665},
@@ -4929,6 +5090,252 @@ def _validate_xls_numeric_sample_order(
     return sample_values, order_values
 
 
+def _validate_xls_lifecycle_vector(
+    value: Any,
+    location: str,
+    sample_count: int,
+    *,
+    boolean: bool = False,
+    positive: bool = False,
+    exact: int | None = None,
+) -> list[Any]:
+    if not isinstance(value, list) or len(value) != sample_count:
+        raise AbbaSummaryInputError(
+            f"{location} must be a list with {sample_count} samples"
+        )
+    for index, item in enumerate(value):
+        item_location = f"{location}[{index}]"
+        if boolean:
+            if not isinstance(item, bool):
+                raise AbbaSummaryInputError(f"{item_location} must be a boolean")
+        else:
+            number = _u64(item, item_location, positive=positive)
+            if exact is not None and number != exact:
+                raise AbbaSummaryInputError(
+                    f"{location} must contain only {exact}"
+                )
+    return value
+
+
+def _validate_xls_lifecycle_source_summary(
+    indexed: Mapping[tuple[str, str], dict[str, Any]], label: str
+) -> None:
+    """Validate the nine fixed XLS lifecycle selectors.
+
+    These selectors intentionally share the exact fixed Number corpus with
+    the native numeric edit/save selectors, but their source observer is the
+    XLS classification-catalog v2 envelope rather than ``xls_numeric``
+    operation evidence.  Keep this validator independent so the stricter
+    native numeric contract cannot be weakened to admit lifecycle rows.
+    """
+
+    expected_corpus = XLS_NUMERIC_CORPUS_CONTRACTS["Number"]
+    archive_sha256 = expected_corpus["archive_sha256"]
+    workbook_sha256 = expected_corpus["target_payload_sha256"]
+    archive_bytes = expected_corpus["archive_bytes"]
+    source_xls_scalar_keys = XLS_LIFECYCLE_SOURCE_XLS_SCALAR_KEYS
+    source_xls_vector_keys = XLS_LIFECYCLE_SOURCE_XLS_VECTOR_KEYS
+    source_root_keys = XLS_LIFECYCLE_SOURCE_ROOT_KEYS
+
+    for (case, _corpus_identity), row in indexed.items():
+        contract = XLS_LIFECYCLE_CASE_CONTRACTS.get(case)
+        if contract is None:
+            continue
+        location = f"{label}.{case}"
+        corpus = _require_object(row.get("corpus"), f"{location}.corpus")
+        # ``xls_semantic_open`` predates this fixed lifecycle matrix and may
+        # still be used with a separately declared semantic corpus.  Preserve
+        # that legacy path for this selector only; a same-marker mutation is
+        # rejected by the exact manifest check below.
+        lifecycle_marker = (
+            corpus.get("name") == XLS_NUMERIC_CORPUS_CONTRACTS["Number"]["name"]
+            and corpus.get("generator")
+            == XLS_NUMERIC_CORPUS_CONTRACTS["Number"]["generator"]
+        )
+        if case == "xls_semantic_open" and not lifecycle_marker:
+            continue
+        if corpus != expected_corpus:
+            raise AbbaSummaryInputError(
+                f"{location}.corpus does not match the exact XLS lifecycle Number corpus manifest"
+            )
+        output_sha256 = _validate_output_sha256(
+            row.get("output_sha256"), f"{location}.output_sha256"
+        )
+        expected_output_sha256 = XLS_LIFECYCLE_OUTPUT_CONTRACTS[
+            contract["operation"]
+        ]
+        if output_sha256 != expected_output_sha256:
+            raise AbbaSummaryInputError(
+                f"{location}.output_sha256 does not match the exact XLS lifecycle output"
+            )
+        sink = row.get("sink", _MISSING)
+        if sink is not _MISSING and sink is not None:
+            raise AbbaSummaryInputError(
+                f"{location}.sink must be null for a read-only XLS lifecycle selector"
+            )
+
+        elapsed = _require_object(row.get("elapsed_ns"), f"{location}.elapsed_ns")
+        elapsed_samples = elapsed.get("samples")
+        if not isinstance(elapsed_samples, list):
+            raise AbbaSummaryInputError(f"{location}.elapsed_ns.samples must be a list")
+        sample_count = len(elapsed_samples)
+        if sample_count < MIN_RETAINED_SAMPLES:
+            raise AbbaSummaryInputError(
+                f"{location}.elapsed_ns.samples must contain at least {MIN_RETAINED_SAMPLES} samples"
+            )
+        _validate_xls_numeric_sample_order(
+            elapsed, f"{location}.elapsed_ns", sample_count
+        )
+
+        source = row.get("source", _MISSING)
+        if not contract["source_backed"]:
+            if source is not _MISSING and source is not None:
+                raise AbbaSummaryInputError(
+                    f"{location}.source must be omitted or null for a non-source XLS lifecycle selector"
+                )
+            continue
+
+        source_object = _require_object(source, f"{location}.source")
+        if set(source_object) != source_root_keys:
+            raise AbbaSummaryInputError(
+                f"{location}.source keys mismatch: expected {sorted(source_root_keys)}"
+            )
+        for field in (
+            "read_calls",
+            "read_bytes",
+            "ordinary_payload_read_calls",
+            "ordinary_payload_read_bytes",
+            "max_in_flight_reads",
+        ):
+            _validate_xls_lifecycle_vector(
+                source_object.get(field),
+                f"{location}.source.{field}",
+                sample_count,
+                positive=field in {"read_calls", "read_bytes", "max_in_flight_reads"},
+            )
+
+        xls = _require_object(source_object.get("xls"), f"{location}.source.xls")
+        if set(xls) != source_xls_scalar_keys | source_xls_vector_keys:
+            raise AbbaSummaryInputError(
+                f"{location}.source.xls keys mismatch: expected "
+                f"{sorted(source_xls_scalar_keys | source_xls_vector_keys)}"
+            )
+        if xls["implementation"] != contract["implementation"]:
+            raise AbbaSummaryInputError(
+                f"{location}.source.xls.implementation disagrees with selector"
+            )
+        operation = contract["operation"]
+        if xls["operation"] != operation or xls["timing_scope"] != operation:
+            raise AbbaSummaryInputError(
+                f"{location}.source.xls operation/timing scope disagrees with selector"
+            )
+        if xls["source_counter_scope"] != XLS_LIFECYCLE_SOURCE_COUNTER_SCOPE:
+            raise AbbaSummaryInputError(
+                f"{location}.source.xls.source_counter_scope is not XLS classification catalog v2"
+            )
+        if xls["materialization_scope"] != XLS_LIFECYCLE_MATERIALIZATION_SCOPE:
+            raise AbbaSummaryInputError(
+                f"{location}.source.xls.materialization_scope is not the fixed lifecycle scope"
+            )
+        if xls["archive_sha256"] != archive_sha256:
+            raise AbbaSummaryInputError(
+                f"{location}.source.xls.archive_sha256 does not match corpus"
+            )
+        if xls["workbook_stream_sha256"] != workbook_sha256:
+            raise AbbaSummaryInputError(
+                f"{location}.source.xls.workbook_stream_sha256 does not match corpus"
+            )
+
+        one_cell = operation == "open+one-cell"
+        exact_zero_fields = {
+            "complete_archive_materialized_bytes",
+            "unselected_worksheet_read_calls",
+            "unselected_worksheet_read_bytes",
+            "opaque_payload_read_calls",
+            "opaque_payload_read_bytes",
+        }
+        exact_archive_fields = {"source_retained_bytes"}
+        exact_two_fields = {"parsed_sheet_counts"}
+        exact_cells = 1 if one_cell else 0
+        for field in source_xls_vector_keys:
+            vector = xls[field]
+            if field == "source_version_stability_verified":
+                _validate_xls_lifecycle_vector(
+                    vector,
+                    f"{location}.source.xls.{field}",
+                    sample_count,
+                    boolean=True,
+                )
+                if vector != [True] * sample_count:
+                    raise AbbaSummaryInputError(
+                        f"{location}.source.xls.{field} must prove stable source versions"
+                    )
+            elif field in {"open_reads_zero_worksheet_payload", "selected_query_reads_only_selected_worksheet"}:
+                _validate_xls_lifecycle_vector(
+                    vector,
+                    f"{location}.source.xls.{field}",
+                    sample_count,
+                    boolean=True,
+                )
+                expected = (not one_cell) if field == "open_reads_zero_worksheet_payload" else one_cell
+                if vector != [expected] * sample_count:
+                    raise AbbaSummaryInputError(
+                        f"{location}.source.xls.{field} disagrees with operation locality"
+                    )
+            elif field in exact_archive_fields:
+                _validate_xls_lifecycle_vector(
+                    vector,
+                    f"{location}.source.xls.{field}",
+                    sample_count,
+                    positive=True,
+                    exact=archive_bytes,
+                )
+            elif field in exact_zero_fields:
+                _validate_xls_lifecycle_vector(
+                    vector,
+                    f"{location}.source.xls.{field}",
+                    sample_count,
+                    exact=0,
+                )
+            elif field in exact_two_fields:
+                _validate_xls_lifecycle_vector(
+                    vector,
+                    f"{location}.source.xls.{field}",
+                    sample_count,
+                    positive=True,
+                    exact=2,
+                )
+            elif field == "parsed_cell_counts":
+                _validate_xls_lifecycle_vector(
+                    vector,
+                    f"{location}.source.xls.{field}",
+                    sample_count,
+                    exact=exact_cells,
+                )
+            elif field in {"selected_worksheet_read_calls", "selected_worksheet_read_bytes"}:
+                _validate_xls_lifecycle_vector(
+                    vector,
+                    f"{location}.source.xls.{field}",
+                    sample_count,
+                    positive=one_cell,
+                    exact=None if one_cell else 0,
+                )
+            else:
+                _validate_xls_lifecycle_vector(
+                    vector,
+                    f"{location}.source.xls.{field}",
+                    sample_count,
+                    positive=field
+                    in {
+                        "source_version_checks",
+                        "cfb_structural_read_calls",
+                        "cfb_structural_read_bytes",
+                        "workbook_global_read_calls",
+                        "workbook_global_read_bytes",
+                    },
+                )
+
+
 def _validate_xls_numeric_source_summary(
     indexed: Mapping[tuple[str, str], dict[str, Any]], label: str
 ) -> None:
@@ -4937,6 +5344,7 @@ def _validate_xls_numeric_source_summary(
     allowed_keys = XLS_NUMERIC_SOURCE_COMMON_KEYS | XLS_NUMERIC_SOURCE_OPTIONAL_KEYS
     for (case, corpus_identity), row in indexed.items():
         is_native_selector = case in XLS_NUMERIC_CASE_CONTRACTS
+        is_lifecycle_selector = case in XLS_LIFECYCLE_CASE_CONTRACTS
         corpus_value = row.get("corpus")
         native_corpus_family = next(
             (
@@ -4946,7 +5354,15 @@ def _validate_xls_numeric_source_summary(
             ),
             None,
         )
-        if native_corpus_family is not None and not is_native_selector:
+        lifecycle_number_corpus = (
+            is_lifecycle_selector
+            and corpus_value == XLS_NUMERIC_CORPUS_CONTRACTS["Number"]
+        )
+        if (
+            native_corpus_family is not None
+            and not is_native_selector
+            and not lifecycle_number_corpus
+        ):
             raise AbbaSummaryInputError(
                 f"{label}.{case}.corpus is a native XLS numeric corpus but the selector is not native"
             )

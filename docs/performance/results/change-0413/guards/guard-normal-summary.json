@@ -1,0 +1,607 @@
+{
+  "environment": {
+    "legs": {
+      "a1": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": null,
+        "git_revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      },
+      "a2": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": null,
+        "git_revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      },
+      "b1": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": null,
+        "git_revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      },
+      "b2": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": null,
+        "git_revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      }
+    },
+    "stable": {
+      "allocator": "Rust system allocator",
+      "cargo_build_target": null,
+      "cpu_affinity": "2",
+      "cpu_model": "AMD EPYC 9R45",
+      "filesystem_type": null,
+      "git_worktree_dirty": false,
+      "kernel": "Linux 7.0.0-1011-aws",
+      "logical_cpus_available": 1,
+      "os": "linux",
+      "page_size_bytes": 4096,
+      "perf_event_paranoid": "1",
+      "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+      "source_destination_same_device": null,
+      "storage_identifier": null,
+      "total_memory_bytes": 132553797632
+    }
+  },
+  "harness_identity": {
+    "configuration": {
+      "cases": [
+        "cfb_open"
+      ],
+      "corpus_shapes": [
+        "tiny",
+        "few-large"
+      ],
+      "execution_workers": [
+        1
+      ],
+      "filesystem_cache_states": [
+        "warm"
+      ],
+      "filesystem_fresh_child_per_sample": true,
+      "filesystem_process_isolated": true,
+      "filesystem_root_selected": false,
+      "opc_cache_lock_diagnostics": false,
+      "payload_kinds": [
+        "incompressible"
+      ],
+      "range_simulation": {
+        "bandwidth_bytes_per_second": 52428800,
+        "fixed_latency_us": 100,
+        "max_physical_range_bytes": 4096,
+        "request_overhead_us": 25
+      },
+      "rtf_variants": [
+        "plain"
+      ],
+      "samples_per_case": 1000,
+      "semantic_shapes": [
+        "tiny",
+        "medium",
+        "large"
+      ],
+      "warmup_iterations_per_case": 50,
+      "writer_shapes": [
+        "tiny",
+        "large",
+        "payload-heavy"
+      ],
+      "xlsb_shapes": [
+        "tiny",
+        "medium",
+        "large",
+        "sparse"
+      ],
+      "xlsx_cell_crud_shapes": [
+        "medium",
+        "dense-sparse"
+      ],
+      "xlsx_row_visibility_shapes": [
+        "medium",
+        "large"
+      ],
+      "xlsx_shapes": [
+        "tiny",
+        "medium",
+        "dense-wide"
+      ]
+    },
+    "schema_version": 1,
+    "tool": {
+      "binary": "litchi-perf-baseline",
+      "instrumentation": "none",
+      "name": "litchi-perf-baseline",
+      "profile": "release",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "version": "0.1.0"
+    }
+  },
+  "implementation_identity": {
+    "candidate": {
+      "binary_identity": {
+        "binary_bytes": 449703584,
+        "binary_sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline",
+        "profile": "release"
+      },
+      "binary_sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550",
+      "git_revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+      "legs": [
+        "b1",
+        "b2"
+      ]
+    },
+    "control": {
+      "binary_identity": {
+        "binary_bytes": 449717472,
+        "binary_sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline",
+        "profile": "release"
+      },
+      "binary_sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e",
+      "git_revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+      "legs": [
+        "a1",
+        "a2"
+      ]
+    },
+    "distinct": true
+  },
+  "protocol": {
+    "dispersion": "sample standard deviation via Rust Welford update",
+    "drift_ceiling_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "percentiles": "p50 = Rust u64 floor midpoint; p95/p99 = integer nearest-rank",
+    "statistics": [
+      "p50",
+      "mean",
+      "p95",
+      "p99"
+    ],
+    "uncertainty": "95% two-sided Student's t interval for the mean; embedded harness critical-value table with Cornish-Fisher tail"
+  },
+  "report_identity": {
+    "a1": {
+      "canonical_sha256": "0fafc53ccc7733328ce9994b90a0f8c5eff7976e5d0ce1bc7fd29da4d1ceb7f7"
+    },
+    "a2": {
+      "canonical_sha256": "e63b33ab5d550f93d1f003b71ffb24d12da85e0d2564d6ac3d4405926661ce18"
+    },
+    "b1": {
+      "canonical_sha256": "ef2e9d8e425af18e77a69f68f7bb93b053f1044389eb4952a3caf44b5c7f8fe4"
+    },
+    "b2": {
+      "canonical_sha256": "26b4681c529498988d2f3987bbebb06e479d3e2051ce87c598030fe97391313f"
+    }
+  },
+  "results": [
+    {
+      "case": "cfb_open",
+      "corpus": {
+        "archive_bytes": 16912384,
+        "archive_member_count": 4,
+        "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+        "compression": "none",
+        "entry_bytes": 4194304,
+        "entry_count": 4,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-few-large-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark_stream_00003.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+        "uncompressed_payload_bytes": 16777216,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": -3.1947135786868017,
+            "p50": -2.868877395801643,
+            "p95": -2.8947043937267702,
+            "p99": -5.018873850556328
+          },
+          "a2_to_b2": {
+            "mean": -3.0075221274318276,
+            "p50": -2.7573919314469943,
+            "p95": -2.6542152259211393,
+            "p99": -2.802477712168577
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 164815.12134907066,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 165106.97465092942
+            },
+            "max": 180090,
+            "mean": 164961.04800000004,
+            "min": 162371,
+            "p50": 164350,
+            "p95": 170311,
+            "p99": 171931,
+            "sample_count": 1000,
+            "standard_deviation": 2351.5815030020362
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 165563.5383025383,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 165852.01169746168
+            },
+            "max": 175181,
+            "mean": 165707.775,
+            "min": 163100,
+            "p50": 165011,
+            "p95": 171011,
+            "p99": 172740,
+            "sample_count": 1000,
+            "standard_deviation": 2324.34820949315
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 170061.25037710782,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 170400.91162289237
+            },
+            "max": 196790,
+            "mean": 170231.0810000001,
+            "min": 168631,
+            "p50": 169065,
+            "p95": 175241,
+            "p99": 180560,
+            "sample_count": 1000,
+            "standard_deviation": 2736.789674081484
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 170483.92899388424,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 170899.01700611564
+            },
+            "max": 246691,
+            "mean": 170691.47299999994,
+            "min": 168911,
+            "p50": 169561,
+            "p95": 175550,
+            "p99": 177581,
+            "sample_count": 1000,
+            "standard_deviation": 3344.534002063948
+          }
+        },
+        "rejected_statistics": {
+          "mean": "candidate is not lower in both paired directions",
+          "p50": "candidate is not lower in both paired directions",
+          "p95": "candidate is not lower in both paired directions",
+          "p99": "candidate is not lower in both paired directions"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": 0.2704511992142297,
+            "p50": 0.29337828645787123,
+            "p95": 0.17632859890094213,
+            "p99": -1.6498670801949489
+          },
+          "control": {
+            "mean": 0.45266868091184476,
+            "p50": 0.40219044721630665,
+            "p95": 0.4110127942411236,
+            "p99": 0.47053759938580014
+          }
+        },
+        "sample_count": 1000
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":16912384,\"archive_member_count\":4,\"archive_sha256\":\"4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa\",\"compression\":\"none\",\"entry_bytes\":4194304,\"entry_count\":4,\"generator\":\"litchi-cfb-synthetic-v1\",\"name\":\"cfb-few-large-incompressible\",\"package_format\":\"CFB/OLE2\",\"payload_kind\":\"incompressible\",\"shape\":\"few-large\",\"target_entry\":\"benchmark_stream_00003.bin\",\"target_payload_bytes\":4194304,\"target_payload_sha256\":\"57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706\",\"uncompressed_payload_bytes\":16777216,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": null,
+        "source_present": false,
+        "source_status": "consistently_absent"
+      },
+      "output_sha256": null,
+      "shape": "few-large",
+      "sink": null,
+      "source": null
+    },
+    {
+      "case": "cfb_open",
+      "corpus": {
+        "archive_bytes": 3584,
+        "archive_member_count": 3,
+        "archive_sha256": "186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+        "compression": "none",
+        "entry_bytes": 512,
+        "entry_count": 3,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-tiny-incompressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "incompressible",
+        "shape": "tiny",
+        "target_entry": "benchmark_stream_00002.bin",
+        "target_payload_bytes": 512,
+        "target_payload_sha256": "df355b60021f82a84ec1ca06edcf7aea64a5272388c4eed239562fd63d3fceb3",
+        "uncompressed_payload_bytes": 1536,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": 6.816426320652166,
+            "p50": 1.098901098901099,
+            "p95": 0.36101083032490977,
+            "p99": 0.0
+          },
+          "a2_to_b2": {
+            "mean": -0.5652662095319982,
+            "p50": -0.36900369003690037,
+            "p95": -0.36231884057971014,
+            "p99": -0.3597122302158274
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": false,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 2572.06236555981,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 3290.0416344401956
+            },
+            "max": 185151,
+            "mean": 2931.052000000003,
+            "min": 2650,
+            "p50": 2730,
+            "p95": 2770,
+            "p99": 2800,
+            "sample_count": 1000,
+            "standard_deviation": 5785.052824432762
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 2702.0859594837743,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 2743.1360405162263
+            },
+            "max": 11150,
+            "mean": 2722.6110000000003,
+            "min": 2630,
+            "p50": 2710,
+            "p95": 2760,
+            "p99": 2780,
+            "sample_count": 1000,
+            "standard_deviation": 330.7573038846959
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 2705.45190900555,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 2757.0660909944518
+            },
+            "max": 12200,
+            "mean": 2731.259000000001,
+            "min": 2630,
+            "p50": 2700,
+            "p95": 2760,
+            "p99": 2800,
+            "sample_count": 1000,
+            "standard_deviation": 415.87658897352736
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 2716.201106121677,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 2759.800893878326
+            },
+            "max": 11370,
+            "mean": 2738.0010000000016,
+            "min": 2650,
+            "p50": 2720,
+            "p95": 2770,
+            "p99": 2790,
+            "sample_count": 1000,
+            "standard_deviation": 351.3013345073237
+          }
+        },
+        "rejected_statistics": {
+          "mean": "paired directions disagree; control drift -7.111474% exceeds 5% ceiling",
+          "p50": "paired directions disagree",
+          "p95": "paired directions disagree",
+          "p99": "candidate is not lower in both paired directions"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": 0.24684586851707002,
+            "p50": 0.7407407407407408,
+            "p95": 0.36231884057971014,
+            "p99": -0.35714285714285715
+          },
+          "control": {
+            "mean": -7.111473969073299,
+            "p50": -0.7326007326007326,
+            "p95": -0.36101083032490977,
+            "p99": -0.7142857142857143
+          }
+        },
+        "sample_count": 1000
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":3584,\"archive_member_count\":3,\"archive_sha256\":\"186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8\",\"compression\":\"none\",\"entry_bytes\":512,\"entry_count\":3,\"generator\":\"litchi-cfb-synthetic-v1\",\"name\":\"cfb-tiny-incompressible\",\"package_format\":\"CFB/OLE2\",\"payload_kind\":\"incompressible\",\"shape\":\"tiny\",\"target_entry\":\"benchmark_stream_00002.bin\",\"target_payload_bytes\":512,\"target_payload_sha256\":\"df355b60021f82a84ec1ca06edcf7aea64a5272388c4eed239562fd63d3fceb3\",\"uncompressed_payload_bytes\":1536,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": null,
+        "source_present": false,
+        "source_status": "consistently_absent"
+      },
+      "output_sha256": null,
+      "shape": "tiny",
+      "sink": null,
+      "source": null
+    }
+  ],
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-abba-summary",
+    "version": "0.1.0"
+  },
+  "verification": {
+    "binary_hashes_distinct": true,
+    "binary_identity_verified": true,
+    "case_corpus_identity_verified": true,
+    "configuration_identity_verified": true,
+    "environment_legs_recorded": true,
+    "environment_stable_identity_verified": true,
+    "filesystem_evidence_identity_verified": true,
+    "operation_metrics_identity": {
+      "consistently_absent": 2,
+      "verified_equal": 0
+    },
+    "output_sha256_identity": {
+      "consistently_absent": 2,
+      "verified_equal": 0
+    },
+    "output_sha256_identity_verified": false,
+    "result_count": 2,
+    "sink_identity": {
+      "consistently_absent": 2,
+      "verified_equal": 0
+    },
+    "sink_identity_verified": false,
+    "source_identity": {
+      "consistently_absent": 2,
+      "verified_equal": 0
+    },
+    "source_identity_verified": false,
+    "statistics_recomputed_from_samples": true,
+    "tool_identity_verified": true
+  }
+}

@@ -1,0 +1,1290 @@
+{
+  "identities": {
+    "candidate": {
+      "artifact": {
+        "bytes": 4988,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/checks/candidate-build-identity.json",
+        "sha256": "771b21306a4dbefed9eafa259d4586bcbae27df5700b59b55f6940a954c42bc1"
+      },
+      "binaries": {
+        "litchi-perf-baseline": {
+          "bytes": 449703584,
+          "sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550"
+        },
+        "litchi-perf-baseline-alloc": {
+          "bytes": 449707528,
+          "sha256": "aacf8554cab913a1b82b04d3316682457b951eda7995457debdf85b1f6e9760b"
+        }
+      },
+      "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+      "source_status": ""
+    },
+    "control": {
+      "artifact": {
+        "bytes": 4985,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/checks/control-build-identity.json",
+        "sha256": "08eaa8917c5114cf2354ea7d821d289101e3f3d172f763183fa5c623da47ecf3"
+      },
+      "binaries": {
+        "litchi-perf-baseline": {
+          "bytes": 449717472,
+          "sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e"
+        },
+        "litchi-perf-baseline-alloc": {
+          "bytes": 449721512,
+          "sha256": "b8b42ce70f2cb39e50a7df86f64533bd52e4eb6670777ac3a5aeb669cc88fa2a"
+        }
+      },
+      "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+      "source_status": ""
+    }
+  },
+  "journal": {
+    "artifact": {
+      "bytes": 27580,
+      "compressed": false,
+      "path": "docs/performance/results/change-0413/capture/commands.json",
+      "sha256": "4ba049435dc6ed955f50bb49c4f91334653b8c3b021aa4f7d96ddd8a2c81eb5a"
+    },
+    "labels": [
+      "normal-1",
+      "normal-2",
+      "normal-3",
+      "normal-4",
+      "allocator-1",
+      "allocator-2",
+      "allocator-3",
+      "allocator-4",
+      "guard-normal-1",
+      "guard-normal-2",
+      "guard-normal-3",
+      "guard-normal-4",
+      "guard-allocator-1",
+      "guard-allocator-2",
+      "guard-allocator-3",
+      "guard-allocator-4",
+      "control-profile",
+      "candidate-profile",
+      "stat-1",
+      "stat-2",
+      "stat-3",
+      "stat-4"
+    ],
+    "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+    "sequential_nonoverlap_verified": true
+  },
+  "observer_equality": {
+    "allocator": {
+      "exact_observer_equality": true,
+      "labels": [
+        "allocator-1",
+        "allocator-2",
+        "allocator-3",
+        "allocator-4"
+      ]
+    },
+    "guard-allocator": {
+      "exact_observer_equality": true,
+      "labels": [
+        "guard-allocator-1",
+        "guard-allocator-2",
+        "guard-allocator-3",
+        "guard-allocator-4"
+      ]
+    },
+    "guard-normal": {
+      "exact_observer_equality": true,
+      "labels": [
+        "guard-normal-1",
+        "guard-normal-2",
+        "guard-normal-3",
+        "guard-normal-4"
+      ]
+    },
+    "normal": {
+      "exact_observer_equality": true,
+      "labels": [
+        "normal-1",
+        "normal-2",
+        "normal-3",
+        "normal-4"
+      ]
+    },
+    "stat/profile": {
+      "exact_observer_equality": true,
+      "labels": [
+        "stat-1",
+        "stat-2",
+        "stat-3",
+        "stat-4",
+        "control-profile",
+        "candidate-profile"
+      ]
+    }
+  },
+  "performance_claim": "none",
+  "protocol": {
+    "allocator": {
+      "order": [
+        "control",
+        "candidate",
+        "candidate",
+        "control"
+      ],
+      "samples": 30,
+      "warmup": 3
+    },
+    "candidate_revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+    "change": "0413",
+    "control_revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+    "guards": {
+      "allocator": {
+        "order": [
+          "control",
+          "candidate",
+          "candidate",
+          "control"
+        ],
+        "samples": 30,
+        "warmup": 3
+      },
+      "cases": [
+        "cfb_open"
+      ],
+      "normal": {
+        "order": [
+          "control",
+          "candidate",
+          "candidate",
+          "control"
+        ],
+        "samples": 1000,
+        "warmup": 50
+      },
+      "payloads": [
+        "incompressible"
+      ],
+      "shapes": [
+        "tiny",
+        "few-large"
+      ]
+    },
+    "normal": {
+      "order": [
+        "control",
+        "candidate",
+        "candidate",
+        "control"
+      ],
+      "samples": 1000,
+      "warmup": 50
+    },
+    "purpose": "Remove redundant per-sector reservation checks from pre-reserved CFB chain scratch",
+    "sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91"
+  },
+  "reports": {
+    "allocator-1": {
+      "artifact": {
+        "artifact_bytes": 10501,
+        "artifact_sha256": "9fc421931e7bba200177d3192b43bf7750f8a810f0e66af13d22468b2b3b1585",
+        "bytes": 235257,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/allocator-1.json.zst",
+        "sha256": "9f13455a459794694cd9df49cadebcacc854dfa747fad71484c1dab3e64f619e"
+      },
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 7822,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/allocator-1.catalog.json",
+        "sha256": "0f1e16dae2d86520f0ad41371d51f5f2541f88350eab8220e95cc808d436e0f6"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_semantic_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "control",
+      "samples": 30,
+      "warmup": 3
+    },
+    "allocator-2": {
+      "artifact": {
+        "artifact_bytes": 10393,
+        "artifact_sha256": "6810a36790d21ec6c9337d6153a2978c980eee549dd42158db612a34f6754263",
+        "bytes": 235266,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/allocator-2.json.zst",
+        "sha256": "0f54dd2335bc474773056ff2e9eecc220a09504a7d4364d28f8eef4b1276bb53"
+      },
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 7822,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/allocator-2.catalog.json",
+        "sha256": "28e3036c6d7c1e6a0564ea01da17f9a0d8b2a73538f49a937140b9e92ced30ee"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_semantic_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "candidate",
+      "samples": 30,
+      "warmup": 3
+    },
+    "allocator-3": {
+      "artifact": {
+        "artifact_bytes": 10482,
+        "artifact_sha256": "a81d44907a9dafd52e01fd4469f0d1cb9442dd4ef4595dfce8744cbd04abb29f",
+        "bytes": 235254,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/allocator-3.json.zst",
+        "sha256": "30cb636f87c2bea2da99533a8cba9bbe383ebd50176634d0b81d35d5e40ba6f7"
+      },
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 7822,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/allocator-3.catalog.json",
+        "sha256": "28e3036c6d7c1e6a0564ea01da17f9a0d8b2a73538f49a937140b9e92ced30ee"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_semantic_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "candidate",
+      "samples": 30,
+      "warmup": 3
+    },
+    "allocator-4": {
+      "artifact": {
+        "artifact_bytes": 10547,
+        "artifact_sha256": "c70182600618e95fa7f637e0a9157eb8c0cd1464b016f1fa30e84852b9d2b4d8",
+        "bytes": 235253,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/allocator-4.json.zst",
+        "sha256": "17b4d0ff2a29a0efe3e498d07d9c570cf113e690bb275fa6eb650f57eb566adb"
+      },
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 7822,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/allocator-4.catalog.json",
+        "sha256": "0f1e16dae2d86520f0ad41371d51f5f2541f88350eab8220e95cc808d436e0f6"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_semantic_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "control",
+      "samples": 30,
+      "warmup": 3
+    },
+    "candidate-profile": {
+      "artifact": {
+        "artifact_bytes": 42811,
+        "artifact_sha256": "a363ca6acacbfb269de2bdecbf8cbeb334b989d79bf4a07eb84dcd3461655e03",
+        "bytes": 514310,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/candidate-profile.json.zst",
+        "sha256": "19e48267a2d52850d961613114dd46f39130196d726d788ae25e972835674467"
+      },
+      "cases": [
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 4840,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/candidate-profile.catalog.json",
+        "sha256": "ea7802af350b29a55ba73674c982cf28eb4d38cd97faaace49d63935440203c7"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "candidate",
+      "samples": 10000,
+      "warmup": 20
+    },
+    "control-profile": {
+      "artifact": {
+        "artifact_bytes": 44136,
+        "artifact_sha256": "e8270ea5702c151ab8a5a53a3e829d7ecee7b2d4d7e2f5e8b27c68691e38cf1e",
+        "bytes": 514308,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/control-profile.json.zst",
+        "sha256": "ab5389e354e389f58593d39a5496a1b7142d076b14fe30b55674ba7d7b62b2a0"
+      },
+      "cases": [
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 4840,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/control-profile.catalog.json",
+        "sha256": "59e19cdec5ea53d4d8efeeb43f257251186d683d733e44ce57cf7210af4ce078"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "control",
+      "samples": 10000,
+      "warmup": 20
+    },
+    "guard-allocator-1": {
+      "artifact": {
+        "artifact_bytes": 2774,
+        "artifact_sha256": "63be56bc0064ed9bcca39d9d038de983a693cf7142ed66d31cb926d65aa42331",
+        "bytes": 10245,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/guard-allocator-1.json.zst",
+        "sha256": "38e86886f030661a269aecde742cfc8d7ac612160f2f56854546bc559507e330"
+      },
+      "cases": [
+        "cfb_open"
+      ],
+      "catalog_artifact": {
+        "bytes": 10438,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/guard-allocator-1.catalog.json",
+        "sha256": "72b067f57ae6a6f6310750bbe5aab02f52de11bd822e68aa56f12515d6b99265"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+          "case": "cfb_open",
+          "shape": "tiny"
+        },
+        {
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "case": "cfb_open",
+          "shape": "few-large"
+        }
+      ],
+      "kind": "cfb",
+      "role": "control",
+      "samples": 30,
+      "warmup": 3
+    },
+    "guard-allocator-2": {
+      "artifact": {
+        "artifact_bytes": 2795,
+        "artifact_sha256": "c63780442418e6e87956747f99b31b517abce8412f43a52065c00beace56a20f",
+        "bytes": 10271,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/guard-allocator-2.json.zst",
+        "sha256": "fe4a171243584c9906dd60e3922d0ea49ce491cf45ed1a41070f6059ada61286"
+      },
+      "cases": [
+        "cfb_open"
+      ],
+      "catalog_artifact": {
+        "bytes": 10438,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/guard-allocator-2.catalog.json",
+        "sha256": "ed00ac830b80b34c7c7cb678d10b36bab19bc446e9863e2d3746302cf0bf2683"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+          "case": "cfb_open",
+          "shape": "tiny"
+        },
+        {
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "case": "cfb_open",
+          "shape": "few-large"
+        }
+      ],
+      "kind": "cfb",
+      "role": "candidate",
+      "samples": 30,
+      "warmup": 3
+    },
+    "guard-allocator-3": {
+      "artifact": {
+        "artifact_bytes": 2799,
+        "artifact_sha256": "e6e148b88aa047452f89dc32ae303edf830fb03c259d4c0f71f753eb942c4aad",
+        "bytes": 10270,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/guard-allocator-3.json.zst",
+        "sha256": "47a61442b8cdd8fcd223c121cf8cf515985ca17eecebf9b9a129e939aead3659"
+      },
+      "cases": [
+        "cfb_open"
+      ],
+      "catalog_artifact": {
+        "bytes": 10438,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/guard-allocator-3.catalog.json",
+        "sha256": "ed00ac830b80b34c7c7cb678d10b36bab19bc446e9863e2d3746302cf0bf2683"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+          "case": "cfb_open",
+          "shape": "tiny"
+        },
+        {
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "case": "cfb_open",
+          "shape": "few-large"
+        }
+      ],
+      "kind": "cfb",
+      "role": "candidate",
+      "samples": 30,
+      "warmup": 3
+    },
+    "guard-allocator-4": {
+      "artifact": {
+        "artifact_bytes": 2784,
+        "artifact_sha256": "f734adc001735063b0f189949e9fdfe92ef0be525cfa2fc3fac4562ee63fd6cd",
+        "bytes": 10257,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/guard-allocator-4.json.zst",
+        "sha256": "0ea5f9d54235b604eee7b7c24cd799d67441c26534aac6c82e9b9c6ae91d66c3"
+      },
+      "cases": [
+        "cfb_open"
+      ],
+      "catalog_artifact": {
+        "bytes": 10438,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/guard-allocator-4.catalog.json",
+        "sha256": "72b067f57ae6a6f6310750bbe5aab02f52de11bd822e68aa56f12515d6b99265"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+          "case": "cfb_open",
+          "shape": "tiny"
+        },
+        {
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "case": "cfb_open",
+          "shape": "few-large"
+        }
+      ],
+      "kind": "cfb",
+      "role": "control",
+      "samples": 30,
+      "warmup": 3
+    },
+    "guard-normal-1": {
+      "artifact": {
+        "artifact_bytes": 9449,
+        "artifact_sha256": "0e8407cf7ad848c9580242085a08c9a6ebc70b1d7675c20ce31f40f87bf6900c",
+        "bytes": 72152,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/guard-normal-1.json.zst",
+        "sha256": "bf4af37165df19131985b1c53e6b482a4e20653302cb03f203351e3d27510121"
+      },
+      "cases": [
+        "cfb_open"
+      ],
+      "catalog_artifact": {
+        "bytes": 10438,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/guard-normal-1.catalog.json",
+        "sha256": "72b067f57ae6a6f6310750bbe5aab02f52de11bd822e68aa56f12515d6b99265"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+          "case": "cfb_open",
+          "shape": "tiny"
+        },
+        {
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "case": "cfb_open",
+          "shape": "few-large"
+        }
+      ],
+      "kind": "cfb",
+      "role": "control",
+      "samples": 1000,
+      "warmup": 50
+    },
+    "guard-normal-2": {
+      "artifact": {
+        "artifact_bytes": 8842,
+        "artifact_sha256": "b5d5640370717aecec4a0b0b1290c98efbd6565a74f4dfdf6cb391d3089b308f",
+        "bytes": 72150,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/guard-normal-2.json.zst",
+        "sha256": "27218f4bfc4287774a0b9ace297489e7557da64c349de107d79516ba190e203a"
+      },
+      "cases": [
+        "cfb_open"
+      ],
+      "catalog_artifact": {
+        "bytes": 10438,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/guard-normal-2.catalog.json",
+        "sha256": "ed00ac830b80b34c7c7cb678d10b36bab19bc446e9863e2d3746302cf0bf2683"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+          "case": "cfb_open",
+          "shape": "tiny"
+        },
+        {
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "case": "cfb_open",
+          "shape": "few-large"
+        }
+      ],
+      "kind": "cfb",
+      "role": "candidate",
+      "samples": 1000,
+      "warmup": 50
+    },
+    "guard-normal-3": {
+      "artifact": {
+        "artifact_bytes": 8830,
+        "artifact_sha256": "52b95a250cc253b6fe285b6df75fcaa7c73fadd2e2fd1b0445d509c2b641e724",
+        "bytes": 72151,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/guard-normal-3.json.zst",
+        "sha256": "f231638e647c34877e2b6466fe3aca450bad63b35d1bbaf1767a0712786d3eeb"
+      },
+      "cases": [
+        "cfb_open"
+      ],
+      "catalog_artifact": {
+        "bytes": 10438,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/guard-normal-3.catalog.json",
+        "sha256": "ed00ac830b80b34c7c7cb678d10b36bab19bc446e9863e2d3746302cf0bf2683"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+          "case": "cfb_open",
+          "shape": "tiny"
+        },
+        {
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "case": "cfb_open",
+          "shape": "few-large"
+        }
+      ],
+      "kind": "cfb",
+      "role": "candidate",
+      "samples": 1000,
+      "warmup": 50
+    },
+    "guard-normal-4": {
+      "artifact": {
+        "artifact_bytes": 9506,
+        "artifact_sha256": "ac8a1c2a7fe633ad2293536613a21a59f7c41a11fd2eb867ad64a8eed85b6745",
+        "bytes": 72141,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/guard-normal-4.json.zst",
+        "sha256": "60380c489403c4ae5ff3a4e678fdcb759c0f8d68bb966093d779105a854045ea"
+      },
+      "cases": [
+        "cfb_open"
+      ],
+      "catalog_artifact": {
+        "bytes": 10438,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/guard-normal-4.catalog.json",
+        "sha256": "72b067f57ae6a6f6310750bbe5aab02f52de11bd822e68aa56f12515d6b99265"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+          "case": "cfb_open",
+          "shape": "tiny"
+        },
+        {
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "case": "cfb_open",
+          "shape": "few-large"
+        }
+      ],
+      "kind": "cfb",
+      "role": "control",
+      "samples": 1000,
+      "warmup": 50
+    },
+    "normal-1": {
+      "artifact": {
+        "artifact_bytes": 52692,
+        "artifact_sha256": "628de999dde355466eaae4f761a5058158796aead16d95d9ed6990f7a36cafbb",
+        "bytes": 1677253,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/normal-1.json.zst",
+        "sha256": "1a9fe1a91c2dd93fe3b2bb80d2ee55b52e6a0d1571ce2252f2cc5b171effcc7e"
+      },
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 7822,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/normal-1.catalog.json",
+        "sha256": "0f1e16dae2d86520f0ad41371d51f5f2541f88350eab8220e95cc808d436e0f6"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_semantic_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "control",
+      "samples": 1000,
+      "warmup": 50
+    },
+    "normal-2": {
+      "artifact": {
+        "artifact_bytes": 51605,
+        "artifact_sha256": "1beaabc27fe609106388882e6a68dcb6ce876134c3d199076682b9f85d7fe13d",
+        "bytes": 1677265,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/normal-2.json.zst",
+        "sha256": "5715420562fbda4eb9a0902357680c2ac76001023cbec653cfd86f2bb7e1aba8"
+      },
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 7822,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/normal-2.catalog.json",
+        "sha256": "28e3036c6d7c1e6a0564ea01da17f9a0d8b2a73538f49a937140b9e92ced30ee"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_semantic_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "candidate",
+      "samples": 1000,
+      "warmup": 50
+    },
+    "normal-3": {
+      "artifact": {
+        "artifact_bytes": 51645,
+        "artifact_sha256": "5395f72772ef335380aac323c97e98bd4ab248c597480c91293237843b2317c2",
+        "bytes": 1677257,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/normal-3.json.zst",
+        "sha256": "2d6f844647a7fcd1ffe97bb6ca9a7742ced06557872012b2505a7d0daffdaac4"
+      },
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 7822,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/normal-3.catalog.json",
+        "sha256": "28e3036c6d7c1e6a0564ea01da17f9a0d8b2a73538f49a937140b9e92ced30ee"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_semantic_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "candidate",
+      "samples": 1000,
+      "warmup": 50
+    },
+    "normal-4": {
+      "artifact": {
+        "artifact_bytes": 52041,
+        "artifact_sha256": "8bfa2933440ef370b6507d72ad9b3e8dd9325d7422d8f23d2bbde6161022a269",
+        "bytes": 1677258,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/normal-4.json.zst",
+        "sha256": "00968dc6e09f812c0b98b29a7049e969d25f2352bf61c7057cdaa4a50fe4f099"
+      },
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 7822,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/normal-4.catalog.json",
+        "sha256": "0f1e16dae2d86520f0ad41371d51f5f2541f88350eab8220e95cc808d436e0f6"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_semantic_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_eager_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_source_backed_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open",
+          "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_list_worksheets",
+          "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+        },
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "control",
+      "samples": 1000,
+      "warmup": 50
+    },
+    "stat-1": {
+      "artifact": {
+        "artifact_bytes": 16314,
+        "artifact_sha256": "f74cf2e7c27123ae92cf6af21db896e36d323649822de4a0c1361e82dbf35a40",
+        "bytes": 164305,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/stat-1.json.zst",
+        "sha256": "0152c0a017d35359a9015f0d59df08c47fef0b1375a33fd05d1e4d6ac4a57764"
+      },
+      "cases": [
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 4840,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/stat-1.catalog.json",
+        "sha256": "59e19cdec5ea53d4d8efeeb43f257251186d683d733e44ce57cf7210af4ce078"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "control",
+      "samples": 3000,
+      "warmup": 10
+    },
+    "stat-2": {
+      "artifact": {
+        "artifact_bytes": 17234,
+        "artifact_sha256": "d12f4aea9774b778ad1cba523336dca327e3300eb541be4c9c3ce690e38cd030",
+        "bytes": 164307,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/stat-2.json.zst",
+        "sha256": "4d609d8747ac4c7676c44a274ccde0aa48ca2c28c800688d9a6d6d2397555b14"
+      },
+      "cases": [
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 4840,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/stat-2.catalog.json",
+        "sha256": "ea7802af350b29a55ba73674c982cf28eb4d38cd97faaace49d63935440203c7"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "candidate",
+      "samples": 3000,
+      "warmup": 10
+    },
+    "stat-3": {
+      "artifact": {
+        "artifact_bytes": 16074,
+        "artifact_sha256": "752a1385bfaece0fcc6c542c5cabd1faa9d84ac7f6b872d0fcc2c25ac8d0335c",
+        "bytes": 164306,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/stat-3.json.zst",
+        "sha256": "8e6cca983cbeca1fa09f2b4e0c2673c323a6871052b6660ecedfc3cbc7e1421a"
+      },
+      "cases": [
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 4840,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/stat-3.catalog.json",
+        "sha256": "ea7802af350b29a55ba73674c982cf28eb4d38cd97faaace49d63935440203c7"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "candidate",
+      "samples": 3000,
+      "warmup": 10
+    },
+    "stat-4": {
+      "artifact": {
+        "artifact_bytes": 16338,
+        "artifact_sha256": "21e78183937fce8a28c7b3313a59a96ba8808968b2c703e9a92955dd5d998122",
+        "bytes": 164304,
+        "compressed": true,
+        "path": "docs/performance/results/change-0413/capture/stat-4.json.zst",
+        "sha256": "280462e35cf1822d587b7ce16bf27f52591e8c04ee513922584642e5dca7e567"
+      },
+      "cases": [
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 4840,
+        "compressed": false,
+        "path": "docs/performance/results/change-0413/capture/stat-4.catalog.json",
+        "sha256": "59e19cdec5ea53d4d8efeeb43f257251186d683d733e44ce57cf7210af4ce078"
+      },
+      "corpus": [
+        {
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "case": "xls_owned_source_open_one_cell",
+          "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+        }
+      ],
+      "kind": "xls",
+      "role": "control",
+      "samples": 3000,
+      "warmup": 10
+    }
+  },
+  "schema_version": 1,
+  "validation": {
+    "all_22_reports_verified": true,
+    "allocation_calls_and_bytes_equal_across_roles": true,
+    "live_peak_snapshots_excluded_from_equality": true,
+    "oracle_and_catalog_binding_verified": true,
+    "plain_source_observers_absent_or_null": true,
+    "reports": 22,
+    "sample_counts_and_permutations_verified": true,
+    "v2_observers_equal_across_roles": true
+  },
+  "verifier": "0413-cfb-scratch-verifier-v1",
+  "wrapper_artifacts": {
+    "profile_data": 2,
+    "stat_reports": 4,
+    "time_reports": 16
+  }
+}

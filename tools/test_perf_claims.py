@@ -41,6 +41,8 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
                 "resource-0251",
                 "abba-0268-xls-owned-source",
                 "abba-0269-xlsx-repeated-store-cache",
+                "abba-0410-mce-attribute-names",
+                "abba-0413-cfb-chain-scratch",
             },
         )
         self.assertEqual(
@@ -52,6 +54,8 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
                 "claim-0251-xlsx-xml-borrowed",
                 "claim-0268-xls-owned-source",
                 "claim-0269-xlsx-repeated-store-cache",
+                "claim-0410-mce-attribute-names",
+                "claim-0413-cfb-chain-scratch",
             },
         )
         claim = claims["claim-0251-xlsx-xml-borrowed"]["value"]

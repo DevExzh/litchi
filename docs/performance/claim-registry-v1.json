@@ -149,6 +149,22 @@
         "canonical_sha256": "42f4eaee58cca84d4141a62415fd936202a07f559f2e692a55d9d0bc06ce5faf",
         "schema_version": 1
       }
+    },
+    {
+      "id": "abba-0413-cfb-chain-scratch",
+      "kind": "abba_package",
+      "relative_path": "docs/performance/results/change-0413/latency",
+      "manifest": {
+        "path": "0413-cfb-chain-scratch-latency-manifest.json",
+        "sha256": "edae96b68f46ef0d7b9b28f2246df3439efcce87eaade8448b5e5d432cfd17c1",
+        "schema_version": 1
+      },
+      "summary": {
+        "path": "normal-summary.json",
+        "sha256": "8926d9730295b565a563eaad35b22bf47be3230fcfd93d0d12a44b569e8b674c",
+        "canonical_sha256": "e07788703821b84dc4bc2910782882a5ec4a5758d5d9dda33a9e8683c993e3f8",
+        "schema_version": 1
+      }
     }
   ],
   "claims": [
@@ -766,6 +782,235 @@
       },
       "documentation": [
         "docs/performance/changes/0410-mce-attribute-name-reuse.md"
+      ]
+    },
+    {
+      "id": "claim-0413-cfb-chain-scratch",
+      "change_id": "0413-cfb-chain-scratch-latency",
+      "claim_class": "optimization",
+      "status": "landed",
+      "code_state": "landed",
+      "reason_codes": [
+        "accepted_latency_only"
+      ],
+      "scope": {
+        "format": "xls",
+        "selectors": [
+          "xls_eager_open_list_worksheets",
+          "xls_eager_open_one_cell",
+          "xls_owned_source_open",
+          "xls_owned_source_open_list_worksheets",
+          "xls_owned_source_open_one_cell",
+          "xls_semantic_open",
+          "xls_source_backed_open",
+          "xls_source_backed_open_list_worksheets",
+          "xls_source_backed_open_one_cell"
+        ],
+        "corpora": [
+          {
+            "name": "xls-comments-opaque-heavy",
+            "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+            "generator": "litchi-xls-comments-opaque-heavy-v1",
+            "shape": "256-comments-opaque-heavy",
+            "package_format": "XLS/CFB"
+          }
+        ]
+      },
+      "latency_evidence": {
+        "evidence_id": "abba-0413-cfb-chain-scratch",
+        "allowed_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "accepted_cells": 36,
+        "adverse_both_cells": 0,
+        "accepted_statistics": [
+          {
+            "case": "xls_eager_open_list_worksheets",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p50"
+          },
+          {
+            "case": "xls_eager_open_list_worksheets",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "mean"
+          },
+          {
+            "case": "xls_eager_open_list_worksheets",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p95"
+          },
+          {
+            "case": "xls_eager_open_list_worksheets",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p99"
+          },
+          {
+            "case": "xls_eager_open_one_cell",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p50"
+          },
+          {
+            "case": "xls_eager_open_one_cell",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "mean"
+          },
+          {
+            "case": "xls_eager_open_one_cell",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p95"
+          },
+          {
+            "case": "xls_eager_open_one_cell",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p99"
+          },
+          {
+            "case": "xls_owned_source_open",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p50"
+          },
+          {
+            "case": "xls_owned_source_open",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "mean"
+          },
+          {
+            "case": "xls_owned_source_open",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p95"
+          },
+          {
+            "case": "xls_owned_source_open",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p99"
+          },
+          {
+            "case": "xls_owned_source_open_list_worksheets",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p50"
+          },
+          {
+            "case": "xls_owned_source_open_list_worksheets",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "mean"
+          },
+          {
+            "case": "xls_owned_source_open_list_worksheets",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p95"
+          },
+          {
+            "case": "xls_owned_source_open_list_worksheets",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p99"
+          },
+          {
+            "case": "xls_owned_source_open_one_cell",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p50"
+          },
+          {
+            "case": "xls_owned_source_open_one_cell",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "mean"
+          },
+          {
+            "case": "xls_owned_source_open_one_cell",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p95"
+          },
+          {
+            "case": "xls_owned_source_open_one_cell",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p99"
+          },
+          {
+            "case": "xls_semantic_open",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p50"
+          },
+          {
+            "case": "xls_semantic_open",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "mean"
+          },
+          {
+            "case": "xls_semantic_open",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p95"
+          },
+          {
+            "case": "xls_semantic_open",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p99"
+          },
+          {
+            "case": "xls_source_backed_open",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p50"
+          },
+          {
+            "case": "xls_source_backed_open",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "mean"
+          },
+          {
+            "case": "xls_source_backed_open",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p95"
+          },
+          {
+            "case": "xls_source_backed_open",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p99"
+          },
+          {
+            "case": "xls_source_backed_open_list_worksheets",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p50"
+          },
+          {
+            "case": "xls_source_backed_open_list_worksheets",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "mean"
+          },
+          {
+            "case": "xls_source_backed_open_list_worksheets",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p95"
+          },
+          {
+            "case": "xls_source_backed_open_list_worksheets",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p99"
+          },
+          {
+            "case": "xls_source_backed_open_one_cell",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p50"
+          },
+          {
+            "case": "xls_source_backed_open_one_cell",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "mean"
+          },
+          {
+            "case": "xls_source_backed_open_one_cell",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p95"
+          },
+          {
+            "case": "xls_source_backed_open_one_cell",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p99"
+          }
+        ]
+      },
+      "documentation": [
+        "docs/performance/changes/0413-cfb-chain-scratch-reservation.md"
       ]
     }
   ]

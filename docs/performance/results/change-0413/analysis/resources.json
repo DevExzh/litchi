@@ -1,0 +1,1497 @@
+{
+  "capture": {
+    "commands": [
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/normal-1.time.txt",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell,xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "1000",
+          "--warmup",
+          "50",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/normal-1.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/normal-1.catalog.json"
+        ],
+        "binary_sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "normal-1",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/normal-2.time.txt",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell,xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "1000",
+          "--warmup",
+          "50",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/normal-2.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/normal-2.catalog.json"
+        ],
+        "binary_sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "normal-2",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/normal-3.time.txt",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell,xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "1000",
+          "--warmup",
+          "50",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/normal-3.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/normal-3.catalog.json"
+        ],
+        "binary_sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "normal-3",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/normal-4.time.txt",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell,xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "1000",
+          "--warmup",
+          "50",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/normal-4.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/normal-4.catalog.json"
+        ],
+        "binary_sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "normal-4",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/allocator-1.time.txt",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell,xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/allocator-1.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/allocator-1.catalog.json"
+        ],
+        "binary_sha256": "b8b42ce70f2cb39e50a7df86f64533bd52e4eb6670777ac3a5aeb669cc88fa2a",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "allocator-1",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/allocator-2.time.txt",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell,xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/allocator-2.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/allocator-2.catalog.json"
+        ],
+        "binary_sha256": "aacf8554cab913a1b82b04d3316682457b951eda7995457debdf85b1f6e9760b",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "allocator-2",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/allocator-3.time.txt",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell,xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/allocator-3.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/allocator-3.catalog.json"
+        ],
+        "binary_sha256": "aacf8554cab913a1b82b04d3316682457b951eda7995457debdf85b1f6e9760b",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "allocator-3",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/allocator-4.time.txt",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell,xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/allocator-4.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/allocator-4.catalog.json"
+        ],
+        "binary_sha256": "b8b42ce70f2cb39e50a7df86f64533bd52e4eb6670777ac3a5aeb669cc88fa2a",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "allocator-4",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/guard-normal-1.time.txt",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "cfb_open",
+          "--samples",
+          "1000",
+          "--warmup",
+          "50",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/guard-normal-1.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/guard-normal-1.catalog.json",
+          "--shape",
+          "tiny,few-large",
+          "--payload",
+          "incompressible"
+        ],
+        "binary_sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "guard-normal-1",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/guard-normal-2.time.txt",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "cfb_open",
+          "--samples",
+          "1000",
+          "--warmup",
+          "50",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/guard-normal-2.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/guard-normal-2.catalog.json",
+          "--shape",
+          "tiny,few-large",
+          "--payload",
+          "incompressible"
+        ],
+        "binary_sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "guard-normal-2",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/guard-normal-3.time.txt",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "cfb_open",
+          "--samples",
+          "1000",
+          "--warmup",
+          "50",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/guard-normal-3.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/guard-normal-3.catalog.json",
+          "--shape",
+          "tiny,few-large",
+          "--payload",
+          "incompressible"
+        ],
+        "binary_sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "guard-normal-3",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/guard-normal-4.time.txt",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "cfb_open",
+          "--samples",
+          "1000",
+          "--warmup",
+          "50",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/guard-normal-4.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/guard-normal-4.catalog.json",
+          "--shape",
+          "tiny,few-large",
+          "--payload",
+          "incompressible"
+        ],
+        "binary_sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "guard-normal-4",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/guard-allocator-1.time.txt",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "cfb_open",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/guard-allocator-1.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/guard-allocator-1.catalog.json",
+          "--shape",
+          "tiny,few-large",
+          "--payload",
+          "incompressible"
+        ],
+        "binary_sha256": "b8b42ce70f2cb39e50a7df86f64533bd52e4eb6670777ac3a5aeb669cc88fa2a",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "guard-allocator-1",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/guard-allocator-2.time.txt",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "cfb_open",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/guard-allocator-2.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/guard-allocator-2.catalog.json",
+          "--shape",
+          "tiny,few-large",
+          "--payload",
+          "incompressible"
+        ],
+        "binary_sha256": "aacf8554cab913a1b82b04d3316682457b951eda7995457debdf85b1f6e9760b",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "guard-allocator-2",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/guard-allocator-3.time.txt",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "cfb_open",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/guard-allocator-3.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/guard-allocator-3.catalog.json",
+          "--shape",
+          "tiny,few-large",
+          "--payload",
+          "incompressible"
+        ],
+        "binary_sha256": "aacf8554cab913a1b82b04d3316682457b951eda7995457debdf85b1f6e9760b",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "guard-allocator-3",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/guard-allocator-4.time.txt",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "cfb_open",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/guard-allocator-4.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/guard-allocator-4.catalog.json",
+          "--shape",
+          "tiny,few-large",
+          "--payload",
+          "incompressible"
+        ],
+        "binary_sha256": "b8b42ce70f2cb39e50a7df86f64533bd52e4eb6670777ac3a5aeb669cc88fa2a",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "guard-allocator-4",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "perf",
+          "record",
+          "--no-buildid-cache",
+          "-e",
+          "cycles:u",
+          "-F",
+          "999",
+          "--call-graph",
+          "fp,127",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/control-profile.data",
+          "--",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open_one_cell",
+          "--samples",
+          "10000",
+          "--warmup",
+          "20",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/control-profile.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/control-profile.catalog.json"
+        ],
+        "binary_sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "control-profile",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "perf",
+          "record",
+          "--no-buildid-cache",
+          "-e",
+          "cycles:u",
+          "-F",
+          "999",
+          "--call-graph",
+          "fp,127",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/candidate-profile.data",
+          "--",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open_one_cell",
+          "--samples",
+          "10000",
+          "--warmup",
+          "20",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/candidate-profile.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/candidate-profile.catalog.json"
+        ],
+        "binary_sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "candidate-profile",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "perf",
+          "stat",
+          "--no-big-num",
+          "-x,",
+          "-e",
+          "task-clock,cycles,instructions,branches,branch-misses,page-faults,context-switches,cpu-migrations,l2_cache_req_stat.dc_access_in_l2,l2_cache_req_stat.dc_hit_in_l2",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/stat-1.csv",
+          "--",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open_one_cell",
+          "--samples",
+          "3000",
+          "--warmup",
+          "10",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/stat-1.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/stat-1.catalog.json"
+        ],
+        "binary_sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "stat-1",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "perf",
+          "stat",
+          "--no-big-num",
+          "-x,",
+          "-e",
+          "task-clock,cycles,instructions,branches,branch-misses,page-faults,context-switches,cpu-migrations,l2_cache_req_stat.dc_access_in_l2,l2_cache_req_stat.dc_hit_in_l2",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/stat-2.csv",
+          "--",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open_one_cell",
+          "--samples",
+          "3000",
+          "--warmup",
+          "10",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/stat-2.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/stat-2.catalog.json"
+        ],
+        "binary_sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "stat-2",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "perf",
+          "stat",
+          "--no-big-num",
+          "-x,",
+          "-e",
+          "task-clock,cycles,instructions,branches,branch-misses,page-faults,context-switches,cpu-migrations,l2_cache_req_stat.dc_access_in_l2,l2_cache_req_stat.dc_hit_in_l2",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/stat-3.csv",
+          "--",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open_one_cell",
+          "--samples",
+          "3000",
+          "--warmup",
+          "10",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/stat-3.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/stat-3.catalog.json"
+        ],
+        "binary_sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "stat-3",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "perf",
+          "stat",
+          "--no-big-num",
+          "-x,",
+          "-e",
+          "task-clock,cycles,instructions,branches,branch-misses,page-faults,context-switches,cpu-migrations,l2_cache_req_stat.dc_access_in_l2,l2_cache_req_stat.dc_hit_in_l2",
+          "-o",
+          "/tmp/litchi-goal-0413-capture/stat-4.csv",
+          "--",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open_one_cell",
+          "--samples",
+          "3000",
+          "--warmup",
+          "10",
+          "--json",
+          "/tmp/litchi-goal-0413-capture/stat-4.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-capture/stat-4.catalog.json"
+        ],
+        "binary_sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "stat-4",
+        "protocol_sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      }
+    ],
+    "identities": {
+      "candidate": {
+        "binaries": {
+          "litchi-perf-baseline": {
+            "bytes": 449703584,
+            "sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550"
+          },
+          "litchi-perf-baseline-alloc": {
+            "bytes": 449707528,
+            "sha256": "aacf8554cab913a1b82b04d3316682457b951eda7995457debdf85b1f6e9760b"
+          }
+        },
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0413/checks/candidate-build-identity.json",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "source_status": ""
+      },
+      "control": {
+        "binaries": {
+          "litchi-perf-baseline": {
+            "bytes": 449717472,
+            "sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e"
+          },
+          "litchi-perf-baseline-alloc": {
+            "bytes": 449721512,
+            "sha256": "b8b42ce70f2cb39e50a7df86f64533bd52e4eb6670777ac3a5aeb669cc88fa2a"
+          }
+        },
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0413/checks/control-build-identity.json",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "source_status": ""
+      }
+    },
+    "pmu": {
+      "stat-1": {
+        "claim": "descriptive",
+        "events": [
+          {
+            "class": "software",
+            "event": "task-clock",
+            "runtime_ns": 2108066939.0,
+            "scaled_count": 2108.07,
+            "scheduled_percent": 100.0,
+            "unit": "msec"
+          },
+          {
+            "class": "hardware",
+            "event": "cycles",
+            "runtime_ns": 1757651004.0,
+            "scaled_count": 8855135045.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "instructions",
+            "runtime_ns": 1749491946.0,
+            "scaled_count": 16690970201.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "branches",
+            "runtime_ns": 1752904147.0,
+            "scaled_count": 2855896936.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "branch-misses",
+            "runtime_ns": 1759215854.0,
+            "scaled_count": 2516069.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "software",
+            "event": "page-faults",
+            "runtime_ns": 2108066939.0,
+            "scaled_count": 57367.0,
+            "scheduled_percent": 100.0,
+            "unit": ""
+          },
+          {
+            "class": "software",
+            "event": "context-switches",
+            "runtime_ns": 2108066939.0,
+            "scaled_count": 58.0,
+            "scheduled_percent": 100.0,
+            "unit": ""
+          },
+          {
+            "class": "software",
+            "event": "cpu-migrations",
+            "runtime_ns": 2108066939.0,
+            "scaled_count": 0.0,
+            "scheduled_percent": 100.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "l2_cache_req_stat.dc_access_in_l2",
+            "runtime_ns": 1760841781.0,
+            "scaled_count": 1439763071.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "l2_cache_req_stat.dc_hit_in_l2",
+            "runtime_ns": 1760229963.0,
+            "scaled_count": 1406312889.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          }
+        ],
+        "scope": "Whole process, scaled multiplexed events; not operation IPC or cache miss rate",
+        "whole_process_scaled_ipc": 1.8848916607346895
+      },
+      "stat-2": {
+        "claim": "descriptive",
+        "events": [
+          {
+            "class": "software",
+            "event": "task-clock",
+            "runtime_ns": 2066226699.0,
+            "scaled_count": 2066.23,
+            "scheduled_percent": 100.0,
+            "unit": "msec"
+          },
+          {
+            "class": "hardware",
+            "event": "cycles",
+            "runtime_ns": 1722041041.0,
+            "scaled_count": 8712693314.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "instructions",
+            "runtime_ns": 1715232404.0,
+            "scaled_count": 16636646220.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "branches",
+            "runtime_ns": 1719862630.0,
+            "scaled_count": 2850669611.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "branch-misses",
+            "runtime_ns": 1725344590.0,
+            "scaled_count": 2484725.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "software",
+            "event": "page-faults",
+            "runtime_ns": 2066226699.0,
+            "scaled_count": 57348.0,
+            "scheduled_percent": 100.0,
+            "unit": ""
+          },
+          {
+            "class": "software",
+            "event": "context-switches",
+            "runtime_ns": 2066226699.0,
+            "scaled_count": 58.0,
+            "scheduled_percent": 100.0,
+            "unit": ""
+          },
+          {
+            "class": "software",
+            "event": "cpu-migrations",
+            "runtime_ns": 2066226699.0,
+            "scaled_count": 0.0,
+            "scheduled_percent": 100.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "l2_cache_req_stat.dc_access_in_l2",
+            "runtime_ns": 1724941220.0,
+            "scaled_count": 1439007018.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "l2_cache_req_stat.dc_hit_in_l2",
+            "runtime_ns": 1723711610.0,
+            "scaled_count": 1410056396.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          }
+        ],
+        "scope": "Whole process, scaled multiplexed events; not operation IPC or cache miss rate",
+        "whole_process_scaled_ipc": 1.9094722631023162
+      },
+      "stat-3": {
+        "claim": "descriptive",
+        "events": [
+          {
+            "class": "software",
+            "event": "task-clock",
+            "runtime_ns": 2101521531.0,
+            "scaled_count": 2101.52,
+            "scheduled_percent": 100.0,
+            "unit": "msec"
+          },
+          {
+            "class": "hardware",
+            "event": "cycles",
+            "runtime_ns": 1754347545.0,
+            "scaled_count": 8835996808.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "instructions",
+            "runtime_ns": 1753379084.0,
+            "scaled_count": 16677819213.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "branches",
+            "runtime_ns": 1753176767.0,
+            "scaled_count": 2858253949.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "branch-misses",
+            "runtime_ns": 1744979467.0,
+            "scaled_count": 2494922.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "software",
+            "event": "page-faults",
+            "runtime_ns": 2101521531.0,
+            "scaled_count": 57368.0,
+            "scheduled_percent": 100.0,
+            "unit": ""
+          },
+          {
+            "class": "software",
+            "event": "context-switches",
+            "runtime_ns": 2101521531.0,
+            "scaled_count": 58.0,
+            "scheduled_percent": 100.0,
+            "unit": ""
+          },
+          {
+            "class": "software",
+            "event": "cpu-migrations",
+            "runtime_ns": 2101521531.0,
+            "scaled_count": 0.0,
+            "scheduled_percent": 100.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "l2_cache_req_stat.dc_access_in_l2",
+            "runtime_ns": 1747811897.0,
+            "scaled_count": 1442284136.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "l2_cache_req_stat.dc_hit_in_l2",
+            "runtime_ns": 1753912895.0,
+            "scaled_count": 1402648308.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          }
+        ],
+        "scope": "Whole process, scaled multiplexed events; not operation IPC or cache miss rate",
+        "whole_process_scaled_ipc": 1.887485880246144
+      },
+      "stat-4": {
+        "claim": "descriptive",
+        "events": [
+          {
+            "class": "software",
+            "event": "task-clock",
+            "runtime_ns": 2108383199.0,
+            "scaled_count": 2108.38,
+            "scheduled_percent": 100.0,
+            "unit": "msec"
+          },
+          {
+            "class": "hardware",
+            "event": "cycles",
+            "runtime_ns": 1753109945.0,
+            "scaled_count": 8851070721.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "instructions",
+            "runtime_ns": 1760007493.0,
+            "scaled_count": 16638543279.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "branches",
+            "runtime_ns": 1761425532.0,
+            "scaled_count": 2866919787.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "branch-misses",
+            "runtime_ns": 1760433544.0,
+            "scaled_count": 2434763.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "software",
+            "event": "page-faults",
+            "runtime_ns": 2108383199.0,
+            "scaled_count": 57362.0,
+            "scheduled_percent": 100.0,
+            "unit": ""
+          },
+          {
+            "class": "software",
+            "event": "context-switches",
+            "runtime_ns": 2108383199.0,
+            "scaled_count": 56.0,
+            "scheduled_percent": 100.0,
+            "unit": ""
+          },
+          {
+            "class": "software",
+            "event": "cpu-migrations",
+            "runtime_ns": 2108383199.0,
+            "scaled_count": 0.0,
+            "scheduled_percent": 100.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "l2_cache_req_stat.dc_access_in_l2",
+            "runtime_ns": 1758870895.0,
+            "scaled_count": 1429119726.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          },
+          {
+            "class": "hardware",
+            "event": "l2_cache_req_stat.dc_hit_in_l2",
+            "runtime_ns": 1748068586.0,
+            "scaled_count": 1398793280.0,
+            "scheduled_percent": 83.0,
+            "unit": ""
+          }
+        ],
+        "scope": "Whole process, scaled multiplexed events; not operation IPC or cache miss rate",
+        "whole_process_scaled_ipc": 1.8798339549500476
+      }
+    },
+    "profiles": {
+      "candidate-profile": {
+        "data_bytes": 895560,
+        "event": "cycles:u",
+        "event_count": 24476478468,
+        "lost_samples": 0
+      },
+      "control-profile": {
+        "data_bytes": 911224,
+        "event": "cycles:u",
+        "event_count": 24943644850,
+        "lost_samples": 0
+      }
+    },
+    "protocol": {
+      "candidate_revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+      "change": "0413",
+      "control_revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0413/capture/protocol.json",
+      "sha256": "d82b4159f8aea8dd1b4b92d50a8a8a0d50fb4be73fa533bb7781be99366fec91"
+    },
+    "recheck": false,
+    "report_count": 22,
+    "root": "/home/zhuhe/code/litchi/docs/performance/results/change-0413/capture",
+    "rss": {
+      "allocator": {
+        "candidate_median_kib": 144856.0,
+        "candidate_values_kib": [
+          144884,
+          144828
+        ],
+        "control_median_kib": 145134.0,
+        "control_values_kib": [
+          144876,
+          145392
+        ],
+        "labels": [
+          "allocator-1",
+          "allocator-2",
+          "allocator-3",
+          "allocator-4"
+        ],
+        "limit_percent": 5.0,
+        "maximum_pair_delta_percent": 0.3879168042258171,
+        "median_delta_percent": 0.19154712197004148,
+        "rss_kib": {
+          "allocator-1": 144876,
+          "allocator-2": 144884,
+          "allocator-3": 144828,
+          "allocator-4": 145392
+        },
+        "variants": [
+          "control",
+          "candidate",
+          "candidate",
+          "control"
+        ]
+      },
+      "guard-allocator": {
+        "candidate_median_kib": 82710.0,
+        "candidate_values_kib": [
+          82676,
+          82744
+        ],
+        "control_median_kib": 82664.0,
+        "control_values_kib": [
+          82604,
+          82724
+        ],
+        "labels": [
+          "guard-allocator-1",
+          "guard-allocator-2",
+          "guard-allocator-3",
+          "guard-allocator-4"
+        ],
+        "limit_percent": 5.0,
+        "maximum_pair_delta_percent": 0.16948331799912836,
+        "median_delta_percent": 0.055646956353430754,
+        "rss_kib": {
+          "guard-allocator-1": 82604,
+          "guard-allocator-2": 82676,
+          "guard-allocator-3": 82744,
+          "guard-allocator-4": 82724
+        },
+        "variants": [
+          "control",
+          "candidate",
+          "candidate",
+          "control"
+        ]
+      },
+      "guard-normal": {
+        "candidate_median_kib": 82712.0,
+        "candidate_values_kib": [
+          82736,
+          82688
+        ],
+        "control_median_kib": 82672.0,
+        "control_values_kib": [
+          82608,
+          82736
+        ],
+        "labels": [
+          "guard-normal-1",
+          "guard-normal-2",
+          "guard-normal-3",
+          "guard-normal-4"
+        ],
+        "limit_percent": 5.0,
+        "maximum_pair_delta_percent": 0.15494867325198527,
+        "median_delta_percent": 0.04838397522740468,
+        "rss_kib": {
+          "guard-normal-1": 82608,
+          "guard-normal-2": 82736,
+          "guard-normal-3": 82688,
+          "guard-normal-4": 82736
+        },
+        "variants": [
+          "control",
+          "candidate",
+          "candidate",
+          "control"
+        ]
+      },
+      "normal": {
+        "candidate_median_kib": 145020.0,
+        "candidate_values_kib": [
+          144888,
+          145152
+        ],
+        "control_median_kib": 145132.0,
+        "control_values_kib": [
+          145132,
+          145132
+        ],
+        "labels": [
+          "normal-1",
+          "normal-2",
+          "normal-3",
+          "normal-4"
+        ],
+        "limit_percent": 5.0,
+        "maximum_pair_delta_percent": 0.16812281233635587,
+        "median_delta_percent": 0.07717112697406499,
+        "rss_kib": {
+          "normal-1": 145132,
+          "normal-2": 144888,
+          "normal-3": 145152,
+          "normal-4": 145132
+        },
+        "variants": [
+          "control",
+          "candidate",
+          "candidate",
+          "control"
+        ]
+      }
+    }
+  },
+  "change": "0413",
+  "errors": [],
+  "guard_recheck": {
+    "commands": [
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-guard-recheck/guard-normal-1.time.txt",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "cfb_open",
+          "--samples",
+          "1000",
+          "--warmup",
+          "50",
+          "--json",
+          "/tmp/litchi-goal-0413-guard-recheck/guard-normal-1.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-guard-recheck/guard-normal-1.catalog.json",
+          "--shape",
+          "tiny,few-large",
+          "--payload",
+          "incompressible"
+        ],
+        "binary_sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "guard-normal-1",
+        "protocol_sha256": "90a34fca16e7a55cd37c0f51d0b12ae26c6230a541bff2ba7b7e81125c1c624c",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-guard-recheck/guard-normal-2.time.txt",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "cfb_open",
+          "--samples",
+          "1000",
+          "--warmup",
+          "50",
+          "--json",
+          "/tmp/litchi-goal-0413-guard-recheck/guard-normal-2.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-guard-recheck/guard-normal-2.catalog.json",
+          "--shape",
+          "tiny,few-large",
+          "--payload",
+          "incompressible"
+        ],
+        "binary_sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "guard-normal-2",
+        "protocol_sha256": "90a34fca16e7a55cd37c0f51d0b12ae26c6230a541bff2ba7b7e81125c1c624c",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-guard-recheck/guard-normal-3.time.txt",
+          "/tmp/litchi-goal-0413-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "cfb_open",
+          "--samples",
+          "1000",
+          "--warmup",
+          "50",
+          "--json",
+          "/tmp/litchi-goal-0413-guard-recheck/guard-normal-3.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-guard-recheck/guard-normal-3.catalog.json",
+          "--shape",
+          "tiny,few-large",
+          "--payload",
+          "incompressible"
+        ],
+        "binary_sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550",
+        "cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+        "label": "guard-normal-3",
+        "protocol_sha256": "90a34fca16e7a55cd37c0f51d0b12ae26c6230a541bff2ba7b7e81125c1c624c",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "variant": "candidate"
+      },
+      {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0413-guard-recheck/guard-normal-4.time.txt",
+          "/tmp/litchi-goal-0413-control-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "cfb_open",
+          "--samples",
+          "1000",
+          "--warmup",
+          "50",
+          "--json",
+          "/tmp/litchi-goal-0413-guard-recheck/guard-normal-4.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0413-guard-recheck/guard-normal-4.catalog.json",
+          "--shape",
+          "tiny,few-large",
+          "--payload",
+          "incompressible"
+        ],
+        "binary_sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e",
+        "cwd": "/tmp/litchi-goal-0413-control-worktree",
+        "label": "guard-normal-4",
+        "protocol_sha256": "90a34fca16e7a55cd37c0f51d0b12ae26c6230a541bff2ba7b7e81125c1c624c",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "variant": "control"
+      }
+    ],
+    "identities": {
+      "candidate": {
+        "binaries": {
+          "litchi-perf-baseline": {
+            "bytes": 449703584,
+            "sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550"
+          },
+          "litchi-perf-baseline-alloc": {
+            "bytes": 449707528,
+            "sha256": "aacf8554cab913a1b82b04d3316682457b951eda7995457debdf85b1f6e9760b"
+          }
+        },
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0413/checks/candidate-build-identity.json",
+        "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+        "source_status": ""
+      },
+      "control": {
+        "binaries": {
+          "litchi-perf-baseline": {
+            "bytes": 449717472,
+            "sha256": "c3cbc576d42027ac7726af10ea7d3d3e560d1a120c5ffe45503082249fb89e9e"
+          },
+          "litchi-perf-baseline-alloc": {
+            "bytes": 449721512,
+            "sha256": "b8b42ce70f2cb39e50a7df86f64533bd52e4eb6670777ac3a5aeb669cc88fa2a"
+          }
+        },
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0413/checks/control-build-identity.json",
+        "revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+        "source_status": ""
+      }
+    },
+    "pmu": {},
+    "profiles": {},
+    "protocol": {
+      "candidate_revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+      "change": "0413",
+      "control_revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0413/guard-recheck/protocol.json",
+      "sha256": "90a34fca16e7a55cd37c0f51d0b12ae26c6230a541bff2ba7b7e81125c1c624c"
+    },
+    "recheck": true,
+    "report_count": 4,
+    "root": "/home/zhuhe/code/litchi/docs/performance/results/change-0413/guard-recheck",
+    "rss": {
+      "guard-normal-recheck": {
+        "candidate_median_kib": 82710.0,
+        "candidate_values_kib": [
+          82736,
+          82684
+        ],
+        "control_median_kib": 82698.0,
+        "control_values_kib": [
+          82660,
+          82736
+        ],
+        "labels": [
+          "guard-normal-1",
+          "guard-normal-2",
+          "guard-normal-3",
+          "guard-normal-4"
+        ],
+        "limit_percent": 5.0,
+        "maximum_pair_delta_percent": 0.09194289862085651,
+        "median_delta_percent": 0.014510629035768701,
+        "rss_kib": {
+          "guard-normal-1": 82660,
+          "guard-normal-2": 82736,
+          "guard-normal-3": 82684,
+          "guard-normal-4": 82736
+        },
+        "variants": [
+          "control",
+          "candidate",
+          "candidate",
+          "control"
+        ]
+      }
+    }
+  },
+  "schema_version": 1,
+  "status": "pass"
+}

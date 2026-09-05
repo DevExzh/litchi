@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "clippy",
+    "--locked",
+    "-p",
+    "litchi-cfb",
+    "--all-features",
+    "--all-targets",
+    "--no-deps",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/tmp/litchi-goal-0413-control-worktree",
+  "exit_code": 101,
+  "wall_seconds": 8.293445941992104
+}

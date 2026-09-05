@@ -1,0 +1,120 @@
+[
+  {
+    "label": "cfb-legacy-tests",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-xls",
+      "-p",
+      "litchi-doc",
+      "-p",
+      "litchi-ppt",
+      "--all-features",
+      "--all-targets",
+      "--no-fail-fast"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:47:44.333488+00:00",
+    "wall_seconds": 43.153588625980774,
+    "exit_code": 0
+  },
+  {
+    "label": "cfb-default-tests",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "--no-default-features"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:48:27.487286+00:00",
+    "wall_seconds": 5.118093745986698,
+    "exit_code": 0
+  },
+  {
+    "label": "cfb-clippy",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "--all-features",
+      "--all-targets",
+      "--no-deps",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:48:32.605557+00:00",
+    "wall_seconds": 3.6409917040145956,
+    "exit_code": 101
+  },
+  {
+    "label": "cfb-clippy",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "--all-features",
+      "--all-targets",
+      "--no-deps",
+      "--",
+      "-D",
+      "warnings",
+      "-A",
+      "clippy::chunks_exact_to_as_chunks"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:48:49.872655+00:00",
+    "wall_seconds": 1.5984914470172953,
+    "exit_code": 0
+  },
+  {
+    "label": "cfb-rustdoc",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "doc",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "--all-features",
+      "--no-deps"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:48:51.471354+00:00",
+    "wall_seconds": 0.9644588190130889,
+    "exit_code": 0
+  },
+  {
+    "label": "rustfmt",
+    "argv": [
+      "rustfmt",
+      "+1.98.1",
+      "--check",
+      "--edition",
+      "2024",
+      "--config",
+      "skip_children=true",
+      "crates/litchi-cfb/src/file.rs"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:48:52.436009+00:00",
+    "wall_seconds": 0.03193239599931985,
+    "exit_code": 0
+  }
+]

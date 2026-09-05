@@ -1,0 +1,90 @@
+[
+  {
+    "label": "control-profile.script.txt",
+    "argv": [
+      "perf",
+      "script",
+      "--no-inline",
+      "-i",
+      "/tmp/litchi-goal-0413-capture/control-profile.data"
+    ],
+    "started_utc": "2026-09-05T01:56:54.096990+00:00",
+    "wall_seconds": 0.41800817899638787,
+    "exit_code": 0
+  },
+  {
+    "label": "control-profile.header.txt",
+    "argv": [
+      "perf",
+      "report",
+      "--header-only",
+      "--stdio",
+      "-i",
+      "/tmp/litchi-goal-0413-capture/control-profile.data"
+    ],
+    "started_utc": "2026-09-05T01:56:54.514997+00:00",
+    "wall_seconds": 0.013531710981624201,
+    "exit_code": 0
+  },
+  {
+    "label": "control-profile.self.txt",
+    "argv": [
+      "perf",
+      "report",
+      "--stdio",
+      "--no-inline",
+      "--no-children",
+      "--call-graph=none",
+      "--percent-limit=0",
+      "-i",
+      "/tmp/litchi-goal-0413-capture/control-profile.data"
+    ],
+    "started_utc": "2026-09-05T01:56:54.528529+00:00",
+    "wall_seconds": 0.39831792598124593,
+    "exit_code": 0
+  },
+  {
+    "label": "candidate-profile.script.txt",
+    "argv": [
+      "perf",
+      "script",
+      "--no-inline",
+      "-i",
+      "/tmp/litchi-goal-0413-capture/candidate-profile.data"
+    ],
+    "started_utc": "2026-09-05T01:56:54.926866+00:00",
+    "wall_seconds": 0.4415070340037346,
+    "exit_code": 0
+  },
+  {
+    "label": "candidate-profile.header.txt",
+    "argv": [
+      "perf",
+      "report",
+      "--header-only",
+      "--stdio",
+      "-i",
+      "/tmp/litchi-goal-0413-capture/candidate-profile.data"
+    ],
+    "started_utc": "2026-09-05T01:56:55.368375+00:00",
+    "wall_seconds": 0.011753252998460084,
+    "exit_code": 0
+  },
+  {
+    "label": "candidate-profile.self.txt",
+    "argv": [
+      "perf",
+      "report",
+      "--stdio",
+      "--no-inline",
+      "--no-children",
+      "--call-graph=none",
+      "--percent-limit=0",
+      "-i",
+      "/tmp/litchi-goal-0413-capture/candidate-profile.data"
+    ],
+    "started_utc": "2026-09-05T01:56:55.380129+00:00",
+    "wall_seconds": 0.39205287100048736,
+    "exit_code": 0
+  }
+]

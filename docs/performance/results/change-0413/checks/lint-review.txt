@@ -1,0 +1,52 @@
+0413 Clippy baseline identity review
+=================================
+
+Scope: read-only verification requested for the six Rust 1.98.1
+`clippy::chunks_exact_to_as_chunks` findings. No Cargo command, workload, or
+tracked-source edit was run by this reviewer.
+
+Repository identity
+-------------------
+- Control revision: `ceba0345220c1ca6a7f61f3fac86145b5afc55ca`
+- Candidate HEAD observed: `bf5b7f50f61ba17091ef80dc509b64378b11aaa7`
+- `git log` shows `bf5b7f50f` is the direct child of `ceba03452`, with the
+  commit message `perf(cfb): use established exact chain scratch reservation`.
+- Current tracked status was clean; only the untracked `docs/GOAL.md` was
+  present.
+- `git diff ceba03452..HEAD` for the two reviewed files contains exactly one
+  hunk in `crates/litchi-cfb/src/file.rs`: the intended
+  `SectorChainScratch::collect_exact` per-push `try_push` to `Vec::push`
+  replacement. `allocation_validation_tests.rs` is byte-identical between
+  the two revisions (`ceba` blob
+  `2edd53e16839172ea088cac6102730e340dfb638`).
+
+Six lint sites
+--------------
+The five `file.rs` source snippets and the one test snippet are identical in
+control and candidate; the last source line moved from 2898 to 2901 solely
+because of the three-line replacement hunk. SHA-256 values below are of each
+four-line source snippet beginning at the `chunks_exact` expression:
+
+| file | control line | candidate line | snippet SHA-256 |
+| --- | ---: | ---: | --- |
+| `crates/litchi-cfb/src/file.rs` | 855 | 855 | `244795c30116fa11ecb310f8d5a6da8d9dfa44d3fa0fa7e6b79509cd155d64f8` |
+| same | 919 | 919 | `e21ec11ec6e66bc916f822b32b26df4c8dfe7dac6f86784978979d9ef782f4ba` |
+| same | 1187 | 1187 | `dee1c454c09da66f7f1aeba585299a4ca03091d3f79a1828ca9c7c760db1e7f7` |
+| same | 1333 | 1333 | `c644d18194f3088c62e508abfdaff49f394611469507e4dfb43fc00dfa335f97` |
+| same | 2898 | 2901 | `d67eedb326a756ed96c83589ee4441eee85136fe6098ac6afe2df5b25435aee4` |
+| `crates/litchi-cfb/src/allocation_validation_tests.rs` | 559 | 559 | `e0d355a00725588efa152ea37c7b91622c694a3d0a18597bede5a08ea57e3b12` |
+
+The recorded 0413 checks also contain the exact strict command (Rust
+1.98.1, all features/targets, no dependencies, `-D warnings`) with exit 101,
+and the same command with only `-A clippy::chunks_exact_to_as_chunks` with
+exit 0. The scoped clean log contains no other diagnostics. Thus the lint
+exception is limited to the six unchanged control findings; it does not
+cover the changed scratch code.
+
+Conclusion
+----------
+The six findings are pre-existing with respect to the ceba control and are
+unchanged by the 0413 production hunk. The command-scoped lint result is
+valid evidence for the isolated candidate, with the remaining limitation
+that a full `-D warnings` CFB Clippy run remains red until those six unrelated
+Rust-1.98 suggestions are addressed or explicitly policy-approved.
