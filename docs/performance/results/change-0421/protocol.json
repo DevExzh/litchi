@@ -1,0 +1,40 @@
+{
+  "change": 421,
+  "declared_utc": "2026-09-05T10:25:56.846564+00:00",
+  "classification": "allocator high-water correctness repair and corrected current baseline; no optimization claim",
+  "baseline_revision": "895153733",
+  "cpu": 2,
+  "workers": 1,
+  "common_flags": [
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm"
+  ],
+  "selectors": [
+    "pptx_cross_copy_media_rich_lifecycle",
+    "pptx_cross_copy_plain_lifecycle"
+  ],
+  "repeats": 2,
+  "samples": 30,
+  "warmups": 3,
+  "mode": "allocator",
+  "isolation": "fresh process per selector/repeat; task CPU workloads serialized; shared host background uncontrolled",
+  "hypothesis": "Atomic fetch_update returns the previous live total; forwarding it to peak can miss transient allocations. Correct post-update accounting must preserve current live totals and cumulative request counts.",
+  "acceptance": "Deterministic regression tests fail before correction and pass afterward. Corrected raw snapshots must satisfy peak >= live at each quiescent observation; reports retain exact corpus/output/refusal gates.",
+  "limits": "No allocator elapsed-time comparison, no performance improvement claim, no operation-local peak or physical realloc-overlap measurement. Existing historical peak fields are suspect and remain immutable."
+}

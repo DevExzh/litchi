@@ -1,0 +1,79 @@
+{
+  "capture": null,
+  "change": 421,
+  "claim_authorized": false,
+  "claim_withheld_reason": "allocator instrumentation is excluded from latency claims",
+  "classification": "matched allocation/resource diagnostic",
+  "lane": "allocator",
+  "performance_claim": null,
+  "report_count": 1,
+  "reports": [
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 369986715,
+          "min": 369977259,
+          "sum": 11099424938
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 59717,
+          "min": 59714,
+          "sum": 1791454
+        },
+        "deallocated_bytes": {
+          "count": 30,
+          "max": 302355447,
+          "min": 302345991,
+          "sum": 9070486898
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 48950,
+          "min": 48947,
+          "sum": 1468444
+        },
+        "failed_allocation_calls": {
+          "count": 30,
+          "max": 0,
+          "min": 0,
+          "sum": 0
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 7305,
+          "min": 7305,
+          "sum": 219150
+        },
+        "status": "measured"
+      },
+      "binary_sha256": "bd6dfd4d0db2bafcd423f2bb4076e33d3c82eccc77061f530528c87cdb399cf9",
+      "corpus_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "elapsed": {
+        "confidence_interval_95": {
+          "lower": 761462875.9540963,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 764898853.445904
+        },
+        "max": 783921997,
+        "mean": 763180864.7000002,
+        "min": 757205468,
+        "p50": 761870499,
+        "p95": 769019672,
+        "p99": 783921997,
+        "sample_count": 30,
+        "standard_deviation": 4601375.010618824
+      },
+      "leg": "single",
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "output_vector_sha256": "d075976dccef89faf6df28685b5051982bde0e45c70bd3d3fc1a81d4c8df4076",
+      "report_sha256": "3afccb2c4e3b192bedd121b77ef3b9dbc96773009be1528673058b3d16e8e202",
+      "revision": "dc7cb687da2fc629695510b9610c97a0233f9df1",
+      "sample_order_sha256": "962fc04e567519aa501cf5244a397abdd033fa3cc08ff68a9f4cbcc850aca85e"
+    }
+  ],
+  "samples": 30,
+  "selector": "pptx_cross_copy_media_rich_lifecycle",
+  "warmups": 3
+}

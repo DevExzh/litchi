@@ -1,0 +1,63 @@
+{
+  "change": 421,
+  "checks": [
+    {
+      "args": [
+        "--replay"
+      ],
+      "exit_code": 0,
+      "script": "summarize.py",
+      "stderr": "",
+      "stdout": "{\"change\": 421, \"replay\": true, \"runs\": 4, \"status\": \"pass\"}\n"
+    },
+    {
+      "args": [],
+      "exit_code": 0,
+      "script": "check-report-guards.py",
+      "stderr": "",
+      "stdout": "{\"status\": \"pass\", \"checks\": 5}\n"
+    },
+    {
+      "args": [
+        "--repo-root",
+        "<EXPORT>",
+        "--report",
+        "<EXPORT>/docs/performance/results/change-0421/checks/normal-identity/report.json",
+        "--catalog",
+        "<EXPORT>/docs/performance/results/change-0421/checks/normal-identity/catalog.json",
+        "--lane",
+        "normal",
+        "--samples",
+        "1",
+        "--warmups",
+        "0",
+        "--selector",
+        "pptx_cross_copy_plain_lifecycle"
+      ],
+      "exit_code": 0,
+      "script": "verify.py",
+      "stderr": "",
+      "stdout": "{\n  \"capture\": null,\n  \"change\": 421,\n  \"claim_authorized\": false,\n  \"claim_withheld_reason\": \"a four-leg ABBA comparison is required\",\n  \"classification\": \"matched allocation/resource diagnostic\",\n  \"lane\": \"normal\",\n  \"performance_claim\": null,\n  \"report_count\": 1,\n  \"reports\": [\n    {\n      \"allocation\": {\n        \"status\": \"unavailable\"\n      },\n      \"binary_sha256\": \"f5fd9d3709849afe4f3e29d5269a1038f4135ad9cbc1b773b499837babd7c278\",\n      \"corpus_archive_sha256\": \"85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f\",\n      \"elapsed\": {\n        \"max\": 9707907,\n        \"mean\": 9707907.0,\n        \"min\": 9707907,\n        \"p50\": 9707907,\n        \"p95\": 9707907,\n        \"p99\": 9707907,\n        \"sample_count\": 1,\n        \"standard_deviation\": 0.0\n      },\n      \"leg\": \"single\",\n      \"output_sha256\": \"3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22\",\n      \"output_vector_sha256\": \"1a722814a5cbe3e8c27ccfc1b88862b0acd52680ea70d80a136af021d28857a7\",\n      \"report_sha256\": \"41c63ba3009d92a369d3f6e15725c572ee2cfe7ddd1641c0af3176245b774f39\",\n      \"revision\": \"dc7cb687da2fc629695510b9610c97a0233f9df1\",\n      \"sample_order_sha256\": \"d0bca111f8628137adc4c16f123496dcdd1d590d06cb5d9acd68b39fe656fb97\"\n    }\n  ],\n  \"samples\": 1,\n  \"selector\": \"pptx_cross_copy_plain_lifecycle\",\n  \"warmups\": 0\n}\n"
+    }
+  ],
+  "status": "pass",
+  "temporary_export_removed": true,
+  "tools": [
+    {
+      "path": "tools/perf_abba_summary.py",
+      "sha256": "b0fe8b782c97cacff953c63c75599d3665063451d07a6912c25a123082e2b9c4"
+    },
+    {
+      "path": "tools/perf_compare.py",
+      "sha256": "3051dd0ee89406949f396645bbed4f213570770f5dc1eb1b02b03b51d2c6c4e2"
+    },
+    {
+      "path": "tools/perf_resource_profile.py",
+      "sha256": "e80c9706189f942ccce645685dafea8612e5e0dc6ea5e659bd1490ffc3256cc4"
+    },
+    {
+      "path": "tools/validate_perf_corpus_binding.py",
+      "sha256": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558"
+    }
+  ]
+}

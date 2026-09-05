@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0421: allocator high-water correction
+
+[0421](changes/0421-allocator-peak-counter.md) fixes a benchmark counter that
+used pre-allocation live bytes when updating the process peak. Historical
+`peak_live_bytes_*` numbers and derived differences require corrected captures;
+raw reports remain unchanged. Live-byte totals, allocation request counts and
+bytes, normal timing, RSS and independent Heaptrack metrics are unaffected by
+this specific defect. New allocator reports carry `post_update_peak_v2`,
+preventing comparison with markerless historical reports under one policy.
+
 ## Change 0420: owned OPC payload storage reuse
 
 [0420](changes/0420-opc-owned-payload-reuse.md) reduces the measured media-rich

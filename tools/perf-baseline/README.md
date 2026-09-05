@@ -1,5 +1,13 @@
 # OPC, CFB, OLE2 Office, OOXML, RTF, and ODF performance baseline
 
+Allocator evidence correction: [change 0421](../../docs/performance/changes/0421-allocator-peak-counter.md)
+fixes under-reported `peak_live_bytes_*` values. Corrected allocator reports
+include `tool.allocator_counter_revision = "post_update_peak_v2"`; normal reports
+omit this field. Existing markerless allocator policies and baselines remain
+historical and reject corrected reports. Re-capture both sides before opting
+a policy into the new marker. Calls, requested bytes, live-byte totals and
+independent RSS/Heaptrack measurements are unaffected by this defect.
+
 `litchi-perf-baseline` is an isolated, reproducible measurement tool for the
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
 public-API XLSX snapshot/edit/save flows, matched opt-in XLSX scalar-cell

@@ -1,0 +1,79 @@
+{
+  "capture": null,
+  "change": 421,
+  "claim_authorized": false,
+  "claim_withheld_reason": "allocator instrumentation is excluded from latency claims",
+  "classification": "matched allocation/resource diagnostic",
+  "lane": "allocator",
+  "performance_claim": null,
+  "report_count": 1,
+  "reports": [
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 15664317,
+          "min": 15664317,
+          "sum": 469929510
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 49335,
+          "min": 49335,
+          "sum": 1480050
+        },
+        "deallocated_bytes": {
+          "count": 30,
+          "max": 15236065,
+          "min": 15236065,
+          "sum": 457081950
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 40652,
+          "min": 40652,
+          "sum": 1219560
+        },
+        "failed_allocation_calls": {
+          "count": 30,
+          "max": 0,
+          "min": 0,
+          "sum": 0
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 6085,
+          "min": 6085,
+          "sum": 182550
+        },
+        "status": "measured"
+      },
+      "binary_sha256": "bd6dfd4d0db2bafcd423f2bb4076e33d3c82eccc77061f530528c87cdb399cf9",
+      "corpus_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+      "elapsed": {
+        "confidence_interval_95": {
+          "lower": 10195646.041220862,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 10245520.025445804
+        },
+        "max": 10518308,
+        "mean": 10220583.033333333,
+        "min": 10151397,
+        "p50": 10206357,
+        "p95": 10277348,
+        "p99": 10518308,
+        "sample_count": 30,
+        "standard_deviation": 66789.99069109197
+      },
+      "leg": "single",
+      "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "output_vector_sha256": "57b461542561c83967ab2f8155439a4f906e03fe1a36f50a0c1b89f5e1750a41",
+      "report_sha256": "d37289b71fce8513be8995e9c44634eb0d4dd5359b0f24e64c8134547f8b9597",
+      "revision": "dc7cb687da2fc629695510b9610c97a0233f9df1",
+      "sample_order_sha256": "81fd744256e9faa27adb525b95f7983db4b4754c359c6c19d57f01a299e8be19"
+    }
+  ],
+  "samples": 30,
+  "selector": "pptx_cross_copy_plain_lifecycle",
+  "warmups": 3
+}

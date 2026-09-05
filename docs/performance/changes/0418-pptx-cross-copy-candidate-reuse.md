@@ -1,5 +1,11 @@
 # Change 0418: reuse proven owned PPTX cross-copy candidates
 
+> Correction (0421): allocator `peak_live_bytes_*` values in this record
+> may under-report peaks and must not support high-water claims.
+> [Counter correction](0421-allocator-peak-counter.md) explains the defect.
+> Live-byte totals, allocation requests, normal timing, RSS and Heaptrack
+> metrics are unaffected by this specific bug. Raw reports are unchanged.
+
 `performance_claim: scoped warm owned PPTX latency; memory tradeoff reviewed separately`
 
 `claim_authorized: true; primary media lifecycle latency only`
