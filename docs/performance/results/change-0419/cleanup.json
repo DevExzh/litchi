@@ -19,5 +19,91 @@
     "target",
     "tools/perf-baseline/target"
   ],
-  "status": "pass"
+  "status": "pass",
+  "retained_agent_diagnostics": [
+    {
+      "removed_temporary": "/tmp/litchi-goal-0419-probe-bad-sample-order.log",
+      "retained_path": "checks/agent-validation/litchi-goal-0419-probe-bad-sample-order.log.gz",
+      "raw_bytes": 120,
+      "raw_sha256": "7656730c089f0f501bf3e35d891283ae6488040546573171a7582e01e7d117c0",
+      "stored_sha256": "8955ff5254b9b44d820384874faa7b75b9193f0cba5ac76bebd5ab3c6e9772aa"
+    },
+    {
+      "removed_temporary": "/tmp/litchi-goal-0419-probe-false-gate.log",
+      "retained_path": "checks/agent-validation/litchi-goal-0419-probe-false-gate.log.gz",
+      "raw_bytes": 174,
+      "raw_sha256": "67e63e5c1f054ea907e2686991b1aa5af00e40ee39c03106ee03f764144d0d96",
+      "stored_sha256": "c04e37dfe7bf406245334841e28b809b75eeedc8282327aec1c0311192039554"
+    },
+    {
+      "removed_temporary": "/tmp/litchi-goal-0419-probe-wrong-output-vector.log",
+      "retained_path": "checks/agent-validation/litchi-goal-0419-probe-wrong-output-vector.log.gz",
+      "raw_bytes": 183,
+      "raw_sha256": "e400f7f52250773ee9330768c58b1f588e77065efc88a88310be5e28d3ac42ae",
+      "stored_sha256": "ec643412d2aee075ce221a148dcaf3a19b1232d5f4299f9539e008a00d0e3fe7"
+    },
+    {
+      "removed_temporary": "/tmp/litchi-goal-0419-verify-allocator-existing.log",
+      "retained_path": "checks/agent-validation/litchi-goal-0419-verify-allocator-existing.log.gz",
+      "raw_bytes": 8534,
+      "raw_sha256": "6f6e907fc7b44504fd43187104932221781625bbd205414ee700c479d656f6be",
+      "stored_sha256": "65c068c774cdc756c7df7ea6f0adcfffc42265da6db4c62075bb33ae30b800d9"
+    },
+    {
+      "removed_temporary": "/tmp/litchi-goal-0419-verify-heaptrack-final.log",
+      "retained_path": "checks/agent-validation/litchi-goal-0419-verify-heaptrack-final.log.gz",
+      "raw_bytes": 1543,
+      "raw_sha256": "529eef448f37aab67318a72a7e5f16e351e69d805c731c94a6b911f31984c82b",
+      "stored_sha256": "7153621b9cf0970e62c97e489a77414171dd48f8fe0010976b61ff60fd3e9fc6"
+    },
+    {
+      "removed_temporary": "/tmp/litchi-goal-0419-verify-heaptrack.log",
+      "retained_path": "checks/agent-validation/litchi-goal-0419-verify-heaptrack.log.gz",
+      "raw_bytes": 1543,
+      "raw_sha256": "529eef448f37aab67318a72a7e5f16e351e69d805c731c94a6b911f31984c82b",
+      "stored_sha256": "7153621b9cf0970e62c97e489a77414171dd48f8fe0010976b61ff60fd3e9fc6"
+    },
+    {
+      "removed_temporary": "/tmp/litchi-goal-0419-verify-help.log",
+      "retained_path": "checks/agent-validation/litchi-goal-0419-verify-help.log.gz",
+      "raw_bytes": 1977,
+      "raw_sha256": "7a0cc3597fc4424aaa2dee4ef9975a6c6f4ede77a4330e10430dc77e7918e80f",
+      "stored_sha256": "af5d9d45e42b4acf637e15d941c5bd2ac1ec2d484ceb3f64c55b0630dc91350f"
+    },
+    {
+      "removed_temporary": "/tmp/litchi-goal-0419-verify-normal-existing.log",
+      "retained_path": "checks/agent-validation/litchi-goal-0419-verify-normal-existing.log.gz",
+      "raw_bytes": 5141,
+      "raw_sha256": "13effca880952c100e9477ced0cf1a68c5e00e0d133e95ac0dfacc4da5b6c297",
+      "stored_sha256": "b1095f7accede867c508734bb4eeed9820d79b61c8c6bc4a2f39daa42853a732"
+    },
+    {
+      "removed_temporary": "/tmp/litchi-goal-0419-verify-probes-final.log",
+      "retained_path": "checks/agent-validation/litchi-goal-0419-verify-probes-final.log.gz",
+      "raw_bytes": 32,
+      "raw_sha256": "09de9ca376df39b46c78c42171bba1a778ff824e589f8b57f2c9ea1a046ee1a4",
+      "stored_sha256": "aec42405a0ffd32975630cb664cd8d4d6078b90675661126ef59bf9c44c469a6"
+    },
+    {
+      "removed_temporary": "/tmp/litchi-goal-0419-verify-probes.log",
+      "retained_path": "checks/agent-validation/litchi-goal-0419-verify-probes.log.gz",
+      "raw_bytes": 32,
+      "raw_sha256": "09de9ca376df39b46c78c42171bba1a778ff824e589f8b57f2c9ea1a046ee1a4",
+      "stored_sha256": "aec42405a0ffd32975630cb664cd8d4d6078b90675661126ef59bf9c44c469a6"
+    }
+  ],
+  "removed_review_projections": [
+    {
+      "path": "/tmp/0419-control-selected.json",
+      "bytes": 28028,
+      "sha256": "4d026d81c6da3ff0c6e361bae9f65e74ec06d73acbd5997ec6a78ed4eebb3c48",
+      "authoritative_evidence": "heaptrack/control/analysis.json"
+    },
+    {
+      "path": "/tmp/0419-candidate-selected.json",
+      "bytes": 7580,
+      "sha256": "cdfb1413b130016d01ca173707c932686fbd62160944aaf8197c55ede3bae541",
+      "authoritative_evidence": "heaptrack/candidate/analysis.json"
+    }
+  ]
 }
