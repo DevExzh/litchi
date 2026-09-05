@@ -1,0 +1,76 @@
+eager-attribution.json
+======================
+case: xls_eager_open_one_cell
+whole_process: period=5270983655 blocks=1290
+unknown_stack: period=86502442 (1.641106%) blocks=34 frames=179
+run_xls_source_backed_case parent observation: period=4085977032 (77.518302%) blocks=942
+whole-process top leafs:
+    1698549648    32.225% __memmove_avx512_unaligned_erms
+     945752591    17.943% sha2::sha256::x86_sha::compress
+     208279357     3.951% litchi_cfb::file::try_push::<u32>
+     181964361     3.452% <litchi_cfb::file::SectorChainScratch>::collect_exact
+     156025800     2.960% <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::claim_sector
+     126878410     2.407% _int_malloc
+     125797544     2.387% litchi_cfb::file::read_u32_le
+     103364954     1.961% litchi_perf_baseline::payload_bytes
+      95462592     1.811% unlink_chunk.isra.0
+      95175697     1.806% <std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&u16>
+production subsets:
+  eager_workbook_from_ole_file: period=0 (0.000000%) blocks=0
+  eager_workbook_new: period=2365298167 (44.873942%) blocks=547
+    leaf    208279357    8.806% litchi_cfb::file::try_push::<u32>
+    leaf    181964361    7.693% <litchi_cfb::file::SectorChainScratch>::collect_exact
+    leaf    156025800    6.596% <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::claim_sector
+    leaf    125934234    5.324% _int_malloc
+    leaf    125797544    5.318% litchi_cfb::file::read_u32_le
+  source_backed_cell_value_by_index: period=0 (0.000000%) blocks=0
+  source_backed_from_read_at: period=0 (0.000000%) blocks=0
+nonzero diagnostic helper whole-process shares:
+  cfb_ole_open: period=820693134 (15.570019%) blocks=191
+
+source-backed-attribution.json
+==============================
+case: xls_source_backed_open_one_cell
+whole_process: period=30600358794 blocks=7057
+unknown_stack: period=211842783 (0.692289%) blocks=73 frames=325
+run_xls_source_backed_case parent observation: period=29341798929 (95.887107%) blocks=6682
+whole-process top leafs:
+   26728687730    87.348% <litchi_perf_baseline::InstrumentedSource as litchi_core::source::ReadAt>::read_at
+    1705132319     5.572% __memmove_avx512_unaligned_erms
+     942353602     3.080% sha2::sha256::x86_sha::compress
+     213369383     0.697% <litchi_cfb::file::SectorChainScratch>::collect_exact
+     210767174     0.689% litchi_cfb::file::try_push::<u32>
+     200493561     0.655% [unknown]
+      98007905     0.320% litchi_perf_baseline::payload_bytes
+      87836825     0.287% <litchi_cfb::file::OleFile<litchi_cfb::shared::ReadAtCursor>>::validate_stream_allocations
+      70304954     0.230% <litchi_cfb::file::OleFile<litchi_cfb::shared::ReadAtCursor>>::validate_physical_sector_layout
+      70187826     0.229% <litchi_cfb::file::OleFile<litchi_cfb::shared::ReadAtCursor>>::claim_sector
+production subsets:
+  eager_workbook_from_ole_file: period=0 (0.000000%) blocks=0
+  eager_workbook_new: period=4684470 (0.015309%) blocks=2
+    leaf      2848230   60.802% cfree@GLIBC_2.2.5
+    leaf      1836240   39.198% <litchi_xls::comments::codec::CommentCollector>::retain_object_record
+  source_backed_cell_value_by_index: period=2082736411 (6.806248%) blocks=474
+    leaf   2073939095   99.578% <litchi_perf_baseline::InstrumentedSource as litchi_core::source::ReadAt>::read_at
+    leaf      4400001    0.211% <litchi_cfb::shared::SharedOleStreamCursor>::move_forward
+    leaf      4397315    0.211% <litchi_perf_baseline::InstrumentedSource as litchi_core::source::ReadAt>::version
+  source_backed_from_read_at: period=25467135865 (83.224958%) blocks=5800
+    leaf  24654748635   96.810% <litchi_perf_baseline::InstrumentedSource as litchi_core::source::ReadAt>::read_at
+    leaf    210767174    0.828% litchi_cfb::file::try_push::<u32>
+    leaf    210733037    0.827% <litchi_cfb::file::SectorChainScratch>::collect_exact
+    leaf     87836825    0.345% <litchi_cfb::file::OleFile<litchi_cfb::shared::ReadAtCursor>>::validate_stream_allocations
+    leaf     70304954    0.276% <litchi_cfb::file::OleFile<litchi_cfb::shared::ReadAtCursor>>::validate_physical_sector_layout
+nonzero diagnostic helper whole-process shares:
+  cfb_ole_open: period=6121843 (0.020006%) blocks=3
+  cfb_ole_open_with_limits: period=20393934621 (66.646064%) blocks=4645
+  cfb_read_sector_into: period=19577182824 (63.976971%) blocks=4459
+  instrumented_source_read_at: period=26842855928 (87.720723%) blocks=6113
+  instrumented_source_read_exact_at: period=7076820922 (23.126595%) blocks=1611
+  read_at_trait_helper: period=26842855928 (87.720723%) blocks=6113
+  shared_ole_open_with_limits: period=20393934621 (66.646064%) blocks=4645
+  shared_ole_read_stream_range: period=61472715 (0.200889%) blocks=14
+  shared_ole_stream_move_forward: period=13191456 (0.043109%) blocks=3
+  shared_ole_stream_read_exact: period=7037323996 (22.997521%) blocks=1602
+  source_query_cell: period=2082736411 (6.806248%) blocks=474
+  source_worksheet_next_frame: period=1933300415 (6.317901%) blocks=440
+  source_worksheet_read_payload: period=158224721 (0.517068%) blocks=36

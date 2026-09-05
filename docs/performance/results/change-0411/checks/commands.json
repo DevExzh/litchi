@@ -1,0 +1,77 @@
+[
+  {
+    "label": "xlsx-clippy",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--all-targets",
+      "--no-deps",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T00:17:43.402097+00:00",
+    "wall_seconds": 0.6337934529874474,
+    "exit_code": 0
+  },
+  {
+    "label": "xlsx-tests",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--no-fail-fast"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T00:17:44.036055+00:00",
+    "wall_seconds": 34.38654387500719,
+    "exit_code": 0
+  },
+  {
+    "label": "harness-xls-tests",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--lib",
+      "xls_source_"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T00:19:56.413224+00:00",
+    "wall_seconds": 45.28391734699835,
+    "exit_code": 0
+  },
+  {
+    "label": "harness-xls-allocator-tests",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--lib",
+      "--",
+      "--test-threads=4",
+      "xls_source_",
+      "allocation_metrics::tests"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T00:27:18.446648+00:00",
+    "wall_seconds": 11.182520738992025,
+    "exit_code": 0
+  }
+]

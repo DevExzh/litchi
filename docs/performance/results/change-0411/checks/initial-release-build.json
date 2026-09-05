@@ -1,0 +1,31 @@
+{
+  "revision": "1f54d359e1ad72eb72c46134e256b80eb976201a",
+  "source_status": "",
+  "build_environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0411-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes"
+  },
+  "build_command": [
+    "cargo",
+    "+1.98.1",
+    "build",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--release",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline",
+    "--bin",
+    "litchi-perf-baseline-alloc"
+  ],
+  "build_cwd": "/tmp/litchi-goal-0411-worktree",
+  "started_utc": "2026-09-05T00:22:44.852972+00:00",
+  "wall_seconds": 227.42154871601088,
+  "exit_code": 0
+}

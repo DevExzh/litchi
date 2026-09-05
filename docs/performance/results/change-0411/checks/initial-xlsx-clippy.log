@@ -1,0 +1,202 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.22
+   Compiling quote v1.0.44
+    Checking typenum v1.20.1
+    Checking zeroize v1.9.0
+    Checking cfg-if v1.0.4
+   Compiling serde_core v1.0.229
+   Compiling libc v0.2.189
+   Compiling crossbeam-utils v0.8.22
+    Checking cpufeatures v0.3.1
+    Checking cmov v0.5.4
+    Checking hybrid-array v0.4.14
+    Checking stable_deref_trait v1.2.1
+   Compiling syn v2.0.114
+    Checking ctutils v0.4.2
+    Checking crypto-common v0.2.2
+    Checking block-buffer v0.12.1
+   Compiling autocfg v1.5.1
+    Checking smallvec v1.16.0
+   Compiling crossbeam-epoch v0.9.20
+    Checking const-oid v0.10.2
+   Compiling num-traits v0.2.19
+    Checking digest v0.11.3
+   Compiling syn v3.0.4
+   Compiling serde v1.0.229
+   Compiling getrandom v0.4.3
+    Checking memchr v2.8.3
+    Checking rand_core v0.10.1
+   Compiling crossbeam-deque v0.8.7
+   Compiling zmij v1.0.19
+   Compiling thiserror v2.0.18
+   Compiling rayon-core v1.13.0
+   Compiling serde_json v1.0.149
+   Compiling zerocopy v0.8.56
+    Checking chacha20 v0.10.2
+    Checking once_cell v1.21.4
+    Checking iana-time-zone v0.1.65
+    Checking writeable v0.5.5
+    Checking itoa v1.0.18
+   Compiling icu_locid_transform_data v1.5.1
+    Checking litemap v0.7.3
+    Checking rand v0.10.2
+   Compiling synstructure v0.13.2
+   Compiling serde_derive v1.0.229
+    Checking sha2 v0.11.0
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.7.5
+   Compiling zerovec-derive v0.10.4
+    Checking zerofrom v0.1.4
+    Checking yoke v0.7.4
+   Compiling displaydoc v0.2.6
+   Compiling thiserror-impl v2.0.18
+    Checking zerovec v0.10.4
+    Checking chrono v0.4.45
+   Compiling icu_provider_macros v1.5.0
+    Checking tinystr v0.7.6
+    Checking icu_locid v1.5.0
+    Checking either v1.18.0
+   Compiling icu_properties_data v1.5.1
+    Checking base64 v0.22.1
+    Checking fast-float2 v0.2.4
+    Checking rayon v1.12.0
+    Checking icu_provider v1.5.0
+    Checking block-padding v0.4.2
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling icu_normalizer_data v1.5.1
+    Checking inout v0.2.2
+    Checking icu_locid_transform v1.5.0
+    Checking icu_collections v1.5.0
+    Checking cipher v0.5.2
+    Checking icu_properties v1.5.1
+   Compiling zerocopy-derive v0.8.56
+    Checking quick-xml v0.41.0
+    Checking bitflags v2.13.1
+    Checking encoding_rs v0.8.35
+   Compiling crc32fast v1.5.1
+    Checking fixedbitset v0.5.7
+   Compiling rustix v1.1.4
+    Checking write16 v1.0.0
+   Compiling getrandom v0.3.4
+    Checking utf8_iter v1.0.4
+   Compiling rustversion v1.0.23
+    Checking utf16_iter v1.0.5
+    Checking icu_normalizer v1.5.0
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking zlib-rs v0.6.7
+    Checking tinyvec_macros v0.1.1
+    Checking linux-raw-sys v0.12.1
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking flate2 v1.1.10
+    Checking tinyvec v1.12.0
+    Checking idna_adapter v1.2.0
+    Checking fastrand v2.5.0
+    Checking debug_unsafe v0.1.4
+    Checking cpubits v0.1.1
+    Checking percent-encoding v2.3.2
+    Checking aes v0.9.3
+    Checking form_urlencoded v1.2.2
+    Checking unicode-normalization v0.1.25
+    Checking atoi_simd v0.18.1
+    Checking tempfile v3.27.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking idna v1.1.0
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking cbc v0.2.1
+    Checking rc4 v0.2.0
+    Checking sha1 v0.11.0
+    Checking hmac v0.13.0
+    Checking subtle v2.6.1
+    Checking url v2.5.8
+    Checking caseless v0.2.2
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking ryu v1.0.22
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+error: unnecessary qualification
+  --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:14:5
+   |
+14 |     std::result::Result<T, Box<litchi_ooxml_common::mce::StreamError<crate::Error, crate::Error>>>;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+   |
+14 -     std::result::Result<T, Box<litchi_ooxml_common::mce::StreamError<crate::Error, crate::Error>>>;
+14 +     Result<T, Box<litchi_ooxml_common::mce::StreamError<crate::Error, crate::Error>>>;
+   |
+
+error: unnecessary qualification
+  --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:17:13
+   |
+17 |       result: std::result::Result<
+   |  _____________^
+18 | |         T,
+19 | |         litchi_ooxml_common::mce::StreamError<crate::Error, crate::Error>,
+20 | |     >,
+   | |_____^
+   |
+help: remove the unnecessary path segments
+   |
+17 -     result: std::result::Result<
+17 +     result: Result<
+   |
+
+error[E0277]: the trait bound `[u8; 8]: std::convert::TryFrom<&[u8; 8]>` is not satisfied
+   --> crates/litchi-xlsx/src/package/xldm/compression.rs:167:18
+    |
+167 |                 .try_into()
+    |                  ^^^^^^^^ the trait `std::convert::From<&[u8; 8]>` is not implemented for `[u8; 8]`
+    |
+help: `[u8; 8]` implements trait `std::convert::From<T>`
+   --> /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-0.8.56/src/byteorder.rs:629:9
+    |
+629 |           impl<O: ByteOrder> From<$name<O>> for [u8; $bytes] {
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |           |
+    |           `std::convert::From<zerocopy::byteorder::F64<O>>`
+    |           `std::convert::From<zerocopy::byteorder::I64<O>>`
+    |           `std::convert::From<zerocopy::byteorder::U64<O>>`
+...
+770 | / define_type!(
+771 | |     A,
+772 | |     "A 64-bit unsigned integer",
+773 | |     U64,
+...   |
+785 | |     [U128]
+786 | | );
+    | |_- in this macro invocation
+...
+855 | / define_type!(
+856 | |     An,
+857 | |     "A 64-bit signed integer",
+858 | |     I64,
+...   |
+870 | |     [I128]
+871 | | );
+    | |_- in this macro invocation
+...
+956 | / define_type!(
+957 | |     An,
+958 | |     "A 64-bit floating point number",
+959 | |     F64,
+...   |
+971 | |     []
+972 | | );
+    | |_- in this macro invocation
+    = note: required for `&[u8; 8]` to implement `std::convert::Into<[u8; 8]>`
+    = note: required for `[u8; 8]` to implement `std::convert::TryFrom<&[u8; 8]>`
+    = note: required for `&[u8; 8]` to implement `std::convert::TryInto<[u8; 8]>`
+    = note: this error originates in the macro `define_type` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `litchi-xlsx` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-xlsx` (lib test) due to 3 previous errors

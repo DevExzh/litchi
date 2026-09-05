@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/tmp/litchi-goal-0411-verify.py", line 106, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/tmp/litchi-goal-0411-verify.py", line 89, in main
+    assert len(values)==samples;summary['source']['xls'][field]=constant(values,field)
+                                                                ~~~~~~~~^^^^^^^^^^^^^^
+  File "/tmp/litchi-goal-0411-verify.py", line 20, in constant
+    assert values and len(set(values))==1,label
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: opaque_payload_read_bytes

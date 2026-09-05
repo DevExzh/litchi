@@ -1,0 +1,23 @@
+[
+  {
+    "label": "xlsx-clippy",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--all-targets",
+      "--no-deps",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T00:16:23.792914+00:00",
+    "wall_seconds": 17.125766327997553,
+    "exit_code": 101
+  }
+]

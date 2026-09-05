@@ -1,0 +1,12 @@
+# started on Sat Sep  5 00:30:46 2026
+
+680.32,msec,task-clock,680321938,100.00,,
+2894498246,,cycles,570176731,83.00,,
+5923433001,,instructions,570304070,83.00,,
+856600488,,branches,569696921,83.00,,
+2415591,,branch-misses,567867292,83.00,,
+57347,,page-faults,680321938,100.00,,
+45,,context-switches,680321938,100.00,,
+0,,cpu-migrations,680321938,100.00,,
+184730285,,l2_cache_req_stat.dc_access_in_l2,559580175,82.00,,
+170784104,,l2_cache_req_stat.dc_hit_in_l2,563984501,83.00,,

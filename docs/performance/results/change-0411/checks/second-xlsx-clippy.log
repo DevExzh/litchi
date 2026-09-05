@@ -1,0 +1,26 @@
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+error: allocating a new `String` only to create a temporary `&str` from it
+    --> crates/litchi-xlsx/tests/source_backed_cell_values.rs:2768:17
+     |
+2768 | /                 &String::from_utf8(
+2769 | |                     replay
+2770 | |                         .get_part(&PackURI::new(SHEET).unwrap())
+2771 | |                         .unwrap()
+...    |
+2775 | |                 .unwrap(),
+     | |_________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_to_owned
+     = note: `-D clippy::unnecessary-to-owned` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::unnecessary_to_owned)]`
+help: convert from `&[u8]` to `&str` directly
+     |
+2768 ~                 core::str::from_utf8(
+2769 ~                     replay
+2770 +                         .get_part(&PackURI::new(SHEET).unwrap())
+2771 +                         .unwrap()
+2772 ~                         .blob(),
+     |
+
+error: could not compile `litchi-xlsx` (test "source_backed_cell_values") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

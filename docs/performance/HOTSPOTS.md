@@ -59,6 +59,24 @@ source edit/save harness also fixes previously unconfigured member ranges;
 corrected compressed overlap includes untouched raw publication and must not
 be read as semantic decoding. No speedup is claimed by 0409.
 
+## Change 0411 update
+
+[0411](changes/0411-xls-read-allocation-baseline.md) supplies a current matched
+XLS open/list/one-cell baseline with operation allocation observations. The
+source one-cell path records 488 calls / 280,542 bytes, compared with the
+separate eager observation of 7,260 calls / 1,015,781 bytes. Four normal repeats
+place source one-cell p50 at 6.016–6.052 ms and eager at 0.510–0.515 ms; these
+instrumented families are not a source/eager speedup comparison.
+
+The source CPU profile assigns 87.35% of whole-process leaf weight to
+`InstrumentedSource::read_at`, including 96.81% of source-open subset leaf
+weight and 99.58% of selected-cell subset leaf weight. This makes diagnostic
+range accounting the next measurement problem to isolate. Preserve full
+locality replay while testing a cheaper observer or a matched plain source;
+then re-rank production XLS/CFB costs. The eager whole-process profile also
+contains substantial setup/copy/hash work. PMU counts are whole-process and
+multiplexed; exact L1/LLC, cold input, remote input and scaling remain open.
+
 ## Change 0410 update
 
 The MCE stream ownership change in

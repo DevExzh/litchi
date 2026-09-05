@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "change": "0411",
+  "declared_utc": "2026-09-05T00:19:00.384037+00:00",
+  "performance_claim": "none",
+  "purpose": "Current descriptive XLS open/list/one-cell baseline with operation allocation and source locality",
+  "cpu": 2,
+  "worker_count": 1,
+  "normal": {
+    "fresh_processes": 4,
+    "warmups_per_case_per_process": 20,
+    "samples_per_case_per_process": 500
+  },
+  "allocator": {
+    "fresh_processes": 2,
+    "warmups_per_case_per_process": 3,
+    "samples_per_case_per_process": 30
+  },
+  "profiles": {
+    "selectors": [
+      "xls_eager_open_one_cell",
+      "xls_source_backed_open_one_cell"
+    ],
+    "samples": 1000,
+    "warmups": 20,
+    "event": "cycles:u",
+    "frequency_hz": 999,
+    "call_graph": "fp,127"
+  },
+  "counters": {
+    "repetitions_per_one_cell_selector": 3,
+    "samples": 300,
+    "warmups": 10,
+    "scope": "whole process including generation, cloning, validation, reporting; not operation-local"
+  },
+  "cases": [
+    "xls_semantic_open",
+    "xls_source_backed_open",
+    "xls_eager_open_list_worksheets",
+    "xls_source_backed_open_list_worksheets",
+    "xls_eager_open_one_cell",
+    "xls_source_backed_open_one_cell"
+  ],
+  "corpus_generator": "litchi-xls-comments-opaque-heavy-v1",
+  "corpus_expected": {
+    "archive_bytes": 16995840,
+    "workbook_bytes": 80946,
+    "worksheets": [
+      "Comments",
+      "Untouched"
+    ],
+    "selected_cell": "Untouched!E21",
+    "selected_value": 42.0,
+    "opaque_streams": 8,
+    "opaque_stream_bytes": 2097152,
+    "name": "xls-comments-opaque-heavy",
+    "shape": "256-comments-opaque-heavy",
+    "entry_count": 257,
+    "archive_member_count": 10,
+    "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+    "workbook_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041",
+    "target_entry": "Workbook",
+    "opaque_identity": "All opaque streams are bound by the exact archive SHA and deterministic generator; per-stream SHA vectors are not exposed by this runner."
+  },
+  "timing_scope": "Both families time fresh workbook open plus requested projection. Archive cloning, source construction, layout/oracle, postvalidation and owner drop are excluded. Source timer includes diagnostic ReadAt observation. Source/eager are separate descriptive families; no cross-family speedup.",
+  "allocation_scope": "Separate counting-System allocator executable. begin immediately before Instant; finish immediately after elapsed; includes temporary and retained owner/query allocation, excludes owner drop, source construction and archive clone. Peak counters are process lifetime snapshots, not isolated operation peaks.",
+  "cache_scope": "Warm in-memory generated corpus; samples share each child. Global filesystem_cache_states/fresh_child_per_sample defaults do not apply to these selectors. No filesystem or cold/remote evidence.",
+  "statistics": "Per process conventional p50 (even midpoint), nearest-rank p95/p99, mean, exact distribution-free 95% binomial/order-statistic median interval; interval assumes independent observations and does not capture host drift. Report all repeats and spread separately.",
+  "read_metrics": "ReadAt logical bytes/counts and classified range overlap are measured; exact request-size distribution, physical reads, syscall attribution and eager source counts are unavailable.",
+  "validation": "Require clean frozen source and binary SHA; matching catalog/corpus, 6case matrix, sample permutation/timing allocation alignment, stable per-family digest, matching generated projections, zero source opaque/unselected bytes and stable version. Preserve all failed runs; no production optimization keep/reject claim.",
+  "remaining": "No latency speedup, cold-file, remote, concurrent, scaling, isolated peak memory, exact LLC/L1 or broad XLS/CFB completeness claim."
+}
