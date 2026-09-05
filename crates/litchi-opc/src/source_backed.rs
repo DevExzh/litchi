@@ -6717,11 +6717,9 @@ impl SourceBackedPackage {
                 .checked_add((bytes.len() as u64).saturating_mul(2))
                 .ok_or_else(|| overlay_unavailable("topology output bound overflows u64"))?;
         }
-        if output_bound > u64::from(u32::MAX) && !self.archive.archive_is_zip64() {
-            return Err(overlay_unavailable(
-                "topology publication may require ZIP64 output",
-            ));
-        }
+        // The ZIP writer promotes the output format when ZIP64 is required;
+        // retain this checked bound solely as an overflow guard.
+        let _ = output_bound;
         Ok(())
     }
 
@@ -7106,12 +7104,9 @@ impl SourceBackedPackage {
             .checked_add(replacement_bytes.saturating_mul(2))
             .and_then(|bytes| bytes.checked_add(appended_bytes))
             .and_then(|bytes| bytes.checked_add(SOURCE_PUBLICATION_CHUNK_BYTES as u64));
-        if conservative_output_bound.is_none()
-            || (!self.archive.archive_is_zip64()
-                && conservative_output_bound.is_some_and(|bytes| bytes > u64::from(u32::MAX)))
-        {
+        if conservative_output_bound.is_none() {
             return Err(overlay_unavailable(
-                "selected Part replacement may require ZIP64 output",
+                "selected Part replacement output bound overflows u64",
             ));
         }
 
@@ -9373,6 +9368,30 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
+    fn zip32_entry_count_boundary_source() -> Vec<u8> {
+        const PART_COUNT: usize = (u16::MAX as usize - 1) - 2;
+        const CONTENT_TYPES: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="bin" ContentType="application/vnd.ms-excel.sheet.binary.macroEnabled.main"/><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
+
+        let package_relationships = Relationships::new(PACKAGE_URI.to_owned()).to_xml();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored("[Content_Types].xml", CONTENT_TYPES)
+            .expect("write boundary content types");
+        writer
+            .write_stored("_rels/.rels", package_relationships.as_bytes())
+            .expect("write boundary package relationships");
+        for index in 0..PART_COUNT {
+            let name = format!("custom/opaque-{index:05}.bin");
+            let payload = [u8::try_from(index % 251).expect("boundary payload byte")];
+            writer
+                .write_stored(&name, &payload)
+                .expect("write boundary opaque Part");
+        }
+        writer
+            .finish_to_bytes()
+            .expect("finish boundary source archive")
+    }
+
     fn read_u16(bytes: &[u8], offset: usize) -> u16 {
         u16::from_le_bytes(bytes[offset..offset + 2].try_into().unwrap())
     }
@@ -9640,6 +9659,66 @@ mod tests {
             b"new payload"
         );
         assert_eq!(archive.read("custom/orphan.xml").unwrap(), b"<orphan/>");
+    }
+
+    #[test]
+    fn topology_add_at_zip32_entry_count_boundary_promotes_source_backed_source() {
+        const SOURCE_MEMBER_COUNT: usize = u16::MAX as usize - 1;
+
+        let source_bytes = zip32_entry_count_boundary_source();
+        let source_archive = soapberry_zip::ZipArchive::from_slice(&source_bytes).unwrap();
+        assert!(!source_archive.is_zip64());
+        assert_eq!(source_archive.entries_hint(), u64::from(u16::MAX - 1));
+        assert_eq!(source_archive.entries().count(), SOURCE_MEMBER_COUNT);
+        let source_raw = raw_records(&source_bytes);
+        let source = Arc::new(CountingSource::new(source_bytes.clone()));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        assert_eq!(package.physical_member_names().len(), SOURCE_MEMBER_COUNT);
+        assert_eq!(package.iter_parts().count(), SOURCE_MEMBER_COUNT - 2);
+
+        let added = PackURI::new("/custom/new.bin").unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_add_part(
+            added.clone(),
+            content_type::XLSB_BIN,
+            b"new payload".to_vec(),
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        package
+            .write_topology_to_stream(&mut output, plan)
+            .expect("publish boundary addition");
+        assert_eq!(source.bytes.as_slice(), source_bytes.as_slice());
+
+        let output_archive = soapberry_zip::ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.is_zip64());
+        assert_eq!(output_archive.entries_hint(), u64::from(u16::MAX));
+        assert_eq!(output_archive.entries().count(), usize::from(u16::MAX));
+
+        let output_raw = raw_records(&output);
+        assert_eq!(output_raw.len(), source_raw.len() + 1);
+        assert!(output_raw.contains_key(added.membername().as_bytes()));
+        for (name, source_record) in &source_raw {
+            let output_record = output_raw.get(name).expect("source member retained");
+            assert_eq!(output_record.local, source_record.local, "{name:?}");
+            assert_eq!(
+                central_without_local_offset(&output_record.central),
+                central_without_local_offset(&source_record.central),
+                "{name:?}"
+            );
+        }
+
+        let archive_reader = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        assert_eq!(
+            archive_reader.read(added.membername()).unwrap(),
+            b"new payload"
+        );
+        let reopened = SourceBackedPackage::from_vec(output).expect("reopen boundary output");
+        assert_eq!(reopened.iter_parts().count(), SOURCE_MEMBER_COUNT - 1);
+        assert_eq!(
+            reopened.part(&added).unwrap().data().unwrap().as_bytes(),
+            b"new payload"
+        );
     }
 
     #[test]

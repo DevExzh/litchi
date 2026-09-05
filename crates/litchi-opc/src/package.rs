@@ -1172,9 +1172,6 @@ impl PreservationProvenance {
     fn from_package(source: &[u8], package: &OpcPackage) -> Option<Self> {
         let archive = soapberry_zip::ZipArchive::from_slice(source).ok()?;
         let entry_count = usize::try_from(archive.entries_hint()).ok()?;
-        if entry_count > u16::MAX as usize {
-            return None;
-        }
 
         let mut actual_entry_count = 0usize;
         for entry in archive.entries() {

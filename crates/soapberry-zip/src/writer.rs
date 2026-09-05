@@ -26,6 +26,9 @@ const FLAG_UTF8_ENCODING: u16 = 0x800; // bit 11: UTF-8 encoding flag (EFS)
 const ZIP64_THRESHOLD_FILE_SIZE: u64 = u32::MAX as u64;
 const ZIP64_THRESHOLD_OFFSET: u64 = u32::MAX as u64;
 const ZIP64_THRESHOLD_ENTRIES: usize = u16::MAX as usize;
+const ZIP64_LOCAL_SIZE_EXTRA_DATA_LEN: u16 = 16;
+const ZIP64_LOCAL_SIZE_EXTRA_FIELD_LEN: u16 = 20;
+const ZIP64_LOCAL_SIZE_EXTRA_MAX_LEN: usize = 20;
 
 #[derive(Debug)]
 struct CountWriter<W> {
@@ -154,6 +157,68 @@ pub struct ZipArchiveWriter<W> {
     files: Vec<FileHeader>,
     file_names: Vec<u8>,
     writer: CountWriter<W>,
+}
+
+struct SizedLocalHeader {
+    fixed: ZipLocalFileHeaderFixed,
+    extra: [u8; ZIP64_LOCAL_SIZE_EXTRA_MAX_LEN],
+}
+
+fn sized_local_header(
+    flags: u16,
+    compression_method: CompressionMethod,
+    crc32: u32,
+    compressed_size: u64,
+    uncompressed_size: u64,
+    file_name_len: u16,
+) -> Result<SizedLocalHeader, Error> {
+    let needs_uncompressed = uncompressed_size >= ZIP64_THRESHOLD_FILE_SIZE;
+    let needs_compressed = compressed_size >= ZIP64_THRESHOLD_FILE_SIZE;
+    let uses_zip64 = needs_uncompressed || needs_compressed;
+    let mut extra = [0u8; ZIP64_LOCAL_SIZE_EXTRA_MAX_LEN];
+    let (version_needed, compressed_size32, uncompressed_size32, extra_field_len) = if uses_zip64 {
+        // A local ZIP64 size extra carries both sizes whenever either one
+        // requires ZIP64. Central records may omit the non-sentinel value.
+        extra[..2].copy_from_slice(&ExtraFieldId::ZIP64.as_u16().to_le_bytes());
+        extra[2..4].copy_from_slice(&ZIP64_LOCAL_SIZE_EXTRA_DATA_LEN.to_le_bytes());
+        extra[4..12].copy_from_slice(&uncompressed_size.to_le_bytes());
+        extra[12..20].copy_from_slice(&compressed_size.to_le_bytes());
+        (
+            ZIP64_VERSION_NEEDED,
+            u32::MAX,
+            u32::MAX,
+            ZIP64_LOCAL_SIZE_EXTRA_FIELD_LEN,
+        )
+    } else {
+        let compressed_size32 = u32::try_from(compressed_size).map_err(|_err| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "compressed payload length does not fit ZIP32".to_string(),
+            })
+        })?;
+        let uncompressed_size32 = u32::try_from(uncompressed_size).map_err(|_err| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "uncompressed payload length does not fit ZIP32".to_string(),
+            })
+        })?;
+        (20, compressed_size32, uncompressed_size32, 0)
+    };
+
+    Ok(SizedLocalHeader {
+        fixed: ZipLocalFileHeaderFixed {
+            signature: ZipLocalFileHeaderFixed::SIGNATURE,
+            version_needed,
+            flags,
+            compression_method: compression_method.as_id(),
+            last_mod_time: 0,
+            last_mod_date: 0,
+            crc32,
+            compressed_size: compressed_size32,
+            uncompressed_size: uncompressed_size32,
+            file_name_len,
+            extra_field_len,
+        },
+        extra,
+    })
 }
 
 impl ZipArchiveWriter<()> {
@@ -584,35 +649,16 @@ where
 
         let crc32 = crc::crc32(data);
         let size_u64 = usize_to_u64(data.len(), "stored payload length")?;
-        if size_u64 >= ZIP64_THRESHOLD_FILE_SIZE {
-            return Err(Error::from(ErrorKind::InvalidInput {
-                msg: "stored file too large".to_string(),
-            }));
-        }
-
-        let header = ZipLocalFileHeaderFixed {
-            signature: ZipLocalFileHeaderFixed::SIGNATURE,
-            version_needed: 20,
+        let local_header = sized_local_header(
             flags,
-            compression_method: CompressionMethod::Store.as_id(),
-            last_mod_time: 0,
-            last_mod_date: 0,
+            CompressionMethod::Store,
             crc32,
-            compressed_size: size_u64 as u32,
-            uncompressed_size: size_u64 as u32,
-            file_name_len: file_path.len() as u16,
-            extra_field_len: 0,
-        };
-
-        header.write(&mut self.writer)?;
-        self.writer.write_all(file_path.as_ref().as_bytes())?;
-        write_all_counted(
-            &mut self.writer,
-            data,
-            accounting,
-            AccountingWriteKind::Stored,
+            size_u64,
+            size_u64,
+            name_len,
         )?;
 
+        let uses_zip64 = local_header.fixed.version_needed == ZIP64_VERSION_NEEDED;
         let mut file_header = FileHeader {
             name_len,
             compression_method: CompressionMethod::Store,
@@ -625,7 +671,24 @@ where
             unix_permissions: None,
             extra_fields: ExtraFieldsContainer::new(),
         };
-        file_header.finalize_extra_fields()?;
+        if uses_zip64 {
+            file_header.finalize_extra_fields()?;
+        }
+
+        local_header.fixed.write(&mut self.writer)?;
+        self.writer.write_all(file_path.as_ref().as_bytes())?;
+        let extra_len = usize::from(local_header.fixed.extra_field_len);
+        self.writer.write_all(&local_header.extra[..extra_len])?;
+        write_all_counted(
+            &mut self.writer,
+            data,
+            accounting,
+            AccountingWriteKind::Stored,
+        )?;
+
+        if !uses_zip64 {
+            file_header.finalize_extra_fields()?;
+        }
         self.files.push(file_header);
 
         Ok(())
@@ -732,13 +795,6 @@ where
         }
 
         let compressed_size = usize_to_u64(compressed.len(), "precompressed payload length")?;
-        if uncompressed_size >= ZIP64_THRESHOLD_FILE_SIZE
-            || compressed_size >= ZIP64_THRESHOLD_FILE_SIZE
-        {
-            return Err(Error::from(ErrorKind::InvalidInput {
-                msg: "file too large".to_string(),
-            }));
-        }
 
         let local_header_offset = self.writer.count();
         let mut flags = 0u16;
@@ -760,24 +816,16 @@ where
             })?;
         self.file_names.extend_from_slice(name_bytes);
 
-        let header = ZipLocalFileHeaderFixed {
-            signature: ZipLocalFileHeaderFixed::SIGNATURE,
-            version_needed: 20,
+        let local_header = sized_local_header(
             flags,
-            compression_method: compression_method.as_id(),
-            last_mod_time: 0,
-            last_mod_date: 0,
+            compression_method,
             crc32,
-            compressed_size: compressed_size as u32,
-            uncompressed_size: uncompressed_size as u32,
-            file_name_len: file_path.len() as u16,
-            extra_field_len: 0,
-        };
+            compressed_size,
+            uncompressed_size,
+            name_len,
+        )?;
 
-        header.write(&mut self.writer)?;
-        self.writer.write_all(file_path.as_ref().as_bytes())?;
-        write_all_counted(&mut self.writer, compressed, accounting, accounting_kind)?;
-
+        let uses_zip64 = local_header.fixed.version_needed == ZIP64_VERSION_NEEDED;
         let mut file_header = FileHeader {
             name_len,
             compression_method,
@@ -790,7 +838,19 @@ where
             unix_permissions: None,
             extra_fields: ExtraFieldsContainer::new(),
         };
-        file_header.finalize_extra_fields()?;
+        if uses_zip64 {
+            file_header.finalize_extra_fields()?;
+        }
+
+        local_header.fixed.write(&mut self.writer)?;
+        self.writer.write_all(file_path.as_ref().as_bytes())?;
+        let extra_len = usize::from(local_header.fixed.extra_field_len);
+        self.writer.write_all(&local_header.extra[..extra_len])?;
+        write_all_counted(&mut self.writer, compressed, accounting, accounting_kind)?;
+
+        if !uses_zip64 {
+            file_header.finalize_extra_fields()?;
+        }
         self.files.push(file_header);
 
         Ok(())
@@ -1145,7 +1205,7 @@ where
         let total_entries = self.files.len();
 
         // Determine if we need ZIP64 format
-        let needs_zip64 = total_entries >= ZIP64_THRESHOLD_ENTRIES
+        let needs_zip64_before_central_directory = total_entries >= ZIP64_THRESHOLD_ENTRIES
             || central_directory_offset >= ZIP64_THRESHOLD_OFFSET
             || self.files.iter().any(|f| f.needs_zip64());
 
@@ -1205,6 +1265,8 @@ where
 
         let central_directory_end = self.writer.count();
         let central_directory_size = central_directory_end - central_directory_offset;
+        let needs_zip64 = needs_zip64_before_central_directory
+            || central_directory_size >= ZIP64_THRESHOLD_OFFSET;
 
         // Write ZIP64 structures if needed
         if needs_zip64 {
@@ -1228,8 +1290,14 @@ where
         // Disk numbers
         self.writer.write_all(&[0u8; 4])?;
 
-        // Number of entries - use 0xFFFF if ZIP64
-        let entries_count = total_entries.min(ZIP64_THRESHOLD_ENTRIES) as u16;
+        // A ZIP64 tail must be discoverable through a classic EOCD sentinel,
+        // even when only an entry's size forced ZIP64 and the directory-level
+        // count, size, and offset still fit in ZIP32.
+        let entries_count = if needs_zip64 {
+            u16::MAX
+        } else {
+            total_entries.min(ZIP64_THRESHOLD_ENTRIES) as u16
+        };
         self.writer.write_all(&entries_count.to_le_bytes())?;
         self.writer.write_all(&entries_count.to_le_bytes())?;
 
@@ -1915,6 +1983,215 @@ mod tests {
             accounting.precompressed_payload_bytes_emitted(),
             precompressed.len() as u64
         );
+    }
+
+    #[test]
+    fn sized_header_zip64_sizes_use_the_sentinel_boundary() {
+        let crc32 = 0x1234_5678;
+        let file_name_len = 9;
+        for (size, uses_zip64) in [
+            (u64::from(u32::MAX) - 1, false),
+            (u64::from(u32::MAX), true),
+            (u64::from(u32::MAX) + 1, true),
+        ] {
+            let local = sized_local_header(
+                FLAG_UTF8_ENCODING,
+                CompressionMethod::Store,
+                crc32,
+                size,
+                size,
+                file_name_len,
+            )
+            .expect("stored header metadata");
+            let expected_size32 = if uses_zip64 { u32::MAX } else { size as u32 };
+            let expected_extra_len = if uses_zip64 {
+                usize::from(ZIP64_LOCAL_SIZE_EXTRA_FIELD_LEN)
+            } else {
+                0
+            };
+            assert_eq!(local.fixed.version_needed, if uses_zip64 { 45 } else { 20 });
+            assert_eq!(local.fixed.compressed_size, expected_size32);
+            assert_eq!(local.fixed.uncompressed_size, expected_size32);
+            assert_eq!(usize::from(local.fixed.extra_field_len), expected_extra_len);
+
+            let mut expected_extra = [0u8; ZIP64_LOCAL_SIZE_EXTRA_MAX_LEN];
+            if uses_zip64 {
+                expected_extra[..2].copy_from_slice(&ExtraFieldId::ZIP64.as_u16().to_le_bytes());
+                expected_extra[2..4]
+                    .copy_from_slice(&ZIP64_LOCAL_SIZE_EXTRA_DATA_LEN.to_le_bytes());
+                expected_extra[4..12].copy_from_slice(&size.to_le_bytes());
+                expected_extra[12..20].copy_from_slice(&size.to_le_bytes());
+            }
+            assert_eq!(
+                &local.extra[..expected_extra_len],
+                &expected_extra[..expected_extra_len]
+            );
+
+            let mut central = FileHeader {
+                name_len: file_name_len,
+                compression_method: CompressionMethod::Store,
+                local_header_offset: 0,
+                compressed_size: size,
+                uncompressed_size: size,
+                crc: crc32,
+                flags: FLAG_UTF8_ENCODING,
+                modification_time: None,
+                unix_permissions: None,
+                extra_fields: ExtraFieldsContainer::new(),
+            };
+            assert_eq!(central.needs_zip64(), uses_zip64);
+            central
+                .finalize_extra_fields()
+                .expect("central ZIP64 metadata");
+            let mut central_extra = Vec::new();
+            central
+                .extra_fields
+                .write_extra_fields(&mut central_extra, Header::CENTRAL)
+                .expect("central extra fields");
+            assert_eq!(central_extra, &expected_extra[..expected_extra_len]);
+        }
+    }
+
+    #[test]
+    fn sized_header_local_zip64_extra_carries_both_sizes() {
+        let maximum = u64::from(u32::MAX);
+        for (compressed_size, uncompressed_size) in [(maximum, maximum - 1), (maximum - 1, maximum)]
+        {
+            let local = sized_local_header(
+                0,
+                CompressionMethod::Deflate,
+                0,
+                compressed_size,
+                uncompressed_size,
+                4,
+            )
+            .expect("stored header metadata");
+            assert_eq!(local.fixed.version_needed, ZIP64_VERSION_NEEDED);
+            assert_eq!(local.fixed.compressed_size, u32::MAX);
+            assert_eq!(local.fixed.uncompressed_size, u32::MAX);
+            assert_eq!(
+                local.fixed.extra_field_len,
+                ZIP64_LOCAL_SIZE_EXTRA_FIELD_LEN
+            );
+
+            let mut expected_extra = [0u8; ZIP64_LOCAL_SIZE_EXTRA_MAX_LEN];
+            expected_extra[..2].copy_from_slice(&ExtraFieldId::ZIP64.as_u16().to_le_bytes());
+            expected_extra[2..4].copy_from_slice(&ZIP64_LOCAL_SIZE_EXTRA_DATA_LEN.to_le_bytes());
+            expected_extra[4..12].copy_from_slice(&uncompressed_size.to_le_bytes());
+            expected_extra[12..20].copy_from_slice(&compressed_size.to_le_bytes());
+            assert_eq!(local.extra, expected_extra);
+
+            let mut central = FileHeader {
+                name_len: 4,
+                compression_method: CompressionMethod::Deflate,
+                local_header_offset: 0,
+                compressed_size,
+                uncompressed_size,
+                crc: 0,
+                flags: 0,
+                modification_time: None,
+                unix_permissions: None,
+                extra_fields: ExtraFieldsContainer::new(),
+            };
+            central
+                .finalize_extra_fields()
+                .expect("central ZIP64 metadata");
+            let mut central_extra = Vec::new();
+            central
+                .extra_fields
+                .write_extra_fields(&mut central_extra, Header::CENTRAL)
+                .expect("central extra fields");
+            let central_size = if compressed_size >= ZIP64_THRESHOLD_FILE_SIZE {
+                compressed_size
+            } else {
+                uncompressed_size
+            };
+            let mut expected_central_extra = [0u8; 12];
+            expected_central_extra[..2]
+                .copy_from_slice(&ExtraFieldId::ZIP64.as_u16().to_le_bytes());
+            expected_central_extra[2..4].copy_from_slice(&8u16.to_le_bytes());
+            expected_central_extra[4..12].copy_from_slice(&central_size.to_le_bytes());
+            assert_eq!(central_extra, expected_central_extra);
+        }
+    }
+
+    #[test]
+    fn precompressed_zip64_metadata_reopens_with_a_small_payload() {
+        let compressed = b"small stored payload";
+        let declared_uncompressed_size = u64::from(u32::MAX);
+        let mut output = Cursor::new(Vec::new());
+        let mut archive = ZipArchiveWriter::new(&mut output);
+        let mut accounting = ZipOperationAccounting::default();
+        archive
+            .write_precompressed_file_with_accounting(
+                "large.bin",
+                CompressionMethod::Store,
+                crate::crc32(compressed),
+                declared_uncompressed_size,
+                compressed,
+                &mut accounting,
+            )
+            .expect("ZIP64 precompressed member");
+        archive.finish().expect("ZIP64 archive finish");
+        assert_eq!(
+            accounting.stored_payload_bytes_emitted(),
+            compressed.len() as u64
+        );
+
+        // This intentionally checks framing and source-index metadata only:
+        // the tiny stored payload cannot satisfy the declared 4 GiB size.
+        let bytes = output.into_inner();
+        let archive = ZipArchive::from_slice(&bytes).expect("reopen ZIP64 archive");
+        assert!(archive.is_zip64());
+        let mut entries = archive.entries();
+        let record = entries
+            .next_entry()
+            .expect("central entry")
+            .expect("one central entry");
+        assert!(
+            entries
+                .next_entry()
+                .expect("end of central entries")
+                .is_none()
+        );
+        assert!(record.is_zip64());
+        assert_eq!(record.compressed_size_hint(), compressed.len() as u64);
+        assert_eq!(record.uncompressed_size_hint(), declared_uncompressed_size);
+
+        let local = ZipLocalFileHeaderFixed::parse(&bytes).expect("local header");
+        assert_eq!(local.version_needed, ZIP64_VERSION_NEEDED);
+        assert_eq!(local.compressed_size, u32::MAX);
+        assert_eq!(local.uncompressed_size, u32::MAX);
+        assert_eq!(local.extra_field_len, ZIP64_LOCAL_SIZE_EXTRA_FIELD_LEN);
+
+        let entry = archive
+            .get_entry(record.wayfinder())
+            .expect("indexed local span");
+        assert_eq!(entry.data(), compressed);
+        let mut local_fields = entry.extra_fields();
+        let (local_id, local_data) = local_fields.next().expect("local ZIP64 field");
+        assert_eq!(local_id, ExtraFieldId::ZIP64);
+        assert_eq!(
+            local_data.len(),
+            usize::from(ZIP64_LOCAL_SIZE_EXTRA_DATA_LEN)
+        );
+        let declared_bytes = declared_uncompressed_size.to_le_bytes();
+        let compressed_bytes = (compressed.len() as u64).to_le_bytes();
+        assert_eq!(&local_data[..8], declared_bytes.as_slice());
+        assert_eq!(&local_data[8..], compressed_bytes.as_slice());
+        assert!(local_fields.next().is_none());
+
+        let central_offset = usize::try_from(record.central_directory_offset()).unwrap();
+        let central = ZipFileHeaderFixed::parse(&bytes[central_offset..]).expect("central header");
+        assert_eq!(central.version_needed, ZIP64_VERSION_NEEDED);
+        assert_eq!(central.compressed_size, compressed.len() as u32);
+        assert_eq!(central.uncompressed_size, u32::MAX);
+        assert_eq!(central.extra_field_len, 12);
+        let mut central_fields = record.extra_fields();
+        let (central_id, central_data) = central_fields.next().expect("central ZIP64 field");
+        assert_eq!(central_id, ExtraFieldId::ZIP64);
+        assert_eq!(central_data, declared_bytes.as_slice());
+        assert!(central_fields.next().is_none());
     }
 
     struct PartialPrecompressedSink<'a> {
