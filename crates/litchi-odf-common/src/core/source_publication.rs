@@ -1039,6 +1039,11 @@ fn validate_preserved_member_framing(
             ));
         }
         if flags & ZIP_DATA_DESCRIPTOR_FLAG == 0 {
+            if local_header_has_zip64_size_sentinel(&local) {
+                return Err(unsupported(
+                    "ZIP64 local member framing is outside the ODF raw-preservation contract",
+                ));
+            }
             if payload_end != local_span.end {
                 return Err(unsupported(
                     "non-descriptor ZIP member has opaque trailing bytes",
@@ -1742,6 +1747,10 @@ fn le_u32(bytes: &[u8], offset: usize) -> Option<u32> {
         .map(u32::from_le_bytes)
 }
 
+fn local_header_has_zip64_size_sentinel(local_fixed: &[u8]) -> bool {
+    le_u32(local_fixed, 18) == Some(u32::MAX) || le_u32(local_fixed, 22) == Some(u32::MAX)
+}
+
 fn le_u64(bytes: &[u8], offset: usize) -> Option<u64> {
     bytes
         .get(offset..offset.checked_add(8)?)
@@ -1794,5 +1803,66 @@ mod tests {
             .expect("publish");
         assert!(report.is_no_op());
         assert_eq!(output, bytes);
+    }
+
+    #[test]
+    fn raw_publication_rejects_local_zip64_size_sentinels() {
+        use soapberry_zip::{PreservationIndex, ZipArchive};
+
+        let original = package_bytes();
+        let archive = ZipArchive::from_slice(&original)
+            .unwrap()
+            .into_zip_archive();
+        let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+        let index = PreservationIndex::new(&archive, &mut scratch).unwrap();
+        let entry = index
+            .entries()
+            .iter()
+            .find(|entry| entry.raw_name_bytes() == b"Pictures/blob.bin")
+            .unwrap();
+        let local = usize::try_from(entry.local_span().start).unwrap();
+        assert_eq!(
+            le_u16(&original, local + 6).unwrap() & ZIP_DATA_DESCRIPTOR_FLAG,
+            0
+        );
+        let name_len = usize::from(le_u16(&original, local + 26).unwrap());
+        let extra_len = le_u16(&original, local + 28).unwrap();
+        let insertion = local + ZIP_LOCAL_HEADER_SIZE + name_len;
+        let mut extra = Vec::new();
+        extra.extend_from_slice(&1_u16.to_le_bytes());
+        extra.extend_from_slice(&16_u16.to_le_bytes());
+        extra.extend_from_slice(&entry.uncompressed_size().to_le_bytes());
+        extra.extend_from_slice(&entry.compressed_size().to_le_bytes());
+        let mut bytes = original.clone();
+        bytes.splice(insertion..insertion, extra);
+        bytes[local + 4..local + 6].copy_from_slice(&45_u16.to_le_bytes());
+        bytes[local + 18..local + 26].fill(0xff);
+        bytes[local + 28..local + 30].copy_from_slice(&(extra_len + 20).to_le_bytes());
+        for member in index.entries() {
+            let central = usize::try_from(member.central_record().start).unwrap() + 20;
+            let offset = member.local_span().start;
+            let relocated = offset + if offset >= insertion as u64 { 20 } else { 0 };
+            bytes[central + 42..central + 46]
+                .copy_from_slice(&u32::try_from(relocated).unwrap().to_le_bytes());
+        }
+        let eocd = original.len() - 22 + 20;
+        let directory = le_u32(&original, original.len() - 6).unwrap() + 20;
+        bytes[eocd + 16..eocd + 20].copy_from_slice(&directory.to_le_bytes());
+
+        // The physical archive is valid and admitted; ODF's narrower raw
+        // publication contract must refuse before writing to the caller sink.
+        let promoted = ZipArchive::from_slice(&bytes).unwrap().into_zip_archive();
+        PreservationIndex::new(&promoted, &mut scratch).unwrap();
+        let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+            .expect("open valid local-only ZIP64 source");
+        let mut output = Vec::new();
+        let error = package
+            .write_content_xml_to_stream(&mut output, TARGET)
+            .unwrap_err();
+        assert!(
+            matches!(error, SourceContentPublicationError::Unsupported { reason }
+            if reason == "ZIP64 local member framing is outside the ODF raw-preservation contract")
+        );
+        assert!(output.is_empty());
     }
 }

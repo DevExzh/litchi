@@ -811,6 +811,11 @@ fn rewrite_package(
             });
             replaced_manifest = true;
         } else {
+            if local_header_has_zip64_size_sentinel(source.as_bytes(), &original_local) {
+                return invalid(
+                    "ODT embedded-resource GC cannot raw-copy ZIP64 local member framing",
+                );
+            }
             entries.push(RawRewriteEntry {
                 central_index,
                 original_start: original_local.start,
@@ -961,6 +966,13 @@ fn archive_comment(source: &[u8]) -> Result<&[u8]> {
     invalid("ODT ZIP end record is invalid")
 }
 
+fn local_header_has_zip64_size_sentinel(source: &[u8], local: &Range<usize>) -> bool {
+    let Some(local_fixed) = source.get(local.clone()) else {
+        return true;
+    };
+    le_u32(local_fixed, 18) == Some(u32::MAX) || le_u32(local_fixed, 22) == Some(u32::MAX)
+}
+
 fn remove_manifest_records(source: &[u8], targets: &BTreeSet<String>) -> Result<Vec<u8>> {
     let xml = std::str::from_utf8(source)
         .map_err(|_error| Error::InvalidFormat("ODT manifest is not UTF-8".to_string()))?;
@@ -1083,4 +1095,27 @@ pub(crate) fn validate_candidate_path_bound(path: &str) -> Result<()> {
 
 fn zip_error(error: soapberry_zip::Error) -> Error {
     Error::InvalidFormat(format!("ODT embedded-resource GC ZIP error: {error}"))
+}
+
+fn le_u32(bytes: &[u8], offset: usize) -> Option<u32> {
+    bytes
+        .get(offset..offset.checked_add(4)?)
+        .and_then(|value| value.try_into().ok())
+        .map(u32::from_le_bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn raw_rewrite_rejects_local_zip64_size_sentinels() {
+        let mut source = [0_u8; 30];
+        let local = 0..source.len();
+        source[18..22].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert!(local_header_has_zip64_size_sentinel(&source, &local));
+        source[18..22].fill(0);
+        source[22..26].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert!(local_header_has_zip64_size_sentinel(&source, &local));
+    }
 }

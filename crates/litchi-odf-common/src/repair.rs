@@ -1923,6 +1923,16 @@ fn inspect_layout(source: &[u8], limits: OdfRepairLimits) -> Result<Layout, Repa
                 reason: "malformed local member header",
             });
         }
+        // This repair emits ZIP32 local and central fields.  The ZIP reader
+        // accepts a validated ZIP64 local header with ordinary central sizes,
+        // but the narrow raw-splice repair contract does not normalize or
+        // rewrite that framing. Refuse the sentinel before any later planning
+        // or output step can treat the untouched span as ZIP32 metadata.
+        if le_u32(local, 18) == Some(u32::MAX) || le_u32(local, 22) == Some(u32::MAX) {
+            return Err(RepairError::Unsupported {
+                reason: "ZIP64 local member framing is outside the ODF repair contract",
+            });
+        }
         let flags = le_u16(local, 6).ok_or(RepairError::Unsupported {
             reason: "local member flags",
         })?;
@@ -3463,6 +3473,175 @@ mod tests {
                 expected: observed_expected,
                 observed,
             }) if observed_expected == expected && observed == RepairFingerprint::of(&[])
+        ));
+    }
+
+    fn push_u16(output: &mut Vec<u8>, value: u16) {
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn push_u32(output: &mut Vec<u8>, value: u32) {
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn push_u64(output: &mut Vec<u8>, value: u64) {
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn append_local_member(
+        archive: &mut Vec<u8>,
+        version_needed: u16,
+        flags: u16,
+        crc: u32,
+        compressed_size: u32,
+        uncompressed_size: u32,
+        name: &[u8],
+        extra: &[u8],
+        payload: &[u8],
+        descriptor: &[u8],
+    ) -> u32 {
+        let offset = u32::try_from(archive.len()).unwrap();
+        push_u32(archive, 0x0403_4b50);
+        push_u16(archive, version_needed);
+        push_u16(archive, flags);
+        push_u16(archive, 0);
+        push_u16(archive, 0);
+        push_u16(archive, 0);
+        push_u32(archive, crc);
+        push_u32(archive, compressed_size);
+        push_u32(archive, uncompressed_size);
+        push_u16(archive, u16::try_from(name.len()).unwrap());
+        push_u16(archive, u16::try_from(extra.len()).unwrap());
+        archive.extend_from_slice(name);
+        archive.extend_from_slice(extra);
+        archive.extend_from_slice(payload);
+        archive.extend_from_slice(descriptor);
+        offset
+    }
+
+    fn append_central_member(
+        central: &mut Vec<u8>,
+        version_made_by: u16,
+        version_needed: u16,
+        flags: u16,
+        crc: u32,
+        compressed_size: u32,
+        uncompressed_size: u32,
+        name: &[u8],
+        local_offset: u32,
+    ) {
+        push_u32(central, 0x0201_4b50);
+        push_u16(central, version_made_by);
+        push_u16(central, version_needed);
+        push_u16(central, flags);
+        push_u16(central, 0);
+        push_u16(central, 0);
+        push_u16(central, 0);
+        push_u32(central, crc);
+        push_u32(central, compressed_size);
+        push_u32(central, uncompressed_size);
+        push_u16(central, u16::try_from(name.len()).unwrap());
+        push_u16(central, 0);
+        push_u16(central, 0);
+        push_u16(central, 0);
+        push_u16(central, 0);
+        push_u32(central, 0);
+        push_u32(central, local_offset);
+        central.extend_from_slice(name);
+    }
+
+    fn zip32_archive_with_local_zip64_descriptor() -> Vec<u8> {
+        let mimetype = b"application/vnd.oasis.opendocument.text";
+        let mimetype_extra = [0x55, 0x54, 0x05, 0, 1, 0, 0, 0, 0];
+        let untouched = b"untouched";
+        let untouched_crc = soapberry_zip::crc32(untouched);
+        let mut untouched_extra = Vec::new();
+        push_u16(&mut untouched_extra, 0x0001);
+        push_u16(&mut untouched_extra, 16);
+        push_u64(&mut untouched_extra, 0);
+        push_u64(&mut untouched_extra, 0);
+        let mut untouched_descriptor = Vec::new();
+        push_u32(&mut untouched_descriptor, 0x0807_4b50);
+        push_u32(&mut untouched_descriptor, untouched_crc);
+        push_u64(&mut untouched_descriptor, untouched.len() as u64);
+        push_u64(&mut untouched_descriptor, untouched.len() as u64);
+
+        let mut archive = Vec::new();
+        let mimetype_offset = append_local_member(
+            &mut archive,
+            20,
+            0,
+            soapberry_zip::crc32(mimetype),
+            u32::try_from(mimetype.len()).unwrap(),
+            u32::try_from(mimetype.len()).unwrap(),
+            b"mimetype",
+            &mimetype_extra,
+            mimetype,
+            &[],
+        );
+        let untouched_offset = append_local_member(
+            &mut archive,
+            45,
+            0x08,
+            0,
+            u32::MAX,
+            u32::MAX,
+            b"untouched.bin",
+            &untouched_extra,
+            untouched,
+            &untouched_descriptor,
+        );
+
+        let central_start = archive.len();
+        let mut central = Vec::new();
+        append_central_member(
+            &mut central,
+            20,
+            20,
+            0,
+            soapberry_zip::crc32(mimetype),
+            u32::try_from(mimetype.len()).unwrap(),
+            u32::try_from(mimetype.len()).unwrap(),
+            b"mimetype",
+            mimetype_offset,
+        );
+        append_central_member(
+            &mut central,
+            45,
+            45,
+            0x08,
+            untouched_crc,
+            u32::try_from(untouched.len()).unwrap(),
+            u32::try_from(untouched.len()).unwrap(),
+            b"untouched.bin",
+            untouched_offset,
+        );
+        let central_size = central.len();
+        archive.extend_from_slice(&central);
+        push_u32(&mut archive, 0x0605_4b50);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 2);
+        push_u16(&mut archive, 2);
+        push_u32(&mut archive, u32::try_from(central_size).unwrap());
+        push_u32(&mut archive, u32::try_from(central_start).unwrap());
+        push_u16(&mut archive, 0);
+        archive
+    }
+
+    #[test]
+    fn zip32_repair_refuses_local_zip64_descriptor_framing() {
+        let source = zip32_archive_with_local_zip64_descriptor();
+        assert!(
+            !ZipArchive::from_slice(source.as_slice())
+                .unwrap()
+                .is_zip64()
+        );
+        assert!(matches!(
+            inspect_layout(&source, OdfRepairLimits::default()),
+            Err(RepairError::Unsupported {
+                reason: "ZIP64 local member framing is outside the ODF repair contract"
+            })
         ));
     }
 }

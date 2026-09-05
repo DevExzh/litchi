@@ -626,7 +626,7 @@ where
             }
 
             let local_central_name_mismatch =
-                validate_local_span(archive, &entries[index], local_end)?;
+                validate_local_span(archive, &entries[index], local_end, policy)?;
             entries[index].local_central_name_mismatch = local_central_name_mismatch;
             entries[index].local_span.end = local_end;
         }
@@ -2016,12 +2016,18 @@ fn validate_local_span<R: ReaderAt>(
     archive: &ZipArchive<R>,
     entry: &PreservedEntry,
     local_end: u64,
+    policy: PreservationPolicy,
 ) -> Result<bool, Error> {
     let (layout, local_central_name_mismatch) = archive
         .validate_preservation_entry_layout(entry.wayfinder, entry.raw_name_bytes())
         .map_err(map_local_layout_error)?;
     if layout.local_header_offset != entry.local_span.start {
         return Err(unsupported("local header offset mismatch"));
+    }
+    if policy == PreservationPolicy::Zip32Only && layout.local_zip64 {
+        return Err(unsupported(
+            "ZIP64 local-header preservation is not enabled",
+        ));
     }
     if layout.span_end > local_end {
         return Err(unsupported("truncated or overlapping local member"));
@@ -2819,6 +2825,59 @@ mod tests {
         data[eocd + 12..eocd + 16]
             .copy_from_slice(&u32::try_from(promoted.len()).unwrap().to_le_bytes());
         data[eocd + 16..eocd + 20].copy_from_slice(&u32::try_from(central).unwrap().to_le_bytes());
+        data
+    }
+
+    fn local_only_zip64_archive() -> Vec<u8> {
+        let mut data = ordinary_archive();
+        let (central, eocd, name_len, compressed_size, uncompressed_size) = {
+            let archive = ZipArchive::from_slice(&data).unwrap();
+            let central = usize::try_from(archive.directory_offset()).unwrap();
+            let eocd = usize::try_from(archive.eocd_offset()).unwrap();
+            let local = archive
+                .entries()
+                .next()
+                .unwrap()
+                .unwrap()
+                .local_header_offset();
+            let local = usize::try_from(local).unwrap();
+            let local_header = ZipLocalFileHeaderFixed::parse(&data[local..]).unwrap();
+            (
+                central,
+                eocd,
+                usize::from(local_header.file_name_len),
+                u64::from(local_header.compressed_size),
+                u64::from(local_header.uncompressed_size),
+            )
+        };
+
+        let mut local_extra = Vec::new();
+        local_extra.extend_from_slice(&ExtraFieldId::ZIP64.as_u16().to_le_bytes());
+        local_extra.extend_from_slice(&16u16.to_le_bytes());
+        local_extra.extend_from_slice(&uncompressed_size.to_le_bytes());
+        local_extra.extend_from_slice(&compressed_size.to_le_bytes());
+        let insertion = ZipLocalFileHeaderFixed::SIZE + name_len;
+        data[4..6].copy_from_slice(&45u16.to_le_bytes());
+        data[18..22].copy_from_slice(&u32::MAX.to_le_bytes());
+        data[22..26].copy_from_slice(&u32::MAX.to_le_bytes());
+        data[28..30].copy_from_slice(&20u16.to_le_bytes());
+        data.splice(insertion..insertion, local_extra.iter().copied());
+
+        let shift = local_extra.len();
+        let central = central + shift;
+        let eocd = eocd + shift;
+        data[eocd + 16..eocd + 20].copy_from_slice(&u32::try_from(central).unwrap().to_le_bytes());
+        let mut central_cursor = central;
+        while central_cursor < eocd {
+            let fixed = ZipFileHeaderFixed::parse(&data[central_cursor..]).unwrap();
+            if fixed.local_header_offset != 0 {
+                let shifted = fixed.local_header_offset + u32::try_from(shift).unwrap();
+                data[central_cursor + 42..central_cursor + 46]
+                    .copy_from_slice(&shifted.to_le_bytes());
+            }
+            central_cursor += ZipFileHeaderFixed::SIZE + fixed.variable_length();
+        }
+        assert_eq!(central_cursor, eocd);
         data
     }
 
@@ -4238,6 +4297,35 @@ mod tests {
         let (archive, mut buffer) = indexed(&data);
         let index = PreservationIndex::new(&archive, &mut buffer)
             .expect("public preservation must accept validated ZIP64");
+        assert_eq!(
+            index
+                .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                .unwrap(),
+            data
+        );
+
+        let (archive, mut buffer) = indexed(&data);
+        let error = PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            PreservationPolicy::Zip32Only,
+        );
+        assert!(matches!(
+            error,
+            Err(error) if matches!(error.kind(), ErrorKind::UnsupportedPreservation { .. })
+        ));
+    }
+
+    #[test]
+    fn zip32_only_refuses_local_only_zip64_framing() {
+        let data = local_only_zip64_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            PreservationPolicy::AllowZip64,
+        )
+        .expect("public policy must preserve local-only ZIP64 framing");
         assert_eq!(
             index
                 .write_to(&PreservationPlan::copy_all(&index), Vec::new())
