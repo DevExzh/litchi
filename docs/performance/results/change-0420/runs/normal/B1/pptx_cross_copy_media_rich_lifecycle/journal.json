@@ -1,0 +1,125 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0420/runs/normal/B1/pptx_cross_copy_media_rich_lifecycle/time.txt",
+    "/tmp/litchi-goal-0420-candidate-normal",
+    "--case",
+    "pptx_cross_copy_media_rich_lifecycle",
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm",
+    "--samples",
+    "100",
+    "--warmup",
+    "10",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0420/runs/normal/B1/pptx_cross_copy_media_rich_lifecycle/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0420/runs/normal/B1/pptx_cross_copy_media_rich_lifecycle/catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4988,
+      "path": "runs/normal/B1/pptx_cross_copy_media_rich_lifecycle/catalog.json",
+      "sha256": "83b2af84480368b60a79184ac13155304018d14ebfbaa0d61ae300ef7b7e28c4"
+    },
+    "report": {
+      "bytes": 90826,
+      "path": "runs/normal/B1/pptx_cross_copy_media_rich_lifecycle/report.json",
+      "sha256": "d6109ab11cb6d3623250d0fa8b204e69e462552084499e34f25bf29df57c7326"
+    },
+    "stderr": {
+      "bytes": 0,
+      "path": "runs/normal/B1/pptx_cross_copy_media_rich_lifecycle/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 0,
+      "path": "runs/normal/B1/pptx_cross_copy_media_rich_lifecycle/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "time_v": {
+      "bytes": 1316,
+      "path": "runs/normal/B1/pptx_cross_copy_media_rich_lifecycle/time.txt",
+      "sha256": "0fa7c29c2d7f1f224f96a91ba65ab9d6e8a09d8a5e71f3f04c8330d2418193f5"
+    }
+  },
+  "binary": {
+    "bytes": 450245896,
+    "label": "candidate/normal",
+    "path": "/tmp/litchi-goal-0420-candidate-normal",
+    "sha256": "0aff183cd68d91a10a08dc8e6cedda7c6da94bde3e1466d773f20c3c4b8b57e4"
+  },
+  "binary_bytes": 450245896,
+  "binary_sha256": "0aff183cd68d91a10a08dc8e6cedda7c6da94bde3e1466d773f20c3c4b8b57e4",
+  "build": {
+    "path": "build-candidate.json",
+    "sha256": "71be145c7c00e9b2dbb7a0616ff503aac01e61a09004a07da45983751e3d538c",
+    "source_identity_sha256": "27598c2a55d9f816f7e9c536fc968d75baa02b5fca474a52b19b23570210191e"
+  },
+  "build_sha256": "71be145c7c00e9b2dbb7a0616ff503aac01e61a09004a07da45983751e3d538c",
+  "change": 420,
+  "common_protocol_sha256": "4e898eb7763019726348c285fcdc7ac2b8951aac275ca875033c5f5307c824de",
+  "contract": {
+    "samples": 100,
+    "warmups": 10
+  },
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T10:08:41.053328+00:00",
+  "index": 3,
+  "leg": "B1",
+  "measurement_protocol_sha256": "b01c64e52369259306f803ace6f80a05e2fa5203c3011838964c6b456aa51d3a",
+  "mode": "normal",
+  "protocol": {
+    "build_binding": {
+      "build_protocol_sha256": "4e898eb7763019726348c285fcdc7ac2b8951aac275ca875033c5f5307c824de",
+      "current_protocol_sha256": "4e898eb7763019726348c285fcdc7ac2b8951aac275ca875033c5f5307c824de",
+      "kind": "current"
+    },
+    "common_path": "protocol.json",
+    "common_sha256": "4e898eb7763019726348c285fcdc7ac2b8951aac275ca875033c5f5307c824de",
+    "measurement_path": "measurement-protocol.json",
+    "measurement_sha256": "b01c64e52369259306f803ace6f80a05e2fa5203c3011838964c6b456aa51d3a"
+  },
+  "role": "candidate",
+  "schema_version": 1,
+  "selector": "pptx_cross_copy_media_rich_lifecycle",
+  "source": {
+    "clean": true,
+    "identity_sha256": "27598c2a55d9f816f7e9c536fc968d75baa02b5fca474a52b19b23570210191e",
+    "revision": "81c70058a33dd671bcf022f72bbf1d90fa35821f",
+    "worktree": "/tmp/litchi-goal-0420-candidate-worktree"
+  },
+  "source_after": {
+    "clean": true,
+    "revision": "81c70058a33dd671bcf022f72bbf1d90fa35821f",
+    "worktree": "/tmp/litchi-goal-0420-candidate-worktree"
+  },
+  "source_identity_sha256": "27598c2a55d9f816f7e9c536fc968d75baa02b5fca474a52b19b23570210191e",
+  "source_revision": "81c70058a33dd671bcf022f72bbf1d90fa35821f",
+  "started_utc": "2026-09-05T10:07:11.861419+00:00",
+  "status": "pass"
+}

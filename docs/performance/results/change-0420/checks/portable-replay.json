@@ -1,0 +1,34 @@
+{
+  "change": 420,
+  "checks": [
+    {
+      "args": [
+        "--replay"
+      ],
+      "exit_code": 0,
+      "script": "summarize.py",
+      "stderr": "",
+      "stdout": "{\"status\": \"pass\", \"runs\": 16, \"report_groups\": 4, \"replay\": true}\n"
+    }
+  ],
+  "status": "pass",
+  "temporary_export_removed": true,
+  "tools": [
+    {
+      "path": "tools/perf_abba_summary.py",
+      "sha256": "b0fe8b782c97cacff953c63c75599d3665063451d07a6912c25a123082e2b9c4"
+    },
+    {
+      "path": "tools/perf_compare.py",
+      "sha256": "3051dd0ee89406949f396645bbed4f213570770f5dc1eb1b02b03b51d2c6c4e2"
+    },
+    {
+      "path": "tools/perf_resource_profile.py",
+      "sha256": "e80c9706189f942ccce645685dafea8612e5e0dc6ea5e659bd1490ffc3256cc4"
+    },
+    {
+      "path": "tools/validate_perf_corpus_binding.py",
+      "sha256": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558"
+    }
+  ]
+}
