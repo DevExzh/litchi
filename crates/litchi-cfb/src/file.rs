@@ -2825,7 +2825,10 @@ impl SectorChainScratch {
                     )));
                 }
                 self.visited.insert(slot)?;
-                try_push(&mut self.sectors, sector, "sector-chain entries")?;
+                // The fallible exact reservation above covers this loop's
+                // exactly `expected_count` pushes; keep allocation failure at
+                // that established boundary.
+                self.sectors.push(sector);
                 let next = *allocation_table.get(slot).ok_or_else(|| {
                     OleError::CorruptedFile(format!(
                         "Invalid sector index {sector} in {table_name}"
