@@ -300,6 +300,40 @@ impl SourceTopologyPlan {
         content_type: impl Into<String>,
         payload: Vec<u8>,
     ) -> Result<()> {
+        self.try_add_part_with_payload(partname, content_type, || Arc::new(payload))
+    }
+
+    /// Add a new typed Part while reusing an already owned immutable payload
+    /// allocation.
+    ///
+    /// The payload is copied into the topology plan by reference-counted
+    /// ownership. All URI, content-type, duplicate-name, operation-count, and
+    /// fallible reservation checks are performed before the payload is
+    /// installed. The caller may retain its own handle by cloning the Arc
+    /// before this call.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same typed URI, content-type, duplicate-name, operation
+    /// bound, and allocation errors as [`Self::try_add_part`].
+    pub fn try_add_part_shared(
+        &mut self,
+        partname: PackURI,
+        content_type: impl Into<String>,
+        payload: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        self.try_add_part_with_payload(partname, content_type, || payload)
+    }
+
+    fn try_add_part_with_payload<F>(
+        &mut self,
+        partname: PackURI,
+        content_type: impl Into<String>,
+        payload: F,
+    ) -> Result<()>
+    where
+        F: FnOnce() -> Arc<Vec<u8>>,
+    {
         if partname.as_str() == PACKAGE_URI {
             return Err(OpcError::InvalidPackUri(
                 "the package root is not a Part URI".to_string(),
@@ -341,7 +375,7 @@ impl SourceTopologyPlan {
         self.additions.push(TopologyPartAddition {
             partname,
             content_type,
-            payload: Arc::new(payload),
+            payload: payload(),
         });
         Ok(())
     }
@@ -9659,6 +9693,99 @@ mod tests {
             b"new payload"
         );
         assert_eq!(archive.read("custom/orphan.xml").unwrap(), b"<orphan/>");
+    }
+
+    #[test]
+    fn topology_add_part_shared_reuses_payload_and_matches_add_validation() {
+        let partname = PackURI::new("/custom/shared.bin").unwrap();
+        let payload = Arc::new(b"shared payload".to_vec());
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_add_part_shared(
+            partname.clone(),
+            "application/octet-stream",
+            Arc::clone(&payload),
+        )
+        .unwrap();
+        assert!(Arc::ptr_eq(&payload, &plan.additions[0].payload));
+
+        assert!(matches!(
+            plan.try_add_part_shared(
+                partname,
+                "application/octet-stream",
+                Arc::new(b"duplicate".to_vec()),
+            ),
+            Err(OpcError::DuplicatePartName(_))
+        ));
+
+        let mut root_plan = SourceTopologyPlan::new();
+        assert!(matches!(
+            root_plan.try_add_part_shared(
+                PackURI::new("/").unwrap(),
+                "application/octet-stream",
+                Arc::new(Vec::new()),
+            ),
+            Err(OpcError::InvalidPackUri(_))
+        ));
+
+        let constructed = Arc::new(AtomicBool::new(false));
+        let constructed_marker = Arc::clone(&constructed);
+        let mut lazy_plan = SourceTopologyPlan::new();
+        assert!(matches!(
+            lazy_plan.try_add_part_with_payload(
+                PackURI::new("/").unwrap(),
+                "application/octet-stream",
+                || {
+                    constructed_marker.store(true, Ordering::SeqCst);
+                    Arc::new(Vec::new())
+                },
+            ),
+            Err(OpcError::InvalidPackUri(_))
+        ));
+        assert!(!constructed.load(Ordering::SeqCst));
+
+        let mut content_type_plan = SourceTopologyPlan::new();
+        assert!(matches!(
+            content_type_plan.try_add_part_shared(
+                PackURI::new("/custom/invalid.bin").unwrap(),
+                "invalid content type",
+                Arc::new(Vec::new()),
+            ),
+            Err(OpcError::InvalidContentType { .. })
+        ));
+
+        let mut bounded_plan = SourceTopologyPlan::new();
+        for index in 0..MAX_SOURCE_TOPOLOGY_PARTS {
+            bounded_plan
+                .try_add_part_shared(
+                    PackURI::new(format!("/custom/bounded{index}.bin")).unwrap(),
+                    "application/octet-stream",
+                    Arc::new(Vec::new()),
+                )
+                .unwrap();
+        }
+        assert!(matches!(
+            bounded_plan.try_add_part_shared(
+                PackURI::new("/custom/over-bound.bin").unwrap(),
+                "application/octet-stream",
+                Arc::new(Vec::new()),
+            ),
+            Err(OpcError::SourceBackedOverlayUnavailable { .. })
+        ));
+
+        let mut retained_payload = Arc::new(b"copy-on-write".to_vec());
+        let mut retained_plan = SourceTopologyPlan::new();
+        retained_plan
+            .try_add_part_shared(
+                PackURI::new("/custom/retained.bin").unwrap(),
+                "application/octet-stream",
+                Arc::clone(&retained_payload),
+            )
+            .unwrap();
+        assert_eq!(Arc::strong_count(&retained_payload), 2);
+        drop(retained_plan);
+        assert_eq!(Arc::strong_count(&retained_payload), 1);
+        Arc::make_mut(&mut retained_payload)[0] = b'C';
+        assert_eq!(retained_payload.as_slice(), b"Copy-on-write");
     }
 
     #[test]
