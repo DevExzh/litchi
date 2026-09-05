@@ -32513,10 +32513,10 @@ def audit_iwa_numbers_table_cell_control_bridge_source_topology(
     source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
     violations: list[str] = []
 
-    location = _rust_any_function_body(source, "focused_control_location")
+    location = _rust_any_function_body(source, "focused_cell_location")
     if location is None:
         violations.append(
-            "Numbers cell-control selector bridge is missing focused_control_location: "
+            "Numbers cell-control selector bridge is missing focused_cell_location: "
             f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
         )
     else:
@@ -32526,7 +32526,7 @@ def audit_iwa_numbers_table_cell_control_bridge_source_topology(
         ):
             if marker not in location:
                 violations.append(
-                    "Numbers cell-control selector bridge focused_control_location "
+                    "Numbers cell-control selector bridge focused_cell_location "
                     f"must retain {marker}: {IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
                 )
 
@@ -32537,7 +32537,7 @@ def audit_iwa_numbers_table_cell_control_bridge_source_topology(
             f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
         )
     else:
-        for marker in ("focused_control_location", "table_cell_control_format"):
+        for marker in ("focused_cell_location", "table_cell_control_format"):
             if marker not in read_helper:
                 violations.append(
                     "Numbers cell-control read bridge must call focused Package "
@@ -32545,29 +32545,62 @@ def audit_iwa_numbers_table_cell_control_bridge_source_topology(
                 )
 
     write_helper = _rust_any_function_body(
-        source, "commit_focused_control_format"
+        source, "commit_exact_focused_data_format"
     )
     if write_helper is None:
         violations.append(
             "Numbers cell-control selector bridge is missing "
-            "commit_focused_control_format: "
+            "commit_exact_focused_data_format: "
             f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
         )
     else:
         for marker in (
-            "focused_control_location",
-            "edit_table_cell_control_format",
-            ".set(",
-            ".clear(",
-            ".commit(",
+            "focused_cell_location",
+            "focused_set_data_format",
+            "focused_clear_data_format",
+            "verify_focused_data_format",
         ):
             if marker not in write_helper:
                 violations.append(
                     "Numbers cell-control write bridge must retain focused "
-                    f"transaction marker {marker}: "
+                    f"dispatch marker {marker}: "
                     f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
                 )
 
+    for helper, markers in (
+        (
+            "focused_set_data_format",
+            (
+                "edit_table_cell_control_format",
+                ".set(",
+                ".commit(",
+                ".patch().is_noop()",
+            ),
+        ),
+        (
+            "focused_clear_data_format",
+            (
+                "edit_table_cell_control_format",
+                ".clear(",
+                ".commit(",
+                ".patch().is_noop()",
+            ),
+        ),
+    ):
+        body = _rust_any_function_body(source, helper)
+        if body is None:
+            violations.append(
+                "Numbers cell-control selector bridge is missing "
+                f"{helper}: {IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+            )
+        else:
+            for marker in markers:
+                if marker not in body:
+                    violations.append(
+                        "Numbers cell-control write bridge must retain focused "
+                        f"transaction marker {marker}: "
+                        f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+                    )
 
     for marker in ("SheetSelector", "TableSelector", "CellPosition"):
         if marker not in source:
@@ -32579,7 +32612,7 @@ def audit_iwa_numbers_table_cell_control_bridge_source_topology(
 
     for method, marker in (
         ("table_cell_data_format", "focused_control_format"),
-        ("set_table_cell_data_format", "commit_focused_control_format"),
+        ("set_table_cell_data_format", "commit_exact_focused_data_format"),
     ):
         body = _rust_any_function_body(source, method)
         if body is None:
@@ -32639,7 +32672,10 @@ def audit_iwa_numbers_table_cell_control_source_topology(
                     frozenset(
                         {
                             "focused_control_format",
-                            "commit_focused_control_format",
+                            "focused_cell_location",
+                            "focused_set_data_format",
+                            "focused_clear_data_format",
+                            "commit_exact_focused_data_format",
                         }
                     ),
                 )

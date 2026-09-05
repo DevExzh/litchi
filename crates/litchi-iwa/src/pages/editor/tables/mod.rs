@@ -22,13 +22,10 @@ pub use formula::{
 pub use sort::PagesTableSortRowRange;
 use std::collections::{HashMap, HashSet};
 
-use prost::Message;
-
 use super::*;
 use crate::bundle::Bundle;
 use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
-use crate::protobuf::tst::TableInfoArchive;
 use crate::table_lock::table_lock_state_from_message;
 use litchi_iwa_common::table::appearance::Appearance as TableAppearance;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
@@ -79,4 +76,4 @@ pub use semantic::{PagesTable, PagesTableInfo};
 use storage::{
     PagesTableGraph, body_table_graphs, clone_body_table_attachment, remove_table_object,
 };
-use validation::decode_table_models;
+use validation::decode_unique_table_model;

@@ -1,5 +1,7 @@
 //! Table and cell editing semantics.
 
+use std::io::{self, Write};
+
 use super::*;
 use crate::numbers::editor::selectors;
 use crate::text::{Alignment, Indents, LineSpacing, Spacing};
@@ -21,7 +23,28 @@ fn focused_control_error(error: FocusedControlError) -> Error {
     ))
 }
 
-fn focused_control_location(
+fn focused_data_format_error(error: impl std::fmt::Display) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Numbers cell data-format operation failed: {error}"
+    ))
+}
+
+fn focused_allocation_error(amount: usize) -> Error {
+    Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+        resource: "focused Numbers package output bytes",
+        amount,
+    })
+}
+
+fn parse_focused_source(source_bytes: &[u8]) -> Result<FocusedNumbersPackage> {
+    FocusedNumbersPackage::from_bytes(source_bytes).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "focused Numbers cell source validation failed: {error}"
+        ))
+    })
+}
+
+fn focused_cell_location(
     editor: &NumbersEditor,
     table_id: u64,
     row: usize,
@@ -31,19 +54,72 @@ fn focused_control_location(
     litchi_numbers::SheetSelector<'static>,
     litchi_numbers::TableSelector<'static>,
     litchi_numbers::table::CellPosition,
+    usize,
 )> {
     let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
     let position =
         litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
-            Error::InvalidFormat(format!("invalid Numbers cell-control coordinate: {error}"))
+            Error::InvalidFormat(format!("invalid Numbers cell coordinate: {error}"))
         })?;
-    let source_bytes = editor.to_bytes()?;
-    let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
-        Error::InvalidFormat(format!(
-            "focused Numbers cell-control source validation failed: {error}"
-        ))
-    })?;
-    Ok((source, sheet, table, position))
+    let (source, source_len) = if let Some(source_bytes) = editor.package.exact_source_bytes() {
+        let source_len = source_bytes.len();
+        (parse_focused_source(source_bytes)?, source_len)
+    } else {
+        let source_bytes = editor.to_bytes()?;
+        let source_len = source_bytes.len();
+        (parse_focused_source(&source_bytes)?, source_len)
+    };
+    Ok((source, sheet, table, position, source_len))
+}
+
+struct FalliblePackageBytes {
+    bytes: Vec<u8>,
+    allocation_failure: Option<usize>,
+}
+
+impl FalliblePackageBytes {
+    fn with_capacity(capacity: usize) -> Result<Self> {
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(capacity)
+            .map_err(|_| focused_allocation_error(capacity))?;
+        Ok(Self {
+            bytes,
+            allocation_failure: None,
+        })
+    }
+}
+
+impl Write for FalliblePackageBytes {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.bytes.try_reserve(bytes.len()).is_err() {
+            self.allocation_failure = Some(self.bytes.len().saturating_add(bytes.len()));
+            return Err(io::Error::new(
+                io::ErrorKind::OutOfMemory,
+                "focused Numbers package output allocation failed",
+            ));
+        }
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn focused_package_to_editor(
+    package: &FocusedNumbersPackage,
+    source_len: usize,
+) -> Result<NumbersEditor> {
+    let mut output = FalliblePackageBytes::with_capacity(source_len)?;
+    if let Err(error) = package.write_to(&mut output) {
+        if let Some(amount) = output.allocation_failure {
+            return Err(focused_allocation_error(amount));
+        }
+        return Err(Error::Io(error.into_io_error()));
+    }
+    NumbersEditor::from_bytes(&output.bytes)
 }
 
 fn focused_control_format(
@@ -52,38 +128,309 @@ fn focused_control_format(
     row: usize,
     column: usize,
 ) -> Result<Option<CellControl>> {
-    let (source, sheet, table, position) = focused_control_location(editor, table_id, row, column)?;
+    let (source, sheet, table, position, _) = focused_cell_location(editor, table_id, row, column)?;
     source
         .table_cell_control_format(sheet, table, position)
         .map_err(focused_control_error)
 }
 
-fn commit_focused_control_format(
+fn focused_set_data_format(
+    source: &FocusedNumbersPackage,
+    sheet: litchi_numbers::SheetSelector<'static>,
+    table: litchi_numbers::TableSelector<'static>,
+    position: litchi_numbers::table::CellPosition,
+    source_len: usize,
+    format: &DataFormat,
+) -> Result<Option<NumbersEditor>> {
+    macro_rules! commit_set {
+        ($edit:expr, $value:expr) => {{
+            let commit = $edit
+                .map_err(focused_data_format_error)?
+                .set($value)
+                .commit()
+                .map_err(focused_data_format_error)?;
+            if commit.patch().is_noop() {
+                Ok(None)
+            } else {
+                focused_package_to_editor(commit.package(), source_len).map(Some)
+            }
+        }};
+    }
+
+    match format {
+        DataFormat::Number(value) => commit_set!(
+            source.edit_table_cell_number_format(sheet, table, position),
+            *value
+        ),
+        DataFormat::Percentage(value) => commit_set!(
+            source.edit_table_cell_percentage_format(sheet, table, position),
+            *value
+        ),
+        DataFormat::Currency(value) => commit_set!(
+            source.edit_table_cell_currency_format(sheet, table, position),
+            *value
+        ),
+        DataFormat::Scientific(value) => commit_set!(
+            source.edit_table_cell_scientific_format(sheet, table, position),
+            *value
+        ),
+        DataFormat::Fraction(value) => commit_set!(
+            source.edit_table_cell_fraction_format(sheet, table, position),
+            *value
+        ),
+        DataFormat::DateTime(value) => commit_set!(
+            source.edit_table_cell_date_time_format(sheet, table, position),
+            value.clone()
+        ),
+        DataFormat::Duration(value) => commit_set!(
+            source.edit_table_cell_duration_format(sheet, table, position),
+            *value
+        ),
+        DataFormat::Text(value) => commit_set!(
+            source.edit_table_cell_text_format(sheet, table, position),
+            *value
+        ),
+        DataFormat::Custom(_) => Err(Error::InvalidFormat(
+            "Custom formats remain owned by the Numbers compatibility writer".to_owned(),
+        )),
+        DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::PopUpMenu(_) => {
+            let control = CellControl::try_from(format.clone()).map_err(|_| {
+                Error::InvalidFormat(
+                    "focused Numbers control conversion rejected the requested format".to_owned(),
+                )
+            })?;
+            let commit = source
+                .edit_table_cell_control_format(sheet, table, position)
+                .map_err(focused_control_error)?
+                .set(control)
+                .commit()
+                .map_err(focused_control_error)?;
+            if commit.patch().is_noop() {
+                Ok(None)
+            } else {
+                focused_package_to_editor(commit.package(), source_len).map(Some)
+            }
+        },
+        DataFormat::Automatic | DataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+            "focused Numbers owner does not publish an automatic or Numeral-System format"
+                .to_owned(),
+        )),
+    }
+}
+
+fn focused_clear_data_format(
+    source: &FocusedNumbersPackage,
+    sheet: litchi_numbers::SheetSelector<'static>,
+    table: litchi_numbers::TableSelector<'static>,
+    position: litchi_numbers::table::CellPosition,
+    source_len: usize,
+    format: &DataFormat,
+) -> Result<Option<NumbersEditor>> {
+    macro_rules! commit_clear {
+        ($edit:expr) => {{
+            let commit = $edit
+                .map_err(focused_data_format_error)?
+                .clear()
+                .commit()
+                .map_err(focused_data_format_error)?;
+            if commit.patch().is_noop() {
+                Ok(None)
+            } else {
+                focused_package_to_editor(commit.package(), source_len).map(Some)
+            }
+        }};
+    }
+
+    match format {
+        DataFormat::Number(_) => {
+            commit_clear!(source.edit_table_cell_number_format(sheet, table, position))
+        },
+        DataFormat::Percentage(_) => {
+            commit_clear!(source.edit_table_cell_percentage_format(sheet, table, position))
+        },
+        DataFormat::Currency(_) => {
+            commit_clear!(source.edit_table_cell_currency_format(sheet, table, position))
+        },
+        DataFormat::Scientific(_) => {
+            commit_clear!(source.edit_table_cell_scientific_format(sheet, table, position))
+        },
+        DataFormat::Fraction(_) => {
+            commit_clear!(source.edit_table_cell_fraction_format(sheet, table, position))
+        },
+        DataFormat::DateTime(_) => {
+            commit_clear!(source.edit_table_cell_date_time_format(sheet, table, position))
+        },
+        DataFormat::Duration(_) => {
+            commit_clear!(source.edit_table_cell_duration_format(sheet, table, position))
+        },
+        DataFormat::Text(_) => {
+            commit_clear!(source.edit_table_cell_text_format(sheet, table, position))
+        },
+        DataFormat::Custom(_) => Err(Error::InvalidFormat(
+            "Custom formats remain owned by the Numbers compatibility writer".to_owned(),
+        )),
+        DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::PopUpMenu(_) => {
+            let commit = source
+                .edit_table_cell_control_format(sheet, table, position)
+                .map_err(focused_control_error)?
+                .clear()
+                .commit()
+                .map_err(focused_control_error)?;
+            if commit.patch().is_noop() {
+                Ok(None)
+            } else {
+                focused_package_to_editor(commit.package(), source_len).map(Some)
+            }
+        },
+        DataFormat::Automatic | DataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
+            "focused Numbers owner cannot clear an automatic or Numeral-System format".to_owned(),
+        )),
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FocusedDataFormatFamily {
+    Number,
+    Percentage,
+    Currency,
+    Scientific,
+    Fraction,
+    DateTime,
+    Duration,
+    Text,
+    Control,
+}
+
+fn focused_data_format_family(format: &DataFormat) -> Option<FocusedDataFormatFamily> {
+    match format {
+        DataFormat::Number(_) => Some(FocusedDataFormatFamily::Number),
+        DataFormat::Percentage(_) => Some(FocusedDataFormatFamily::Percentage),
+        DataFormat::Currency(_) => Some(FocusedDataFormatFamily::Currency),
+        DataFormat::Scientific(_) => Some(FocusedDataFormatFamily::Scientific),
+        DataFormat::Fraction(_) => Some(FocusedDataFormatFamily::Fraction),
+        DataFormat::DateTime(_) => Some(FocusedDataFormatFamily::DateTime),
+        DataFormat::Duration(_) => Some(FocusedDataFormatFamily::Duration),
+        DataFormat::Text(_) => Some(FocusedDataFormatFamily::Text),
+        DataFormat::Custom(_) => None,
+        DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::PopUpMenu(_) => Some(FocusedDataFormatFamily::Control),
+        DataFormat::Automatic | DataFormat::NumeralSystem(_) => None,
+    }
+}
+
+fn is_focused_data_format(format: &DataFormat) -> bool {
+    focused_data_format_family(format).is_some()
+}
+
+/// Select the focused owner only for an operation represented by that owner.
+///
+/// Cross-family display-format changes remain a compatibility-host concern;
+/// selecting an owner for those changes would turn a typed family refusal
+/// into an accidental fallback.  Control targets are a deliberate exception:
+/// the unified owner owns the scalar-to-control transition as well as control
+/// replacement, while control-to-scalar conversion first releases the control
+/// graph and then uses the host's generic scalar writer.
+fn uses_focused_data_format_owner(current: &DataFormat, requested: &DataFormat) -> bool {
+    // Custom formats still carry package-level registry and cleanup metadata
+    // that the focused owner does not publish. Keep every transition that
+    // mentions Custom on the compatibility writer, including the
+    // exact-source reset path.
+    if matches!(current, DataFormat::Custom(_)) || matches!(requested, DataFormat::Custom(_)) {
+        return false;
+    }
+    if matches!(requested, DataFormat::Automatic) {
+        return is_focused_data_format(current);
+    }
+    if matches!(requested, DataFormat::NumeralSystem(_)) {
+        return false;
+    }
+    if matches!(
+        requested,
+        DataFormat::Checkbox(_)
+            | DataFormat::StarRating(_)
+            | DataFormat::Slider(_)
+            | DataFormat::Stepper(_)
+            | DataFormat::PopUpMenu(_)
+    ) {
+        return matches!(current, DataFormat::Automatic) || is_focused_data_format(current);
+    }
+    matches!(current, DataFormat::Automatic)
+        || focused_data_format_family(current) == focused_data_format_family(requested)
+}
+
+fn commit_exact_focused_data_format(
     editor: &NumbersEditor,
     table_id: u64,
     row: usize,
     column: usize,
-    format: Option<CellControl>,
+    current: &DataFormat,
+    requested: &DataFormat,
 ) -> Result<NumbersEditor> {
-    let source_bytes = editor.to_bytes()?;
-    let (source, sheet, table, position) = focused_control_location(editor, table_id, row, column)?;
-    let edit = source
-        .edit_table_cell_control_format(sheet, table, position)
-        .map_err(focused_control_error)?;
-    let commit = match format {
-        Some(format) => edit.set(format).commit(),
-        None => edit.clear().commit(),
+    let (source, sheet, table, position, source_len) =
+        focused_cell_location(editor, table_id, row, column)?;
+    if !is_focused_data_format(current) && !matches!(current, DataFormat::Automatic) {
+        return Err(Error::InvalidFormat(
+            "focused Numbers owner does not admit the current cell format".to_owned(),
+        ));
     }
-    .map_err(focused_control_error)?;
-    let mut bytes = Vec::new();
-    bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
-        Error::InvalidFormat("could not allocate focused Numbers cell-control candidate".to_owned())
-    })?;
-    commit
-        .package()
-        .write_to(&mut bytes)
-        .map_err(|error| Error::Io(error.into_io_error()))?;
-    NumbersEditor::from_bytes(&bytes)
+    if matches!(requested, DataFormat::Automatic) {
+        let candidate =
+            focused_clear_data_format(&source, sheet, table, position, source_len, current)?;
+        let Some(candidate) = candidate else {
+            verify_focused_data_format(editor, table_id, row, column, &DataFormat::Automatic)?;
+            return Ok(editor.clone());
+        };
+        verify_focused_data_format(&candidate, table_id, row, column, &DataFormat::Automatic)?;
+        return Ok(candidate);
+    }
+    let Some(requested_family) = focused_data_format_family(requested) else {
+        return Err(Error::InvalidFormat(
+            "focused Numbers owner does not admit the requested cell format".to_owned(),
+        ));
+    };
+    if matches!(requested_family, FocusedDataFormatFamily::Control)
+        || matches!(current, DataFormat::Automatic)
+        || focused_data_format_family(current) == Some(requested_family)
+    {
+        let candidate =
+            focused_set_data_format(&source, sheet, table, position, source_len, requested)?;
+        let Some(candidate) = candidate else {
+            verify_focused_data_format(editor, table_id, row, column, requested)?;
+            return Ok(editor.clone());
+        };
+        verify_focused_data_format(&candidate, table_id, row, column, requested)?;
+        return Ok(candidate);
+    }
+
+    Err(Error::InvalidFormat(
+        "focused Numbers owner does not admit a cross-family cell-format conversion".to_owned(),
+    ))
+}
+
+fn verify_focused_data_format(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    expected: &DataFormat,
+) -> Result<()> {
+    if editor.table_cell_data_format(table_id, row, column)? != *expected {
+        return Err(Error::InvalidFormat(
+            "focused Numbers table-cell data format failed package validation".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 /// Apply the legacy native control writer to an editor-owned package.
@@ -479,20 +826,36 @@ impl NumbersEditor {
     ) -> Result<()> {
         let source_built = !self.package.source_is_exact();
         let current = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;
-        if let Ok(control) = CellControl::try_from(format.clone()) {
-            if source_built {
-                commit_compatibility_control_format(self, table_id, row, column, &format)?;
-            } else {
-                *self = commit_focused_control_format(self, table_id, row, column, Some(control))?;
-            }
+        if !source_built && current == format && !is_focused_data_format(&format) {
+            // Preserve exact-source no-op bytes for formats without an
+            // eligible focused owner: Automatic, NumeralSystem, and Custom.
+            // Re-running the native writer here would needlessly allocate a
+            // new package and can normalize inherited automatic metadata.
             return Ok(());
         }
-        if CellControl::try_from(current).is_ok() {
-            if source_built {
-                commit_compatibility_control_format(self, table_id, row, column, &format)?;
-                return Ok(());
-            }
-            let mut staged = commit_focused_control_format(self, table_id, row, column, None)?;
+        if !source_built && uses_focused_data_format_owner(&current, &format) {
+            *self =
+                commit_exact_focused_data_format(self, table_id, row, column, &current, &format)?;
+            return Ok(());
+        }
+
+        // A control-to-scalar conversion has two owners.  Release the
+        // focused control graph first, then let the generic compatibility
+        // writer replace the scalar display metadata in the private snapshot.
+        // A focused refusal is terminal; there is no retry through a raw-ID
+        // mutation after that first transaction fails.
+        if !source_built
+            && CellControl::try_from(current.clone()).is_ok()
+            && !matches!(format, DataFormat::Automatic)
+        {
+            let mut staged = commit_exact_focused_data_format(
+                self,
+                table_id,
+                row,
+                column,
+                &current,
+                &DataFormat::Automatic,
+            )?;
             cell_data_format::set_cell_data_format(
                 &mut staged.package,
                 table_id,
@@ -507,6 +870,18 @@ impl NumbersEditor {
                 ));
             }
             *self = verified;
+            return Ok(());
+        }
+
+        // Generated packages and cross-family/unsupported exact-source
+        // formats still use the native compatibility writer.  The focused
+        // owner branches above are terminal once selected, so a focused error
+        // cannot silently fall back to a raw-ID mutation.
+        if source_built
+            && (CellControl::try_from(format.clone()).is_ok()
+                || CellControl::try_from(current.clone()).is_ok())
+        {
+            commit_compatibility_control_format(self, table_id, row, column, &format)?;
             return Ok(());
         }
         let mut staged = self.package.clone();

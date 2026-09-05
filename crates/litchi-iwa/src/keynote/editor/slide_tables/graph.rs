@@ -36,13 +36,6 @@ struct CatalogTableModelFacts {
     style_preset_identifier: Option<u64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct TableModelDiscoveryFacts {
-    name: String,
-    rows: u32,
-    columns: u32,
-}
-
 pub(super) fn require_table_model(
     editor: &KeynoteEditor,
     slide_index: usize,
@@ -65,144 +58,28 @@ pub(super) fn require_table_model(
     Ok(table)
 }
 
+/// Resolve one table through the bounded catalog used by slide listing.
+///
+/// Keeping one admission path for listing and mutation prevents a private
+/// caller from observing a different model candidate after the public listing
+/// has already established ownership.  In particular, a valid legacy 6000
+/// model remains supported when it is the sole candidate, while malformed or
+/// mixed current/legacy candidates are rejected by the catalog's strict role
+/// census rather than being retried through an eager graph.
 pub(super) fn slide_table_graph(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<SlideTableGraph> {
-    let graph = ObjectGraph::read(editor.package())?;
-    slide_table_graph_from_graph(editor, &graph, slide_index, drawable_object_id)
-}
-
-/// Resolve one table from an already-built object graph.
-///
-/// Table listing walks every drawable in a slide.  Keeping the graph as an
-/// explicit input for that inner loop prevents each table from rebuilding the
-/// package-wide graph; callers that only need one table can continue using
-/// [`slide_table_graph`].  The graph is still the legacy generated/native
-/// representation for now, so this seam also gives the bounded catalog a
-/// single replacement point without changing mutation callers.
-pub(super) fn slide_table_graph_from_graph(
-    editor: &KeynoteEditor,
-    graph: &ObjectGraph,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<SlideTableGraph> {
-    let context = text_box_create::text_box_context(graph, slide_index)?;
-    for (name, references) in [
-        ("owned_drawables", &context.slide.owned_drawables),
-        ("drawables_z_order", &context.slide.drawables_z_order),
-    ] {
-        if references
-            .iter()
-            .filter(|reference| reference.identifier == drawable_object_id)
-            .count()
-            != 1
-        {
-            return Err(Error::ParseError(format!(
-                "Keynote slide {} {name} does not own table {drawable_object_id} exactly once",
-                context.slide_id
-            )));
-        }
-    }
-    validate_graph_table_info_role(graph, drawable_object_id)?;
-    let table_info = graph.decode_type::<TableInfoArchive>(
+    let mut catalog = KeynoteObjectCatalog::build(editor.package()).map_err(map_catalog_error)?;
+    let context = catalog_slide_context(editor.package(), &mut catalog, slide_index)?;
+    slide_table_graph_from_catalog_context(
+        editor,
+        &mut catalog,
+        slide_index,
         drawable_object_id,
-        TABLE_INFO_MESSAGE_TYPE,
-        "TableInfoArchive",
-    )?;
-    if table_info
-        .super_
-        .parent
-        .as_ref()
-        .map(|reference| reference.identifier)
-        != Some(context.slide_id)
-    {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote table {drawable_object_id} does not name slide {} as its parent",
-            context.slide_id
-        )));
-    }
-    let model_id = table_info.table_model.identifier;
-    let model = decode_table_model(graph, model_id)?;
-    let table_position =
-        graph_table_position(graph, &context.slide.drawables_z_order, drawable_object_id)?;
-    let slide_archive = graph.archive_name(context.slide_id)?.to_owned();
-    let slide_component_id = component_identifier_for_entry(editor.package(), &slide_archive)?
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Keynote slide component {slide_archive} is not registered"
-            ))
-        })?;
-    // The generated graph wrapper is retained for legacy native mutation
-    // paths.  Those editor snapshots are not necessarily admitted by the
-    // strict package lock owner, so project the already-decoded drawable
-    // lock bit here.  Public persisted lock reads/writes and Sort Now's
-    // safety gate use the focused package APIs below.
-    let lock_state = TableLockState::from_locked(table_info.super_.locked.unwrap_or(false));
-    let appearance = match focused_table_appearance_package(editor.package())? {
-        Some(focused) => focused_table_appearance(&focused, slide_index, table_position)?,
-        None => crate::table_appearance::table_appearance(editor.package(), model_id)?,
-    };
-    Ok(SlideTableGraph {
-        info: KeynoteSlideTableInfo {
-            slide_index,
-            slide_id: context.slide_id,
-            drawable_object_id,
-            model_object_id: model_id,
-            name: model.name,
-            rows: model.rows as usize,
-            columns: model.columns as usize,
-            geometry: crate::shapes::geometry_from_drawable(&table_info.super_)?,
-            appearance,
-            lock_state,
-        },
-        slide_archive,
-        slide_component_id,
-    })
-}
-
-/// Return the table's zero-based position in the slide's native z-order.
-///
-/// The focused package owner addresses tables by this semantic position.  The
-/// compatibility graph still receives a drawable identifier, so resolve that
-/// identifier only at this private migration seam and verify that it appears
-/// exactly once among the table entries.
-fn graph_table_position(
-    graph: &ObjectGraph,
-    references: &[tsp::Reference],
-    drawable_object_id: u64,
-) -> Result<usize> {
-    let mut table_position = None;
-    let mut table_count = 0usize;
-    for reference in references {
-        let is_table = graph
-            .objects
-            .get(&reference.identifier)
-            .is_some_and(|messages| {
-                messages
-                    .iter()
-                    .any(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
-            });
-        if !is_table {
-            continue;
-        }
-        if reference.identifier == drawable_object_id
-            && table_position.replace(table_count).is_some()
-        {
-            return Err(Error::ParseError(format!(
-                "Keynote slide table {drawable_object_id} has ambiguous z-order position"
-            )));
-        }
-        table_count = table_count.checked_add(1).ok_or_else(|| {
-            Error::InvalidFormat("Keynote slide table count exceeds usize".to_owned())
-        })?;
-    }
-    table_position.ok_or_else(|| {
-        Error::ParseError(format!(
-            "Keynote slide table {drawable_object_id} has no z-order position"
-        ))
-    })
+        &context,
+    )
 }
 
 /// Return the table's zero-based position in a catalog-backed slide listing.
@@ -484,30 +361,6 @@ fn validate_catalog_table_info_role(catalog: &KeynoteObjectCatalog, info_id: u64
     {
         return Err(Error::InvalidFormat(format!(
             "Keynote table-info object {info_id} contains a historical table-model role alias"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_graph_table_info_role(graph: &ObjectGraph, info_id: u64) -> Result<()> {
-    let messages = graph.objects.get(&info_id).ok_or_else(|| {
-        Error::InvalidFormat(format!("Keynote table-info object {info_id} is missing"))
-    })?;
-    let table_info_count = messages
-        .iter()
-        .filter(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
-        .count();
-    if table_info_count != 1 {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote table-info object {info_id} must contain exactly one table-info payload"
-        )));
-    }
-    if messages
-        .iter()
-        .any(|message| matches!(message.type_, 6_001 | TABLE_MODEL_ROLE_ALIAS_MESSAGE_TYPE))
-    {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote table-info object {info_id} contains a table-model role alias"
         )));
     }
     Ok(())
@@ -881,122 +734,6 @@ fn table_model_options(source: &[u8]) -> table_model_discovery_codec::DecodeOpti
     table_model_discovery_codec::DecodeOptions::for_source(source)
 }
 
-/// Decode the facts needed by the legacy slide-table listing.
-///
-/// This compatibility path intentionally uses the bounded Buffa discovery
-/// projection instead of materializing the complete generated model.  The
-/// projection validates the outer table-model wire shape and required display
-/// fields; nested length-delimited envelopes remain opaque because this caller
-/// never interprets them.  Consequently, this path does not promise identical
-/// acceptance for every malformed payload that Prost's complete model decoder
-/// happened to accept or reject.
-fn decode_table_model(graph: &ObjectGraph, model_id: u64) -> Result<TableModelDiscoveryFacts> {
-    let messages = graph.objects.get(&model_id).ok_or_else(|| {
-        Error::InvalidFormat(format!("Keynote table model {model_id} is missing"))
-    })?;
-    if messages
-        .iter()
-        .any(|message| message.type_ == TABLE_MODEL_ROLE_ALIAS_MESSAGE_TYPE)
-    {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote table model {model_id} contains a historical table-model role alias"
-        )));
-    }
-    let mut model = None;
-    for message in messages
-        .iter()
-        .filter(|message| TABLE_MODEL_MESSAGE_TYPES.contains(&message.type_))
-    {
-        let source = message.data.as_slice();
-        let snapshot = match table_model_discovery_codec::decode_table_model(
-            source,
-            table_model_options(source),
-        ) {
-            Ok(snapshot) => snapshot,
-            // Keep the legacy candidate collector's malformed-message
-            // behavior: an invalid candidate does not become a model.  A
-            // bounded resource failure is different; propagating it prevents
-            // a hostile payload from being silently retried as another role.
-            Err(error) if error.resource_limit().is_some() => {
-                return Err(map_table_model_discovery_error(error));
-            },
-            Err(_error) => continue,
-        };
-        if model.is_some() {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote table model {model_id} must contain exactly one table-model payload"
-            )));
-        }
-        model = Some(TableModelDiscoveryFacts {
-            name: own_table_model_name(snapshot.table_name())?,
-            rows: snapshot.number_of_rows(),
-            columns: snapshot.number_of_columns(),
-        });
-    }
-    model.ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Keynote table model {model_id} must contain exactly one table-model payload"
-        ))
-    })
-}
-
-fn own_table_model_name(table_name: &str) -> Result<String> {
-    if table_name.len() > WireLimits::MAX_OUTPUT_BYTES {
-        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-            kind: litchi_iwa_common::LimitKind::OutputBytes,
-            observed: table_name.len(),
-            limit: WireLimits::MAX_OUTPUT_BYTES,
-        }));
-    }
-    let mut name = String::new();
-    name.try_reserve_exact(table_name.len()).map_err(|_error| {
-        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-            resource: "Keynote table-model discovery name",
-            amount: table_name.len(),
-        })
-    })?;
-    name.push_str(table_name);
-    Ok(name)
-}
-
-fn map_table_model_discovery_error(error: table_model_discovery_codec::DecodeError) -> Error {
-    use table_model_discovery_codec::DecodeLimit;
-
-    match error.resource_limit() {
-        Some(DecodeLimit::Bytes { observed, maximum }) => {
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::InputBytes,
-                observed,
-                limit: maximum,
-            })
-        },
-        Some(DecodeLimit::Fields { observed, maximum }) => {
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::Fields,
-                observed,
-                limit: maximum,
-            })
-        },
-        Some(DecodeLimit::Work { observed, maximum }) => {
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::RewriteWork,
-                observed,
-                limit: maximum,
-            })
-        },
-        Some(DecodeLimit::Nesting { observed, maximum }) => {
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::Nesting,
-                observed: usize::try_from(observed).unwrap_or(usize::MAX),
-                limit: usize::try_from(maximum).unwrap_or(usize::MAX),
-            })
-        },
-        Some(_) | None => Error::InvalidFormat(format!(
-            "Keynote table-model discovery failed strict validation: {error}"
-        )),
-    }
-}
-
 /// Find a table template through the bounded catalog.
 pub(super) fn table_template_from_catalog(
     package: &IWorkPackage,
@@ -1117,11 +854,6 @@ mod tests {
             )
             .expect("synthetic archive");
         package
-    }
-
-    fn model_graph(messages: Vec<(u32, Vec<u8>)>) -> ObjectGraph {
-        let package = model_package(messages);
-        ObjectGraph::read(&package).expect("synthetic model graph")
     }
 
     fn table_template_package(model_messages: Vec<(u32, Vec<u8>)>) -> IWorkPackage {
@@ -1498,124 +1230,55 @@ mod tests {
     }
 
     #[test]
-    fn graph_model_discovery_owns_only_listing_facts() {
-        let graph = model_graph(vec![(MODEL_TYPE, model_payload())]);
-        let facts = decode_table_model(&graph, 42).expect("model facts");
-
-        assert_eq!(facts.name, "Table");
-        assert_eq!((facts.rows, facts.columns), (3, 4));
-    }
-
-    #[test]
-    fn graph_model_discovery_skips_malformed_candidates() {
-        let graph = model_graph(vec![
-            (MODEL_TYPE, vec![0x08, 0x01]),
-            (LEGACY_MODEL_TYPE, model_payload()),
-        ]);
-        let facts = decode_table_model(&graph, 42).expect("legacy fallback candidate");
-
-        assert_eq!(facts.name, "Table");
-        assert_eq!((facts.rows, facts.columns), (3, 4));
-    }
-
-    #[test]
-    fn graph_model_discovery_rejects_duplicate_valid_candidates() {
-        let payload = model_payload();
-        let graph = model_graph(vec![(MODEL_TYPE, payload.clone()), (MODEL_TYPE, payload)]);
-        let error = decode_table_model(&graph, 42).expect_err("duplicate model candidates");
-
-        assert!(
-            error
-                .to_string()
-                .contains("must contain exactly one table-model payload")
-        );
-    }
-
-    #[test]
-    fn graph_model_discovery_rejects_historical_role_alias() {
-        let graph = model_graph(vec![
-            (MODEL_TYPE, model_payload()),
-            (TABLE_MODEL_ROLE_ALIAS_MESSAGE_TYPE, Vec::new()),
-        ]);
-        let error = decode_table_model(&graph, 42).expect_err("historical role alias");
-
-        assert!(
-            error
-                .to_string()
-                .contains("contains a historical table-model role alias")
-        );
-    }
-
-    #[test]
-    fn graph_model_discovery_keeps_nested_envelopes_opaque() {
-        let mut payload = model_payload();
-        let field = payload
-            .windows(4)
-            .position(|window| window == [0x1a, 0x02, 0x08, 0x01])
-            .expect("table-style envelope");
-        // The discovery contract validates the outer length-delimited framing
-        // only.  A complete Prost TableModelArchive decode would interpret
-        // this nested envelope and reject its truncated varint; no listing
-        // consumer needs that nested value here.
-        payload[field + 2..field + 4].copy_from_slice(&[0xff, 0xff]);
-
-        let graph = model_graph(vec![(MODEL_TYPE, payload)]);
-        let facts = decode_table_model(&graph, 42).expect("opaque nested envelope");
-
-        assert_eq!(facts.name, "Table");
-        assert_eq!((facts.rows, facts.columns), (3, 4));
-    }
-
-    #[test]
-    fn graph_model_discovery_propagates_resource_failure_before_sibling_fallback() {
-        let mut hostile = model_payload();
-        for _ in 0..65 {
-            append_key(100, 3, &mut hostile);
-        }
-        for _ in 0..65 {
-            append_key(100, 4, &mut hostile);
-        }
-        let graph = model_graph(vec![
-            (MODEL_TYPE, hostile),
-            (LEGACY_MODEL_TYPE, model_payload()),
-        ]);
-
-        let error = decode_table_model(&graph, 42).expect_err("deep candidate");
-        assert!(matches!(
-            error,
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::Nesting,
-                ..
-            })
-        ));
-    }
-
-    #[test]
     fn graph_model_discovery_reads_checked_in_native_keynote_models() {
         let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/iwork/keynote/table-discovery.key");
         let source = std::fs::read(fixture).expect("native Keynote fixture");
-        let package = IWorkPackage::from_bytes(&source).expect("native Keynote fixture");
-        let graph = ObjectGraph::read(&package).expect("native Keynote object graph");
-        let mut admitted = Vec::new();
-        for (identifier, messages) in &graph.objects {
-            if messages.iter().any(|message| message.type_ == MODEL_TYPE) {
-                admitted.push(
-                    decode_table_model(&graph, *identifier)
-                        .expect("native table-model discovery candidate"),
-                );
-            }
-        }
+        let editor = KeynoteEditor::from_bytes(&source).expect("native Keynote editor");
+        let before = editor.to_bytes().expect("native package bytes");
+        assert_eq!(before, source);
+        let listed = editor.slide_tables(0).expect("native table listing");
 
-        assert_eq!(
-            admitted,
-            vec![TableModelDiscoveryFacts {
-                name: "Table 1".to_owned(),
-                rows: 5,
-                columns: 4,
-            }]
-        );
-        assert_eq!(package.to_bytes().expect("native package bytes"), source);
+        assert_eq!(listed.len(), 1);
+        let table = &listed[0];
+        assert_eq!(table.name, "Table 1");
+        assert_eq!((table.rows, table.columns), (5, 4));
+
+        let resolved = slide_table_graph(&editor, 0, table.drawable_object_id)
+            .expect("native direct table graph");
+        assert_eq!(&resolved.info, table);
+        assert_eq!(editor.to_bytes().expect("native package bytes"), source);
+    }
+
+    #[test]
+    fn direct_table_graph_matches_catalog_listing_without_mutation() {
+        let mut editor = KeynoteDocumentBuilder::new().build().expect("builder");
+        let geometry = DrawableGeometry {
+            position: Some(DrawablePoint { x: 40.0, y: 40.0 }),
+            size: Some(DrawableSize {
+                width: 320.0,
+                height: 180.0,
+            }),
+            flags: Some(3),
+            angle: Some(0.0),
+        };
+        let table = editor
+            .add_slide_table(
+                0,
+                "Catalog graph",
+                2,
+                2,
+                geometry.position.expect("position"),
+                geometry.size.expect("size"),
+            )
+            .expect("table");
+        let before = editor.to_bytes().expect("source bytes");
+        let listed = editor.slide_tables(0).expect("catalog listing");
+        let resolved = slide_table_graph(&editor, 0, table.drawable_object_id)
+            .expect("catalog graph resolution");
+
+        assert_eq!(resolved.info, listed[0]);
+        assert_eq!(editor.to_bytes().expect("source bytes"), before);
     }
 
     fn assert_model_rejected_without_fallback(messages: Vec<(u32, Vec<u8>)>) {

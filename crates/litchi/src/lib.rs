@@ -442,7 +442,7 @@ pub mod pages {
     /// Archive-free, immutable Pages values.
     ///
     /// This namespace is the strict semantic reader surface. Package
-    /// preservation and editing remain available from [`super::Package`] but
+    /// preservation and editing remain available from [`crate::pages::Package`] but
     /// are not part of this contract; no native archive, generated message, or
     /// compatibility projection is re-exported here. The checked source and
     /// semantic limit profiles are re-exported alongside
@@ -494,7 +494,7 @@ pub mod keynote {
     /// Archive-free, immutable Keynote values.
     ///
     /// This namespace intentionally excludes the package adapter and its
-    /// editing transactions. Use [`super::Package`] when exact package
+    /// editing transactions. Use [`crate::keynote::Package`] when exact package
     /// preservation or editing is required. The source and semantic limit
     /// profiles, selector errors, and immutable value errors are available
     /// here as well, so no package-layer type is needed to configure a read.
@@ -563,8 +563,8 @@ pub mod numbers {
     /// Archive-free, immutable Numbers values.
     ///
     /// This namespace intentionally excludes the package adapter and the
-    /// global compatibility-table projection. Use [`super`] when exact
-    /// package preservation or editing is required via [`super::Package`].
+    /// global compatibility-table projection. Use [`crate::numbers`] when exact
+    /// package preservation or editing is required via [`crate::numbers::Package`].
     /// The checked source and semantic limit profiles and their errors remain
     /// in this namespace for a complete immutable-reader boundary.
     pub mod semantic {

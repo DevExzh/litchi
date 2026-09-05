@@ -39,7 +39,6 @@ use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeleti
 use storage::{remove_objects, set_table_geometry_in_package, set_uniform_table_dimensions};
 
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
-const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
 const TABLE_MODEL_ROLE_ALIAS_MESSAGE_TYPE: u32 = 6_003;
 const TABLE_GEOMETRY_FLAGS: u32 = 3;
 const TABLE_ANGLE_DEGREES: f32 = 0.0;

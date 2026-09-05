@@ -32657,24 +32657,33 @@ fn rewrite_movie_title_operation(
             bridge.write_text(
                 "use litchi_numbers::cell::CellControl;\n"
                 "use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};\n"
-                "fn focused_control_location() -> (SheetSelector<'static>, TableSelector<'static>, CellPosition) {\n"
+                "fn focused_cell_location() -> (FocusedNumbersPackage, SheetSelector<'static>, TableSelector<'static>, CellPosition, usize) {\n"
                 "    focused_table_location(); CellPosition::try_from_usize(0, 0).unwrap()\n"
                 "}\n"
                 "fn focused_control_format() {\n"
-                "    let (source, sheet, table, position) = focused_control_location();\n"
+                "    let (source, sheet, table, position, _) = focused_cell_location();\n"
                 "    source.table_cell_control_format(sheet, table, position);\n"
                 "}\n"
-                "fn commit_focused_control_format(format: Option<CellControl>) {\n"
-                "    let (source, sheet, table, position) = focused_control_location();\n"
-                "    let edit = source.edit_table_cell_control_format(sheet, table, position);\n"
-                "    match format { Some(value) => edit.set(value).commit(), None => edit.clear().commit() };\n"
+                "fn focused_set_data_format(source: &FocusedNumbersPackage, sheet: SheetSelector<'static>, table: TableSelector<'static>, position: CellPosition, value: CellControl) {\n"
+                "    let commit = source.edit_table_cell_control_format(sheet, table, position).unwrap().set(value).commit();\n"
+                "    if commit.patch().is_noop() { return; }\n"
+                "}\n"
+                "fn focused_clear_data_format(source: &FocusedNumbersPackage, sheet: SheetSelector<'static>, table: TableSelector<'static>, position: CellPosition) {\n"
+                "    let commit = source.edit_table_cell_control_format(sheet, table, position).unwrap().clear().commit();\n"
+                "    if commit.patch().is_noop() { return; }\n"
+                "}\n"
+                "fn verify_focused_data_format() {}\n"
+                "fn commit_exact_focused_data_format(format: Option<CellControl>) {\n"
+                "    let (source, sheet, table, position, _) = focused_cell_location();\n"
+                "    match format { Some(value) => focused_set_data_format(&source, sheet, table, position, value), None => focused_clear_data_format(&source, sheet, table, position) };\n"
+                "    verify_focused_data_format();\n"
                 "}\n"
                 "impl NumbersEditor {\n"
                 "    pub fn table_cell_data_format(&self) {\n"
                 "        if CellControl::try_from(()).is_ok() { focused_control_format(); }\n"
                 "    }\n"
                 "    pub fn set_table_cell_data_format(&mut self, value: CellControl) {\n"
-                "        commit_focused_control_format(Some(value));\n"
+                "        if uses_focused_data_format_owner() { commit_exact_focused_data_format(Some(value)); return Ok(()); }\n"
                 "    }\n"
                 "}\n",
                 encoding="utf-8",
@@ -32708,7 +32717,7 @@ fn rewrite_movie_title_operation(
                     "cell_data_format::cell_slider_format();",
                     "source.table_cell_control_format(sheet, table, position);",
                 ).replace(
-                    "commit_focused_control_format(Some(value));",
+                    "commit_exact_focused_data_format(Some(value));",
                     "cell_data_format::set_cell_data_format();",
                 ),
                 encoding="utf-8",
