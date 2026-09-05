@@ -1,0 +1,40 @@
+{
+  "change": 422,
+  "declared_utc": "2026-09-05T11:08:44.539540+00:00",
+  "classification": "serialized operation-region allocator observation and current baseline; no optimization claim",
+  "baseline_revision": "8e8dda3aa",
+  "cpu": 2,
+  "workers": 1,
+  "common_flags": [
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm"
+  ],
+  "selectors": [
+    "pptx_cross_copy_media_rich_lifecycle",
+    "pptx_cross_copy_plain_lifecycle"
+  ],
+  "repeats": 2,
+  "samples": 30,
+  "warmups": 3,
+  "mode": "allocator",
+  "isolation": "fresh process per selector/repeat; task CPU workloads serialized; shared host background uncontrolled",
+  "hypothesis": "A separately initialized region maximum reveals operation live-byte peaks below historical setup highwater. Serialize callbacks and region boundaries to define an exact observer order without resetting absolute process counters.",
+  "acceptance": "Focused deterministic counter, boundary, concurrency, overflow, aggregation and compatibility tests pass. Every measured region peak is at least entry/exit live bytes and at most the process highwater at exit. Exact corpus/output/refusal gates remain required.",
+  "limits": "No allocator elapsed-time comparison or speedup/memory-reduction claim. Callback-order logical request sizes include background allocations and pre-existing live bytes; they exclude allocator-internal realloc overlap, physical RSS and object-owned retention. The observer mutex can perturb allocator-thread scheduling. Old v2 and v3 reports must not be mixed."
+}

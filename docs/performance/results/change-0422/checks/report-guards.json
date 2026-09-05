@@ -1,0 +1,38 @@
+{
+  "change": 422,
+  "checks": {
+    "chronological_peak_decrease": {
+      "diagnostic": "guard_probe violates peak/live or monotonic-peak invariants",
+      "rejected": true
+    },
+    "elapsed_sorted_vectors_restore_chronology": true,
+    "missing_counter_revision": {
+      "diagnostic": "guard_probe.tool is not the serialized_region_peak_v3 allocator identity",
+      "rejected": true
+    },
+    "missing_region_peak": {
+      "diagnostic": "guard_probe.allocation.region_peak_live_bytes must be an object",
+      "rejected": true
+    },
+    "old_counter_revision": {
+      "diagnostic": "guard_probe.tool is not the serialized_region_peak_v3 allocator identity",
+      "rejected": true
+    },
+    "peak_below_live": {
+      "diagnostic": "guard_probe violates peak/live or monotonic-peak invariants",
+      "rejected": true
+    },
+    "region_peak_above_lifetime": {
+      "diagnostic": "guard_probe violates region peak/live/process-highwater invariants",
+      "rejected": true
+    },
+    "region_peak_below_live": {
+      "diagnostic": "guard_probe violates region peak/live/process-highwater invariants",
+      "rejected": true
+    },
+    "unmodified_real_report_accepted": true
+  },
+  "classification": "in-memory validator guards; no synthetic measurement",
+  "original_report_sha256": "14944af47a0dbf44b6d5f0d38670375dd2b301a3c981908a2e6c96e893a0fcca",
+  "status": "pass"
+}

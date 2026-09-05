@@ -1,0 +1,94 @@
+{
+  "binary": {
+    "bytes": 449917568,
+    "mode_bits": 509,
+    "path": "/tmp/litchi-goal-0422-candidate-allocator",
+    "profile": "release-debug1-frame-pointer",
+    "sha256": "b189d92075dd3fe242d17bda6444ff48b0029b2ff255047fd6ea70eae334b738"
+  },
+  "build": {
+    "path": "build-candidate.json",
+    "sha256": "46a1d2e6b35c432196c816a3a7b3b6d9cf094f5582b0a61c8bddcb99b340b858"
+  },
+  "change": 422,
+  "claim_authorized": false,
+  "common_flags": [
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm"
+  ],
+  "cpu": 2,
+  "expected_run_count": 4,
+  "finished_utc": "2026-09-05T11:35:29.717537+00:00",
+  "performance_claim": null,
+  "protocol": {
+    "path": "protocol.json",
+    "sha256": "cd33d9c853feec5c0fc6b6b4754f3d0988f70119c352c93373b9d1510695f1a6"
+  },
+  "repeats": [
+    "R1",
+    "R2"
+  ],
+  "runs": [
+    {
+      "journal": "runs/R1/pptx_cross_copy_media_rich_lifecycle/journal.json",
+      "journal_sha256": "1af3eb842e7d11e3acf11f6cdd48380bc211f4451592308f3c9609095929350e",
+      "repeat": "R1",
+      "selector": "pptx_cross_copy_media_rich_lifecycle",
+      "status": "pass"
+    },
+    {
+      "journal": "runs/R1/pptx_cross_copy_plain_lifecycle/journal.json",
+      "journal_sha256": "079e8416ac3e25a385f9e8754ed98170dad8a943b5c65c6b08c2aebb837de068",
+      "repeat": "R1",
+      "selector": "pptx_cross_copy_plain_lifecycle",
+      "status": "pass"
+    },
+    {
+      "journal": "runs/R2/pptx_cross_copy_media_rich_lifecycle/journal.json",
+      "journal_sha256": "ad7676a5755ebcabc0b7c22eb0c07f50b97b3fe8a95330b81a9233ec28627cc0",
+      "repeat": "R2",
+      "selector": "pptx_cross_copy_media_rich_lifecycle",
+      "status": "pass"
+    },
+    {
+      "journal": "runs/R2/pptx_cross_copy_plain_lifecycle/journal.json",
+      "journal_sha256": "dd101a436b6e0f7e02ecb00c7cc91ab5e57ad4dae229801cd0ebd9cb79946b8f",
+      "repeat": "R2",
+      "selector": "pptx_cross_copy_plain_lifecycle",
+      "status": "pass"
+    }
+  ],
+  "samples": 30,
+  "schema_version": 1,
+  "selectors": [
+    "pptx_cross_copy_media_rich_lifecycle",
+    "pptx_cross_copy_plain_lifecycle"
+  ],
+  "source": {
+    "identity_sha256": "f93cc7b572f5f85745fc2ea3534e28d750dbee95f5d78d6088232b9dd947dc97",
+    "revision": "40c40ea89591140e15e68d00f3fce2c4c376e445"
+  },
+  "started_utc": "2026-09-05T11:34:28.053433+00:00",
+  "status": "pass",
+  "verifier": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0422/verify.py",
+    "sha256": "2ea9101cb0fd62063c533f78708e72b4e11a32a3946afcac9d49e21da3588854"
+  },
+  "warmups": 3
+}

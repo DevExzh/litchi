@@ -1,0 +1,15 @@
+{
+  "change": 422,
+  "checks": [
+    {
+      "check": "standalone bundle without repository layout",
+      "status": "pass"
+    },
+    {
+      "check": "modified pinned validator rejected before replay",
+      "status": "pass"
+    }
+  ],
+  "status": "pass",
+  "temporary_export_removed": true
+}

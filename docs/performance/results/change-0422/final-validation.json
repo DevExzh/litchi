@@ -1,0 +1,77 @@
+{
+  "change": 422,
+  "checks": [
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "allocation_metrics::tests",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T11:26:27.849747+00:00",
+      "log": "final-counter-tests.log",
+      "name": "counter-tests",
+      "started_utc": "2026-09-05T11:26:24.144702+00:00"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools",
+        "-p",
+        "test_perf_compare.py"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T11:26:28.317860+00:00",
+      "log": "final-comparator-tests.log",
+      "name": "comparator-tests",
+      "started_utc": "2026-09-05T11:26:27.849994+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--all-features",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-A",
+        "clippy::chunks_exact_to_as_chunks",
+        "-A",
+        "clippy::clone_on_copy",
+        "-A",
+        "clippy::needless_lifetimes"
+      ],
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T11:26:30.749554+00:00",
+      "log": "final-clippy-diagnostic.log",
+      "name": "clippy-diagnostic",
+      "started_utc": "2026-09-05T11:26:28.318098+00:00"
+    }
+  ],
+  "reason": "new counter let-chain lint fix and additional Python filesystem/mixed-generation negative tests",
+  "source_sha256": {
+    "tools/perf-baseline/src/allocation_metrics.rs": "38300a617799071092652ca0422d56a8510b69839b095061eea00d2b679f81b0",
+    "tools/perf-baseline/src/filesystem.rs": "ce1934b95cdcec607c647220b330800302e9fa93b6f8d1e61cdae446825966e4",
+    "tools/perf-baseline/src/operation_metrics.rs": "c8ee7587161592d2047e70aa463b47becf86069e7f72631caf818fb65bf414ec",
+    "tools/perf_compare.py": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e",
+    "tools/test_perf_compare.py": "553229f7165e09fa8934fc8c9c0167f894e504d0c1409fa304e9d55901660f6d"
+  },
+  "status": "pass"
+}

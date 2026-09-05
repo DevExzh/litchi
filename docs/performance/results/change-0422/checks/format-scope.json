@@ -1,0 +1,19 @@
+{
+  "file": "tools/perf-baseline/src/filesystem.rs",
+  "reason": "remove unrelated rustfmt churn outside the five added test lines",
+  "argv": [
+    "rustup",
+    "run",
+    "1.98.1",
+    "rustfmt",
+    "--edition",
+    "2024",
+    "--config",
+    "skip_children=true",
+    "--emit",
+    "stdout"
+  ],
+  "tested_formatted_sha256": "ce1934b95cdcec607c647220b330800302e9fa93b6f8d1e61cdae446825966e4",
+  "final_scoped_sha256": "35a560bf657a63e1db81d9ec580003459858a6e52afe1e1fb394dd947122d210",
+  "normalizing_final_scoped_source_exactly_reproduces_tested_source": true
+}

@@ -1,0 +1,16 @@
+{
+  "change": 422,
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "remaining_batch_temporaries": [],
+  "removed": [
+    "/tmp/litchi-goal-0422-candidate-worktree",
+    "/tmp/litchi-goal-0422-candidate-normal",
+    "/tmp/litchi-goal-0422-candidate-allocator"
+  ],
+  "shared_caches_preserved": [
+    "target",
+    "tools/perf-baseline/target"
+  ],
+  "source_worktree_clean_before_removal": true,
+  "status": "pass"
+}
