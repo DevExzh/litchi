@@ -139,7 +139,7 @@ impl SharedStringIndex {
         }
 
         let mut buckets = Vec::with_capacity(actual_count);
-        for entry in data[FIXED_PAYLOAD_LEN..].chunks_exact(BUCKET_LEN) {
+        for entry in data[FIXED_PAYLOAD_LEN..].as_chunks::<BUCKET_LEN>().0.iter() {
             let stream_position = u32::from_le_bytes(entry[0..4].try_into().unwrap());
             let record_offset = u16::from_le_bytes([entry[4], entry[5]]);
             let reserved = u16::from_le_bytes([entry[6], entry[7]]);

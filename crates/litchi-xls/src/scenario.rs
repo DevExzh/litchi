@@ -406,7 +406,7 @@ fn parse_scen_man(data: &[u8]) -> Result<ScenarioManagerHeader> {
     let shown_scenario = parse_index(shown)?;
     let mut result_ranges =
         Vec::with_capacity(crate::utils::sign_extend_i16_to_usize(result_count));
-    for chunk in data[8..].chunks_exact(8) {
+    for chunk in data[8..].as_chunks::<8>().0.iter() {
         let first_row = read_u16(chunk, 0);
         let last_row = read_u16(chunk, 2);
         let first_column = read_u16(chunk, 4);
@@ -577,7 +577,9 @@ impl<'a> Cursor<'a> {
                 Error::InvalidData("Scenario string size overflow".to_string())
             })?)?;
             let units: Vec<u16> = bytes
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
                 .collect();
             String::from_utf16(&units).map_err(|_error| Error::InvalidRecord {

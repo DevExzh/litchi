@@ -291,7 +291,11 @@ impl RecolorInfo {
         let mut entries = Vec::with_capacity(entry_count);
         let mut parsed_colors = 0usize;
         let mut parsed_fills = 0usize;
-        for bytes in payload[PREFIX_BYTES..required].chunks_exact(ENTRY_BYTES) {
+        for bytes in payload[PREFIX_BYTES..required]
+            .as_chunks::<ENTRY_BYTES>()
+            .0
+            .iter()
+        {
             let entry = parse_entry(bytes)?;
             match entry.source {
                 RecolorSource::Color { .. } => parsed_colors += 1,

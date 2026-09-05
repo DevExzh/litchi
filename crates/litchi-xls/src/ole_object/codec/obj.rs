@@ -351,7 +351,9 @@ pub(super) fn decode_xl_unicode_string(encoded: &[u8]) -> Option<String> {
     if options & XL_STRING_HIGH_BYTE != 0 {
         let bytes = encoded.get(offset..offset + character_count * 2)?;
         let units = bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
         String::from_utf16(&units.collect::<Vec<_>>()).ok()
     } else {

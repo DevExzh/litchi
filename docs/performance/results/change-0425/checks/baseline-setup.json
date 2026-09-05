@@ -1,0 +1,6 @@
+{
+  "baseline_revision": "340cc91ae2bdec338dfe7682b4b5d8c219a2d288",
+  "workspace_lock_sha256": "c14b122a53a49b4c602353bf52ac2b77b7acf190030f11e859290958c80407ef",
+  "lock_source": "existing root workspace ignored lockfile; identical copy supplied to baseline and retained",
+  "initial_attempts": "baseline-odp/odt/xlsb failed before compilation because checkout had no ignored Cargo.lock; no reproduction claim for those attempts"
+}

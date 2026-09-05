@@ -360,7 +360,7 @@ fn parse_string(record: &Record, descriptor: StringDescriptor) -> Result<String>
         )));
     }
     let mut units = Vec::with_capacity(record.data.len() / 2);
-    for bytes in record.data.chunks_exact(2) {
+    for bytes in record.data.as_chunks::<2>().0.iter() {
         let unit = u16::from_le_bytes([bytes[0], bytes[1]]);
         if descriptor.kind == StringKind::Unicode && unit == 0 {
             break;
@@ -562,7 +562,10 @@ fn system_time_bytes(value: SystemTime) -> [u8; 16] {
         value.millisecond,
     ];
     let mut bytes = [0u8; 16];
-    for (field, output) in fields.into_iter().zip(bytes.chunks_exact_mut(2)) {
+    for (field, output) in fields
+        .into_iter()
+        .zip(bytes.as_chunks_mut::<2>().0.iter_mut())
+    {
         output.copy_from_slice(&field.to_le_bytes());
     }
     bytes

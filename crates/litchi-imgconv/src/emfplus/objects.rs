@@ -644,7 +644,9 @@ fn decode_font(c: &mut Cursor<'_>) -> Result<Font> {
             .ok_or_else(|| error("font family length overflow"))?,
     )?;
     let utf16: Vec<u16> = units
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
         .collect();
     let family = String::from_utf16(&utf16).map_err(|_| error("invalid UTF-16 font family"))?;

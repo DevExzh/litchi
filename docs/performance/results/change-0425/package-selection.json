@@ -1,0 +1,542 @@
+{
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "clippy",
+    "--locked",
+    "--keep-going",
+    "-p",
+    "litchi-biff",
+    "-p",
+    "litchi-cfb",
+    "-p",
+    "litchi-codepage",
+    "-p",
+    "litchi-core",
+    "-p",
+    "litchi-crypto",
+    "-p",
+    "litchi-doc",
+    "-p",
+    "litchi-docx",
+    "-p",
+    "litchi-drawingml",
+    "-p",
+    "litchi-eval",
+    "-p",
+    "litchi-fonts",
+    "-p",
+    "litchi-formula",
+    "-p",
+    "litchi-imgconv",
+    "-p",
+    "litchi-markdown",
+    "-p",
+    "litchi-odb",
+    "-p",
+    "litchi-odc",
+    "-p",
+    "litchi-odf",
+    "-p",
+    "litchi-odf-common",
+    "-p",
+    "litchi-odf-formula",
+    "-p",
+    "litchi-odg",
+    "-p",
+    "litchi-odi",
+    "-p",
+    "litchi-odm",
+    "-p",
+    "litchi-odp",
+    "-p",
+    "litchi-odraw",
+    "-p",
+    "litchi-ods",
+    "-p",
+    "litchi-odt",
+    "-p",
+    "litchi-ograph",
+    "-p",
+    "litchi-ole-common",
+    "-p",
+    "litchi-ooxml-common",
+    "-p",
+    "litchi-opc",
+    "-p",
+    "litchi-oth",
+    "-p",
+    "litchi-ppt",
+    "-p",
+    "litchi-pptx",
+    "-p",
+    "litchi-rtf",
+    "-p",
+    "litchi-sheet",
+    "-p",
+    "litchi-sign",
+    "-p",
+    "litchi-slide",
+    "-p",
+    "litchi-spreadsheet-drawing",
+    "-p",
+    "litchi-vba",
+    "-p",
+    "litchi-word",
+    "-p",
+    "litchi-xls",
+    "-p",
+    "litchi-xlsb",
+    "-p",
+    "litchi-xlsx",
+    "-p",
+    "soapberry-zip",
+    "-p",
+    "xml-minifier",
+    "-p",
+    "xml-minifier-macros",
+    "--all-features",
+    "--all-targets",
+    "--no-deps",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "change": 425,
+  "limitation": "Umbrella separately checked with explicit features; Python binding requires excluded iWork and is not certified by this audit.",
+  "manifests": [
+    {
+      "manifest": "crates/litchi/Cargo.toml",
+      "package": "litchi",
+      "separate_or_excluded_reason": "umbrella requires explicit non-iWork features",
+      "sha256": "21e39c9e1fde9013f0f42657502b99131a94ef49ad8c5062fccbe7a134c0d692"
+    },
+    {
+      "manifest": "crates/litchi-biff/Cargo.toml",
+      "package": "litchi-biff",
+      "separate_or_excluded_reason": null,
+      "sha256": "66f8c54ce57986552002767091582c852b558cf9d0be97aaf0a2cc2b778eff41"
+    },
+    {
+      "manifest": "crates/litchi-cfb/Cargo.toml",
+      "package": "litchi-cfb",
+      "separate_or_excluded_reason": null,
+      "sha256": "19aaa8b5521eb417ee78d189a5af9a14b698c15925c7f3fc060bd3cf00f62573"
+    },
+    {
+      "manifest": "crates/litchi-codepage/Cargo.toml",
+      "package": "litchi-codepage",
+      "separate_or_excluded_reason": null,
+      "sha256": "c1e1c7986d78c876cefe99d35c9b4ebf43f06bc484eea3b184ded9d4b8bcca12"
+    },
+    {
+      "manifest": "crates/litchi-core/Cargo.toml",
+      "package": "litchi-core",
+      "separate_or_excluded_reason": null,
+      "sha256": "f269d5d26b041dca9d589342f3b0f3cdd796ea4c9afb72b09bf9b1933001d8ac"
+    },
+    {
+      "manifest": "crates/litchi-crypto/Cargo.toml",
+      "package": "litchi-crypto",
+      "separate_or_excluded_reason": null,
+      "sha256": "c36d538193278709fd71401f7f7fd8647182ba568de74fbbe9cada9ee59bfcee"
+    },
+    {
+      "manifest": "crates/litchi-doc/Cargo.toml",
+      "package": "litchi-doc",
+      "separate_or_excluded_reason": null,
+      "sha256": "ab81c896059f0606d252c4c6c65c7b7b583f5bd381f58f66573858deb48db1cc"
+    },
+    {
+      "manifest": "crates/litchi-docx/Cargo.toml",
+      "package": "litchi-docx",
+      "separate_or_excluded_reason": null,
+      "sha256": "c080cc757c8c75de1c5846954258ee585d4dfdaa931e2200ca89fb42903b448b"
+    },
+    {
+      "manifest": "crates/litchi-drawingml/Cargo.toml",
+      "package": "litchi-drawingml",
+      "separate_or_excluded_reason": null,
+      "sha256": "22d5aba613de0f1322b9ae7efa4cc333e6d95d1bffaddb2487c2c107101995fe"
+    },
+    {
+      "manifest": "crates/litchi-eval/Cargo.toml",
+      "package": "litchi-eval",
+      "separate_or_excluded_reason": null,
+      "sha256": "bfc344a86b46702b45edfdd3e8145619555342bef5659feb8bf099a092c93a25"
+    },
+    {
+      "manifest": "crates/litchi-fonts/Cargo.toml",
+      "package": "litchi-fonts",
+      "separate_or_excluded_reason": null,
+      "sha256": "eb78e6b307c60dde955c0e0883815dc12f61817ede6c9f7a82355150d804ea54"
+    },
+    {
+      "manifest": "crates/litchi-formula/Cargo.toml",
+      "package": "litchi-formula",
+      "separate_or_excluded_reason": null,
+      "sha256": "9d0c8257e5ca0bed894b1115b25e7fd77b20a4dfb4c974590f8e5ba97ee48f02"
+    },
+    {
+      "manifest": "crates/litchi-imgconv/Cargo.toml",
+      "package": "litchi-imgconv",
+      "separate_or_excluded_reason": null,
+      "sha256": "ae06fec835d9b7d9b98f6d584d258fbbf9ea8c92ce64e38de50b5f94a7dc6b2b"
+    },
+    {
+      "manifest": "crates/litchi-iwa/Cargo.toml",
+      "package": "litchi-iwa",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "a6735624abe8a2fd7bb3696527ee6e09b83f12aeec1a982c05994df651006d40"
+    },
+    {
+      "manifest": "crates/litchi-iwa-archive/Cargo.toml",
+      "package": "litchi-iwa-archive",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "2fcc4c8bc042efadeb01da21d6cc3c44b6af9ee8f2614fa216e017bf92e3f1db"
+    },
+    {
+      "manifest": "crates/litchi-iwa-cache/Cargo.toml",
+      "package": "litchi-iwa-cache",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "0d24660d31fcc7c55143d44803f854db5f2a268bc98834c295995ff9877cdfd9"
+    },
+    {
+      "manifest": "crates/litchi-iwa-common/Cargo.toml",
+      "package": "litchi-iwa-common",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "9deb264a0baba5a4e51dd48de92f6906a7f7a4c23730ee8135801215fc868e62"
+    },
+    {
+      "manifest": "crates/litchi-iwa-core/Cargo.toml",
+      "package": "litchi-iwa-core",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "a835b9c5b86a715813823fea5f6677729b9d84cbe81900633daf3e35e391092a"
+    },
+    {
+      "manifest": "crates/litchi-iwa-detect/Cargo.toml",
+      "package": "litchi-iwa-detect",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "96165d8b8bfc164fe9dc1d923b655cd8e0b9670388920746ef39bf7baf78b974"
+    },
+    {
+      "manifest": "crates/litchi-iwa-graph/Cargo.toml",
+      "package": "litchi-iwa-graph",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "90d3d36a39c179a1317981a372ce6f7575c71c03c53119a0f3f1b0742f10a3ee"
+    },
+    {
+      "manifest": "crates/litchi-iwa-index/Cargo.toml",
+      "package": "litchi-iwa-index",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "e32ca609e6eea4abf953dec18452f6b2d1ef8c002fef7234af047e219e3508ef"
+    },
+    {
+      "manifest": "crates/litchi-iwa-package/Cargo.toml",
+      "package": "litchi-iwa-package",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "dfbd816fa7ef829a309b78d3ceba8ef69a6881b6bed1a8edf76e976a59bf4c13"
+    },
+    {
+      "manifest": "crates/litchi-iwa-protos/Cargo.toml",
+      "package": "litchi-iwa-protos",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "f5cc5e114aafc462556df243c4fc4b13a6eb440913553fb7f5b9092ac55b4efa"
+    },
+    {
+      "manifest": "crates/litchi-iwa-structured/Cargo.toml",
+      "package": "litchi-iwa-structured",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "c51b6972b814b6e7733f6e9388dffe5e1a0f1a791a303fa26025a5bd21b0061d"
+    },
+    {
+      "manifest": "crates/litchi-iwa-text/Cargo.toml",
+      "package": "litchi-iwa-text",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "bf178c26de442810188cc8f29d2427d1a3216e38b51205aab12fb7deeac33a92"
+    },
+    {
+      "manifest": "crates/litchi-iwa-text-wire/Cargo.toml",
+      "package": "litchi-iwa-text-wire",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "0ad6dcd1629e377ab59f9f8a0e4c91be81973a57c4593f85ec0410a7c459dab5"
+    },
+    {
+      "manifest": "crates/litchi-keynote/Cargo.toml",
+      "package": "litchi-keynote",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "3c79468cb650938babcbc8d887c73f3a22ffb45988d2b293f224ed395886dc0f"
+    },
+    {
+      "manifest": "crates/litchi-markdown/Cargo.toml",
+      "package": "litchi-markdown",
+      "separate_or_excluded_reason": null,
+      "sha256": "549c2aebd0ca3345088923419b828c6932bdc8456f47548dc8b88c274e6f52e5"
+    },
+    {
+      "manifest": "crates/litchi-numbers/Cargo.toml",
+      "package": "litchi-numbers",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "835ffd39d712e04c361c96b2a26d7e16a4b8a00c5ad39f88f2b834f9a5b8e8e7"
+    },
+    {
+      "manifest": "crates/litchi-numbers-wire/Cargo.toml",
+      "package": "litchi-numbers-wire",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "be255b8b1d92c5fec9fbf48c2de43cc8461fca2e2ee84a7da236a328ecc1721e"
+    },
+    {
+      "manifest": "crates/litchi-odb/Cargo.toml",
+      "package": "litchi-odb",
+      "separate_or_excluded_reason": null,
+      "sha256": "6d2eba40a47cbb0f1e36455b39b0892973db8ca03ae9264d58d336e614573f4c"
+    },
+    {
+      "manifest": "crates/litchi-odc/Cargo.toml",
+      "package": "litchi-odc",
+      "separate_or_excluded_reason": null,
+      "sha256": "1749e391ef12222977f2fbf1c73252e54fd875295468f716926b1b7a9ab35b65"
+    },
+    {
+      "manifest": "crates/litchi-odf/Cargo.toml",
+      "package": "litchi-odf",
+      "separate_or_excluded_reason": null,
+      "sha256": "93a991d98dec7a6cea4982b7cbd375a92502bc0c4ef04c8449c9906e0c87299c"
+    },
+    {
+      "manifest": "crates/litchi-odf-common/Cargo.toml",
+      "package": "litchi-odf-common",
+      "separate_or_excluded_reason": null,
+      "sha256": "1b14a428a7862478cddfd791d0b2cbba6d8f050f8dcb2f33e345b96f4efc3169"
+    },
+    {
+      "manifest": "crates/litchi-odf-formula/Cargo.toml",
+      "package": "litchi-odf-formula",
+      "separate_or_excluded_reason": null,
+      "sha256": "b5606aeef996a4dcee84746e079e05e11bb64ffbc78921be92cc74457efcee09"
+    },
+    {
+      "manifest": "crates/litchi-odg/Cargo.toml",
+      "package": "litchi-odg",
+      "separate_or_excluded_reason": null,
+      "sha256": "68295a0cf69f8caaf74157c568f6dbaaf5d4128b69809b63ec48205cbf49151f"
+    },
+    {
+      "manifest": "crates/litchi-odi/Cargo.toml",
+      "package": "litchi-odi",
+      "separate_or_excluded_reason": null,
+      "sha256": "6f5f573326f4636128579b280aa7f1d1b5b52e43e0e0941e2e6f81a6ed4fca9f"
+    },
+    {
+      "manifest": "crates/litchi-odm/Cargo.toml",
+      "package": "litchi-odm",
+      "separate_or_excluded_reason": null,
+      "sha256": "a4f5bdc944a8b812ddd548ad182f62f1996d29d54e7a344b0b76dd306f62591c"
+    },
+    {
+      "manifest": "crates/litchi-odp/Cargo.toml",
+      "package": "litchi-odp",
+      "separate_or_excluded_reason": null,
+      "sha256": "f3c7bd2fb2632c1d7eb8050467bae6c89fdc16244b1babcd9fba1e8602290858"
+    },
+    {
+      "manifest": "crates/litchi-odraw/Cargo.toml",
+      "package": "litchi-odraw",
+      "separate_or_excluded_reason": null,
+      "sha256": "2373771e335971e08ed9dbc3875f1ef4125e77e16f7d602046a20ac7aa715473"
+    },
+    {
+      "manifest": "crates/litchi-ods/Cargo.toml",
+      "package": "litchi-ods",
+      "separate_or_excluded_reason": null,
+      "sha256": "8b0aa977a404eadf4b466f9aa1dcb871c3b5cf18a7462fa3fe11ace65278ace1"
+    },
+    {
+      "manifest": "crates/litchi-odt/Cargo.toml",
+      "package": "litchi-odt",
+      "separate_or_excluded_reason": null,
+      "sha256": "7dce2f52c8f62ef1301d205becb51446c5c3ff8b25bedc0781531fe09f0f6154"
+    },
+    {
+      "manifest": "crates/litchi-ograph/Cargo.toml",
+      "package": "litchi-ograph",
+      "separate_or_excluded_reason": null,
+      "sha256": "fd8447d5db5e6451468ee9e9ccf698bf42f0ecd5aafc83a4720cf1c893022de8"
+    },
+    {
+      "manifest": "crates/litchi-ole-common/Cargo.toml",
+      "package": "litchi-ole-common",
+      "separate_or_excluded_reason": null,
+      "sha256": "059020ac93ea3cb203007efb026ab89ddba6b317bf9664f537948e38557bdb78"
+    },
+    {
+      "manifest": "crates/litchi-ooxml-common/Cargo.toml",
+      "package": "litchi-ooxml-common",
+      "separate_or_excluded_reason": null,
+      "sha256": "e226484cae42a827ff8d37603870ebd088cfaba953338825664433290d04489e"
+    },
+    {
+      "manifest": "crates/litchi-opc/Cargo.toml",
+      "package": "litchi-opc",
+      "separate_or_excluded_reason": null,
+      "sha256": "0572d27f2134b4d060e79ac2bbd57ae3d839ad768e57a944d5674538388b80fb"
+    },
+    {
+      "manifest": "crates/litchi-oth/Cargo.toml",
+      "package": "litchi-oth",
+      "separate_or_excluded_reason": null,
+      "sha256": "2ce0c25ac67f97a19fcc08184539e42edcb9cbd85c52f96036cd44305107163e"
+    },
+    {
+      "manifest": "crates/litchi-pages/Cargo.toml",
+      "package": "litchi-pages",
+      "separate_or_excluded_reason": "iWork owner",
+      "sha256": "310229eb8810772b3bf26a28f57019702c112599c7a442a9eb2b6b20901e2b3a"
+    },
+    {
+      "manifest": "crates/litchi-ppt/Cargo.toml",
+      "package": "litchi-ppt",
+      "separate_or_excluded_reason": null,
+      "sha256": "c4ed2bea304a9a6ae84f448d2829af72336c884767682856a3ec87b4ad0e9ef8"
+    },
+    {
+      "manifest": "crates/litchi-pptx/Cargo.toml",
+      "package": "litchi-pptx",
+      "separate_or_excluded_reason": null,
+      "sha256": "5a4e4103de4c427ff4601ab2ebc1b758eb26d58e8ad661d1db3f838ff490ec65"
+    },
+    {
+      "manifest": "crates/litchi-rtf/Cargo.toml",
+      "package": "litchi-rtf",
+      "separate_or_excluded_reason": null,
+      "sha256": "ad27bdeb69f562e6bb846174abb559257f8481e16ea8119ab44c037bef2fa91f"
+    },
+    {
+      "manifest": "crates/litchi-sheet/Cargo.toml",
+      "package": "litchi-sheet",
+      "separate_or_excluded_reason": null,
+      "sha256": "8b8d201f79456de9ce43137e3943e58eaea9269c7440108e336ef687c23ade4a"
+    },
+    {
+      "manifest": "crates/litchi-sign/Cargo.toml",
+      "package": "litchi-sign",
+      "separate_or_excluded_reason": null,
+      "sha256": "1f41ecc3d6a14bfa22f9cb8a6302a0deb6910013f59fd9a753597c0aad01d66d"
+    },
+    {
+      "manifest": "crates/litchi-slide/Cargo.toml",
+      "package": "litchi-slide",
+      "separate_or_excluded_reason": null,
+      "sha256": "c24a0359b15942d3aa0097ee228a6a332187cd4db1d2cca3f3f4475e06d5e91a"
+    },
+    {
+      "manifest": "crates/litchi-spreadsheet-drawing/Cargo.toml",
+      "package": "litchi-spreadsheet-drawing",
+      "separate_or_excluded_reason": null,
+      "sha256": "faf1b59e59847f22edccc152020175bb69b4a74674159e1961a0ed91d7ccb1a3"
+    },
+    {
+      "manifest": "crates/litchi-vba/Cargo.toml",
+      "package": "litchi-vba",
+      "separate_or_excluded_reason": null,
+      "sha256": "af005cab814d60efad3f4ddcabad5d65991f407ba20f6670afbe35b6f1ea060c"
+    },
+    {
+      "manifest": "crates/litchi-word/Cargo.toml",
+      "package": "litchi-word",
+      "separate_or_excluded_reason": null,
+      "sha256": "2d2b22c8f3ce8f0b158ae2e20a9da8c83792430e3b65dd00324c961ad2e024a8"
+    },
+    {
+      "manifest": "crates/litchi-xls/Cargo.toml",
+      "package": "litchi-xls",
+      "separate_or_excluded_reason": null,
+      "sha256": "92f1eeb7c84753d780831d0e3bc638e2b03e8dd86259611370a607fa851604d2"
+    },
+    {
+      "manifest": "crates/litchi-xlsb/Cargo.toml",
+      "package": "litchi-xlsb",
+      "separate_or_excluded_reason": null,
+      "sha256": "8ebc420a70e92909dbaf3241064178bc37c8ee525aa50bd60707a269b0d0ff2c"
+    },
+    {
+      "manifest": "crates/litchi-xlsx/Cargo.toml",
+      "package": "litchi-xlsx",
+      "separate_or_excluded_reason": null,
+      "sha256": "d8139ad1d4abd39e3aa0a09c60fc7a70aa251ab026fa4f2e793b68228fcb3d9c"
+    },
+    {
+      "manifest": "crates/pyo3-litchi/Cargo.toml",
+      "package": "litchi-py",
+      "separate_or_excluded_reason": "Python binding unconditionally enables iWork",
+      "sha256": "ce0420a8e315818e90d13efe10b9cef66f4ddb7cb05d6d09f3ce5cb57ee7d5ed"
+    },
+    {
+      "manifest": "crates/soapberry-zip/Cargo.toml",
+      "package": "soapberry-zip",
+      "separate_or_excluded_reason": null,
+      "sha256": "c78ca970c3bfd6e55ae48be3d5407b34360a7ac359bd2ed2b4c07d4206a4731e"
+    },
+    {
+      "manifest": "crates/xml-minifier/Cargo.toml",
+      "package": "xml-minifier",
+      "separate_or_excluded_reason": null,
+      "sha256": "7cdf4fac21a50ce8c39fc20d0af89c3ca24f869b74d95c6cd449249f0e28b797"
+    },
+    {
+      "manifest": "crates/xml-minifier-macros/Cargo.toml",
+      "package": "xml-minifier-macros",
+      "separate_or_excluded_reason": null,
+      "sha256": "950c387592a3652d0587568dda66e824d1c21ee2f23d3212ed302befa3a3e4cc"
+    }
+  ],
+  "selected_packages": [
+    "litchi-biff",
+    "litchi-cfb",
+    "litchi-codepage",
+    "litchi-core",
+    "litchi-crypto",
+    "litchi-doc",
+    "litchi-docx",
+    "litchi-drawingml",
+    "litchi-eval",
+    "litchi-fonts",
+    "litchi-formula",
+    "litchi-imgconv",
+    "litchi-markdown",
+    "litchi-odb",
+    "litchi-odc",
+    "litchi-odf",
+    "litchi-odf-common",
+    "litchi-odf-formula",
+    "litchi-odg",
+    "litchi-odi",
+    "litchi-odm",
+    "litchi-odp",
+    "litchi-odraw",
+    "litchi-ods",
+    "litchi-odt",
+    "litchi-ograph",
+    "litchi-ole-common",
+    "litchi-ooxml-common",
+    "litchi-opc",
+    "litchi-oth",
+    "litchi-ppt",
+    "litchi-pptx",
+    "litchi-rtf",
+    "litchi-sheet",
+    "litchi-sign",
+    "litchi-slide",
+    "litchi-spreadsheet-drawing",
+    "litchi-vba",
+    "litchi-word",
+    "litchi-xls",
+    "litchi-xlsb",
+    "litchi-xlsx",
+    "soapberry-zip",
+    "xml-minifier",
+    "xml-minifier-macros"
+  ],
+  "selection_count": 45,
+  "workspace_packages": 64
+}

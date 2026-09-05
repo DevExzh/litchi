@@ -159,7 +159,9 @@ impl<'data> Name<'data> {
     pub fn text(self) -> Result<String> {
         let units = self
             .raw
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .take(self.unit_len())
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
         String::from_utf16(&units.collect::<Vec<_>>()).map_err(|_err| Error::MalformedProperties {

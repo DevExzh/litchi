@@ -131,7 +131,7 @@ pub(in crate::embedded_object) fn text_range(
             let bytes = word
                 .get(offset..offset + count * 2)
                 .ok_or_else(|| corrupted("field code exceeds WordDocument"))?;
-            for pair in bytes.chunks_exact(2) {
+            for pair in bytes.as_chunks::<2>().0.iter() {
                 units.push(u16::from_le_bytes([pair[0], pair[1]]));
             }
         } else {

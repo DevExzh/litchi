@@ -92,7 +92,9 @@ impl WmfPlaceableHeader {
 
         let reserved = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
         let calculated_checksum = data[..20]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|word| u16::from_le_bytes([word[0], word[1]]))
             .fold(0u16, |value, word| value ^ word);
         if reserved != 0 {
@@ -522,7 +524,9 @@ mod tests {
         put_i16(&mut placeable, 12, 200);
         put_u16(&mut placeable, 14, 1440);
         let checksum = placeable[..20]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|word| u16::from_le_bytes([word[0], word[1]]))
             .fold(0u16, |value, word| value ^ word);
         put_u16(&mut placeable, 20, checksum);
@@ -628,7 +632,9 @@ mod tests {
         put_u16(&mut memory, 22, WmfFileType::Memory as u16);
         put_u16(&mut memory, 4, 1);
         let checksum = memory[..20]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|word| u16::from_le_bytes([word[0], word[1]]))
             .fold(0u16, |value, word| value ^ word);
         put_u16(&mut memory, 20, checksum);
@@ -637,7 +643,9 @@ mod tests {
         let mut reversed = base;
         put_i16(&mut reversed, 10, -10);
         let checksum = reversed[..20]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|word| u16::from_le_bytes([word[0], word[1]]))
             .fold(0u16, |value, word| value ^ word);
         put_u16(&mut reversed, 20, checksum);
@@ -653,14 +661,12 @@ mod tests {
 
     #[test]
     fn parses_repository_wmf_fixtures() {
-        for data in [include_bytes!(concat!(
+        let data = include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/images/wmf/santa.wmf"
         ))
-        .as_slice()]
-        {
-            WmfParser::new(data).unwrap();
-        }
+        .as_slice();
+        WmfParser::new(data).unwrap();
 
         // The legacy sample has a nine-byte WMFC trailer after the declared
         // metafile. Strict parsing intentionally rejects that trailing data.

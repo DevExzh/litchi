@@ -837,7 +837,9 @@ pub(super) fn parse_authors(word: &[u8], table: &[u8]) -> Result<Vec<String>> {
             .get(cursor..cursor + n * 2)
             .ok_or_else(|| corrupted("revision author is truncated"))?;
         let units = bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|v| u16::from_le_bytes([v[0], v[1]]))
             .collect::<Vec<_>>();
         output.push(
@@ -942,7 +944,9 @@ pub(super) fn read_units(
                 .ok_or_else(|| corrupted("text range exceeds WordDocument"))?;
             out.extend(
                 bytes
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|v| u16::from_le_bytes([v[0], v[1]])),
             );
         } else {
@@ -1030,6 +1034,130 @@ pub(super) fn kind_order(kind: RevisionKind) -> u8 {
         RevisionKind::ParagraphFormatting => 3,
         RevisionKind::TableRowFormatting => 4,
     }
+}
+
+pub(super) fn validate_range(start: u32, end: u32, limit: u32) -> Result<()> {
+    if start >= end || end > limit {
+        Err(corrupted(
+            "tracked revision range is empty or exceeds the main story",
+        ))
+    } else {
+        Ok(())
+    }
+}
+pub(super) fn pack_dttm(value: Option<DateTime>) -> Result<u32> {
+    let Some(v) = value else { return Ok(0) };
+    if !(1900..=2411).contains(&v.year)
+        || !(1..=12).contains(&v.month)
+        || !(1..=31).contains(&v.day)
+        || v.hour > 23
+        || v.minute > 59
+        || v.weekday > 6
+    {
+        return Err(corrupted("revision timestamp is outside DTTM limits"));
+    }
+    Ok(u32::from(v.minute)
+        | u32::from(v.hour) << 6
+        | u32::from(v.day) << 11
+        | u32::from(v.month) << 16
+        | u32::from(v.year - 1900) << 20
+        | u32::from(v.weekday) << 29)
+}
+pub(super) fn decode_dttm(raw: u32) -> Result<Option<DateTime>> {
+    if raw == 0 {
+        return Ok(None);
+    }
+    let value = DateTime {
+        minute: (raw & 0x3f) as u8,
+        hour: ((raw >> 6) & 0x1f) as u8,
+        day: ((raw >> 11) & 0x1f) as u8,
+        month: ((raw >> 16) & 0xf) as u8,
+        year: ((raw >> 20) & 0x1ff) as u16 + 1900,
+        weekday: ((raw >> 29) & 7) as u8,
+    };
+    pack_dttm(Some(value))?;
+    Ok(Some(value))
+}
+pub(super) fn push_byte(out: &mut Vec<u8>, op: u16, v: u8) {
+    out.extend_from_slice(&op.to_le_bytes());
+    out.push(v);
+}
+pub(super) fn push_word(out: &mut Vec<u8>, op: u16, v: u16) {
+    out.extend_from_slice(&op.to_le_bytes());
+    out.extend_from_slice(&v.to_le_bytes());
+}
+pub(super) fn push_dword(out: &mut Vec<u8>, op: u16, v: u32) {
+    out.extend_from_slice(&op.to_le_bytes());
+    out.extend_from_slice(&v.to_le_bytes());
+}
+pub(super) fn append_table_block(
+    word: &mut [u8],
+    table: &mut Vec<u8>,
+    index: usize,
+    data: &[u8],
+) -> Result<()> {
+    let offset = u32::try_from(table.len()).map_err(|_| corrupted("Table stream exceeds u32"))?;
+    table.extend_from_slice(data);
+    put_fib_pair(
+        word,
+        index,
+        offset,
+        u32::try_from(data.len()).map_err(|_| corrupted("table block exceeds u32"))?,
+    )
+}
+pub(super) fn fib_pair(word: &[u8], index: usize) -> Result<(u32, u32)> {
+    Ok((
+        u32_at(word, FIB_FC_LCB + index * 8)?,
+        u32_at(word, FIB_FC_LCB + index * 8 + 4)?,
+    ))
+}
+pub(super) fn put_fib_pair(word: &mut [u8], index: usize, fc: u32, lcb: u32) -> Result<()> {
+    put_u32(word, FIB_FC_LCB + index * 8, fc)?;
+    put_u32(word, FIB_FC_LCB + index * 8 + 4, lcb)
+}
+pub(super) fn slice<'a>(data: &'a [u8], offset: u32, length: u32, name: &str) -> Result<&'a [u8]> {
+    let start = offset as usize;
+    let end = start
+        .checked_add(length as usize)
+        .ok_or_else(|| corrupted(format!("{name} range overflow")))?;
+    data.get(start..end)
+        .ok_or_else(|| corrupted(format!("{name} exceeds stream")))
+}
+pub(super) fn u16_at(data: &[u8], offset: usize) -> Result<u16> {
+    Ok(u16::from_le_bytes(array_at(data, offset, "u16")?))
+}
+pub(super) fn u32_at(data: &[u8], offset: usize) -> Result<u32> {
+    Ok(u32::from_le_bytes(array_at(data, offset, "u32")?))
+}
+pub(super) fn put_u32(data: &mut [u8], offset: usize, value: u32) -> Result<()> {
+    let end = offset
+        .checked_add(4)
+        .ok_or_else(|| corrupted("FIB field offset overflow"))?;
+    data.get_mut(offset..end)
+        .ok_or_else(|| corrupted("truncated FIB field"))?
+        .copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+pub(super) fn array_at<const N: usize>(data: &[u8], offset: usize, name: &str) -> Result<[u8; N]> {
+    let end = offset
+        .checked_add(N)
+        .ok_or_else(|| corrupted(format!("{name} offset overflow")))?;
+    data.get(offset..end)
+        .and_then(|bytes| bytes.try_into().ok())
+        .ok_or_else(|| corrupted(format!("truncated {name}")))
+}
+pub(super) fn align2(v: usize) -> Result<usize> {
+    v.checked_add(1)
+        .map(|n| n & !1)
+        .ok_or_else(|| corrupted("alignment overflow"))
+}
+pub(super) fn align512(v: usize) -> Result<usize> {
+    v.checked_add(511)
+        .map(|n| n & !511)
+        .ok_or_else(|| corrupted("alignment overflow"))
+}
+pub(super) fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 #[cfg(test)]
@@ -1207,127 +1335,4 @@ mod papx_cache_tests {
     fn papx_run_cache_is_send_sync() {
         assert_send_sync::<PapxRun>();
     }
-}
-pub(super) fn validate_range(start: u32, end: u32, limit: u32) -> Result<()> {
-    if start >= end || end > limit {
-        Err(corrupted(
-            "tracked revision range is empty or exceeds the main story",
-        ))
-    } else {
-        Ok(())
-    }
-}
-pub(super) fn pack_dttm(value: Option<DateTime>) -> Result<u32> {
-    let Some(v) = value else { return Ok(0) };
-    if !(1900..=2411).contains(&v.year)
-        || !(1..=12).contains(&v.month)
-        || !(1..=31).contains(&v.day)
-        || v.hour > 23
-        || v.minute > 59
-        || v.weekday > 6
-    {
-        return Err(corrupted("revision timestamp is outside DTTM limits"));
-    }
-    Ok(u32::from(v.minute)
-        | u32::from(v.hour) << 6
-        | u32::from(v.day) << 11
-        | u32::from(v.month) << 16
-        | u32::from(v.year - 1900) << 20
-        | u32::from(v.weekday) << 29)
-}
-pub(super) fn decode_dttm(raw: u32) -> Result<Option<DateTime>> {
-    if raw == 0 {
-        return Ok(None);
-    }
-    let value = DateTime {
-        minute: (raw & 0x3f) as u8,
-        hour: ((raw >> 6) & 0x1f) as u8,
-        day: ((raw >> 11) & 0x1f) as u8,
-        month: ((raw >> 16) & 0xf) as u8,
-        year: ((raw >> 20) & 0x1ff) as u16 + 1900,
-        weekday: ((raw >> 29) & 7) as u8,
-    };
-    pack_dttm(Some(value))?;
-    Ok(Some(value))
-}
-pub(super) fn push_byte(out: &mut Vec<u8>, op: u16, v: u8) {
-    out.extend_from_slice(&op.to_le_bytes());
-    out.push(v);
-}
-pub(super) fn push_word(out: &mut Vec<u8>, op: u16, v: u16) {
-    out.extend_from_slice(&op.to_le_bytes());
-    out.extend_from_slice(&v.to_le_bytes());
-}
-pub(super) fn push_dword(out: &mut Vec<u8>, op: u16, v: u32) {
-    out.extend_from_slice(&op.to_le_bytes());
-    out.extend_from_slice(&v.to_le_bytes());
-}
-pub(super) fn append_table_block(
-    word: &mut [u8],
-    table: &mut Vec<u8>,
-    index: usize,
-    data: &[u8],
-) -> Result<()> {
-    let offset = u32::try_from(table.len()).map_err(|_| corrupted("Table stream exceeds u32"))?;
-    table.extend_from_slice(data);
-    put_fib_pair(
-        word,
-        index,
-        offset,
-        u32::try_from(data.len()).map_err(|_| corrupted("table block exceeds u32"))?,
-    )
-}
-pub(super) fn fib_pair(word: &[u8], index: usize) -> Result<(u32, u32)> {
-    Ok((
-        u32_at(word, FIB_FC_LCB + index * 8)?,
-        u32_at(word, FIB_FC_LCB + index * 8 + 4)?,
-    ))
-}
-pub(super) fn put_fib_pair(word: &mut [u8], index: usize, fc: u32, lcb: u32) -> Result<()> {
-    put_u32(word, FIB_FC_LCB + index * 8, fc)?;
-    put_u32(word, FIB_FC_LCB + index * 8 + 4, lcb)
-}
-pub(super) fn slice<'a>(data: &'a [u8], offset: u32, length: u32, name: &str) -> Result<&'a [u8]> {
-    let start = offset as usize;
-    let end = start
-        .checked_add(length as usize)
-        .ok_or_else(|| corrupted(format!("{name} range overflow")))?;
-    data.get(start..end)
-        .ok_or_else(|| corrupted(format!("{name} exceeds stream")))
-}
-pub(super) fn u16_at(data: &[u8], offset: usize) -> Result<u16> {
-    Ok(u16::from_le_bytes(array_at(data, offset, "u16")?))
-}
-pub(super) fn u32_at(data: &[u8], offset: usize) -> Result<u32> {
-    Ok(u32::from_le_bytes(array_at(data, offset, "u32")?))
-}
-pub(super) fn put_u32(data: &mut [u8], offset: usize, value: u32) -> Result<()> {
-    let end = offset
-        .checked_add(4)
-        .ok_or_else(|| corrupted("FIB field offset overflow"))?;
-    data.get_mut(offset..end)
-        .ok_or_else(|| corrupted("truncated FIB field"))?
-        .copy_from_slice(&value.to_le_bytes());
-    Ok(())
-}
-pub(super) fn array_at<const N: usize>(data: &[u8], offset: usize, name: &str) -> Result<[u8; N]> {
-    let end = offset
-        .checked_add(N)
-        .ok_or_else(|| corrupted(format!("{name} offset overflow")))?;
-    data.get(offset..end)
-        .and_then(|bytes| bytes.try_into().ok())
-        .ok_or_else(|| corrupted(format!("truncated {name}")))
-}
-pub(super) fn align2(v: usize) -> Result<usize> {
-    v.checked_add(1)
-        .map(|n| n & !1)
-        .ok_or_else(|| corrupted("alignment overflow"))
-}
-pub(super) fn align512(v: usize) -> Result<usize> {
-    v.checked_add(511)
-        .map(|n| n & !511)
-        .ok_or_else(|| corrupted("alignment overflow"))
-}
-pub(super) fn corrupted(message: impl Into<String>) -> PackageError {
-    PackageError::Corrupted(message.into())
 }

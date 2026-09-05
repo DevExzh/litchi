@@ -355,7 +355,9 @@ impl DataLabExtContents {
     pub fn separator(&self) -> String {
         let units: Vec<u16> = if self.separator_flags & HIGH_BYTE != 0 {
             self.separator_bytes
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
                 .collect()
         } else {

@@ -201,7 +201,7 @@ fn tiff_dimensions(data: &[u8]) -> Option<(u32, u32)> {
     let entries = entries.get(..entry_bytes)?;
     let mut width = None;
     let mut height = None;
-    for entry in entries.chunks_exact(12) {
+    for entry in entries.as_chunks::<12>().0.iter() {
         let tag = read_u16(entry)?;
         if !matches!(tag, 256 | 257) {
             continue;

@@ -283,8 +283,10 @@ mod tests {
     fn explicit_limits_bound_requests_before_resolution() {
         let mut glyphs = HashMap::new();
         glyphs.insert(Request::regular("Alpha"), crate::Glyphs::new());
-        let mut limits = PreparationLimits::default();
-        limits.max_requests = 0;
+        let limits = PreparationLimits {
+            max_requests: 0,
+            ..PreparationLimits::default()
+        };
         assert!(matches!(
             prepare_with_limits(&StaticResolver, glyphs, Mode::Full, limits),
             Err(FontError::LimitExceeded {
@@ -302,8 +304,10 @@ mod tests {
             map
         }
 
-        let mut limits = PreparationLimits::default();
-        limits.max_family_name_bytes = 5;
+        let mut limits = PreparationLimits {
+            max_family_name_bytes: 5,
+            ..PreparationLimits::default()
+        };
         assert!(
             prepare_with_limits(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,)
                 .is_ok()

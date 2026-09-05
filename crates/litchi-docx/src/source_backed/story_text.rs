@@ -2258,19 +2258,17 @@ fn decode_attribute_value(value: &[u8]) -> Result<Vec<u8>> {
                 ))
             })?;
         let entity = &value.as_bytes()[entity_start..entity_end];
-        let replacement: &[u8];
         let mut numeric = [0u8; 4];
-        let numeric_length;
-        if entity == b"lt" {
-            replacement = b"<";
+        let replacement: &[u8] = if entity == b"lt" {
+            b"<"
         } else if entity == b"gt" {
-            replacement = b">";
+            b">"
         } else if entity == b"amp" {
-            replacement = b"&";
+            b"&"
         } else if entity == b"apos" {
-            replacement = b"'";
+            b"'"
         } else if entity == b"quot" {
-            replacement = b"\"";
+            b"\""
         } else if entity.first() == Some(&b'#') {
             let (radix, digits) = if entity.get(1) == Some(&b'x') || entity.get(1) == Some(&b'X') {
                 (16, &entity[2..])
@@ -2307,13 +2305,13 @@ fn decode_attribute_value(value: &[u8]) -> Result<Vec<u8>> {
                     "XML character reference is not a Unicode scalar".into(),
                 ))
             })?;
-            numeric_length = character.encode_utf8(&mut numeric).len();
-            replacement = &numeric[..numeric_length];
+            let numeric_length = character.encode_utf8(&mut numeric).len();
+            &numeric[..numeric_length]
         } else {
             return Err(Error::Document(crate::Error::InvalidFormat(
                 "unsupported XML attribute escape".into(),
             )));
-        }
+        };
         decoded
             .try_reserve(replacement.len())
             .map_err(|source| Error::Allocation {

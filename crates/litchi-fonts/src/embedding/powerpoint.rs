@@ -85,7 +85,9 @@ impl<'a> Name<'a> {
 
     pub fn units(self) -> impl Iterator<Item = u16> + 'a {
         self.bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
     }
 
@@ -171,7 +173,9 @@ impl<'a> View<'a> {
                 .ok_or_else(|| invalid("truncated EOT name"))?;
             // Validate UTF-16 without allocating while retaining the borrowed view.
             if char::decode_utf16(
-                name.chunks_exact(2)
+                name.as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
             )
             .any(|value| value.is_err())
@@ -714,7 +718,9 @@ fn name_string(
             }
             decode_utf16(
                 value
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|pair| u16::from_be_bytes([pair[0], pair[1]])),
                 "sfnt name",
             )?
@@ -884,8 +890,10 @@ mod tests {
     fn limits_fail_before_source_program_is_moved() {
         let sfnt = test_sfnt(0);
         let mut font = prepared(sfnt, 0, false);
-        let mut limits = Limits::default();
-        limits.max_output_bytes = 16;
+        let limits = Limits {
+            max_output_bytes: 16,
+            ..Limits::default()
+        };
         assert!(matches!(
             encode(&mut font, Intent::PreviewPrint, limits),
             Err(FontError::LimitExceeded {
@@ -902,8 +910,10 @@ mod tests {
         let font_size = sfnt.len();
 
         let mut exact_font = prepared(sfnt.clone(), 0, false);
-        let mut limits = Limits::default();
-        limits.max_font_bytes = font_size;
+        let mut limits = Limits {
+            max_font_bytes: font_size,
+            ..Limits::default()
+        };
         assert!(encode(&mut exact_font, Intent::Editable, limits).is_ok());
         let mut over_font = prepared(sfnt.clone(), 0, false);
         limits.max_font_bytes = font_size - 1;
@@ -969,8 +979,10 @@ mod tests {
     fn fallback_name_is_bounded_before_license_error_cloning() {
         let mut font = prepared(test_sfnt(0), 0x0008, false);
         font.name = "AB".into();
-        let mut limits = Limits::default();
-        limits.max_name_bytes = 2;
+        let limits = Limits {
+            max_name_bytes: 2,
+            ..Limits::default()
+        };
         assert!(matches!(
             encode(&mut font, Intent::PreviewPrint, limits),
             Err(FontError::LimitExceeded {
@@ -1012,8 +1024,10 @@ mod tests {
         assert!(View::parse(&reserved).is_err());
         assert!(View::parse(&eot[..eot.len() - 1]).is_err());
 
-        let mut limits = Limits::default();
-        limits.max_input_bytes = eot.len() - 1;
+        let limits = Limits {
+            max_input_bytes: eot.len() - 1,
+            ..Limits::default()
+        };
         assert!(matches!(
             View::parse_with(&eot, limits),
             Err(FontError::LimitExceeded {
@@ -1034,8 +1048,10 @@ mod tests {
         // record-count cap must fire before range traversal or UTF-16 decoding.
         set_u16(&mut sfnt, name_offset + 2, 1_000);
         let mut font = prepared(sfnt, 0, false);
-        let mut limits = Limits::default();
-        limits.max_name_records = 8;
+        let limits = Limits {
+            max_name_records: 8,
+            ..Limits::default()
+        };
         assert!(matches!(
             encode(&mut font, Intent::PreviewPrint, limits),
             Err(FontError::LimitExceeded {
@@ -1063,8 +1079,10 @@ mod tests {
         }
         let mut font = prepared(sfnt, 0, false);
         font.name = "L".into();
-        let mut limits = Limits::default();
-        limits.max_name_bytes = 6;
+        let limits = Limits {
+            max_name_bytes: 6,
+            ..Limits::default()
+        };
         assert!(matches!(
             encode(&mut font, Intent::PreviewPrint, limits),
             Err(FontError::LimitExceeded {

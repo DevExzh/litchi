@@ -894,7 +894,7 @@ impl<'a> EmfSvgConverter<'a> {
             if (points.len() - index) % 3 != 0 {
                 return malformed(kind, "Bezier point count is not a multiple of three");
             }
-            for curve in points[index..].chunks_exact(3) {
+            for curve in points[index..].as_chunks::<3>().0.iter() {
                 let a = transform(curve[0], &state.dc);
                 let b = transform(curve[1], &state.dc);
                 let c = transform(curve[2], &state.dc);
@@ -1959,7 +1959,9 @@ fn decode_text(
         .ok_or_else(|| Error::ParseError(format!("{} text exceeds payload", kind.name())))?;
     if unicode {
         let units = raw
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|v| u16::from_le_bytes([v[0], v[1]]))
             .collect::<Vec<_>>();
         Ok(String::from_utf16_lossy(&units)
@@ -2008,7 +2010,9 @@ fn parse_font(data: &[u8], kind: EmrType) -> Result<(u32, Font)> {
     let log = read_record::<LogFontW>(&data[4..], kind)?;
     let face_offset = 4 + size_of::<LogFontW>();
     let units = data[face_offset..face_offset + 64]
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|v| u16::from_le_bytes([v[0], v[1]]))
         .take_while(|&v| v != 0)
         .collect::<Vec<_>>();
@@ -2467,14 +2471,16 @@ mod tests {
 
     #[test]
     fn transformed_rectangle_keeps_rotation() {
-        let mut dc = DeviceContext::default();
-        dc.world_transform = XForm {
-            m11: 0.0,
-            m12: 1.0,
-            m21: -1.0,
-            m22: 0.0,
-            dx: 0.0,
-            dy: 0.0,
+        let dc = DeviceContext {
+            world_transform: XForm {
+                m11: 0.0,
+                m12: 1.0,
+                m21: -1.0,
+                m22: 0.0,
+                dx: 0.0,
+                dy: 0.0,
+            },
+            ..DeviceContext::default()
         };
         let path = rectangle_path(
             RectL {

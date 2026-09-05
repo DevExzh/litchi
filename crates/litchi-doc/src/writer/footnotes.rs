@@ -229,7 +229,9 @@ mod tests {
 
         let text = writer.build_subdocument_text().unwrap();
         let units = text
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         assert_eq!(String::from_utf16(&units).unwrap(), "\u{2}A😀\r\r");
@@ -270,7 +272,9 @@ mod tests {
 
         let text = writer.build_subdocument_text().unwrap();
         let units = text
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         assert_eq!(

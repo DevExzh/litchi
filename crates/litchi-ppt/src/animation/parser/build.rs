@@ -95,7 +95,7 @@ fn parse_paragraph_build(record: &Record) -> Result<ParagraphBuild> {
     let atom = parse_build_atom(&record.children[0], BuildKind::Paragraph)?;
     let paragraph = parse_paragraph_build_atom(&record.children[1])?;
     let mut levels = Vec::with_capacity((record.children.len() - 2) / 2);
-    for pair in record.children[2..].chunks_exact(2) {
+    for pair in record.children[2..].as_chunks::<2>().0.iter() {
         let level = parse_level_info_atom(&pair[0])?;
         let time_node = parse_extended_time_node(&pair[1])?;
         if levels

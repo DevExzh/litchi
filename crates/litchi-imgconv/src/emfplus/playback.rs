@@ -1210,7 +1210,7 @@ impl PlaybackEngine {
             resource: "EMF+ string",
             source: e,
         })?;
-        for chunk in d[28..28 + bytes].chunks_exact(2) {
+        for chunk in d[28..28 + bytes].as_chunks::<2>().0.iter() {
             chars.push(u16::from_le_bytes([chunk[0], chunk[1]]));
         }
         let text = String::from_utf16_lossy(&chars);
@@ -1247,7 +1247,7 @@ impl PlaybackEngine {
             resource: "EMF+ glyphs",
             source: e,
         })?;
-        for part in d[16..positions_start].chunks_exact(2) {
+        for part in d[16..positions_start].as_chunks::<2>().0.iter() {
             glyphs.push(u16::from_le_bytes([part[0], part[1]]));
         }
         let positions = fixed_points(d, positions_start, count)?;

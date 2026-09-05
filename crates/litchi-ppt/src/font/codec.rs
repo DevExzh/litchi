@@ -767,7 +767,9 @@ fn parse_font_entity(record: &Record, ordinal: usize) -> Result<Font> {
     let mut source_name = [0u8; 64];
     source_name.copy_from_slice(&record.data[..64]);
     let units: Vec<u16> = source_name
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect();
     let end = units
@@ -828,7 +830,9 @@ fn font_entity(font: &Font, canonical: bool) -> Result<Record> {
 
 fn decode_name(bytes: &[u8; 64]) -> Result<String> {
     let units: Vec<u16> = bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|v| u16::from_le_bytes([v[0], v[1]]))
         .collect();
     let end = units

@@ -338,7 +338,9 @@ fn parse_header_footer(data: &[u8], record_type: u16) -> Result<String> {
         Ok(data[3..].iter().map(|&byte| char::from(byte)).collect())
     } else {
         let units = data[3..]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
@@ -625,7 +627,9 @@ fn parse_no_cch_string(data: &[u8], offset: &mut usize, count: usize) -> Result<
         Ok(text.iter().map(|&byte| char::from(byte)).collect())
     } else {
         let units = text
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
@@ -712,7 +716,7 @@ fn parse_page_breaks(data: &[u8], record_type: u16) -> Result<Vec<PageBreak>> {
         ));
     }
     let mut breaks: Vec<PageBreak> = Vec::with_capacity(count);
-    for chunk in data[2..].chunks_exact(6) {
+    for chunk in data[2..].as_chunks::<6>().0.iter() {
         let page_break = PageBreak {
             position: read_u16(chunk, 0),
             range_start: read_u16(chunk, 2),

@@ -257,7 +257,7 @@ impl Workbook {
             });
         }
         external_sheets.reserve(count);
-        for chunk in data[4..].chunks_exact(12) {
+        for chunk in data[4..].as_chunks::<12>().0.iter() {
             external_sheets.push(ExternalSheet {
                 external_link: binary::read_u32_le_at(chunk, 0)?,
                 first_sheet: binary::read_u32_le_at(chunk, 4)? as i32,

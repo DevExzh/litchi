@@ -399,7 +399,9 @@ fn parse_cstring_atom(
     )?;
     let units: Vec<u16> = record
         .data
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect();
     if printable {

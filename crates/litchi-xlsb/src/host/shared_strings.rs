@@ -169,7 +169,7 @@ impl SharedString {
             }
             runs.reserve(count);
             let mut previous = None;
-            for chunk in data[offset..end].chunks_exact(4) {
+            for chunk in data[offset..end].as_chunks::<4>().0.iter() {
                 let character_index = binary::read_u16_le_at(chunk, 0)?;
                 if usize::from(character_index) >= text_len
                     || previous.is_some_and(|value| character_index <= value)
@@ -211,7 +211,7 @@ impl SharedString {
             let mut phonetic_runs = Vec::with_capacity(count);
             let mut previous_phonetic = None;
             let mut previous_base_end = None;
-            for chunk in data[offset..runs_end].chunks_exact(6) {
+            for chunk in data[offset..runs_end].as_chunks::<6>().0.iter() {
                 let phonetic_character_index = binary::read_u16_le_at(chunk, 0)?;
                 let base_character_index = binary::read_u16_le_at(chunk, 2)?;
                 let base_character_count = binary::read_u16_le_at(chunk, 4)?;

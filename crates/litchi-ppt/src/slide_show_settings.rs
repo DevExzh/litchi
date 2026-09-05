@@ -315,7 +315,7 @@ fn parse_nonnegative_i16(data: &[u8], field: &str) -> Result<u16> {
 
 fn parse_char2(data: &[u8]) -> Result<String> {
     let mut units = Vec::with_capacity(data.len() / 2);
-    for bytes in data.chunks_exact(2) {
+    for bytes in data.as_chunks::<2>().0.iter() {
         let unit = u16::from_le_bytes([bytes[0], bytes[1]]);
         if unit == 0 {
             break;
@@ -335,7 +335,7 @@ fn encode_char2(value: &str) -> Result<[u8; NAMED_SHOW_BYTES]> {
         return corrupted("namedShow contains an embedded null");
     }
     let mut data = [0; NAMED_SHOW_BYTES];
-    for (slot, unit) in data.chunks_exact_mut(2).zip(units) {
+    for (slot, unit) in data.as_chunks_mut::<2>().0.iter_mut().zip(units) {
         slot.copy_from_slice(&unit.to_le_bytes());
     }
     Ok(data)

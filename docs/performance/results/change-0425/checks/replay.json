@@ -1,0 +1,11 @@
+{
+  "status": "pass",
+  "command_receipts": 34,
+  "composite_45_package_passed_tests": 15778,
+  "ignored_tests": 98,
+  "basis": "full run plus three complete integration-target reruns; only those test files changed",
+  "strict_full_gate": "open; see ODF, facade, harness and native-resave debt",
+  "performance_claim": null,
+  "finished_utc": "2026-09-05T18:57:15.644743+00:00",
+  "temporary_baseline_removed": true
+}

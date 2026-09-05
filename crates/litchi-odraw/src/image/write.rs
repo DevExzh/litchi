@@ -529,28 +529,27 @@ pub fn copy<W: Write>(writer: &mut W, blip: &super::Blip<'_>) -> io::Result<()> 
 #[must_use]
 pub fn digest(data: &[u8]) -> Uid {
     let mut state = [0x6745_2301, 0xEFCD_AB89, 0x98BA_DCFE, 0x1032_5476];
-    let mut chunks = data.chunks_exact(64);
-    for chunk in &mut chunks {
+    let (chunks, remainder) = data.as_chunks::<64>();
+    for chunk in chunks {
         let mut block = [0; 64];
         block.copy_from_slice(chunk);
         compress(&mut state, &block);
     }
 
-    let remainder = chunks.remainder();
     let mut tail = [0; 128];
     tail[..remainder.len()].copy_from_slice(remainder);
     tail[remainder.len()] = 0x80;
     let padded = if remainder.len() < 56 { 64 } else { 128 };
     let bit_len = (data.len() as u64).wrapping_mul(8);
     tail[padded - 8..padded].copy_from_slice(&bit_len.to_le_bytes());
-    for chunk in tail[..padded].chunks_exact(64) {
+    for chunk in tail[..padded].as_chunks::<64>().0 {
         let mut block = [0; 64];
         block.copy_from_slice(chunk);
         compress(&mut state, &block);
     }
 
     let mut digest = [0; 16];
-    for (bytes, word) in digest.chunks_exact_mut(4).zip(state) {
+    for (bytes, word) in digest.as_chunks_mut::<4>().0.iter_mut().zip(state) {
         bytes.copy_from_slice(&word.to_le_bytes());
     }
     Uid::new(digest)
@@ -558,7 +557,7 @@ pub fn digest(data: &[u8]) -> Uid {
 
 fn compress(state: &mut [u32; 4], block: &[u8; 64]) {
     let mut words = [0u32; 16];
-    for (word, bytes) in words.iter_mut().zip(block.chunks_exact(4)) {
+    for (word, bytes) in words.iter_mut().zip(block.as_chunks::<4>().0) {
         *word = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
     }
     let [mut aa, mut bb, mut cc, mut dd] = *state;

@@ -64,7 +64,7 @@ pub(crate) fn parse_condfmt(data: &[u8]) -> Result<PendingFormatting> {
         ));
     }
     let mut ranges = Vec::with_capacity(range_count);
-    for chunk in data[14..].chunks_exact(8) {
+    for chunk in data[14..].as_chunks::<8>().0.iter() {
         let range = parse_range(chunk, CONDFMT_RECORD_TYPE)?;
         if range.first_row < enclosing_range.first_row
             || range.last_row > enclosing_range.last_row
@@ -116,7 +116,9 @@ fn parse_simple_xl_unicode(data: &[u8], record_type: u16) -> Result<String> {
         Ok(data[3..].iter().map(|&byte| char::from(byte)).collect())
     } else {
         let units = data[3..]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
@@ -160,7 +162,9 @@ fn parse_font(data: &[u8]) -> Result<Font> {
             chars.iter().map(|&byte| char::from(byte)).collect()
         } else {
             let units = chars
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
                 .collect::<Vec<_>>();
             String::from_utf16(&units)

@@ -1,0 +1,29 @@
+{
+  "baseline_revision": "340cc91ae2bdec338dfe7682b4b5d8c219a2d288",
+  "cargo_jobs": 4,
+  "change": 425,
+  "claim_authorized": false,
+  "classification": "strict non-iWork verification gate maintenance; no performance claim",
+  "constraints": [
+    "No new lint allowances",
+    "Do not touch iWork sources",
+    "Retain strict failures and successful reruns",
+    "Do not infer performance improvements from lint changes"
+  ],
+  "expanded_scope": {
+    "pure_non_iwork_packages": 45,
+    "python_binding": "excluded because its manifest unconditionally enables iWork",
+    "reason": "45-package strict audit confirms further shared-dependency chunk and test-assertion failures; complete the same compiler-directed non-iWork migration across downstream constant chunk users",
+    "runtime_chunk_widths": "remain runtime iterators; no const conversion",
+    "umbrella": "separate explicit non-iWork feature gate"
+  },
+  "initial_findings": {
+    "count": 4,
+    "source_receipt": "../change-0424/checks/lint-debt-scope.json",
+    "source_receipt_sha256": "b9612b75dff9892267dc8fdd6ea4e57884728c61a2d525770ec106f2d2732ef9"
+  },
+  "performance_claim": null,
+  "rust_toolchain": "1.98.1",
+  "serialization": "All Cargo, tests and profiling workloads serialized by root",
+  "test_threads": 1
+}

@@ -283,7 +283,9 @@ impl<'a> Parser<'a> {
             .ok_or_else(|| Error::InvalidFormula("PtgStr UTF-16 length overflow".to_string()))?;
         self.require(byte_len, "PtgStr text")?;
         let units = self.data[self.offset..self.offset + byte_len]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
         let string = char::decode_utf16(units)
             .collect::<std::result::Result<String, _>>()
@@ -340,7 +342,9 @@ impl<'a> Parser<'a> {
             })?;
             self.require(byte_len, "PtgAttrChoose offsets")?;
             let offsets = self.data[self.offset..self.offset + byte_len]
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|bytes| usize::from(u16::from_le_bytes([bytes[0], bytes[1]])))
                 .collect::<Vec<_>>();
             self.offset += byte_len;
@@ -605,7 +609,9 @@ impl<'a> Parser<'a> {
         self.require_extra(byte_len, context)?;
         let value = char::decode_utf16(
             self.extra[self.extra_offset..self.extra_offset + byte_len]
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
         )
         .collect::<std::result::Result<String, _>>()
@@ -683,7 +689,9 @@ impl<'a> Parser<'a> {
                     })?;
                     self.require_extra(byte_len, "SerStr text")?;
                     let units = self.extra[self.extra_offset..self.extra_offset + byte_len]
-                        .chunks_exact(2)
+                        .as_chunks::<2>()
+                        .0
+                        .iter()
                         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
                     let value = char::decode_utf16(units)
                         .collect::<std::result::Result<String, _>>()

@@ -611,20 +611,12 @@ fn generic_content_publication_rejects_malformed_preserved_descriptor_crc_or_siz
     for field_offset in [4, 8, 12] {
         let malformed = corrupt_deflated_descriptor(&source, field_offset);
         let mut document = Document::from_bytes(malformed).unwrap();
-        let result = document.set_definition(&replacement);
-        if field_offset == 4 {
-            let error = result.expect_err("descriptor CRC unexpectedly accepted");
-            assert!(error.to_string().contains("deflated.bin"));
-        } else {
-            let output = result
-                .map(|()| document.to_bytes())
-                .unwrap_or_else(|error| panic!("descriptor size fallback failed: {error}"));
-            assert_ne!(
-                raw_members(&source)["Pictures/deflated.bin"],
-                raw_members(&output)["Pictures/deflated.bin"],
-                "descriptor size mutation incorrectly took the raw path for field {field_offset}"
-            );
-        }
+        let before = document.to_bytes();
+        let error = document
+            .set_definition(&replacement)
+            .expect_err("malformed descriptor unexpectedly accepted");
+        assert!(error.to_string().contains("deflated.bin"));
+        assert_eq!(document.to_bytes(), before);
     }
 }
 

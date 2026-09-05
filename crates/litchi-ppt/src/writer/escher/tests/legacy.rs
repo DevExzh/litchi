@@ -856,7 +856,9 @@ fn test_freeform_geometry_round_trips_through_opt_record() {
     );
     let segment_words: Vec<u16> = extract_segment_info(&properties)
         .expect("segment array")
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|word| u16::from_le_bytes([word[0], word[1]]))
         .collect();
     assert_eq!(segment_words, [0x4000, 0x0001, 0x0001, 0x8000]);

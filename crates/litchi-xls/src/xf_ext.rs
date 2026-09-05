@@ -291,7 +291,11 @@ impl ExtProp {
             ));
         }
         let mut stops = Vec::with_capacity(stop_count);
-        for chunk in data[GRADIENT_LEN + 4..].chunks_exact(GRAD_STOP_LEN) {
+        for chunk in data[GRADIENT_LEN + 4..]
+            .as_chunks::<GRAD_STOP_LEN>()
+            .0
+            .iter()
+        {
             stops.push(XfGradientStop::parse(chunk)?);
         }
         Ok(Self::FillGradient { gradient, stops })

@@ -237,7 +237,7 @@ impl Record {
         cells
             .try_reserve_exact(remaining.len() / RTD_E_ITEM_LEN)
             .map_err(|_error| Error::Allocation("retaining RTD subscriber cells"))?;
-        for chunk in remaining.chunks_exact(RTD_E_ITEM_LEN) {
+        for chunk in remaining.as_chunks::<RTD_E_ITEM_LEN>().0.iter() {
             let column = u8::try_from(read_u16(chunk, 2)?)
                 .map_err(|_error| invalid("RTD subscriber column exceeds the BIFF8 grid"))?;
             cells.push(Cell {

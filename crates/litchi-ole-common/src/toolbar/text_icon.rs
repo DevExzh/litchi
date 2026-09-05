@@ -360,7 +360,9 @@ impl BitOps for u8 {
 
 fn encoded_units(bytes: &[u8]) -> impl Iterator<Item = u16> + '_ {
     bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
 }
 

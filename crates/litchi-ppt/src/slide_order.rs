@@ -3452,7 +3452,7 @@ fn digest_slide_ids(ids: impl IntoIterator<Item = u32>) -> [u8; 32] {
         .collect::<Vec<_>>();
     let hex = litchi_core::patch::BlobId::of(&bytes).as_hex();
     let mut digest = [0_u8; 32];
-    for (index, pair) in hex.as_bytes().chunks_exact(2).enumerate() {
+    for (index, pair) in hex.as_bytes().as_chunks::<2>().0.iter().enumerate() {
         digest[index] = (hex_nibble(pair[0]) << 4) | hex_nibble(pair[1]);
     }
     digest
@@ -4358,7 +4358,7 @@ fn option_blip_references(instance: u16, payload: &[u8]) -> Result<BTreeSet<u32>
         .get(..property_bytes)
         .ok_or_else(|| PackageError::Corrupted("OfficeArt property table is truncated".into()))?;
     let mut references = BTreeSet::new();
-    for property in properties.chunks_exact(6) {
+    for property in properties.as_chunks::<6>().0.iter() {
         if u16::from_le_bytes([property[0], property[1]]) & 0x4000 == 0 {
             continue;
         }
@@ -4381,7 +4381,7 @@ fn scan_linked_shape_references(
     let properties = payload
         .get(..property_bytes)
         .ok_or_else(|| PackageError::Corrupted("OfficeArt property table is truncated".into()))?;
-    for property in properties.chunks_exact(6) {
+    for property in properties.as_chunks::<6>().0.iter() {
         let opid = u16::from_le_bytes([property[0], property[1]]) & 0x3fff;
         if opid == 0x008a {
             let shape_id = u32::from_le_bytes([property[2], property[3], property[4], property[5]]);
@@ -5449,7 +5449,7 @@ fn rewrite_linked_shape_references(
     let properties = payload
         .get_mut(..property_bytes)
         .ok_or_else(|| PackageError::Corrupted("OfficeArt property table is truncated".into()))?;
-    for property in properties.chunks_exact_mut(6) {
+    for property in properties.as_chunks_mut::<6>().0.iter_mut() {
         let opid = u16::from_le_bytes([property[0], property[1]]) & 0x3fff;
         if opid != 0x008a {
             continue;
@@ -5479,7 +5479,7 @@ fn rewrite_blip_references(
     let properties = payload
         .get_mut(..property_bytes)
         .ok_or_else(|| PackageError::Corrupted("OfficeArt property table is truncated".into()))?;
-    for property in properties.chunks_exact_mut(6) {
+    for property in properties.as_chunks_mut::<6>().0.iter_mut() {
         if u16::from_le_bytes([property[0], property[1]]) & 0x4000 == 0 {
             continue;
         }
@@ -6713,8 +6713,10 @@ mod tests {
     #[test]
     fn shape_text_batch_oversized_late_replacement_is_atomic() {
         let bytes = authored_batch_fixture();
-        let mut limits = RecordLimits::default();
-        limits.max_package_bytes = bytes.len();
+        let limits = RecordLimits {
+            max_package_bytes: bytes.len(),
+            ..Default::default()
+        };
         let source = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
         let first = crate::text_edit::Target::new(Position::new(0), Position::new(0));
         let second = crate::text_edit::Target::new(Position::new(0), Position::new(1));

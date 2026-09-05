@@ -637,7 +637,9 @@ fn feed_txo_continue(pending: &mut PendingTxo, data: &[u8]) -> Result<bool> {
                 .map_err(|_error| Error::Allocation("retaining TXO text"))?;
             pending.code_units.extend(
                 characters
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
             );
         } else {
@@ -702,7 +704,9 @@ fn decode_unicode(data: &[u8], wide: bool) -> Result<String> {
             .try_reserve_exact(data.len() / 2)
             .map_err(|_error| Error::Allocation("decoding comment UTF-16 text"))?;
         words.extend(
-            data.chunks_exact(2)
+            data.as_chunks::<2>()
+                .0
+                .iter()
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
         );
         String::from_utf16(&words)

@@ -1,0 +1,296 @@
+[
+  {
+    "tag": "corrected-odp-tests",
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-odp",
+      "--all-features",
+      "--test",
+      "source_backed",
+      "--",
+      "--test-threads=1"
+    ]
+  },
+  {
+    "tag": "corrected-odt-tests",
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-odt",
+      "--all-features",
+      "--test",
+      "generic_content_publication",
+      "--",
+      "--test-threads=1"
+    ]
+  },
+  {
+    "tag": "corrected-xlsb-tests",
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-xlsb",
+      "--all-features",
+      "--test",
+      "workbook_structure_edit",
+      "--",
+      "--test-threads=1"
+    ]
+  },
+  {
+    "tag": "corrected-tests-clippy",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-odp",
+      "-p",
+      "litchi-odt",
+      "-p",
+      "litchi-xlsb",
+      "--all-features",
+      "--all-targets",
+      "--no-deps",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  {
+    "tag": "facade-clippy",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi",
+      "--no-default-features",
+      "--features",
+      "legacy,ooxml,odf,rtf,sign,encryption,vba-inspection,formula,automatic-fonts,images,eval,web-functions,markdown,yaml",
+      "--all-targets",
+      "--no-deps",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  {
+    "tag": "facade-test",
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi",
+      "--no-default-features",
+      "--features",
+      "legacy,ooxml,odf,rtf,sign,encryption,vba-inspection,formula,automatic-fonts,images,eval,web-functions,markdown,yaml",
+      "--no-fail-fast",
+      "--",
+      "--test-threads=1"
+    ]
+  },
+  {
+    "tag": "facade-doc",
+    "argv": [
+      "cargo",
+      "doc",
+      "--locked",
+      "-p",
+      "litchi",
+      "--no-default-features",
+      "--features",
+      "legacy,ooxml,odf,rtf,sign,encryption,vba-inspection,formula,automatic-fonts,images,eval,web-functions,markdown,yaml",
+      "--no-deps"
+    ]
+  },
+  {
+    "tag": "perf-baseline-strict",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--all-targets",
+      "--all-features",
+      "--no-deps",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  {
+    "tag": "native-resave-strict",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--manifest-path",
+      "tools/native-resave/Cargo.toml",
+      "--all-targets",
+      "--all-features",
+      "--no-deps",
+      "--target-dir",
+      "/home/zhuhe/code/litchi/target",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  {
+    "tag": "perf-xls-tests",
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--all-features",
+      "--lib",
+      "xls_",
+      "--",
+      "--test-threads=1"
+    ]
+  },
+  {
+    "tag": "non-iwork-rustdoc",
+    "argv": [
+      "cargo",
+      "doc",
+      "--locked",
+      "--all-features",
+      "--no-deps",
+      "-p",
+      "litchi-biff",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-codepage",
+      "-p",
+      "litchi-core",
+      "-p",
+      "litchi-crypto",
+      "-p",
+      "litchi-doc",
+      "-p",
+      "litchi-docx",
+      "-p",
+      "litchi-drawingml",
+      "-p",
+      "litchi-eval",
+      "-p",
+      "litchi-fonts",
+      "-p",
+      "litchi-formula",
+      "-p",
+      "litchi-imgconv",
+      "-p",
+      "litchi-markdown",
+      "-p",
+      "litchi-odb",
+      "-p",
+      "litchi-odc",
+      "-p",
+      "litchi-odf",
+      "-p",
+      "litchi-odf-common",
+      "-p",
+      "litchi-odf-formula",
+      "-p",
+      "litchi-odg",
+      "-p",
+      "litchi-odi",
+      "-p",
+      "litchi-odm",
+      "-p",
+      "litchi-odp",
+      "-p",
+      "litchi-odraw",
+      "-p",
+      "litchi-ods",
+      "-p",
+      "litchi-odt",
+      "-p",
+      "litchi-ograph",
+      "-p",
+      "litchi-ole-common",
+      "-p",
+      "litchi-ooxml-common",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "litchi-oth",
+      "-p",
+      "litchi-ppt",
+      "-p",
+      "litchi-pptx",
+      "-p",
+      "litchi-rtf",
+      "-p",
+      "litchi-sheet",
+      "-p",
+      "litchi-sign",
+      "-p",
+      "litchi-slide",
+      "-p",
+      "litchi-spreadsheet-drawing",
+      "-p",
+      "litchi-vba",
+      "-p",
+      "litchi-word",
+      "-p",
+      "litchi-xls",
+      "-p",
+      "litchi-xlsb",
+      "-p",
+      "litchi-xlsx",
+      "-p",
+      "soapberry-zip",
+      "-p",
+      "xml-minifier",
+      "-p",
+      "xml-minifier-macros"
+    ]
+  },
+  {
+    "tag": "boundaries",
+    "argv": [
+      "python3",
+      "-B",
+      "tools/check_crate_boundaries.py"
+    ]
+  },
+  {
+    "tag": "crud-index",
+    "argv": [
+      "python3",
+      "-B",
+      "tools/validate_crud_coverage_index.py"
+    ]
+  },
+  {
+    "tag": "claims",
+    "argv": [
+      "python3",
+      "-B",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--evidence-root",
+      ".",
+      "--mode",
+      "strict"
+    ]
+  }
+]

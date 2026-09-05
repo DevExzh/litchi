@@ -315,7 +315,9 @@ fn read_unicode_string(cursor: &mut Cursor<'_>, name: &str) -> Result<String> {
         .get(range)
         .ok_or_else(|| corrupted("Unicode string range is invalid"))?;
     let units = bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
         .collect::<Vec<_>>();
     String::from_utf16(&units).map_err(|_| corrupted(format!("{name} is not valid UTF-16")))
@@ -405,7 +407,9 @@ fn read_unicode_clipboard(cursor: &mut Cursor<'_>) -> Result<Clipboard> {
                 .get(range)
                 .ok_or_else(|| corrupted("CompObj Unicode clipboard range is invalid"))?;
             let units = bytes
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
                 .collect::<Vec<_>>();
             Ok(Clipboard::Registered(String::from_utf16(&units).map_err(

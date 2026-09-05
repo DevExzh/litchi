@@ -1505,15 +1505,15 @@ mod tests {
         crate::package::reset_index_build_count();
         let mut reader = Cursor::new(prefixed);
         reader.set_position(3);
-        assert!(matches!(
+        assert!(
             reader_preparation_with_limits(
                 &mut reader,
                 Limits::default(),
                 CatalogProbeLimits::default(),
             )
-            .expect("prefix is ordinary detector uncertainty"),
-            None
-        ));
+            .expect("prefix is ordinary detector uncertainty")
+            .is_none()
+        );
         assert_eq!(reader.position(), 3);
         assert_eq!(reader_snapshot_reads(), 0);
         assert_eq!(crate::package::index_build_count(), 0);
@@ -2049,15 +2049,15 @@ mod tests {
 
         let mut short = Cursor::new(ordinary[..LOCAL_HEADER_BYTES - 1].to_vec());
         short.set_position(5);
-        assert!(matches!(
+        assert!(
             reader_preparation_with_limits(
                 &mut short,
                 Limits::default(),
                 CatalogProbeLimits::default(),
             )
-            .expect("short input is detector uncertainty"),
-            None
-        ));
+            .expect("short input is detector uncertainty")
+            .is_none()
+        );
         assert_eq!(short.position(), 5);
 
         let mut read_failure = ReadFailureReader {
@@ -2065,30 +2065,30 @@ mod tests {
             fail_at: 10,
         };
         read_failure.cursor.set_position(6);
-        assert!(matches!(
+        assert!(
             reader_preparation_with_limits(
                 &mut read_failure,
                 Limits::default(),
                 CatalogProbeLimits::default(),
             )
-            .expect("read failure is detector uncertainty"),
-            None
-        ));
+            .expect("read failure is detector uncertainty")
+            .is_none()
+        );
         assert_eq!(read_failure.cursor.position(), 6);
 
         let mut seek_failure = EndSeekFailureReader {
             cursor: Cursor::new(ordinary.clone()),
         };
         seek_failure.cursor.set_position(8);
-        assert!(matches!(
+        assert!(
             reader_preparation_with_limits(
                 &mut seek_failure,
                 Limits::default(),
                 CatalogProbeLimits::default(),
             )
-            .expect("seek failure is detector uncertainty"),
-            None
-        ));
+            .expect("seek failure is detector uncertainty")
+            .is_none()
+        );
         assert_eq!(seek_failure.cursor.position(), 8);
 
         let mut restore_failure = RestoreFailReader {

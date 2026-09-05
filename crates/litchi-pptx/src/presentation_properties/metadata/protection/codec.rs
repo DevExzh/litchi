@@ -216,7 +216,7 @@ fn decode_base64(value: &str) -> Result<Vec<u8>> {
         ));
     }
     let mut output = Vec::with_capacity(bytes.len() / 4 * 3);
-    for chunk in bytes.chunks_exact(4) {
+    for chunk in bytes.as_chunks::<4>().0 {
         let a = sextet(chunk[0])?;
         let b = sextet(chunk[1])?;
         let c = if chunk[2] == b'=' {

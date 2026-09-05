@@ -99,7 +99,7 @@ pub fn decode(hex_str: &str) -> Result<Vec<u8>> {
 fn decode_hex_scalar(hex_bytes: &[u8]) -> Result<Vec<u8>> {
     let mut result = Vec::with_capacity(hex_bytes.len() / 2);
 
-    for chunk in hex_bytes.chunks_exact(2) {
+    for chunk in hex_bytes.as_chunks::<2>().0 {
         let hi = hex_char_to_nibble(chunk[0])?;
         let lo = hex_char_to_nibble(chunk[1])?;
         result.push((hi << 4) | lo);

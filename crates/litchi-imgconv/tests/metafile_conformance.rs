@@ -680,7 +680,7 @@ fn placeable_header(left: i16, top: i16, right: i16, bottom: i16) -> Vec<u8> {
     }
     data.extend_from_slice(&1440_u16.to_le_bytes());
     data.extend_from_slice(&0_u32.to_le_bytes());
-    let checksum = data.chunks_exact(2).fold(0_u16, |sum, word| {
+    let checksum = data.as_chunks::<2>().0.iter().fold(0_u16, |sum, word| {
         sum ^ u16::from_le_bytes([word[0], word[1]])
     });
     data.extend_from_slice(&checksum.to_le_bytes());

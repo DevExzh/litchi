@@ -178,7 +178,9 @@ pub(crate) fn parse_biff8_string(data: &[u8]) -> Result<String> {
     }
     if wide {
         let units = data[2..]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|v| u16::from_le_bytes([v[0], v[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
@@ -211,7 +213,9 @@ pub(crate) fn parse_xl_unicode_string(data: &[u8]) -> Result<String> {
     }
     if wide {
         let units = data[3..]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|value| u16::from_le_bytes([value[0], value[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)

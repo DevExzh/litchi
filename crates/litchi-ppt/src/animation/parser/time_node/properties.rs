@@ -70,7 +70,9 @@ fn parse_time_node_property(record: &Record) -> Result<TimeNodeProperty> {
         }
         String::from_utf16(
             &data[1..]
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
                 .collect::<Vec<_>>(),
         )

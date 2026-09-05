@@ -1716,7 +1716,8 @@ fn resolve_paragraph(
             prefix_units = prefix_units
                 .checked_add(count)
                 .ok_or_else(|| Error::Limit("DOC paragraph-prefix count overflows usize".into()))?;
-            for (unit_offset, unit_bytes) in bytes[..byte_len].chunks_exact(2).enumerate() {
+            for (unit_offset, unit_bytes) in bytes[..byte_len].as_chunks::<2>().0.iter().enumerate()
+            {
                 let cp = cp
                     .checked_add(u32::try_from(unit_offset).map_err(|_error| {
                         Error::Limit("DOC paragraph CP offset does not fit u32".into())

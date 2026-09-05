@@ -292,8 +292,10 @@ impl ListObject {
                     .get(*offset..end)
                     .ok_or_else(|| invalid(rt, format!("truncated {label}")))?;
                 let ids = bytes
-                    .chunks_exact(4)
-                    .map(|v| u32::from_le_bytes(v.try_into().unwrap()))
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|v| u32::from_le_bytes(*v))
                     .collect();
                 *offset = end;
                 Ok(ids)

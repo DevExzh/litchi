@@ -96,8 +96,10 @@ impl DocumentRsids {
             return Err(corrupted("PLRSID identifier count does not match its size"));
         }
         let ids = data[HEADER_LEN..]
-            .chunks_exact(RSID_LEN)
-            .map(|chunk| u32::from_le_bytes(chunk.try_into().expect("length checked")))
+            .as_chunks::<RSID_LEN>()
+            .0
+            .iter()
+            .map(|chunk| u32::from_le_bytes(*chunk))
             .collect();
         Ok(DocumentRsids { ids })
     }

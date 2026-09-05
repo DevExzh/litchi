@@ -1,5 +1,52 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current evidence through 0424 and the 0425 gate audit
+
+The latest completed performance batch is
+[0424](changes/0424-staged-pptx-payload-reuse.md), based on production revision
+`d18bf7db4` and evidence revision `340cc91ae`. Its matched source-backed media
+lifecycle records 14.266% fewer requested allocation bytes and a 7.317% lower
+mean V3 operation-region peak. Logical reads and endpoint retention remain
+essentially unchanged; normal timing is diagnostic. The standalone bundle
+replays 16 reports, four traces and 104 mutation probes after original
+worktree/binary cleanup. It establishes no release latency, physical-copy,
+managed-budget or post-drop claim.
+
+The intervening [0419](changes/0419-pptx-bounded-archive-growth.md),
+[0420](changes/0420-opc-owned-payload-reuse.md),
+[0421](changes/0421-allocator-peak-counter.md),
+[0422](changes/0422-operation-region-allocator-peak.md), and
+[0423](changes/0423-matched-source-backed-pptx-lifecycles.md) records distinguish
+allocation requests, retained endpoints, corrected lifetime peaks, V3 region
+peaks and aligned lifecycle boundaries. Historical high-water values affected
+by the 0421 correction remain unsuitable for current comparisons. There are
+nine strict registered claim replays and 15 index categories with 32
+representative selectors in the retained 0424 verification; coverage remains
+representative rather than complete.
+
+The 0425 audit finds 64 workspace members: 45 non-iWork leaf/shared packages,
+the separately configured `litchi` facade, 17 iWork owners, and the Python
+binding that unconditionally enables iWork. Shared ZIP and XML owners remain
+in scope. The current strict layout finding in ODF's `ArchiveReaderKind`
+requires a measured ownership decision; its borrowed reader is retained inline.
+Mechanical constant-chunk and test setup findings are closed in the 45 leaf/shared
+packages, with strict Clippy passing for 44 and the ODF layout gate open.
+[0425](changes/0425-non-iwork-verification-maintenance.md) retains composite
+coverage of 15,778 passing tests and 98 ignored tests. The separate facade has
+six baseline-reproduced test failures and 18 unchanged strict lint findings.
+The standalone harness has 29 lint findings outside the modified code, and
+native-resave requires a lockfile refresh before its locked gate can run.
+These remain open; no blanket strict or facade correctness pass is claimed.
+
+Resolve the baseline-reproduced facade detection/limit arbitration, deferred
+spreadsheet access and XLS extraction failures, and the scoped strict-gate debt.
+Explicit caller-drop snapshots, near-limit memory/cache evidence, broad native
+producer matrices, cold/range sources, bounded semantic streaming and append,
+scaling/CPU counters, full CRUD coverage and final strict gates remain open.
+The full non-iWork goal is not achieved. Sections below retain earlier
+revision-specific audits and their historical counts; this section supersedes
+only the current facts explicitly listed above.
+
 Change [0418](changes/0418-pptx-cross-copy-candidate-reuse.md) retains a scoped
 owned PPTX candidate-reuse optimization. Media lifecycle p50 improves
 38.27–38.69%, with an explicitly reviewed approximately 8% whole-process RSS

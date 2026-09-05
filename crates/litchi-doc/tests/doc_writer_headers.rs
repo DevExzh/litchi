@@ -167,8 +167,10 @@ fn writes_header_and_note_plcfs_through_fib_pointers() {
     }
 
     fn cps(plcf: &[u8]) -> Vec<u32> {
-        plcf.chunks_exact(4)
-            .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
+        plcf.as_chunks::<4>()
+            .0
+            .iter()
+            .map(|chunk| u32::from_le_bytes(*chunk))
             .collect()
     }
 

@@ -288,7 +288,9 @@ mod tests {
         let (text_bytes, char_positions) = writer.build_subdocument_text().unwrap();
         let text = String::from_utf16(
             &text_bytes
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
                 .collect::<Vec<_>>(),
         )
@@ -307,7 +309,9 @@ mod tests {
         writer.add_header(HeaderFooterType::EvenPageHeader, "Second");
         let (text_bytes, char_positions) = writer.build_subdocument_text().unwrap();
         let units = text_bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         assert_eq!(String::from_utf16(&units).unwrap(), "Second\r\rFirst\r\r\r");
@@ -338,8 +342,10 @@ mod tests {
         let plcf = writer.build_plcfhdd().unwrap();
         assert_eq!(plcf.len(), 56); // 14 CPs
         let cps = plcf
-            .chunks_exact(4)
-            .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|chunk| u32::from_le_bytes(*chunk))
             .collect::<Vec<_>>();
         assert_eq!(&cps[..8], &[0; 8]);
         assert_eq!(cps[8], 8);

@@ -167,8 +167,7 @@ fn uppercase_after_digest(mut bytes: Vec<u8>) -> Vec<u8> {
 }
 
 fn mutate_numeric_field(mut bytes: Vec<u8>, field: &[u8]) -> Vec<u8> {
-    let marker = [b'"']
-        .into_iter()
+    let marker = std::iter::once(b'"')
         .chain(field.iter().copied())
         .collect::<Vec<_>>();
     let start = bytes

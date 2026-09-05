@@ -5096,7 +5096,7 @@ fn hex_decode(text: &str, max_bytes: usize) -> Result<Vec<u8>, TailAppendError> 
             requested: observed,
         })?;
     let raw = text.as_bytes();
-    for pair in raw.chunks_exact(2) {
+    for pair in raw.as_chunks::<2>().0.iter() {
         let high = hex_value(
             *pair
                 .first()

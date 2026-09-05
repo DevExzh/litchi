@@ -432,7 +432,7 @@ impl ListLevel {
 
         let text_bytes = &data[cch_end..total_size];
         let mut text_units = Vec::with_capacity(text_len);
-        for chunk in text_bytes.chunks_exact(2) {
+        for chunk in text_bytes.as_chunks::<2>().0.iter() {
             text_units.push(u16::from_le_bytes([chunk[0], chunk[1]]));
         }
         let mut number_text = String::new();

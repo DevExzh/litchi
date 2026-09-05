@@ -1,5 +1,19 @@
 # Performance program phase report
 
+## Change 0425: non-iWork verification maintenance
+
+[0425](changes/0425-non-iwork-verification-maintenance.md) closes compiler-directed
+constant-width chunk and mechanical test findings across the 45 non-iWork
+leaf/shared packages. Composite test coverage is 15,778 passes and 98 ignored
+tests: one full run plus three complete target reruns after baseline-reproduced
+test corrections. Strict Clippy passes for 44 packages; ODF layout debt remains.
+The separate facade retains six baseline-reproduced test failures and 18 lint
+findings, the standalone harness retains 29 lint findings, and native-resave
+needs a lockfile refresh. The [bundle](results/change-0425/README.md) retains
+failures, source-bound reruns and independent review without suppressions.
+This is verification maintenance with no performance claim. The program is
+incomplete; facade correctness and strict-gate debt remain explicit follow-ups.
+
 ## Change 0424: validated staged PPTX payload reuse
 
 [0424](changes/0424-staged-pptx-payload-reuse.md) shares independently staged

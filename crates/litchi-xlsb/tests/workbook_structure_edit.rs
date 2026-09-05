@@ -783,24 +783,90 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
 
 #[test]
 fn checked_in_unique_standard_drawing_corpus_transfers_every_anchor() {
-    let corpus = [
-        "test-data/libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb",
-        "test-data/ooxml/xlsb/universal-content.xlsb",
-        "test-data/poi/test-data/spreadsheet/WithTextBox.xlsb",
-        "test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+    let corpus: &[(&str, &[usize], usize, usize, Option<usize>)] = &[
+        (
+            "test-data/libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb",
+            &[0],
+            1,
+            0,
+            Some(1),
+        ),
+        (
+            "test-data/ooxml/xlsb/universal-content.xlsb",
+            &[0, 1],
+            1,
+            1,
+            None,
+        ),
+        (
+            "test-data/poi/test-data/spreadsheet/WithTextBox.xlsb",
+            &[0, 1, 2],
+            1,
+            1,
+            None,
+        ),
+        (
+            "test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+            &[0],
+            3,
+            3,
+            None,
+        ),
     ];
+    let mut parsed = 0usize;
     let mut transferred = 0usize;
-    for relative in corpus {
+    for &(
+        relative,
+        worksheet_catalog_positions,
+        expected_parsed,
+        expected_transfers,
+        chart_catalog_position,
+    ) in corpus
+    {
         let source = Workbook::new(File::open(fixture(relative)).expect("drawing corpus fixture"))
             .expect("drawing corpus workbook");
-        for sheet in 0..source.worksheet_count() {
-            let Some(drawing) = source.sheet_drawing(sheet) else {
+
+        assert_eq!(
+            source.worksheet_count(),
+            worksheet_catalog_positions.len(),
+            "worksheet catalog map changed for {relative}"
+        );
+        let parsed_for_fixture = source
+            .sheet_drawings()
+            .iter()
+            .map(|drawing| drawing.drawing.anchors.len())
+            .sum::<usize>();
+        assert_eq!(
+            parsed_for_fixture, expected_parsed,
+            "parsed drawing anchor census changed for {relative}"
+        );
+        if let Some(catalog_position) = chart_catalog_position {
+            assert!(
+                source.chart_sheet(catalog_position).is_some(),
+                "expected chart-sheet catalog position {catalog_position} for {relative}"
+            );
+            assert_eq!(
+                source
+                    .sheet_drawing(catalog_position)
+                    .expect("chart-sheet drawing inventory")
+                    .drawing
+                    .anchors
+                    .len(),
+                1,
+                "chart-sheet anchor census changed for {relative}"
+            );
+        }
+
+        let mut transferred_for_fixture = 0usize;
+        for (worksheet_ordinal, &catalog_position) in worksheet_catalog_positions.iter().enumerate()
+        {
+            let Some(drawing) = source.sheet_drawing(catalog_position) else {
                 continue;
             };
             for anchor in 0..drawing.drawing.anchors.len() {
                 let mut target = producer_workbook("Corpus target", None);
                 let mut edit = target.edit_workbook_structure().expect("corpus edit");
-                edit.transfer_drawing_object(&source, sheet, anchor, 0)
+                edit.transfer_drawing_object(&source, worksheet_ordinal, anchor, 0)
                     .expect("corpus drawing transfer");
                 let commit = edit.commit().expect("corpus commit");
                 target
@@ -810,12 +876,29 @@ fn checked_in_unique_standard_drawing_corpus_transfers_every_anchor() {
                 target.save(&mut bytes).expect("save corpus transfer");
                 let reopened = Workbook::new(Cursor::new(bytes.into_inner()))
                     .expect("full reopen corpus transfer");
-                assert!(reopened.sheet_drawing(0).is_some());
+                let reopened_drawing = reopened
+                    .sheet_drawing(0)
+                    .expect("full reopen corpus transfer drawing");
+                assert_eq!(
+                    reopened_drawing.drawing.anchors.len(),
+                    1,
+                    "one selected corpus anchor must survive reopen for {relative} worksheet {worksheet_ordinal} anchor {anchor}"
+                );
+                transferred_for_fixture = transferred_for_fixture.saturating_add(1);
                 transferred = transferred.saturating_add(1);
             }
         }
+        assert_eq!(
+            transferred_for_fixture, expected_transfers,
+            "worksheet transfer anchor census changed for {relative}"
+        );
+        parsed = parsed.saturating_add(parsed_for_fixture);
     }
-    assert_eq!(transferred, 6, "the unique corpus anchor census changed");
+    assert_eq!(parsed, 6, "the parsed corpus anchor census changed");
+    assert_eq!(
+        transferred, 5,
+        "the supported worksheet transfer anchor census changed"
+    );
 }
 
 #[test]

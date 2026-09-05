@@ -1,0 +1,15 @@
+{
+  "change": 425,
+  "removed_worktree": "/tmp/litchi-goal-0425-baseline",
+  "baseline_revision": "340cc91ae2bdec338dfe7682b4b5d8c219a2d288",
+  "baseline_tracked_status_before_removal": "clean",
+  "ignored_workspace_lock": "identical retained bundle copy; removed before normal git worktree remove",
+  "workspace_lock_sha256": "c14b122a53a49b4c602353bf52ac2b77b7acf190030f11e859290958c80407ef",
+  "preserved": [
+    "root target",
+    "tools/perf-baseline/target",
+    "unrelated worktrees",
+    "docs/GOAL.md"
+  ],
+  "finished_utc": "2026-09-05T18:56:40.810889+00:00"
+}

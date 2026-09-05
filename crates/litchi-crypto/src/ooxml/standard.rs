@@ -259,14 +259,16 @@ fn validate_provider_name(bytes: &[u8]) -> Result<()> {
     }
     let body_end = bytes.len() - 2;
     if bytes.get(body_end..) != Some(&[0, 0][..])
-        || bytes[..body_end].chunks_exact(2).any(|pair| pair == [0, 0])
+        || bytes[..body_end].as_chunks::<2>().0.contains(&[0, 0])
     {
         return Err(malformed(
             "Standard CSPName terminator is missing or not final",
         ));
     }
     let units = bytes[..body_end]
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
     if char::decode_utf16(units).any(|character| character.is_err()) {
         return Err(malformed("Standard CSPName contains invalid UTF-16"));
@@ -360,8 +362,8 @@ fn crypt_blocks(cipher: &Aes128, bytes: &mut [u8], direction: Direction) -> Resu
     if !bytes.len().is_multiple_of(BLOCK) {
         return Err(malformed("AES data is not aligned to a 16-byte block"));
     }
-    for chunk in bytes.chunks_exact_mut(BLOCK) {
-        let block: &mut Block<Aes128> = chunk
+    for chunk in bytes.as_chunks_mut::<BLOCK>().0.iter_mut() {
+        let block: &mut Block<Aes128> = (&mut chunk[..])
             .try_into()
             .map_err(|_err| malformed("AES block conversion failed"))?;
         match direction {

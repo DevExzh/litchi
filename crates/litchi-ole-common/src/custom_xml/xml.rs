@@ -137,7 +137,9 @@ pub(crate) fn normalize_encoding(xml: &[u8]) -> Result<Cow<'_, [u8]>> {
         return Err(xml_error("UTF-16 XML has an odd byte length"));
     }
     let units = bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| match utf16_encoding {
             Utf16Encoding::LittleEndian => u16::from_le_bytes([pair[0], pair[1]]),
             Utf16Encoding::BigEndian => u16::from_be_bytes([pair[0], pair[1]]),

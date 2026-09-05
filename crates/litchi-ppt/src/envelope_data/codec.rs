@@ -278,7 +278,9 @@ impl<'a> Cursor<'a> {
         }
         let units: Vec<u16> = self
             .take(byte_length)?
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
             .collect();
         validate_utf16(&units, "UTF-16 envelope string")?;

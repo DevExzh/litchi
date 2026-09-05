@@ -89,7 +89,9 @@ pub fn parse_custom_xml_transform(
         .get(start..end)
         .ok_or_else(|| corrupted("fcCustomXForm extends beyond the table stream"))?;
     let mut units = data
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
         .collect::<Vec<_>>();
     // Producers commonly terminate the path array with a null code unit;
@@ -195,7 +197,9 @@ fn parse_string_table(data: &[u8], offset: &mut usize, name: &str) -> Result<Vec
 
 fn decode_utf16(bytes: &[u8], field: &str) -> Result<String> {
     let units = bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
         .collect::<Vec<_>>();
     String::from_utf16(&units).map_err(|_| corrupted(format!("{field} is invalid UTF-16")))

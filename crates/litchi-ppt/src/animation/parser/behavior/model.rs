@@ -141,7 +141,9 @@ pub(crate) fn parse_time_variant_string(record: &Record) -> Result<String> {
     }
     String::from_utf16(
         &record.data[1..]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
             .collect::<Vec<_>>(),
     )

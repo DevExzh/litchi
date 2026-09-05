@@ -286,8 +286,10 @@ impl Encoding {
                     ));
                 }
                 let end = data
-                    .chunks_exact(2)
-                    .position(|pair| pair == [0, 0])
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
+                    .position(|pair| *pair == [0, 0])
                     .map_or(data.len(), |units| units * 2);
                 Page::UTF_16LE
                     .decode(&data[..end])
@@ -765,7 +767,9 @@ fn parse_phonetic_string(
 
     let text_bytes = &data[14..14 + text_byte_length];
     let text_words: Vec<u16> = text_bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect();
     let text = String::from_utf16(&text_words)

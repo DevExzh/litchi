@@ -31,7 +31,7 @@ impl PersistPtrHolder {
     ///
     /// # Performance
     ///
-    /// - Uses `chunks_exact(4)` for efficient 4-byte iteration
+    /// - Uses `as_chunks::<4>()` for efficient 4-byte iteration
     /// - Pre-allocates `HashMap` with estimated capacity
     /// - Zero-copy: reads directly from slice without intermediate allocations
     ///
@@ -55,7 +55,8 @@ impl PersistPtrHolder {
         let estimated_capacity = data.len() / 8;
         let mut slide_locations = HashMap::with_capacity(estimated_capacity);
 
-        let mut chunks = data.chunks_exact(4);
+        let (chunks, remainder) = data.as_chunks::<4>();
+        let mut chunks = chunks.iter();
 
         while let Some(info_bytes) = chunks.next() {
             let info =
@@ -93,7 +94,7 @@ impl PersistPtrHolder {
             }
         }
 
-        if !chunks.remainder().is_empty() {
+        if !remainder.is_empty() {
             return Err(Error::Corrupted(
                 "persist directory is not aligned to 4 bytes".to_string(),
             ));

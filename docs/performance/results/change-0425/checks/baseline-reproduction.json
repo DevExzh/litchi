@@ -1,0 +1,29 @@
+{
+  "change": 425,
+  "baseline_revision": "340cc91ae2bdec338dfe7682b4b5d8c219a2d288",
+  "status": "all three original test failures reproduced",
+  "results": [
+    {
+      "package": "odp",
+      "receipt": "checks/baseline-odp-locked.json",
+      "exit_code": 101,
+      "source_unchanged": true,
+      "one_test_failure": true
+    },
+    {
+      "package": "odt",
+      "receipt": "checks/baseline-odt-locked.json",
+      "exit_code": 101,
+      "source_unchanged": true,
+      "one_test_failure": true
+    },
+    {
+      "package": "xlsb",
+      "receipt": "checks/baseline-xlsb-locked.json",
+      "exit_code": 101,
+      "source_unchanged": true,
+      "one_test_failure": true
+    }
+  ],
+  "interpretation": "Test-only corrections follow baseline reproduction; no weakening of production validation authorized."
+}

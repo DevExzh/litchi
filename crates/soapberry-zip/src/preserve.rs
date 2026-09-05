@@ -3127,7 +3127,7 @@ mod tests {
             (zip64_descriptor_archive(&payload, false), true),
         ] {
             let (archive, mut buffer) = indexed(&data);
-            assert_eq!(archive.is_zip64(), false);
+            assert!(!archive.is_zip64());
             let index = if zip64 {
                 PreservationIndex::new_with_policy(
                     &archive,

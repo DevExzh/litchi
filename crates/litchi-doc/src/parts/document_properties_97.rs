@@ -715,7 +715,9 @@ fn put_number_format(data: &mut [u8], offset: usize, value: NumberFormat) {
 
 fn decode_utf16(data: &[u8], count: usize) -> Result<String, DopExtensionError> {
     let units = data
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .take(count)
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
         .collect::<Vec<_>>();
@@ -736,7 +738,7 @@ fn write_utf16(
         ));
     }
     target.fill(0);
-    for (slot, unit) in target.chunks_exact_mut(2).zip(units) {
+    for (slot, unit) in target.as_chunks_mut::<2>().0.iter_mut().zip(units) {
         slot.copy_from_slice(&unit.to_le_bytes());
     }
     stored.clear();

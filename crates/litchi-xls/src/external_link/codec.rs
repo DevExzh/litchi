@@ -467,7 +467,9 @@ pub(super) fn parse_extern_sheet(data: &[u8]) -> Result<Vec<SheetReference>> {
         });
     }
     Ok(data[2..]
-        .chunks_exact(6)
+        .as_chunks::<6>()
+        .0
+        .iter()
         .map(|entry| SheetReference {
             supporting_book_index: read_u16(entry, 0),
             first_sheet_index: i16::from_le_bytes([entry[2], entry[3]]),
@@ -658,7 +660,9 @@ fn parse_unicode_no_cch(
     })?;
     let value = if wide {
         let units = encoded
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units).map_err(|error| Error::InvalidRecord {

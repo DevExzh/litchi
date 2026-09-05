@@ -42,7 +42,9 @@ pub(in crate::list_object) fn parse_string(
     } else {
         char::decode_utf16(
             bytes
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|c| u16::from_le_bytes([c[0], c[1]])),
         )
         .collect::<Result<String, _>>()

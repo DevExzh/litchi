@@ -1079,7 +1079,7 @@ fn patch_selection_shift(payload: &mut [u8], shift: AxisShift) -> Result<()> {
             let active = binary::read_u16_le_at(payload, 1)?;
             let active = shift_axis_point(active, start, count, insert, 65_536)?;
             payload[1..3].copy_from_slice(&active.to_le_bytes());
-            for range in payload[9..].chunks_exact_mut(6) {
+            for range in payload[9..].as_chunks_mut::<6>().0.iter_mut() {
                 let first = binary::read_u16_le_at(range, 0)?;
                 let last = binary::read_u16_le_at(range, 2)?;
                 let (first, last) = shift_axis_range(first, last, start, count, insert, 65_536)?;
@@ -1095,7 +1095,7 @@ fn patch_selection_shift(payload: &mut [u8], shift: AxisShift) -> Result<()> {
             let active = binary::read_u16_le_at(payload, 3)?;
             let active = shift_axis_point(active, u16::from(start), u16::from(count), insert, 256)?;
             payload[3..5].copy_from_slice(&active.to_le_bytes());
-            for range in payload[9..].chunks_exact_mut(6) {
+            for range in payload[9..].as_chunks_mut::<6>().0.iter_mut() {
                 let (first, last) = shift_axis_range(
                     u16::from(range[4]),
                     u16::from(range[5]),
@@ -1181,7 +1181,7 @@ fn patch_merged_cells(payload: &mut [u8], shift: AxisShift) -> Result<()> {
             "MergedCells count does not match its payload".into(),
         ));
     }
-    for range in payload[2..].chunks_exact_mut(8) {
+    for range in payload[2..].as_chunks_mut::<8>().0.iter_mut() {
         patch_ref8(range, shift)?;
     }
     Ok(())
@@ -2853,7 +2853,9 @@ fn decode_bound_name(payload: &[u8]) -> Result<String> {
             .get(8..8 + byte_len)
             .ok_or_else(|| Error::InvalidData("wide BoundSheet name is truncated".into()))?;
         let utf16: Vec<u16> = bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
             .collect();
         String::from_utf16(&utf16)

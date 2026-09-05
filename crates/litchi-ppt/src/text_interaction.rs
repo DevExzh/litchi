@@ -396,7 +396,9 @@ fn exact_text_from_records<'a>(records: impl IntoIterator<Item = &'a Record>) ->
                 }
                 let units = record
                     .data
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
                     .collect::<Vec<_>>();
                 String::from_utf16(&units).map_err(|_err| {

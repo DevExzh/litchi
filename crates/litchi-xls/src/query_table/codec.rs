@@ -233,7 +233,9 @@ pub(crate) fn parse_db_query_ext(build: &mut QueryTableBuild, data: &[u8]) -> Op
         other => HtmlFormatting::Unknown(other),
     };
     build.table.parameter_flags = data[28..parameter_end]
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
         .collect();
     build.table.future_bytes = data[parameter_end..future_end.min(data.len())].to_vec();
@@ -264,7 +266,9 @@ pub(crate) fn parse_txt_qry(data: &[u8]) -> Option<TextQuery> {
         return None;
     }
     let fields = data[22..fields_end]
-        .chunks_exact(8)
+        .as_chunks::<8>()
+        .0
+        .iter()
         .map(|chunk| TextField {
             format: match u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) {
                 0 => TextFieldFormat::General,

@@ -66,7 +66,9 @@ fn parse_cache_string(data: &[u8], record_type: u16) -> Result<(String, usize)> 
     })?;
     let value = if wide {
         let units = chars
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
@@ -250,7 +252,9 @@ pub fn parse_pivot_cache_stream(data: &[u8]) -> Result<PivotCache> {
                 ));
             }
             let item_to_group = body
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
                 .collect::<Vec<_>>();
             if item_to_group
@@ -792,7 +796,9 @@ pub fn parse_sxivd(data: &[u8]) -> Result<Vec<PivotAxisField>> {
     if !data.len().is_multiple_of(2) {
         return Err(cache_invalid(SXIVD_TYPE, "SXIVD length must be even"));
     }
-    data.chunks_exact(2)
+    data.as_chunks::<2>()
+        .0
+        .iter()
         .map(|bytes| match u16::from_le_bytes([bytes[0], bytes[1]]) {
             DATA_LAYOUT_FIELD => Ok(PivotAxisField::DataLayout),
             value if value != u16::MAX => Ok(PivotAxisField::Field(value)),
@@ -875,7 +881,9 @@ pub(crate) fn parse_sxli(
             ));
         }
         let indices = line[8..]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
             .collect();
         lines.push(PivotLayoutLine {
@@ -1069,7 +1077,9 @@ fn read_xl_string_no_cch(data: &[u8], offset: &mut usize, cch: usize) -> Result<
             });
         }
         let words: Vec<u16> = data[*offset..end]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|c| u16::from_le_bytes([c[0], c[1]]))
             .collect();
         *offset = end;

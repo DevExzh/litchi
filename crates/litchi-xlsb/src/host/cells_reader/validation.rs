@@ -151,7 +151,7 @@ where
 
         let mut column_spans = Vec::with_capacity(span_count);
         let mut previous_segment = None;
-        for span in data[17..].chunks_exact(8) {
+        for span in data[17..].as_chunks::<8>().0.iter() {
             let first = binary::read_u32_le_at(span, 0)?;
             let last = binary::read_u32_le_at(span, 4)?;
             let segment = first / 1024;
@@ -1278,7 +1278,9 @@ where
             });
         }
         let units = data[text_offset..end]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         let value = String::from_utf16(&units)

@@ -240,7 +240,9 @@ fn parse_style(std: &[u8], index: u16, cb_std: u16, stdf_size: u16) -> Result<St
         return Err(corrupted("style name is not null-terminated"));
     }
     let units = name_data
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect::<Vec<_>>();
     let combined_name =

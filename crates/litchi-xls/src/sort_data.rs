@@ -1167,7 +1167,9 @@ fn parse_custom_list(body: &[u8], char_count: usize) -> Result<Option<String>> {
         .map_err(|_error| allocation("reserving decoded SortCond12 string storage"))?;
     if wide {
         let units = encoded
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]));
         for character in char::decode_utf16(units) {
             value.push(character.map_err(|_error| {
