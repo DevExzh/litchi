@@ -1,0 +1,39 @@
+{
+  "change": 429,
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import subprocess; from pathlib import Path; root=Path(\"docs/performance/results/change-0429\"); [subprocess.run([\"python3\",\"-B\",str(root/\"probe-report.py\"),str(root/p)],check=True) for p in [\"smoke/provider-lifecycle-plain-bytes.json\",\"native-cli-control.json\"]]"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+  "driver_sha256": "fe045dd9f3e4128911a377dc44313bcd7ff33c8baf8ed0fb7b45cfcd43c9be9d",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-05T23:34:05.400732+00:00",
+  "source_before": {
+    "path": "sources/1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122.json",
+    "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+    "files": 6634
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T23:34:07.443252+00:00",
+  "source_after": {
+    "path": "sources/1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122.json",
+    "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+    "files": 6634
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/probe-controls.log",
+    "bytes": 2828,
+    "sha256": "50fc469bb046bece17959725e20908477b6393c7f4aabdf7f925f91bcfa8ad63"
+  }
+}

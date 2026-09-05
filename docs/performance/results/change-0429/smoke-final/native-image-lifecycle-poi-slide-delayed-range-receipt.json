@@ -1,0 +1,28 @@
+{
+  "name": "native-image-lifecycle-poi-slide-delayed-range",
+  "argv": [
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+    "native-image-lifecycle",
+    "--fixture",
+    "poi-slide",
+    "--provider",
+    "range",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--source-revision",
+    "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/smoke-final/native-image-lifecycle-poi-slide-delayed-range.json",
+    "--max-range",
+    "65536",
+    "--delay-us",
+    "200"
+  ],
+  "exit_code": 0,
+  "status": "pass",
+  "output_sha256": "83aa6d8233a878d12170ea8200a81a09c72b9f175ec2996b9966a028f294dd47",
+  "existing_output_preserved": true,
+  "existing_output_exit_code": 1
+}

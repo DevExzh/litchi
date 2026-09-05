@@ -1,0 +1,554 @@
+{
+  "change": 429,
+  "baseline_revision": "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "classification": "provider-specific API duration and managed ownership baseline plus ZIP short-read correctness enabler; no causal performance claim",
+  "rust_toolchain": "1.98.1",
+  "build_profile": "release",
+  "rustflags": "-Cforce-frame-pointers=yes",
+  "release_debug": 1,
+  "cargo_jobs": 4,
+  "cargo_incremental": false,
+  "cpu": 2,
+  "workers": 1,
+  "samples_per_process": 30,
+  "warmups_per_process": 3,
+  "lanes": [
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-slide",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-slide",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-slide",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-slide",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-video",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-video",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-video",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-video",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200
+    }
+  ],
+  "order": [
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200,
+      "repeat": "R1"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-slide",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R1"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-slide",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R1"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-slide",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0,
+      "repeat": "R1"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-slide",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200,
+      "repeat": "R1"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-video",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R1"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-video",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R1"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-video",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0,
+      "repeat": "R1"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-video",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200,
+      "repeat": "R1"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-video",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200,
+      "repeat": "R2"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-video",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0,
+      "repeat": "R2"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-video",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R2"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-video",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R2"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-slide",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200,
+      "repeat": "R2"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-slide",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0,
+      "repeat": "R2"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-slide",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R2"
+    },
+    {
+      "command": "native-image-lifecycle",
+      "selector_key": "fixture",
+      "selector": "poi-slide",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R2"
+    }
+  ],
+  "expected_processes": 32,
+  "expected_retained_samples": 960,
+  "capture_constraints": [
+    "Freeze code, protocol and independent validators before formal release capture.",
+    "Serialize every build, test, analysis and capture workload on root; source-only agent work may overlap.",
+    "Use identical synthetic input and exact output gates across providers; native POI slide-image and video-poster fixtures remain distinct named inputs.",
+    "File inputs are recently written or hash-read before samples: warm positional-file baseline, not a filesystem-cold experiment.",
+    "Range inputs use explicit caller adapters, no networking; range size caps returned chunks, fixed delay per nonempty backing read. Sleeping includes OS scheduling overhead, not a calibrated bandwidth or WAN model.",
+    "Record open/plan/publication or open/metadata/image-read clocks immediately around APIs. Their sum excludes source construction, copies, sink reservation, observation, checks, corpus gates and drops; it is not full lifecycle latency.",
+    "Keep managed budget gauges, cache retention, logical source reads and process RSS separate; cache diagnostics explicitly unavailable when observer owner drops.",
+    "Retain returned native image across all package-owner drops and revalidate payload; check final Memory/Objects/Depth zero.",
+    "Retain all raw observations; flag every corresponding API-duration/RSS repeat change greater than5percent; do not selectively rerun to suppress noise.",
+    "Report empirical p50/p95/p99 and deterministic bootstrap median intervals, with finite-sample and host-background limits.",
+    "Portable replay and mutation probes must pass after copied executable cleanup."
+  ],
+  "scope_limits": [
+    "Native cross-copy remains unsupported for inspected unnamed slides; native selected-image lifecycle is a separate operation, not evidence of native cross-copy.",
+    "No causal speedup/regression, end-to-end optimization, allocator, physical-copy, cold-filesystem, remote-service, general leak, or scaling claim.",
+    "Synthetic media-rich and small native fixtures do not close representative producer/size breadth or the global CRUD goal."
+  ],
+  "performance_claim": null,
+  "supplementary_profiles": {
+    "cases": [
+      {
+        "command": "provider-lifecycle",
+        "corpus": "media-rich",
+        "provider": "bytes"
+      },
+      {
+        "command": "provider-lifecycle",
+        "corpus": "media-rich",
+        "provider": "file"
+      }
+    ],
+    "samples": 100,
+    "warmups": 3,
+    "event": "cycles:u",
+    "frequency_hz": 499,
+    "call_graph": "dwarf,16384",
+    "scope": "Full-process samples retained; any operation attribution must select stacks under the measured iteration and identify setup/observer/check frames separately. Profile rows are not additional formal baseline samples."
+  },
+  "request_size_histogram": {
+    "scope": "nonempty caller-requested ReadAt buffer lengths, not capped delegated lengths or physical transport requests",
+    "buckets": [
+      "1",
+      "2",
+      "3..4",
+      "5..8",
+      "9..16",
+      "17..32",
+      "33..64",
+      "65..128",
+      "129..256",
+      "257..512",
+      "513..1024",
+      "1025..2048",
+      "2049..4096",
+      "4097..8192",
+      "8193..16384",
+      "16385..32768",
+      "32769..65536",
+      ">65536"
+    ],
+    "counter_type": "18 checked u64 counters; per-phase intervals subtract each bucket; sum equals logical_calls"
+  },
+  "production_change": {
+    "path": "crates/soapberry-zip/src/archive.rs",
+    "mechanism": "Refill only missing fixed-header bytes; parse exactly buffered headers and reject truncated trailing fixed headers.",
+    "evidence": "Four generated integration regressions fail before and pass after the bounded fix; broader ZIP and consumer gates required."
+  }
+}

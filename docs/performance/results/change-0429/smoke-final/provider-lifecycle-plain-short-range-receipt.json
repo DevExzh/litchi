@@ -1,0 +1,28 @@
+{
+  "name": "provider-lifecycle-plain-short-range",
+  "argv": [
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+    "provider-lifecycle",
+    "--corpus",
+    "plain",
+    "--provider",
+    "range",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--source-revision",
+    "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/smoke-final/provider-lifecycle-plain-short-range.json",
+    "--max-range",
+    "4096",
+    "--delay-us",
+    "0"
+  ],
+  "exit_code": 0,
+  "status": "pass",
+  "output_sha256": "4d0f56ca73c6df9f41f9759e51e563ca7668ed2b2d1b5475d0ffc38a0dcf839b",
+  "existing_output_preserved": true,
+  "existing_output_exit_code": 1
+}

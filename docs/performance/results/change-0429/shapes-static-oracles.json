@@ -1,0 +1,28 @@
+[
+  {
+    "fixture": "original",
+    "path": "test-data/ooxml/pptx/shapes.pptx",
+    "archive_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571",
+    "archive_bytes": 68822,
+    "slide": 0,
+    "image": 0,
+    "image_count": 1,
+    "relationship_id": "rId2",
+    "part": "/ppt/media/image1.jpg",
+    "payload_bytes": 11988,
+    "payload_sha256": "8345fcf9642a79651ea36935f736e753e355a4df2d85eaaa1589837143b8f2f0"
+  },
+  {
+    "fixture": "libreoffice",
+    "path": "test-data/office-interop/libreoffice-resaved/shapes-litchi.pptx",
+    "archive_sha256": "fcc8acffad88f5091316f67403c099a4c9eaa372e17927edfee29c35fb132034",
+    "archive_bytes": 53239,
+    "slide": 0,
+    "image": 0,
+    "image_count": 1,
+    "relationship_id": "rId1",
+    "part": "/ppt/media/image1.jpeg",
+    "payload_bytes": 11988,
+    "payload_sha256": "8345fcf9642a79651ea36935f736e753e355a4df2d85eaaa1589837143b8f2f0"
+  }
+]

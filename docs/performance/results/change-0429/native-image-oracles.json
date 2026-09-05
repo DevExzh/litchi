@@ -1,0 +1,48 @@
+[
+  {
+    "fixture": "poi-slide",
+    "path": "test-data/poi/test-data/slideshow/bug62513.pptx",
+    "archive_sha256": "cd841112bd5b53f21e8434d080af8b2eeca78a07bc820e9ea0b97a0962c85c79",
+    "archive_bytes": 384775,
+    "slide": 4,
+    "image": 0,
+    "image_count": 1,
+    "relationship_id": "rId2",
+    "part": "/ppt/media/image2.jpeg",
+    "payload_bytes": 21997,
+    "payload_sha256": "d5f10480ab75ce1175eea7432e684e9fac7319a7b9bd15512759385eae4842db",
+    "shape_position": 1,
+    "shape_id": 37890,
+    "shape_name": "Picture 2",
+    "bounds": {
+      "x": 1115616,
+      "y": 2276872,
+      "width": 7017380,
+      "height": 3262858
+    },
+    "content_type": "image/jpeg"
+  },
+  {
+    "fixture": "poi-video",
+    "path": "test-data/poi/test-data/slideshow/EmbeddedVideo.pptx",
+    "archive_sha256": "7940e3b1a339db11f00b65399a2fe77e0e85a5da3a30ac8d6c8a0a77527b2ab2",
+    "archive_bytes": 201418,
+    "slide": 0,
+    "image": 0,
+    "image_count": 1,
+    "relationship_id": "rId4",
+    "part": "/ppt/media/image1.png",
+    "payload_bytes": 65215,
+    "payload_sha256": "f5516c6cae484df63ce03db77fb69b778660916b9207de5a4e04aa5e3b72908d",
+    "shape_position": 0,
+    "shape_id": 2,
+    "shape_name": "file_example_MP4_480_1_5MG_Trim",
+    "bounds": {
+      "x": 3810000,
+      "y": 2143125,
+      "width": 4572000,
+      "height": 2571750
+    },
+    "content_type": "image/png"
+  }
+]

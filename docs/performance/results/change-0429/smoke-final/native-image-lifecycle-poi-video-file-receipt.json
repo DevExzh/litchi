@@ -1,0 +1,24 @@
+{
+  "name": "native-image-lifecycle-poi-video-file",
+  "argv": [
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+    "native-image-lifecycle",
+    "--fixture",
+    "poi-video",
+    "--provider",
+    "file",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--source-revision",
+    "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/smoke-final/native-image-lifecycle-poi-video-file.json"
+  ],
+  "exit_code": 0,
+  "status": "pass",
+  "output_sha256": "bc106e3fa42f0711717fdb62d383f5310b28f37898c4bf181348c0fe4e703139",
+  "existing_output_preserved": true,
+  "existing_output_exit_code": 1
+}

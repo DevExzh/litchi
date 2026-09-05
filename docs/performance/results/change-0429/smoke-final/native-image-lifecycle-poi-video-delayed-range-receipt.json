@@ -1,0 +1,28 @@
+{
+  "name": "native-image-lifecycle-poi-video-delayed-range",
+  "argv": [
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+    "native-image-lifecycle",
+    "--fixture",
+    "poi-video",
+    "--provider",
+    "range",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--source-revision",
+    "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/smoke-final/native-image-lifecycle-poi-video-delayed-range.json",
+    "--max-range",
+    "65536",
+    "--delay-us",
+    "200"
+  ],
+  "exit_code": 0,
+  "status": "pass",
+  "output_sha256": "03772f321af276e4a6249320809ef5f762d849bc97520a0bf3ed96e9d86e6670",
+  "existing_output_preserved": true,
+  "existing_output_exit_code": 1
+}

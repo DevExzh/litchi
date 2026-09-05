@@ -1,0 +1,28 @@
+{
+  "name": "native-image-lifecycle-poi-slide-short-range",
+  "argv": [
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+    "native-image-lifecycle",
+    "--fixture",
+    "poi-slide",
+    "--provider",
+    "range",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--source-revision",
+    "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/smoke-final/native-image-lifecycle-poi-slide-short-range.json",
+    "--max-range",
+    "4096",
+    "--delay-us",
+    "0"
+  ],
+  "exit_code": 0,
+  "status": "pass",
+  "output_sha256": "1fe7a9cdb32b154c63dfbb2755d912c8aeba164c7fd622b8d767191826becd7b",
+  "existing_output_preserved": true,
+  "existing_output_exit_code": 1
+}
