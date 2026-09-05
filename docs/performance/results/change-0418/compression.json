@@ -157,6 +157,22 @@
       "stored_sha256": "17dd168bf0eb651b60039575d96e2aeaa3c422499de48888e671d56b4892b292"
     },
     {
+      "raw_path": "checks/harness-lifecycle.log",
+      "raw_bytes": 2303,
+      "raw_sha256": "18713953af52b272f3800baee18640ddf18f68bf8f37f3431e226a3da7894228",
+      "stored_path": "checks/harness-lifecycle.log.zst",
+      "stored_bytes": 542,
+      "stored_sha256": "e0684b4d9da2ca1256dd540f9216f17e779a861e5ecf8b2cfb340f1799385e28"
+    },
+    {
+      "raw_path": "checks/harness-registry.log",
+      "raw_bytes": 1350,
+      "raw_sha256": "1b2661ca8c41374c70ca25e326ef40ba99d24f96328c5d98216ed1bf16595b03",
+      "stored_path": "checks/harness-registry.log.zst",
+      "stored_bytes": 448,
+      "stored_sha256": "e2cd4aeaf9958dd62693bc2e4c973acf39f8be8ebdb762c3efd40cd5ea510138"
+    },
+    {
       "raw_path": "checks/pptx-all-features-corrected.log",
       "raw_bytes": 63922,
       "raw_sha256": "6b762310f2f6a4571432383a96dc5f76065bb5868d7b2b10c47b96f8208b4f22",
@@ -325,6 +341,14 @@
       "stored_sha256": "2100ba39959ed17e635929812ba6eddd0cc3156cdc8e8fd5d544bae8fa700a16"
     },
     {
+      "raw_path": "profile/candidate-pptx_cross_copy_media_rich_lifecycle.header.txt",
+      "raw_bytes": 1817,
+      "raw_sha256": "b4846633c19633b355283853b657cc38ae55b5360b3b0ce11fed90d00e2662e0",
+      "stored_path": "profile/candidate-pptx_cross_copy_media_rich_lifecycle.header.txt.zst",
+      "stored_bytes": 976,
+      "stored_sha256": "5ad725bb2acb2eb456203a73260b7b52b007976e95454c90c226e2e33d2249af"
+    },
+    {
       "raw_path": "profile/candidate-pptx_cross_copy_media_rich_lifecycle.perf-report.txt",
       "raw_bytes": 4680802,
       "raw_sha256": "eb4cbf26d68d4bfd40b4e5df52ac6a326e3a7b26cd58bad7b2de782301aa0237",
@@ -371,6 +395,14 @@
       "stored_path": "profile/control-pptx_cross_copy_media_rich_lifecycle.children.txt.zst",
       "stored_bytes": 302342,
       "stored_sha256": "033b04ff3bbdeb0b70123076798bdd817e874cc15db41d3caf181f7dac89e9aa"
+    },
+    {
+      "raw_path": "profile/control-pptx_cross_copy_media_rich_lifecycle.header.txt",
+      "raw_bytes": 1817,
+      "raw_sha256": "0ebcca6a504e0bb7371791d42b7e01fbd0e039b5a195572dbe278e7531c674ee",
+      "stored_path": "profile/control-pptx_cross_copy_media_rich_lifecycle.header.txt.zst",
+      "stored_bytes": 978,
+      "stored_sha256": "d61ca9b35f7578186648ea7a7c67e674afbdd92bdfb2e4d2e0bb4b0f55379474"
     },
     {
       "raw_path": "profile/control-pptx_cross_copy_media_rich_lifecycle.perf-report.txt",
