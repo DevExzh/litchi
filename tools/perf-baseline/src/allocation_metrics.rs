@@ -21,6 +21,9 @@ const SCOPE: Scope = Scope::OperationGlobalSystemAllocator;
 static ENABLED: AtomicBool = AtomicBool::new(false);
 static REGION_ACTIVE: AtomicBool = AtomicBool::new(false);
 
+#[cfg(test)]
+pub(crate) static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Scope {
@@ -438,7 +441,7 @@ mod tests {
 
     use super::{Counters, Sample, Scope, Status};
 
-    static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    use super::TEST_LOCK;
 
     #[test]
     fn disabled_region_publishes_no_sample() {
