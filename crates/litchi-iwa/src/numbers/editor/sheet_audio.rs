@@ -6,14 +6,14 @@ use std::time::Duration;
 use litchi_iwa_common::media::Type as MediaType;
 
 use super::sheet_movies::graph::{
-    MovieObjectIds, movie_creation_context, set_movie_geometry, set_movie_properties,
+    MovieObjectIds, movie_creation_context, replace_movie_playback_settings, set_movie_geometry,
+    set_movie_properties,
 };
 use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::media::MediaAssetId;
-use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, offset_drawable_geometry,
 };

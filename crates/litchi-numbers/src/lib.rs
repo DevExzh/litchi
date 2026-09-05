@@ -340,6 +340,11 @@ pub use package::table_appearance::SourceBuiltAppearancePayload;
 pub use package::{
     __compatibility_tables_from_prepared_source, __semantic_document_from_prepared_source,
 };
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use package::{
+    __movie_playback_settings, __rewrite_movie_playback_settings, MoviePlaybackError,
+};
 pub use package::{
     Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, Package,
     PayloadLimitKind as PackagePayloadLimitKind, ReadOptions as PackageReadOptions,

@@ -10,7 +10,6 @@ use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::media::MediaAssetId;
-use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,

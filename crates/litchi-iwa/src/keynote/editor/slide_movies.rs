@@ -1,6 +1,6 @@
 //! Standalone movie-object CRUD for Keynote slides.
 
-use litchi_iwa_common::media::Type as MediaType;
+use litchi_iwa_common::{WireLimits, media::Type as MediaType};
 use litchi_iwa_protos::keynote_media_codec;
 use litchi_keynote::slide::media::MovieKind;
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
@@ -10,7 +10,6 @@ use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::media::MediaAssetId;
-use crate::media_playback::media_playback_settings;
 use crate::shapes::{DrawableGeometry, DrawableProperties, DrawableSize, geometry_from_drawable};
 use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
@@ -30,6 +29,37 @@ const POSTER_IMAGE_DATA_FIELD: u32 = 15;
 const SLIDE_BUILDS_FIELD: u32 = 2;
 const SLIDE_BUILD_CHUNKS_FIELD: u32 = 43;
 const MOVIE_MEDIA_PLACEHOLDER_FLAG: u32 = 1;
+
+pub(in crate::keynote::editor) fn movie_playback_wire_limits(
+    package: &IWorkPackage,
+) -> Result<WireLimits> {
+    let archive_limits = package.limits().archive_limits();
+    let source_bytes = archive_limits
+        .max_message_bytes()
+        .min(archive_limits.max_archive_bytes())
+        .min(package.limits().max_iwa_stream_bytes())
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    WireLimits::default()
+        .with_input_bytes(source_bytes)
+        .and_then(|limits| {
+            limits.with_fields(
+                source_bytes
+                    .saturating_mul(4)
+                    .clamp(1, WireLimits::MAX_FIELDS),
+            )
+        })
+        .and_then(|limits| limits.with_output_bytes(source_bytes))
+        .and_then(|limits| {
+            limits.with_rewrite_work(
+                source_bytes
+                    .saturating_mul(8)
+                    .clamp(1, WireLimits::MAX_REWRITE_WORK),
+            )
+        })
+        .map_err(|error| {
+            Error::InvalidFormat(format!("invalid Keynote movie playback limits: {error}"))
+        })
+}
 
 /// One movie drawable owned directly by a Keynote slide.
 #[derive(Debug, Clone, PartialEq)]
@@ -108,7 +138,7 @@ impl KeynoteEditor {
                             .any(|message| message.type_ == MOVIE_MESSAGE_TYPE)
                     })
             })
-            .map(|reference| movie_info(&graph, slide_index, reference.identifier))
+            .map(|reference| movie_info(&graph, self.package(), slide_index, reference.identifier))
             .collect()
     }
 
@@ -699,7 +729,7 @@ impl KeynoteEditor {
                 "Keynote movie private graph reaches its owning slide".to_owned(),
             ));
         }
-        let info = movie_info(&graph, slide_index, drawable_object_id)?;
+        let info = movie_info(&graph, self.package(), slide_index, drawable_object_id)?;
         let build_ids = self
             .slide_builds(slide_index)?
             .into_iter()
@@ -758,6 +788,7 @@ impl KeynoteEditor {
 
 fn movie_info(
     graph: &ObjectGraph,
+    package: &IWorkPackage,
     slide_index: usize,
     identifier: u64,
 ) -> Result<KeynoteSlideMovieInfo> {
@@ -804,16 +835,18 @@ fn movie_info(
     } else {
         MovieKind::File
     };
-    let playback = movie
-        .end_time
-        .map(|_| {
-            media_playback_settings(&movie).map_err(|error| {
+    let playback = if movie.end_time.is_some() {
+        let limits = movie_playback_wire_limits(package)?;
+        Some(
+            litchi_keynote::__decode_movie_playback_payload(raw, limits).map_err(|error| {
                 Error::InvalidFormat(format!(
                     "Keynote media {identifier} has invalid playback settings: {error}"
                 ))
-            })
-        })
-        .transpose()?;
+            })?,
+        )
+    } else {
+        None
+    };
     Ok(KeynoteSlideMovieInfo {
         slide_index,
         drawable_object_id: identifier,

@@ -5327,6 +5327,7 @@ mod charts;
 mod date_time_fields;
 mod footnotes;
 mod images;
+mod media_playback;
 mod movies;
 mod number_attachments;
 mod section_content;

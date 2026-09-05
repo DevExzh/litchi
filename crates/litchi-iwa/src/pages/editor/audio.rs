@@ -6,12 +6,12 @@ use std::time::Duration;
 use litchi_iwa_common::media::Type as MediaType;
 use litchi_pages::audio::Options as PagesAudioOptions;
 
+use super::media_playback::replace_movie_playback_settings;
 use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::media::MediaAssetId;
-use crate::media_playback::replace_movie_playback_settings;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{DrawablePoint, DrawableProperties, offset_drawable_geometry};
 use litchi_iwa_common::media::playback::MediaPlaybackSettings;
@@ -250,7 +250,7 @@ impl PagesEditor {
         &self,
         drawable_object_id: u64,
     ) -> Result<MediaPlaybackSettings> {
-        Ok(body_audio_graph(self, drawable_object_id)?.info.playback)
+        Ok(body_audio_playback_target(self, drawable_object_id)?.playback)
     }
 
     /// Update playback settings while retaining unrelated and unknown audio fields.
@@ -259,7 +259,7 @@ impl PagesEditor {
         drawable_object_id: u64,
         settings: MediaPlaybackSettings,
     ) -> Result<()> {
-        let source = body_audio_graph(self, drawable_object_id)?;
+        let source = body_audio_playback_target(self, drawable_object_id)?;
         let mut staged = self.package().clone();
         let expected = replace_movie_playback_settings(
             &mut staged,
@@ -737,6 +737,57 @@ mod tests {
         assert!(editor.body_audio().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
         PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn native_inline_audio_allows_playback_but_rejects_spatial_edit() {
+        let source = std::fs::read(
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/iwork/pages/audio-playback-native.pages"),
+        )
+        .expect("native Pages audio fixture");
+        let mut editor = PagesEditor::from_bytes(&source).expect("native Pages fixture");
+        let audio = editor
+            .body_audio()
+            .expect("native body audio")
+            .into_iter()
+            .next()
+            .expect("native inline audio");
+        assert_eq!(audio.playback.loop_mode, Some(MediaLoopMode::None));
+        assert_eq!(
+            audio.playback.volume.map(|volume| volume.as_f32()),
+            Some(1.0)
+        );
+
+        let changed = MediaPlaybackSettings {
+            loop_mode: Some(MediaLoopMode::Repeat),
+            volume: Some(MediaVolume::new(0.75).unwrap()),
+            ..audio.playback
+        };
+        editor
+            .set_body_audio_playback_settings(audio.drawable_object_id, changed)
+            .expect("playback-only update accepts inline audio");
+        assert_eq!(
+            editor
+                .body_audio_playback_settings(audio.drawable_object_id)
+                .expect("updated native playback"),
+            changed
+        );
+        let after_playback = editor.to_bytes().expect("native playback serialization");
+
+        let moved = DrawablePoint {
+            x: audio.position.x + 1.0,
+            y: audio.position.y,
+        };
+        assert!(
+            editor
+                .set_body_audio_position(audio.drawable_object_id, moved)
+                .is_err()
+        );
+        assert_eq!(
+            editor.to_bytes().expect("native audio bytes"),
+            after_playback
+        );
     }
 
     #[test]

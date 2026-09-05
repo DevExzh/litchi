@@ -2,12 +2,13 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
+use crate::archive::RawMessage;
 use crate::image_caption::CaptionThemeStyle;
-use crate::media_playback::media_playback_settings;
 use crate::shapes::{
     DrawableProperties, drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
 };
+use litchi_iwa_common::{WireLimits, media::playback::MediaPlaybackSettings};
 
 const NUMBERS_THEME_MESSAGE_TYPE: u32 = 12_009;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
@@ -20,6 +21,127 @@ const DEFAULT_TEXT_WRAP_MARGIN_POINTS: f32 = 12.0;
 const DEFAULT_TEXT_WRAP_ALPHA_THRESHOLD: f32 = 0.5;
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const STANDIN_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];
+
+/// Derive one bounded playback profile from the host package's physical
+/// archive ceilings. The focused Numbers owner applies the profile to its
+/// borrowed Buffa projection and source-preserving rewrite.
+pub(in crate::numbers::editor) fn movie_playback_wire_limits(
+    package: &IWorkPackage,
+) -> Result<WireLimits> {
+    let archive_limits = package.limits().archive_limits();
+    let source_bytes = archive_limits
+        .max_message_bytes()
+        .min(archive_limits.max_archive_bytes())
+        .min(package.limits().max_iwa_stream_bytes())
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    WireLimits::default()
+        .with_input_bytes(source_bytes)
+        .and_then(|limits| {
+            limits.with_fields(
+                source_bytes
+                    .saturating_mul(4)
+                    .clamp(1, WireLimits::MAX_FIELDS),
+            )
+        })
+        .and_then(|limits| limits.with_output_bytes(source_bytes))
+        .and_then(|limits| {
+            limits.with_rewrite_work(
+                source_bytes
+                    .saturating_mul(8)
+                    .clamp(1, WireLimits::MAX_REWRITE_WORK),
+            )
+        })
+        .map_err(|error| {
+            Error::InvalidFormat(format!("invalid Numbers movie playback limits: {error}"))
+        })
+}
+
+/// Decode one MovieArchive's scalar playback edge through the focused
+/// bounded Buffa projection. The generated MovieArchive remains the owner of
+/// the drawable graph; this seam borrows only the playback payload bytes.
+pub(in crate::numbers::editor) fn movie_playback_settings_from_payload(
+    package: &IWorkPackage,
+    payload: &[u8],
+) -> Result<MediaPlaybackSettings> {
+    let limits = movie_playback_wire_limits(package)?;
+    litchi_numbers::__movie_playback_settings(payload, limits).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Numbers media playback payload is invalid: {error}"
+        ))
+    })
+}
+
+/// Stage one playback rewrite in a Numbers component. The archive callback
+/// receives a private clone, so malformed payloads, strict codec failures, and
+/// candidate validation errors leave the caller's package unchanged.
+pub(in crate::numbers::editor) fn replace_movie_playback_settings(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    movie_id: u64,
+    context: &str,
+    settings: MediaPlaybackSettings,
+) -> Result<MediaPlaybackSettings> {
+    let settings = settings.canonicalize().map_err(Error::from)?;
+    let playback_limits = movie_playback_wire_limits(package)?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(movie_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("{context} object {movie_id} is missing"))
+        })?;
+        let mut message_index = None;
+        for (index, message) in object.messages.iter().enumerate() {
+            if message.type_ != MOVIE_MESSAGE_TYPE {
+                continue;
+            }
+            if message_index.replace(index).is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "{context} {movie_id} must have exactly one MovieArchive payload"
+                )));
+            }
+        }
+        let message_index = message_index.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "{context} {movie_id} must have exactly one MovieArchive payload"
+            ))
+        })?;
+        let original = object.messages[message_index].data.as_slice();
+        let current = litchi_numbers::__movie_playback_settings(original, playback_limits)
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "{context} {movie_id} playback payload is invalid: {error}"
+                ))
+            })?;
+        if current == settings {
+            return Ok(());
+        }
+        let data =
+            litchi_numbers::__rewrite_movie_playback_settings(original, settings, playback_limits)
+                .map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "{context} {movie_id} playback rewrite failed: {error}"
+                    ))
+                })?;
+        let verified =
+            litchi_numbers::__movie_playback_settings(&data, playback_limits).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "{context} {movie_id} rewritten playback payload is invalid: {error}"
+                ))
+            })?;
+        if verified != settings {
+            return Err(Error::InvalidFormat(format!(
+                "{context} {movie_id} playback rewrite failed validation"
+            )));
+        }
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: MOVIE_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        Ok(())
+    })?;
+    Ok(settings)
+}
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
@@ -482,11 +604,13 @@ fn movie_info(
         })?
         .identifier;
     let poster_image_data_identifier = MediaAssetId::try_from(poster_image_data_identifier)?;
-    let playback = media_playback_settings(&movie).map_err(|error| {
-        Error::InvalidFormat(format!(
-            "Numbers movie {identifier} has invalid playback settings: {error}"
-        ))
-    })?;
+    let playback = movie_playback_settings_from_payload(package, message.data.as_slice()).map_err(
+        |error| {
+            Error::InvalidFormat(format!(
+                "Numbers movie {identifier} has invalid playback settings: {error}"
+            ))
+        },
+    )?;
     Ok(NumbersSheetMovieInfo {
         sheet_id,
         drawable_object_id: identifier,

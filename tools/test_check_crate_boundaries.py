@@ -93,6 +93,177 @@ def write_cargo_manifest_fixture(root: Path, relative: str, source: str) -> Path
     return path
 
 
+def add_iwa_numbers_model_storage_scaffold(
+    root: Path,
+    *,
+    permissive_owner_probe: bool = False,
+    direct_storage_parse: bool = False,
+) -> None:
+    """Create the strict Numbers model/storage lookup fixture.
+
+    The fixture deliberately keeps generated decoding outside the owner probe:
+    ``decode_table_info`` may materialize the one admitted payload, while
+    ``find_table_owner`` only consumes the explicit candidate projection.
+    """
+
+    model = root / boundaries.IWA_NUMBERS_MODEL_SOURCE
+    model.parent.mkdir(parents=True, exist_ok=True)
+    owner_probe = (
+        "        let _ = tst::TableInfoArchive::decode(message.data.as_slice());\n"
+        if permissive_owner_probe
+        else ""
+    )
+    model.write_text(
+        "fn table_info_message_index(object: &ArchiveObject) {\n"
+        "    let _ = TABLE_INFO_MESSAGE_TYPES;\n"
+        "    let _ = table_info_model_identifier;\n"
+        "    let _ = object;\n"
+        "}\n"
+        "fn decode_table_info(object: &ArchiveObject) {\n"
+        "    let _ = table_info_message_index(object);\n"
+        "    let _ = object.messages[index].data;\n"
+        "    let _ = tst::TableInfoArchive::decode(object.messages[index].data);\n"
+        "}\n"
+        "fn find_table_owner(package: &IWorkPackage) {\n"
+        "    package.with_parsed_archive(name, |archive| {\n"
+        "        let _ = table_info_message_index(archive);\n"
+        f"{owner_probe}"
+        "    });\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    storage = root / boundaries.IWA_NUMBERS_STORAGE_SOURCE
+    storage.parent.mkdir(parents=True, exist_ok=True)
+    direct_parse = "    let _ = package.archive(name);\n" if direct_storage_parse else ""
+    storage.write_text(
+        "fn table_models(package: &IWorkPackage) {\n"
+        "    package.with_parsed_archive(name, |archive| { let _ = archive; });\n"
+        f"{direct_parse}"
+        "}\n"
+        "fn object_locations(package: &IWorkPackage) {\n"
+        "    package.with_parsed_archive(name, |archive| { let _ = archive; });\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
+def add_iwa_shared_media_playback_scaffold(
+    root: Path,
+    *,
+    restore_shared_host: bool = False,
+    owner_generated_decode: bool = False,
+    host_generated_decode: bool = False,
+) -> None:
+    """Create the three focused playback owners and their thin host adapters."""
+
+    codec = root / boundaries.IWA_MEDIA_PLAYBACK_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "fn decode_movie_playback() {}\n"
+        "fn rewrite_movie_playback() {}\n",
+        encoding="utf-8",
+    )
+
+    owner_sources = {
+        "Keynote": (
+            "pub fn __decode_movie_playback_payload(source: &[u8], limits: WireLimits) "
+            "{ movie_playback_codec::decode_movie_playback_with_report(source, limits); }\n"
+        ),
+        "Pages": (
+            "pub fn __decode_movie_playback_payload(source: &[u8], limits: WireLimits) "
+            "{ movie_playback_codec::decode_movie_playback(source, limits); }\n"
+            "#[doc(hidden)]\n"
+            "pub fn __rewrite_movie_playback_payload(source: &[u8], settings: MediaPlaybackSettings, limits: WireLimits) "
+            "{ movie_playback_codec::rewrite_movie_playback(source, settings, limits); }\n"
+        ),
+        "Numbers": (
+            "pub fn __movie_playback_settings(source: &[u8], limits: WireLimits) "
+            "{ movie_playback_codec::decode_movie_playback(source, limits); }\n"
+            "#[doc(hidden)]\n"
+            "pub fn __rewrite_movie_playback_settings(source: &[u8], settings: MediaPlaybackSettings, limits: WireLimits) "
+            "{ movie_playback_codec::rewrite_movie_playback(source, settings, limits); }\n"
+        ),
+    }
+    for ecosystem, relative in boundaries.IWA_MEDIA_PLAYBACK_OWNER_SOURCES.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        decode_name, rewrite_name = boundaries.IWA_MEDIA_PLAYBACK_OWNER_SEAMS[ecosystem]
+        source = owner_sources[ecosystem]
+        source = (
+            "#[doc(hidden)]\n" + source
+            if not source.startswith("#[doc(hidden)]")
+            else source
+        )
+        if owner_generated_decode and ecosystem == "Pages":
+            source += "fn legacy() { tsd::MovieArchive::decode(source); }\n"
+        path.write_text(source, encoding="utf-8")
+
+        package = root / boundaries.IWA_MEDIA_PLAYBACK_OWNER_PACKAGE_SOURCES[ecosystem]
+        package.parent.mkdir(parents=True, exist_ok=True)
+        module = (
+            "mod slide_movie_playback;\n"
+            if ecosystem == "Keynote"
+            else "#[cfg(feature = \"internal-iwork-source\")]\nmod movie_playback;\n"
+        )
+        reexports = ", ".join(
+            name for name in (decode_name, rewrite_name) if name is not None
+        )
+        package.write_text(
+            module
+            + "#[cfg(feature = \"internal-iwork-source\")]\n"
+            + "#[doc(hidden)]\n"
+            + f"pub use {'slide_movie_playback' if ecosystem == 'Keynote' else 'movie_playback'}::{{{reexports}}};\n",
+            encoding="utf-8",
+        )
+        export = root / boundaries.IWA_MEDIA_PLAYBACK_OWNER_EXPORT_SOURCES[ecosystem]
+        export.parent.mkdir(parents=True, exist_ok=True)
+        export.write_text(
+            "#[cfg(feature = \"internal-iwork-source\")]\n"
+            "#[doc(hidden)]\n"
+            + f"pub use package::{{{reexports}}};\n",
+            encoding="utf-8",
+        )
+
+    hosts = {
+        "Keynote": {
+            boundaries.IWA_MEDIA_PLAYBACK_HOST_SOURCES["Keynote"][0]:
+                "fn movie_info() { litchi_keynote::__decode_movie_playback_payload(source, limits); }\n",
+            boundaries.IWA_MEDIA_PLAYBACK_HOST_SOURCES["Keynote"][1]:
+                "fn audio_info() { litchi_keynote::__decode_movie_playback_payload(source, limits); }\n",
+        },
+        "Pages": {
+            boundaries.IWA_MEDIA_PLAYBACK_HOST_SOURCES["Pages"][0]:
+                "fn movie_playback_settings() { litchi_pages::__decode_movie_playback_payload(source, limits); }\n"
+                "fn replace_movie_playback_settings() { litchi_pages::__rewrite_movie_playback_payload(source, settings, limits); }\n",
+        },
+        "Numbers": {
+            boundaries.IWA_MEDIA_PLAYBACK_HOST_SOURCES["Numbers"][0]:
+                "fn movie_playback_settings_from_payload() { litchi_numbers::__movie_playback_settings(source, limits); }\n"
+                "fn replace_movie_playback_settings() { litchi_numbers::__rewrite_movie_playback_settings(source, settings, limits); }\n",
+        },
+    }
+    for ecosystem, entries in hosts.items():
+        for relative, source in entries.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if host_generated_decode and ecosystem == "Numbers":
+                source = source.replace(
+                    "litchi_numbers::__rewrite_movie_playback_settings(source, settings, limits);",
+                    "litchi_numbers::__rewrite_movie_playback_settings(source, settings, limits); "
+                    "tsd::MovieArchive::decode(source);",
+                )
+            path.write_text(source, encoding="utf-8")
+
+    if restore_shared_host:
+        shared = root / boundaries.IWA_SHARED_MEDIA_PLAYBACK_SOURCE
+        shared.parent.mkdir(parents=True, exist_ok=True)
+        shared.write_text("fn media_playback_settings() {}\n", encoding="utf-8")
+        root_lib = root / boundaries.IWA_FACADE_SOURCE
+        root_lib.parent.mkdir(parents=True, exist_ok=True)
+        root_lib.write_text("pub(crate) mod media_playback;\n", encoding="utf-8")
+
+
 def add_iwa_table_cell_borders_scaffold(root: Path) -> None:
     """Install the minimal common-owner and host-import boundary fixture."""
 
@@ -24012,6 +24183,27 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+    def test_iwa_pages_root_facts_graph_follows_audio_validation_delegate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative, _function_name = boundaries.IWA_PAGES_ROOT_FACTS_GRAPH_SITES[0]
+            source = root / relative
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(
+                "fn body_audio_graph() {\n"
+                "    body_audio_graph_with_validation(package);\n"
+                "}\n"
+                "fn body_audio_graph_with_validation(package: &Package) {\n"
+                "    let _ = pages_document_root_facts(package);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_root_facts_graph_source_topology(root),
+                [],
+            )
+
     def test_iwa_pages_root_facts_graph_readers_reject_eager_root_and_aliases(
         self,
     ) -> None:
@@ -39935,6 +40127,91 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_iwa_table_cell_borders_source_topology()",
+            main_source,
+        )
+
+    def test_iwa_numbers_model_storage_boundary_accepts_strict_borrowed_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_model_storage_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_model_storage_source_topology(root), []
+            )
+
+    def test_iwa_numbers_model_storage_boundary_rejects_probe_and_direct_parse(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_model_storage_scaffold(
+                root,
+                permissive_owner_probe=True,
+                direct_storage_parse=True,
+            )
+
+            violations = boundaries.audit_iwa_numbers_model_storage_source_topology(root)
+
+            self.assertTrue(
+                any("find_table_owner performs a generated" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("direct archive parse" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_numbers_model_storage_boundary_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_numbers_model_storage_source_topology()",
+            main_source,
+        )
+
+    def test_iwa_shared_media_playback_boundary_accepts_focused_owners(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_shared_media_playback_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_iwa_shared_media_playback_source_topology(root), []
+            )
+
+    def test_iwa_shared_media_playback_boundary_rejects_resurrection_and_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_shared_media_playback_scaffold(
+                root,
+                restore_shared_host=True,
+                owner_generated_decode=True,
+                host_generated_decode=True,
+            )
+
+            violations = boundaries.audit_iwa_shared_media_playback_source_topology(root)
+
+            self.assertTrue(
+                any("source was restored" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("module declaration" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("generated playback decoding" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("staging function replace_movie_playback_settings" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_shared_media_playback_boundary_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_shared_media_playback_source_topology()",
             main_source,
         )
 

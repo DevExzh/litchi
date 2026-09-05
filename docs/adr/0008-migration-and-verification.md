@@ -16569,3 +16569,64 @@ gated. Boundary policy tests pass 897 cases, with the scanner retaining
 64 packages, 238 internal dependency declarations, and 11 ordered debts.
 Normal commit hooks enforce formatting, workspace library lint, all-feature
 library/integration tests, and doc tests.
+
+## 2026-09-06 follow-up: bounded media playback ownership
+
+The shared 326-line host `media_playback.rs` module is deleted. Bounded Buffa
+scalar playback readers now live in the focused Numbers, Pages, and Keynote
+crates, with typed hidden rewrites in Numbers and Pages. The projections retain
+unknown and optional fields, legacy and modern loop representations, and exact
+no-op behavior. A newly inserted modern loop-plus-volume pair can have a
+different append order from the obsolete host sequence; the focused codec's
+append order and preservation of existing fields and unknown bytes remain the
+authority. This does not claim changed output bytes are identical to the old
+writer.
+
+Numbers host `object_locations`, `table_models`, and `find_table_owner` now
+borrow cached archives. Strict explicit type-6000/type-6003 `TableInfo`
+selection runs before compatibility mutation decoding; classification of other
+attached descriptors remains role-aware follow-up work. Pages native inline
+audio playback now reuses the non-spatial graph proof and requires exactly one
+drawable-z-order occurrence while skipping spatial basis, offset, and position
+comparisons. Spatial mutations retain their previous restrictions.
+
+Computer Use authored the checked-in Numbers source
+[`audio-playback-native.numbers`](../../test-data/iwork/numbers/audio-playback-native.numbers)
+in Numbers 14.4 from Blank, with `Native playback marker` in B2 and the
+existing `test-data/poi/test-data/slideshow/ringin.wav` audio asset inserted.
+The source UI showed loop `None` and volume `1`; Rust set `Repeat` and `0.5`.
+Numbers UI then displayed `Loop` with typed semantic `Repeat` and volume
+`0.5`, and after B2 changed to `Native playback marker saved`, save, close,
+and exact-path reopen preserved
+the result. The resaved fixture is
+[`audio-playback-native-resaved.numbers`](../../test-data/iwork/numbers/audio-playback-native-resaved.numbers).
+Source and resaved SHA-256 values are
+`eaf23bbf21364715be43a1857b8065e7061bafb17ea4c8c99f8b5f5f2766e4ed` and
+`eff3046e643345c417e048c9ac743383ab4c539fcb6a0d5bb8dc00acaf8756aa`.
+Rust changed only `Index/Document.iwa`; the repeated setter is an exact no-op
+after the first write, and the audio asset remains unchanged.
+
+The checked-in Pages source
+[`audio-playback-native.pages`](../../test-data/iwork/pages/audio-playback-native.pages)
+has SHA-256
+`f6078e869651c75a689c569dbc3c9c8517896fb59214fc401ebf19108ec7e301`.
+It contains `Native Pages playback marker` and the same `ringin.wav` audio;
+the source reopened with loop `None` and volume `1`. Rust `Repeat` plus `0.5`
+passes the new profile and changes only `Document.iwa`, with an exact no-op
+afterward. After save, close, and exact-path reopen, Pages displayed `Loop`
+with typed semantic `Repeat` and volume `0.5`, retained `Saved Native Pages
+playback marker`, and showed no repair prompt. The copied resaved fixture is
+[`audio-playback-native-resaved.pages`](../../test-data/iwork/pages/audio-playback-native-resaved.pages)
+with SHA-256
+`62e47a4ec6a2d9667b85ea836b2a9bf2bb1dab1118815eed320c9ed3cdf5c102`.
+
+Scoped validation passes 209 Keynote library tests, 456 Numbers tests plus
+four ignored, and 157 Pages library tests. The three default-feature facade
+library checks pass, and the new native integration tests pass for Numbers
+(four tests) and Pages (four tests). The native Pages host regression also
+passes. Boundary policy verification passes 904 cases; the scanner retains
+64 packages, 238 internal dependency declarations, and 11 ordered debts.
+Normal commit hooks enforce formatting, workspace library lint, all-feature
+library/integration tests, and doc tests. The shared host deletion is complete;
+monolith, ordered-debt, and global native-parity gates remain open as separate
+retirement criteria.

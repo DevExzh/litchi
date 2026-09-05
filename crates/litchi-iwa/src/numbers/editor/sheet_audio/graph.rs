@@ -1,7 +1,7 @@
 //! Typed construction and strict discovery of sheet-owned Numbers audio graphs.
 
 use super::*;
-use crate::media_playback::media_playback_settings;
+use crate::numbers::editor::sheet_movies::graph::movie_playback_settings_from_payload;
 use crate::shapes::{DrawableSize, drawable_properties, geometry_from_drawable};
 
 const AUDIO_MESSAGE_TYPE: u32 = 3_007;
@@ -342,11 +342,13 @@ fn audio_info(
     let position = geometry.position.ok_or_else(|| {
         Error::InvalidFormat(format!("Numbers audio {identifier} has no position"))
     })?;
-    let playback = media_playback_settings(&audio).map_err(|error| {
-        Error::InvalidFormat(format!(
-            "Numbers audio {identifier} has invalid playback settings: {error}"
-        ))
-    })?;
+    let playback = movie_playback_settings_from_payload(package, message.data.as_slice()).map_err(
+        |error| {
+            Error::InvalidFormat(format!(
+                "Numbers audio {identifier} has invalid playback settings: {error}"
+            ))
+        },
+    )?;
     Ok(NumbersSheetAudioInfo {
         sheet_id,
         drawable_object_id: identifier,

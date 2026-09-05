@@ -141,7 +141,6 @@ mod image_adjustments;
 mod image_caption;
 pub mod media;
 /// Native movie and audio playback wire adapter.
-pub(crate) mod media_playback;
 mod object_index;
 mod package;
 mod package_metadata;
@@ -334,6 +333,12 @@ impl From<litchi_iwa_archive::Error> for Error {
 
 impl From<litchi_numbers::table::dimension::Error> for Error {
     fn from(error: litchi_numbers::table::dimension::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::media::playback::Error> for Error {
+    fn from(error: litchi_iwa_common::media::playback::Error) -> Self {
         Self::ParseError(error.to_string())
     }
 }

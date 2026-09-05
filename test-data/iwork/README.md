@@ -249,3 +249,37 @@ Both Rust mutations verified semantic reopen, exact no-op and inverse
 restoration, unchanged stored Duration and cached scalar, and locality to the
 format-list and tile components. These observations qualify this Duration
 replacement and clear profile; broader native unit/style parity remains open.
+
+## Numbers audio playback source (2026-09-06)
+
+[`numbers/audio-playback-native.numbers`](numbers/audio-playback-native.numbers)
+was authored through Computer Use in Numbers 14.4 from Blank. B2 contains
+`Native playback marker`, and the existing
+`test-data/poi/test-data/slideshow/ringin.wav` asset was inserted. The source
+UI showed loop `None` and volume `1`. Rust set `Repeat` and `0.5`; Numbers UI
+displayed `Loop` with typed semantic `Repeat` and volume `0.5` after
+save/close and exact-path reopen, with B2 changed to `Native playback marker saved`.
+The source SHA-256 is
+`eaf23bbf21364715be43a1857b8065e7061bafb17ea4c8c99f8b5f5f2766e4ed`.
+
+[`numbers/audio-playback-native-resaved.numbers`](numbers/audio-playback-native-resaved.numbers)
+retains the native-resaved candidate. Its SHA-256 is
+`eff3046e643345c417e048c9ac743383ab4c539fcb6a0d5bb8dc00acaf8756aa`.
+Rust changed only `Index/Document.iwa`; the audio asset was unchanged and the
+repeated setter was an exact no-op after the first write. This qualifies the
+recorded Numbers playback profile only.
+
+## Pages audio playback source (2026-09-06)
+
+[`pages/audio-playback-native.pages`](pages/audio-playback-native.pages) has
+SHA-256
+`f6078e869651c75a689c569dbc3c9c8517896fb59214fc401ebf19108ec7e301`.
+It contains `Native Pages playback marker` and the same `ringin.wav` asset.
+The source reopened with loop `None` and volume `1`. Rust `Repeat` plus `0.5`
+passes the new profile, changes only `Document.iwa`, and has an exact no-op
+afterward. After save, close, and exact-path reopen, Pages displayed `Loop`
+with typed semantic `Repeat` and volume `0.5`, retained `Saved Native Pages
+playback marker`, and showed no repair prompt. The copied resaved fixture is
+[`pages/audio-playback-native-resaved.pages`](pages/audio-playback-native-resaved.pages)
+with SHA-256
+`62e47a4ec6a2d9667b85ea836b2a9bf2bb1dab1118815eed320c9ed3cdf5c102`.

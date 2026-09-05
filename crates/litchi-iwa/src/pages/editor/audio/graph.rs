@@ -1,8 +1,8 @@
 //! Typed construction and strict discovery of body-anchored Pages audio graphs.
 
+use super::super::media_playback::movie_playback_settings;
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::media_playback::media_playback_settings;
 use crate::shapes::{
     DrawableGeometry, DrawableProperties, DrawableSize, drawable_properties,
     geometry_from_drawable, patch_drawable_geometry, patch_wrapped_drawable_properties,
@@ -105,6 +105,17 @@ pub(super) struct BodyAudioGraph {
     pub(super) data_references: Vec<(u64, u64)>,
 }
 
+pub(super) struct BodyAudioPlaybackTarget {
+    pub(super) archive_name: String,
+    pub(super) playback: MediaPlaybackSettings,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum AudioGraphValidation {
+    Spatial,
+    Playback,
+}
+
 pub(super) fn audio_creation_values(options: PagesAudioOptions) -> Result<(DrawableGeometry, f32)> {
     let geometry = DrawableGeometry {
         position: Some(options.position()),
@@ -203,6 +214,7 @@ pub(super) fn body_audio_infos(editor: &PagesEditor) -> Result<Vec<PagesAudioInf
         audio.push(audio_info(
             editor.package(),
             editor.body_storage_id.get(),
+            &archive_name,
             drawable.identifier,
             entry.character_index,
         )?);
@@ -237,6 +249,29 @@ fn audio_is_discoverable(source: &[u8], drawable_object_id: u64) -> Result<bool>
 pub(super) fn body_audio_graph(
     editor: &PagesEditor,
     drawable_object_id: u64,
+) -> Result<BodyAudioGraph> {
+    body_audio_graph_with_validation(editor, drawable_object_id, AudioGraphValidation::Spatial)
+}
+
+pub(super) fn body_audio_playback_target(
+    editor: &PagesEditor,
+    drawable_object_id: u64,
+) -> Result<BodyAudioPlaybackTarget> {
+    let graph = body_audio_graph_with_validation(
+        editor,
+        drawable_object_id,
+        AudioGraphValidation::Playback,
+    )?;
+    Ok(BodyAudioPlaybackTarget {
+        archive_name: graph.archive_name,
+        playback: graph.info.playback,
+    })
+}
+
+fn body_audio_graph_with_validation(
+    editor: &PagesEditor,
+    drawable_object_id: u64,
+    validation: AudioGraphValidation,
 ) -> Result<BodyAudioGraph> {
     let info = body_audio_infos(editor)?
         .into_iter()
@@ -319,48 +354,49 @@ pub(super) fn body_audio_graph(
         )));
     }
 
-    if attachment.h_offset_type != Some(HorizontalAnchorBasis::BodyMargin as u32)
-        || attachment.v_offset_type != Some(VerticalAnchorBasis::Page as u32)
-    {
-        return Err(Error::ParseError(format!(
-            "Pages audio {drawable_object_id} uses unsupported attachment offset bases"
-        )));
-    }
-    let h_offset = attachment.h_offset.ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Pages audio {drawable_object_id} attachment has no horizontal offset"
-        ))
-    })?;
-    let v_offset = attachment.v_offset.ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Pages audio {drawable_object_id} attachment has no vertical offset"
-        ))
-    })?;
-    if !h_offset.is_finite() || !v_offset.is_finite() {
-        return Err(Error::InvalidFormat(format!(
-            "Pages audio {drawable_object_id} attachment offsets must be finite"
-        )));
-    }
+    match validation {
+        AudioGraphValidation::Spatial => {
+            if attachment.h_offset_type != Some(HorizontalAnchorBasis::BodyMargin as u32)
+                || attachment.v_offset_type != Some(VerticalAnchorBasis::Page as u32)
+            {
+                return Err(Error::ParseError(format!(
+                    "Pages audio {drawable_object_id} uses unsupported attachment offset bases"
+                )));
+            }
+            let h_offset = attachment.h_offset.ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Pages audio {drawable_object_id} attachment has no horizontal offset"
+                ))
+            })?;
+            let v_offset = attachment.v_offset.ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Pages audio {drawable_object_id} attachment has no vertical offset"
+                ))
+            })?;
+            if !h_offset.is_finite() || !v_offset.is_finite() {
+                return Err(Error::InvalidFormat(format!(
+                    "Pages audio {drawable_object_id} attachment offsets must be finite"
+                )));
+            }
 
-    let document = pages_document_root_facts(editor.package())?;
-    let attachment_position = DrawablePoint {
-        x: h_offset + document.left_margin.unwrap_or_default(),
-        y: v_offset,
-    };
-    if geometry.position != Some(attachment_position) || info.position != attachment_position {
-        return Err(Error::InvalidFormat(format!(
-            "Pages audio {drawable_object_id} geometry and attachment positions disagree"
-        )));
-    }
-    let z_order_id = document.drawables_zorder.ok_or_else(|| {
-        Error::InvalidFormat("Pages document has no drawable z-order object".to_owned())
-    })?;
-    let z_order_count =
-        pages_drawable_z_order_count(editor.package(), z_order_id, drawable_object_id)?;
-    if z_order_count != 1 {
-        return Err(Error::InvalidFormat(format!(
-            "Pages audio {drawable_object_id} occurs {z_order_count} times in drawable z-order"
-        )));
+            let document = pages_document_root_facts(editor.package())?;
+            let attachment_position = DrawablePoint {
+                x: h_offset + document.left_margin.unwrap_or_default(),
+                y: v_offset,
+            };
+            if geometry.position != Some(attachment_position)
+                || info.position != attachment_position
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Pages audio {drawable_object_id} geometry and attachment positions disagree"
+                )));
+            }
+            validate_drawable_z_order(editor, drawable_object_id, document.drawables_zorder)?;
+        },
+        AudioGraphValidation::Playback => {
+            let document = pages_document_root_facts(editor.package())?;
+            validate_drawable_z_order(editor, drawable_object_id, document.drawables_zorder)?;
+        },
     }
 
     let title_id = required_reference(drawable_object_id, audio.super_.title, "title stand-in")?;
@@ -470,9 +506,28 @@ pub(super) fn body_audio_graph(
     })
 }
 
+fn validate_drawable_z_order(
+    editor: &PagesEditor,
+    drawable_object_id: u64,
+    z_order_id: Option<u64>,
+) -> Result<()> {
+    let z_order_id = z_order_id.ok_or_else(|| {
+        Error::InvalidFormat("Pages document has no drawable z-order object".to_owned())
+    })?;
+    let z_order_count =
+        pages_drawable_z_order_count(editor.package(), z_order_id, drawable_object_id)?;
+    if z_order_count != 1 {
+        return Err(Error::InvalidFormat(format!(
+            "Pages audio {drawable_object_id} occurs {z_order_count} times in drawable z-order"
+        )));
+    }
+    Ok(())
+}
+
 fn audio_info(
     package: &IWorkPackage,
     body_storage_id: u64,
+    archive_name: &str,
     identifier: u64,
     anchor_character_index: u32,
 ) -> Result<PagesAudioInfo> {
@@ -499,11 +554,7 @@ fn audio_info(
     let position = geometry_from_drawable(&audio.super_)?
         .position
         .ok_or_else(|| Error::InvalidFormat(format!("Pages audio {identifier} has no position")))?;
-    let playback = media_playback_settings(&audio).map_err(|error| {
-        Error::InvalidFormat(format!(
-            "Pages audio {identifier} has invalid playback settings: {error}"
-        ))
-    })?;
+    let playback = movie_playback_settings(package, archive_name, identifier, "Pages audio")?;
     Ok(PagesAudioInfo {
         drawable_object_id: identifier,
         anchor_character_index,

@@ -23,7 +23,9 @@ use std::time::Duration;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::{Catalog, Entry, EntryEdit, ExactArtifacts};
-use litchi_iwa_common::{decode_varint_from_bytes, varint::encoded_len, wire::WireView};
+use litchi_iwa_common::{
+    WireLimits, decode_varint_from_bytes, varint::encoded_len, wire::WireView,
+};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::movie_playback_codec;
 use thiserror::Error;
@@ -251,8 +253,8 @@ impl PlaybackBudget {
 
     fn residual_wire_limits(
         &self,
-        base: litchi_iwa_common::WireLimits,
-    ) -> Result<litchi_iwa_common::WireLimits, SlideMoviePlaybackError> {
+        base: WireLimits,
+    ) -> Result<WireLimits, SlideMoviePlaybackError> {
         let input = self.max_input.saturating_sub(self.input).max(1);
         let fields = self.max_fields.saturating_sub(self.fields).max(1);
         let work = self.max_work.saturating_sub(self.work).max(1);
@@ -723,6 +725,58 @@ impl Package {
         }
         reopen_target_patch(self, patch, &mut budget)
     }
+}
+
+/// Decode one borrowed `TSD.MovieArchive` playback payload for the migration
+/// host.
+///
+/// The host already owns the physical object graph and supplies the package's
+/// bounded wire profile. This seam retains no generated archive and never
+/// re-encodes the source payload; the strict Buffa projection and the focused
+/// semantic conversion remain owned by Keynote.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub fn __decode_movie_playback_payload(
+    source: &[u8],
+    wire_limits: WireLimits,
+) -> Result<litchi_iwa_common::media::playback::MediaPlaybackSettings, SlideMoviePlaybackError> {
+    let settings = decode_movie_playback_payload(source, wire_limits)?;
+    let settings = litchi_iwa_common::media::playback::MediaPlaybackSettings {
+        start_time: settings.start_time,
+        end_time: settings.end_time,
+        poster_time: settings.poster_time,
+        loop_mode: settings
+            .loop_mode
+            .map(|mode| litchi_iwa_common::media::playback::MediaLoopMode::from_raw(mode.as_raw())),
+        volume: settings
+            .volume
+            .map(|volume| litchi_iwa_common::media::playback::MediaVolume::new(volume.as_f32()))
+            .transpose()
+            .map_err(|_| SlideMoviePlaybackError::InvalidSource)?,
+    };
+    settings
+        .canonicalize()
+        .map_err(|_| SlideMoviePlaybackError::InvalidSource)
+}
+
+#[cfg(any(test, feature = "internal-iwork-source"))]
+fn decode_movie_playback_payload(
+    source: &[u8],
+    wire_limits: WireLimits,
+) -> Result<MediaPlaybackSettings, SlideMoviePlaybackError> {
+    let recursion_limit = u32::try_from(wire_limits.max_nesting())
+        .map_err(|_| SlideMoviePlaybackError::InvalidSource)?;
+    let options = movie_playback_codec::DecodeOptions::new(
+        wire_limits.max_input_bytes().min(source.len().max(1)),
+        wire_limits.max_fields(),
+        wire_limits.max_rewrite_work(),
+        recursion_limit,
+    )
+    .with_max_output_bytes(wire_limits.max_output_bytes());
+    let (snapshot, _report) =
+        movie_playback_codec::decode_movie_playback_with_report(source, options)
+            .map_err(map_codec_error)?;
+    settings_from_snapshot(snapshot)
 }
 
 fn commit_edit(
@@ -1307,7 +1361,7 @@ fn unique_message(
 fn repeated_references(
     payload: &[u8],
     field_number: u32,
-    limits: litchi_iwa_common::WireLimits,
+    limits: WireLimits,
 ) -> Result<Vec<u64>, SlideMoviePlaybackError> {
     let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
     let mut values = Vec::new();
@@ -1333,10 +1387,7 @@ fn repeated_references(
     Ok(values)
 }
 
-fn movie_parent(
-    payload: &[u8],
-    limits: litchi_iwa_common::WireLimits,
-) -> Result<u64, SlideMoviePlaybackError> {
+fn movie_parent(payload: &[u8], limits: WireLimits) -> Result<u64, SlideMoviePlaybackError> {
     let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
     let super_field = fields
         .fields()
@@ -1359,7 +1410,7 @@ fn movie_parent(
 
 fn strict_reference_payload(
     payload: &[u8],
-    limits: litchi_iwa_common::WireLimits,
+    limits: WireLimits,
     _context: &'static str,
 ) -> Result<u64, SlideMoviePlaybackError> {
     let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
@@ -1391,7 +1442,7 @@ fn strict_reference_payload(
 
 fn movie_data_field_count(
     payload: &[u8],
-    limits: litchi_iwa_common::WireLimits,
+    limits: WireLimits,
 ) -> Result<usize, SlideMoviePlaybackError> {
     let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
     let mut count = 0usize;
@@ -1412,7 +1463,7 @@ fn ensure_unique_movie_owner(
     package: &Package,
     slide_identifier: u64,
     movie_identifier: u64,
-    limits: litchi_iwa_common::WireLimits,
+    limits: WireLimits,
     budget: &mut PlaybackBudget,
 ) -> Result<(), SlideMoviePlaybackError> {
     let mut occurrences = 0usize;
@@ -1696,5 +1747,111 @@ fn map_core_error(error: litchi_iwa_core::Error) -> SlideMoviePlaybackError {
             SlideMoviePlaybackError::Allocation { amount: requested }
         },
         _ => SlideMoviePlaybackError::InvalidSource,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use litchi_iwa_protos::tsd;
+    use prost::Message as _;
+
+    use super::*;
+
+    fn payload() -> Vec<u8> {
+        tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            start_time: Some(0.25),
+            end_time: Some(1.5),
+            poster_time: Some(0.5),
+            loop_option_as_integer: Some(u32::from_le_bytes((-1_i32).to_le_bytes())),
+            volume: Some(0.75),
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    fn payload_without_end() -> Vec<u8> {
+        tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    #[test]
+    fn borrowed_payload_reader_preserves_optional_and_unknown_values() {
+        let settings = decode_movie_playback_payload(&payload(), WireLimits::default()).unwrap();
+        assert_eq!(settings.start_time, Some(Duration::from_secs_f32(0.25)));
+        assert_eq!(settings.end_time, Duration::from_secs_f32(1.5));
+        assert_eq!(settings.poster_time, Some(Duration::from_secs_f32(0.5)));
+        assert_eq!(settings.loop_mode, Some(MediaLoopMode::Unknown(-1)));
+        assert_eq!(settings.volume.map(MediaVolume::as_f32), Some(0.75));
+    }
+
+    #[test]
+    fn borrowed_payload_reader_rejects_missing_end_time() {
+        assert!(
+            decode_movie_playback_payload(&payload_without_end(), WireLimits::default()).is_err()
+        );
+    }
+
+    #[test]
+    fn borrowed_payload_reader_rejects_conflicting_loop_fields() {
+        let source = tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            end_time: Some(1.0),
+            loop_option_as_integer: Some(1),
+            loop_option: Some(2),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        assert!(decode_movie_playback_payload(&source, WireLimits::default()).is_err());
+    }
+
+    #[test]
+    fn borrowed_payload_reader_rejects_noncanonical_known_varints() {
+        let mut source = tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            end_time: Some(1.0),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        source.extend_from_slice(&[0xc0, 0x01, 0x80, 0x00]);
+        assert!(decode_movie_playback_payload(&source, WireLimits::default()).is_err());
+    }
+
+    #[test]
+    fn borrowed_payload_reader_rejects_invalid_scalar_values() {
+        let negative_end = tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            end_time: Some(-1.0),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        assert!(decode_movie_playback_payload(&negative_end, WireLimits::default()).is_err());
+
+        let invalid_volume = tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            end_time: Some(1.0),
+            volume: Some(1.1),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        assert!(decode_movie_playback_payload(&invalid_volume, WireLimits::default()).is_err());
+    }
+
+    #[test]
+    fn borrowed_payload_reader_honors_lower_field_budget() {
+        let limits = WireLimits::default().with_fields(1).unwrap();
+        let error = decode_movie_playback_payload(&payload(), limits).unwrap_err();
+        assert!(matches!(
+            error,
+            SlideMoviePlaybackError::LimitExceeded {
+                kind: SlideMoviePlaybackLimitKind::WireFields,
+                ..
+            }
+        ));
     }
 }

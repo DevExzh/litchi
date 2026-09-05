@@ -33,6 +33,8 @@ mod function_map;
 mod index;
 mod limits;
 mod metadata;
+#[cfg(feature = "internal-iwork-source")]
+mod movie_playback;
 /// Exact-source sheet and table name transactions.
 pub(crate) mod names;
 mod physical_entry_index;
@@ -115,6 +117,11 @@ pub use limits::{
 };
 /// Physical ingress ceilings for a parsed Numbers package.
 pub use litchi_iwa_archive::Limits;
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use movie_playback::{
+    __movie_playback_settings, __rewrite_movie_playback_settings, MoviePlaybackError,
+};
 pub use save::SaveError;
 pub use table_lock::{
     TableLockCommit, TableLockDiagnostics, TableLockEdit, TableLockError, TableLockLimitKind,
