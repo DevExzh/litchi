@@ -16037,11 +16037,14 @@ the required legacy qualification. Its bounded UID arrays are one-to-one
 physical permutations matching the model dimensions.
 
 The complete type-4008 -> type-6204/type-6220 dependency closure is admitted
-and validated only when an existing hidden-state owner is present. An
-ownerless table may contain an unrelated formula-owner record, but it is a
-valid empty read/no-op shape only; it is not treated as proof that this
-dependency closure can be created. An active UUID in `TableInfoArchive`
-selects one stored view for reads, and its matching state must be unique.
+and validated for an existing hidden-state owner. An ownerless table may
+contain an unrelated formula-owner record, but it remains a valid empty
+read/no-op shape. For a qualified exact `Indexed` source, a changed request
+may now create a bounded owner/dependency closure after the physical, UUID,
+registry, metadata, and wire-limit preflight described below; this creation
+path is not available to the `NativeVisible` profile or unsupported producer
+shapes. An active UUID in `TableInfoArchive` selects one stored view for
+reads, and its matching state must be unique.
 Reads may follow a uniquely selected active view, but a changed edit refuses
 an owner containing multiple stored views, even when the active UUID is
 unambiguous, because preserving the
@@ -16057,12 +16060,20 @@ and groups, unselected fields and members, and admitted filtered/pivot markers
 remain preserved. Duplicate, stale, dangling, malformed, wrong-wire,
 ambiguous, out-of-bounds, locked, finite-limit, pivot, and unsupported
 dependency cases fail closed before publication. An absent owner reads as
-empty; an empty request is an exact source no-op. On an exact, unlocked
-source, a nonempty absent-owner request is refused as `UnsupportedDependency`
-because owner creation is not supported; a non-exact source reports
-`UnsupportedSource` before that owner check. For a changed edit, `TableLocked`
-takes precedence over the absent-owner dependency result, while exact no-ops
-on a locked table remain allowed subject to read/graph admission.
+empty; an empty request is an exact source no-op. On an exact, unlocked,
+qualified `Indexed` source, a nonempty request now runs bounded owner
+creation: it allocates four helper objects for the column/row formula and
+filter records, adds the selected model references through the core
+canonical object-reference `FieldInfo` primitive, and, when present, updates
+the strict `Index/Metadata.iwa` registry/save-token route. A valid
+metadata-free source is also admitted; a present but malformed, ambiguous, or
+unknown registry fails closed. Physical object/reference/UUID census and
+finite output, retained, and wire budgets precede allocation and publication.
+`NativeVisible` and unsupported producer shapes still return
+`UnsupportedDependency`; a non-exact source reports `UnsupportedSource` before
+that profile check. For a changed edit, `TableLocked` takes precedence over
+the absent-owner dependency result, while exact no-ops on a locked table
+remain allowed subject to read/graph admission.
 Existing-owner changes use copy-on-write, touch one selected component,
 invalidate the three canonical root previews, reopen and read back the
 candidate, and enforce exact-source apply/inverse/conflict fences.
@@ -16121,8 +16132,8 @@ and column state lists are empty, so its native read returns
 hidden-axis request is refused as `UnsupportedDependency` before publication.
 This native baseline contains no user-hidden rows or columns and supplies
 bounded E1/native visible-profile read/no-op evidence, not positive E2 hidden-axis
-mutation or E3/E4 acceptance of a Litchi visibility mutation. Creation and
-native changed-edit parity remain open.
+mutation or E3/E4 acceptance of a Litchi visibility mutation. NativeVisible
+owner creation and native changed-edit parity remain open.
 
 A fresh Computer Use duplicate/save/close/reopen check showed the same body
 marker and visible 5-by-4 table without repair UI. The checked-in fixture was
@@ -16159,9 +16170,12 @@ narrow path does not promise acceptance parity with the full Prost decoder.
 
 The Pages raw-ID `PagesEditor::{table_hidden_axes, set_table_hidden_axes}`
 route, its tests, and the mixed example remain migration-host compatibility.
-Retirement is deferred because the focused owner refuses absent-owner creation
-and has no native changed-edit parity evidence. The shared hidden-axis helper
-also preserves Numbers/Keynote compatibility, Numbers sort restoration, and
+Retirement remains deferred because `NativeVisible` changed edits still
+return `UnsupportedDependency`, native changed-edit parity is unproven, and
+the migration host still carries compatibility behavior. Qualified `Indexed`
+absent-owner creation is now owned by the focused route; it does not authorize
+raw-ID retirement or broaden native scope. The shared hidden-axis helper also
+preserves Numbers/Keynote compatibility, Numbers sort restoration, and
 row/column-deletion cleanup. Focused refusals remain terminal; supported format
 facades never fall back to the host. Existing functionality is retained until
 ADR 0028's parity and native gates permit removal.
@@ -16210,3 +16224,43 @@ still-visible markers. The oversized-dimension descriptor specifically expects
 `WireFields` exhaustion before shape validation. The earlier harness assertion
 failures were explained and corrected; this result remains synthetic fuzz
 evidence, while native hidden-axis mutation parity stays open.
+
+## 2026-09-05 follow-up: Pages Indexed owner creation and admitted Numbers routes
+
+This follow-up records the current implementation boundary after the preceding
+native-visible baseline. For the qualified exact `Indexed` Pages profile, a
+changed ownerless request can now prepare and publish a bounded hidden-state
+closure for the selected body table. The creation plan allocates four helper
+objects for column/row formula and filter records, writes the selected model
+references through the core canonical object-reference `FieldInfo` primitive,
+and supports both a valid metadata-free package and a metadata-bearing
+`Index/Metadata.iwa` route. Strict current component/object/UUID census,
+collision and misroute checks, exact source-bound inverse/locality checks, and
+finite retained/output/wire budgets run before candidate publication. Metadata
+additions and save tokens use the narrow Buffa visitor/rewrite path when that
+member exists; malformed or unknown metadata fails closed for changed
+creation.
+
+Ownerless empty reads and exact empty no-ops remain valid. `NativeVisible`
+changed edits still return `UnsupportedDependency` before candidate allocation
+or publication, and native changed-edit parity remains open. The checked-in
+Pages fuzz target and corpus now exercise metadata absence, malformed,
+duplicate, dangling, collision, and limit cases. The 34-test Pages hidden-axis
+integration suite passes. The updated 87-seed corpus replay completed 89
+executions, followed by a 100-run AddressSanitizer smoke with no findings and
+498 MB peak reported RSS. Harness fixes preserve exact and one-under budget
+checks and derive creation/locality expectations from the selected table.
+
+Numbers now routes admitted numeric-family transitions and control-to-numeric
+changes through focused typed owners while retaining the compatibility writer
+for non-admitted formats and unsupported value/storage shapes. Admitted focused
+transitions preserve typed values and numeric formula caches; compatibility
+routes retain their existing conversion semantics. An operation-specific Numbers UI check
+confirmed one Currency cell displaying `$42.00` and retaining a marker through
+save/close/reopen; it does not generalize to all formats or native mutation
+parity.
+
+No workspace package, manifest/dependency edge, ordered debt, migration-host
+item, or ADR 0028 deletion gate is removed or closed by this follow-up. The
+previously recorded verification figures remain historical; these new results
+qualify the focused operation and do not close native mutation gates.

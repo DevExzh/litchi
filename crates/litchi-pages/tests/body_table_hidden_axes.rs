@@ -49,6 +49,17 @@ const FILTER_SET_MESSAGE_TYPE: u32 = 6_220;
 const ROOT_MESSAGE_TYPE: u32 = 10_000;
 const BODY_MESSAGE_TYPE: u32 = 2_001;
 const ATTACHMENT_MESSAGE_TYPE: u32 = 2_003;
+const METADATA_MEMBER: &str = "Index/Metadata.iwa";
+const METADATA_OBJECT_IDENTIFIER: u64 = 50_000;
+const METADATA_MESSAGE_TYPE: u32 = 11_006;
+const METADATA_WATERMARK: u64 = METADATA_OBJECT_IDENTIFIER;
+const METADATA_ORPHAN_IDENTIFIER: u64 = 90_000;
+const METADATA_UUID_LOWER_OFFSET: u64 = 10_000;
+const METADATA_UUID_UPPER_OFFSET: u64 = 20_000;
+const UNRELATED_MEMBER: &str = "Index/Other.iwa";
+const UNRELATED_OBJECT_IDENTIFIER: u64 = 800;
+const UNRELATED_MESSAGE_TYPE: u32 = 12_000;
+const UNRELATED_SAVE_TOKEN: u64 = 1;
 const NATIVE_TABLE_MODEL_IDENTIFIER: u64 = 1_733_258;
 const NATIVE_FORMULA_OWNER_IDENTIFIER: u64 = 1_733_486;
 const NATIVE_COLUMN_FILTER_IDENTIFIER: u64 = 1_733_511;
@@ -841,6 +852,115 @@ fn normal_package() -> TestResult<Vec<u8>> {
     Ok(source)
 }
 
+fn metadata_uuid(identifier: u64) -> tsp::Uuid {
+    uuid(
+        identifier.saturating_add(METADATA_UUID_LOWER_OFFSET),
+        identifier.saturating_add(METADATA_UUID_UPPER_OFFSET),
+    )
+}
+
+fn metadata_uuid_entry(identifier: u64) -> tsp::ObjectUuidMapEntry {
+    tsp::ObjectUuidMapEntry {
+        identifier,
+        uuid: metadata_uuid(identifier),
+    }
+}
+
+/// Add strict current PackageMetadata components to an ownerless document.
+/// The ordinary fixture stays metadata-free so the compatibility creation
+/// shape remains covered separately; these tests opt into a registry-bearing
+/// shape with one unrelated physical component as well.
+fn metadata_package(source: &[u8]) -> TestResult<Vec<u8>> {
+    let source_catalog = Catalog::from_bytes(source)?;
+    let document = source_catalog
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT_MEMBER)
+        .ok_or("missing document member")?;
+    let archive = Archive::parse(SnappyStream::decompress(document.data())?.as_bytes())?;
+    let mut identifiers = archive
+        .objects
+        .iter()
+        .map(|object| {
+            object
+                .archive_info
+                .identifier
+                .ok_or("document object has no identifier")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    identifiers.sort_unstable();
+    identifiers.dedup();
+    let metadata = tsp::PackageMetadata {
+        last_object_identifier: METADATA_WATERMARK,
+        save_token: Some(1),
+        components: vec![
+            tsp::ComponentInfo {
+                identifier: 1,
+                preferred_locator: "Document".to_owned(),
+                // The native metadata uses the preferred locator for this
+                // current component and leaves the explicit locator absent.
+                locator: None,
+                save_token: Some(1),
+                object_uuid_map_entries: identifiers.into_iter().map(metadata_uuid_entry).collect(),
+                ..tsp::ComponentInfo::default()
+            },
+            tsp::ComponentInfo {
+                identifier: 2,
+                preferred_locator: "Other".to_owned(),
+                locator: None,
+                save_token: Some(UNRELATED_SAVE_TOKEN),
+                object_uuid_map_entries: vec![metadata_uuid_entry(UNRELATED_OBJECT_IDENTIFIER)],
+                ..tsp::ComponentInfo::default()
+            },
+        ],
+        ..tsp::PackageMetadata::default()
+    }
+    .encode_to_vec();
+    let metadata_component = SnappyStream::compress(
+        &Archive {
+            objects: vec![object(
+                METADATA_OBJECT_IDENTIFIER,
+                METADATA_MESSAGE_TYPE,
+                metadata,
+                &[],
+            )?],
+        }
+        .to_bytes()?,
+    )?;
+    let mut members = source_catalog
+        .iter()
+        .filter(|entry| entry.name() != METADATA_MEMBER)
+        .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
+        .collect::<Vec<_>>();
+    let unrelated_component = SnappyStream::compress(
+        &Archive {
+            objects: vec![object(
+                UNRELATED_OBJECT_IDENTIFIER,
+                UNRELATED_MESSAGE_TYPE,
+                b"unrelated-component-preservation-witness".to_vec(),
+                &[],
+            )?],
+        }
+        .to_bytes()?,
+    )?;
+    members.push((UNRELATED_MEMBER.to_owned(), unrelated_component));
+    members.push((METADATA_MEMBER.to_owned(), metadata_component));
+    let references = members
+        .iter()
+        .map(|(name, data)| (name.as_str(), data.as_slice()))
+        .collect::<Vec<_>>();
+    Ok(litchi_iwa_archive::package::to_bytes(
+        references,
+        Limits::default(),
+    )?)
+}
+
+fn ownerless_metadata_package() -> TestResult<Vec<u8>> {
+    metadata_package(&synthetic_package(
+        [TableOptions::default(), TableOptions::default()],
+        ["Revenue", "Costs"],
+    )?)
+}
+
 fn native_visible_package() -> TestResult<Vec<u8>> {
     Ok(std::fs::read(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -923,6 +1043,201 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
         .ok_or_else(|| format!("missing package member {name}"))?
         .data()
         .to_vec())
+}
+
+fn metadata_payload_from_package(package: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA_MEMBER)
+        .ok_or("missing metadata member")?;
+    let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    archive
+        .object(METADATA_OBJECT_IDENTIFIER)
+        .ok_or("missing metadata object")?
+        .messages
+        .iter()
+        .find(|message| message.type_ == METADATA_MESSAGE_TYPE)
+        .map(|message| message.data.clone())
+        .ok_or_else(|| "missing metadata message".into())
+}
+
+fn metadata_from_package(package: &[u8]) -> TestResult<tsp::PackageMetadata> {
+    Ok(tsp::PackageMetadata::decode(
+        metadata_payload_from_package(package)?.as_slice(),
+    )?)
+}
+
+fn rewrite_metadata(
+    package: &[u8],
+    mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA_MEMBER)
+        .ok_or("missing metadata member")?;
+    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let metadata_object = archive
+        .object_mut(METADATA_OBJECT_IDENTIFIER)
+        .ok_or("missing metadata object")?;
+    let message_index = metadata_object
+        .messages
+        .iter()
+        .position(|message| message.type_ == METADATA_MESSAGE_TYPE)
+        .ok_or("missing metadata message")?;
+    let mut metadata =
+        tsp::PackageMetadata::decode(metadata_object.messages[message_index].data.as_slice())?;
+    mutate(&mut metadata)?;
+    metadata_object.replace_message_preserving_header(
+        message_index,
+        RawMessage {
+            type_: METADATA_MESSAGE_TYPE,
+            data: metadata.encode_to_vec(),
+        },
+    )?;
+    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(METADATA_MEMBER, component.as_slice())],
+        Limits::default(),
+    )?)
+}
+
+fn metadata_component_mut(
+    metadata: &mut tsp::PackageMetadata,
+) -> TestResult<&mut tsp::ComponentInfo> {
+    metadata
+        .components
+        .iter_mut()
+        .find(|component| {
+            component.identifier == 1
+                && component
+                    .locator
+                    .as_deref()
+                    .unwrap_or(component.preferred_locator.as_str())
+                    == "Document"
+        })
+        .ok_or_else(|| "missing Document metadata component".into())
+}
+
+fn metadata_dangling_registry(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_metadata(package, |metadata| {
+        metadata_component_mut(metadata)?
+            .object_uuid_map_entries
+            .push(metadata_uuid_entry(METADATA_ORPHAN_IDENTIFIER));
+        Ok(())
+    })
+}
+
+fn metadata_duplicate_registry_identifier(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_metadata(package, |metadata| {
+        let component = metadata_component_mut(metadata)?;
+        let mut duplicate = component
+            .object_uuid_map_entries
+            .first()
+            .cloned()
+            .ok_or("metadata registry is empty")?;
+        duplicate.uuid = uuid(0xdead_beef, 0xcafe_babe);
+        component.object_uuid_map_entries.push(duplicate);
+        Ok(())
+    })
+}
+
+fn metadata_duplicate_uuid(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_metadata(package, |metadata| {
+        let component = metadata_component_mut(metadata)?;
+        let first_uuid = component
+            .object_uuid_map_entries
+            .first()
+            .map(|entry| entry.uuid)
+            .ok_or("metadata registry is empty")?;
+        let second = component
+            .object_uuid_map_entries
+            .get_mut(1)
+            .ok_or("metadata registry has fewer than two entries")?;
+        // Keep identifiers, membership, and cardinality intact.  Only the
+        // second binding's UUID is made equal to the first binding's UUID so
+        // this case isolates duplicate UUID identity from dangling IDs.
+        second.uuid = first_uuid;
+        Ok(())
+    })
+}
+
+fn metadata_watermark_near_max(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_metadata(package, |metadata| {
+        metadata.last_object_identifier = u64::MAX - 2;
+        Ok(())
+    })
+}
+
+fn metadata_physical_id_collision(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document_archive(package, |archive| {
+        archive.insert_object(object(
+            METADATA_OBJECT_IDENTIFIER,
+            FILTER_SET_MESSAGE_TYPE,
+            filter_set_payload()?,
+            &[],
+        )?)?;
+        Ok(())
+    })
+}
+
+fn metadata_misrouted_member(package: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let metadata = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA_MEMBER)
+        .ok_or("missing metadata member")?
+        .data()
+        .to_vec();
+    let members = catalog
+        .iter()
+        .filter(|entry| entry.name() != METADATA_MEMBER)
+        .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
+        .chain(std::iter::once((
+            "Index/NotMetadata.iwa".to_owned(),
+            metadata,
+        )))
+        .collect::<Vec<_>>();
+    let references = members
+        .iter()
+        .map(|(name, data)| (name.as_str(), data.as_slice()))
+        .collect::<Vec<_>>();
+    Ok(litchi_iwa_archive::package::to_bytes(
+        references,
+        Limits::default(),
+    )?)
+}
+
+fn append_metadata_unknown(package: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA_MEMBER)
+        .ok_or("missing metadata member")?;
+    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let metadata_object = archive
+        .object_mut(METADATA_OBJECT_IDENTIFIER)
+        .ok_or("missing metadata object")?;
+    let message_index = metadata_object
+        .messages
+        .iter()
+        .position(|message| message.type_ == METADATA_MESSAGE_TYPE)
+        .ok_or("missing metadata message")?;
+    let mut payload = metadata_object.messages[message_index].data.clone();
+    litchi_iwa_common::wire::append_varint_field(&mut payload, 90, 0xdecafbad)?;
+    metadata_object.replace_message_preserving_header(
+        message_index,
+        RawMessage {
+            type_: METADATA_MESSAGE_TYPE,
+            data: payload,
+        },
+    )?;
+    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
+        Limits::default(),
+    )?)
 }
 
 fn rewrite_document_archive(
@@ -1952,8 +2267,8 @@ fn uid_map_legacy_qualification_and_table_info_model_reference_edges_are_strict(
     );
 
     // Exercise the optional table-info map edge against a table that has an
-    // existing owner, so each case reaches graph validation instead of being
-    // short-circuited by the existing-owner-only refusal.
+    // existing owner, so each case reaches graph validation independently of
+    // the ownerless creation path.
     let both_owner_source = synthetic_package(
         [
             TableOptions {
@@ -2959,6 +3274,7 @@ fn cloned_packages_are_copy_on_write_and_safe_for_concurrent_reads_and_edits() -
     {
         let package = Arc::clone(&package);
         let requested_is_empty = requested.is_empty();
+        let expected = requested.clone();
         handles.push(thread::spawn(move || {
             let selector = if thread_index % 2 == 0 {
                 0usize
@@ -2979,16 +3295,18 @@ fn cloned_packages_are_copy_on_write_and_safe_for_concurrent_reads_and_edits() -
                         matches!(&result, Ok(commit) if commit.patch().is_noop()),
                         "an unchanged absent-owner edit must be a no-op: {result:?}"
                     );
+                    package.exact_bytes()
                 } else {
-                    assert!(
-                        matches!(
-                            &result,
-                            Err(Error::UnsupportedDependency | Error::UnsupportedSource)
-                        ),
-                        "absent-owner creation must remain unsupported: {result:?}"
+                    let commit = result.expect("valid absent-owner creation publishes");
+                    assert_eq!(
+                        commit
+                            .package()
+                            .body_table_hidden_axes(selector)
+                            .expect("created hidden-axis state reads back"),
+                        expected
                     );
+                    commit.package().exact_bytes()
                 }
-                package.exact_bytes()
             } else {
                 edit.commit()
                     .expect("existing-owner edit publishes")
@@ -3032,6 +3350,62 @@ fn rewrite_uid_map(
         message.data = map.encode_to_vec();
         Ok(())
     })
+}
+
+fn creation_uuid_candidates(package: &[u8], index: usize) -> TestResult<[tsp::Uuid; 2]> {
+    let formula_owner = tsce::FormulaOwnerDependenciesArchive::decode(
+        document_archive(package)?
+            .object(table_formula_owner(index))
+            .ok_or("missing formula-owner object")?
+            .messages
+            .iter()
+            .find(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
+            .ok_or("missing formula-owner message")?
+            .data
+            .as_slice(),
+    )?;
+    let active = tsp::Uuid {
+        lower: formula_owner
+            .formula_owner_uid
+            .lower
+            .checked_add(4)
+            .ok_or("formula-owner UUID overflow")?,
+        upper: formula_owner.formula_owner_uid.upper,
+    };
+    let column_extent = tsp::Uuid {
+        lower: active.lower.checked_add(7).ok_or("active UUID overflow")?,
+        upper: active.upper,
+    };
+    Ok([active, column_extent])
+}
+
+fn unselected_uid_map_with_creation_uuid(
+    package: &[u8],
+    map_index: usize,
+    selected_index: usize,
+    column: bool,
+) -> TestResult<Vec<u8>> {
+    let [active, column_extent] = creation_uuid_candidates(package, selected_index)?;
+    let replacement = if column { column_extent } else { active };
+    let mut map = tst::ColumnRowUidMapArchive::decode(
+        document_archive(package)?
+            .object(table_uid_map(map_index))
+            .ok_or("missing UID map")?
+            .messages
+            .iter()
+            .find(|message| message.type_ == UID_MAP_MESSAGE_TYPE)
+            .ok_or("missing UID-map message")?
+            .data
+            .as_slice(),
+    )?;
+    if column {
+        *map.sorted_column_uids
+            .last_mut()
+            .ok_or("empty column UID map")? = replacement;
+    } else {
+        *map.sorted_row_uids.last_mut().ok_or("empty row UID map")? = replacement;
+    }
+    rewrite_uid_map(package, map_index, map)
 }
 
 fn rewrite_model(
@@ -4041,25 +4415,546 @@ fn selectors_read_rows_columns_and_absence_without_collapsing_names() -> TestRes
 }
 
 #[test]
-fn absent_state_reads_empty_and_changed_creation_is_refused_atomically() -> TestResult {
+fn ownerless_creation_allows_repeated_hidden_owner_uuid_occurrences() -> TestResult {
+    let source = synthetic_package(
+        [
+            TableOptions::default(),
+            TableOptions {
+                user_hidden: true,
+                ..TableOptions::default()
+            },
+        ],
+        ["Revenue", "Costs"],
+    )?;
+    let owner_payload = hidden_owner_payload_from_package(&source, 1)?;
+    let owner = tst::HiddenStatesOwnerArchive::decode(owner_payload.as_slice())?;
+    let active = owner
+        .hidden_states
+        .first()
+        .ok_or("existing hidden-state owner has no active state")?;
+    // These aliases are the native identity relationship, not duplicate
+    // records: owner, active state, and row extent intentionally share one
+    // UUID while the column extent derives the sibling UUID.
+    assert_eq!(owner.owner_uid, active.hidden_states_uid);
+    assert_eq!(
+        active.row_hidden_state_extent.hidden_state_extent_uid,
+        active.hidden_states_uid
+    );
+    assert_ne!(
+        active.column_hidden_state_extent.hidden_state_extent_uid,
+        active.hidden_states_uid
+    );
+
+    let package = Package::from_bytes(&source)?;
+    assert_eq!(package.body_table_hidden_axes(0usize)?, HiddenAxes::empty());
+    assert_eq!(
+        package.body_table_hidden_axes(1usize)?,
+        HiddenAxes::new([AxisIndex::row(1), AxisIndex::column(2)])?
+    );
+    let requested = HiddenAxes::new([AxisIndex::row(0), AxisIndex::column(3)])?;
+    let commit = package
+        .edit_body_table_hidden_axes(0usize)?
+        .set(requested.clone())
+        .commit()?;
+    assert_eq!(commit.diagnostics().touched_components(), 1);
+    assert_eq!(commit.package().body_table_hidden_axes(0usize)?, requested);
+    assert_eq!(
+        commit.package().body_table_hidden_axes(1usize)?,
+        HiddenAxes::new([AxisIndex::row(1), AxisIndex::column(2)])?
+    );
+    let restored = commit
+        .package()
+        .apply_body_table_hidden_axes(&commit.patch().inverse())?;
+    assert_eq!(restored.package().exact_bytes(), source);
+    Ok(())
+}
+
+#[test]
+fn ownerless_creation_rejects_active_or_column_extent_uuid_in_unselected_map() -> TestResult {
+    let base = synthetic_package(
+        [TableOptions::default(), TableOptions::default()],
+        ["Revenue", "Costs"],
+    )?;
+    let requested = HiddenAxes::new([AxisIndex::row(0)])?;
+    for (column, label) in [(false, "active"), (true, "column extent")] {
+        let source = unselected_uid_map_with_creation_uuid(&base, 1, 0, column)?;
+        let package = Package::from_bytes(&source)?;
+        // The replacement is a coherent map entry, so the unselected
+        // ownerless table remains a valid readable graph before the edit.
+        assert_eq!(package.body_table_hidden_axes(1usize)?, HiddenAxes::empty());
+        let before = package.exact_bytes();
+        let result = package
+            .edit_body_table_hidden_axes(0usize)?
+            .set(requested.clone())
+            .commit();
+        assert!(
+            matches!(&result, Err(Error::UnsupportedDependency)),
+            "{label} UUID collision in an unselected map was accepted: {result:?}"
+        );
+        assert_eq!(package.exact_bytes(), before);
+    }
+    Ok(())
+}
+
+#[test]
+fn malformed_known_unselected_model_and_uid_map_fail_creation_atomically() -> TestResult {
+    let base = synthetic_package(
+        [TableOptions::default(), TableOptions::default()],
+        ["Revenue", "Costs"],
+    )?;
+    let malformed_sources = [
+        ("unselected model", overlong_known_row_count(&base, 1)?),
+        ("unselected UID map", wrong_uid_map_lengths(&base, 1)?),
+    ];
+    let requested = HiddenAxes::new([AxisIndex::row(0)])?;
+    for (label, source) in malformed_sources {
+        let Ok(package) = Package::from_bytes(&source) else {
+            // A package-wide ingress census may reject a malformed
+            // unselected payload before the focused edit is opened.  That is
+            // still the required fail-closed result.
+            continue;
+        };
+        let before = package.exact_bytes();
+        let result = package
+            .edit_body_table_hidden_axes(0usize)
+            .and_then(|edit| edit.set(requested.clone()).commit());
+        assert!(
+            matches!(&result, Err(Error::InvalidSource)),
+            "malformed {label} payload was ignored during owner creation: {result:?}"
+        );
+        assert_eq!(package.exact_bytes(), before);
+    }
+    Ok(())
+}
+
+#[test]
+fn ownerless_creation_rejects_unknown_or_missing_unselected_rooted_uid_map() -> TestResult {
+    let base = synthetic_package(
+        [TableOptions::default(), TableOptions::default()],
+        ["Revenue", "Costs"],
+    )?;
+    let malformed_sources = [
+        (
+            "unknown UID-map message type",
+            mismatched_uid_map_header_type(&base, 1)?,
+        ),
+        (
+            "missing rooted UID map",
+            remove_object(&base, table_uid_map(1))?,
+        ),
+    ];
+    let requested = HiddenAxes::new([AxisIndex::row(0)])?;
+    for (label, source) in malformed_sources {
+        let Ok(package) = Package::from_bytes(&source) else {
+            // A package-wide ingress census may reject the contradiction
+            // before the focused edit is opened.  That is still fail-closed.
+            continue;
+        };
+        let before = package.exact_bytes();
+        let result = package
+            .edit_body_table_hidden_axes(0usize)
+            .and_then(|edit| edit.set(requested.clone()).commit());
+        assert!(
+            matches!(&result, Err(Error::InvalidSource)),
+            "{label} was ignored during owner creation: {result:?}"
+        );
+        assert_eq!(package.exact_bytes(), before);
+    }
+    Ok(())
+}
+
+#[test]
+fn metadata_bearing_ownerless_creation_round_trips_rows_columns_and_both() -> TestResult {
+    let requests = [
+        HiddenAxes::new([AxisIndex::row(1)])?,
+        HiddenAxes::new([AxisIndex::column(2)])?,
+        HiddenAxes::new([AxisIndex::row(0), AxisIndex::row(3), AxisIndex::column(1)])?,
+    ];
+
+    for requested in requests {
+        let source = ownerless_metadata_package()?;
+        let package = Package::from_bytes(&source)?;
+        assert_eq!(package.body_table_hidden_axes(0usize)?, HiddenAxes::empty());
+        let source_model = model_payload_from_package(&source, 0)?;
+        let source_info = info_payload(&source, 0)?;
+        let source_second_model = model_payload_from_package(&source, 1)?;
+        let source_second_info = info_payload(&source, 1)?;
+        let source_sentinel = member_bytes(&source, "Data/sentinel.bin")?;
+        let source_metadata = metadata_from_package(&source)?;
+        let source_other_component = source_metadata
+            .components
+            .iter()
+            .find(|component| component.identifier == 2)
+            .cloned()
+            .ok_or("missing unrelated metadata component")?;
+        let source_other_archive = member_bytes(&source, UNRELATED_MEMBER)?;
+        let source_object_ids = document_archive(&source)?
+            .objects
+            .iter()
+            .map(|object| {
+                object
+                    .archive_info
+                    .identifier
+                    .ok_or("source object has no identifier")
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let commit = package
+            .edit_body_table_hidden_axes(0usize)?
+            .set(requested.clone())
+            .commit()?;
+        let target = commit.package().exact_bytes();
+        assert!(!commit.patch().is_noop());
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().touched_components(), 2);
+        assert_eq!(commit.package().body_table_hidden_axes(0usize)?, requested);
+        assert_eq!(
+            Package::from_bytes(&target)?.body_table_hidden_axes(0usize)?,
+            requested
+        );
+
+        // The selected model and table-info payloads retain their source
+        // owned unknown fields while their native projections gain the
+        // hidden-state owner and active UUID.
+        for (before, after, fields) in [
+            (
+                source_model.as_slice(),
+                model_payload_from_package(&target, 0)?,
+                [UNKNOWN_MODEL_FIELD, UNKNOWN_LENGTH_FIELD],
+            ),
+            (
+                source_info.as_slice(),
+                info_payload(&target, 0)?,
+                [UNKNOWN_INFO_FIELD, UNKNOWN_LENGTH_FIELD],
+            ),
+        ] {
+            assert_eq!(
+                raw_fields_at_path(before, &[], &fields)?,
+                raw_fields_at_path(&after, &[], &fields)?
+            );
+        }
+        let target_model_payload = model_payload_from_package(&target, 0)?;
+        let model = WireView::parse(&target_model_payload)?;
+        let owner_payload = model
+            .fields()
+            .find(|field| field.number() == 70)
+            .ok_or("ownerless creation did not add model hidden-state owner")?
+            .payload();
+        let owner = tst::HiddenStatesOwnerArchive::decode(owner_payload)?;
+        assert_eq!(owner.hidden_states.len(), 1);
+        let info = tst::TableInfoArchive::decode(info_payload(&target, 0)?.as_slice())?;
+        assert!(info.hidden_states_uuid.is_some());
+
+        // Existing document objects, the unselected table, unrelated data,
+        // and preview-like names stay source authoritative.  Canonical
+        // previews are lifecycle-owned and are removed by any changed edit.
+        let source_archive = document_archive(&source)?;
+        let target_archive = document_archive(&target)?;
+        for &identifier in &source_object_ids {
+            let before = source_archive
+                .object(identifier)
+                .ok_or("source object disappeared while checking locality")?;
+            let after = target_archive
+                .object(identifier)
+                .ok_or("existing object disappeared during owner creation")?;
+            if identifier != table_model(0) && identifier != table_drawable(0) {
+                assert!(before.same_content_ignoring_offsets(after));
+            }
+        }
+        assert_eq!(model_payload_from_package(&target, 1)?, source_second_model);
+        assert_eq!(info_payload(&target, 1)?, source_second_info);
+        assert_eq!(member_bytes(&target, "Data/sentinel.bin")?, source_sentinel);
+        assert_eq!(
+            member_bytes(&target, UNRELATED_MEMBER)?,
+            source_other_archive
+        );
+        let target_catalog = Catalog::from_bytes(&target)?;
+        for preview in PREVIEWS {
+            assert!(target_catalog.iter().all(|entry| entry.name() != preview));
+        }
+        for preview in NONCANONICAL_PREVIEWS {
+            assert!(target_catalog.iter().any(|entry| entry.name() == preview));
+        }
+
+        let helper_ids = target_archive
+            .objects
+            .iter()
+            .filter(|object| {
+                object.messages.iter().any(|message| {
+                    message.type_ == HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE
+                        || message.type_ == FILTER_SET_MESSAGE_TYPE
+                })
+            })
+            .map(|object| {
+                object
+                    .archive_info
+                    .identifier
+                    .ok_or("created helper has no identifier")
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(helper_ids.len(), 4);
+        assert_eq!(
+            helper_ids
+                .iter()
+                .filter(|identifier| {
+                    target_archive.object(**identifier).is_some_and(|object| {
+                        object
+                            .messages
+                            .iter()
+                            .any(|message| message.type_ == HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE)
+                    })
+                })
+                .count(),
+            2
+        );
+        let target_metadata = metadata_from_package(&target)?;
+        let target_component = target_metadata
+            .components
+            .iter()
+            .find(|component| {
+                component
+                    .locator
+                    .as_deref()
+                    .unwrap_or(component.preferred_locator.as_str())
+                    == "Document"
+            })
+            .ok_or("created metadata lost Document component")?;
+        let source_component = source_metadata
+            .components
+            .iter()
+            .find(|component| component.identifier == 1)
+            .ok_or("source metadata lost Document component")?;
+        assert_eq!(
+            target_metadata
+                .components
+                .iter()
+                .find(|component| component.identifier == 2)
+                .ok_or("created metadata lost unrelated component")?,
+            &source_other_component
+        );
+        for source_binding in &source_component.object_uuid_map_entries {
+            let target_binding = target_component
+                .object_uuid_map_entries
+                .iter()
+                .find(|binding| binding.identifier == source_binding.identifier)
+                .ok_or("created metadata lost an existing Document UUID binding")?;
+            assert_eq!(
+                (target_binding.uuid.lower, target_binding.uuid.upper),
+                (source_binding.uuid.lower, source_binding.uuid.upper)
+            );
+        }
+        for identifier in &helper_ids {
+            assert!(
+                target_component
+                    .object_uuid_map_entries
+                    .iter()
+                    .any(|entry| entry.identifier == *identifier)
+            );
+        }
+        let helper_uuids = target_component
+            .object_uuid_map_entries
+            .iter()
+            .filter(|entry| helper_ids.contains(&entry.identifier))
+            .map(|entry| (entry.uuid.lower, entry.uuid.upper))
+            .collect::<Vec<_>>();
+        assert_eq!(helper_uuids.len(), helper_ids.len());
+        assert!(
+            helper_uuids
+                .iter()
+                .all(|(lower, upper)| *lower != 0 || *upper != 0)
+        );
+        let mut sorted_helper_uuids = helper_uuids.clone();
+        sorted_helper_uuids.sort_unstable();
+        assert!(
+            sorted_helper_uuids
+                .windows(2)
+                .all(|pair| pair[0] != pair[1])
+        );
+        assert_eq!(
+            target_component.object_uuid_map_entries.len(),
+            source_object_ids.len() + helper_ids.len()
+        );
+        for identifier in &source_object_ids {
+            assert!(
+                target_component
+                    .object_uuid_map_entries
+                    .iter()
+                    .any(|entry| entry.identifier == *identifier)
+            );
+        }
+        assert!(
+            !target_component
+                .object_uuid_map_entries
+                .iter()
+                .any(|entry| entry.identifier == METADATA_OBJECT_IDENTIFIER)
+        );
+        assert!(target_metadata.last_object_identifier > source_metadata.last_object_identifier);
+        let highest_helper_id = helper_ids
+            .iter()
+            .copied()
+            .max()
+            .ok_or("created helper IDs unexpectedly empty")?;
+        assert!(target_metadata.last_object_identifier >= highest_helper_id);
+    }
+    Ok(())
+}
+
+#[test]
+fn metadata_bearing_ownerless_creation_inverse_restores_exact_source() -> TestResult {
+    let source = ownerless_metadata_package()?;
+    let package = Package::from_bytes(&source)?;
+    let requested = HiddenAxes::new([AxisIndex::row(0), AxisIndex::column(3)])?;
+    let commit = package
+        .edit_body_table_hidden_axes(BodyTableSelector::name("Revenue"))?
+        .set(requested)
+        .commit()?;
+    let restored = commit
+        .package()
+        .apply_body_table_hidden_axes(&commit.patch().inverse())?;
+    assert_eq!(restored.package().exact_bytes(), source);
+    assert_eq!(
+        restored.package().body_table_hidden_axes(0usize)?,
+        HiddenAxes::empty()
+    );
+    assert_eq!(
+        metadata_from_package(&restored.package().exact_bytes())?,
+        metadata_from_package(&source)?
+    );
+    Ok(())
+}
+
+#[test]
+fn hostile_metadata_identity_routes_and_watermarks_fail_closed_atomically() -> TestResult {
+    let source = ownerless_metadata_package()?;
+    let malformed_sources = [
+        metadata_dangling_registry(&source)?,
+        metadata_duplicate_registry_identifier(&source)?,
+        metadata_duplicate_uuid(&source)?,
+        metadata_physical_id_collision(&source)?,
+        metadata_misrouted_member(&source)?,
+        metadata_watermark_near_max(&source)?,
+    ];
+    let hostile_axes = HiddenAxes::new([AxisIndex::row(1)])?;
+    for (case_index, bytes) in malformed_sources.into_iter().enumerate() {
+        let Ok(package) = Package::from_bytes(&bytes) else {
+            // A physical identity contradiction may be rejected while the
+            // package is opened.  That remains a fail-closed result.
+            continue;
+        };
+        let before = package.exact_bytes();
+        let result = package
+            .edit_body_table_hidden_axes(0usize)
+            .and_then(|edit| edit.set(hostile_axes.clone()).commit());
+        assert!(
+            matches!(
+                &result,
+                Err(Error::InvalidSource
+                    | Error::UnsupportedSource
+                    | Error::UnsupportedDependency
+                    | Error::LimitExceeded { .. })
+            ),
+            "hostile metadata case {case_index} was accepted: {result:?}"
+        );
+        assert_eq!(package.exact_bytes(), before);
+    }
+    Ok(())
+}
+
+#[test]
+fn unknown_metadata_is_read_and_noop_preserved_but_changed_creation_refused() -> TestResult {
+    let source = append_metadata_unknown(&ownerless_metadata_package()?)?;
+    let package = Package::from_bytes(&source)?;
+    let metadata_before = metadata_payload_from_package(&source)?;
+    assert_eq!(package.body_table_hidden_axes(0usize)?, HiddenAxes::empty());
+
+    let noop = package
+        .edit_body_table_hidden_axes(0usize)?
+        .clear()
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.package().exact_bytes(), source);
+    assert_eq!(
+        metadata_payload_from_package(&noop.package().exact_bytes())?,
+        metadata_before
+    );
+
+    let result = package
+        .edit_body_table_hidden_axes(0usize)?
+        .set(HiddenAxes::new([AxisIndex::row(1)])?)
+        .commit();
+    assert!(
+        matches!(
+            &result,
+            Err(Error::InvalidSource | Error::UnsupportedSource | Error::UnsupportedDependency)
+        ),
+        "changed owner creation accepted unknown PackageMetadata fields: {result:?}"
+    );
+    assert_eq!(package.exact_bytes(), source);
+    Ok(())
+}
+
+#[test]
+fn ownerless_creation_output_limit_is_atomic() -> TestResult {
+    // Keep all source previews absent so owner creation cannot shrink the ZIP
+    // by deleting preview members while growing the selected component.
+    let previews = [
+        PREVIEWS[0],
+        PREVIEWS[1],
+        PREVIEWS[2],
+        NONCANONICAL_PREVIEWS[0],
+        NONCANONICAL_PREVIEWS[1],
+    ];
+    let source = without_preview_subset(&ownerless_metadata_package()?, &previews)?;
+    let requested = HiddenAxes::new([AxisIndex::row(0), AxisIndex::column(3)])?;
+    let unrestricted = Package::from_bytes(&source)?
+        .edit_body_table_hidden_axes(0usize)?
+        .set(requested.clone())
+        .commit()?;
+    let target_len = unrestricted.package().exact_bytes().len();
+    assert!(target_len > source.len());
+
+    let limits = Limits::new(
+        u64::try_from(target_len - 1)?,
+        128,
+        64 * 1024 * 1024,
+        64 * 1024 * 1024,
+        64 * 1024 * 1024,
+    )?;
+    let bounded = Package::from_bytes_with_limits(&source, limits)?;
+    let before = bounded.exact_bytes();
+    let result = bounded
+        .edit_body_table_hidden_axes(0usize)?
+        .set(requested)
+        .commit();
+    assert!(
+        matches!(&result, Err(Error::LimitExceeded { .. })),
+        "ownerless creation crossed the output limit without reporting it: {result:?}"
+    );
+    assert_eq!(bounded.exact_bytes(), before);
+    Ok(())
+}
+
+#[test]
+fn metadata_free_ownerless_creation_round_trips_and_is_reversible() -> TestResult {
     let source = normal_package()?;
     let package = Package::from_bytes(&source)?;
     let requested = HiddenAxes::new([AxisIndex::row(0), AxisIndex::column(3)])?;
     assert_eq!(package.body_table_hidden_axes(1usize)?, HiddenAxes::empty());
 
-    let before = package.exact_bytes();
-    let result = package
+    let commit = package
         .edit_body_table_hidden_axes(BodyTableSelector::name("Costs"))?
         .set(requested.clone())
-        .commit();
-    assert!(
-        matches!(
-            result,
-            Err(Error::UnsupportedDependency | Error::UnsupportedSource)
-        ),
-        "native absent-owner creation must be refused: {result:?}"
+        .commit()?;
+    assert_eq!(commit.diagnostics().touched_components(), 1);
+    assert_eq!(commit.package().body_table_hidden_axes(1usize)?, requested);
+    assert_eq!(
+        Package::from_bytes(&commit.package().exact_bytes())?.body_table_hidden_axes(1usize)?,
+        requested
     );
-    assert_eq!(package.exact_bytes(), before);
+    let restored = commit
+        .package()
+        .apply_body_table_hidden_axes(&commit.patch().inverse())?;
+    assert_eq!(restored.package().exact_bytes(), source);
 
     let absent_noop = package
         .edit_body_table_hidden_axes(1usize)?

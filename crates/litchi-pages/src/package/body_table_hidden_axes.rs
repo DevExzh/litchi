@@ -15,9 +15,13 @@ use std::fmt;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_common::{decode_varint_from_bytes, varint::encoded_len};
-use litchi_iwa_core::{Archive, ArchiveObject, MessageInfo, RawMessage};
+use litchi_iwa_core::archive::ObjectReferenceTransition;
+use litchi_iwa_core::{
+    ArchiveObject, CanonicalObjectReferenceField, CanonicalObjectReferenceFields, MessageInfo,
+    RawMessage,
+};
 use litchi_iwa_protos::numbers_table_physical_sort_codec as uid_codec;
 use litchi_iwa_protos::pages_hidden_state_codec as codec;
 use thiserror::Error;
@@ -25,6 +29,8 @@ use thiserror::Error;
 use super::{Package, PackageError, page_layout, table_lock};
 use crate::selector::BodyTableSelector;
 use crate::table::hidden_axes::{AxisIndex, HiddenAxes};
+
+mod rewrite;
 
 const TABLE_INFO_MESSAGE_TYPES: &[u32] = &[6_000, 6_003];
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
@@ -39,6 +45,13 @@ const NATIVE_TABLE_MODEL_MESSAGE_VERSIONS: &[u32] = &[3, 2, 10];
 const NATIVE_FORMULA_OWNER_MESSAGE_VERSIONS: &[u32] = &[3, 2, 10];
 const FORMULA_OWNER_REFERENCE_PATH: &[u32] = &[11];
 const MODEL_PIVOT_OWNER_FIELD: u32 = 85;
+const METADATA_ENTRY_NAME: &str = "Index/Metadata.iwa";
+const METADATA_MESSAGE_TYPE: u32 = 11_006;
+const OWNER_CREATION_OBJECTS: usize = 4;
+const OWNER_CREATION_MESSAGES: usize = 4;
+const OWNER_CREATION_FIELD_INFOS: usize = 2;
+const MODEL_COLUMN_REFERENCE_PATH: &[u32] = &[34];
+const MODEL_ROW_REFERENCE_PATH: &[u32] = &[35];
 
 /// The selected Pages producer profile determines which archive-header
 /// version tuples and dependency metadata are authoritative.  The qualified
@@ -303,6 +316,7 @@ pub struct BodyTableHiddenAxesPatch {
     source_previews: usize,
     target_previews: usize,
     touched_components: usize,
+    added_object_ids: Arc<[u64]>,
 }
 
 impl fmt::Debug for BodyTableHiddenAxesPatch {
@@ -349,6 +363,8 @@ impl BodyTableHiddenAxesPatch {
     pub fn is_noop(&self) -> bool {
         self.before == self.after
             && self.source_fingerprint == self.target_fingerprint
+            && self.added_object_ids.is_empty()
+            && self.touched_components == 0
             && (Arc::ptr_eq(&self.source, &self.target) || self.source == self.target)
     }
 
@@ -365,6 +381,7 @@ impl BodyTableHiddenAxesPatch {
             source_previews: self.target_previews,
             target_previews: self.source_previews,
             touched_components: self.touched_components,
+            added_object_ids: Arc::clone(&self.added_object_ids),
         }
     }
 }
@@ -672,6 +689,7 @@ impl Package {
             &candidate,
             &patch.proof,
             patch.touched_components,
+            patch.added_object_ids.as_ref(),
             &mut budget,
         )?;
         Ok(BodyTableHiddenAxesCommit {
@@ -719,6 +737,7 @@ fn commit_edit(
                 source_previews,
                 target_previews: source_previews,
                 touched_components: 0,
+                added_object_ids: Arc::from(Vec::<u64>::new()),
             },
             diagnostics: BodyTableHiddenAxesDiagnostics::unchanged(),
         });
@@ -745,14 +764,9 @@ fn commit_edit(
     if graph.model.pivot || graph.info.pivot {
         return Err(BodyTableHiddenAxesError::UnsupportedDependency);
     }
-    // Creating this graph requires a producer-owned formula dependency and
-    // package metadata creation records.  Until a native Pages producer path
-    // can prove those records, fail closed before allocating candidate state.
-    if graph.model.owner.is_none() && !edit.axes.is_empty() {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
-    }
     validate_axis_bounds(&graph, &edit.axes)?;
-    let candidate = rewrite(source, &graph, &edit.axes, &mut budget)?;
+    let (candidate, touched_components, added_object_ids) =
+        rewrite::run(source, &graph, &edit.axes, &mut budget)?;
     let verified = resolve_graph(
         &candidate,
         BodyTableSelector::index(edit.target.table_position),
@@ -766,7 +780,14 @@ fn commit_edit(
     if preview_count(&candidate) != 0 {
         return Err(BodyTableHiddenAxesError::Verification);
     }
-    verify_locality(source, &candidate, &edit.target, 1, &mut budget)?;
+    verify_locality(
+        source,
+        &candidate,
+        &edit.target,
+        touched_components,
+        added_object_ids.as_ref(),
+        &mut budget,
+    )?;
     let target = candidate.state.source.shared_source();
     let target_fingerprint = page_layout::fingerprint(target.as_ref());
     let target_previews = preview_count(&candidate);
@@ -782,11 +803,12 @@ fn commit_edit(
             after: edit.axes,
             source_previews,
             target_previews,
-            touched_components: 1,
+            touched_components,
+            added_object_ids,
         },
         diagnostics: BodyTableHiddenAxesDiagnostics::published(
             source_previews.saturating_sub(target_previews),
-            1,
+            touched_components,
         ),
     })
 }
@@ -1800,11 +1822,14 @@ fn codec_options(
     let work = budget.remaining_wire_work();
     let input = source_len.min(limits.max_input_bytes());
     let output = required_output.min(limits.max_output_bytes());
-    // Decoded collections and rewrite bookkeeping can exceed their encoded
-    // payload length. These are ceilings, not reservations: the strict codec
-    // preflights actual memory before allocation and reports it for charging.
-    let retained = limits.max_output_bytes();
-    let scratch = limits.max_output_bytes();
+    // A strict projection retains borrowed source spans and decoded snapshot
+    // storage at the same time; both can exceed the wire payload length.
+    // Reuse the remaining transaction-work ceiling as the codec's finite
+    // retained/scratch envelope, then charge the exact report after decode.
+    // This avoids a false source-sized cap without introducing an unrelated
+    // multiplier or an unbounded codec-local allowance.
+    let retained = budget.remaining_wire_work().max(1);
+    let scratch = budget.remaining_wire_work().max(1);
     let allocations = fields;
     let states = source_len.min(16_384);
     let recursion = u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX);
@@ -1876,6 +1901,13 @@ struct ObjectLocation {
 #[derive(Clone, Copy)]
 struct MessageLocation {
     object: ObjectLocation,
+    message_index: usize,
+}
+
+#[derive(Clone, Copy)]
+struct MetadataRoute {
+    component_index: usize,
+    object_index: usize,
     message_index: usize,
 }
 
@@ -2123,6 +2155,92 @@ fn global_objects(
         )?)
         .map_err(map_lock_error)?;
     Ok(objects)
+}
+
+fn metadata_route(
+    source: &Package,
+    budget: &mut table_lock::WireBudget,
+) -> Result<Option<MetadataRoute>, BodyTableHiddenAxesError> {
+    if let Some(entry) = source
+        .state
+        .source
+        .package()
+        .iter()
+        .find(|entry| entry.name() == METADATA_ENTRY_NAME)
+    {
+        if entry.is_opaque() {
+            return Err(BodyTableHiddenAxesError::UnsupportedSource);
+        }
+    }
+
+    let mut component_index = None;
+    let mut route = None;
+    for (index, component) in source.state.source.components().iter().enumerate() {
+        budget.charge_payload_work(1).map_err(map_lock_error)?;
+        if component.name() == METADATA_ENTRY_NAME {
+            if component_index.replace(index).is_some() {
+                return Err(BodyTableHiddenAxesError::InvalidSource);
+            }
+        }
+        for (object_index, object) in component.archive().objects.iter().enumerate() {
+            budget
+                .charge_payload_work(object.messages.len())
+                .map_err(map_lock_error)?;
+            for (message_index, message) in object.messages.iter().enumerate() {
+                if message.type_ != METADATA_MESSAGE_TYPE {
+                    continue;
+                }
+                if component.name() != METADATA_ENTRY_NAME || route.is_some() {
+                    return Err(BodyTableHiddenAxesError::InvalidSource);
+                }
+                validate_metadata_message(object, message_index)?;
+                route = Some(MetadataRoute {
+                    component_index: index,
+                    object_index,
+                    message_index,
+                });
+            }
+        }
+    }
+    // Scan every parsed component even when the canonical member is absent.
+    // A package containing a metadata payload under an alias is malformed;
+    // treating that payload as metadata-free would allow a subsequent owner
+    // creation to orphan or duplicate the package registry.
+    if component_index.is_none() {
+        return Ok(None);
+    }
+    if route.is_none() {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    if route.is_some_and(|route| Some(route.component_index) != component_index) {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    Ok(route)
+}
+
+fn validate_metadata_message(
+    object: &ArchiveObject,
+    message_index: usize,
+) -> Result<&MessageInfo, BodyTableHiddenAxesError> {
+    let message = object
+        .messages
+        .get(message_index)
+        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let info = object
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    if message.type_ != METADATA_MESSAGE_TYPE
+        || info.type_ != METADATA_MESSAGE_TYPE
+        || usize::try_from(info.length).ok() != Some(message.data.len())
+        || object.header_length == 0
+    {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    page_layout::validate_selected_metadata(object, message_index)
+        .map_err(map_page_layout_error)?;
+    Ok(info)
 }
 
 /// Index every type-4008 message once before resolving the selected drawable.
@@ -3336,636 +3454,6 @@ fn validate_model_counts(
     Ok(())
 }
 
-fn desired_owner(
-    graph: &Graph,
-    axes: &HiddenAxes,
-    budget: &mut table_lock::WireBudget,
-) -> Result<(codec::HiddenStatesOwnerSnapshot, codec::UuidSnapshot), BodyTableHiddenAxesError> {
-    let owner = graph
-        .model
-        .owner
-        .as_ref()
-        .ok_or(BodyTableHiddenAxesError::UnsupportedDependency)?;
-    let active_uuid = graph
-        .info
-        .hidden_uuid
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    if owner.hidden_states().len() != 1
-        || owner
-            .hidden_states()
-            .first()
-            .is_none_or(|state| state.hidden_states_uid() != active_uuid)
-    {
-        // The strict owner codec can preserve opaque fields, but it cannot
-        // prove byte-exact preservation of an inactive view while changing a
-        // sibling.  Reject that shape before allocating a candidate.
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
-    }
-    let state = owner
-        .hidden_states()
-        .first()
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    let column = update_extent(
-        state.column_hidden_state_extent(),
-        &graph.column_indices,
-        &graph.columns,
-        axes,
-        false,
-        budget,
-    )?;
-    let row = update_extent(
-        state.row_hidden_state_extent(),
-        &graph.row_indices,
-        &graph.rows,
-        axes,
-        true,
-        budget,
-    )?;
-    let additional_states =
-        axes.as_slice()
-            .len()
-            .checked_mul(2)
-            .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-            })?;
-    charge_owner_storage(owner, additional_states, budget)?;
-    let updated_state = codec::HiddenStatesSnapshot::new(active_uuid, column, row);
-    let rebuilt = codec::HiddenStatesOwnerSnapshot::new(owner.owner_uid(), [updated_state])
-        .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?;
-    Ok((rebuilt, active_uuid))
-}
-
-fn update_extent(
-    extent: &codec::HiddenStateExtentSnapshot,
-    physical: &UidIndex,
-    physical_order: &[codec::UuidSnapshot],
-    axes: &HiddenAxes,
-    row: bool,
-    budget: &mut table_lock::WireBudget,
-) -> Result<codec::HiddenStateExtentSnapshot, BodyTableHiddenAxesError> {
-    let loop_work = extent
-        .base_hidden_states()
-        .len()
-        .checked_add(physical_order.len())
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-            observed: u64::MAX,
-            maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-        })?;
-    budget
-        .charge_payload_work(loop_work)
-        .map_err(map_lock_error)?;
-    let mut existing = Vec::new();
-    existing
-        .try_reserve_exact(extent.base_hidden_states().len())
-        .map_err(|_| BodyTableHiddenAxesError::Allocation {
-            amount: extent.base_hidden_states().len(),
-        })?;
-    for state in extent.base_hidden_states() {
-        validate_uuid(state.row_or_column_uid())?;
-        existing.push(state.row_or_column_uid());
-    }
-    existing.sort_unstable_by_key(|uid| (uid.lower(), uid.upper()));
-    if existing.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
-    }
-    let levels = if existing.len() <= 1 {
-        0
-    } else {
-        (usize::BITS - (existing.len() - 1).leading_zeros()) as usize
-    };
-    budget
-        .charge_payload_work(existing.len().checked_mul(levels).ok_or(
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-            },
-        )?)
-        .map_err(map_lock_error)?;
-    let mut states = Vec::new();
-    states
-        .try_reserve_exact(extent.base_hidden_states().len())
-        .map_err(|_| BodyTableHiddenAxesError::Allocation {
-            amount: extent.base_hidden_states().len(),
-        })?;
-    for state in extent.base_hidden_states() {
-        let index = physical
-            .index_of(state.row_or_column_uid())
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-        let hidden = axes.contains(if row {
-            AxisIndex::row(index)
-        } else {
-            AxisIndex::column(index)
-        });
-        states.push(
-            codec::RowOrColumnStateSnapshot::new(state.row_or_column_uid())
-                .with_user_hidden(if hidden {
-                    Some(true)
-                } else {
-                    state.user_hidden().filter(|value| !*value)
-                })
-                .with_filtered(state.filtered())
-                .with_pivot_hidden(state.pivot_hidden()),
-        );
-    }
-    for (index, uid) in physical_order.iter().copied().enumerate() {
-        if axes.contains(if row {
-            AxisIndex::row(index)
-        } else {
-            AxisIndex::column(index)
-        }) && existing
-            .binary_search_by_key(&(uid.lower(), uid.upper()), |candidate| {
-                (candidate.lower(), candidate.upper())
-            })
-            .is_err()
-        {
-            states
-                .try_reserve(1)
-                .map_err(|_| BodyTableHiddenAxesError::Allocation { amount: 1 })?;
-            states.push(codec::RowOrColumnStateSnapshot::new(uid).with_user_hidden(Some(true)));
-        }
-    }
-    codec::HiddenStateExtentSnapshot::new(
-        extent.hidden_state_extent_uid(),
-        extent.direction(),
-        states,
-    )
-    .map(|value| {
-        value
-            .with_needs_to_update_filter_set_for_import(
-                extent.needs_to_update_filter_set_for_import(),
-            )
-            .with_filter_set(extent.filter_set())
-    })
-    .map_err(|_| BodyTableHiddenAxesError::InvalidSource)
-}
-
-fn archive_source_length(archive: &Archive) -> Result<usize, BodyTableHiddenAxesError> {
-    archive.objects.iter().try_fold(0usize, |end, object| {
-        let object_end = usize::try_from(object.header_offset)
-            .ok()
-            .and_then(|offset| offset.checked_add(usize::try_from(object.header_length).ok()?))
-            .and_then(|offset| offset.checked_add(usize::try_from(object.data_length).ok()?))
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-        Ok(end.max(object_end))
-    })
-}
-
-fn charge_owner_storage(
-    owner: &codec::HiddenStatesOwnerSnapshot,
-    additional: usize,
-    budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
-    let mut count = owner.hidden_states().len();
-    for state in owner.hidden_states() {
-        count = count
-            .checked_add(2)
-            .and_then(|value| {
-                value.checked_add(
-                    state
-                        .column_hidden_state_extent()
-                        .base_hidden_states()
-                        .len(),
-                )
-            })
-            .and_then(|value| {
-                value.checked_add(state.row_hidden_state_extent().base_hidden_states().len())
-            })
-            .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-            })?;
-    }
-    count = count
-        .checked_add(additional)
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-            observed: u64::MAX,
-            maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-        })?;
-    budget.charge_payload_work(count).map_err(map_lock_error)
-}
-
-fn charge_rewrite_requirements(
-    budget: &mut table_lock::WireBudget,
-    requirements: codec::RewriteExecutionRequirements,
-) -> Result<(), BodyTableHiddenAxesError> {
-    let retained_work = requirements
-        .states()
-        .checked_add(requirements.allocations())
-        .and_then(|value| value.checked_add(requirements.retained_bytes()))
-        .and_then(|value| value.checked_add(requirements.scratch_bytes()))
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-            observed: u64::MAX,
-            maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-        })?;
-    budget
-        .charge_output_bytes(requirements.output_bytes())
-        .and_then(|_| {
-            budget.charge_codec_report(
-                requirements.fields(),
-                requirements.work_bytes(),
-                requirements.max_depth(),
-                0,
-            )
-        })
-        .and_then(|_| budget.charge_payload_work(retained_work))
-        .map_err(map_lock_error)
-}
-
-fn desired_model_snapshot(
-    graph: &Graph,
-    owner: &codec::HiddenStatesOwnerSnapshot,
-    active_uuid: codec::UuidSnapshot,
-    budget: &mut table_lock::WireBudget,
-) -> Result<codec::TableModelSnapshot, BodyTableHiddenAxesError> {
-    let active = owner
-        .hidden_states()
-        .first()
-        .filter(|state| state.hidden_states_uid() == active_uuid)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    charge_owner_storage(owner, 0, budget)?;
-    let count_work = active
-        .row_hidden_state_extent()
-        .base_hidden_states()
-        .len()
-        .checked_add(
-            active
-                .column_hidden_state_extent()
-                .base_hidden_states()
-                .len(),
-        )
-        .and_then(|count| count.checked_mul(5))
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-            observed: u64::MAX,
-            maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-        })?;
-    budget
-        .charge_payload_work(count_work)
-        .map_err(map_lock_error)?;
-    let total_rows = active
-        .row_hidden_state_extent()
-        .base_hidden_states()
-        .iter()
-        .filter(|state| {
-            state.user_hidden() == Some(true)
-                || state.filtered() == Some(true)
-                || state.pivot_hidden() == Some(true)
-        })
-        .count();
-    let total_columns = active
-        .column_hidden_state_extent()
-        .base_hidden_states()
-        .iter()
-        .filter(|state| {
-            state.user_hidden() == Some(true)
-                || state.filtered() == Some(true)
-                || state.pivot_hidden() == Some(true)
-        })
-        .count();
-    let user_rows = active
-        .row_hidden_state_extent()
-        .base_hidden_states()
-        .iter()
-        .filter(|state| state.user_hidden() == Some(true))
-        .count();
-    let user_columns = active
-        .column_hidden_state_extent()
-        .base_hidden_states()
-        .iter()
-        .filter(|state| state.user_hidden() == Some(true))
-        .count();
-    let filtered_rows = active
-        .row_hidden_state_extent()
-        .base_hidden_states()
-        .iter()
-        .filter(|state| state.filtered() == Some(true))
-        .count();
-    Ok(
-        codec::TableModelSnapshot::new(graph.model.rows, graph.model.columns)
-            .with_number_of_hidden_rows(
-                graph
-                    .model
-                    .hidden_rows
-                    .map(|_| u32::try_from(total_rows))
-                    .transpose()
-                    .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?,
-            )
-            .with_number_of_hidden_columns(
-                graph
-                    .model
-                    .hidden_columns
-                    .map(|_| u32::try_from(total_columns))
-                    .transpose()
-                    .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?,
-            )
-            .with_number_of_filtered_rows(
-                graph
-                    .model
-                    .filtered_rows
-                    .map(|_| u32::try_from(filtered_rows))
-                    .transpose()
-                    .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?,
-            )
-            .with_number_of_user_hidden_rows(
-                graph
-                    .model
-                    .user_rows
-                    .map(|_| u32::try_from(user_rows))
-                    .transpose()
-                    .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?,
-            )
-            .with_number_of_user_hidden_columns(
-                graph
-                    .model
-                    .user_columns
-                    .map(|_| u32::try_from(user_columns))
-                    .transpose()
-                    .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?,
-            )
-            .with_hidden_state_formula_owner_for_columns(graph.model.formula_columns_ref)
-            .with_hidden_state_formula_owner_for_rows(graph.model.formula_rows_ref)
-            .with_base_column_row_uids(graph.model.map_ref)
-            .with_hidden_states_owner(Some(owner.clone())),
-    )
-}
-
-fn rewrite(
-    source: &Package,
-    graph: &Graph,
-    axes: &HiddenAxes,
-    budget: &mut table_lock::WireBudget,
-) -> Result<Package, BodyTableHiddenAxesError> {
-    let component = source
-        .state
-        .source
-        .components()
-        .get_index(graph.target.model_component_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    if graph.target.component_index != graph.target.model_component_index {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
-    }
-    let component_name = component.name();
-    let entry = source
-        .state
-        .source
-        .package()
-        .iter()
-        .find(|entry| entry.name() == component_name)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    if entry.is_opaque() {
-        return Err(BodyTableHiddenAxesError::UnsupportedSource);
-    }
-    let archive_limits = source
-        .state
-        .source
-        .limits()
-        .effective_archive_limits()
-        .map_err(map_archive_error)?;
-    let (owner, active_uuid) = desired_owner(graph, axes, budget)?;
-    let desired_model = desired_model_snapshot(graph, &owner, active_uuid, budget)?;
-    let desired_info = codec::TableInfoSnapshot::new(graph.info.model_ref)
-        .with_view_column_row_uids(graph.info.map_ref)
-        .with_hidden_states_uuid(Some(active_uuid));
-    let source_archive = component.archive();
-    let model_message = source_archive
-        .objects
-        .get(graph.target.model_object_index)
-        .and_then(|object| object.messages.get(graph.target.model_message_index))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    let info_message = source_archive
-        .objects
-        .get(graph.target.object_index)
-        .and_then(|object| object.messages.get(graph.target.info_message_index))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    if source_archive
-        .objects
-        .get(graph.target.model_object_index)
-        .and_then(|object| object.archive_info.identifier)
-        != Some(graph.target.model_identifier.get())
-        || source_archive
-            .objects
-            .get(graph.target.object_index)
-            .and_then(|object| object.archive_info.identifier)
-            != Some(graph.target.drawable_identifier.get())
-    {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
-    }
-    let model_prepared = codec::prepare_table_model_rewrite(
-        model_message.data.as_slice(),
-        &desired_model,
-        codec_options(
-            budget,
-            model_message.data.len(),
-            model_message.data.len().checked_add(512).ok_or(
-                BodyTableHiddenAxesError::LimitExceeded {
-                    kind: BodyTableHiddenAxesLimitKind::WireOutputBytes,
-                    observed: u64::MAX,
-                    maximum: source.state.source.limits().max_input_bytes(),
-                },
-            )?,
-        )?,
-    )
-    .map_err(map_codec_error)?;
-    let info_prepared = codec::prepare_table_info_rewrite(
-        info_message.data.as_slice(),
-        &desired_info,
-        codec_options(
-            budget,
-            info_message.data.len(),
-            info_message.data.len().checked_add(128).ok_or(
-                BodyTableHiddenAxesError::LimitExceeded {
-                    kind: BodyTableHiddenAxesLimitKind::WireOutputBytes,
-                    observed: u64::MAX,
-                    maximum: source.state.source.limits().max_input_bytes(),
-                },
-            )?,
-        )?,
-    )
-    .map_err(map_codec_error)?;
-    let model_requirements = model_prepared.execution_requirements();
-    let info_requirements = info_prepared.execution_requirements();
-    charge_rewrite_requirements(budget, model_requirements)?;
-    charge_rewrite_requirements(budget, info_requirements)?;
-
-    let stream_length = archive_source_length(source_archive)?;
-    let old_payload_length = model_message
-        .data
-        .len()
-        .checked_add(info_message.data.len())
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    let new_payload_length = model_requirements
-        .output_bytes()
-        .checked_add(info_requirements.output_bytes())
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    let rewritten_bound = stream_length
-        .checked_sub(old_payload_length)
-        .and_then(|value| value.checked_add(new_payload_length))
-        .and_then(|value| value.checked_add(64))
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::OutputBytes,
-            observed: u64::MAX,
-            maximum: source.state.source.limits().max_input_bytes(),
-        })?;
-    let compressed_bound = table_lock::snappy_compressed_bound(rewritten_bound).ok_or(
-        BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::OutputBytes,
-            observed: u64::MAX,
-            maximum: source.state.source.limits().max_input_bytes(),
-        },
-    )?;
-    let replacement_compressed_bound = match entry.metadata().central().compression_method() {
-        0 => compressed_bound,
-        8 => table_lock::deflate_compressed_bound(compressed_bound).ok_or(
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::OutputBytes,
-                observed: u64::MAX,
-                maximum: source.state.source.limits().max_input_bytes(),
-            },
-        )?,
-        _ => return Err(BodyTableHiddenAxesError::UnsupportedSource),
-    };
-    let old_compressed_size =
-        usize::try_from(entry.metadata().compressed_size()).map_err(|_| {
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::EntryBytes,
-                observed: u64::MAX,
-                maximum: source.state.source.limits().max_entry_bytes(),
-            }
-        })?;
-    let package_output_bound = source
-        .state
-        .source
-        .source_bytes()
-        .len()
-        .checked_sub(old_compressed_size)
-        .and_then(|value| value.checked_add(replacement_compressed_bound))
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::OutputBytes,
-            observed: u64::MAX,
-            maximum: source.state.source.limits().max_input_bytes(),
-        })?;
-    budget
-        .charge_output_bytes(rewritten_bound)
-        .and_then(|_| budget.charge_output_bytes(compressed_bound))
-        .and_then(|_| budget.charge_output_bytes(replacement_compressed_bound))
-        .and_then(|_| budget.charge_output_bytes(package_output_bound))
-        .and_then(|_| budget.charge_payload_bytes(rewritten_bound))
-        .and_then(|_| budget.charge_total_payload_bytes(rewritten_bound))
-        .and_then(|_| budget.charge_payload_work(rewritten_bound))
-        .and_then(|_| budget.charge_payload_work(compressed_bound))
-        .and_then(|_| budget.charge_payload_work(replacement_compressed_bound))
-        .and_then(|_| budget.charge_payload_work(package_output_bound))
-        .and_then(|_| budget.charge_payload_work(info_requirements.output_bytes()))
-        .map_err(map_lock_error)?;
-    budget
-        .precharge_candidate_reopen(
-            &source.state.source,
-            package_output_bound,
-            graph.target.model_component_index,
-            compressed_bound,
-            rewritten_bound,
-            graph.target.model_object_index,
-            graph.target.model_message_index,
-            model_requirements.output_bytes(),
-        )
-        .map_err(map_lock_error)?;
-
-    let mut archive = page_layout::editable_archive(source, component_name)
-        .map_err(map_page_layout_error)?
-        .0;
-    let model_object = archive
-        .objects
-        .get_mut(graph.target.model_object_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    if model_object.archive_info.identifier != Some(graph.target.model_identifier.get()) {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
-    }
-    let new_model = model_prepared
-        .execute(codec::RewriteExecutionLimits::exact(model_requirements))
-        .map_err(map_codec_error)?
-        .into_bytes();
-    model_object
-        .replace_message_preserving_header_with_limits(
-            graph.target.model_message_index,
-            RawMessage {
-                type_: graph.target.model_message_type,
-                data: new_model,
-            },
-            archive_limits,
-        )
-        .map_err(map_core_error)?;
-    let info_object = archive
-        .objects
-        .get_mut(graph.target.object_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    let new_info = info_prepared
-        .execute(codec::RewriteExecutionLimits::exact(info_requirements))
-        .map_err(map_codec_error)?
-        .into_bytes();
-    info_object
-        .replace_message_preserving_header_with_limits(
-            graph.target.info_message_index,
-            RawMessage {
-                type_: graph.target.message_type,
-                data: new_info,
-            },
-            archive_limits,
-        )
-        .map_err(map_core_error)?;
-    let compressed =
-        page_layout::compress_archive(archive, archive_limits).map_err(map_page_layout_error)?;
-    if compressed.len() > compressed_bound {
-        return Err(BodyTableHiddenAxesError::Verification);
-    }
-    let mut previews = Vec::new();
-    previews
-        .try_reserve_exact(page_layout::PREVIEW_ENTRY_NAMES.len())
-        .map_err(|_| BodyTableHiddenAxesError::Allocation {
-            amount: page_layout::PREVIEW_ENTRY_NAMES.len(),
-        })?;
-    for name in page_layout::PREVIEW_ENTRY_NAMES.iter().copied() {
-        if source
-            .state
-            .source
-            .package()
-            .iter()
-            .any(|entry| entry.name() == name)
-        {
-            previews.push(name);
-        }
-    }
-    let edits = [EntryEdit::new(component_name, &compressed)];
-    let prepared = source
-        .state
-        .source
-        .package()
-        .prepare_reassembly_with_deletions(&edits, &previews, source.state.source.limits())
-        .map_err(map_archive_error)?;
-    let requirements = prepared.execution_requirements();
-    budget
-        .charge_output_bytes(prepared.output_bytes())
-        .and_then(|_| budget.charge_payload_work(requirements.scratch_bytes()))
-        .and_then(|_| budget.charge_payload_work(requirements.allocations()))
-        .map_err(map_lock_error)?;
-    let output = prepared
-        .execute(requirements.exact_limits())
-        .map_err(map_archive_error)?;
-    if output.len() > package_output_bound {
-        return Err(BodyTableHiddenAxesError::Verification);
-    }
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), source.state.source.limits())
-            .map_err(map_archive_error)?;
-    Package::from_source_catalog(candidate_source).map_err(map_package_error)
-}
-
 fn preview_count(package: &Package) -> usize {
     page_layout::PREVIEW_ENTRY_NAMES
         .iter()
@@ -4003,11 +3491,14 @@ fn verify_locality(
     candidate: &Package,
     target: &table_lock::BodyTableTarget,
     touched_components: usize,
+    added_object_ids: &[u64],
     budget: &mut table_lock::WireBudget,
 ) -> Result<(), BodyTableHiddenAxesError> {
-    if touched_components != 1
+    if !(1..=2).contains(&touched_components)
+        || (touched_components == 2 && added_object_ids.is_empty())
         || source.state.source.components().len() != candidate.state.source.components().len()
         || target.model_identifier == target.drawable_identifier
+        || (!added_object_ids.is_empty() && added_object_ids.len() != OWNER_CREATION_OBJECTS)
     {
         return Err(BodyTableHiddenAxesError::Verification);
     }
@@ -4017,6 +3508,49 @@ fn verify_locality(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let source_objects = global_objects(source, budget)?;
+    let candidate_objects = global_objects(candidate, budget)?;
+    let source_has_added = added_object_ids
+        .iter()
+        .all(|identifier| find_object_location(&source_objects, *identifier).is_some());
+    let candidate_has_added = added_object_ids
+        .iter()
+        .all(|identifier| find_object_location(&candidate_objects, *identifier).is_some());
+    let creation_in_candidate =
+        !added_object_ids.is_empty() && !source_has_added && candidate_has_added;
+    let creation_in_source =
+        !added_object_ids.is_empty() && source_has_added && !candidate_has_added;
+    if !added_object_ids.is_empty() && creation_in_candidate == creation_in_source {
+        return Err(BodyTableHiddenAxesError::Verification);
+    }
+    let body_name = source
+        .state
+        .source
+        .components()
+        .get_index(target.model_component_index)
+        .ok_or(BodyTableHiddenAxesError::Verification)?
+        .name();
+    let metadata_changed = touched_components == 2;
+    let source_metadata_route = if metadata_changed {
+        metadata_route(source, budget)?.ok_or(BodyTableHiddenAxesError::Verification)?
+    } else {
+        MetadataRoute {
+            component_index: usize::MAX,
+            object_index: usize::MAX,
+            message_index: usize::MAX,
+        }
+    };
+    if metadata_changed {
+        let candidate_metadata_route =
+            metadata_route(candidate, budget)?.ok_or(BodyTableHiddenAxesError::Verification)?;
+        if candidate_metadata_route.component_index != source_metadata_route.component_index
+            || candidate_metadata_route.object_index != source_metadata_route.object_index
+            || candidate_metadata_route.message_index != source_metadata_route.message_index
+        {
+            return Err(BodyTableHiddenAxesError::Verification);
+        }
+    }
+
     // Exact inverse patches restore the source previews. Compare the same
     // non-preview member sequence in both directions; changed commits enforce
     // preview invalidation before reaching this symmetric locality check.
@@ -4056,14 +3590,8 @@ fn verify_locality(
         {
             return Err(BodyTableHiddenAxesError::Verification);
         }
-        let selected_entry = before_entry.name()
-            == source
-                .state
-                .source
-                .components()
-                .get_index(target.model_component_index)
-                .ok_or(BodyTableHiddenAxesError::Verification)?
-                .name();
+        let selected_entry = before_entry.name() == body_name
+            || (metadata_changed && before_entry.name() == METADATA_ENTRY_NAME);
         if selected_entry {
             if after_entry.is_opaque() || !same_entry_static_metadata(before_entry, after_entry) {
                 return Err(BodyTableHiddenAxesError::Verification);
@@ -4077,7 +3605,7 @@ fn verify_locality(
     if candidate_entries.next().is_some() {
         return Err(BodyTableHiddenAxesError::Verification);
     }
-    let mut changed = 0usize;
+
     for (component_index, (before, after)) in source
         .state
         .source
@@ -4089,54 +3617,277 @@ fn verify_locality(
         if before.name() != after.name() {
             return Err(BodyTableHiddenAxesError::Verification);
         }
-        if before.archive().objects.len() != after.archive().objects.len() {
+        let expected_count = if component_index == target.model_component_index {
+            if creation_in_candidate {
+                before
+                    .archive()
+                    .objects
+                    .len()
+                    .checked_add(OWNER_CREATION_OBJECTS)
+            } else if creation_in_source {
+                before
+                    .archive()
+                    .objects
+                    .len()
+                    .checked_sub(OWNER_CREATION_OBJECTS)
+            } else {
+                Some(before.archive().objects.len())
+            }
+        } else {
+            Some(before.archive().objects.len())
+        }
+        .ok_or(BodyTableHiddenAxesError::Verification)?;
+        if after.archive().objects.len() != expected_count {
             return Err(BodyTableHiddenAxesError::Verification);
         }
-        for (object_index, before_object) in before.archive().objects.iter().enumerate() {
-            let id = before_object
-                .archive_info
-                .identifier
-                .ok_or(BodyTableHiddenAxesError::Verification)?;
-            let after_object = after
-                .archive()
-                .objects
-                .get(object_index)
-                .ok_or(BodyTableHiddenAxesError::Verification)?;
-            if after_object.archive_info.identifier != Some(id) {
-                return Err(BodyTableHiddenAxesError::Verification);
-            }
-            let selected = component_index == target.model_component_index
-                && (id == target.model_identifier.get() || id == target.drawable_identifier.get());
-            if !selected {
-                if !before_object.same_content_ignoring_offsets(after_object) {
+    }
+
+    if !added_object_ids.is_empty() {
+        let helper_component = target.model_component_index;
+        for identifier in added_object_ids {
+            let source_location = find_object_location(&source_objects, *identifier);
+            let candidate_location = find_object_location(&candidate_objects, *identifier);
+            if creation_in_candidate {
+                if source_location.is_some()
+                    || candidate_location
+                        .is_none_or(|location| location.component_index != helper_component)
+                {
                     return Err(BodyTableHiddenAxesError::Verification);
                 }
+            } else if creation_in_source {
+                if candidate_location.is_some()
+                    || source_location
+                        .is_none_or(|location| location.component_index != helper_component)
+                {
+                    return Err(BodyTableHiddenAxesError::Verification);
+                }
+            }
+        }
+    }
+
+    let mut changed = 0usize;
+    let metadata_identifier = if metadata_changed {
+        source
+            .state
+            .source
+            .components()
+            .get_index(source_metadata_route.component_index)
+            .and_then(|component| {
+                component
+                    .archive()
+                    .objects
+                    .get(source_metadata_route.object_index)
+            })
+            .and_then(|object| object.archive_info.identifier)
+            .ok_or(BodyTableHiddenAxesError::Verification)?
+    } else {
+        0
+    };
+    for before_location in &source_objects {
+        if creation_in_source
+            && added_object_ids
+                .binary_search(&before_location.identifier)
+                .is_ok()
+        {
+            continue;
+        }
+        let after_location = find_object_location(&candidate_objects, before_location.identifier)
+            .ok_or(BodyTableHiddenAxesError::Verification)?;
+        let before_component = source
+            .state
+            .source
+            .components()
+            .get_index(before_location.component_index)
+            .ok_or(BodyTableHiddenAxesError::Verification)?;
+        let after_component = candidate
+            .state
+            .source
+            .components()
+            .get_index(after_location.component_index)
+            .ok_or(BodyTableHiddenAxesError::Verification)?;
+        if before_component.name() != after_component.name() {
+            return Err(BodyTableHiddenAxesError::Verification);
+        }
+        let before_object = before_component
+            .archive()
+            .objects
+            .get(before_location.object_index)
+            .ok_or(BodyTableHiddenAxesError::Verification)?;
+        let after_object = after_component
+            .archive()
+            .objects
+            .get(after_location.object_index)
+            .ok_or(BodyTableHiddenAxesError::Verification)?;
+        let id = before_location.identifier;
+        let selected = before_location.component_index == target.model_component_index
+            && (id == target.model_identifier.get() || id == target.drawable_identifier.get());
+        let selected_metadata = metadata_changed && id == metadata_identifier;
+        if selected {
+            changed = changed.saturating_add(1);
+            let message_index = if id == target.model_identifier.get() {
+                target.model_message_index
             } else {
-                changed = changed.saturating_add(1);
-                let message_index = if id == target.model_identifier.get() {
-                    target.model_message_index
+                target.info_message_index
+            };
+            let equivalent = if id == target.model_identifier.get() && !added_object_ids.is_empty()
+            {
+                let (original, creation_object) = if creation_in_candidate {
+                    (before_object, after_object)
                 } else {
-                    target.info_message_index
+                    (after_object, before_object)
                 };
-                if !same_object_except_message(
+                same_creation_model_object(
+                    original,
+                    creation_object,
+                    message_index,
+                    added_object_ids,
+                    archive_limits,
+                    budget,
+                )?
+            } else {
+                same_object_except_message(
                     before_object,
                     after_object,
                     message_index,
                     archive_limits,
                     budget,
-                )? {
-                    return Err(BodyTableHiddenAxesError::Verification);
-                }
+                )?
+            };
+            if !equivalent {
+                return Err(BodyTableHiddenAxesError::Verification);
             }
-            budget
-                .charge_payload_work(object_index.saturating_add(1))
-                .map_err(map_lock_error)?;
+        } else if selected_metadata {
+            changed = changed.saturating_add(1);
+            if !same_object_except_message(
+                before_object,
+                after_object,
+                source_metadata_route.message_index,
+                archive_limits,
+                budget,
+            )? {
+                return Err(BodyTableHiddenAxesError::Verification);
+            }
+        } else if !before_object.same_content_ignoring_offsets(after_object) {
+            return Err(BodyTableHiddenAxesError::Verification);
         }
+        budget
+            .charge_payload_work(
+                before_object
+                    .messages
+                    .len()
+                    .checked_add(before_object.archive_info.message_infos.len())
+                    .and_then(|value| value.checked_add(1))
+                    .ok_or(BodyTableHiddenAxesError::Verification)?,
+            )
+            .map_err(map_lock_error)?;
     }
-    if changed != 2 {
+    let expected_changed = 2usize.saturating_add(usize::from(metadata_changed));
+    if changed != expected_changed {
         return Err(BodyTableHiddenAxesError::Verification);
     }
     Ok(())
+}
+
+fn find_object_location(objects: &[ObjectLocation], identifier: u64) -> Option<ObjectLocation> {
+    objects
+        .binary_search_by_key(&identifier, |location| location.identifier)
+        .ok()
+        .map(|index| objects[index])
+}
+
+fn same_creation_model_object(
+    original: &ArchiveObject,
+    creation: &ArchiveObject,
+    selected_message: usize,
+    added_object_ids: &[u64],
+    archive_limits: litchi_iwa_core::ArchiveLimits,
+    budget: &mut table_lock::WireBudget,
+) -> Result<bool, BodyTableHiddenAxesError> {
+    if added_object_ids.len() != OWNER_CREATION_OBJECTS
+        || original.archive_info.identifier != creation.archive_info.identifier
+        || original.archive_info.should_merge != creation.archive_info.should_merge
+        || original.messages.len() != creation.messages.len()
+        || original.archive_info.message_infos.len() != creation.archive_info.message_infos.len()
+        || selected_message >= original.messages.len()
+    {
+        return Ok(false);
+    }
+    for (index, (original_message, creation_message)) in original
+        .messages
+        .iter()
+        .zip(creation.messages.iter())
+        .enumerate()
+    {
+        if index == selected_message {
+            if original_message.type_ != creation_message.type_ {
+                return Ok(false);
+            }
+        } else if original_message != creation_message {
+            return Ok(false);
+        }
+    }
+    for (index, (original_info, creation_info)) in original
+        .archive_info
+        .message_infos
+        .iter()
+        .zip(creation.archive_info.message_infos.iter())
+        .enumerate()
+    {
+        if index != selected_message && original_info != creation_info {
+            return Ok(false);
+        }
+    }
+    let scan_work = original
+        .messages
+        .iter()
+        .chain(creation.messages.iter())
+        .try_fold(0usize, |work, message| {
+            work.checked_add(message.data.len())
+                .and_then(|value| value.checked_add(1))
+        })
+        .ok_or(BodyTableHiddenAxesError::Verification)?;
+    budget
+        .charge_payload_work(scan_work)
+        .map_err(map_lock_error)?;
+    let original_info = original
+        .archive_info
+        .message_infos
+        .get(selected_message)
+        .ok_or(BodyTableHiddenAxesError::Verification)?;
+    let creation_info = creation
+        .archive_info
+        .message_infos
+        .get(selected_message)
+        .ok_or(BodyTableHiddenAxesError::Verification)?;
+    let column_references = [added_object_ids[0]];
+    let row_references = [added_object_ids[1]];
+    let fields = [
+        CanonicalObjectReferenceField {
+            path: MODEL_COLUMN_REFERENCE_PATH,
+            references: &column_references,
+        },
+        CanonicalObjectReferenceField {
+            path: MODEL_ROW_REFERENCE_PATH,
+            references: &row_references,
+        },
+    ];
+    let mut restored = creation.clone();
+    restored
+        .replace_message_transitioning_object_references_with_canonical_fields_preserving_header_with_limits(
+            selected_message,
+            original.messages[selected_message].clone(),
+            ObjectReferenceTransition {
+                aggregate_before: &creation_info.object_references,
+                aggregate_after: &original_info.object_references,
+                fields: &[],
+            },
+            CanonicalObjectReferenceFields::Remove(&fields),
+            archive_limits,
+        )
+        .map_err(map_core_error)?;
+    restored.header_length = original.header_length;
+    restored.data_length = original.data_length;
+    Ok(original.same_content_ignoring_offsets(&restored))
 }
 
 fn same_entry_static_metadata(

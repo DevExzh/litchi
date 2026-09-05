@@ -32695,6 +32695,52 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+            # Parsed-source extraction may move the staged transaction into a
+            # helper. The bridge must still delegate explicitly, and the
+            # helper must retain every focused stage and read-back marker.
+            delegated = bridge.read_text(encoding="utf-8")
+            delegated = delegated.replace(
+                "    let (source, sheet, table, position, _) = focused_cell_location();\n"
+                "    match format { Some(value) => focused_set_data_format(&source, sheet, table, position, value), None => focused_clear_data_format(&source, sheet, table, position) };\n"
+                "    verify_focused_data_format();\n",
+                "    commit_exact_focused_data_format_with_location(format);\n",
+            )
+            delegated = delegated.replace(
+                "}\nimpl NumbersEditor {",
+                "}\n"
+                "fn commit_exact_focused_data_format_with_location(format: Option<CellControl>) {\n"
+                "    let (source, sheet, table, position, _) = focused_cell_location();\n"
+                "    match format { Some(value) => focused_set_data_format(&source, sheet, table, position, value), None => focused_clear_data_format(&source, sheet, table, position) };\n"
+                "    verify_focused_data_format();\n"
+                "}\n"
+                "impl NumbersEditor {",
+            )
+            bridge.write_text(delegated, encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_control_bridge_source_topology(
+                    root
+                ),
+                [],
+            )
+            for marker in (
+                "focused_set_data_format",
+                "focused_clear_data_format",
+                "verify_focused_data_format",
+            ):
+                with self.subTest(delegated_marker=marker):
+                    bridge.write_text(
+                        delegated.replace(marker, "removed_focused_stage"),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_iwa_numbers_table_cell_control_bridge_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"dispatch marker {marker}" in item for item in violations),
+                        violations,
+                    )
+            bridge.write_text(delegated, encoding="utf-8")
+
             broken = bridge.read_text(encoding="utf-8").replace(
                 "source.table_cell_control_format(sheet, table, position);",
                 "cell_data_format::cell_slider_format();",

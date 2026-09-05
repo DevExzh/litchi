@@ -8283,3 +8283,75 @@ No workspace package, manifest edge, ordered migration debt, migration-host
 item, or deletion gate is removed or closed by this follow-up. The monolithic
 `litchi-iwa` crate remains until the global parity, native, and boundary gates
 in this ADR are satisfied.
+
+### 2026-09-05 follow-up: bounded hidden-state publication primitives
+
+`litchi-iwa-core` now owns bounded canonical object-reference `FieldInfo`
+insertion and exact suffix removal alongside its aggregate and selected-field
+transitions. The operation checks distinct absent paths, unique nonzero
+aggregate members, exact removal wire bytes, and target metadata/header/object
+limits before publishing. Tests cover unknown header and nested field
+preservation, combined selected-field updates, hostile authorization,
+noncanonical removal refusal, and inclusive metadata/header limits with
+one-under atomic refusal. This closes a physical primitive needed by format
+adapters without exposing raw header surgery in those adapters. Whole-package
+inverse restoration remains the source-bound patch's responsibility.
+
+`pages_hidden_state_codec` now measures candidate verification as part of its
+rewrite execution requirements. The prepared plan accounts for candidate
+fields, work, nesting depth, allocations, scratch, retained bytes, and state
+counts before execution, including appended owners and nested states. Exact
+execution limits admit the earlier 1,695/1,960-byte scratch and depth-three
+regression; one-under limits reject before execution in each governed
+category. Unknown wire values and wide encodings remain source authoritative.
+This corrects the codec contract rather than adding caller-side scratch slack.
+Aggregate field visits and traversal work include the deepest nested
+source-preserving rewrite path. Regressions cover removing up to 256 source
+rows and retaining up to 128 unknown UUID fields through a matched model
+rewrite, with exact and one-under field/work limits. The final focused codec
+suite has 25 passing tests and three passing public limit-contract tests.
+
+The Numbers migration host now delegates exact-source transitions among
+Number, Percentage, Currency, Scientific, and Fraction, and supported control
+to numeric transitions, through focused clear and set transactions. Dispatch
+checks Currency and Scientific storage eligibility before entering the focused path;
+unsupported value shapes and the retained Custom/NumeralSystem conversions
+keep their compatibility owner. A focused refusal remains terminal. Both
+stages complete privately, then host format readback and typed-value equality
+must agree before publication. Formula regressions retain formula text and
+cached numeric results through Number to Currency to Number. The bridge
+reuses its parsed source for both dispatch and the first transition stage.
+
+A native Numbers check accepted the focused Number-to-Currency candidate for
+the existing numeric value 42. The cell displayed `$42.00`; the inspector
+showed US Dollar, two decimals, minus-sign negatives, thousands separators,
+and accounting style disabled. Numbers saved a changed file, which was closed
+and reopened. The marker, value display, and all inspected Currency settings
+survived without a repair prompt. This qualifies this operation-specific
+Currency case; it does not establish arbitrary-producer or other-family
+native parity, and it does not close the monolith deletion gates.
+
+The focused Pages `Indexed` profile now creates an absent hidden-state owner
+for changed row/column requests. It retains the selected formula dependency,
+adds two formula and two filter helpers, and publishes the selected model
+edges through the core canonical `FieldInfo` operation. A package-wide census
+reserves physical identifiers and logical UUIDs, requires rooted UID maps to
+resolve, and rejects misplaced metadata. Current metadata registries and save
+tokens are rewritten through the narrow codec when present; valid
+metadata-free sources remain supported. Source-bound patches restore exact
+original bytes, including metadata, on inverse application. Thirty-four
+integration tests pass, covering existing-owner behavior, creation, malformed
+registries, UUID collisions, strict map routing, limits, and locality.
+Creation, metadata planning, and candidate construction live in a private
+rewrite module with one internal transaction entry point; resolution and
+locality verification remain with the public owner.
+Companion audits verify owner creation on cloned snapshots and eight
+concurrent workers, preserving shared source bytes and exact inverses.
+`NativeVisible` changed edits remain unsupported, so the raw-ID compatibility
+writer and native mutation qualification gate remain open.
+
+The 87-seed Pages fuzz corpus replay and 100-run AddressSanitizer smoke pass.
+The harness retains independent helper-count, selected-table locality, exact
+inverse, and one-under resource checks. Workspace lint, all 860 boundary-policy
+tests, and the current tree scan pass; topology remains 64 packages, 238
+internal dependency declarations, and 11 ordered migration debts.

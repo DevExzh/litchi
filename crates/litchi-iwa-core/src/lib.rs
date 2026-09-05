@@ -16,8 +16,9 @@ pub use archive::{
     Archive, ArchiveInfo, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
     ArchiveReferencePolicy, ArchiveReferenceScope, ArchiveReferenceVisitor,
     CanonicalFieldDataReferenceOperation, CanonicalFieldDataReferenceTransition,
-    DataReferenceTransition, FieldDataReferenceTransition, FieldInfo, FieldPath, FieldType,
-    KnownFieldRule, MessageInfo, RawMessage, UnknownFieldRule,
+    CanonicalObjectReferenceField, CanonicalObjectReferenceFields, DataReferenceTransition,
+    FieldDataReferenceTransition, FieldInfo, FieldPath, FieldType, KnownFieldRule, MessageInfo,
+    RawMessage, UnknownFieldRule,
 };
 pub use error::{Error, HeaderKind, HeaderOperation, LimitKind, Result};
 pub use limits::Limits;

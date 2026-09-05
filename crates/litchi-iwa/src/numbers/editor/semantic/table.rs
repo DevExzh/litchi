@@ -13,6 +13,7 @@ use litchi_numbers::cell::comment::{
 use litchi_numbers::table::merge::Region;
 use litchi_numbers::{Package as FocusedNumbersPackage, TableCellCommentError};
 
+use crate::numbers::bnc::{BncCellView, CachedScalar, NumericCellType, StoredValue};
 use litchi_numbers::cell::CellControl;
 
 type FocusedControlError = litchi_numbers::cell::data_format::control::transaction::Error;
@@ -44,18 +45,20 @@ fn parse_focused_source(source_bytes: &[u8]) -> Result<FocusedNumbersPackage> {
     })
 }
 
+struct FocusedCellLocation {
+    source: FocusedNumbersPackage,
+    sheet: litchi_numbers::SheetSelector<'static>,
+    table: litchi_numbers::TableSelector<'static>,
+    position: litchi_numbers::table::CellPosition,
+    source_len: usize,
+}
+
 fn focused_cell_location(
     editor: &NumbersEditor,
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<(
-    FocusedNumbersPackage,
-    litchi_numbers::SheetSelector<'static>,
-    litchi_numbers::TableSelector<'static>,
-    litchi_numbers::table::CellPosition,
-    usize,
-)> {
+) -> Result<FocusedCellLocation> {
     let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
     let position =
         litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
@@ -69,7 +72,13 @@ fn focused_cell_location(
         let source_len = source_bytes.len();
         (parse_focused_source(&source_bytes)?, source_len)
     };
-    Ok((source, sheet, table, position, source_len))
+    Ok(FocusedCellLocation {
+        source,
+        sheet,
+        table,
+        position,
+        source_len,
+    })
 }
 
 struct FalliblePackageBytes {
@@ -128,7 +137,14 @@ fn focused_control_format(
     row: usize,
     column: usize,
 ) -> Result<Option<CellControl>> {
-    let (source, sheet, table, position, _) = focused_cell_location(editor, table_id, row, column)?;
+    let location = focused_cell_location(editor, table_id, row, column)?;
+    let FocusedCellLocation {
+        source,
+        sheet,
+        table,
+        position,
+        ..
+    } = location;
     source
         .table_cell_control_format(sheet, table, position)
         .map_err(focused_control_error)
@@ -296,6 +312,80 @@ fn focused_clear_data_format(
     }
 }
 
+fn is_focused_control_data_format(format: &DataFormat) -> bool {
+    matches!(
+        format,
+        DataFormat::Checkbox(_)
+            | DataFormat::StarRating(_)
+            | DataFormat::Slider(_)
+            | DataFormat::Stepper(_)
+            | DataFormat::PopUpMenu(_)
+    )
+}
+
+fn is_focused_numeric_data_format(format: &DataFormat) -> bool {
+    matches!(
+        format,
+        DataFormat::Number(_)
+            | DataFormat::Percentage(_)
+            | DataFormat::Currency(_)
+            | DataFormat::Scientific(_)
+            | DataFormat::Fraction(_)
+    )
+}
+
+fn focused_cell_value(
+    source: &FocusedNumbersPackage,
+    sheet: litchi_numbers::SheetSelector<'static>,
+    table: litchi_numbers::TableSelector<'static>,
+    position: litchi_numbers::table::CellPosition,
+) -> Result<Option<litchi_numbers::cell::Value>> {
+    source
+        .table_cell(sheet, table, position)
+        .map_err(focused_data_format_error)
+        .map(|state| state.storage().value().cloned())
+}
+
+fn focused_cell_storage(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Vec<u8>>> {
+    let location = locate_attached_cell(&editor.package, table_id, row, column)?;
+    read_tile_cell(
+        &editor.package,
+        &location.tile_archive,
+        location.tile_id,
+        location.tile_row,
+        column,
+    )
+}
+
+fn focused_cell_has_numeric_storage(cell: Option<&[u8]>) -> Result<bool> {
+    let Some(cell) = cell else {
+        return Ok(true);
+    };
+    let cell = BncCellView::parse(cell).map_err(focused_data_format_error)?;
+    let numeric_type = cell.numeric_cell_type();
+    let numeric_type = matches!(
+        numeric_type,
+        Some(NumericCellType::Number | NumericCellType::AlternateNumber)
+    );
+    let numeric_cache = matches!(cell.cached_scalar(), None | Some(CachedScalar::Number(_)));
+    Ok(match cell.stored_value() {
+        StoredValue::Empty => cell.numeric_cell_type().is_none() && cell.cached_scalar().is_none(),
+        StoredValue::Number | StoredValue::Formula(_) => numeric_type && numeric_cache,
+        StoredValue::Text(_)
+        | StoredValue::RichText(_)
+        | StoredValue::Date
+        | StoredValue::Boolean
+        | StoredValue::Duration
+        | StoredValue::Error
+        | StoredValue::Unsupported(_) => false,
+    })
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum FocusedDataFormatFamily {
     Number,
@@ -337,10 +427,10 @@ fn is_focused_data_format(format: &DataFormat) -> bool {
 ///
 /// Cross-family display-format changes remain a compatibility-host concern;
 /// selecting an owner for those changes would turn a typed family refusal
-/// into an accidental fallback.  Control targets are a deliberate exception:
-/// the unified owner owns the scalar-to-control transition as well as control
-/// replacement, while control-to-scalar conversion first releases the control
-/// graph and then uses the host's generic scalar writer.
+/// into an accidental fallback.  The focused owner explicitly supports
+/// transitions between the shared numeric storage families and from an
+/// interactive control to one of those families by staging a typed clear and
+/// target set. Other cross-family conversions remain compatibility-host work.
 fn uses_focused_data_format_owner(current: &DataFormat, requested: &DataFormat) -> bool {
     // Custom formats still carry package-level registry and cleanup metadata
     // that the focused owner does not publish. Keep every transition that
@@ -354,6 +444,11 @@ fn uses_focused_data_format_owner(current: &DataFormat, requested: &DataFormat) 
     }
     if matches!(requested, DataFormat::NumeralSystem(_)) {
         return false;
+    }
+    if is_focused_numeric_data_format(requested)
+        && (is_focused_control_data_format(current) || is_focused_numeric_data_format(current))
+    {
+        return true;
     }
     if matches!(
         requested,
@@ -369,6 +464,44 @@ fn uses_focused_data_format_owner(current: &DataFormat, requested: &DataFormat) 
         || focused_data_format_family(current) == focused_data_format_family(requested)
 }
 
+/// Return the parsed focused source when its native storage shape is eligible.
+///
+/// Currency and Scientific owners can preserve only empty, numeric, or
+/// numeric-cache formula storage.  The compatibility writer has historically
+/// handled the other values (including controls and nonnumeric formula
+/// caches), so dispatching them to a focused owner would reject an existing
+/// operation or require an invented coercion.  The raw storage check runs
+/// before focused parsing for numeric families, so an unsupported shape does
+/// not allocate a discarded focused package before the compatibility route
+/// releases a control. Admitted sources return that parsed package to the
+/// commit path; failures after owner selection remain terminal and never fall
+/// back to the compatibility writer.
+fn focused_data_format_owner_is_eligible(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    current: &DataFormat,
+    requested: &DataFormat,
+) -> Result<Option<FocusedCellLocation>> {
+    if !uses_focused_data_format_owner(current, requested) {
+        return Ok(None);
+    }
+    let needs_numeric_storage =
+        matches!(current, DataFormat::Currency(_) | DataFormat::Scientific(_))
+            || matches!(
+                requested,
+                DataFormat::Currency(_) | DataFormat::Scientific(_)
+            );
+    if needs_numeric_storage {
+        let storage = focused_cell_storage(editor, table_id, row, column)?;
+        if !focused_cell_has_numeric_storage(storage.as_deref())? {
+            return Ok(None);
+        }
+    }
+    Ok(Some(focused_cell_location(editor, table_id, row, column)?))
+}
+
 fn commit_exact_focused_data_format(
     editor: &NumbersEditor,
     table_id: u64,
@@ -377,8 +510,28 @@ fn commit_exact_focused_data_format(
     current: &DataFormat,
     requested: &DataFormat,
 ) -> Result<NumbersEditor> {
-    let (source, sheet, table, position, source_len) =
-        focused_cell_location(editor, table_id, row, column)?;
+    let location = focused_cell_location(editor, table_id, row, column)?;
+    commit_exact_focused_data_format_with_location(
+        editor, table_id, row, column, current, requested, location,
+    )
+}
+
+fn commit_exact_focused_data_format_with_location(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    current: &DataFormat,
+    requested: &DataFormat,
+    location: FocusedCellLocation,
+) -> Result<NumbersEditor> {
+    let FocusedCellLocation {
+        source,
+        sheet,
+        table,
+        position,
+        source_len,
+    } = location;
     if !is_focused_data_format(current) && !matches!(current, DataFormat::Automatic) {
         return Err(Error::InvalidFormat(
             "focused Numbers owner does not admit the current cell format".to_owned(),
@@ -413,9 +566,79 @@ fn commit_exact_focused_data_format(
         return Ok(candidate);
     }
 
+    if is_focused_numeric_data_format(requested)
+        && (is_focused_control_data_format(current) || is_focused_numeric_data_format(current))
+    {
+        return commit_focused_data_format_transition(
+            table_id, row, column, &source, sheet, table, position, source_len, current, requested,
+        );
+    }
+
     Err(Error::InvalidFormat(
         "focused Numbers owner does not admit a cross-family cell-format conversion".to_owned(),
     ))
+}
+
+fn commit_focused_data_format_transition(
+    table_id: u64,
+    row: usize,
+    column: usize,
+    source: &FocusedNumbersPackage,
+    sheet: litchi_numbers::SheetSelector<'static>,
+    table: litchi_numbers::TableSelector<'static>,
+    position: litchi_numbers::table::CellPosition,
+    source_len: usize,
+    current: &DataFormat,
+    requested: &DataFormat,
+) -> Result<NumbersEditor> {
+    let before_value = focused_cell_value(source, sheet, table, position)?;
+    let Some(cleared) =
+        focused_clear_data_format(source, sheet, table, position, source_len, current)?
+    else {
+        return Err(Error::InvalidFormat(
+            "focused Numbers format transition clear unexpectedly produced a no-op".to_owned(),
+        ));
+    };
+    let FocusedCellLocation {
+        source: cleared_source,
+        sheet: cleared_sheet,
+        table: cleared_table,
+        position: cleared_position,
+        source_len: cleared_source_len,
+    } = focused_cell_location(&cleared, table_id, row, column)?;
+    let Some(candidate) = focused_set_data_format(
+        &cleared_source,
+        cleared_sheet,
+        cleared_table,
+        cleared_position,
+        cleared_source_len,
+        requested,
+    )?
+    else {
+        return Err(Error::InvalidFormat(
+            "focused Numbers format transition target unexpectedly produced a no-op".to_owned(),
+        ));
+    };
+    verify_focused_data_format(&candidate, table_id, row, column, requested)?;
+    let FocusedCellLocation {
+        source: candidate_source,
+        sheet: candidate_sheet,
+        table: candidate_table,
+        position: candidate_position,
+        ..
+    } = focused_cell_location(&candidate, table_id, row, column)?;
+    if focused_cell_value(
+        &candidate_source,
+        candidate_sheet,
+        candidate_table,
+        candidate_position,
+    )? != before_value
+    {
+        return Err(Error::InvalidFormat(
+            "focused Numbers format transition changed the cell value".to_owned(),
+        ));
+    }
+    Ok(candidate)
 }
 
 fn verify_focused_data_format(
@@ -833,17 +1056,32 @@ impl NumbersEditor {
             // new package and can normalize inherited automatic metadata.
             return Ok(());
         }
-        if !source_built && uses_focused_data_format_owner(&current, &format) {
-            *self =
-                commit_exact_focused_data_format(self, table_id, row, column, &current, &format)?;
+        let focused_owner_context = if !source_built
+            && current == format
+            && is_focused_data_format(&format)
+        {
+            // A focused no-op still has to enter the focused transaction
+            // so malformed family metadata keeps its terminal refusal
+            // semantics and a valid no-op can retain the exact source. Shape
+            // admission is intentionally skipped for this forced validation.
+            Some(focused_cell_location(self, table_id, row, column)?)
+        } else if !source_built {
+            focused_data_format_owner_is_eligible(self, table_id, row, column, &current, &format)?
+        } else {
+            None
+        };
+        if let Some(location) = focused_owner_context {
+            *self = commit_exact_focused_data_format_with_location(
+                self, table_id, row, column, &current, &format, location,
+            )?;
             return Ok(());
         }
 
-        // A control-to-scalar conversion has two owners.  Release the
-        // focused control graph first, then let the generic compatibility
-        // writer replace the scalar display metadata in the private snapshot.
-        // A focused refusal is terminal; there is no retry through a raw-ID
-        // mutation after that first transaction fails.
+        // Unsupported exact-source control-to-scalar conversions still have
+        // two owners. Release the focused control graph first, then let the
+        // compatibility writer replace the unsupported display metadata in
+        // the private snapshot. Supported numeric targets were selected by
+        // the focused branch above and never reach this path.
         if !source_built
             && CellControl::try_from(current.clone()).is_ok()
             && !matches!(format, DataFormat::Automatic)
