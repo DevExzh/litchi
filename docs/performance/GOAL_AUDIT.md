@@ -1,6 +1,18 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0427
+## Current evidence through 0428
+
+[0428](changes/0428-managed-pptx-cache-lifetimes.md) completes the fixed synthetic
+managed-cache/budget matrix: 16 processes, 480 samples, exact admission and
+refusal, pinning/eviction, oversized bypass, and three publications at an exact
+cumulative output ceiling. Every final releasable caller budget is zero. It
+adds no production optimization and does not close the global goal. All 27
+repeat flags are RSS points with differing entry values; comparative RSS
+claims require a new setup/warmup attribution protocol. Native-producer and
+cold/range-source lifecycles, the full CRUD taxonomy, streaming, and explicit
+scaling remain open. See the [next-work record](results/change-0428/next-work.md).
+
+## Prior evidence through 0427
 
 [0427](changes/0427-pptx-allocator-drop-checkpoints.md) adds explicit allocator
 phase/drop observations for the current plain/media-rich PPTX APIs. Eight

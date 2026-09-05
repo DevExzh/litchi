@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "implementation_revision": "6d0dc4ff0d3f54b0afae09a3e8fe684593741478",
+  "source_manifest_unchanged": true,
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "bundle_python_syntax": "pass",
+  "git_diff_check": "pass",
+  "portable_before_cleanup": "pass",
+  "portable_after_cleanup": "pass",
+  "performance_claim": null
+}

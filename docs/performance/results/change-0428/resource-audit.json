@@ -1,0 +1,277 @@
+{
+  "status": "pass",
+  "retained_samples": 480,
+  "phase_points": 5460,
+  "non_rss_numeric_observations_identical_within_and_across_repeats": true,
+  "final_releasable_budget_zero_samples": 480,
+  "rss_repeat_review_triggers": 27,
+  "rss_processes": [
+    {
+      "name": "lifecycle-plain-r1",
+      "scenario": "lifecycle",
+      "corpus": "plain",
+      "repeat": "R1",
+      "entry_rss_median": 18567168.0,
+      "all_phase_rss_min": 18567168,
+      "all_phase_rss_max": 18567168,
+      "all_phase_vmhwm_min": 18567168,
+      "all_phase_vmhwm_max": 18567168,
+      "external_maxrss_bytes": 19517440,
+      "samples": 30
+    },
+    {
+      "name": "lifecycle-media-rich-r1",
+      "scenario": "lifecycle",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "entry_rss_median": 547794944.0,
+      "all_phase_rss_min": 547794944,
+      "all_phase_rss_max": 547794944,
+      "all_phase_vmhwm_min": 822120448,
+      "all_phase_vmhwm_max": 822120448,
+      "external_maxrss_bytes": 822120448,
+      "samples": 30
+    },
+    {
+      "name": "exact-admission-media-rich-r1",
+      "scenario": "exact-admission",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "entry_rss_median": 170864640.0,
+      "all_phase_rss_min": 170864640,
+      "all_phase_rss_max": 170864640,
+      "all_phase_vmhwm_min": 845312000,
+      "all_phase_vmhwm_max": 845312000,
+      "external_maxrss_bytes": 845312000,
+      "samples": 30
+    },
+    {
+      "name": "one-under-media-rich-r1",
+      "scenario": "one-under",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "entry_rss_median": 285212672.0,
+      "all_phase_rss_min": 285212672,
+      "all_phase_rss_max": 285212672,
+      "all_phase_vmhwm_min": 846049280,
+      "all_phase_vmhwm_max": 846049280,
+      "external_maxrss_bytes": 846049280,
+      "samples": 30
+    },
+    {
+      "name": "pinned-eviction-media-rich-r1",
+      "scenario": "pinned-eviction",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "entry_rss_median": 573210624.0,
+      "all_phase_rss_min": 573210624,
+      "all_phase_rss_max": 573210624,
+      "all_phase_vmhwm_min": 850907136,
+      "all_phase_vmhwm_max": 850907136,
+      "external_maxrss_bytes": 850907136,
+      "samples": 30
+    },
+    {
+      "name": "oversized-bypass-media-rich-r1",
+      "scenario": "oversized-bypass",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "entry_rss_median": 573399040.0,
+      "all_phase_rss_min": 573399040,
+      "all_phase_rss_max": 573399040,
+      "all_phase_vmhwm_min": 851099648,
+      "all_phase_vmhwm_max": 851099648,
+      "external_maxrss_bytes": 851099648,
+      "samples": 30
+    },
+    {
+      "name": "repeated-publication-plain-r1",
+      "scenario": "repeated-publication",
+      "corpus": "plain",
+      "repeat": "R1",
+      "entry_rss_median": 18419712.0,
+      "all_phase_rss_min": 18419712,
+      "all_phase_rss_max": 18837504,
+      "all_phase_vmhwm_min": 18419712,
+      "all_phase_vmhwm_max": 18837504,
+      "external_maxrss_bytes": 22134784,
+      "samples": 30
+    },
+    {
+      "name": "repeated-publication-media-rich-r1",
+      "scenario": "repeated-publication",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "entry_rss_median": 539516928.0,
+      "all_phase_rss_min": 539516928,
+      "all_phase_rss_max": 539516928,
+      "all_phase_vmhwm_min": 822128640,
+      "all_phase_vmhwm_max": 822128640,
+      "external_maxrss_bytes": 822128640,
+      "samples": 30
+    },
+    {
+      "name": "repeated-publication-media-rich-r2",
+      "scenario": "repeated-publication",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "entry_rss_median": 547905536.0,
+      "all_phase_rss_min": 547905536,
+      "all_phase_rss_max": 547905536,
+      "all_phase_vmhwm_min": 821866496,
+      "all_phase_vmhwm_max": 821866496,
+      "external_maxrss_bytes": 821866496,
+      "samples": 30
+    },
+    {
+      "name": "repeated-publication-plain-r2",
+      "scenario": "repeated-publication",
+      "corpus": "plain",
+      "repeat": "R2",
+      "entry_rss_median": 18604032.0,
+      "all_phase_rss_min": 18604032,
+      "all_phase_rss_max": 18862080,
+      "all_phase_vmhwm_min": 18604032,
+      "all_phase_vmhwm_max": 18862080,
+      "external_maxrss_bytes": 21868544,
+      "samples": 30
+    },
+    {
+      "name": "oversized-bypass-media-rich-r2",
+      "scenario": "oversized-bypass",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "entry_rss_median": 331792384.0,
+      "all_phase_rss_min": 331792384,
+      "all_phase_rss_max": 331792384,
+      "all_phase_vmhwm_min": 846508032,
+      "all_phase_vmhwm_max": 846508032,
+      "external_maxrss_bytes": 846508032,
+      "samples": 30
+    },
+    {
+      "name": "pinned-eviction-media-rich-r2",
+      "scenario": "pinned-eviction",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "entry_rss_median": 285270016.0,
+      "all_phase_rss_min": 285270016,
+      "all_phase_rss_max": 285270016,
+      "all_phase_vmhwm_min": 848330752,
+      "all_phase_vmhwm_max": 848330752,
+      "external_maxrss_bytes": 848330752,
+      "samples": 30
+    },
+    {
+      "name": "one-under-media-rich-r2",
+      "scenario": "one-under",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "entry_rss_median": 573272064.0,
+      "all_phase_rss_min": 573272064,
+      "all_phase_rss_max": 573272064,
+      "all_phase_vmhwm_min": 853209088,
+      "all_phase_vmhwm_max": 853209088,
+      "external_maxrss_bytes": 853209088,
+      "samples": 30
+    },
+    {
+      "name": "exact-admission-media-rich-r2",
+      "scenario": "exact-admission",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "entry_rss_median": 277901312.0,
+      "all_phase_rss_min": 277901312,
+      "all_phase_rss_max": 277901312,
+      "all_phase_vmhwm_min": 847130624,
+      "all_phase_vmhwm_max": 847130624,
+      "external_maxrss_bytes": 847130624,
+      "samples": 30
+    },
+    {
+      "name": "lifecycle-media-rich-r2",
+      "scenario": "lifecycle",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "entry_rss_median": 539258880.0,
+      "all_phase_rss_min": 539258880,
+      "all_phase_rss_max": 539258880,
+      "all_phase_vmhwm_min": 821837824,
+      "all_phase_vmhwm_max": 821837824,
+      "external_maxrss_bytes": 821837824,
+      "samples": 30
+    },
+    {
+      "name": "lifecycle-plain-r2",
+      "scenario": "lifecycle",
+      "corpus": "plain",
+      "repeat": "R2",
+      "entry_rss_median": 18432000.0,
+      "all_phase_rss_min": 18432000,
+      "all_phase_rss_max": 18432000,
+      "all_phase_vmhwm_min": 18432000,
+      "all_phase_vmhwm_max": 18432000,
+      "external_maxrss_bytes": 19238912,
+      "samples": 30
+    }
+  ],
+  "entry_rss_comparisons": [
+    {
+      "scenario": "exact-admission",
+      "corpus": "media-rich",
+      "r1_entry_rss": 170864640.0,
+      "r2_entry_rss": 277901312.0,
+      "entry_rss_change_percent": 62.644132805945105
+    },
+    {
+      "scenario": "lifecycle",
+      "corpus": "media-rich",
+      "r1_entry_rss": 547794944.0,
+      "r2_entry_rss": 539258880.0,
+      "entry_rss_change_percent": -1.5582589970016225
+    },
+    {
+      "scenario": "lifecycle",
+      "corpus": "plain",
+      "r1_entry_rss": 18567168.0,
+      "r2_entry_rss": 18432000.0,
+      "entry_rss_change_percent": -0.727994705493051
+    },
+    {
+      "scenario": "one-under",
+      "corpus": "media-rich",
+      "r1_entry_rss": 285212672.0,
+      "r2_entry_rss": 573272064.0,
+      "entry_rss_change_percent": 100.99810431985294
+    },
+    {
+      "scenario": "oversized-bypass",
+      "corpus": "media-rich",
+      "r1_entry_rss": 573399040.0,
+      "r2_entry_rss": 331792384.0,
+      "entry_rss_change_percent": -42.13586684763197
+    },
+    {
+      "scenario": "pinned-eviction",
+      "corpus": "media-rich",
+      "r1_entry_rss": 573210624.0,
+      "r2_entry_rss": 285270016.0,
+      "entry_rss_change_percent": -50.23295032298634
+    },
+    {
+      "scenario": "repeated-publication",
+      "corpus": "media-rich",
+      "r1_entry_rss": 539516928.0,
+      "r2_entry_rss": 547905536.0,
+      "entry_rss_change_percent": 1.5548368484185913
+    },
+    {
+      "scenario": "repeated-publication",
+      "corpus": "plain",
+      "r1_entry_rss": 18419712.0,
+      "r2_entry_rss": 18604032.0,
+      "entry_rss_change_percent": 1.0006671114076051
+    }
+  ],
+  "interpretation": "Descriptive only. Entry RSS already differs; procfs VmHWM and external process maxima include setup/warmups. No causal allocator or RSS-release conclusion."
+}

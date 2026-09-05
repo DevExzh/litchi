@@ -1,0 +1,50 @@
+{
+  "name": "lifecycle-media-rich-r1",
+  "corpus": "media-rich",
+  "scenario": "lifecycle",
+  "repeat": "R1",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0428/capture/lifecycle-media-rich-r1-resource.log",
+    "/tmp/litchi-goal-0428-binaries/litchi-perf-baseline",
+    "cache-retention",
+    "--scenario",
+    "lifecycle",
+    "--corpus",
+    "media-rich",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "6d0dc4ff0d3f54b0afae09a3e8fe684593741478",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0428/capture/lifecycle-media-rich-r1.json"
+  ],
+  "revision": "6d0dc4ff0d3f54b0afae09a3e8fe684593741478",
+  "binary_sha256": "2f85c419ea29ecb771bffca19c0b1a5f866fbaad80c93651c7b06b5ef68b5c43",
+  "protocol_sha256": "418fe2143a2d822cee91db7b4168363adfe50137c839337bc4ce752fef9490f0",
+  "started_utc": "2026-09-05T22:23:20.528548+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T22:23:34.683807+00:00",
+  "artifacts": {
+    "capture/lifecycle-media-rich-r1.json": {
+      "sha256": "2727f7a1cd96e412284953750a36f268424aac55e053c0653a828152e49adaf8",
+      "bytes": 1230447
+    },
+    "capture/lifecycle-media-rich-r1.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "capture/lifecycle-media-rich-r1-resource.log": {
+      "sha256": "5d703de2426a8fba6f7d700e582d73d675268c9e9500c455cdbfa388cd3eb520",
+      "bytes": 1022
+    }
+  }
+}

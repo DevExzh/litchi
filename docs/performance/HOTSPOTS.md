@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## Change 0428: managed PPTX cache and budget lifetimes
+
+[0428](changes/0428-managed-pptx-cache-lifetimes.md) adds fallible diagnostics on
+existing PPTX source owners and a separate managed-resource journal. Sixteen
+fresh processes retain 480 samples and 5,460 phase points. Final caller Memory,
+Objects, and Depth are zero in every sample; non-RSS numeric phase observations
+match across repeats. Exact/one-under image admission, pinning, oversized
+bypass, and cumulative publication limits pass. All 27 repeat flags are RSS
+points; image-lane RSS already differs at entry, so comparative RSS claims are
+withheld. The [resource review](results/change-0428/resource-review.md) retains
+those limitations. There is no workload optimization or general leak claim;
+native/range, broader CRUD, bounded streaming, and scaling work remain open.
+
 ## Change 0427: explicit PPTX allocator drop checkpoints
 
 [0427](changes/0427-pptx-allocator-drop-checkpoints.md) adds a separate allocator

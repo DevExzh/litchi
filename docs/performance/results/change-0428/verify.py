@@ -312,6 +312,7 @@ def verify_capture_index(root: Path, protocol: dict[str, Any], build: dict[str, 
         assert row.get("binary_sha256") == build["binary_sha256"]
         assert row.get("protocol_sha256") == build["protocol_sha256"]
         verify_argv(row, protocol, build["revision"])
+        assert row["argv"][7] == build["capture_binary"]
 
         artifacts = require_object(row.get("artifacts"), f"{name} artifacts")
         expected_artifacts = {
@@ -335,6 +336,7 @@ def verify_capture_index(root: Path, protocol: dict[str, Any], build: dict[str, 
         assert report.get("source_revision") == build["revision"]
         assert report.get("binary_sha256") == build["binary_sha256"]
         assert report.get("binary_bytes") == build["binary_bytes"]
+        assert report.get("current_exe") == build["capture_binary"]
         assert report.get("scenario") == scenario
         assert report.get("corpus") == corpus
         assert report.get("samples") == SAMPLES
@@ -446,6 +448,7 @@ def verify(root: Path) -> dict[str, Any]:
     run_quiet(
         [sys.executable, "-B", str(root / "summarize.py"), "--check"],
     )
+    run_quiet([sys.executable, "-B", str(root / "resource-audit.py"), "--check"])
     cleanup_state = verify_cleanup(root, build)
     inventory_files = verify_compression_and_inventory(root)
     return {

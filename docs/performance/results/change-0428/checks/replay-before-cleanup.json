@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "docs/performance/results/change-0428/verify.py",
+    "--portable"
+  ],
+  "status": "pass",
+  "exit_code": 0,
+  "stdout": "{\n  \"cleanup\": \"before-cleanup; copied binary checked\",\n  \"command_receipts\": 34,\n  \"inventory_files\": 188,\n  \"performance_claim\": null,\n  \"pinned_validator_mutation\": \"rejected\",\n  \"portable_export\": \"pass; copied executable not needed\",\n  \"processes\": 16,\n  \"required_pass\": 19,\n  \"required_review\": 3,\n  \"samples\": 480,\n  \"status\": \"pass\",\n  \"valid_digest_repeat_output_mutation\": \"rejected\"\n}\n",
+  "stderr": ""
+}

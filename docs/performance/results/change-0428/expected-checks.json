@@ -27,6 +27,10 @@
   "preflight-release-read-counters": "pass",
   "preflight-release-rebuild": "pass",
   "python-syntax": "pass",
+  "release-build": "pass",
+  "release-capture": "pass",
+  "release-summary": "pass",
   "report-probes-final": "pass",
+  "resource-audit": "pass",
   "rustfmt-final": "pass"
 }
