@@ -84,6 +84,11 @@ pub use package::{
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::{
+    __decode_movie_playback_payload, __rewrite_movie_playback_payload, MoviePlaybackError,
+};
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use package::{
     __is_valid_pages_text_storage, __pages_body_storage_discovery,
     __semantic_document_from_prepared_source, BodyStorageDiscovery,
 };

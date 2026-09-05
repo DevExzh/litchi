@@ -1922,6 +1922,90 @@ IWA_KEYNOTE_MOVIE_PLAYBACK_EXAMPLES = (
     Path("crates/litchi-iwa/examples/create_keynote_movie.rs"),
 )
 
+# Wave108 moves the last shared host playback reader/writer into the three
+# format owners.  The focused packages expose only feature-gated hidden seams
+# for the compatibility host; their public APIs remain semantic and selector
+# first.  Keep the source inventory explicit so a generic ``media_playback``
+# spelling in an unrelated Pages editor module cannot satisfy or trip this
+# boundary.
+IWA_SHARED_MEDIA_PLAYBACK_SOURCE = Path("crates/litchi-iwa/src/media_playback.rs")
+IWA_SHARED_MEDIA_PLAYBACK_ROOT_MODULE = re.compile(
+    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+(?:r#)?media_playback\b"
+)
+IWA_MEDIA_PLAYBACK_OWNER_SOURCES = {
+    "Keynote": Path("crates/litchi-keynote/src/package/slide_movie_playback.rs"),
+    "Pages": Path("crates/litchi-pages/src/package/movie_playback.rs"),
+    "Numbers": Path("crates/litchi-numbers/src/package/movie_playback.rs"),
+}
+IWA_MEDIA_PLAYBACK_OWNER_PACKAGE_SOURCES = {
+    "Keynote": Path("crates/litchi-keynote/src/package.rs"),
+    "Pages": Path("crates/litchi-pages/src/package.rs"),
+    "Numbers": Path("crates/litchi-numbers/src/package.rs"),
+}
+IWA_MEDIA_PLAYBACK_OWNER_EXPORT_SOURCES = {
+    "Keynote": Path("crates/litchi-keynote/src/lib.rs"),
+    "Pages": Path("crates/litchi-pages/src/lib.rs"),
+    "Numbers": Path("crates/litchi-numbers/src/lib.rs"),
+}
+IWA_MEDIA_PLAYBACK_OWNER_MODULES = {
+    "Keynote": re.compile(
+        r"(?m)^[ \t]*mod[ \t]+(?:r#)?slide_movie_playback\s*;"
+    ),
+    "Pages": re.compile(
+        r"(?ms)^[ \t]*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
+        r'"internal-iwork-source"\s*\)\s*\][ \t]*\n'
+        r"^[ \t]*mod[ \t]+(?:r#)?movie_playback\s*;"
+    ),
+    "Numbers": re.compile(
+        r"(?ms)^[ \t]*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
+        r'"internal-iwork-source"\s*\)\s*\][ \t]*\n'
+        r"^[ \t]*mod[ \t]+(?:r#)?movie_playback\s*;"
+    ),
+}
+IWA_MEDIA_PLAYBACK_OWNER_SEAMS = {
+    "Keynote": ("__decode_movie_playback_payload", None),
+    "Pages": (
+        "__decode_movie_playback_payload",
+        "__rewrite_movie_playback_payload",
+    ),
+    "Numbers": ("__movie_playback_settings", "__rewrite_movie_playback_settings"),
+}
+IWA_MEDIA_PLAYBACK_HOST_SOURCES = {
+    "Keynote": (
+        Path("crates/litchi-iwa/src/keynote/editor/slide_movies.rs"),
+        Path("crates/litchi-iwa/src/keynote/editor/slide_audio.rs"),
+    ),
+    "Pages": (Path("crates/litchi-iwa/src/pages/editor/media_playback.rs"),),
+    "Numbers": (
+        Path("crates/litchi-iwa/src/numbers/editor/sheet_movies/graph.rs"),
+    ),
+}
+IWA_MEDIA_PLAYBACK_HOST_CALLS = {
+    "Keynote": re.compile(
+        r"\blitchi_keynote\s*::\s*__decode_movie_playback_payload\s*\("
+    ),
+    "Pages": re.compile(
+        r"\blitchi_pages\s*::\s*__decode_movie_playback_payload\s*\("
+        r"|\blitchi_pages\s*::\s*__rewrite_movie_playback_payload\s*\("
+    ),
+    "Numbers": re.compile(
+        r"\blitchi_numbers\s*::\s*__movie_playback_settings\s*\("
+        r"|\blitchi_numbers\s*::\s*__rewrite_movie_playback_settings\s*\("
+    ),
+}
+IWA_MEDIA_PLAYBACK_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/movie_playback_codec.rs"
+)
+IWA_MEDIA_PLAYBACK_GENERATED_LEAK = re.compile(
+    r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?(?:MovieArchive|MovieArchiveMessage)\s*::\s*decode\s*\("
+    r"|\b(?:prost|buffa)\s*::\s*Message\b"
+    r"|\b(?:tsd|tsp)\s*::\s*MovieArchive\b"
+)
+KEYNOTE_MOVIE_PLAYBACK_HIDDEN_SOURCE_SEAM_DECLARATION = re.compile(
+    r"\bpub\s+fn\s+__decode_movie_playback_payload\s*\([^)]*"
+    r"\bsource\s*:\s*&\s*\[\s*u8\s*\][^)]*\bWireLimits\b"
+)
+
 # Wave87 moves Keynote movie geometry behind a selector-first package facade.
 # Keep this separate from playback/title/caption and from generic image, shape,
 # or audio geometry. Geometry writes own preview invalidation as an explicit
@@ -10298,6 +10382,33 @@ IWA_NUMBERS_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_TABLE_LOCK_SOURCE = Path("crates/litchi-iwa/src/table_lock.rs")
 IWA_NUMBERS_TABLE_INFO_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "model.rs"
+)
+# Numbers' editor model lookup used to probe every drawable payload by asking
+# Prost whether it happened to decode as ``TableInfoArchive``.  Keep that
+# compatibility host path on the explicit type-admission and borrowed archive
+# route once the focused model/storage refactor is present.  These are narrow
+# function-body ratchets: other Numbers mutation code may still materialize
+# generated messages while it owns that separate operation.
+IWA_NUMBERS_MODEL_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "editor" / "model.rs"
+IWA_NUMBERS_STORAGE_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "editor" / "storage.rs"
+IWA_NUMBERS_MODEL_LOOKUP_FUNCTIONS = (
+    "decode_table_info",
+    "find_table_owner",
+)
+IWA_NUMBERS_STORAGE_CACHE_FUNCTIONS = (
+    "table_models",
+    "object_locations",
+)
+IWA_NUMBERS_TABLE_INFO_STRICT_MARKERS = (
+    "TABLE_INFO_MESSAGE_TYPES",
+    "table_info_message_index",
+    "table_info_model_identifier",
+)
+IWA_NUMBERS_DIRECT_ARCHIVE_PARSE = re.compile(
+    r"\b(?:package|self|source)\s*\.\s*archive\s*\("
+)
+IWA_NUMBERS_BORROWED_ARCHIVE_PARSE = re.compile(
+    r"\bwith_parsed_archive\s*\("
 )
 NUMBERS_SOURCE_ROOT = Path("crates/litchi-numbers/src")
 NUMBERS_PACKAGE_SOURCE = NUMBERS_SOURCE_ROOT / "package.rs"
@@ -39128,7 +39239,7 @@ def audit_pages_footnote_lifecycle_facade_source_topology(
         )
 
     if package_path.is_file():
-        package_code = _mask_rust_non_code(package_source)
+        package_code = _mask_rust_comments(package_source)
         if PAGES_PACKAGE_FOOTNOTE_LIFECYCLE_MODULE.search(package_code) is None:
             violations.append(
                 "focused litchi-pages body-footnote public API is missing private "
@@ -41094,6 +41205,338 @@ def audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
                     "legacy iwa Numbers formula production source uses "
                     f"{label}: {path}:{line_number}"
                 )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_numbers_model_storage_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep Numbers table ownership and archive discovery on strict caches.
+
+    ``decode_table_info`` and ``find_table_owner`` are compatibility-host
+    lookup helpers, while ``table_models`` and ``object_locations`` provide
+    the storage index consumed by the editor.  Once either half of the
+    refactor claims its explicit type-admission/borrowed-archive marker, audit
+    all four functions together.  This prevents a partial migration from
+    leaving a permissive ``TableInfoArchive`` probe or a direct archive parse
+    reachable from the same lookup path, without banning unrelated generated
+    readers elsewhere in the editor.
+    """
+
+    model_path = root / IWA_NUMBERS_MODEL_SOURCE
+    storage_path = root / IWA_NUMBERS_STORAGE_SOURCE
+    existing_paths = [path for path in (model_path, storage_path) if path.is_file()]
+    if not existing_paths:
+        return []
+
+    production: dict[Path, str] = {}
+    code_by_path: dict[Path, str] = {}
+    for path in existing_paths:
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        production[path] = source
+        code_by_path[path] = _mask_rust_non_code(source)
+
+    # Keep historical/reduced fixtures dormant until the concrete migration
+    # is present.  Once any strict marker lands, fail closed if the partner
+    # functions are missing or route back through the old readers.
+    activation_markers = (
+        *IWA_NUMBERS_TABLE_INFO_STRICT_MARKERS,
+        "with_parsed_archive",
+    )
+    if not any(
+        re.search(rf"\b{re.escape(marker)}\b", code)
+        for code in code_by_path.values()
+        for marker in activation_markers
+    ):
+        return []
+
+    violations: list[str] = []
+
+    def require_functions(
+        path: Path,
+        names: tuple[str, ...],
+    ) -> dict[str, tuple[str, int]]:
+        source = production[path]
+        functions = _rust_top_level_function_bodies(source)
+        for name in names:
+            if name not in functions:
+                violations.append(
+                    "legacy iwa Numbers strict model/storage route is missing "
+                    f"{name}: {path.relative_to(root)}"
+                )
+        return functions
+
+    model_functions = require_functions(model_path, IWA_NUMBERS_MODEL_LOOKUP_FUNCTIONS)
+    storage_functions = require_functions(
+        storage_path, IWA_NUMBERS_STORAGE_CACHE_FUNCTIONS
+    )
+
+    def body_line(path: Path, offset: int, match: re.Match[str] | None = None) -> int:
+        source = production[path]
+        position = offset if match is None else offset + match.start()
+        return source.count("\n", 0, position) + 1
+
+    decode_body = model_functions.get("decode_table_info")
+    if decode_body is not None:
+        body, offset = decode_body
+        if not any(
+            re.search(rf"\b{re.escape(marker)}\b", body)
+            for marker in IWA_NUMBERS_TABLE_INFO_STRICT_MARKERS
+        ):
+            violations.append(
+                "legacy iwa Numbers decode_table_info must use explicit table-info "
+                f"admission markers: {IWA_NUMBERS_MODEL_SOURCE}"
+            )
+        generated_decodes = list(
+            re.finditer(
+                r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?TableInfoArchive\s*::\s*decode\s*\(",
+                body,
+            )
+        )
+        if generated_decodes and (
+            re.search(r"\btable_info_message_index\b", body) is None
+            or re.search(r"\bmessages\s*\[\s*index\s*\]", body) is None
+        ):
+            for match in generated_decodes:
+                violations.append(
+                    "legacy iwa Numbers decode_table_info retains a permissive "
+                    "TableInfoArchive probe: "
+                    f"{IWA_NUMBERS_MODEL_SOURCE}:{body_line(model_path, offset, match)}"
+                )
+
+    owner_body = model_functions.get("find_table_owner")
+    if owner_body is not None:
+        body, offset = owner_body
+        if IWA_NUMBERS_BORROWED_ARCHIVE_PARSE.search(body) is None:
+            violations.append(
+                "legacy iwa Numbers find_table_owner must borrow parsed archives "
+                f"through with_parsed_archive: {IWA_NUMBERS_MODEL_SOURCE}"
+            )
+        if not any(
+            re.search(rf"\b{re.escape(marker)}\b", body)
+            for marker in IWA_NUMBERS_TABLE_INFO_STRICT_MARKERS
+        ):
+            violations.append(
+                "legacy iwa Numbers find_table_owner must use strict table-info "
+                f"admission: {IWA_NUMBERS_MODEL_SOURCE}"
+            )
+        for match in re.finditer(
+            r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?TableInfoArchive\s*::\s*decode\s*\(",
+            body,
+        ):
+            violations.append(
+                "legacy iwa Numbers find_table_owner performs a generated "
+                "TableInfo decode while probing candidates: "
+                f"{IWA_NUMBERS_MODEL_SOURCE}:{body_line(model_path, offset, match)}"
+            )
+
+    for name in IWA_NUMBERS_STORAGE_CACHE_FUNCTIONS:
+        function = storage_functions.get(name)
+        if function is None:
+            continue
+        body, offset = function
+        if IWA_NUMBERS_BORROWED_ARCHIVE_PARSE.search(body) is None:
+            violations.append(
+                "legacy iwa Numbers storage lookup must borrow parsed archives "
+                f"through with_parsed_archive in {name}: {IWA_NUMBERS_STORAGE_SOURCE}"
+            )
+        for match in IWA_NUMBERS_DIRECT_ARCHIVE_PARSE.finditer(body):
+            violations.append(
+                "legacy iwa Numbers storage lookup performs a direct archive parse "
+                f"in {name}: {IWA_NUMBERS_STORAGE_SOURCE}:{body_line(storage_path, offset, match)}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_shared_media_playback_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire the shared playback host after focused owners are wired.
+
+    The physical archive lookup and transaction staging remain in the narrow
+    format adapters.  Scalar playback projection and source-preserving rewrite
+    belong to the corresponding Numbers, Pages, or Keynote package, where the
+    strict Buffa codec is available.  This audit follows only those concrete
+    seams and their known host adapters; it does not reject unrelated
+    ``MovieArchive`` graph materialization used for geometry or creation.
+    """
+
+    owner_paths = {
+        ecosystem: root / path
+        for ecosystem, path in IWA_MEDIA_PLAYBACK_OWNER_SOURCES.items()
+    }
+    package_paths = {
+        ecosystem: root / path
+        for ecosystem, path in IWA_MEDIA_PLAYBACK_OWNER_PACKAGE_SOURCES.items()
+    }
+    export_paths = {
+        ecosystem: root / path
+        for ecosystem, path in IWA_MEDIA_PLAYBACK_OWNER_EXPORT_SOURCES.items()
+    }
+    codec_path = root / IWA_MEDIA_PLAYBACK_CODEC_SOURCE
+    if not codec_path.is_file() or not all(path.is_file() for path in owner_paths.values()):
+        return []
+
+    violations: list[str] = []
+    owner_sources: dict[str, str] = {}
+    owner_codes: dict[str, str] = {}
+    for ecosystem, path in owner_paths.items():
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        owner_sources[ecosystem] = source
+        owner_codes[ecosystem] = _mask_rust_non_code(source)
+
+    def function_declaration(
+        name: str,
+        *,
+        rewrite: bool = False,
+    ) -> re.Pattern[str]:
+        arguments = (
+            r"(?=[^)]*\bsource\s*:\s*&\s*\[\s*u8\s*\])"
+            r"(?=[^)]*\bWireLimits\b)"
+        )
+        if rewrite:
+            arguments += r"(?=[^)]*\bMediaPlaybackSettings\b)"
+        arguments += r"[^)]*"
+        return re.compile(
+            r"(?ms)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][^\n]*\n"
+            r"(?:\s*#\s*\[[^\]]+\]\s*\n)*"
+            rf"\s*pub\s+fn\s+{re.escape(name)}\s*\({arguments}\s*\)"
+        )
+
+    for ecosystem, owner_path in owner_paths.items():
+        owner_code = owner_codes[ecosystem]
+        decode_name, rewrite_name = IWA_MEDIA_PLAYBACK_OWNER_SEAMS[ecosystem]
+        for name, rewrite in ((decode_name, False), (rewrite_name, True)):
+            if name is None:
+                continue
+            if function_declaration(name, rewrite=rewrite).search(owner_code) is None:
+                violations.append(
+                    f"focused litchi-{ecosystem.lower()} movie-playback owner is missing "
+                    f"hidden source seam {name}: {owner_paths[ecosystem]}"
+                )
+
+        package_source = (
+            _mask_rust_cfg_test_items(package_paths[ecosystem].read_text(encoding="utf-8"))
+            if package_paths[ecosystem].is_file()
+            else ""
+        )
+        # Keep feature strings intact while hiding comments.  The module is
+        # intentionally gated by the literal `internal-iwork-source` feature,
+        # so the general non-code mask would erase the declaration we need to
+        # enforce here.
+        package_code = _mask_rust_comments(package_source)
+        if IWA_MEDIA_PLAYBACK_OWNER_MODULES[ecosystem].search(package_code) is None:
+            violations.append(
+                f"focused litchi-{ecosystem.lower()} movie-playback owner module is missing: "
+                f"{IWA_MEDIA_PLAYBACK_OWNER_PACKAGE_SOURCES[ecosystem]}"
+            )
+
+        export_sources = [package_source]
+        export_path = export_paths[ecosystem]
+        if export_path.is_file():
+            export_sources.append(
+                _mask_rust_comments(
+                    _mask_rust_cfg_test_items(export_path.read_text(encoding="utf-8"))
+                )
+            )
+        export_sources[0] = _mask_rust_comments(export_sources[0])
+        for name in (decode_name, rewrite_name):
+            if name is None:
+                continue
+            hidden_export = re.compile(
+                r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
+                r'"internal-iwork-source"\s*\)\s*\]\s*\n'
+                r"\s*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\]\s*\n"
+                rf"\s*pub\s+use[^;]*\b{re.escape(name)}\b[^;]*;"
+            )
+            if not any(hidden_export.search(source) for source in export_sources):
+                violations.append(
+                    f"focused litchi-{ecosystem.lower()} movie-playback seam {name} "
+                    "must use the hidden internal-iwork-source export: "
+                    f"{IWA_MEDIA_PLAYBACK_OWNER_EXPORT_SOURCES[ecosystem]}"
+                )
+
+        if "movie_playback_codec" not in owner_code:
+            violations.append(
+                f"focused litchi-{ecosystem.lower()} movie-playback owner must use "
+                f"movie_playback_codec: {owner_paths[ecosystem]}"
+            )
+        if re.search(r"\b(?:decode|rewrite)_movie_playback(?:\b|_)", owner_code) is None:
+            violations.append(
+                f"focused litchi-{ecosystem.lower()} movie-playback owner is missing "
+                f"strict codec routing: {owner_paths[ecosystem]}"
+            )
+        for match in IWA_MEDIA_PLAYBACK_GENERATED_LEAK.finditer(owner_code):
+            line_number = owner_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                f"focused litchi-{ecosystem.lower()} movie-playback owner retains "
+                f"generated playback decoding {match.group(0).strip()}: "
+                f"{owner_paths[ecosystem]}:{line_number}"
+            )
+
+        for relative_host in IWA_MEDIA_PLAYBACK_HOST_SOURCES[ecosystem]:
+            host_path = root / relative_host
+            if not host_path.is_file():
+                violations.append(
+                    f"litchi-{ecosystem.lower()} movie-playback host adapter is missing: "
+                    f"{relative_host}"
+                )
+                continue
+            host_source = _mask_rust_cfg_test_items(host_path.read_text(encoding="utf-8"))
+            host_code = _mask_rust_non_code(host_source)
+            if IWA_MEDIA_PLAYBACK_HOST_CALLS[ecosystem].search(host_code) is None:
+                violations.append(
+                    f"litchi-{ecosystem.lower()} movie-playback host adapter must call "
+                    f"its focused package seam: {relative_host}"
+                )
+            # Limit the generated-decoder check to the small playback staging
+            # functions.  Numbers and Keynote still need generated graph reads
+            # for geometry/creation outside this scalar edge.
+            function_names = {
+                "Keynote": ("movie_info", "audio_info"),
+                "Pages": ("movie_playback_settings", "replace_movie_playback_settings"),
+                "Numbers": (
+                    "movie_playback_settings_from_payload",
+                    "replace_movie_playback_settings",
+                ),
+            }[ecosystem]
+            functions = _rust_top_level_function_bodies(host_source)
+            for function_name in function_names:
+                function = functions.get(function_name)
+                if function is None:
+                    continue
+                body, offset = function
+                for match in re.finditer(
+                    r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?MovieArchive\s*::\s*decode\s*\(",
+                    body,
+                ):
+                    line_number = host_source.count(
+                        "\n", 0, offset + match.start()
+                    ) + 1
+                    violations.append(
+                        f"litchi-{ecosystem.lower()} movie-playback staging function "
+                        f"{function_name} retains generated MovieArchive decoding: "
+                        f"{relative_host}:{line_number}"
+                    )
+
+    root_lib = root / IWA_FACADE_SOURCE
+    if root_lib.is_file():
+        root_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(root_lib.read_text(encoding="utf-8"))
+        )
+        for match in IWA_SHARED_MEDIA_PLAYBACK_ROOT_MODULE.finditer(root_code):
+            line_number = root_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired shared litchi-iwa media-playback module declaration: "
+                f"{IWA_FACADE_SOURCE}:{line_number}"
+            )
+    if (root / IWA_SHARED_MEDIA_PLAYBACK_SOURCE).is_file():
+        violations.append(
+            "retired shared litchi-iwa media-playback source was restored: "
+            f"{IWA_SHARED_MEDIA_PLAYBACK_SOURCE}"
+        )
 
     return sorted(set(violations))
 
@@ -44805,6 +45248,22 @@ def audit_iwa_pages_root_facts_graph_source_topology(
             ),
             1,
         )
+        # A graph reader may delegate validation variants to one shared
+        # helper. Follow that concrete local edge before deciding that the
+        # root-facts projection is missing; this keeps the ratchet attached to
+        # the actual production read path rather than to incidental wrapper
+        # structure.
+        if (
+            IWA_PAGES_ROOT_FACTS_GRAPH_CALL.search(production_body) is None
+            and function_name == "body_audio_graph"
+        ):
+            delegated = _rust_named_function_body(
+                masked_source, "body_audio_graph_with_validation"
+            )
+            if delegated is not None:
+                body, body_offset = delegated
+                production_body = _mask_rust_non_code(body)
+                line_number = masked_source.count("\n", 0, body_offset) + 1
         if IWA_PAGES_ROOT_FACTS_GRAPH_CALL.search(production_body) is None:
             violations.append(
                 "litchi-iwa Pages graph reader is missing the compact root-facts "
@@ -50251,6 +50710,16 @@ def audit_keynote_movie_playback_facade_source_topology(
             continue
         dedicated = source_path in {owner_path, semantic_path}
         for declaration, line_number in _rust_public_declarations(source):
+            # The migration host needs one exact hidden borrowed-payload
+            # ingress. It is feature-gated at the package/lib re-export and
+            # is intentionally the only raw-wire exception in this facade.
+            if (
+                source_path == owner_path
+                and KEYNOTE_MOVIE_PLAYBACK_HIDDEN_SOURCE_SEAM_DECLARATION.search(
+                    declaration
+                )
+            ):
+                continue
             identifiers = {match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)}
             if not dedicated and not (identifiers & facade_names):
                 continue
@@ -57601,6 +58070,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_extractor_no_eager_tile_source_topology()
         + audit_iwa_numbers_table_extractor_model_tile_source_topology()
         + audit_iwa_numbers_table_extractor_no_eager_formula_source_topology()
+        + audit_iwa_numbers_model_storage_source_topology()
+        + audit_iwa_shared_media_playback_source_topology()
         + audit_iwa_keynote_slide_table_discovery_source_topology()
         + audit_iwa_keynote_slide_table_listing_appearance_source_topology()
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()

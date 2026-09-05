@@ -15,7 +15,7 @@ const TABLE_CELL_STORAGE_MAX_WORK: usize = litchi_iwa_common::WireLimits::MAX_RE
 const TABLE_CELL_STORAGE_MAX_REFERENCES: usize = litchi_numbers::MAX_REFERENCES;
 const TABLE_CELL_STORAGE_MAX_TEXT_BYTES: usize = litchi_numbers::DEFAULT_MAX_TEXT_BYTES;
 
-fn table_info_model_identifier(message: &RawMessage, drawable_id: u64) -> Result<u64> {
+pub(super) fn table_info_model_identifier(message: &RawMessage, drawable_id: u64) -> Result<u64> {
     let mut compatibility = Vec::new();
     let source = if message.type_ == 6_003 {
         // Historical type-6003 fixtures can omit the required DrawableArchive
@@ -3452,11 +3452,13 @@ pub(super) fn table_models(package: &IWorkPackage) -> Result<Vec<TableDescriptor
         let sheet_archive_name = locations.get(&sheet_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers sheet object {sheet_id} is missing"))
         })?;
-        let sheet_archive = package.archive(sheet_archive_name)?;
-        let sheet_object = sheet_archive.object(sheet_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers sheet object {sheet_id} is missing"))
+        let sheet = package.with_parsed_archive(sheet_archive_name, |sheet_archive| {
+            let sheet_object = sheet_archive.object(sheet_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers sheet object {sheet_id} is missing"))
+            })?;
+            let (_, sheet) = decode_sheet(sheet_object)?;
+            Ok(sheet)
         })?;
-        let (_, sheet) = decode_sheet(sheet_object)?;
         for drawable in sheet.drawable_infos {
             let drawable_id = drawable.identifier;
             let drawable_archive_name = locations.get(&drawable_id).ok_or_else(|| {
@@ -3464,53 +3466,68 @@ pub(super) fn table_models(package: &IWorkPackage) -> Result<Vec<TableDescriptor
                     "Numbers sheet {sheet_id} drawable {drawable_id} is missing"
                 ))
             })?;
-            let drawable_archive = package.archive(drawable_archive_name)?;
-            let drawable_object = drawable_archive.object(drawable_id).ok_or_else(|| {
-                Error::InvalidFormat(format!("Numbers drawable object {drawable_id} is missing"))
-            })?;
             // TST type numbers differ between archive generations, but both
             // admitted TableInfo aliases are explicit. Do not let arbitrary
             // drawable payloads exploit Prost's permissive cross-message
-            // decoding to claim a table model.
-            let mut resolved_model = None;
-            for message in drawable_object
-                .messages
-                .iter()
-                .filter(|message| TABLE_INFO_MESSAGE_TYPES.contains(&message.type_))
-            {
-                let candidate_id = table_info_model_identifier(message, drawable_id)?;
-                if candidate_id == drawable_id {
-                    return Err(Error::InvalidFormat(format!(
-                        "Numbers drawable object {drawable_id} cannot also own its table-model payload"
-                    )));
-                }
-                let Some(model_archive_name) = locations.get(&candidate_id) else {
-                    return Err(Error::InvalidFormat(format!(
-                        "Numbers drawable object {drawable_id} references missing table model {candidate_id}"
-                    )));
-                };
-                let model_archive = package.archive(model_archive_name)?;
-                let Some(model_object) = model_archive.object(candidate_id) else {
-                    return Err(Error::InvalidFormat(format!(
-                        "Numbers drawable object {drawable_id} references missing table model {candidate_id}"
-                    )));
-                };
-                let Some(model) = model::decode_attached_table_model_with_budget(
-                    model_object.messages.as_slice(),
-                    candidate_id,
-                    &mut model_budget,
-                )?
-                else {
-                    return Err(Error::InvalidFormat(format!(
-                        "Numbers drawable object {drawable_id} references object {candidate_id} without a table-model payload"
-                    )));
-                };
-                if resolved_model.replace((candidate_id, model)).is_some() {
-                    return Err(Error::InvalidFormat(format!(
-                        "Numbers drawable object {drawable_id} contains multiple table-info payloads"
-                    )));
-                }
-            }
+            // decoding to claim a table model. Resolve each candidate while
+            // its drawable archive is borrowed so malformed/duplicate
+            // payloads retain their original first-error ordering.
+            let resolved_model = package.with_parsed_archive(
+                drawable_archive_name,
+                |drawable_archive| {
+                    let drawable_object = drawable_archive.object(drawable_id).ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Numbers drawable object {drawable_id} is missing"
+                        ))
+                    })?;
+                    let mut resolved_model = None;
+                    for message in drawable_object
+                        .messages
+                        .iter()
+                        .filter(|message| TABLE_INFO_MESSAGE_TYPES.contains(&message.type_))
+                    {
+                        let candidate_id = table_info_model_identifier(message, drawable_id)?;
+                        if candidate_id == drawable_id {
+                            return Err(Error::InvalidFormat(format!(
+                                "Numbers drawable object {drawable_id} cannot also own its table-model payload"
+                            )));
+                        }
+                        let Some(model_archive_name) = locations.get(&candidate_id) else {
+                            return Err(Error::InvalidFormat(format!(
+                                "Numbers drawable object {drawable_id} references missing table model {candidate_id}"
+                            )));
+                        };
+                        let model = package.with_parsed_archive(
+                            model_archive_name,
+                            |model_archive| {
+                                let Some(model_object) = model_archive.object(candidate_id)
+                                else {
+                                    return Err(Error::InvalidFormat(format!(
+                                        "Numbers drawable object {drawable_id} references missing table model {candidate_id}"
+                                    )));
+                                };
+                                let Some(model) = model::decode_attached_table_model_with_budget(
+                                    model_object.messages.as_slice(),
+                                    candidate_id,
+                                    &mut model_budget,
+                                )?
+                                else {
+                                    return Err(Error::InvalidFormat(format!(
+                                        "Numbers drawable object {drawable_id} references object {candidate_id} without a table-model payload"
+                                    )));
+                                };
+                                Ok(model)
+                            },
+                        )?;
+                        if resolved_model.replace((candidate_id, model)).is_some() {
+                            return Err(Error::InvalidFormat(format!(
+                                "Numbers drawable object {drawable_id} contains multiple table-info payloads"
+                            )));
+                        }
+                    }
+                    Ok(resolved_model)
+                },
+            )?;
             let Some((object_id, model)) = resolved_model else {
                 // Non-table drawables intentionally have no TableInfo alias.
                 continue;
@@ -3533,18 +3550,20 @@ pub(super) fn table_models(package: &IWorkPackage) -> Result<Vec<TableDescriptor
 pub(super) fn object_locations(package: &IWorkPackage) -> Result<HashMap<u64, String>> {
     let mut locations = HashMap::new();
     for name in package.iwa_entry_names() {
-        let archive = package.archive(name)?;
-        for object in archive.objects {
-            let identifier = object
-                .archive_info
-                .identifier
-                .ok_or_else(|| Error::Archive(format!("Object in {name} has no identifier")))?;
-            if let Some(previous) = locations.insert(identifier, name.to_owned()) {
-                return Err(Error::Archive(format!(
-                    "Object {identifier} appears in both {previous} and {name}"
-                )));
+        package.with_parsed_archive(name, |archive| {
+            for object in &archive.objects {
+                let identifier = object
+                    .archive_info
+                    .identifier
+                    .ok_or_else(|| Error::Archive(format!("Object in {name} has no identifier")))?;
+                if let Some(previous) = locations.insert(identifier, name.to_owned()) {
+                    return Err(Error::Archive(format!(
+                        "Object {identifier} appears in both {previous} and {name}"
+                    )));
+                }
             }
-        }
+            Ok(())
+        })?;
     }
     Ok(locations)
 }

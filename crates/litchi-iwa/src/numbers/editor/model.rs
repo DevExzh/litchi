@@ -9,6 +9,7 @@ use litchi_iwa_protos::comment_storage_codec;
 
 const DEFAULT_TILE_SIZE_ROWS: u32 = 256;
 const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
+const TABLE_INFO_MESSAGE_TYPES: &[u32] = &[6_000, 6_003];
 #[cfg(test)]
 const LEGACY_TABLE_MODEL_MESSAGE_TYPE: u32 = 6_000;
 #[cfg(test)]
@@ -2095,23 +2096,45 @@ pub(super) fn rewrite_reference_list(
     rewrite_repeated_length_delimited_fields(data, field_number, &replacements)
 }
 
+fn table_info_message_index(object: &ArchiveObject) -> Result<Option<(usize, u64)>> {
+    let drawable_id = object.archive_info.identifier.unwrap_or_default();
+    let mut selected = None;
+    for (index, message) in object.messages.iter().enumerate() {
+        if !TABLE_INFO_MESSAGE_TYPES.contains(&message.type_) {
+            continue;
+        }
+        let model_id = super::storage::table_info_model_identifier(message, drawable_id)?;
+        if selected.replace((index, model_id)).is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "Object {:?} contains multiple Numbers table-info payloads",
+                object.archive_info.identifier
+            )));
+        }
+    }
+    Ok(selected)
+}
+
 pub(super) fn decode_table_info(object: &ArchiveObject) -> Result<(usize, tst::TableInfoArchive)> {
-    object
-        .messages
-        .iter()
-        .enumerate()
-        .find_map(|(index, message)| {
-            tst::TableInfoArchive::decode(message.data.as_slice())
-                .ok()
-                .filter(|info| info.table_model.identifier != 0)
-                .map(|info| (index, info))
-        })
-        .ok_or_else(|| {
+    let (index, model_id) = table_info_message_index(object)?.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Object {:?} has no Numbers table info payload",
+            object.archive_info.identifier
+        ))
+    })?;
+    let info =
+        tst::TableInfoArchive::decode(object.messages[index].data.as_slice()).map_err(|error| {
             Error::InvalidFormat(format!(
-                "Object {:?} has no Numbers table info payload",
+                "Object {:?} has a malformed Numbers table info payload: {error}",
                 object.archive_info.identifier
             ))
-        })
+        })?;
+    if info.table_model.identifier != model_id {
+        return Err(Error::InvalidFormat(format!(
+            "Object {:?} table info model reference changed during strict validation",
+            object.archive_info.identifier
+        )));
+    }
+    Ok((index, info))
 }
 
 pub(super) fn find_table_model_message(object: &ArchiveObject) -> Result<usize> {
@@ -2650,26 +2673,29 @@ pub(super) fn find_table_owner(package: &IWorkPackage, table_id: u64) -> Result<
                 sheet_reference.identifier
             ))
         })?;
-        let archive = package.archive(archive_name)?;
-        let sheet_object = archive.object(sheet_reference.identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Numbers sheet {} is missing",
-                sheet_reference.identifier
-            ))
+        let sheet = package.with_parsed_archive(archive_name, |archive| {
+            let sheet_object = archive.object(sheet_reference.identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers sheet {} is missing",
+                    sheet_reference.identifier
+                ))
+            })?;
+            let (_, sheet) = decode_sheet(sheet_object)?;
+            Ok(sheet)
         })?;
-        let (_, sheet) = decode_sheet(sheet_object)?;
         for drawable in sheet.drawable_infos {
             let Some(drawable_archive) = locations.get(&drawable.identifier) else {
                 continue;
             };
-            let object_archive = package.archive(drawable_archive)?;
-            let Some(object) = object_archive.object(drawable.identifier) else {
-                continue;
-            };
-            let matches = object.messages.iter().any(|message| {
-                tst::TableInfoArchive::decode(message.data.as_slice())
-                    .is_ok_and(|info| info.table_model.identifier == table_id)
-            });
+            let matches = package.with_parsed_archive(drawable_archive, |archive| {
+                let Some(object) = archive.object(drawable.identifier) else {
+                    return Ok(false);
+                };
+                let Some((_, model_id)) = table_info_message_index(object)? else {
+                    return Ok(false);
+                };
+                Ok(model_id == table_id)
+            })?;
             if matches {
                 if owner.is_some() {
                     return Err(Error::InvalidFormat(format!(
@@ -5418,6 +5444,99 @@ mod tests {
     use super::*;
 
     const SPARSE_TABLE_MODEL: &[u8] = &[0x22, 0x00, 0x30, 0x00, 0x38, 0x00, 0x42, 0x00];
+
+    fn table_info_payload(model_id: u64) -> Vec<u8> {
+        tst::TableInfoArchive {
+            super_: tsd::DrawableArchive::default(),
+            table_model: tsp::Reference {
+                identifier: model_id,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    #[test]
+    fn table_info_selection_requires_an_admitted_alias() {
+        let payload = table_info_payload(41);
+        for message_type in [9_999, TABLE_MODEL_MESSAGE_TYPE] {
+            let object = ArchiveObject::new(
+                7,
+                vec![RawMessage {
+                    type_: message_type,
+                    data: payload.clone(),
+                }],
+            )
+            .unwrap();
+            assert_eq!(table_info_message_index(&object).unwrap(), None);
+            assert!(decode_table_info(&object).is_err());
+        }
+    }
+
+    #[test]
+    fn malformed_admitted_table_info_is_not_skipped() {
+        let object = ArchiveObject::new(
+            7,
+            vec![RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPES[0],
+                data: vec![0x80],
+            }],
+        )
+        .unwrap();
+
+        let error = table_info_message_index(&object).expect_err("malformed TableInfo payload");
+        assert!(error.to_string().contains("malformed table-info payload"));
+    }
+
+    #[test]
+    fn duplicate_admitted_table_info_payloads_are_rejected() {
+        let payload = table_info_payload(41);
+        let object = ArchiveObject::new(
+            7,
+            vec![
+                RawMessage {
+                    type_: TABLE_INFO_MESSAGE_TYPES[0],
+                    data: payload.clone(),
+                },
+                RawMessage {
+                    type_: TABLE_INFO_MESSAGE_TYPES[1],
+                    data: payload,
+                },
+            ],
+        )
+        .unwrap();
+
+        let error = table_info_message_index(&object).expect_err("duplicate TableInfo payloads");
+        assert!(
+            error
+                .to_string()
+                .contains("multiple Numbers table-info payloads")
+        );
+    }
+
+    #[test]
+    fn sparse_legacy_table_info_alias_keeps_mutation_decode_behavior() {
+        let object = ArchiveObject::new(
+            7,
+            vec![RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPES[1],
+                data: tst::TableInfoArchive {
+                    table_model: tsp::Reference {
+                        identifier: 41,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            }],
+        )
+        .unwrap();
+
+        let (index, info) = decode_table_info(&object).expect("legacy sparse TableInfo");
+        assert_eq!(index, 0);
+        assert_eq!(info.table_model.identifier, 41);
+    }
 
     #[test]
     fn malformed_attached_table_model_payload_is_reported() {

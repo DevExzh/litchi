@@ -93,6 +93,8 @@ use crate::{
 pub use catalog_table_appearance::{
     __CatalogTableAppearanceSource, __catalog_table_appearance, __catalog_table_style_edges,
 };
+#[cfg(feature = "internal-iwork-source")]
+pub use slide_movie_playback::__decode_movie_playback_payload;
 
 pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};
 pub use limits::{

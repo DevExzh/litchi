@@ -1,8 +1,8 @@
 //! Typed construction and strict discovery of body-anchored Pages movie graphs.
 
+use super::super::media_playback::movie_playback_settings;
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::media_playback::media_playback_settings;
 use crate::shapes::{
     DrawableProperties, drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
@@ -198,6 +198,7 @@ pub(super) fn body_movie_infos(editor: &PagesEditor) -> Result<Vec<PagesMovieInf
         movies.push(movie_info(
             editor.package(),
             editor.body_storage_id.get(),
+            &archive_name,
             drawable.identifier,
             entry.character_index,
         )?);
@@ -472,6 +473,7 @@ pub(super) fn body_movie_graph(
 fn movie_info(
     package: &IWorkPackage,
     body_storage_id: u64,
+    archive_name: &str,
     identifier: u64,
     anchor_character_index: u32,
 ) -> Result<PagesMovieInfo> {
@@ -503,11 +505,7 @@ fn movie_info(
             })?
             .identifier,
     )?;
-    let playback = media_playback_settings(&movie).map_err(|error| {
-        Error::InvalidFormat(format!(
-            "Pages movie {identifier} has invalid playback settings: {error}"
-        ))
-    })?;
+    let playback = movie_playback_settings(package, archive_name, identifier, "Pages movie")?;
     Ok(PagesMovieInfo {
         drawable_object_id: identifier,
         anchor_character_index,

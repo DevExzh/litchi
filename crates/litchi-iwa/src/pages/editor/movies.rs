@@ -6,12 +6,12 @@ use std::time::Duration;
 use litchi_iwa_common::media::Type as MediaType;
 use litchi_pages::movie::Options as PagesMovieOptions;
 
+use super::media_playback::replace_movie_playback_settings;
 use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::media::MediaAssetId;
-use crate::media_playback::replace_movie_playback_settings;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,

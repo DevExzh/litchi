@@ -18,6 +18,8 @@ pub(crate) mod document_settings;
 mod drawable_order;
 mod footnote_text;
 mod header_footer_text;
+#[cfg(feature = "internal-iwork-source")]
+mod movie_playback;
 mod page_layout;
 mod save;
 pub(crate) mod section_background;
@@ -109,6 +111,10 @@ pub use footnote_text::{
 pub use header_footer_text::{
     HeaderFooterTextCommit, HeaderFooterTextDiagnostics, HeaderFooterTextEdit,
     HeaderFooterTextError, HeaderFooterTextLimitKind, HeaderFooterTextPatch,
+};
+#[cfg(feature = "internal-iwork-source")]
+pub use movie_playback::{
+    __decode_movie_playback_payload, __rewrite_movie_playback_payload, MoviePlaybackError,
 };
 pub use page_layout::{
     PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,

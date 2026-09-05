@@ -10,10 +10,10 @@ use super::slide_movies::geometry::{set_movie_geometry, set_movie_properties};
 use super::slide_movies::graph::{
     MovieObjectIds, audio_creation_values, audio_objects, movie_creation_context,
 };
+use super::slide_movies::movie_playback_wire_limits;
 use super::*;
 use crate::data_reference_registry::add_component_data_reference;
 use crate::media::MediaAssetId;
-use crate::media_playback::media_playback_settings;
 use crate::shapes::{
     DrawablePoint, DrawableProperties, drawable_properties, geometry_from_drawable,
 };
@@ -340,11 +340,18 @@ fn audio_info(
                 "Keynote audio {drawable_object_id} has no position"
             ))
         })?;
-    let playback = media_playback_settings(&audio).map_err(|error| {
-        Error::InvalidFormat(format!(
-            "Keynote audio {drawable_object_id} has invalid playback settings: {error}"
-        ))
-    })?;
+    let raw = graph.message_data_type(
+        drawable_object_id,
+        AUDIO_ARCHIVE_MESSAGE_TYPE,
+        "TSD.MovieArchive",
+    )?;
+    let playback_limits = movie_playback_wire_limits(editor.package())?;
+    let playback =
+        litchi_keynote::__decode_movie_playback_payload(raw, playback_limits).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Keynote audio {drawable_object_id} has invalid playback settings: {error}"
+            ))
+        })?;
     Ok(KeynoteSlideAudioInfo {
         slide_index,
         drawable_object_id,
