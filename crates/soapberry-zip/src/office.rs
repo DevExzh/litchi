@@ -4023,10 +4023,13 @@ impl std::fmt::Debug for ArchiveReader<'_> {
 
 /// Bounded limits for the ZIP transport streaming writer.
 ///
-/// The writer deliberately supports only ZIP32 output in this first transport
-/// substrate. The output ceiling, per-entry ceiling, aggregate uncompressed
-/// ceiling, member count, and metadata ceiling are finite by default and are
-/// checked before an entry starts or before an input chunk is accepted.
+/// The writer uses ZIP32 framing while all configured payload ceilings remain
+/// below ZIP64 thresholds, and promotes unknown-size entries to ZIP64 before
+/// their local header when an admitted entry or compressed-size ceiling can
+/// reach a ZIP32 sentinel. The output ceiling, per-entry ceiling, aggregate
+/// uncompressed ceiling, member count, and metadata ceiling are finite by
+/// default and are checked before an entry starts or before an input chunk is
+/// accepted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StreamingArchiveLimits {
     /// Maximum number of file members accepted by a writer.
@@ -4035,9 +4038,9 @@ pub struct StreamingArchiveLimits {
     pub max_member_name_bytes: u64,
     /// Maximum aggregate variable central-directory metadata bytes.
     ///
-    /// The streaming convenience methods currently add no extra fields, so
-    /// this is the aggregate member-name budget.  ZIP fixed-size headers are
-    /// not included, matching [`ArchiveLimits::max_metadata_bytes`].
+    /// This includes normalized member names and generated ZIP64 extra-field
+    /// bytes. ZIP fixed-size headers are not included, matching
+    /// [`ArchiveLimits::max_metadata_bytes`].
     pub max_metadata_bytes: u64,
     /// Maximum compressed bytes accepted for one streamed member.
     ///
@@ -4115,8 +4118,9 @@ impl Default for StreamingArchiveLimits {
 }
 
 const ZIP32_MAX_VALUE: u64 = u32::MAX as u64;
-const ZIP32_MAX_ENTRIES: usize = u16::MAX as usize - 1;
 const ZIP32_MAX_MEMBER_NAME_BYTES: u64 = u16::MAX as u64;
+const ZIP64_EXTRA_FIELD_HEADER_BYTES: u64 = 4;
+const ZIP64_EXTRA_FIELD_VALUE_BYTES: u64 = 8;
 const MIN_STREAM_OUTPUT_BYTES: u64 = 22;
 const DEFAULT_STREAM_MAX_ENTRIES: usize = 65_534;
 const DEFAULT_STREAM_MAX_COMPRESSED_SIZE: u64 = 512 * 1024 * 1024;
@@ -4124,6 +4128,18 @@ const DEFAULT_STREAM_MAX_ENTRY_SIZE: u64 = 512 * 1024 * 1024;
 const DEFAULT_STREAM_MAX_TOTAL_SIZE: u64 = 2 * 1024 * 1024 * 1024;
 const DEFAULT_STREAM_MAX_OUTPUT_BYTES: u64 = 512 * 1024 * 1024;
 const STREAM_COPY_BUFFER_SIZE: usize = 16 * 1024;
+
+/// Admission state retained until a generated member has been finalized.
+///
+/// `metadata_bytes` includes the normalized member name and any ZIP64 extra
+/// fields that the low-level writer will generate for the central record.
+#[derive(Debug)]
+struct StreamingEntryAdmission {
+    normalized_name: String,
+    metadata_bytes: u64,
+    next_entries: usize,
+    next_metadata_bytes: u64,
+}
 
 /// Content-free progress exposed after a non-atomic streaming failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -4383,11 +4399,16 @@ impl<W: Write> Write for BoundedOutput<W> {
         }
         let requested = usize_to_u64(buffer.len(), "streaming ZIP output bytes requested")
             .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
-        let remaining = self.maximum.saturating_sub(self.accepted);
-        if requested > remaining {
+        let attempted = self.accepted.checked_add(requested).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "streaming ZIP output byte count overflow",
+            )
+        })?;
+        if attempted > self.maximum {
             return Err(streaming_limit_io_error(
                 StreamingLimitResource::OutputBytes,
-                self.accepted.saturating_add(requested),
+                attempted,
                 self.maximum,
             ));
         }
@@ -4462,11 +4483,16 @@ impl<W: Write> Write for LimitedEntryWriter<'_, '_, '_, W> {
         let requested = usize_to_u64(buffer.len(), "generated ZIP payload bytes requested")
             .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
         let compressed = self.compressed_bytes();
-        let remaining = self.maximum.saturating_sub(compressed);
-        if requested > remaining {
+        let attempted = compressed.checked_add(requested).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "generated ZIP payload byte count overflow",
+            )
+        })?;
+        if attempted > self.maximum {
             return Err(streaming_limit_io_error(
                 StreamingLimitResource::CompressedBytes,
-                compressed.saturating_add(requested),
+                attempted,
                 self.maximum,
             ));
         }
@@ -4510,11 +4536,16 @@ impl Write for CompressedScratch<'_> {
             .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
         let requested = usize_to_u64(buffer.len(), "compressed scratch bytes requested")
             .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
-        let remaining = self.maximum.saturating_sub(written);
-        if requested > remaining {
+        let attempted = written.checked_add(requested).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "compressed scratch byte count overflow",
+            )
+        })?;
+        if attempted > self.maximum {
             return Err(streaming_limit_io_error(
                 StreamingLimitResource::CompressedBytes,
-                written.saturating_add(requested),
+                attempted,
                 self.maximum,
             ));
         }
@@ -4556,10 +4587,10 @@ pub struct StreamingArchiveEntry<W: Write> {
     limits: StreamingArchiveLimits,
     entries: usize,
     metadata_bytes: u64,
+    metadata_charge: u64,
     total_uncompressed_bytes: u64,
     names: HashSet<String>,
     normalized_name: String,
-    name_bytes: u64,
     uncompressed_bytes: u64,
     output_bytes: u64,
     poisoned: bool,
@@ -4670,6 +4701,38 @@ impl<W: Write> StreamingArchiveEntry<W> {
             return Err(self.failure());
         }
 
+        let next_entries = match self.entries.checked_add(1) {
+            Some(entries) => entries,
+            None => {
+                self.poisoned = true;
+                self.failure = Some(accounting_overflow("streaming ZIP entry count"));
+                return Err(self.failure());
+            },
+        };
+        let next_metadata_bytes = match self.metadata_bytes.checked_add(self.metadata_charge) {
+            Some(metadata_bytes) => metadata_bytes,
+            None => {
+                self.poisoned = true;
+                self.failure = Some(accounting_overflow(
+                    "streaming ZIP aggregate metadata bytes",
+                ));
+                return Err(self.failure());
+            },
+        };
+        let next_total_uncompressed_bytes = match self
+            .total_uncompressed_bytes
+            .checked_add(self.uncompressed_bytes)
+        {
+            Some(total) => total,
+            None => {
+                self.poisoned = true;
+                self.failure = Some(accounting_overflow(
+                    "streaming ZIP aggregate uncompressed bytes",
+                ));
+                return Err(self.failure());
+            },
+        };
+
         let entry = match self.entry.take() {
             Some(entry) => entry,
             None => {
@@ -4705,11 +4768,9 @@ impl<W: Write> StreamingArchiveEntry<W> {
         let mut writer = StreamingArchiveWriter {
             archive,
             limits: self.limits,
-            entries: self.entries.saturating_add(1),
-            metadata_bytes: self.metadata_bytes.saturating_add(self.name_bytes),
-            total_uncompressed_bytes: self
-                .total_uncompressed_bytes
-                .saturating_add(self.uncompressed_bytes),
+            entries: next_entries,
+            metadata_bytes: next_metadata_bytes,
+            total_uncompressed_bytes: next_total_uncompressed_bytes,
             output_bytes: self.output_bytes,
             poisoned: false,
             names: self.names,
@@ -4736,8 +4797,24 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
             return Ok(0);
         }
 
-        let requested = u64::try_from(buffer.len()).unwrap_or(u64::MAX);
-        let next_entry = self.uncompressed_bytes.saturating_add(requested);
+        let requested = match usize_to_u64(buffer.len(), "streaming ZIP entry bytes requested") {
+            Ok(requested) => requested,
+            Err(error) => {
+                return Err(self.capture_io_failure(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    error.to_string(),
+                )));
+            },
+        };
+        let next_entry = match self.uncompressed_bytes.checked_add(requested) {
+            Some(next_entry) => next_entry,
+            None => {
+                return Err(self.capture_io_failure(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    accounting_overflow("streaming ZIP entry uncompressed bytes").to_string(),
+                )));
+            },
+        };
         if next_entry > self.limits.max_entry_size {
             let error = streaming_payload_limit_io_error(
                 LimitResource::EntrySize,
@@ -4746,7 +4823,15 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
             );
             return Err(self.capture_io_failure(error));
         }
-        let next_total = self.total_uncompressed_bytes.saturating_add(next_entry);
+        let next_total = match self.total_uncompressed_bytes.checked_add(next_entry) {
+            Some(next_total) => next_total,
+            None => {
+                return Err(self.capture_io_failure(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    accounting_overflow("streaming ZIP aggregate uncompressed bytes").to_string(),
+                )));
+            },
+        };
         if next_total > self.limits.max_total_size {
             let error = streaming_payload_limit_io_error(
                 LimitResource::TotalSize,
@@ -4772,7 +4857,26 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
                 Err(self.capture_io_failure(error))
             },
             Ok(written) => {
-                self.uncompressed_bytes = self.uncompressed_bytes.saturating_add(written as u64);
+                let written_u64 = match usize_to_u64(written, "streaming ZIP entry bytes accepted")
+                {
+                    Ok(written) => written,
+                    Err(error) => {
+                        return Err(self.capture_io_failure(std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            error.to_string(),
+                        )));
+                    },
+                };
+                self.uncompressed_bytes = match self.uncompressed_bytes.checked_add(written_u64) {
+                    Some(uncompressed_bytes) => uncompressed_bytes,
+                    None => {
+                        return Err(self.capture_io_failure(std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            accounting_overflow("streaming ZIP entry uncompressed bytes")
+                                .to_string(),
+                        )));
+                    },
+                };
                 self.refresh_output_bytes();
                 Ok(written)
             },
@@ -4875,7 +4979,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
     }
 
     /// Return the aggregate variable central-directory metadata bytes retained
-    /// for finalized members.
+    /// for finalized members, including generated ZIP64 extra fields.
     #[must_use]
     pub const fn metadata_bytes(&self) -> u64 {
         self.metadata_bytes
@@ -4920,28 +5024,57 @@ impl<W: Write> StreamingArchiveWriter<W> {
     }
 
     fn invalid_limits(&self) -> Option<Error> {
-        let reason = if self.limits.max_entries > ZIP32_MAX_ENTRIES {
-            "max_entries must be below the ZIP32 entry-count ceiling"
-        } else if self.limits.max_member_name_bytes > ZIP32_MAX_MEMBER_NAME_BYTES {
+        let reason = if self.limits.max_member_name_bytes > ZIP32_MAX_MEMBER_NAME_BYTES {
             "max_member_name_bytes exceeds the ZIP32 member-name field"
         } else if self.limits.max_metadata_bytes > self.limits.max_output_bytes {
             "max_metadata_bytes exceeds max_output_bytes"
-        } else if self.limits.max_compressed_size >= ZIP32_MAX_VALUE {
-            "max_compressed_size must be below the ZIP32 size ceiling"
         } else if self.limits.max_compressed_size > self.limits.max_output_bytes {
             "max_compressed_size exceeds max_output_bytes"
-        } else if self.limits.max_entry_size >= ZIP32_MAX_VALUE {
-            "max_entry_size must be below the ZIP32 size ceiling"
-        } else if self.limits.max_total_size >= ZIP32_MAX_VALUE {
-            "max_total_size must be below the ZIP32 size ceiling"
-        } else if self.limits.max_output_bytes >= ZIP32_MAX_VALUE {
-            "max_output_bytes must be below the ZIP32 size ceiling"
         } else if self.limits.max_output_bytes < MIN_STREAM_OUTPUT_BYTES {
             "max_output_bytes is too small for an empty ZIP archive"
         } else {
             return None;
         };
         Some(ErrorKind::InvalidInput { msg: reason.into() }.into())
+    }
+
+    /// Whether an unknown-size entry must establish ZIP64 framing before its
+    /// local header is emitted.
+    ///
+    /// The byte ceilings are the admission contract for streamed payloads.
+    /// When either payload ceiling can reach the ZIP32 sentinel, a later
+    /// chunk may require a 64-bit descriptor even though its final size is not
+    /// known at entry start. Count, aggregate, and output boundaries are
+    /// handled by the archive writer's ZIP64 tail promotion and do not change
+    /// the descriptor width for an entry whose own size remains ZIP32-sized.
+    #[inline]
+    fn streaming_entry_uses_zip64(&self) -> bool {
+        self.limits.max_compressed_size >= ZIP32_MAX_VALUE
+            || self.limits.max_entry_size >= ZIP32_MAX_VALUE
+    }
+
+    /// Number of bytes the low-level writer will add to one central record's
+    /// ZIP64 extra field for the supplied size/offset knowledge.
+    #[inline]
+    fn generated_central_zip64_extra_bytes(
+        force_size_fields: bool,
+        compressed_size: Option<u64>,
+        uncompressed_size: Option<u64>,
+        local_header_offset: u64,
+    ) -> u64 {
+        let has_uncompressed_size =
+            force_size_fields || uncompressed_size.is_some_and(|size| size >= ZIP32_MAX_VALUE);
+        let has_compressed_size =
+            force_size_fields || compressed_size.is_some_and(|size| size >= ZIP32_MAX_VALUE);
+        let has_offset = local_header_offset >= ZIP32_MAX_VALUE;
+
+        let field_count =
+            has_uncompressed_size as u64 + has_compressed_size as u64 + has_offset as u64;
+        if field_count == 0 {
+            0
+        } else {
+            ZIP64_EXTRA_FIELD_HEADER_BYTES + field_count * ZIP64_EXTRA_FIELD_VALUE_BYTES
+        }
     }
 
     fn ensure_usable(&self) -> Result<(), Error> {
@@ -4979,10 +5112,10 @@ impl<W: Write> StreamingArchiveWriter<W> {
         }
     }
 
-    fn validate_streaming_entry(&self, name: &str) -> Result<(String, u64), Error> {
+    fn validate_entry_name(&self, name: &str) -> Result<(String, u64, usize), Error> {
         self.ensure_usable()?;
         let raw_name = name.trim_end_matches('/');
-        let raw_name_bytes = u64::try_from(raw_name.len()).unwrap_or(u64::MAX);
+        let raw_name_bytes = usize_to_u64(raw_name.len(), "streaming ZIP member name bytes")?;
         let maximum_name_bytes = self
             .limits
             .max_member_name_bytes
@@ -4996,7 +5129,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
         }
         let path = ZipFilePath::from_str(raw_name);
         let normalized_name = canonical_member_name(path.as_str().to_string());
-        let name_bytes = u64::try_from(normalized_name.len()).unwrap_or(u64::MAX);
+        let name_bytes = usize_to_u64(normalized_name.len(), "normalized ZIP member name bytes")?;
         if name_bytes > ZIP32_MAX_MEMBER_NAME_BYTES
             || name_bytes > self.limits.max_member_name_bytes
         {
@@ -5014,18 +5147,12 @@ impl<W: Write> StreamingArchiveWriter<W> {
             .into());
         }
 
-        let next_metadata = self.metadata_bytes.saturating_add(name_bytes);
-        if next_metadata > self.limits.max_metadata_bytes {
-            return Err(limit_error(
-                LimitResource::MetadataBytes,
-                next_metadata,
-                self.limits.max_metadata_bytes,
-            ));
-        }
-
-        let next_entries = self.entries.saturating_add(1);
-        let max_entries = u64::try_from(self.limits.max_entries).unwrap_or(u64::MAX);
-        let actual_entries = u64::try_from(next_entries).unwrap_or(u64::MAX);
+        let next_entries = self
+            .entries
+            .checked_add(1)
+            .ok_or_else(|| accounting_overflow("streaming ZIP entry count"))?;
+        let max_entries = usize_to_u64(self.limits.max_entries, "streaming ZIP entry limit")?;
+        let actual_entries = usize_to_u64(next_entries, "streaming ZIP entry count")?;
         if next_entries > self.limits.max_entries {
             return Err(limit_error(
                 LimitResource::FileCount,
@@ -5034,15 +5161,56 @@ impl<W: Write> StreamingArchiveWriter<W> {
             ));
         }
 
-        Ok((normalized_name, name_bytes))
+        Ok((normalized_name, name_bytes, next_entries))
     }
 
-    fn validate_known_entry(
+    fn complete_entry_admission(
         &self,
-        name: &str,
-        uncompressed_bytes: u64,
-    ) -> Result<(String, u64), Error> {
-        let (normalized_name, name_bytes) = self.validate_streaming_entry(name)?;
+        normalized_name: String,
+        name_bytes: u64,
+        next_entries: usize,
+        generated_central_extra_bytes: u64,
+    ) -> Result<StreamingEntryAdmission, Error> {
+        let metadata_bytes = name_bytes
+            .checked_add(generated_central_extra_bytes)
+            .ok_or_else(|| accounting_overflow("streaming ZIP member metadata bytes"))?;
+        let next_metadata = self
+            .metadata_bytes
+            .checked_add(metadata_bytes)
+            .ok_or_else(|| accounting_overflow("streaming ZIP aggregate metadata bytes"))?;
+        if next_metadata > self.limits.max_metadata_bytes {
+            return Err(limit_error(
+                LimitResource::MetadataBytes,
+                next_metadata,
+                self.limits.max_metadata_bytes,
+            ));
+        }
+
+        Ok(StreamingEntryAdmission {
+            normalized_name,
+            metadata_bytes,
+            next_entries,
+            next_metadata_bytes: next_metadata,
+        })
+    }
+
+    fn validate_streaming_entry(&self, name: &str) -> Result<StreamingEntryAdmission, Error> {
+        let (normalized_name, name_bytes, next_entries) = self.validate_entry_name(name)?;
+        let generated_central_extra_bytes = Self::generated_central_zip64_extra_bytes(
+            self.streaming_entry_uses_zip64(),
+            None,
+            None,
+            self.archive.stream_offset(),
+        );
+        self.complete_entry_admission(
+            normalized_name,
+            name_bytes,
+            next_entries,
+            generated_central_extra_bytes,
+        )
+    }
+
+    fn validate_known_payload(&self, uncompressed_bytes: u64) -> Result<(), Error> {
         if uncompressed_bytes > self.limits.max_entry_size {
             return Err(limit_error(
                 LimitResource::EntrySize,
@@ -5052,7 +5220,8 @@ impl<W: Write> StreamingArchiveWriter<W> {
         }
         let total = self
             .total_uncompressed_bytes
-            .saturating_add(uncompressed_bytes);
+            .checked_add(uncompressed_bytes)
+            .ok_or_else(|| accounting_overflow("streaming ZIP aggregate uncompressed bytes"))?;
         if total > self.limits.max_total_size {
             return Err(limit_error(
                 LimitResource::TotalSize,
@@ -5060,14 +5229,36 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 self.limits.max_total_size,
             ));
         }
-        Ok((normalized_name, name_bytes))
+        Ok(())
     }
 
-    fn record_streaming_entry(&mut self, normalized_name: String, name_bytes: u64) {
-        let inserted = self.names.insert(normalized_name);
+    fn validate_known_entry(
+        &self,
+        name: &str,
+        uncompressed_bytes: u64,
+        compressed_bytes: u64,
+    ) -> Result<StreamingEntryAdmission, Error> {
+        let (normalized_name, name_bytes, next_entries) = self.validate_entry_name(name)?;
+        self.validate_known_payload(uncompressed_bytes)?;
+        let generated_central_extra_bytes = Self::generated_central_zip64_extra_bytes(
+            false,
+            Some(compressed_bytes),
+            Some(uncompressed_bytes),
+            self.archive.stream_offset(),
+        );
+        self.complete_entry_admission(
+            normalized_name,
+            name_bytes,
+            next_entries,
+            generated_central_extra_bytes,
+        )
+    }
+
+    fn record_streaming_entry(&mut self, admission: StreamingEntryAdmission) {
+        let inserted = self.names.insert(admission.normalized_name);
         debug_assert!(inserted);
-        self.entries += 1;
-        self.metadata_bytes += name_bytes;
+        self.entries = admission.next_entries;
+        self.metadata_bytes = admission.next_metadata_bytes;
     }
 
     fn reserve_streaming_entry(&mut self) -> Result<(), Error> {
@@ -5104,7 +5295,9 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 .into());
             }
             let read_bytes = usize_to_u64(read, "stream source bytes read")?;
-            let next_entry = accepted_uncompressed.saturating_add(read_bytes);
+            let next_entry = accepted_uncompressed
+                .checked_add(read_bytes)
+                .ok_or_else(|| accounting_overflow("streaming ZIP entry uncompressed bytes"))?;
             if next_entry > max_entry_size {
                 return Err(limit_error(
                     LimitResource::EntrySize,
@@ -5113,8 +5306,9 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 ));
             }
             let next_total = committed_total
-                .saturating_add(accepted_uncompressed)
-                .saturating_add(read_bytes);
+                .checked_add(accepted_uncompressed)
+                .and_then(|total| total.checked_add(read_bytes))
+                .ok_or_else(|| accounting_overflow("streaming ZIP aggregate uncompressed bytes"))?;
             if next_total > max_total_size {
                 return Err(limit_error(
                     LimitResource::TotalSize,
@@ -5144,12 +5338,14 @@ impl<W: Write> StreamingArchiveWriter<W> {
         compression_method: CompressionMethod,
         accounting: &mut ZipOperationAccounting,
     ) -> Result<(), Error> {
-        let (normalized_name, name_bytes) = self.validate_streaming_entry(name)?;
+        let admission = self.validate_streaming_entry(name)?;
         self.reserve_streaming_entry()?;
+        let zip64 = self.streaming_entry_uses_zip64();
         let started = self
             .archive
-            .new_file(&normalized_name)
+            .new_file(&admission.normalized_name)
             .compression_method(compression_method)
+            .zip64(zip64)
             .start();
         let (mut entry, config) = match started {
             Ok(started) => started,
@@ -5219,10 +5415,18 @@ impl<W: Write> StreamingArchiveWriter<W> {
             Ok(accepted) => accepted,
             Err(error) => return Err(self.poison(error)),
         };
-        self.total_uncompressed_bytes = self
+        self.total_uncompressed_bytes = match self
             .total_uncompressed_bytes
-            .saturating_add(accepted_uncompressed);
-        self.record_streaming_entry(normalized_name, name_bytes);
+            .checked_add(accepted_uncompressed)
+        {
+            Some(total) => total,
+            None => {
+                return Err(self.poison(accounting_overflow(
+                    "streaming ZIP aggregate uncompressed bytes",
+                )));
+            },
+        };
+        self.record_streaming_entry(admission);
         self.refresh_output_bytes();
         Ok(())
     }
@@ -5239,7 +5443,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
         name: &str,
         compression_method: CompressionMethod,
     ) -> Result<StreamingArchiveEntry<W>, StreamingArchiveFailure> {
-        let (normalized_name, name_bytes) = match self.validate_streaming_entry(name) {
+        let admission = match self.validate_streaming_entry(name) {
             Ok(value) => value,
             Err(error) => {
                 return Err(StreamingArchiveFailure {
@@ -5268,6 +5472,8 @@ impl<W: Write> StreamingArchiveWriter<W> {
             });
         }
 
+        let zip64 = self.streaming_entry_uses_zip64();
+
         let StreamingArchiveWriter {
             archive,
             limits,
@@ -5280,9 +5486,12 @@ impl<W: Write> StreamingArchiveWriter<W> {
             last_limit,
             output_counter,
         } = self;
-        let entry = match archive
-            .start_file_owned(&normalized_name, compression_method)
-            .map(|entry| entry.with_compressed_limit(limits.max_compressed_size))
+        let entry = match (if zip64 {
+            archive.start_file_owned_zip64(&admission.normalized_name, compression_method)
+        } else {
+            archive.start_file_owned(&admission.normalized_name, compression_method)
+        })
+        .map(|entry| entry.with_compressed_limit(limits.max_compressed_size))
         {
             Ok(entry) => entry,
             Err(error) => {
@@ -5311,10 +5520,10 @@ impl<W: Write> StreamingArchiveWriter<W> {
             limits,
             entries,
             metadata_bytes,
+            metadata_charge: admission.metadata_bytes,
             total_uncompressed_bytes,
             names,
-            normalized_name,
-            name_bytes,
+            normalized_name: admission.normalized_name,
             uncompressed_bytes: 0,
             output_bytes,
             poisoned: false,
@@ -5339,7 +5548,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
         accounting: &mut ZipOperationAccounting,
     ) -> Result<(), Error> {
         let data_bytes = usize_to_u64(data.len(), "stored payload length")?;
-        let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+        let admission = self.validate_known_entry(name, data_bytes, data_bytes)?;
         self.reserve_streaming_entry()?;
         if data_bytes > self.limits.max_compressed_size {
             return Err(limit_error(
@@ -5348,14 +5557,22 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 self.limits.max_compressed_size,
             ));
         }
-        match self
-            .archive
-            .write_stored_file_with_accounting(&normalized_name, data, accounting)
-        {
+        match self.archive.write_stored_file_with_accounting(
+            &admission.normalized_name,
+            data,
+            accounting,
+        ) {
             Ok(()) => {
                 self.total_uncompressed_bytes =
-                    self.total_uncompressed_bytes.saturating_add(data_bytes);
-                self.record_streaming_entry(normalized_name, name_bytes);
+                    match self.total_uncompressed_bytes.checked_add(data_bytes) {
+                        Some(total) => total,
+                        None => {
+                            return Err(self.poison(accounting_overflow(
+                                "streaming ZIP aggregate uncompressed bytes",
+                            )));
+                        },
+                    };
+                self.record_streaming_entry(admission);
                 self.refresh_output_bytes();
                 Ok(())
             },
@@ -5383,12 +5600,15 @@ impl<W: Write> StreamingArchiveWriter<W> {
         accounting: &mut ZipOperationAccounting,
     ) -> Result<(), Error> {
         let data_bytes = usize_to_u64(data.len(), "Deflate payload length")?;
-        let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+        let admission = self.validate_streaming_entry(name)?;
+        self.validate_known_payload(data_bytes)?;
         self.reserve_streaming_entry()?;
+        let zip64 = self.streaming_entry_uses_zip64();
         let started = self
             .archive
-            .new_file(&normalized_name)
+            .new_file(&admission.normalized_name)
             .compression_method(CompressionMethod::Deflate)
+            .zip64(zip64)
             .start();
         let result = match started {
             Ok((mut entry, config)) => (|| {
@@ -5415,8 +5635,16 @@ impl<W: Write> StreamingArchiveWriter<W> {
         if let Err(error) = result {
             return Err(self.poison(error));
         }
-        self.total_uncompressed_bytes = self.total_uncompressed_bytes.saturating_add(data_bytes);
-        self.record_streaming_entry(normalized_name, name_bytes);
+        self.total_uncompressed_bytes = match self.total_uncompressed_bytes.checked_add(data_bytes)
+        {
+            Some(total) => total,
+            None => {
+                return Err(self.poison(accounting_overflow(
+                    "streaming ZIP aggregate uncompressed bytes",
+                )));
+            },
+        };
+        self.record_streaming_entry(admission);
         self.refresh_output_bytes();
         Ok(())
     }
@@ -5445,7 +5673,8 @@ impl<W: Write> StreamingArchiveWriter<W> {
         accounting: &mut ZipOperationAccounting,
     ) -> Result<(), Error> {
         let data_bytes = usize_to_u64(data.len(), "Deflate payload length")?;
-        let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+        let (normalized_name, name_bytes, next_entries) = self.validate_entry_name(name)?;
+        self.validate_known_payload(data_bytes)?;
         self.reserve_streaming_entry()?;
         let mut compressed = Vec::new();
         compressed
@@ -5477,9 +5706,22 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 _ => error,
             });
         }
+        let compressed_bytes = usize_to_u64(compressed.len(), "compressed Deflate payload length")?;
+        let metadata_extra = Self::generated_central_zip64_extra_bytes(
+            false,
+            Some(compressed_bytes),
+            Some(data_bytes),
+            self.archive.stream_offset(),
+        );
+        let admission = self.complete_entry_admission(
+            normalized_name,
+            name_bytes,
+            next_entries,
+            metadata_extra,
+        )?;
         let crc32 = crate::crc32(data);
         match self.archive.write_generated_deflate_file_with_accounting(
-            &normalized_name,
+            &admission.normalized_name,
             crc32,
             data_bytes,
             &compressed,
@@ -5487,8 +5729,15 @@ impl<W: Write> StreamingArchiveWriter<W> {
         ) {
             Ok(()) => {
                 self.total_uncompressed_bytes =
-                    self.total_uncompressed_bytes.saturating_add(data_bytes);
-                self.record_streaming_entry(normalized_name, name_bytes);
+                    match self.total_uncompressed_bytes.checked_add(data_bytes) {
+                        Some(total) => total,
+                        None => {
+                            return Err(self.poison(accounting_overflow(
+                                "streaming ZIP aggregate uncompressed bytes",
+                            )));
+                        },
+                    };
+                self.record_streaming_entry(admission);
                 self.refresh_output_bytes();
                 Ok(())
             },
@@ -7863,7 +8112,7 @@ mod tests {
     }
 
     #[test]
-    fn streaming_limits_reject_zip32_overrides_before_output() {
+    fn streaming_limits_reject_oversized_member_name_before_output() {
         let invalid = StreamingArchiveLimits::new(usize::MAX, u64::MAX, u64::MAX).with_byte_limits(
             u64::MAX,
             u64::MAX,
@@ -7876,6 +8125,144 @@ mod tests {
         assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
         assert_eq!(writer.output_bytes(), 0);
         assert!(!writer.is_poisoned());
+    }
+
+    #[test]
+    fn streaming_zip64_admission_selects_framing_for_borrowed_and_owned_entries() {
+        let zip32_boundary = u64::from(u32::MAX);
+        let limits = StreamingArchiveLimits::new(u16::MAX as usize, 64, 4096)
+            .with_byte_limits(zip32_boundary, zip32_boundary, zip32_boundary)
+            .with_compressed_size_limit(zip32_boundary);
+        let mut writer = StreamingArchiveWriter::with_limits(limits);
+
+        writer
+            .write_deflated("borrowed-deflated", b"borrowed payload")
+            .unwrap();
+        writer
+            .write_stored_stream("reader-stored", Cursor::new(b"reader payload".to_vec()))
+            .unwrap();
+
+        let mut entry = writer
+            .start_entry("owned-stored", CompressionMethod::Store)
+            .unwrap();
+        entry.write_all(b"owned payload").unwrap();
+        writer = entry.finish().unwrap();
+
+        let bytes = writer.finish_to_bytes().unwrap();
+        assert!(ZipArchive::from_slice(&bytes).unwrap().is_zip64());
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.read("borrowed-deflated").unwrap(),
+            b"borrowed payload"
+        );
+        assert_eq!(reader.read("reader-stored").unwrap(), b"reader payload");
+        assert_eq!(reader.read("owned-stored").unwrap(), b"owned payload");
+
+        for name in [
+            b"borrowed-deflated" as &[u8],
+            b"reader-stored",
+            b"owned-stored",
+        ] {
+            let local = local_header_offset_for_name(&bytes, name);
+            assert_eq!(
+                u16::from_le_bytes([bytes[local + 4], bytes[local + 5]]),
+                45,
+                "ZIP64 local header version for {}",
+                String::from_utf8_lossy(name)
+            );
+            assert!(local_member_has_data_descriptor(&bytes, name));
+        }
+    }
+
+    #[test]
+    fn streaming_zip64_metadata_budget_includes_generated_central_extra() {
+        let zip32_boundary = u64::from(u32::MAX);
+        let borrowed_name = "borrowed.bin";
+        let owned_name = "owned.bin";
+        let borrowed_metadata = borrowed_name.len() as u64 + 20;
+        let expected_metadata = borrowed_metadata + owned_name.len() as u64 + 20;
+        let limits = StreamingArchiveLimits::new(4, 64, expected_metadata)
+            .with_byte_limits(zip32_boundary, zip32_boundary, zip32_boundary)
+            .with_compressed_size_limit(zip32_boundary);
+        let mut writer = StreamingArchiveWriter::with_limits(limits);
+        writer.write_deflated(borrowed_name, b"payload").unwrap();
+        assert_eq!(writer.metadata_bytes(), borrowed_metadata);
+
+        let mut entry = writer
+            .start_entry(owned_name, CompressionMethod::Store)
+            .unwrap();
+        entry.write_all(b"owned").unwrap();
+        writer = entry.finish().unwrap();
+        assert_eq!(writer.metadata_bytes(), expected_metadata);
+
+        let name_only_budget = StreamingArchiveLimits::new(4, 64, borrowed_name.len() as u64)
+            .with_byte_limits(zip32_boundary, zip32_boundary, zip32_boundary)
+            .with_compressed_size_limit(zip32_boundary);
+        let mut name_only = StreamingArchiveWriter::with_limits(name_only_budget);
+        let error = name_only
+            .write_deflated(borrowed_name, b"payload")
+            .unwrap_err();
+        assert_limit(
+            error,
+            LimitResource::MetadataBytes,
+            borrowed_metadata,
+            borrowed_name.len() as u64,
+        );
+        assert_eq!(name_only.output_bytes(), 0);
+    }
+
+    #[test]
+    fn generated_central_zip64_extra_size_matches_size_and_offset_fields() {
+        let below = u64::from(u32::MAX) - 1;
+        let at = u64::from(u32::MAX);
+        assert_eq!(
+            StreamingArchiveWriter::<Cursor<Vec<u8>>>::generated_central_zip64_extra_bytes(
+                false,
+                Some(below),
+                Some(below),
+                below,
+            ),
+            0
+        );
+        assert_eq!(
+            StreamingArchiveWriter::<Cursor<Vec<u8>>>::generated_central_zip64_extra_bytes(
+                false,
+                Some(at),
+                Some(at),
+                below,
+            ),
+            20
+        );
+        assert_eq!(
+            StreamingArchiveWriter::<Cursor<Vec<u8>>>::generated_central_zip64_extra_bytes(
+                false,
+                Some(below),
+                Some(below),
+                at,
+            ),
+            12
+        );
+        assert_eq!(
+            StreamingArchiveWriter::<Cursor<Vec<u8>>>::generated_central_zip64_extra_bytes(
+                false,
+                Some(at),
+                Some(at),
+                at,
+            ),
+            28
+        );
+        assert_eq!(
+            StreamingArchiveWriter::<Cursor<Vec<u8>>>::generated_central_zip64_extra_bytes(
+                true, None, None, below,
+            ),
+            20
+        );
+        assert_eq!(
+            StreamingArchiveWriter::<Cursor<Vec<u8>>>::generated_central_zip64_extra_bytes(
+                true, None, None, at,
+            ),
+            28
+        );
     }
 
     #[test]

@@ -418,7 +418,21 @@ fn validate_borrowed_entry_metadata(
         )
     };
 
-    if !entry.has_data_descriptor || local_has_zip64_sentinel {
+    // A non-seekable ZIP64 producer may reserve the local ZIP64 size extra
+    // with zero placeholders and put the actual values only in the trailing
+    // descriptor and central directory.  Keep validating the extra-field
+    // grammar above, but do not compare those reserved zeros with the final
+    // central sizes.  Non-zero local values remain authoritative and must
+    // agree with the central record.
+    let local_sizes_are_zero_placeholders = local_zip64_sizes_are_zero_placeholders(
+        &file_header,
+        entry,
+        local_compressed_size,
+        local_uncompressed_size,
+    );
+    if !entry.has_data_descriptor
+        || (local_has_zip64_sentinel && !local_sizes_are_zero_placeholders)
+    {
         if local_compressed_size != entry.compressed_size {
             return Err(Error::from(ErrorKind::InvalidSize {
                 expected: entry.compressed_size,
@@ -741,7 +755,15 @@ fn validate_reader_entry_layout_with_name_policy<R: ReaderAt>(
             u64::from(file_header.uncompressed_size),
         )
     };
-    if !entry.has_data_descriptor || local_has_zip64_sentinel {
+    let local_sizes_are_zero_placeholders = local_zip64_sizes_are_zero_placeholders(
+        &file_header,
+        entry,
+        local_compressed_size,
+        local_uncompressed_size,
+    );
+    if !entry.has_data_descriptor
+        || (local_has_zip64_sentinel && !local_sizes_are_zero_placeholders)
+    {
         if local_compressed_size != entry.compressed_size {
             return Err(Error::from(ErrorKind::InvalidSize {
                 expected: entry.compressed_size,
@@ -969,6 +991,27 @@ fn local_header_sizes(
         })?;
     }
     Ok((compressed_size, uncompressed_size))
+}
+
+/// Returns whether a streaming ZIP64 local header carries reserved size
+/// values.  In this form both fixed-width fields are sentinels and the
+/// corresponding 16-byte ZIP64 extra contains zeros; the descriptor and
+/// central directory carry the final sizes.  Requiring both sentinels keeps
+/// the exception narrow and leaves one-sided or otherwise non-canonical
+/// metadata subject to the ordinary local/central agreement check.
+#[inline]
+fn local_zip64_sizes_are_zero_placeholders(
+    file_header: &ZipLocalFileHeaderFixed,
+    entry: &ZipArchiveEntryWayfinder,
+    local_compressed_size: u64,
+    local_uncompressed_size: u64,
+) -> bool {
+    entry.has_data_descriptor
+        && file_header.version_needed >= 45
+        && file_header.compressed_size == u32::MAX
+        && file_header.uncompressed_size == u32::MAX
+        && local_compressed_size == 0
+        && local_uncompressed_size == 0
 }
 
 /// Represents a single entry (file or directory) within a `ZipSliceArchive`.
@@ -3509,6 +3552,97 @@ mod tests {
         archive
     }
 
+    fn archive_zip64_zero_placeholder_fixture(
+        local_compressed_size: u64,
+        local_uncompressed_size: u64,
+    ) -> Vec<u8> {
+        let payload = b"hello";
+        let name = b"x";
+        let crc = crate::crc32(payload);
+        let size = u64::try_from(payload.len()).unwrap();
+        let local_extra_body = {
+            let mut body = Vec::new();
+            body.extend_from_slice(&local_uncompressed_size.to_le_bytes());
+            body.extend_from_slice(&local_compressed_size.to_le_bytes());
+            body
+        };
+        let local_extra = zip64_extra(&local_extra_body);
+        let mut archive = Vec::new();
+
+        // A streaming ZIP64 local header may reserve both size values as
+        // sentinels and leave the corresponding extra-field values at zero.
+        push_u32(&mut archive, 0x0403_4b50);
+        push_u16(&mut archive, 45);
+        push_u16(&mut archive, 0x08);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u32(&mut archive, 0);
+        push_u32(&mut archive, u32::MAX);
+        push_u32(&mut archive, u32::MAX);
+        push_u16(&mut archive, u16::try_from(name.len()).unwrap());
+        push_u16(&mut archive, u16::try_from(local_extra.len()).unwrap());
+        archive.extend_from_slice(name);
+        archive.extend_from_slice(&local_extra);
+        archive.extend_from_slice(payload);
+        archive.extend_from_slice(&descriptor_bytes(8, true, crc, size, size));
+
+        let central_directory_offset = u64::try_from(archive.len()).unwrap();
+        let central_extra = zip64_extra(&{
+            let mut body = Vec::new();
+            body.extend_from_slice(&size.to_le_bytes());
+            body.extend_from_slice(&size.to_le_bytes());
+            body
+        });
+        let mut central = Vec::new();
+        push_u32(&mut central, 0x0201_4b50);
+        push_u16(&mut central, 45);
+        push_u16(&mut central, 45);
+        push_u16(&mut central, 0x08);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u32(&mut central, crc);
+        push_u32(&mut central, u32::MAX);
+        push_u32(&mut central, u32::MAX);
+        push_u16(&mut central, u16::try_from(name.len()).unwrap());
+        push_u16(&mut central, u16::try_from(central_extra.len()).unwrap());
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u32(&mut central, 0);
+        push_u32(&mut central, 0);
+        central.extend_from_slice(name);
+        central.extend_from_slice(&central_extra);
+        let central_directory_size = u64::try_from(central.len()).unwrap();
+        archive.extend_from_slice(&central);
+
+        let zip64_eocd_offset = u64::try_from(archive.len()).unwrap();
+        push_u32(&mut archive, END_OF_CENTRAL_DIR_SIGNATURE64);
+        push_u64(&mut archive, 44);
+        push_u16(&mut archive, 45);
+        push_u16(&mut archive, 45);
+        push_u32(&mut archive, 0);
+        push_u32(&mut archive, 0);
+        push_u64(&mut archive, 1);
+        push_u64(&mut archive, 1);
+        push_u64(&mut archive, central_directory_size);
+        push_u64(&mut archive, central_directory_offset);
+        push_u32(&mut archive, END_OF_CENTRAL_DIR_LOCATOR_SIGNATURE);
+        push_u32(&mut archive, 0);
+        push_u64(&mut archive, zip64_eocd_offset);
+        push_u32(&mut archive, 1);
+        push_u32(&mut archive, 0x0605_4b50);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 1);
+        push_u16(&mut archive, 1);
+        push_u32(&mut archive, u32::try_from(central_directory_size).unwrap());
+        push_u32(&mut archive, u32::MAX);
+        push_u16(&mut archive, 0);
+        archive
+    }
+
     #[test]
     fn complete_descriptor_uses_archive_zip64_context_without_changing_zip32_empty_entries() {
         let crc = 0x3610_a686;
@@ -3561,6 +3695,69 @@ mod tests {
                     .unwrap();
                 assert_eq!(layout.span_end, reader_archive.directory_offset());
             }
+        }
+    }
+
+    #[test]
+    fn strict_layout_accepts_zero_zip64_local_placeholders_and_checks_descriptor() {
+        let data = archive_zip64_zero_placeholder_fixture(0, 0);
+        let archive = ZipArchive::from_slice(data.as_slice()).unwrap();
+        assert!(archive.entries().next_entry().unwrap().unwrap().is_zip64());
+        let entry = archive.entries().next_entry().unwrap().unwrap();
+        let layout = archive
+            .validate_strict_entry_layout(entry.wayfinder(), b"x")
+            .unwrap();
+        assert_eq!(layout.data_end_offset - layout.data_start_offset, 5);
+        assert_eq!(layout.span_end, archive.directory_offset());
+
+        let mut bad_descriptor = data.clone();
+        // Local header (30), name (1), ZIP64 extra (20), and payload (5).
+        let descriptor_offset = 30 + 1 + 20 + 5;
+        bad_descriptor[descriptor_offset + 4..descriptor_offset + 8]
+            .copy_from_slice(&0xdead_beefu32.to_le_bytes());
+        let bad_archive = ZipArchive::from_slice(bad_descriptor.as_slice()).unwrap();
+        let bad_entry = bad_archive.entries().next_entry().unwrap().unwrap();
+        let error = bad_archive
+            .validate_strict_entry_layout(bad_entry.wayfinder(), b"x")
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
+
+        let mut bad_descriptor = data.clone();
+        bad_descriptor[descriptor_offset + 8..descriptor_offset + 16]
+            .copy_from_slice(&4u64.to_le_bytes());
+        let bad_archive = ZipArchive::from_slice(bad_descriptor.as_slice()).unwrap();
+        let bad_entry = bad_archive.entries().next_entry().unwrap().unwrap();
+        let error = bad_archive
+            .validate_strict_entry_layout(bad_entry.wayfinder(), b"x")
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
+
+        let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
+        let reader_archive =
+            ZipArchive::from_seekable(Cursor::new(data.as_slice()), &mut buffer).unwrap();
+        let wayfinder = {
+            let mut entries = reader_archive.entries(&mut buffer);
+            entries.next_entry().unwrap().unwrap().wayfinder()
+        };
+        let layout = reader_archive
+            .validate_strict_entry_layout(wayfinder, b"x")
+            .unwrap();
+        assert_eq!(layout.span_end, reader_archive.directory_offset());
+    }
+
+    #[test]
+    fn strict_layout_rejects_nonzero_mismatching_zip64_local_sizes() {
+        for (local_compressed_size, local_uncompressed_size) in [(4, 5), (5, 4), (6, 7)] {
+            let data = archive_zip64_zero_placeholder_fixture(
+                local_compressed_size,
+                local_uncompressed_size,
+            );
+            let archive = ZipArchive::from_slice(data.as_slice()).unwrap();
+            let entry = archive.entries().next_entry().unwrap().unwrap();
+            let error = archive
+                .validate_strict_entry_layout(entry.wayfinder(), b"x")
+                .unwrap_err();
+            assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
         }
     }
 

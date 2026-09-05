@@ -48,8 +48,37 @@ impl<W> CountWriter<W> {
 
 impl<W: Write> Write for CountWriter<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let requested = u64::try_from(buf.len()).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP output byte count does not fit in u64",
+            )
+        })?;
+        if self.count.checked_add(requested).is_none() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP output offset overflows u64",
+            ));
+        }
         let bytes_written = self.writer.write(buf)?;
-        self.count += bytes_written as u64;
+        if bytes_written > buf.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "ZIP output sink returned more bytes than requested",
+            ));
+        }
+        let accepted = u64::try_from(bytes_written).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "ZIP output byte count does not fit in u64",
+            )
+        })?;
+        self.count = self.count.checked_add(accepted).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP output offset overflows u64",
+            )
+        })?;
         Ok(bytes_written)
     }
 
@@ -317,6 +346,7 @@ pub struct ZipFileBuilder<'archive, 'name, W> {
     archive: &'archive mut ZipArchiveWriter<W>,
     name: &'name str,
     compression_method: CompressionMethod,
+    zip64: bool,
     modification_time: Option<UtcDateTime>,
     unix_permissions: Option<u32>,
     extra_fields: ExtraFieldsContainer,
@@ -332,6 +362,22 @@ where
     #[inline]
     pub fn compression_method(mut self, compression_method: CompressionMethod) -> Self {
         self.compression_method = compression_method;
+        self
+    }
+
+    /// Selects ZIP64 framing for this streaming entry before its local header
+    /// is emitted.
+    ///
+    /// The default is `false`, which preserves the compact ZIP32 streaming
+    /// header and descriptor. Set this to `true` when the final sizes are not
+    /// known in advance and the entry may require ZIP64. The opt-in mode uses
+    /// a version-4.5 local header, a signed 64-bit data descriptor, and
+    /// ZIP64 size fields in the central directory even when the final payload
+    /// happens to fit in ZIP32.
+    #[must_use]
+    #[inline]
+    pub fn zip64(mut self, zip64: bool) -> Self {
+        self.zip64 = zip64;
         self
     }
 
@@ -530,6 +576,7 @@ where
         let crc32_option = self.crc32_option;
         let options = ZipEntryOptions {
             compression_method: self.compression_method,
+            zip64: self.zip64,
             modification_time: self.modification_time,
             unix_permissions: self.unix_permissions,
             extra_fields: self.extra_fields,
@@ -594,6 +641,7 @@ where
     pub fn create(self) -> Result<(), Error> {
         let options = ZipEntryOptions {
             compression_method: CompressionMethod::Store, // Directories always use Store
+            zip64: false,
             modification_time: self.modification_time,
             unix_permissions: self.unix_permissions,
             extra_fields: self.extra_fields,
@@ -667,6 +715,7 @@ where
             uncompressed_size: size_u64,
             crc: crc32,
             flags,
+            zip64: false,
             modification_time: None,
             unix_permissions: None,
             extra_fields: ExtraFieldsContainer::new(),
@@ -834,6 +883,7 @@ where
             uncompressed_size,
             crc: crc32,
             flags,
+            zip64: false,
             modification_time: None,
             unix_permissions: None,
             extra_fields: ExtraFieldsContainer::new(),
@@ -864,6 +914,16 @@ where
         compression_method: CompressionMethod,
         options: &mut ZipEntryOptions,
     ) -> Result<(), Error> {
+        if options.zip64
+            && options
+                .extra_fields
+                .contains_id(ExtraFieldId::ZIP64, Header::default())
+        {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "ZIP64 streaming mode reserves its own ZIP64 extra field".to_string(),
+            }));
+        }
+
         // Get DOS timestamp from options or use 0 as default
         let (dos_time, dos_date) = options
             .modification_time
@@ -883,16 +943,33 @@ where
             )?;
         }
 
+        // A ZIP64 streaming local header reserves both size values in the
+        // ZIP64 extra field.  The values are intentionally zero until the
+        // descriptor is emitted; the central record carries the resolved
+        // values.  Selecting this layout before writing the header keeps the
+        // descriptor width fixed for the lifetime of the entry.
+        if options.zip64 {
+            options.extra_fields.add_field(
+                ExtraFieldId::ZIP64,
+                &[0u8; ZIP64_LOCAL_SIZE_EXTRA_DATA_LEN as usize],
+                Header::LOCAL,
+            )?;
+        }
+
         let header = ZipLocalFileHeaderFixed {
             signature: ZipLocalFileHeaderFixed::SIGNATURE,
-            version_needed: 20,
+            version_needed: if options.zip64 {
+                ZIP64_VERSION_NEEDED
+            } else {
+                20
+            },
             flags,
             compression_method: compression_method.as_id(),
             last_mod_time: dos_time,
             last_mod_date: dos_date,
             crc32: 0, // must be zero if data descriptor is used (4.4.4)
-            compressed_size: 0,
-            uncompressed_size: 0,
+            compressed_size: if options.zip64 { u32::MAX } else { 0 },
+            uncompressed_size: if options.zip64 { u32::MAX } else { 0 },
             file_name_len: file_path.len() as u16,
             extra_field_len: options.extra_fields.local_size,
         };
@@ -985,6 +1062,7 @@ where
             uncompressed_size: 0,
             crc: 0,
             flags,
+            zip64: false,
             modification_time: options.modification_time,
             unix_permissions: options.unix_permissions,
             extra_fields: options.extra_fields,
@@ -1018,6 +1096,7 @@ where
             archive: self,
             name,
             compression_method: CompressionMethod::Store,
+            zip64: false,
             modification_time: None,
             unix_permissions: None,
             extra_fields: ExtraFieldsContainer::new(),
@@ -1070,6 +1149,7 @@ where
             name_len,
             local_header_offset,
             compression_method: options.compression_method,
+            zip64: options.zip64,
             flags,
             modification_time: options.modification_time,
             unix_permissions: options.unix_permissions,
@@ -1105,6 +1185,7 @@ where
 
         let options = ZipEntryOptions {
             compression_method,
+            zip64: false,
             modification_time: None,
             unix_permissions: None,
             extra_fields: ExtraFieldsContainer::new(),
@@ -1120,6 +1201,46 @@ where
         compression_method: CompressionMethod,
     ) -> Result<ZipOwnedEntryWriter<W>, Error> {
         self.start_file_owned(name, compression_method)
+    }
+
+    /// Starts an owned streaming entry with explicit ZIP64 framing.
+    ///
+    /// This is the consuming counterpart of [`ZipFileBuilder::zip64`]. The
+    /// ZIP64 local header and 64-bit descriptor are selected before any entry
+    /// bytes are accepted, so the entry remains valid when its final sizes are
+    /// not known to the caller.
+    pub fn start_file_owned_zip64(
+        self,
+        name: &str,
+        compression_method: CompressionMethod,
+    ) -> Result<ZipOwnedEntryWriter<W>, Error> {
+        if !matches!(
+            compression_method,
+            CompressionMethod::Store | CompressionMethod::Deflate
+        ) {
+            return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                compression_method.as_id().as_u16(),
+            )));
+        }
+
+        let options = ZipEntryOptions {
+            compression_method,
+            zip64: true,
+            modification_time: None,
+            unix_permissions: None,
+            extra_fields: ExtraFieldsContainer::new(),
+        };
+        self.start_file_owned_with_options(name, options)
+    }
+
+    /// Alias for [`Self::start_file_owned_zip64`] using the entry-oriented
+    /// name used by higher-level package writers.
+    pub fn start_entry_owned_zip64(
+        self,
+        name: &str,
+        compression_method: CompressionMethod,
+    ) -> Result<ZipOwnedEntryWriter<W>, Error> {
+        self.start_file_owned_zip64(name, compression_method)
     }
 
     fn start_file_owned_with_options(
@@ -1159,6 +1280,7 @@ where
             name_len,
             local_header_offset,
             compression_method: options.compression_method,
+            zip64: options.zip64,
             flags,
             modification_time: options.modification_time,
             unix_permissions: options.unix_permissions,
@@ -1239,8 +1361,16 @@ where
                 last_mod_time: dos_time,
                 last_mod_date: dos_date,
                 crc32: file.crc,
-                compressed_size: file.compressed_size.min(ZIP64_THRESHOLD_FILE_SIZE) as u32,
-                uncompressed_size: file.uncompressed_size.min(ZIP64_THRESHOLD_FILE_SIZE) as u32,
+                compressed_size: if file.zip64 {
+                    u32::MAX
+                } else {
+                    file.compressed_size.min(ZIP64_THRESHOLD_FILE_SIZE) as u32
+                },
+                uncompressed_size: if file.zip64 {
+                    u32::MAX
+                } else {
+                    file.uncompressed_size.min(ZIP64_THRESHOLD_FILE_SIZE) as u32
+                },
                 file_name_len: file.name_len,
                 extra_field_len: file.extra_fields.central_size,
                 file_comment_len: 0,
@@ -1330,6 +1460,7 @@ pub struct ZipEntryWriter<'a, W> {
     name_len: u16,
     local_header_offset: u64,
     compression_method: CompressionMethod,
+    zip64: bool,
     flags: u16,
     modification_time: Option<UtcDateTime>,
     unix_permissions: Option<u32>,
@@ -1370,26 +1501,6 @@ impl<'a, W> ZipEntryWriter<'a, W> {
         W: Write,
     {
         output.compressed_size = self.compressed_bytes;
-        let mut buffer = [0u8; 24];
-        buffer[0..4].copy_from_slice(&DataDescriptor::SIGNATURE.to_le_bytes());
-        buffer[4..8].copy_from_slice(&output.crc.to_le_bytes());
-
-        let out_data = if output.compressed_size >= ZIP64_THRESHOLD_FILE_SIZE
-            || output.uncompressed_size >= ZIP64_THRESHOLD_FILE_SIZE
-        {
-            // Use 64-bit sizes for ZIP64
-            buffer[8..16].copy_from_slice(&output.compressed_size.to_le_bytes());
-            buffer[16..24].copy_from_slice(&output.uncompressed_size.to_le_bytes());
-            &buffer[..]
-        } else {
-            // Use 32-bit sizes for standard ZIP
-            buffer[8..12].copy_from_slice(&(output.compressed_size as u32).to_le_bytes());
-            buffer[12..16].copy_from_slice(&(output.uncompressed_size as u32).to_le_bytes());
-            &buffer[..16]
-        };
-
-        self.inner.writer.write_all(out_data)?;
-
         let mut file_header = FileHeader {
             name_len: self.name_len,
             compression_method: self.compression_method,
@@ -1398,11 +1509,19 @@ impl<'a, W> ZipEntryWriter<'a, W> {
             uncompressed_size: output.uncompressed_size,
             crc: output.crc,
             flags: self.flags,
+            zip64: self.zip64,
             modification_time: self.modification_time,
             unix_permissions: self.unix_permissions,
             extra_fields: self.extra_fields,
         };
         file_header.finalize_extra_fields()?;
+        write_data_descriptor(
+            &mut self.inner.writer,
+            output.crc,
+            output.compressed_size,
+            output.uncompressed_size,
+            self.zip64,
+        )?;
         self.inner.files.push(file_header);
 
         Ok(self.compressed_bytes)
@@ -1414,8 +1533,37 @@ where
     W: Write,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let requested = u64::try_from(buf.len()).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP compressed byte count does not fit in u64",
+            )
+        })?;
+        if self.compressed_bytes.checked_add(requested).is_none() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP compressed byte count overflows u64",
+            ));
+        }
         let bytes_written = self.inner.writer.write(buf)?;
-        self.compressed_bytes += bytes_written as u64;
+        if bytes_written > buf.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "ZIP compressed sink returned more bytes than requested",
+            ));
+        }
+        let accepted = u64::try_from(bytes_written).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "ZIP compressed byte count does not fit in u64",
+            )
+        })?;
+        self.compressed_bytes = self.compressed_bytes.checked_add(accepted).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP compressed byte count overflows u64",
+            )
+        })?;
         Ok(bytes_written)
     }
 
@@ -1430,6 +1578,7 @@ struct OwnedEntryState {
     name_len: u16,
     local_header_offset: u64,
     compression_method: CompressionMethod,
+    zip64: bool,
     flags: u16,
     modification_time: Option<UtcDateTime>,
     unix_permissions: Option<u32>,
@@ -1460,24 +1609,6 @@ impl<W> OwnedCompressedEntry<W> {
     {
         output.compressed_size = self.compressed_bytes;
         let mut archive = self.archive;
-
-        let mut buffer = [0u8; 24];
-        buffer[0..4].copy_from_slice(&DataDescriptor::SIGNATURE.to_le_bytes());
-        buffer[4..8].copy_from_slice(&output.crc.to_le_bytes());
-
-        let out_data = if output.compressed_size >= ZIP64_THRESHOLD_FILE_SIZE
-            || output.uncompressed_size >= ZIP64_THRESHOLD_FILE_SIZE
-        {
-            buffer[8..16].copy_from_slice(&output.compressed_size.to_le_bytes());
-            buffer[16..24].copy_from_slice(&output.uncompressed_size.to_le_bytes());
-            &buffer[..]
-        } else {
-            buffer[8..12].copy_from_slice(&(output.compressed_size as u32).to_le_bytes());
-            buffer[12..16].copy_from_slice(&(output.uncompressed_size as u32).to_le_bytes());
-            &buffer[..16]
-        };
-        archive.writer.write_all(out_data)?;
-
         let mut file_header = FileHeader {
             name_len: self.state.name_len,
             compression_method: self.state.compression_method,
@@ -1486,11 +1617,19 @@ impl<W> OwnedCompressedEntry<W> {
             uncompressed_size: output.uncompressed_size,
             crc: output.crc,
             flags: self.state.flags,
+            zip64: self.state.zip64,
             modification_time: self.state.modification_time,
             unix_permissions: self.state.unix_permissions,
             extra_fields: self.state.extra_fields,
         };
         file_header.finalize_extra_fields()?;
+        write_data_descriptor(
+            &mut archive.writer,
+            output.crc,
+            output.compressed_size,
+            output.uncompressed_size,
+            self.state.zip64,
+        )?;
         archive.files.push(file_header);
 
         Ok(archive)
@@ -1577,23 +1716,84 @@ pub(crate) fn owned_entry_limit_from_io_error(error: &io::Error) -> Option<(u64,
         .map(|marker| (marker.actual, marker.maximum))
 }
 
+/// Writes a signed data descriptor with the width selected before payload
+/// emission. A streaming entry that was not explicitly opted into ZIP64 must
+/// refuse a size that reaches the ZIP64 sentinel boundary rather than emit a
+/// descriptor whose width disagrees with its local header.
+fn write_data_descriptor<W: Write>(
+    writer: &mut W,
+    crc: u32,
+    compressed_size: u64,
+    uncompressed_size: u64,
+    zip64: bool,
+) -> Result<(), Error> {
+    let sizes_need_zip64 = compressed_size >= ZIP64_THRESHOLD_FILE_SIZE
+        || uncompressed_size >= ZIP64_THRESHOLD_FILE_SIZE;
+    if sizes_need_zip64 && !zip64 {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "streaming entry reached ZIP64 size without zip64(true)".to_string(),
+        }));
+    }
+
+    let mut buffer = [0u8; 24];
+    buffer[0..4].copy_from_slice(&DataDescriptor::SIGNATURE.to_le_bytes());
+    buffer[4..8].copy_from_slice(&crc.to_le_bytes());
+    if zip64 || sizes_need_zip64 {
+        buffer[8..16].copy_from_slice(&compressed_size.to_le_bytes());
+        buffer[16..24].copy_from_slice(&uncompressed_size.to_le_bytes());
+        writer.write_all(&buffer)?;
+    } else {
+        buffer[8..12].copy_from_slice(&(compressed_size as u32).to_le_bytes());
+        buffer[12..16].copy_from_slice(&(uncompressed_size as u32).to_le_bytes());
+        writer.write_all(&buffer[..16])?;
+    }
+    Ok(())
+}
+
 impl<W: Write> Write for OwnedCompressedEntry<W> {
     fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
         if buffer.is_empty() {
             return Ok(0);
         }
+        let requested = u64::try_from(buffer.len()).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP compressed byte count does not fit in u64",
+            )
+        })?;
+        let attempted = self
+            .compressed_bytes
+            .checked_add(requested)
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "ZIP compressed byte count overflows u64",
+                )
+            })?;
         if let Some(maximum) = self.compressed_limit {
-            let requested = u64::try_from(buffer.len()).unwrap_or(u64::MAX);
-            let remaining = maximum.saturating_sub(self.compressed_bytes);
-            if requested > remaining {
-                return Err(owned_entry_limit_io_error(
-                    self.compressed_bytes.saturating_add(requested),
-                    maximum,
-                ));
+            if attempted > maximum {
+                return Err(owned_entry_limit_io_error(attempted, maximum));
             }
         }
         let written = self.archive.writer.write(buffer)?;
-        self.compressed_bytes = self.compressed_bytes.saturating_add(written as u64);
+        if written > buffer.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "ZIP compressed sink returned more bytes than requested",
+            ));
+        }
+        let accepted = u64::try_from(written).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "ZIP compressed byte count does not fit in u64",
+            )
+        })?;
+        self.compressed_bytes = self.compressed_bytes.checked_add(accepted).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP compressed byte count overflows u64",
+            )
+        })?;
         Ok(written)
     }
 
@@ -1750,8 +1950,40 @@ where
     W: Write,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let requested = u64::try_from(buf.len()).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP uncompressed byte count does not fit in u64",
+            )
+        })?;
+        if self.uncompressed_bytes.checked_add(requested).is_none() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP uncompressed byte count overflows u64",
+            ));
+        }
         let bytes_written = self.inner.write(buf)?;
-        self.uncompressed_bytes += bytes_written as u64;
+        if bytes_written > buf.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "ZIP uncompressed sink returned more bytes than requested",
+            ));
+        }
+        let accepted = u64::try_from(bytes_written).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "ZIP uncompressed byte count does not fit in u64",
+            )
+        })?;
+        self.uncompressed_bytes =
+            self.uncompressed_bytes
+                .checked_add(accepted)
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "ZIP uncompressed byte count overflows u64",
+                    )
+                })?;
 
         // Only calculate CRC32 if the option is Calculate
         if matches!(self.crc32_option, Crc32Option::Calculate) {
@@ -1795,6 +2027,7 @@ struct FileHeader {
     uncompressed_size: u64,
     crc: u32,
     flags: u16,
+    zip64: bool,
     modification_time: Option<UtcDateTime>,
     unix_permissions: Option<u32>,
     extra_fields: ExtraFieldsContainer,
@@ -1802,20 +2035,29 @@ struct FileHeader {
 
 impl FileHeader {
     fn needs_zip64(&self) -> bool {
-        self.compressed_size >= ZIP64_THRESHOLD_FILE_SIZE
+        self.zip64
+            || self.compressed_size >= ZIP64_THRESHOLD_FILE_SIZE
             || self.uncompressed_size >= ZIP64_THRESHOLD_FILE_SIZE
             || self.local_header_offset >= ZIP64_THRESHOLD_OFFSET
     }
 
     fn finalize_extra_fields(&mut self) -> Result<(), Error> {
         if self.needs_zip64() {
+            if self
+                .extra_fields
+                .contains_id(ExtraFieldId::ZIP64, Header::CENTRAL)
+            {
+                return Err(Error::from(ErrorKind::InvalidInput {
+                    msg: "ZIP64 extra field collides with automatic central metadata".to_string(),
+                }));
+            }
             let mut sink = [0u8; 24];
             let mut pos = 0;
-            if self.uncompressed_size >= ZIP64_THRESHOLD_FILE_SIZE {
+            if self.zip64 || self.uncompressed_size >= ZIP64_THRESHOLD_FILE_SIZE {
                 sink[pos..pos + 8].copy_from_slice(&self.uncompressed_size.to_le_bytes());
                 pos += 8;
             }
-            if self.compressed_size >= ZIP64_THRESHOLD_FILE_SIZE {
+            if self.zip64 || self.compressed_size >= ZIP64_THRESHOLD_FILE_SIZE {
                 sink[pos..pos + 8].copy_from_slice(&self.compressed_size.to_le_bytes());
                 pos += 8;
             }
@@ -1898,6 +2140,7 @@ where
 #[derive(Debug, Clone)]
 struct ZipEntryOptions {
     compression_method: CompressionMethod,
+    zip64: bool,
     modification_time: Option<UtcDateTime>,
     unix_permissions: Option<u32>,
     extra_fields: ExtraFieldsContainer,
@@ -2035,6 +2278,7 @@ mod tests {
                 uncompressed_size: size,
                 crc: crc32,
                 flags: FLAG_UTF8_ENCODING,
+                zip64: false,
                 modification_time: None,
                 unix_permissions: None,
                 extra_fields: ExtraFieldsContainer::new(),
@@ -2089,6 +2333,7 @@ mod tests {
                 uncompressed_size,
                 crc: 0,
                 flags: 0,
+                zip64: false,
                 modification_time: None,
                 unix_permissions: None,
                 extra_fields: ExtraFieldsContainer::new(),
@@ -2192,6 +2437,264 @@ mod tests {
         assert_eq!(central_id, ExtraFieldId::ZIP64);
         assert_eq!(central_data, declared_bytes.as_slice());
         assert!(central_fields.next().is_none());
+    }
+
+    #[test]
+    fn explicit_zip64_streaming_deflate_reopens_with_a_small_payload() {
+        let payload = b"streamed ZIP64 payload";
+        let mut output = Cursor::new(Vec::new());
+        let mut archive = ZipArchiveWriter::new(&mut output);
+
+        let (mut entry, config) = archive
+            .new_file("small.txt")
+            .compression_method(CompressionMethod::Deflate)
+            .zip64(true)
+            .start()
+            .expect("ZIP64 streaming entry");
+        let encoder = DeflateEncoder::new(&mut entry, Compression::default());
+        let mut data_writer = config.wrap(encoder);
+        data_writer.write_all(payload).expect("entry payload");
+        let (encoder, descriptor) = data_writer.finish().expect("entry data finish");
+        encoder.finish().expect("deflate finish");
+        entry.finish(descriptor).expect("entry finish");
+        archive.finish().expect("archive finish");
+
+        let bytes = output.into_inner();
+        let archive = ZipArchive::from_slice(&bytes).expect("reopen ZIP64 archive");
+        assert!(archive.is_zip64());
+        let mut entries = archive.entries();
+        let record = entries
+            .next_entry()
+            .expect("central entry")
+            .expect("one central entry");
+        assert!(
+            entries
+                .next_entry()
+                .expect("end of central entries")
+                .is_none()
+        );
+        assert!(record.is_zip64());
+        assert!(record.compressed_size_hint() > 0);
+        assert_eq!(record.uncompressed_size_hint(), payload.len() as u64);
+
+        let local = ZipLocalFileHeaderFixed::parse(&bytes).expect("local header");
+        assert_eq!(local.version_needed, ZIP64_VERSION_NEEDED);
+        assert_eq!(local.flags & FLAG_DATA_DESCRIPTOR, FLAG_DATA_DESCRIPTOR);
+        assert_eq!(local.crc32, 0);
+        assert_eq!(local.compressed_size, u32::MAX);
+        assert_eq!(local.uncompressed_size, u32::MAX);
+        assert_eq!(local.extra_field_len, ZIP64_LOCAL_SIZE_EXTRA_FIELD_LEN);
+        let local_extra_start = ZipLocalFileHeaderFixed::SIZE + usize::from(local.file_name_len);
+        let local_extra =
+            &bytes[local_extra_start..local_extra_start + usize::from(local.extra_field_len)];
+        assert_eq!(
+            u16::from_le_bytes(local_extra[..2].try_into().unwrap()),
+            ExtraFieldId::ZIP64.as_u16()
+        );
+        assert_eq!(
+            u16::from_le_bytes(local_extra[2..4].try_into().unwrap()),
+            ZIP64_LOCAL_SIZE_EXTRA_DATA_LEN
+        );
+        assert!(local_extra[4..].iter().all(|byte| *byte == 0));
+
+        let central_offset = usize::try_from(record.central_directory_offset()).unwrap();
+        let central = ZipFileHeaderFixed::parse(&bytes[central_offset..]).expect("central header");
+        assert_eq!(central.version_needed, ZIP64_VERSION_NEEDED);
+        assert_eq!(central.compressed_size, u32::MAX);
+        assert_eq!(central.uncompressed_size, u32::MAX);
+        assert_eq!(central.extra_field_len, ZIP64_LOCAL_SIZE_EXTRA_FIELD_LEN);
+        let mut central_fields = record.extra_fields();
+        let (central_id, central_data) = central_fields.next().expect("central ZIP64 field");
+        assert_eq!(central_id, ExtraFieldId::ZIP64);
+        assert_eq!(
+            central_data.len(),
+            usize::from(ZIP64_LOCAL_SIZE_EXTRA_DATA_LEN)
+        );
+        assert_eq!(
+            u64::from_le_bytes(central_data[..8].try_into().unwrap()),
+            payload.len() as u64
+        );
+        assert_eq!(
+            u64::from_le_bytes(central_data[8..].try_into().unwrap()),
+            record.compressed_size_hint()
+        );
+        assert!(central_fields.next().is_none());
+
+        let data_start = ZipLocalFileHeaderFixed::SIZE
+            + usize::from(local.file_name_len)
+            + usize::from(local.extra_field_len);
+        let descriptor_start = data_start + record.compressed_size_hint() as usize;
+        let descriptor = &bytes[descriptor_start..descriptor_start + 24];
+        assert_eq!(
+            u32::from_le_bytes(descriptor[..4].try_into().unwrap()),
+            DataDescriptor::SIGNATURE
+        );
+        assert_eq!(
+            u64::from_le_bytes(descriptor[8..16].try_into().unwrap()),
+            record.compressed_size_hint()
+        );
+        assert_eq!(
+            u64::from_le_bytes(descriptor[16..24].try_into().unwrap()),
+            payload.len() as u64
+        );
+
+        let reader = crate::office::ArchiveReader::new(&bytes).expect("archive reader");
+        assert_eq!(reader.read("small.txt").expect("inflate payload"), payload);
+    }
+
+    #[test]
+    fn explicit_zip64_owned_streaming_deflate_reopens_with_a_small_payload() {
+        let payload = b"owned streamed ZIP64 payload";
+        let archive = ZipArchiveWriter::new(Vec::new());
+        let mut entry = archive
+            .start_file_owned_zip64("owned.txt", CompressionMethod::Deflate)
+            .expect("owned ZIP64 streaming entry");
+        entry.write_all(payload).expect("entry payload");
+        let archive = entry.finish().expect("entry finish");
+        let bytes = archive.finish().expect("archive finish");
+
+        let reader = crate::office::ArchiveReader::new(&bytes).expect("archive reader");
+        assert_eq!(reader.read("owned.txt").expect("inflate payload"), payload);
+        let archive = ZipArchive::from_slice(&bytes).expect("reopen ZIP64 archive");
+        assert!(archive.is_zip64());
+        let record = archive
+            .entries()
+            .next_entry()
+            .expect("central entry")
+            .expect("one central entry");
+        assert!(record.is_zip64());
+    }
+
+    #[test]
+    fn explicit_zip64_rejects_user_zip64_extra_before_local_header() {
+        let mut output = Cursor::new(Vec::new());
+        let mut archive = ZipArchiveWriter::new(&mut output);
+        let error = archive
+            .new_file("duplicate.txt")
+            .zip64(true)
+            .extra_field(ExtraFieldId::ZIP64, &[0u8; 16], Header::CENTRAL)
+            .expect("user extra field");
+        let error = error
+            .start()
+            .expect_err("explicit ZIP64 mode rejects a user ZIP64 field");
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+        assert_eq!(archive.stream_offset(), 0);
+        drop(archive);
+        assert!(output.into_inner().is_empty());
+    }
+
+    #[test]
+    fn automatic_zip64_rejects_a_central_zip64_extra_collision() {
+        let mut file_header = FileHeader {
+            name_len: 1,
+            compression_method: CompressionMethod::Store,
+            local_header_offset: ZIP64_THRESHOLD_OFFSET,
+            compressed_size: 0,
+            uncompressed_size: 0,
+            crc: 0,
+            flags: 0,
+            zip64: false,
+            modification_time: None,
+            unix_permissions: None,
+            extra_fields: ExtraFieldsContainer::new(),
+        };
+        file_header
+            .extra_fields
+            .add_field(ExtraFieldId::ZIP64, &[0u8; 8], Header::CENTRAL)
+            .expect("user central ZIP64 field");
+        let error = file_header
+            .finalize_extra_fields()
+            .expect_err("automatic ZIP64 metadata must not duplicate user data");
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+        assert_eq!(file_header.extra_fields.central_size, 12);
+    }
+
+    #[test]
+    fn zip32_streaming_size_boundary_refuses_before_descriptor() {
+        let mut output = Cursor::new(Vec::new());
+        let mut archive = ZipArchiveWriter::new(&mut output);
+        let entry = ZipEntryWriter {
+            inner: &mut archive,
+            compressed_bytes: ZIP64_THRESHOLD_FILE_SIZE,
+            name_len: 1,
+            local_header_offset: 0,
+            compression_method: CompressionMethod::Store,
+            zip64: false,
+            flags: FLAG_DATA_DESCRIPTOR,
+            modification_time: None,
+            unix_permissions: None,
+            extra_fields: ExtraFieldsContainer::new(),
+        };
+        let error = entry
+            .finish(DataDescriptorOutput {
+                crc: 0,
+                compressed_size: 0,
+                uncompressed_size: 0,
+            })
+            .expect_err("ZIP32 streaming entry must refuse ZIP64 size");
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+        assert_eq!(archive.stream_offset(), 0);
+        drop(archive);
+        assert!(output.into_inner().is_empty());
+    }
+
+    #[test]
+    fn streaming_counters_reject_u64_overflow_before_sink_write() {
+        let mut output = Vec::new();
+        let mut count_writer = CountWriter::new(&mut output, u64::MAX);
+        let error = count_writer.write(b"x").expect_err("offset overflow");
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        assert!(output.is_empty());
+
+        let mut output = Vec::new();
+        let mut archive = ZipArchiveWriter::builder()
+            .with_offset(u64::MAX)
+            .build(&mut output);
+        let error = archive
+            .new_file("x")
+            .start()
+            .expect_err("offset overflow before local header");
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert_eq!(archive.stream_offset(), u64::MAX);
+        drop(archive);
+        assert!(output.is_empty());
+
+        let mut output = Vec::new();
+        let mut data_writer = ZipDataWriter {
+            inner: &mut output,
+            uncompressed_bytes: u64::MAX,
+            crc: 0,
+            crc32_option: Crc32Option::Skip,
+        };
+        let error = data_writer
+            .write(b"x")
+            .expect_err("uncompressed count overflow");
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        assert!(output.is_empty());
+
+        let mut output = Vec::new();
+        let archive = ZipArchiveWriter::new(&mut output);
+        let mut compressed_entry = OwnedCompressedEntry {
+            archive,
+            state: OwnedEntryState {
+                name_len: 1,
+                local_header_offset: 0,
+                compression_method: CompressionMethod::Store,
+                zip64: false,
+                flags: FLAG_DATA_DESCRIPTOR,
+                modification_time: None,
+                unix_permissions: None,
+                extra_fields: ExtraFieldsContainer::new(),
+            },
+            compressed_bytes: u64::MAX,
+            compressed_limit: None,
+        };
+        let error = compressed_entry
+            .write(b"x")
+            .expect_err("compressed count overflow");
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        drop(compressed_entry);
+        assert!(output.is_empty());
     }
 
     struct PartialPrecompressedSink<'a> {
