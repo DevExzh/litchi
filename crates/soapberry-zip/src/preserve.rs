@@ -9,7 +9,7 @@
 use crate::office::ArchiveLimits;
 use crate::{
     CompressionMethod, EndOfCentralDirectoryRecordFixed, Error, ErrorKind, LimitResource, ReaderAt,
-    ZipArchive, ZipArchiveWriter, ZipFileHeaderFixed,
+    ZipArchive, ZipArchiveWriter, ZipFileHeaderFixed, ZipLocalFileHeaderFixed,
     accounting::{AccountingWriteKind, ZipOperationAccounting, usize_to_u64, write_all_counted},
     extra_fields::{ExtraFieldId, ExtraFields},
 };
@@ -1850,6 +1850,52 @@ fn validate_prepared_local(entry: &PreparedEntry, source_end: u64) -> Result<(),
     }
 }
 
+/// Select ZIP64 framing before a one-pass Deflate stream emits its local header.
+///
+/// At the current lockfile versions (`flate2` 1.1.10 and `zlib-rs` 0.6.7), the
+/// selected backend uses raw Deflate. The formula below mirrors zlib-rs's
+/// `compress_bound_help` (source:
+/// <https://github.com/trifectatechfoundation/zlib-rs/blob/734b2c1f42e2efaafe04cbab9c61cfaa5dead9ad/zlib-rs/src/deflate.rs#L2979-L2990>),
+/// which is the source length plus `ceil(source_len / 8)` and three
+/// block-overhead bytes, with two small input corrections. If those dependency
+/// versions or the backend change, this selector must be revalidated. Include
+/// the ZIP32 local header, the largest streaming descriptor, and the source
+/// name when checking the central-directory offset boundary so the decision
+/// remains valid without a second pass or a payload copy. The candidate bound
+/// intentionally uses the ordinary ZIP32 local layout; when it reaches the
+/// boundary, `.zip64(true)` selects the writer's explicit ZIP64 framing before
+/// any payload bytes are emitted. The known-size 20-byte ZIP64 local-size extra
+/// is therefore intentionally not part of this ZIP32 candidate bound. The
+/// bound may select ZIP64 slightly before a concrete stream requires it, while
+/// ordinary small generated entries retain their existing ZIP32 framing.
+fn generated_deflate_needs_zip64(payload_len: usize, name_len: usize) -> Result<bool, Error> {
+    let payload_len = usize_to_u64(payload_len, "generated Deflate input length")?;
+    let name_len = usize_to_u64(name_len, "generated Deflate name length")?;
+    let zip32_boundary = u32::MAX as u64;
+    if payload_len >= zip32_boundary {
+        return Ok(true);
+    }
+
+    let compressed_bound = payload_len
+        .checked_add(if payload_len == 0 { 1 } else { 0 })
+        .and_then(|size| size.checked_add(if payload_len < 9 { 1 } else { 0 }))
+        .and_then(|size| size.checked_add(payload_len / 8))
+        .and_then(|size| size.checked_add(if payload_len % 8 == 0 { 0 } else { 1 }))
+        .and_then(|size| size.checked_add(3))
+        .ok_or_else(|| unsupported("generated Deflate size bound"))?;
+    let local_header_size = usize_to_u64(
+        ZipLocalFileHeaderFixed::SIZE,
+        "generated Deflate local header size",
+    )?;
+    let member_bound = local_header_size
+        .checked_add(name_len)
+        // Account for the signed ZIP64 descriptor selected by the opt-in mode.
+        .and_then(|size| size.checked_add(24))
+        .and_then(|size| size.checked_add(compressed_bound))
+        .ok_or_else(|| unsupported("generated Deflate member bound"))?;
+    Ok(member_bound >= zip32_boundary)
+}
+
 fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
     let payload_len = entry.data.as_slice().len();
     let name_bytes = entry
@@ -1873,9 +1919,13 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
             use flate2::Compression;
             use flate2::write::DeflateEncoder;
 
+            // This helper remains fully buffered; the selector only establishes
+            // valid ZIP framing before the one-pass compressor starts.
+            let zip64 = generated_deflate_needs_zip64(payload_len, entry.name.len())?;
             let (mut file, config) = writer
                 .new_file(&entry.name)
                 .compression_method(CompressionMethod::Deflate)
+                .zip64(zip64)
                 .start()?;
             let encoder = DeflateEncoder::new(&mut file, Compression::default());
             let mut data_writer = config.wrap(encoder);
@@ -1891,15 +1941,6 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         let archive = ZipArchive::from_slice(&bytes)?;
         if archive.entries_hint() != 1 {
             return Err(unsupported("generated archive entry count"));
-        }
-        // The one-pass Deflate API currently emits a version-20 local header
-        // without a ZIP64 local extra. Its 64-bit descriptor is readable by
-        // our archive parser, but it is not a proven preservation grammar for
-        // generated ZIP64 members. Known-size Store generation has a complete
-        // local/central ZIP64 framing path; retain a typed refusal for the
-        // unproven Deflate case until that API is made explicit.
-        if archive.is_zip64() && entry.compression != CompressionMethod::Store {
-            return Err(unsupported("generated ZIP64 Deflate framing"));
         }
         let directory_offset = usize::try_from(archive.directory_offset())
             .map_err(|_| unsupported("generated archive layout"))?;
@@ -2318,7 +2359,6 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ZipLocalFileHeaderFixed;
     use flate2::{Compression, write::DeflateEncoder};
     use std::{
         cell::RefCell,
@@ -3332,6 +3372,8 @@ mod tests {
         let central = prepared.central.bytes(&[]);
         let central_header = ZipFileHeaderFixed::parse(central).unwrap();
 
+        assert_eq!(local_header.version_needed, 20);
+        assert_eq!(central_header.version_needed, 20);
         assert_eq!(local_header.file_name_len as usize, b"large.bin".len());
         assert_eq!(
             &local
@@ -3345,6 +3387,27 @@ mod tests {
         assert_eq!(central_header.local_header_offset, 0);
         assert_eq!(central_header.uncompressed_size as usize, data.len());
         assert_eq!(Arc::strong_count(&data), 2);
+    }
+
+    #[test]
+    fn generated_deflate_zip64_selector_covers_compression_boundaries() {
+        let zip32_boundary = u64::from(u32::MAX);
+        let source_bound_crossing = usize::try_from(zip32_boundary * 8 / 9 + 1024).unwrap();
+        let source_bound_below = usize::try_from(zip32_boundary * 8 / 9 - 1024).unwrap();
+        let zip32_boundary = usize::try_from(zip32_boundary).unwrap();
+
+        assert!(!generated_deflate_needs_zip64(256 * 1024, u16::MAX as usize).unwrap());
+        assert!(!generated_deflate_needs_zip64(source_bound_below, 0).unwrap());
+        assert!(generated_deflate_needs_zip64(source_bound_below, u16::MAX as usize).unwrap());
+        assert!(generated_deflate_needs_zip64(source_bound_crossing, 0).unwrap());
+        assert!(generated_deflate_needs_zip64(zip32_boundary - 1, 0).unwrap());
+        assert!(generated_deflate_needs_zip64(zip32_boundary, 0).unwrap());
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn generated_deflate_zip64_selector_handles_usize_max_without_bound_overflow() {
+        assert!(generated_deflate_needs_zip64(usize::MAX, 0).unwrap());
     }
 
     #[test]
