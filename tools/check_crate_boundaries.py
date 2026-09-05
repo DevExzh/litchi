@@ -4306,6 +4306,68 @@ KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_SEAM_CALLS = {
         r"\blitchi_keynote\s*::\s*__catalog_table_appearance\s*\("
     ),
 }
+# Exact-source Keynote listings use one focused package scan per slide. Keep
+# this handoff separate from the catalog callback inventory above: the latter
+# is the source-built compatibility route, while this method is an unstable
+# feature-gated bridge for an already-admitted exact source.
+KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SOURCE = Path(
+    "crates/litchi-keynote/src/package/slide_table_appearance.rs"
+)
+KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SEAM = "__slide_table_appearances"
+KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SEAM_DECLARATION = re.compile(
+    r"(?ms)^[ \t]*#[ \t]*\[[ \t]*cfg\s*\(\s*feature\s*=\s*"
+    r'"internal-iwork-source"\s*\)[ \t]*\][ \t]*\n'
+    r"^[ \t]*#[ \t]*\[[ \t]*doc\s*\(\s*hidden\s*\)[ \t]*\][ \t]*\n"
+    rf"^[ \t]*pub\s+fn\s+{re.escape(KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SEAM)}\b"
+)
+KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SEAM_SIGNATURE = re.compile(
+    rf"(?ms)\bpub\s+fn\s+{re.escape(KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SEAM)}"
+    r"\s*\([^{{}};]*\)[ \t\r\n]*->[ \t\r\n]*"
+    r"[^{{}};]*\bResult\s*<\s*Vec\s*<\s*Appearance\b"
+)
+KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_HOST_CALL = re.compile(
+    rf"\.[ \t\r\n]*{re.escape(KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SEAM)}"
+    r"\s*\("
+)
+KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_PUBLIC_CALL = re.compile(
+    r"\.[ \t\r\n]*slide_table_appearance\s*\("
+)
+# Exact Keynote packages use the same allocation-preserving wrapper as the
+# Numbers owner. Keeping this as a format-local seam avoids adding a direct
+# detector dependency to the migration host.
+KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE = Path(
+    "crates/litchi-keynote/src/package.rs"
+)
+KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM = (
+    "__from_shared_source_with_options"
+)
+KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_DECLARATION = re.compile(
+    r"(?ms)^[ \t]*#[ \t]*\[[ \t]*cfg\s*\(\s*feature\s*=\s*"
+    r'"internal-iwork-source"\s*\)[ \t]*\][ \t]*\n'
+    r"^[ \t]*#[ \t]*\[[ \t]*doc\s*\(\s*hidden\s*\)[ \t]*\][ \t]*\n"
+    rf"^[ \t]*pub\s+fn\s+{re.escape(KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM)}\b"
+)
+KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_SIGNATURE = re.compile(
+    rf"(?ms)\bpub\s+fn\s+{re.escape(KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM)}"
+    r"\s*\([^{{}};]*\bArc\s*<\s*\[\s*u8\s*\]\s*>"
+    r"[^{{}};]*\bReadOptions\b"
+)
+KEYNOTE_SLIDE_TABLE_APPEARANCE_EXACT_SOURCE_OWNER = re.compile(
+    r"\bexact_source_owner\s*\("
+)
+KEYNOTE_SLIDE_TABLE_APPEARANCE_FORBIDDEN_EXACT_SOURCE_COPY = (
+    (
+        "focused Package::from_bytes(source) copy",
+        re.compile(
+            r"\b(?:litchi_keynote\s*::\s*)?Package\s*::\s*"
+            r"from_bytes\s*\(\s*source\b"
+        ),
+    ),
+    (
+        "exact source to_vec copy",
+        re.compile(r"\bsource\s*\.\s*(?:to_vec|to_owned|to_bytes)\s*\("),
+    ),
+)
 IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_ROOT_FUNCTION = "slide_tables"
 IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_ACTIVATION = re.compile(
     r"\b(?:keynote_table_appearance_codec|table_appearance_codec|"
@@ -6132,6 +6194,47 @@ NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_CALL = re.compile(
 NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_SIGNATURE = re.compile(
     rf"\bpub\s+fn\s+{re.escape(NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM)}"
     r"\s*(?:<|\()"
+)
+# Exact Numbers packages retain the coordinator's immutable source allocation
+# through this narrow hidden constructor. It is intentionally tracked beside
+# the source-built callback: the two routes have different compatibility and
+# admission semantics and must not collapse into one broad raw-source escape.
+NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE = Path(
+    "crates/litchi-numbers/src/package.rs"
+)
+NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM = (
+    "__from_shared_source_with_options"
+)
+NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_DECLARATION = re.compile(
+    r"(?ms)^[ \t]*#[ \t]*\[[ \t]*cfg\s*\(\s*feature\s*=\s*"
+    r'"internal-iwork-source"\s*\)[ \t]*\][ \t]*\n'
+    r"^[ \t]*#[ \t]*\[[ \t]*doc\s*\(\s*hidden\s*\)[ \t]*\][ \t]*\n"
+    rf"^[ \t]*pub\s+fn\s+{re.escape(NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM)}\b"
+)
+NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_SIGNATURE = re.compile(
+    rf"(?ms)\bpub\s+fn\s+{re.escape(NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM)}"
+    r"\s*\([^{{}};]*\bArc\s*<\s*\[\s*u8\s*\]\s*>"
+    r"[^{{}};]*\bReadOptions\b"
+)
+NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_CALL = re.compile(
+    rf"\b(?:[A-Za-z_][A-Za-z0-9_]*\s*::\s*)*Package\s*::\s*"
+    rf"{re.escape(NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM)}\s*\("
+)
+NUMBERS_TABLE_APPEARANCE_EXACT_SOURCE_OWNER_CALL = re.compile(
+    r"\bexact_source_owner\s*\("
+)
+NUMBERS_TABLE_APPEARANCE_FORBIDDEN_EXACT_SOURCE_COPY = (
+    (
+        "focused Package::from_bytes(source) copy",
+        re.compile(
+            r"\b(?:litchi_numbers\s*::\s*)?Package\s*::\s*"
+            r"from_bytes\s*\(\s*source\b"
+        ),
+    ),
+    (
+        "exact source to_vec copy",
+        re.compile(r"\bsource\s*\.\s*(?:to_vec|to_owned|to_bytes)\s*\("),
+    ),
 )
 NUMBERS_TABLE_APPEARANCE_OWNER_HELPER_ROOT = Path(
     "crates/litchi-numbers/src/package/table_appearance"
@@ -23850,6 +23953,95 @@ def audit_iwa_numbers_table_appearance_source_topology(
                 f"{NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE}"
             )
 
+        # Exact-source Numbers reads use a separate focused constructor. Do
+        # not infer this route from a nearby identifier: activate the check
+        # only when either the exact declaration or its host call is present,
+        # then require the complete feature-gated handoff and source-owner
+        # identity. This leaves historical fixtures dormant while making a
+        # partial cutover fail closed as soon as one half lands.
+        shared_owner_path = root / NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE
+        shared_owner_source = (
+            _mask_rust_cfg_test_items(shared_owner_path.read_text(encoding="utf-8"))
+            if shared_owner_path.is_file()
+            else ""
+        )
+        shared_owner_code = _mask_rust_non_code(shared_owner_source)
+        shared_name = re.compile(
+            rf"\bpub\s+fn\s+{re.escape(NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM)}\b"
+        )
+        shared_call_present = (
+            NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_CALL.search(host_code)
+            is not None
+        )
+        shared_route_active = (
+            shared_name.search(shared_owner_code) is not None or shared_call_present
+        )
+        if shared_route_active:
+            if (
+                NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_DECLARATION.search(
+                    shared_owner_source
+                )
+                is None
+            ):
+                violations.append(
+                    "focused litchi-numbers exact-source handoff is missing the "
+                    "feature-gated hidden seam "
+                    f"{NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM}: "
+                    f"{NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE}"
+                )
+            elif (
+                NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_SIGNATURE.search(
+                    shared_owner_code
+                )
+                is None
+            ):
+                violations.append(
+                    "focused litchi-numbers exact-source handoff seam must accept "
+                    "Arc<[u8]> and ReadOptions: "
+                    f"{NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE}"
+                )
+
+            if NUMBERS_TABLE_APPEARANCE_EXACT_SOURCE_OWNER_CALL.search(host_code) is None:
+                violations.append(
+                    "litchi-iwa Numbers exact table-appearance route must retain "
+                    "the immutable exact_source_owner handoff: "
+                    f"{NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_HOST_SOURCE}"
+                )
+            if not shared_call_present:
+                violations.append(
+                    "litchi-iwa Numbers exact table-appearance route must call "
+                    f"{NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM}: "
+                    f"{NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_HOST_SOURCE}"
+                )
+            if re.search(r"\bsource_is_exact\s*\(", host_code) is None:
+                violations.append(
+                    "litchi-iwa Numbers table-appearance route must preserve the "
+                    "exact/source-built admission split: "
+                    f"{NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_HOST_SOURCE}"
+                )
+
+            handoff_bodies = [
+                (body, offset)
+                for body, offset in _rust_top_level_function_bodies(host_source).values()
+                if NUMBERS_TABLE_APPEARANCE_EXACT_SOURCE_OWNER_CALL.search(body)
+                or NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_CALL.search(body)
+            ]
+            if not handoff_bodies:
+                handoff_bodies = [(host_code, 0)]
+            for body, body_offset in handoff_bodies:
+                for label, forbidden in NUMBERS_TABLE_APPEARANCE_FORBIDDEN_EXACT_SOURCE_COPY:
+                    match = forbidden.search(body)
+                    if match is not None:
+                        line_number = host_code.count(
+                            "\n", 0, body_offset + match.start()
+                        ) + 1
+                        violations.append(
+                            "litchi-iwa Numbers exact table-appearance route must not "
+                            f"perform {label}: "
+                            f"{NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_HOST_SOURCE}:"
+                            f"{line_number}"
+                        )
+
     source_paths = {
         root / path
         for path in RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_SOURCE
@@ -35534,6 +35726,12 @@ def audit_iwa_numbers_table_lock_source_topology(root: Path = ROOT) -> list[str]
         ),
     )
     violations: list[str] = []
+    shared_source = root / IWA_TABLE_LOCK_SOURCE
+    if shared_source.is_file():
+        violations.append(
+            "retired litchi-iwa shared table-lock source returned: "
+            + str(IWA_TABLE_LOCK_SOURCE)
+        )
     for source_path, retired_names in scoped_sources:
         paths = (
             sorted(source_path.rglob("*.rs"))
@@ -41812,6 +42010,169 @@ def audit_iwa_keynote_slide_table_appearance_source_topology(
                         f"focused hidden seam call {seam}: "
                         f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST}"
                     )
+
+    # Exact-source listings retain one compact appearance vector per slide.
+    # Keep this separate from the source-built catalog callbacks above: a
+    # method declaration or host call is the explicit activation token, and
+    # once either appears the complete hidden handoff must be present.
+    batch_owner_path = root / KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SOURCE
+    batch_owner_source = (
+        _mask_rust_cfg_test_items(batch_owner_path.read_text(encoding="utf-8"))
+        if batch_owner_path.is_file()
+        else ""
+    )
+    batch_owner_code = _mask_rust_non_code(batch_owner_source)
+    batch_name = re.compile(
+        rf"\bpub\s+fn\s+{re.escape(KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SEAM)}\b"
+    )
+    batch_host_path = root / KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST
+    batch_host_source = (
+        _mask_rust_cfg_test_items(batch_host_path.read_text(encoding="utf-8"))
+        if batch_host_path.is_file()
+        else ""
+    )
+    batch_host_code = _mask_rust_non_code(batch_host_source)
+    batch_call_present = (
+        KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_HOST_CALL.search(batch_host_code)
+        is not None
+    )
+    batch_route_active = (
+        batch_name.search(batch_owner_code) is not None or batch_call_present
+    )
+    if batch_route_active:
+        if (
+            KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SEAM_DECLARATION.search(
+                batch_owner_source
+            )
+            is None
+        ):
+            violations.append(
+                "focused litchi-keynote exact-source appearance owner is missing "
+                "the feature-gated hidden batch seam "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SEAM}: "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SOURCE}"
+            )
+        elif (
+            KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SEAM_SIGNATURE.search(
+                batch_owner_code
+            )
+            is None
+        ):
+            violations.append(
+                "focused litchi-keynote exact-source batch seam must return "
+                "semantic position-ordered Vec<Appearance>: "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SOURCE}"
+            )
+
+        shared_owner_path = root / KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE
+        shared_owner_source = (
+            _mask_rust_cfg_test_items(shared_owner_path.read_text(encoding="utf-8"))
+            if shared_owner_path.is_file()
+            else ""
+        )
+        shared_owner_code = _mask_rust_non_code(shared_owner_source)
+        shared_name = re.compile(
+            rf"\bpub\s+fn\s+{re.escape(KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM)}\b"
+        )
+        if shared_name.search(shared_owner_code) is None:
+            violations.append(
+                "focused litchi-keynote exact-source handoff is missing the "
+                "feature-gated hidden seam "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM}: "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE}"
+            )
+        elif (
+            KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_DECLARATION.search(
+                shared_owner_source
+            )
+            is None
+        ):
+            violations.append(
+                "focused litchi-keynote exact-source handoff is missing the "
+                "feature-gated hidden seam "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM}: "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE}"
+            )
+        elif (
+            KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_SIGNATURE.search(
+                shared_owner_code
+            )
+            is None
+        ):
+            violations.append(
+                "focused litchi-keynote exact-source handoff seam must accept "
+                "Arc<[u8]> and ReadOptions: "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE}"
+            )
+        if not batch_call_present:
+            violations.append(
+                "litchi-iwa Keynote exact table-appearance listing must call "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SEAM}: "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST}"
+            )
+        if KEYNOTE_SLIDE_TABLE_APPEARANCE_EXACT_SOURCE_OWNER.search(batch_host_code) is None:
+            violations.append(
+                "litchi-iwa Keynote exact table-appearance listing must retain "
+                "the immutable exact_source_owner handoff: "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST}"
+            )
+
+        package_aliases = set(
+            _rust_focused_package_import_aliases(batch_host_source, ecosystem="Keynote")
+        )
+        package_aliases.add("Package")
+        package_call = re.compile(
+            r"\b(?:litchi_keynote\s*::\s*)?(?:"
+            + "|".join(
+                re.escape(alias)
+                for alias in sorted(package_aliases, key=len, reverse=True)
+            )
+            + r")\s*::\s*"
+            + re.escape(KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM)
+            + r"\s*\("
+        )
+        handoff_bodies = [
+            (body, offset)
+            for body, offset in _rust_top_level_function_bodies(batch_host_source).values()
+            if KEYNOTE_SLIDE_TABLE_APPEARANCE_EXACT_SOURCE_OWNER.search(body)
+        ]
+        if not handoff_bodies:
+            violations.append(
+                "litchi-iwa Keynote exact table-appearance listing has no single "
+                "focused handoff function containing exact_source_owner: "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST}"
+            )
+            handoff_bodies = [(batch_host_code, 0)]
+        if not any(package_call.search(body) for body, _offset in handoff_bodies):
+            violations.append(
+                "litchi-iwa Keynote exact table-appearance handoff must use "
+                f"Package::{KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM}: "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST}"
+            )
+        for body, body_offset in handoff_bodies:
+            for label, forbidden in KEYNOTE_SLIDE_TABLE_APPEARANCE_FORBIDDEN_EXACT_SOURCE_COPY:
+                match = forbidden.search(body)
+                if match is not None:
+                    line_number = batch_host_code.count(
+                        "\n", 0, body_offset + match.start()
+                    ) + 1
+                    violations.append(
+                        "litchi-iwa Keynote exact table-appearance handoff must not "
+                        f"perform {label}: "
+                        f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST}:{line_number}"
+                    )
+
+        # The public selector-first reader is intentionally retained for
+        # callers, but listing must consume the one batch projection above.
+        for match in KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_PUBLIC_CALL.finditer(
+            batch_host_code
+        ):
+            line_number = batch_host_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "litchi-iwa Keynote exact table-appearance listing must not "
+                "repeat the public per-table appearance read: "
+                f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST}:{line_number}"
+            )
     source_root = root / IWA_KEYNOTE_SOURCE_ROOT
     if source_root.is_dir():
         for path in sorted(source_root.rglob("*.rs")):

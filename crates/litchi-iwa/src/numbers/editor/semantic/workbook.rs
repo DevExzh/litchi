@@ -218,24 +218,41 @@ impl NumbersEditor {
         let focused_package = if source_built {
             None
         } else {
-            let source = self.package.exact_source_bytes().ok_or_else(|| {
+            let source = self.package.exact_source_owner().ok_or_else(|| {
                 Error::InvalidFormat(
                     "focused Numbers table-appearance source is not exact".to_owned(),
                 )
             })?;
-            Some(Package::from_bytes(source).map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "focused Numbers table-appearance source failed: {error}"
-                ))
-            })?)
+            Some(
+                Package::__from_shared_source_with_options(
+                    source,
+                    litchi_numbers::PackageReadOptions::default(),
+                )
+                .map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "focused Numbers table-appearance source failed: {error}"
+                    ))
+                })?,
+            )
+        };
+        let focused_locations = if source_built {
+            None
+        } else {
+            Some(selectors::FocusedTableSelectorIndex::from_descriptors(
+                self,
+                &descriptors,
+            )?)
         };
         let read_focused_appearance = litchi_numbers::Package::table_appearance;
         let mut tables = descriptors
             .into_iter()
             .map(|descriptor| {
                 let appearance = if let Some(package) = focused_package.as_ref() {
+                    let locations = focused_locations.as_ref().ok_or_else(|| {
+                        Error::InvalidFormat("focused Numbers selector index is missing".to_owned())
+                    })?;
                     let (sheet_selector, table_selector) =
-                        selectors::focused_table_location(self, descriptor.object_id)?;
+                        locations.selectors(descriptor.object_id)?;
                     read_focused_appearance(package, sheet_selector, table_selector).map_err(
                         |error| {
                             Error::InvalidFormat(format!(

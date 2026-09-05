@@ -217,3 +217,35 @@ byte-exact no-op behavior, and exact inverse restoration. Rust also read the
 native-resaved clear result and confirmed another clear was an exact no-op.
 This qualifies these Custom DateTime replacement and clear cases; broader
 native format parity remains open.
+
+
+## Numbers Duration source (2026-09-06)
+
+`numbers/duration-native.numbers` was authored through Computer Use in Numbers
+14.4 from Blank. B2 contains `1h 23m 45s` with explicit `Duration`, abbreviated
+style, and automatic units spanning hours through seconds. C2 contains
+`Native Duration marker`. Numbers saved, closed, and reopened the exact path
+with the value, marker, and Duration inspector settings intact, without a
+repair prompt. SHA-256:
+`d146050a7bff23622cb3acb759d53446e81d55673b806362f7233e02ca01b10d`.
+
+The focused Numbers API changed B2 to colon style with custom hours-through-
+seconds units. Numbers displayed `1:23:45`; the Cell inspector showed
+`Duration`, `Custom Units`, and style `0:00:00`. After changing C2 to
+`Native Duration marker saved`, save, close, and exact-path reopen preserved
+all these values without repair. `numbers/duration-native-resaved.numbers`
+retains that artifact. SHA-256:
+`656da1ea88e5afc2d9c7ec450714a9f30397ac30c8ebce4ef9dad92c7f78b50d`.
+
+The focused API then cleared the explicit Duration format. Numbers displayed
+`1h 23m 45s` with `Automatic` in the Cell inspector. After C2 changed to
+`Native Duration clear saved`, save, close, and exact-path reopen again
+preserved the value, marker, and Automatic setting without repair. The
+closed temporary native-resaved clear artifact had SHA-256
+`c5c1343cf29e685dc017dd9924c082c9ed351b12aa9561158a73c54095a39938`.
+Rust read that result and verified another clear was an exact no-op.
+
+Both Rust mutations verified semantic reopen, exact no-op and inverse
+restoration, unchanged stored Duration and cached scalar, and locality to the
+format-list and tile components. These observations qualify this Duration
+replacement and clear profile; broader native unit/style parity remains open.

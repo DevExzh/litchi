@@ -13573,6 +13573,8 @@ class BoundaryPolicyTests(unittest.TestCase):
                         for index, (name, _) in enumerate(numbers_declarations, start=1)
                     ]
                     + [
+                        "retired litchi-iwa shared table-lock source returned: "
+                        "crates/litchi-iwa/src/table_lock.rs",
                         "retired litchi-iwa Numbers table-lock method "
                         "set_table_lock_state_for_model: "
                         "crates/litchi-iwa/src/table_lock.rs:1",
@@ -13630,7 +13632,11 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
 
             self.assertEqual(
-                boundaries.audit_iwa_numbers_table_lock_source_topology(root), []
+                boundaries.audit_iwa_numbers_table_lock_source_topology(root),
+                [
+                    "retired litchi-iwa shared table-lock source returned: "
+                    "crates/litchi-iwa/src/table_lock.rs"
+                ],
             )
 
     def test_retired_iwa_numbers_table_info_lock_state_field_cannot_return(
@@ -19627,6 +19633,22 @@ fn rewrite_movie_title_operation(
                 "__catalog_table_appearance",
             ),
         )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SOURCE,
+            Path("crates/litchi-keynote/src/package/slide_table_appearance.rs"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SEAM,
+            "__slide_table_appearances",
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE,
+            Path("crates/litchi-keynote/src/package.rs"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM,
+            "__from_shared_source_with_options",
+        )
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -19692,6 +19714,160 @@ fn rewrite_movie_title_operation(
             self.assertEqual(
                 boundaries.audit_keynote_slide_table_appearance_resource_source_topology(root),
                 [],
+            )
+
+    def test_keynote_exact_source_listing_uses_one_hidden_batch_handoff(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+
+            catalog_owner = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_OWNER
+            catalog_owner.parent.mkdir(parents=True, exist_ok=True)
+            catalog_owner.write_text(
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                "pub trait __CatalogTableAppearanceSource {}\n"
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                "pub fn __catalog_table_style_edges(payload: &[u8], limits: WireLimits) {}\n"
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                "pub fn __catalog_table_appearance(source: &mut dyn __CatalogTableAppearanceSource, style: u64, preset: Option<u64>, limits: WireLimits) {}\n",
+                encoding="utf-8",
+            )
+            batch_owner = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SOURCE
+            batch_owner.write_text(
+                batch_owner.read_text(encoding="utf-8")
+                + "#[cfg(feature = \"internal-iwork-source\")]\n"
+                + "#[doc(hidden)]\n"
+                + "pub fn __slide_table_appearances(&self, slide_index: usize) -> Result<Vec<Appearance>, Error> { let _ = slide_index; todo!() }\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE
+            package.write_text(
+                package.read_text(encoding="utf-8")
+                + "#[cfg(feature = \"internal-iwork-source\")]\n"
+                + "#[doc(hidden)]\n"
+                + "pub fn __from_shared_source_with_options(source: Arc<[u8]>, options: ReadOptions) -> Result<Self, Error> { let _ = (source, options); todo!() }\n",
+                encoding="utf-8",
+            )
+            shared_wrapper_source = package.read_text(encoding="utf-8")
+            host = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SOURCE_HOST
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn read_catalog() {\n"
+                "    litchi_keynote::__catalog_table_style_edges(payload, limits);\n"
+                "    litchi_keynote::__catalog_table_appearance(source, style, preset, limits);\n"
+                "}\n"
+                "fn focused_handoff(package: &IWorkPackage) {\n"
+                "    let source = package.exact_source_owner().expect(\"source\");\n"
+                "    let focused = litchi_keynote::Package::__from_shared_source_with_options(\n"
+                "        Arc::clone(&source), ReadOptions::default());\n"
+                "    let _ = focused.__slide_table_appearances(slide_index);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_appearance_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            package.write_text(
+                shared_wrapper_source.replace(
+                    "#[cfg(feature = \"internal-iwork-source\")]\n", "", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_appearance_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("exact-source handoff is missing the feature-gated hidden seam" in item for item in violations),
+                violations,
+            )
+            package.write_text(shared_wrapper_source, encoding="utf-8")
+
+            batch_owner.write_text(
+                batch_owner.read_text(encoding="utf-8").replace(
+                    "#[cfg(feature = \"internal-iwork-source\")]\n", "", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_appearance_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing the feature-gated hidden batch seam" in item for item in violations),
+                violations,
+            )
+
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+            catalog_owner.write_text(
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                "pub trait __CatalogTableAppearanceSource {}\n"
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                "pub fn __catalog_table_style_edges(payload: &[u8], limits: WireLimits) {}\n"
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                "pub fn __catalog_table_appearance(source: &mut dyn __CatalogTableAppearanceSource, style: u64, preset: Option<u64>, limits: WireLimits) {}\n",
+                encoding="utf-8",
+            )
+            batch_owner = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_BATCH_SOURCE
+            batch_owner.write_text(
+                batch_owner.read_text(encoding="utf-8")
+                + "#[cfg(feature = \"internal-iwork-source\")]\n"
+                + "#[doc(hidden)]\n"
+                + "pub fn __slide_table_appearances(&self, slide_index: usize) -> Result<Vec<Appearance>, Error> { let _ = slide_index; todo!() }\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE
+            package.write_text(
+                package.read_text(encoding="utf-8")
+                + "#[cfg(feature = \"internal-iwork-source\")]\n"
+                + "#[doc(hidden)]\n"
+                + "pub fn __from_shared_source_with_options(source: Arc<[u8]>, options: ReadOptions) -> Result<Self, Error> { let _ = (source, options); todo!() }\n",
+                encoding="utf-8",
+            )
+            host.write_text(
+                "fn focused_handoff(package: &IWorkPackage) {\n"
+                "    let source = package.exact_source_owner().expect(\"source\");\n"
+                "    let focused = litchi_keynote::Package::__from_shared_source_with_options(\n"
+                "        Arc::clone(&source), ReadOptions::default());\n"
+                "    let _copy = litchi_keynote::Package::from_bytes(source);\n"
+                "    let _ = focused.__slide_table_appearances(slide_index);\n"
+                "}\n"
+                "fn read_catalog() {\n"
+                "    litchi_keynote::__catalog_table_style_edges(payload, limits);\n"
+                "    litchi_keynote::__catalog_table_appearance(source, style, preset, limits);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_appearance_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must not perform focused Package::from_bytes(source) copy" in item for item in violations),
+                violations,
+            )
+
+            host.write_text(
+                host.read_text(encoding="utf-8").replace(
+                    "focused.__slide_table_appearances(slide_index)",
+                    "focused.slide_table_appearance(slide_index, table_position)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_appearance_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must not repeat the public per-table appearance read" in item for item in violations),
+                violations,
             )
 
     def test_keynote_slide_table_appearance_requires_selector_codec_and_exports(self) -> None:
@@ -29510,6 +29686,14 @@ fn rewrite_movie_title_operation(
             "__table_appearance_from_source_built",
         )
         self.assertEqual(
+            boundaries.NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE,
+            Path("crates/litchi-numbers/src/package.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM,
+            "__from_shared_source_with_options",
+        )
+        self.assertEqual(
             boundaries.NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_HOST_SOURCE,
             Path(
                 "crates/litchi-iwa/src/numbers/editor/semantic/workbook.rs"
@@ -29694,6 +29878,88 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(
                 any("missing the feature-gated hidden source-built seam" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_exact_source_handoff_is_shared_and_strictly_gated(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_appearance_canonical_scaffold(root)
+            package = root / boundaries.NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE
+            package.write_text(
+                "mod table_appearance;\n"
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                "pub fn __from_shared_source_with_options(\n"
+                "    source: Arc<[u8]>, options: ReadOptions\n"
+                ") -> Result<Self, Error> { let _ = (source, options); todo!() }\n",
+                encoding="utf-8",
+            )
+            host = root / boundaries.NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_HOST_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn read_exact(package: &IWorkPackage) {\n"
+                "    if package.source_is_exact() {\n"
+                "    let source = package.exact_source_owner().expect(\"source\");\n"
+                "    let _focused = Package::__from_shared_source_with_options(\n"
+                "        Arc::clone(&source), ReadOptions::default());\n"
+                "    }\n"
+                "}\n"
+                "fn read_source_built() {\n"
+                "    Package::__table_appearance_from_source_built(\n"
+                "        payload, style, preset, lookup);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_appearance_source_topology(root),
+                [],
+            )
+
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "#[cfg(feature = \"internal-iwork-source\")]\n", "", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_appearance_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing the feature-gated hidden seam" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_appearance_canonical_scaffold(root)
+            package.write_text(
+                "mod table_appearance;\n"
+                "#[cfg(feature = \"internal-iwork-source\")]\n"
+                "#[doc(hidden)]\n"
+                "pub fn __from_shared_source_with_options(\n"
+                "    source: Arc<[u8]>, options: ReadOptions\n"
+                ") -> Result<Self, Error> { let _ = (source, options); todo!() }\n",
+                encoding="utf-8",
+            )
+            host.write_text(
+                "fn read_exact(package: &IWorkPackage) {\n"
+                "    if package.source_is_exact() {\n"
+                "    let source = package.exact_source_owner().expect(\"source\");\n"
+                "    let _focused = Package::__from_shared_source_with_options(\n"
+                "        Arc::clone(&source), ReadOptions::default());\n"
+                "    let _copied = Package::from_bytes(source);\n"
+                "    }\n"
+                "}\n"
+                "fn read_source_built() {\n"
+                "    Package::__table_appearance_from_source_built(\n"
+                "        payload, style, preset, lookup);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_appearance_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must not perform focused Package::from_bytes(source) copy" in item for item in violations),
                 violations,
             )
 

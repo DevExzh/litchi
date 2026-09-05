@@ -2,6 +2,8 @@
 
 use super::*;
 
+use litchi_iwa_common::table::lock::State as TableLockState;
+
 const APPEARANCE_TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
 const APPEARANCE_ROLE_MESSAGE_TYPES: &[u32] = &[6_000, 6_001, 6_003, 401, 6_008, 6_247];
 
@@ -447,7 +449,7 @@ pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGr
                 rows: model.rows() as usize,
                 columns: model.columns() as usize,
                 appearance,
-                lock_state: table_lock_state_from_message(&message.data)?,
+                lock_state: TableLockState::from_locked(table_info.locked().unwrap_or(false)),
             },
         });
     }
