@@ -197,7 +197,6 @@ fn try_write_preserved<W: Write>(
     let Ok(archive) = soapberry_zip::ZipArchive::from_slice(source) else {
         return Ok(PreservationWrite::Fallback(writer));
     };
-    let source_uses_zip64 = archive.is_zip64();
     let archive = archive.into_zip_archive();
     let mut buffer = Vec::new();
     buffer
@@ -593,13 +592,8 @@ fn try_write_preserved<W: Write>(
         .and_then(|size| size.checked_add(appended_bytes.saturating_mul(2)))
         .and_then(|size| size.checked_add(appended_members.saturating_mul(64 * 1024)));
     if conservative_output_bound.is_none()
-        || (!source_uses_zip64
-            && (conservative_output_bound.is_some_and(|size| size > u64::from(u32::MAX))
-                || !output_entry_count_is_zip32_safe(
-                    provenance.members.len(),
-                    omitted_members,
-                    appended_members,
-                )))
+        || checked_output_entry_count(provenance.members.len(), omitted_members, appended_members)
+            .is_none()
     {
         return Ok(PreservationWrite::Fallback(writer));
     }
@@ -829,16 +823,15 @@ fn normalized_member_name(name: &str, resource: &'static str) -> Result<String> 
     })
 }
 
-fn output_entry_count_is_zip32_safe(
+fn checked_output_entry_count(
     source_members: usize,
     omitted_members: u64,
     appended_members: u64,
-) -> bool {
+) -> Option<u64> {
     u64::try_from(source_members)
         .ok()
         .and_then(|count| count.checked_sub(omitted_members))
         .and_then(|count| count.checked_add(appended_members))
-        .is_some_and(|count| count < u64::from(u16::MAX))
 }
 
 fn regenerated_name(name: Option<&str>) -> Result<String> {
@@ -1265,27 +1258,20 @@ mod tests {
     }
 
     #[test]
-    fn targeted_output_entry_count_rejects_zip32_sentinel() {
-        assert!(output_entry_count_is_zip32_safe(
-            usize::from(u16::MAX - 1),
-            0,
-            0
-        ));
-        assert!(!output_entry_count_is_zip32_safe(
-            usize::from(u16::MAX),
-            0,
-            0
-        ));
-        assert!(!output_entry_count_is_zip32_safe(
-            usize::from(u16::MAX - 1),
-            0,
-            1
-        ));
-        assert!(output_entry_count_is_zip32_safe(
-            usize::from(u16::MAX),
-            1,
-            0
-        ));
+    fn targeted_output_entry_count_checks_checked_arithmetic() {
+        assert_eq!(
+            checked_output_entry_count(usize::from(u16::MAX - 1), 0, 0),
+            Some(u64::from(u16::MAX - 1))
+        );
+        assert_eq!(
+            checked_output_entry_count(usize::from(u16::MAX - 1), 0, 1),
+            Some(u64::from(u16::MAX))
+        );
+        assert_eq!(
+            checked_output_entry_count(usize::from(u16::MAX), 1, 0),
+            Some(u64::from(u16::MAX - 1))
+        );
+        assert_eq!(checked_output_entry_count(0, 1, 0), None);
     }
 
     fn pseudo_random_bytes(len: usize, mut state: u32) -> Vec<u8> {
@@ -1323,6 +1309,29 @@ mod tests {
             first,
             second,
         )
+    }
+
+    fn zip32_entry_count_boundary_source() -> Vec<u8> {
+        const PART_COUNT: usize = (u16::MAX as usize - 1) - 2;
+        const CONTENT_TYPES: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="bin" ContentType="application/vnd.ms-excel.sheet.binary.macroEnabled.main"/><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
+        let package_relationships = Relationships::new(PACKAGE_URI.to_owned()).to_xml();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored("[Content_Types].xml", CONTENT_TYPES)
+            .expect("write boundary content types");
+        writer
+            .write_stored("_rels/.rels", package_relationships.as_bytes())
+            .expect("write boundary package relationships");
+        for index in 0..PART_COUNT {
+            let name = format!("custom/opaque-{index:05}.bin");
+            let payload = [u8::try_from(index % 251).expect("boundary payload byte")];
+            writer
+                .write_stored(&name, &payload)
+                .expect("write boundary opaque Part");
+        }
+        writer
+            .finish_to_bytes()
+            .expect("finish boundary source archive")
     }
 
     fn source_with_explicit_empty_part_relationships() -> (Vec<u8>, PackURI) {
@@ -2192,6 +2201,201 @@ mod tests {
             reopened.get_part(&second_added).unwrap().content_type(),
             "application/octet-stream"
         );
+    }
+
+    #[test]
+    fn topology_add_at_zip32_entry_count_boundary_promotes_owned_source() {
+        const SOURCE_MEMBER_COUNT: usize = u16::MAX as usize - 1;
+        const SOURCE_PART_COUNT: usize = SOURCE_MEMBER_COUNT - 2;
+        const BINARY_CONTENT_TYPE: &str = "application/vnd.ms-excel.sheet.binary.macroEnabled.main";
+        const CONTENT_TYPES_MEMBER: &str = "[Content_Types].xml";
+        const BINARY_DEFAULT: &[u8] = br#"<Default Extension="bin" ContentType="application/vnd.ms-excel.sheet.binary.macroEnabled.main"/>"#;
+
+        let source = zip32_entry_count_boundary_source();
+        let source_archive = soapberry_zip::ZipArchive::from_slice(&source).unwrap();
+        assert!(!source_archive.is_zip64());
+        assert_eq!(source_archive.entries_hint(), u64::from(u16::MAX - 1));
+        assert_eq!(source_archive.entries().count(), SOURCE_MEMBER_COUNT);
+        let source_content_types = soapberry_zip::office::ArchiveReader::new(&source)
+            .unwrap()
+            .read(CONTENT_TYPES_MEMBER)
+            .unwrap();
+        assert!(
+            source_content_types
+                .windows(BINARY_DEFAULT.len())
+                .any(|window| window == BINARY_DEFAULT)
+        );
+        let source_raw = raw_archive(&source);
+
+        let mut package = OpcPackage::from_vec(source.clone()).expect("open boundary source");
+        assert_eq!(package.part_count(), SOURCE_PART_COUNT);
+        let added = PackURI::new("/custom/new.bin").unwrap();
+        package.add_part(Box::new(crate::BlobPart::new(
+            added.clone(),
+            BINARY_CONTENT_TYPE.to_owned(),
+            b"new payload".to_vec(),
+        )));
+
+        let output = PackageWriter::to_bytes(&package).expect("publish boundary addition");
+        let output_archive = soapberry_zip::ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.is_zip64());
+        assert_eq!(output_archive.entries_hint(), u64::from(u16::MAX));
+        assert_eq!(output_archive.entries().count(), usize::from(u16::MAX));
+
+        let output_raw = raw_archive(&output);
+        assert_eq!(
+            &output_raw.local_order[..source_raw.local_order.len()],
+            source_raw.local_order.as_slice()
+        );
+        assert_eq!(
+            &output_raw.central_order[..source_raw.central_order.len()],
+            source_raw.central_order.as_slice()
+        );
+        assert_eq!(output_raw.local_order.last().unwrap(), added.membername());
+        assert_eq!(output_raw.central_order.last().unwrap(), added.membername());
+        for name in &source_raw.local_order {
+            if name == CONTENT_TYPES_MEMBER {
+                continue;
+            }
+            assert_eq!(
+                output_raw.local_members[name], source_raw.local_members[name],
+                "source local record changed for {name}"
+            );
+            assert_eq!(
+                central_without_local_offset(&output_raw.central_records[name]),
+                central_without_local_offset(&source_raw.central_records[name]),
+                "source central record changed for {name}"
+            );
+        }
+
+        let archive_reader = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        assert_eq!(
+            archive_reader.read(CONTENT_TYPES_MEMBER).unwrap(),
+            source_content_types
+        );
+        assert_eq!(
+            archive_reader.read(added.membername()).unwrap(),
+            b"new payload"
+        );
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen boundary output");
+        assert_eq!(reopened.part_count(), SOURCE_PART_COUNT + 1);
+        assert_eq!(reopened.get_part(&added).unwrap().blob(), b"new payload");
+
+        let second = PackURI::new("/custom/new-2.bin").unwrap();
+        let mut package = OpcPackage::from_vec(output).expect("reopen owned ZIP64 output");
+        package.add_part(Box::new(crate::BlobPart::new(
+            second.clone(),
+            BINARY_CONTENT_TYPE.to_owned(),
+            b"second payload".to_vec(),
+        )));
+        let output_2 = PackageWriter::to_bytes(&package).expect("publish 65536-member output");
+        let output_2_archive = soapberry_zip::ZipArchive::from_slice(&output_2).unwrap();
+        assert!(output_2_archive.is_zip64());
+        assert_eq!(output_2_archive.entries_hint(), u64::from(u16::MAX) + 1);
+        assert_eq!(
+            output_2_archive.entries().count(),
+            usize::from(u16::MAX) + 1
+        );
+        let output_2_raw = raw_archive(&output_2);
+        assert_eq!(
+            &output_2_raw.local_order[..output_raw.local_order.len()],
+            output_raw.local_order.as_slice()
+        );
+        assert_eq!(
+            &output_2_raw.central_order[..output_raw.central_order.len()],
+            output_raw.central_order.as_slice()
+        );
+        assert_eq!(
+            output_2_raw.local_order.last().unwrap(),
+            second.membername()
+        );
+        assert_eq!(
+            output_2_raw.central_order.last().unwrap(),
+            second.membername()
+        );
+        for name in &output_raw.local_order {
+            if name == CONTENT_TYPES_MEMBER {
+                continue;
+            }
+            assert_eq!(
+                output_2_raw.local_members[name], output_raw.local_members[name],
+                "retained local record changed for {name}"
+            );
+            assert_eq!(
+                central_without_local_offset(&output_2_raw.central_records[name]),
+                central_without_local_offset(&output_raw.central_records[name]),
+                "retained central record changed for {name}"
+            );
+        }
+        let output_2_reader = soapberry_zip::office::ArchiveReader::new(&output_2).unwrap();
+        assert_eq!(
+            output_2_reader.read(CONTENT_TYPES_MEMBER).unwrap(),
+            source_content_types
+        );
+        assert_eq!(
+            output_2_reader.read(second.membername()).unwrap(),
+            b"second payload"
+        );
+
+        let third = PackURI::new("/custom/new-3.bin").unwrap();
+        let mut package = OpcPackage::from_vec(output_2).expect("reopen 65536-member output");
+        package.add_part(Box::new(crate::BlobPart::new(
+            third.clone(),
+            BINARY_CONTENT_TYPE.to_owned(),
+            b"third payload".to_vec(),
+        )));
+        let output_3 = PackageWriter::to_bytes(&package).expect("publish 65537-member output");
+        let output_3_archive = soapberry_zip::ZipArchive::from_slice(&output_3).unwrap();
+        assert!(output_3_archive.is_zip64());
+        assert_eq!(output_3_archive.entries_hint(), u64::from(u16::MAX) + 2);
+        assert_eq!(
+            output_3_archive.entries().count(),
+            usize::from(u16::MAX) + 2
+        );
+        let output_3_raw = raw_archive(&output_3);
+        assert_eq!(
+            &output_3_raw.local_order[..output_2_raw.local_order.len()],
+            output_2_raw.local_order.as_slice()
+        );
+        assert_eq!(
+            &output_3_raw.central_order[..output_2_raw.central_order.len()],
+            output_2_raw.central_order.as_slice()
+        );
+        assert_eq!(output_3_raw.local_order.last().unwrap(), third.membername());
+        assert_eq!(
+            output_3_raw.central_order.last().unwrap(),
+            third.membername()
+        );
+        for name in &output_2_raw.local_order {
+            if name == CONTENT_TYPES_MEMBER {
+                continue;
+            }
+            assert_eq!(
+                output_3_raw.local_members[name], output_2_raw.local_members[name],
+                "last-phase retained local record changed for {name}"
+            );
+            assert_eq!(
+                central_without_local_offset(&output_3_raw.central_records[name]),
+                central_without_local_offset(&output_2_raw.central_records[name]),
+                "last-phase retained central record changed for {name}"
+            );
+        }
+        let output_3_reader = soapberry_zip::office::ArchiveReader::new(&output_3).unwrap();
+        assert_eq!(
+            output_3_reader.read(CONTENT_TYPES_MEMBER).unwrap(),
+            source_content_types
+        );
+        assert_eq!(
+            output_3_reader.read(third.membername()).unwrap(),
+            b"third payload"
+        );
+        let reopened = OpcPackage::from_bytes(&output_3).expect("reopen final boundary output");
+        assert_eq!(reopened.part_count(), SOURCE_PART_COUNT + 3);
+        assert_eq!(
+            reopened.get_part(&second).unwrap().blob(),
+            b"second payload"
+        );
+        assert_eq!(reopened.get_part(&third).unwrap().blob(), b"third payload");
     }
 
     #[test]
