@@ -1257,6 +1257,9 @@ enum Case {
     XlsSourceBackedOpenListWorksheets,
     XlsEagerOpenOneCell,
     XlsSourceBackedOpenOneCell,
+    XlsOwnedSourceOpen,
+    XlsOwnedSourceOpenListWorksheets,
+    XlsOwnedSourceOpenOneCell,
     XlsbSemanticOpen,
     XlsbSemanticListWorksheets,
     XlsbSemanticOneCell,
@@ -1805,6 +1808,9 @@ impl Case {
             Self::XlsSourceBackedOpenListWorksheets => "xls_source_backed_open_list_worksheets",
             Self::XlsEagerOpenOneCell => "xls_eager_open_one_cell",
             Self::XlsSourceBackedOpenOneCell => "xls_source_backed_open_one_cell",
+            Self::XlsOwnedSourceOpen => "xls_owned_source_open",
+            Self::XlsOwnedSourceOpenListWorksheets => "xls_owned_source_open_list_worksheets",
+            Self::XlsOwnedSourceOpenOneCell => "xls_owned_source_open_one_cell",
             Self::XlsbSemanticOpen => "xlsb_semantic_open",
             Self::XlsbSemanticListWorksheets => "xlsb_semantic_list_worksheets",
             Self::XlsbSemanticOneCell => "xlsb_semantic_one_cell",
@@ -2228,6 +2234,15 @@ impl Case {
                 | Self::XlsSourceBackedOpenListWorksheets
                 | Self::XlsEagerOpenOneCell
                 | Self::XlsSourceBackedOpenOneCell
+        )
+    }
+
+    const fn is_xls_owned_source_case(self) -> bool {
+        matches!(
+            self,
+            Self::XlsOwnedSourceOpen
+                | Self::XlsOwnedSourceOpenListWorksheets
+                | Self::XlsOwnedSourceOpenOneCell
         )
     }
 
@@ -7167,9 +7182,14 @@ impl InstrumentedSource {
     }
 
     fn new_xls(bytes: Vec<u8>, xls_ranges: XlsTrackedRanges) -> Self {
+        let mut xls_ranges = xls_ranges;
+        normalize_xls_tracked_ranges(&mut xls_ranges);
         let mut source = Self::new_xlsx(bytes, Vec::new(), XlsxTrackedRanges::default());
         source.xls_ranges = xls_ranges;
-        source.track_read_ranges = true;
+        // XLS reports consume the five category counters above. They do not
+        // consume repeated-read overlap, so keep the generic union tracker
+        // disabled for this observer.
+        source.track_read_ranges = false;
         source
     }
 
@@ -7267,6 +7287,36 @@ fn range_overlap_bytes(ranges: &[Range<u64>], start: u64, end: u64) -> u64 {
         .iter()
         .map(|range| end.min(range.end).saturating_sub(start.max(range.start)))
         .sum()
+}
+
+/// Prepare one XLS logical-range catalog for the read observer.
+///
+/// Only nonempty, non-reversed ranges whose endpoints touch are coalesced.
+/// Ranges with shared coverage remain separate, including duplicate spans, so
+/// each original contribution to `range_overlap_bytes` is retained.
+fn coalesce_adjacent_xls_ranges(ranges: &mut Vec<Range<u64>>) {
+    ranges.sort_unstable_by_key(|range| (range.start, range.end));
+    let mut coalesced: Vec<Range<u64>> = Vec::with_capacity(ranges.len());
+    for range in ranges.drain(..) {
+        if let Some(previous) = coalesced.last_mut()
+            && previous.start < previous.end
+            && range.start < range.end
+            && previous.end == range.start
+        {
+            previous.end = range.end;
+        } else {
+            coalesced.push(range);
+        }
+    }
+    *ranges = coalesced;
+}
+
+fn normalize_xls_tracked_ranges(ranges: &mut XlsTrackedRanges) {
+    coalesce_adjacent_xls_ranges(&mut ranges.cfb_structural);
+    coalesce_adjacent_xls_ranges(&mut ranges.workbook_global);
+    coalesce_adjacent_xls_ranges(&mut ranges.selected_worksheet);
+    coalesce_adjacent_xls_ranges(&mut ranges.unselected_worksheets);
+    coalesce_adjacent_xls_ranges(&mut ranges.opaque_payload);
 }
 
 impl ReadAt for InstrumentedSource {
@@ -8456,7 +8506,9 @@ fn validate_xls_source_options(
     payloads: &[PayloadKind],
     writer_shapes: &[WriterShape],
 ) -> Result<(), Box<dyn Error>> {
-    if cases.iter().any(|case| case.is_xls_source_backed_case())
+    if cases
+        .iter()
+        .any(|case| case.is_xls_source_backed_case() || case.is_xls_owned_source_case())
         && (shapes != CorpusShape::ALL.as_slice()
             || payloads != PayloadKind::ALL.as_slice()
             || writer_shapes != WriterShape::ALL.as_slice())
@@ -8470,7 +8522,10 @@ fn validate_xls_source_options(
 }
 
 fn xls_source_family_dispatch_cases(cases: &[Case]) -> Vec<Case> {
-    if !cases.iter().any(|case| case.is_xls_source_backed_case()) {
+    if !cases
+        .iter()
+        .any(|case| case.is_xls_source_backed_case() || case.is_xls_owned_source_case())
+    {
         return Vec::new();
     }
     let mut dispatch = Vec::new();
@@ -8486,12 +8541,20 @@ fn xls_source_family_dispatch_cases(cases: &[Case]) -> Vec<Case> {
     dispatch
 }
 
+fn xls_owned_source_dispatch_cases(cases: &[Case]) -> Vec<Case> {
+    cases
+        .iter()
+        .copied()
+        .filter(|case| case.is_xls_owned_source_case())
+        .collect()
+}
+
 fn xls_writer_semantic_dispatch_selected(case: Case, selected_cases: &[Case]) -> bool {
     case.uses_semantic_xls()
         && !(case == Case::XlsSemanticOpen
-            && selected_cases
-                .iter()
-                .any(|selected| selected.is_xls_source_backed_case()))
+            && selected_cases.iter().any(|selected| {
+                selected.is_xls_source_backed_case() || selected.is_xls_owned_source_case()
+            }))
 }
 
 pub fn run() -> Result<(), Box<dyn Error>> {
@@ -8734,11 +8797,12 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_xls_numeric_edit_save()
                     && !case.is_xls_visibility_edit_save()
                     && !case.is_xls_source_backed_case()
+                    && !case.is_xls_owned_source_case()
                     && !(**case == Case::XlsSemanticOpen
-                        && options
-                            .cases
-                            .iter()
-                            .any(|selected| selected.is_xls_source_backed_case()))
+                        && options.cases.iter().any(|selected| {
+                            selected.is_xls_source_backed_case()
+                                || selected.is_xls_owned_source_case()
+                        }))
                     && !case.uses_validation_xls()
                     && !case.uses_validation_rtf()
                     && !case.uses_validation_docx()
@@ -8974,11 +9038,19 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
-        .any(|case| case.is_xls_source_backed_case())
+        .any(|case| case.is_xls_source_backed_case() || case.is_xls_owned_source_case())
     {
         let corpus = build_xls_comments_edit_corpus()?;
         for case in xls_source_family_dispatch_cases(&options.cases) {
             results.push(run_xls_source_backed_case(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+        for case in xls_owned_source_dispatch_cases(&options.cases) {
+            results.push(run_xls_owned_source_case(
                 case,
                 &corpus,
                 options.warmup_iterations,
@@ -11060,6 +11132,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "xls_source_backed_open_list_worksheets" => Some(Case::XlsSourceBackedOpenListWorksheets),
         "xls_eager_open_one_cell" => Some(Case::XlsEagerOpenOneCell),
         "xls_source_backed_open_one_cell" => Some(Case::XlsSourceBackedOpenOneCell),
+        "xls_owned_source_open" => Some(Case::XlsOwnedSourceOpen),
+        "xls_owned_source_open_list_worksheets" => Some(Case::XlsOwnedSourceOpenListWorksheets),
+        "xls_owned_source_open_one_cell" => Some(Case::XlsOwnedSourceOpenOneCell),
         "xlsb_semantic_open" => Some(Case::XlsbSemanticOpen),
         "xlsb_semantic_list_worksheets" => Some(Case::XlsbSemanticListWorksheets),
         "xlsb_semantic_one_cell" => Some(Case::XlsbSemanticOneCell),
@@ -11553,6 +11628,9 @@ fn usage_text() -> String {
                                        xls_source_backed_open_list_worksheets,\n\
                                        xls_eager_open_one_cell,\n\
                                        xls_source_backed_open_one_cell,\n\
+                                       xls_owned_source_open,\n\
+                                       xls_owned_source_open_list_worksheets,\n\
+                                       xls_owned_source_open_one_cell,\n\
                                        xlsb_semantic_open,xlsb_semantic_list_worksheets,\n\
                                        xlsb_semantic_one_cell,xlsb_semantic_full_cell_scan,\n\
                                        xls_comments_eager_edit_save,\n\
@@ -21292,6 +21370,11 @@ fn run_case_with_config(
         | Case::XlsSourceBackedOpenOneCell => {
             run_xls_source_backed_case(case, corpus, warmup_iterations, samples)
         },
+        Case::XlsOwnedSourceOpen
+        | Case::XlsOwnedSourceOpenListWorksheets
+        | Case::XlsOwnedSourceOpenOneCell => {
+            run_xls_owned_source_case(case, corpus, warmup_iterations, samples)
+        },
         Case::XlsbSemanticOpen
         | Case::XlsbSemanticListWorksheets
         | Case::XlsbSemanticOneCell
@@ -24897,7 +24980,7 @@ fn run_xls_source_backed_case(
                 implementation: "source-backed",
                 operation: operation_name,
                 timing_scope: operation_name,
-                source_counter_scope: "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload",
+                source_counter_scope: "caller-provided ReadAt logical ranges: XLS classification catalog v2 (sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; repeated-read union disabled); actual CFB metadata versus opaque payload",
                 materialization_scope: "complete archive only; parser-owned Workbook globals/SST are materialized but not counted",
                 source_retained_bytes: u64::try_from(corpus.archive.len())?,
                 complete_archive_materialized_bytes: 0,
@@ -25038,6 +25121,114 @@ fn run_xls_source_backed_case(
     if source_case_for_case(case) {
         output.source = boxed_source(source_summary);
     }
+    Ok(output)
+}
+
+/// Measures the same XLS source-backed lifecycle over the production
+/// `litchi_core::OwnedSource` adapter.  The plain adapter deliberately has no
+/// source observer, so the result carries operation/allocation metrics but no
+/// fabricated logical-read counters or XLS source summary.
+fn run_xls_owned_source_case(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_core::sheet::Cell as _;
+
+    if !case.is_xls_owned_source_case() {
+        return Err("non-owned-source case passed to the plain XLS source runner".into());
+    }
+    let layout = build_xls_source_layout(corpus)?;
+    if layout.parsed_cell_count == 0 {
+        return Err("XLS owned-source corpus has no authoritative cell inventory".into());
+    }
+    let expected_digest = match case {
+        Case::XlsOwnedSourceOpen => layout.archive_sha256.clone(),
+        Case::XlsOwnedSourceOpenListWorksheets => xls_source_names_digest(&layout.worksheet_names),
+        Case::XlsOwnedSourceOpenOneCell => sha256_hex(&layout.selected_value_bits.to_le_bytes()),
+        _ => return Err("unsupported XLS owned-source case".into()),
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
+    let mut measured_digests = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Source ownership and version probes stay outside the matched timer.
+        let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
+        let source_read_at: Arc<dyn ReadAt> = source.clone();
+        let source_version_before = source.version()?;
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(source_read_at)?;
+        let operation = match case {
+            Case::XlsOwnedSourceOpen => XlsMeasuredOperation::Open {
+                worksheet_count: std::hint::black_box(workbook.worksheet_count()?),
+            },
+            Case::XlsOwnedSourceOpenListWorksheets => {
+                let worksheet_names = workbook.worksheet_names()?;
+                XlsMeasuredOperation::List {
+                    worksheet_names: std::hint::black_box(worksheet_names),
+                }
+            },
+            Case::XlsOwnedSourceOpenOneCell => {
+                let value = workbook
+                    .cell_value_by_index(
+                        layout.selected_worksheet_index,
+                        layout.selected_row,
+                        layout.selected_column,
+                    )?
+                    .ok_or("owned-source XLS selected cell is missing")?;
+                let actual = value
+                    .as_float()
+                    .ok_or("owned-source XLS selected cell is not numeric")?;
+                XlsMeasuredOperation::OneCell {
+                    value_bits: std::hint::black_box(actual).to_bits(),
+                }
+            },
+            _ => return Err("invalid XLS owned-source case".into()),
+        };
+        let duration = started.elapsed();
+        let allocation_metrics = match allocation_region.finish() {
+            Some(sample) => Some(sample),
+            None => Some(allocation_metrics::unavailable_sample()),
+        };
+
+        if case == Case::XlsOwnedSourceOpen && workbook.worksheet_names()? != layout.worksheet_names
+        {
+            return Err("owned-source XLS open names differ from the oracle".into());
+        }
+        validate_xls_measured_operation(&operation, &layout)?;
+        let source_version_after = source.version()?;
+        if source_version_before != source_version_after {
+            return Err("owned-source XLS source version changed during the operation".into());
+        }
+        let digest = xls_operation_digest(&operation, &layout);
+        if digest != expected_digest {
+            return Err("XLS owned-source lifecycle digest differs from the oracle".into());
+        }
+        if iteration >= warmup_iterations {
+            measured_digests.push(digest);
+            let elapsed_ns = elapsed_ns(duration)?;
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns,
+                process_metrics: None,
+                allocation_metrics,
+            });
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("XLS owned-source lifecycle digest is unstable".into());
+    }
+
+    let mut output = result(case, corpus, elapsed, None);
+    output.output_sha256 = Some(expected_digest);
+    output.operation_metrics =
+        Some(operation_metrics::from_in_process_observations_without_sink(&observations)?);
     Ok(output)
 }
 
@@ -54852,8 +55043,9 @@ mod tests {
         validate_pptx_source_image_query_options, validate_xls_source_locality,
         validate_xls_source_options, verify_opc_materialized_package,
         verify_opc_serial_eager_fixed_corpus_preflight, verify_xlsx_cells, writer_shape,
-        xls_source_family_dispatch_cases, xls_writer_semantic_dispatch_selected, xlsb_cells_digest,
-        xlsb_expected_cells, xlsx_cell_count, xlsx_spec, zip_member_ranges,
+        xls_owned_source_dispatch_cases, xls_source_family_dispatch_cases,
+        xls_writer_semantic_dispatch_selected, xlsb_cells_digest, xlsb_expected_cells,
+        xlsx_cell_count, xlsx_spec, zip_member_ranges,
     };
 
     #[test]
@@ -56064,7 +56256,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 422);
+        assert_eq!(selectable_count, 425);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -57248,6 +57440,113 @@ mod tests {
     }
 
     #[test]
+    fn xls_range_catalog_coalescing_preserves_multiplicity_and_locality() {
+        let mut overlap_chain = vec![0_u64..10, 5_u64..15, 15_u64..20];
+        let overlap_chain_before = overlap_chain.clone();
+        super::coalesce_adjacent_xls_ranges(&mut overlap_chain);
+        assert_eq!(
+            overlap_chain,
+            vec![0_u64..10, 5_u64..20],
+            "overlap stays separate while the touching tail coalesces"
+        );
+        for query in [0_u64..5, 5_u64..10, 10_u64..15, 15_u64..20, 0_u64..20] {
+            assert_eq!(
+                super::range_overlap_bytes(&overlap_chain_before, query.start, query.end),
+                super::range_overlap_bytes(&overlap_chain, query.start, query.end),
+                "overlap-chain query {query:?}"
+            );
+        }
+
+        let ranges_for = |offset: u64| {
+            vec![
+                (offset + 20)..(offset + 24),
+                (offset + 4)..(offset + 8),
+                offset..(offset + 4),
+                (offset + 3)..(offset + 6),
+                (offset + 3)..(offset + 6),
+                (offset + 1)..(offset + 10),
+                (offset + 10)..(offset + 10),
+                (offset + 30)..(offset + 25),
+                (offset + 12)..(offset + 16),
+                (offset + 8)..(offset + 12),
+                (offset + 40)..(offset + 44),
+                (offset + 44)..(offset + 48),
+                (offset + 48)..(offset + 52),
+            ]
+        };
+        let before = [
+            ranges_for(0),
+            ranges_for(100),
+            ranges_for(200),
+            ranges_for(300),
+            ranges_for(400),
+        ];
+        let mut tracked = super::XlsTrackedRanges {
+            cfb_structural: before[0].clone(),
+            workbook_global: before[1].clone(),
+            selected_worksheet: before[2].clone(),
+            unselected_worksheets: before[3].clone(),
+            opaque_payload: before[4].clone(),
+        };
+        super::normalize_xls_tracked_ranges(&mut tracked);
+        let after = [
+            tracked.cfb_structural,
+            tracked.workbook_global,
+            tracked.selected_worksheet,
+            tracked.unselected_worksheets,
+            tracked.opaque_payload,
+        ];
+        for (index, (original, normalized)) in before.iter().zip(after.iter()).enumerate() {
+            let offset = index as u64 * 100;
+            let queries = [
+                offset..(offset + 1),
+                (offset + 2)..(offset + 5),
+                (offset + 4)..(offset + 9),
+                (offset + 6)..(offset + 13),
+                (offset + 10)..(offset + 10),
+                (offset + 20)..(offset + 24),
+                (offset + 40)..(offset + 52),
+                (offset + 52)..(offset + 40),
+                (offset + 70)..(offset + 75),
+            ];
+            for query in queries {
+                assert_eq!(
+                    super::range_overlap_bytes(original, query.start, query.end),
+                    super::range_overlap_bytes(normalized, query.start, query.end),
+                    "catalog {index} query {query:?}"
+                );
+            }
+            let duplicate = (offset + 3)..(offset + 6);
+            assert_eq!(
+                normalized
+                    .iter()
+                    .filter(|range| range.start == duplicate.start && range.end == duplicate.end)
+                    .count(),
+                2,
+                "catalog {index} retains duplicate overlap spans"
+            );
+            assert!(
+                normalized
+                    .iter()
+                    .any(|range| range.start == offset + 10 && range.end == offset + 10),
+                "catalog {index} retains empty spans"
+            );
+            assert!(
+                normalized
+                    .iter()
+                    .any(|range| range.start == offset + 30 && range.end == offset + 25),
+                "catalog {index} retains reversed spans"
+            );
+            assert!(
+                normalized
+                    .iter()
+                    .any(|range| range.start == offset + 40 && range.end == offset + 52),
+                "catalog {index} coalesces the isolated touching chain"
+            );
+        }
+    }
+
+    #[test]
     fn xls_source_backed_lifecycle_selectors_are_matched_and_local() {
         let _allocation_test_lock = super::allocation_metrics::TEST_LOCK.lock().unwrap();
         let cases = [
@@ -57284,8 +57583,15 @@ mod tests {
         regression_source
             .read_at(opaque_range.start, &mut opaque_byte)
             .unwrap();
+        regression_source
+            .read_at(opaque_range.start, &mut opaque_byte)
+            .unwrap();
         let regression_metrics = regression_source.snapshot();
         assert!(regression_metrics.xls.opaque_payload.read_bytes > 0);
+        assert_eq!(
+            regression_metrics.read_range_overlap_bytes, 0,
+            "XLS category observer does not collect unused repeated-read union"
+        );
         assert!(
             validate_xls_source_locality(Case::XlsSourceBackedOpen, &regression_metrics).is_err()
         );
@@ -57318,6 +57624,11 @@ mod tests {
             .as_ref()
             .and_then(|summary| summary.xls.as_ref())
             .expect("source-backed XLS open evidence");
+        assert!(
+            source
+                .source_counter_scope
+                .contains("XLS classification catalog v2")
+        );
         assert_eq!(
             source.source_retained_bytes,
             vec![corpus.archive.len() as u64]
@@ -57436,6 +57747,112 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn xls_owned_source_lifecycle_is_dedicated_and_has_no_source_counters() {
+        let _allocation_test_lock = super::allocation_metrics::TEST_LOCK.lock().unwrap();
+        let owned_cases = [
+            Case::XlsOwnedSourceOpen,
+            Case::XlsOwnedSourceOpenListWorksheets,
+            Case::XlsOwnedSourceOpenOneCell,
+        ];
+        for case in owned_cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(usage_text().contains(case.name()));
+            assert!(!Case::DEFAULT.contains(&case));
+            assert!(case.is_xls_owned_source_case());
+            assert!(!case.is_xls_source_backed_case());
+        }
+
+        let mixed = [
+            Case::XlsOwnedSourceOpen,
+            Case::XlsSemanticOpen,
+            Case::XlsOwnedSourceOpenOneCell,
+            Case::XlsSemanticOpen,
+        ];
+        assert_eq!(
+            xls_owned_source_dispatch_cases(&mixed),
+            vec![Case::XlsOwnedSourceOpen, Case::XlsOwnedSourceOpenOneCell]
+        );
+        let source_family = xls_source_family_dispatch_cases(&mixed);
+        assert_eq!(source_family, vec![Case::XlsSemanticOpen]);
+        assert!(!xls_writer_semantic_dispatch_selected(
+            Case::XlsSemanticOpen,
+            &mixed
+        ));
+        assert!(xls_writer_semantic_dispatch_selected(
+            Case::XlsSemanticListWorksheets,
+            &mixed
+        ));
+
+        let corpus = build_xls_comments_edit_corpus().unwrap();
+        for (owned_case, instrumented_case) in [
+            (Case::XlsOwnedSourceOpen, Case::XlsSourceBackedOpen),
+            (
+                Case::XlsOwnedSourceOpenListWorksheets,
+                Case::XlsSourceBackedOpenListWorksheets,
+            ),
+            (
+                Case::XlsOwnedSourceOpenOneCell,
+                Case::XlsSourceBackedOpenOneCell,
+            ),
+        ] {
+            let owned = run_case(owned_case, &corpus, 0, 2).unwrap();
+            let instrumented = run_case(instrumented_case, &corpus, 0, 2).unwrap();
+            assert_eq!(owned.output_sha256, instrumented.output_sha256);
+            assert_eq!(owned.corpus.archive_sha256, corpus.manifest.archive_sha256);
+            assert_eq!(
+                owned.corpus.target_payload_sha256,
+                corpus.manifest.target_payload_sha256
+            );
+            assert!(owned.source.is_none());
+
+            let operation = owned
+                .operation_metrics
+                .as_ref()
+                .expect("owned-source operation metrics");
+            assert_eq!(operation.sample_count, owned.elapsed_ns.samples.len());
+            assert_eq!(operation.sample_indices, owned.elapsed_ns.sample_order);
+            assert_eq!(
+                operation.source.status,
+                super::operation_metrics::MetricStatus::NotApplicable
+            );
+            assert!(operation.source.logical_read_calls.values.is_none());
+            assert!(
+                operation
+                    .source
+                    .logical_read_requested_bytes
+                    .values
+                    .is_none()
+            );
+            assert!(
+                operation
+                    .source
+                    .logical_read_returned_bytes
+                    .values
+                    .is_none()
+            );
+            assert!(
+                operation
+                    .source
+                    .logical_read_largest_requested_bytes
+                    .values
+                    .is_none()
+            );
+            assert!(
+                operation
+                    .source
+                    .logical_read_largest_returned_bytes
+                    .values
+                    .is_none()
+            );
+            assert!(operation.source.max_concurrent_reads.values.is_none());
+            assert!(operation.source.logical_read_pattern.values.is_none());
+            assert!(operation.source.compressed_bytes.values.is_none());
+            assert!(operation.source.decompressed_bytes.values.is_none());
+            assert!(operation.source.recompressed_bytes.values.is_none());
+        }
     }
 
     #[test]
