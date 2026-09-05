@@ -10,6 +10,7 @@ use litchi_pptx::{Error, Package, Result};
 use tempfile::NamedTempFile;
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
 const RML: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 
 type SlideReferences = Result<Vec<SlideReference>>;
@@ -78,6 +79,59 @@ fn malformed_presentation_children_are_reported_by_their_owner() {
     let (references, size) = presentation_accessors(malformed_reference.as_bytes());
     assert!(references.is_err());
     assert!(size.is_ok());
+}
+
+#[test]
+fn optional_slide_id_list_accepts_missing_and_empty_lists_in_both_namespaces() {
+    let cases = [
+        (
+            "transitional missing",
+            format!(r#"<p:presentation xmlns:p="{PML}"><p:sldSz cx="1" cy="1"/></p:presentation>"#),
+        ),
+        (
+            "transitional empty",
+            format!(
+                r#"<p:presentation xmlns:p="{PML}"><p:sldIdLst/><p:sldSz cx="1" cy="1"/></p:presentation>"#
+            ),
+        ),
+        (
+            "strict missing",
+            format!(
+                r#"<p:presentation xmlns:p="{STRICT_PML}"><p:sldSz cx="1" cy="1"/></p:presentation>"#
+            ),
+        ),
+        (
+            "strict empty",
+            format!(
+                r#"<p:presentation xmlns:p="{STRICT_PML}"><p:sldIdLst/><p:sldSz cx="1" cy="1"/></p:presentation>"#
+            ),
+        ),
+    ];
+
+    for (label, blob) in cases {
+        let package = with_presentation_blob(blob.as_bytes());
+        let presentation = package
+            .presentation()
+            .expect("presentation root should remain valid");
+        assert!(
+            !presentation.part().slide_master_relationships().is_empty(),
+            "fixture should retain package relationships: {label}"
+        );
+        assert!(
+            presentation
+                .slide_references()
+                .expect("optional slide-ID list should be readable")
+                .is_empty(),
+            "optional slide-ID list should produce no references: {label}"
+        );
+        assert_eq!(
+            presentation
+                .slide_size()
+                .expect("slide size should remain readable"),
+            (1, 1),
+            "slide size should be independent of slide-ID list presence: {label}"
+        );
+    }
 }
 
 #[test]

@@ -957,6 +957,22 @@ speedup, allocation, RSS, release-ABBA, or physical-I/O claim at the 0145
 revision. Change 0158 now accepts the later owned-source additive-topology
 publisher on these exact selectors at the bounded prepared-operation scope.
 
+The opt-in `pptx_cross_copy_plain_lifecycle` and
+`pptx_cross_copy_media_rich_lifecycle` selectors add a complete owned
+ingress-to-publication guard over the corresponding corpus. Each retained
+sample times owned `Package::from_vec` ingress for both packages, opened
+snapshots, cross-slide planning, atomic `apply_cross_slide_copy_plan`, and
+final `OpcPackage::to_stream` publication into a pre-reserved bounded sink.
+The corpus clones and sink reservation occur before the timer; reopen,
+semantic/package/closure/refusal/source-immutability checks, and package/sink
+teardown occur afterward. Their `source.pptx_cross_copy.lifecycle_ns` vector
+and `operation_metrics` envelope carry the complete lifecycle and explicit
+operation-scoped allocator status (`measured` in the allocator target or
+`unavailable` in the normal target). The existing phase-only selectors are
+unchanged. These lifecycle selectors provide fixed-corpus correctness and
+allocation evidence only and make no speedup, full-retention memory, or
+release claim.
+
 Change 0159 adds the independent opt-in
 `pptx_source_backed_cross_copy_plain` selector over the exact same plain
 three-slide-source/two-slide-destination bytes. It calls the public

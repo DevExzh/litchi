@@ -295,9 +295,9 @@ impl<'a> PresentationPart<'a> {
                 _ => {},
             }
         }
-        if roots != 1 || depth != 0 || list_depth.is_some() || lists != 1 {
+        if roots != 1 || depth != 0 || list_depth.is_some() || lists > 1 {
             return Err(invalid(
-                "presentation must contain exactly one direct slide-ID list",
+                "presentation must contain at most one direct slide-ID list",
             ));
         }
         Ok(references)
