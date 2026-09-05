@@ -14,6 +14,7 @@ mod docx_story_hyperlinks;
 mod filesystem;
 mod operation_metrics;
 mod parallel_metrics;
+pub mod pptx_retention;
 mod pptx_slide_boundaries;
 mod process_metrics;
 #[cfg(test)]
@@ -57772,7 +57773,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 427);
+        assert_eq!(selectable_count, 429);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 

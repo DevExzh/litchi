@@ -1,0 +1,62 @@
+{
+  "change": 427,
+  "classification": "descriptive allocator lifecycle and explicit caller-drop observations",
+  "production_revision": "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "production_changes": false,
+  "rust_toolchain": "1.98.1",
+  "build_profile": "release",
+  "cargo_jobs": 4,
+  "cargo_incremental": false,
+  "cpu": 2,
+  "workers": 1,
+  "samples_per_process": 30,
+  "warmups_per_process": 3,
+  "corpora": [
+    "plain",
+    "media-rich"
+  ],
+  "order_per_corpus": [
+    {
+      "api": "owned",
+      "repeat": "R1"
+    },
+    {
+      "api": "source-backed",
+      "repeat": "R1"
+    },
+    {
+      "api": "source-backed",
+      "repeat": "R2"
+    },
+    {
+      "api": "owned",
+      "repeat": "R2"
+    }
+  ],
+  "expected_processes": 8,
+  "expected_retained_samples": 240,
+  "inputs": "Reuse the exact existing plain/media-rich PPTX lifecycle corpus builders and their semantic/preservation/refusal gates. Owned and source-backed source/destination hashes must match for each corpus.",
+  "observation": "Allocator-only explicit retention subcommand; absolute callback counters at input preparation, open, plan, publication and explicit ordered drops, plus one whole-cycle region peak. The input clones and output reservation are included in this new cycle. Existing timing selector boundaries are unchanged.",
+  "capture_constraints": [
+    "Fixed preallocated scalar observation storage; no reporting, hashing, reopen or process-stat allocations between endpoint checkpoints.",
+    "Exact output byte comparison against independently prevalidated corpus output before sink drop on every iteration.",
+    "Allocation counters must be available, nonoverflowed and observer-valid. Retain cumulative counters and derive checked stage differences.",
+    "Record live ownership sets per checkpoint, including publication result, plan, document handles, caller source Arcs and sink. Owned input Vecs move into packages.",
+    "Fresh process for each role/repeat. Root serializes all task Cargo/build/test/profiling and capture workloads; shared-host activity is uncontrolled.",
+    "Freeze harness/protocol in a commit before release build and formal capture. Bind revision, source manifest, binary, protocol, report, corpus and output hashes.",
+    "Keep raw rows in capture order; summarize every boundary, signed change from entry, after-drop residual and repeat drift. No geometric-mean aggregation across APIs.",
+    "Review nonzero post-drop residual or repeat drift above 5% in nonzero phase changes; do not relabel retained observations as object-owned bytes or leaks.",
+    "Portable replay and adversarial report mutations must pass after copied executable and task-temporary cleanup. Retain failures and lossless log custody."
+  ],
+  "scope_limits": [
+    "No optimization, latency, throughput, physical-copy, cache-occupancy, managed-budget or RSS-release claim.",
+    "Absolute callback live bytes are process-global and can include unrelated threads; they are not object-owned or allocator-internal memory.",
+    "The source-backed source observer and output reservation are declared owners in these observations.",
+    "Whole-process resource usage may be retained separately as context, but is not a phase-specific RSS observation.",
+    "Near-limit/pinning/eviction/repeated-publication, native/cold/range, broad CRUD, streaming and scaling gates remain open."
+  ],
+  "performance_claim": null,
+  "rustflags": "-Cforce-frame-pointers=yes",
+  "release_debug": 1
+}

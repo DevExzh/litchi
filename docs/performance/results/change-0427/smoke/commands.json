@@ -1,0 +1,468 @@
+{
+  "classification": "debug CLI validation; not formal measurements",
+  "revision": "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+  "binary_sha256": "c142f5d2f71b96caa124c848351c6dfbc579f182d540085ff54ee550d5d83489",
+  "commands": [
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "plain",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/smoke/plain-owned.json"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "expected_success": true
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/verify-report.py",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/smoke/plain-owned.json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"api\": \"owned\", \"corpus\": \"plain\", \"samples\": 1, \"schema\": \"pptx_retention_v1\", \"status\": \"valid\"}\n",
+      "stderr": "",
+      "expected_success": true
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/probe-report.py",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/smoke/plain-owned.json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mutations\": [{\"mutation\": \"missing_boundary\", \"rejected\": true}, {\"mutation\": \"reordered_boundary\", \"rejected\": true}, {\"mutation\": \"owner_label\", \"rejected\": true}, {\"mutation\": \"impossible_live_counter\", \"rejected\": true}, {\"mutation\": \"missing_numeric\", \"rejected\": true}, {\"mutation\": \"sample_order\", \"rejected\": true}, {\"mutation\": \"region_peak_below_endpoint\", \"rejected\": true}, {\"mutation\": \"absolute_baseline_offset\", \"rejected\": true}, {\"mutation\": \"u64_overflow\", \"rejected\": true}, {\"mutation\": \"missing_region_numeric\", \"rejected\": true}, {\"mutation\": \"missing_arc_count\", \"rejected\": true}, {\"mutation\": \"output_equality_flag\", \"rejected\": true}, {\"mutation\": \"output_hash_shape\", \"rejected\": true}, {\"mutation\": \"corpus_gate\", \"rejected\": true}, {\"mutation\": \"counter_revision\", \"rejected\": true}, {\"mutation\": \"counter_scope\", \"rejected\": true}, {\"mutation\": \"duplicate_json_key\", \"rejected\": true}, {\"mutation\": \"nonfinite_json_constant\", \"rejected\": true}], \"status\": \"pass\"}\n",
+      "stderr": "",
+      "expected_success": true
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "source-backed",
+        "--corpus",
+        "plain",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/smoke/plain-source-backed.json"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "expected_success": true
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/verify-report.py",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/smoke/plain-source-backed.json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"api\": \"source-backed\", \"corpus\": \"plain\", \"samples\": 1, \"schema\": \"pptx_retention_v1\", \"status\": \"valid\"}\n",
+      "stderr": "",
+      "expected_success": true
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/probe-report.py",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/smoke/plain-source-backed.json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mutations\": [{\"mutation\": \"missing_boundary\", \"rejected\": true}, {\"mutation\": \"reordered_boundary\", \"rejected\": true}, {\"mutation\": \"owner_label\", \"rejected\": true}, {\"mutation\": \"impossible_live_counter\", \"rejected\": true}, {\"mutation\": \"missing_numeric\", \"rejected\": true}, {\"mutation\": \"sample_order\", \"rejected\": true}, {\"mutation\": \"region_peak_below_endpoint\", \"rejected\": true}, {\"mutation\": \"absolute_baseline_offset\", \"rejected\": true}, {\"mutation\": \"u64_overflow\", \"rejected\": true}, {\"mutation\": \"missing_region_numeric\", \"rejected\": true}, {\"mutation\": \"missing_arc_count\", \"rejected\": true}, {\"mutation\": \"output_equality_flag\", \"rejected\": true}, {\"mutation\": \"output_hash_shape\", \"rejected\": true}, {\"mutation\": \"corpus_gate\", \"rejected\": true}, {\"mutation\": \"counter_revision\", \"rejected\": true}, {\"mutation\": \"counter_scope\", \"rejected\": true}, {\"mutation\": \"duplicate_json_key\", \"rejected\": true}, {\"mutation\": \"nonfinite_json_constant\", \"rejected\": true}], \"status\": \"pass\"}\n",
+      "stderr": "",
+      "expected_success": true
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "media-rich",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/smoke/media-rich-owned.json"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "expected_success": true
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/verify-report.py",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/smoke/media-rich-owned.json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"api\": \"owned\", \"corpus\": \"media-rich\", \"samples\": 1, \"schema\": \"pptx_retention_v1\", \"status\": \"valid\"}\n",
+      "stderr": "",
+      "expected_success": true
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/probe-report.py",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/smoke/media-rich-owned.json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mutations\": [{\"mutation\": \"missing_boundary\", \"rejected\": true}, {\"mutation\": \"reordered_boundary\", \"rejected\": true}, {\"mutation\": \"owner_label\", \"rejected\": true}, {\"mutation\": \"impossible_live_counter\", \"rejected\": true}, {\"mutation\": \"missing_numeric\", \"rejected\": true}, {\"mutation\": \"sample_order\", \"rejected\": true}, {\"mutation\": \"region_peak_below_endpoint\", \"rejected\": true}, {\"mutation\": \"absolute_baseline_offset\", \"rejected\": true}, {\"mutation\": \"u64_overflow\", \"rejected\": true}, {\"mutation\": \"missing_region_numeric\", \"rejected\": true}, {\"mutation\": \"missing_arc_count\", \"rejected\": true}, {\"mutation\": \"output_equality_flag\", \"rejected\": true}, {\"mutation\": \"output_hash_shape\", \"rejected\": true}, {\"mutation\": \"corpus_gate\", \"rejected\": true}, {\"mutation\": \"counter_revision\", \"rejected\": true}, {\"mutation\": \"counter_scope\", \"rejected\": true}, {\"mutation\": \"duplicate_json_key\", \"rejected\": true}, {\"mutation\": \"nonfinite_json_constant\", \"rejected\": true}], \"status\": \"pass\"}\n",
+      "stderr": "",
+      "expected_success": true
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "source-backed",
+        "--corpus",
+        "media-rich",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/smoke/media-rich-source-backed.json"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "expected_success": true
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/verify-report.py",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/smoke/media-rich-source-backed.json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"api\": \"source-backed\", \"corpus\": \"media-rich\", \"samples\": 1, \"schema\": \"pptx_retention_v1\", \"status\": \"valid\"}\n",
+      "stderr": "",
+      "expected_success": true
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/probe-report.py",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0427/smoke/media-rich-source-backed.json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"mutations\": [{\"mutation\": \"missing_boundary\", \"rejected\": true}, {\"mutation\": \"reordered_boundary\", \"rejected\": true}, {\"mutation\": \"owner_label\", \"rejected\": true}, {\"mutation\": \"impossible_live_counter\", \"rejected\": true}, {\"mutation\": \"missing_numeric\", \"rejected\": true}, {\"mutation\": \"sample_order\", \"rejected\": true}, {\"mutation\": \"region_peak_below_endpoint\", \"rejected\": true}, {\"mutation\": \"absolute_baseline_offset\", \"rejected\": true}, {\"mutation\": \"u64_overflow\", \"rejected\": true}, {\"mutation\": \"missing_region_numeric\", \"rejected\": true}, {\"mutation\": \"missing_arc_count\", \"rejected\": true}, {\"mutation\": \"output_equality_flag\", \"rejected\": true}, {\"mutation\": \"output_hash_shape\", \"rejected\": true}, {\"mutation\": \"corpus_gate\", \"rejected\": true}, {\"mutation\": \"counter_revision\", \"rejected\": true}, {\"mutation\": \"counter_scope\", \"rejected\": true}, {\"mutation\": \"duplicate_json_key\", \"rejected\": true}, {\"mutation\": \"nonfinite_json_constant\", \"rejected\": true}], \"status\": \"pass\"}\n",
+      "stderr": "",
+      "expected_success": true
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--corpus",
+        "plain",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/tmp/litchi-0427-cli-ww87xdfk/output.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: \"missing --api\"\n",
+      "expected_success": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/tmp/litchi-0427-cli-ww87xdfk/output.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: \"missing --corpus\"\n",
+      "expected_success": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "plain",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/tmp/litchi-0427-cli-ww87xdfk/output.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: \"missing --samples\"\n",
+      "expected_success": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "plain",
+        "--samples",
+        "1",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/tmp/litchi-0427-cli-ww87xdfk/output.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: \"missing --warmup\"\n",
+      "expected_success": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "plain",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--output",
+        "/tmp/litchi-0427-cli-ww87xdfk/output.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: \"missing --source-revision\"\n",
+      "expected_success": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "plain",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: \"missing --output\"\n",
+      "expected_success": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "plain",
+        "--samples",
+        "0",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/tmp/litchi-0427-cli-ww87xdfk/output.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: \"--samples must be between 1 and 1000\"\n",
+      "expected_success": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "plain",
+        "--samples",
+        "1001",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/tmp/litchi-0427-cli-ww87xdfk/output.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: \"--samples must be between 1 and 1000\"\n",
+      "expected_success": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "plain",
+        "--samples",
+        "1",
+        "--warmup",
+        "1001",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/tmp/litchi-0427-cli-ww87xdfk/output.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: \"--warmup must be between 0 and 1000\"\n",
+      "expected_success": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "plain",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "invalid",
+        "--output",
+        "/tmp/litchi-0427-cli-ww87xdfk/output.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: \"--source-revision must contain exactly 40 hexadecimal characters\"\n",
+      "expected_success": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "plain",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/tmp/litchi-0427-cli-ww87xdfk/output.json",
+        "--api",
+        "owned"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: \"duplicate --api\"\n",
+      "expected_success": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "plain",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/tmp/litchi-0427-cli-ww87xdfk/output.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: \"unrecognized argument \\\"retention\\\"; use --help\"\n",
+      "expected_success": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/debug/litchi-perf-baseline-alloc",
+        "retention",
+        "--api",
+        "owned",
+        "--corpus",
+        "plain",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--source-revision",
+        "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+        "--output",
+        "/tmp/litchi-0427-cli-ww87xdfk/output.json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: Os { code: 17, kind: AlreadyExists, message: \"File exists\" }\n",
+      "expected_success": false
+    }
+  ],
+  "status": "pass"
+}

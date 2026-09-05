@@ -1,0 +1,46 @@
+{
+  "change": 427,
+  "argv": [
+    "rustup",
+    "run",
+    "1.98.1",
+    "rustfmt",
+    "--check",
+    "--edition",
+    "2024",
+    "--config",
+    "skip_children=true",
+    "tools/perf-baseline/src/pptx_retention.rs",
+    "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+  "driver_sha256": "d4acf2e82061cd079d9a033fd092d86236fd07fea0a5794ccde2f3d7445a90dd",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "started_utc": "2026-09-05T21:03:09.814204+00:00",
+  "source_before": {
+    "path": "sources/8680b682b0369d011a6cfb43d6f8c2fed658a07e3f7fdbe4203a60ae798b331a.json",
+    "sha256": "8680b682b0369d011a6cfb43d6f8c2fed658a07e3f7fdbe4203a60ae798b331a",
+    "files": 6629
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T21:03:10.357051+00:00",
+  "source_after": {
+    "path": "sources/8680b682b0369d011a6cfb43d6f8c2fed658a07e3f7fdbe4203a60ae798b331a.json",
+    "sha256": "8680b682b0369d011a6cfb43d6f8c2fed658a07e3f7fdbe4203a60ae798b331a",
+    "files": 6629
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/rustfmt-verified.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
