@@ -1,0 +1,73 @@
+{
+  "catalog_sha256": "8b6fb062d0c8d4005a8bc99968216b8205ea146c6961264c24df6cec99fd744e",
+  "change": 423,
+  "checks": [
+    {
+      "error": "report.results[0].source.pptx_source_backed_cross_copy_lifecycle.gates.matched_owned_corpus_verified: must be true",
+      "name": "gate_false",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0].source.pptx_source_backed_cross_copy_lifecycle.output_sha256[0]: does not match expected_output_sha256",
+      "name": "output_digest_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0].elapsed_ns.samples: must contain positive durations",
+      "name": "elapsed_or_sample_order_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0]: sink validation failed: report.results[0].sink.largest_write exceeds the configured 64 KiB sink ceiling",
+      "name": "sink_write_ceiling_exceeded",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0].source.pptx_source_backed_cross_copy_lifecycle.added_opc_part_count: must be 9 for this corpus",
+      "name": "copy_plan_count_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report.configuration: must match the complete fixed experiment configuration",
+      "name": "unknown_configuration_field",
+      "rejected": true
+    },
+    {
+      "error": "report.configuration: must match the complete fixed experiment configuration",
+      "name": "configuration_shape_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0].source.pptx_source_backed_cross_copy_lifecycle.source_archive_sha256: does not match the fixed source archive",
+      "name": "fixed_source_identity_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0].sink.accepted_bytes: does not match source_expected_output_bytes",
+      "name": "source_output_length_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0].source.pptx_source_backed_cross_copy_lifecycle.open_ns: open/plan/publication total exceeds lifecycle_ns[0]",
+      "name": "open_phase_exceeds_lifecycle",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0].source.pptx_source_backed_cross_copy_lifecycle.source_read_calls[0]: must be an integer at least 1",
+      "name": "source_reads_omitted",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0].source.pptx_source_backed_cross_copy_lifecycle.matched_owned_output_ceiling: does not match the fixed sink ceiling",
+      "name": "common_owned_sink_ceiling_mutated",
+      "rejected": true
+    }
+  ],
+  "claim_authorized": false,
+  "lane": "normal",
+  "report_sha256": "848ee9f08fe9eec41b2d1a8ca256054566b3da06e53137bf1fcfaffa15309f9d",
+  "samples": 1,
+  "selector": "pptx_source_backed_cross_copy_media_rich_lifecycle",
+  "validated_original": true,
+  "warmups": 0
+}

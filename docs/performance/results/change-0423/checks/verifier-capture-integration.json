@@ -1,0 +1,16 @@
+{
+  "status": "pass",
+  "scope": "retained0422owned reports verified by0423CLI andaccepted0423captureproofschema; notformal0423capture",
+  "checks": [
+    {
+      "selector": "pptx_cross_copy_plain_lifecycle",
+      "status": "pass",
+      "report_count": 1
+    },
+    {
+      "selector": "pptx_cross_copy_media_rich_lifecycle",
+      "status": "pass",
+      "report_count": 1
+    }
+  ]
+}

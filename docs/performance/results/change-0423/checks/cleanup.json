@@ -1,0 +1,22 @@
+{
+  "status": "pass",
+  "removed_worktree": "/tmp/litchi-goal-0423-candidate",
+  "removed_binaries": [
+    {
+      "path": "/tmp/litchi-goal-0423-candidate-normal",
+      "bytes": 450732392,
+      "sha256": "6abd772ec7e5fc8be2b39db21b46739d0e32be26b74d7dce10c5021c56d914dc"
+    },
+    {
+      "path": "/tmp/litchi-goal-0423-candidate-allocator",
+      "bytes": 450737632,
+      "sha256": "f4ac2eb142c36630ed2d468986106adb21b8e7e5f068e41c5919b7908b9c32e4"
+    }
+  ],
+  "shared_targets_preserved": [
+    "target",
+    "tools/perf-baseline/target"
+  ],
+  "batch_cache_directories": [],
+  "unrelated_worktrees_preserved": true
+}

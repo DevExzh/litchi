@@ -1,0 +1,24 @@
+[
+  {
+    "name": "crud-tests",
+    "argv": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tools",
+      "-p",
+      "test_crud_coverage_index.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "crud-index",
+    "argv": [
+      "python3",
+      "tools/validate_crud_coverage_index.py"
+    ],
+    "exit_code": 0
+  }
+]

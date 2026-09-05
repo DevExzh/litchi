@@ -1,0 +1,284 @@
+{
+  "binaries": {
+    "allocator": {
+      "bytes": 450737632,
+      "executable": true,
+      "mode_bits": 509,
+      "path": "/tmp/litchi-goal-0423-candidate-allocator",
+      "profile": "release-debug1-frame-pointer",
+      "sha256": "f4ac2eb142c36630ed2d468986106adb21b8e7e5f068e41c5919b7908b9c32e4"
+    },
+    "normal": {
+      "bytes": 450732392,
+      "executable": true,
+      "mode_bits": 509,
+      "path": "/tmp/litchi-goal-0423-candidate-normal",
+      "profile": "release-debug1-frame-pointer",
+      "sha256": "6abd772ec7e5fc8be2b39db21b46739d0e32be26b74d7dce10c5021c56d914dc"
+    }
+  },
+  "build": {
+    "path": "build-candidate.json",
+    "sha256": "e3884ca4a3b851a036578812f4323fe93a22a98a27aaf4fb2b31a0250cd138e3"
+  },
+  "change": 423,
+  "claim_authorized": false,
+  "common_flags": [
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm"
+  ],
+  "corpora": [
+    "plain",
+    "media_rich"
+  ],
+  "cpu": 2,
+  "expected_run_count": 16,
+  "finished_utc": "2026-09-05T13:01:11.743062+00:00",
+  "lanes": {
+    "allocator": {
+      "samples": 30,
+      "warmups": 3
+    },
+    "normal": {
+      "samples": 100,
+      "warmups": 10
+    }
+  },
+  "order": [
+    {
+      "repeat": "R1",
+      "role": "owned"
+    },
+    {
+      "repeat": "R1",
+      "role": "source"
+    },
+    {
+      "repeat": "R2",
+      "role": "source"
+    },
+    {
+      "repeat": "R2",
+      "role": "owned"
+    }
+  ],
+  "performance_claim": null,
+  "protocol": {
+    "path": "protocol.json",
+    "sha256": "7a7d672f08c1688f707ce9e879e341032c9b5835115f0850a81a02c321d18046"
+  },
+  "runs": [
+    {
+      "corpus": "plain",
+      "index": 1,
+      "journal": "runs/normal/plain/owned-R1/journal.json",
+      "journal_sha256": "4fe0e6cfc585df21a87e9b3087ce4c4840731673c9e8ebbae3047deb98abb353",
+      "lane": "normal",
+      "repeat": "R1",
+      "role": "owned",
+      "selector": "pptx_cross_copy_plain_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "plain",
+      "index": 2,
+      "journal": "runs/normal/plain/source-R1/journal.json",
+      "journal_sha256": "ca0fc47f73b16bf07ebdb63b9970e4e9ceb869879de3083ce9000eadb59c17a9",
+      "lane": "normal",
+      "repeat": "R1",
+      "role": "source",
+      "selector": "pptx_source_backed_cross_copy_plain_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "plain",
+      "index": 3,
+      "journal": "runs/normal/plain/source-R2/journal.json",
+      "journal_sha256": "4cad1f2b9e9def45c0673f2a8311854b39e7d5326429bde66ee7805efeb3694d",
+      "lane": "normal",
+      "repeat": "R2",
+      "role": "source",
+      "selector": "pptx_source_backed_cross_copy_plain_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "plain",
+      "index": 4,
+      "journal": "runs/normal/plain/owned-R2/journal.json",
+      "journal_sha256": "ba94d7085790fc2bc9ba795e960411e9f9d03e26b6b876bf8b09c0e11ee55340",
+      "lane": "normal",
+      "repeat": "R2",
+      "role": "owned",
+      "selector": "pptx_cross_copy_plain_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "media_rich",
+      "index": 5,
+      "journal": "runs/normal/media_rich/owned-R1/journal.json",
+      "journal_sha256": "ef8e93dc4469696dfcc7ac8c3762d696f977ffa7de7a4fda904653aac32b2abb",
+      "lane": "normal",
+      "repeat": "R1",
+      "role": "owned",
+      "selector": "pptx_cross_copy_media_rich_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "media_rich",
+      "index": 6,
+      "journal": "runs/normal/media_rich/source-R1/journal.json",
+      "journal_sha256": "b05bb7c0c8b5776716ade00bdef2776513417b201362d415f55111d0e88666ab",
+      "lane": "normal",
+      "repeat": "R1",
+      "role": "source",
+      "selector": "pptx_source_backed_cross_copy_media_rich_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "media_rich",
+      "index": 7,
+      "journal": "runs/normal/media_rich/source-R2/journal.json",
+      "journal_sha256": "ce788ff9b55e74fe172b0960c79eb08bce1560ca82c4b1504f5f5da552dc16d0",
+      "lane": "normal",
+      "repeat": "R2",
+      "role": "source",
+      "selector": "pptx_source_backed_cross_copy_media_rich_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "media_rich",
+      "index": 8,
+      "journal": "runs/normal/media_rich/owned-R2/journal.json",
+      "journal_sha256": "e239def88e5fc17a138ed55aa9aea551a79cbf3f4cf8c11de17810d5cb5227b7",
+      "lane": "normal",
+      "repeat": "R2",
+      "role": "owned",
+      "selector": "pptx_cross_copy_media_rich_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "plain",
+      "index": 9,
+      "journal": "runs/allocator/plain/owned-R1/journal.json",
+      "journal_sha256": "9c27fedcf6ec301c79f80fb14337cfedd0f3ecd7c5fe935262156f380a522b0b",
+      "lane": "allocator",
+      "repeat": "R1",
+      "role": "owned",
+      "selector": "pptx_cross_copy_plain_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "plain",
+      "index": 10,
+      "journal": "runs/allocator/plain/source-R1/journal.json",
+      "journal_sha256": "90a48043cb1dc5175971f73a6c5a3a62992fd220eb35067cfd883e55e5c28ec2",
+      "lane": "allocator",
+      "repeat": "R1",
+      "role": "source",
+      "selector": "pptx_source_backed_cross_copy_plain_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "plain",
+      "index": 11,
+      "journal": "runs/allocator/plain/source-R2/journal.json",
+      "journal_sha256": "a4de87048b23246b82e99f5259c1f9aaa992b32840e0b4a16b5e56a6df9f5122",
+      "lane": "allocator",
+      "repeat": "R2",
+      "role": "source",
+      "selector": "pptx_source_backed_cross_copy_plain_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "plain",
+      "index": 12,
+      "journal": "runs/allocator/plain/owned-R2/journal.json",
+      "journal_sha256": "cb1358629853863d14c9d78934791ded4787db79b4d4bc4bc33499da85261c17",
+      "lane": "allocator",
+      "repeat": "R2",
+      "role": "owned",
+      "selector": "pptx_cross_copy_plain_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "media_rich",
+      "index": 13,
+      "journal": "runs/allocator/media_rich/owned-R1/journal.json",
+      "journal_sha256": "877503bd24e427972a13dcaa16b27c1c74e5ab2fd25efada441c8cf38f943bcf",
+      "lane": "allocator",
+      "repeat": "R1",
+      "role": "owned",
+      "selector": "pptx_cross_copy_media_rich_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "media_rich",
+      "index": 14,
+      "journal": "runs/allocator/media_rich/source-R1/journal.json",
+      "journal_sha256": "640ab6c4d38ab3878ed778e5bbccac0e9a493c46524ca4d5bbed3217e90794cf",
+      "lane": "allocator",
+      "repeat": "R1",
+      "role": "source",
+      "selector": "pptx_source_backed_cross_copy_media_rich_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "media_rich",
+      "index": 15,
+      "journal": "runs/allocator/media_rich/source-R2/journal.json",
+      "journal_sha256": "92602921341e2c2575806d03b0668799d8fc0dec72e3098520fe296b379bbe57",
+      "lane": "allocator",
+      "repeat": "R2",
+      "role": "source",
+      "selector": "pptx_source_backed_cross_copy_media_rich_lifecycle",
+      "status": "pass"
+    },
+    {
+      "corpus": "media_rich",
+      "index": 16,
+      "journal": "runs/allocator/media_rich/owned-R2/journal.json",
+      "journal_sha256": "c1b62613c806a259293135a02c66d289c61edb8bf1893ef75fbb02187dc29750",
+      "lane": "allocator",
+      "repeat": "R2",
+      "role": "owned",
+      "selector": "pptx_cross_copy_media_rich_lifecycle",
+      "status": "pass"
+    }
+  ],
+  "runtime_toolchain": "1.98.1",
+  "schema_version": 1,
+  "selectors": [
+    "pptx_cross_copy_plain_lifecycle",
+    "pptx_source_backed_cross_copy_plain_lifecycle",
+    "pptx_cross_copy_media_rich_lifecycle",
+    "pptx_source_backed_cross_copy_media_rich_lifecycle"
+  ],
+  "source": {
+    "identity_sha256": "0d6d14c0f34adc5e011c227eb132c23455f1ee876d465308cbe511d89f0ddf62",
+    "revision": "6ca9962c7818e173538a40ed45f3a3c32cc1aa6a",
+    "worktree": "/tmp/litchi-goal-0423-candidate"
+  },
+  "started_utc": "2026-09-05T12:55:04.374732+00:00",
+  "status": "pass",
+  "verifier": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0423/verify.py",
+    "sha256": "ddc813db0c297e07239fa6436037aedbb7e0a192ade7e627a030459ed1d6a8f5"
+  },
+  "workers": 1
+}

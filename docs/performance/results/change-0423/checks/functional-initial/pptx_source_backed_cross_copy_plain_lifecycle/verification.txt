@@ -1,0 +1,1 @@
+FAIL: report: shared row validator rejected report: report.configuration shape declarations do not cover result shapes

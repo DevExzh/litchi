@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "rustup",
+    "run",
+    "1.98.1",
+    "rustfmt",
+    "--edition",
+    "2024",
+    "--config",
+    "skip_children=true",
+    "--emit",
+    "stdout",
+    "tools/perf-baseline/src/lib.rs"
+  ],
+  "status": "pass",
+  "scope": "Apply pinned rustfmt changes intersecting this batch changed lines; retain preexisting formatting elsewhere",
+  "before_sha256": "604d312caf8ba45fab8a41be1a8e9a357308471ac6d42e6843b9bf7449b61fbf",
+  "after_sha256": "eebed204779859b406992fd33ea4a92dc0eb00bc3aba3d8b9e9f600e1e88b8fe",
+  "formatted_stdout_sha256": "14f817009f6c3bc5bed1e53fee06ef1257981207ed0ad9d9af207a152df35b93",
+  "applied_hunks": 26,
+  "skipped_preexisting_hunks": 1
+}

@@ -1,0 +1,7 @@
+{
+  "status": "pass",
+  "change": "Mark newly introduced archive mutation helper cfg(test); runtime code never calls it. The cfg(test) test body is unchanged.",
+  "tested_before_sha256": "8485cc1d8679f83b78a37d0a3f69fb82af3ec0ca51981bf846b81a87946df62d",
+  "final_after_sha256": "db2b572189f03bb216ac74c4b070aa6c737cfb817ed48756b1196e0287a2d05b",
+  "normalizing_added_cfg_reproduces_tested_source": true
+}

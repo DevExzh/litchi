@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "reason": "Scoped rustfmt selected a removed import block but skipped its relocated insertion. Compiler rejected missing imports. Restore required imports using a separately formatted crate-path block and add the new expectation/helper imports.",
+  "argv": [
+    "rustup",
+    "run",
+    "1.98.1",
+    "rustfmt",
+    "--edition",
+    "2024",
+    "--config",
+    "skip_children=true",
+    "--emit",
+    "stdout"
+  ],
+  "before_sha256": "eebed204779859b406992fd33ea4a92dc0eb00bc3aba3d8b9e9f600e1e88b8fe",
+  "after_sha256": "8485cc1d8679f83b78a37d0a3f69fb82af3ec0ca51981bf846b81a87946df62d"
+}

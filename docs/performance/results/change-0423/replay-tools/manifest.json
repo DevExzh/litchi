@@ -1,0 +1,25 @@
+{
+  "source_revision": "6ca9962c7818e173538a40ed45f3a3c32cc1aa6a",
+  "files": [
+    {
+      "path": "perf_abba_summary.py",
+      "source_path": "tools/perf_abba_summary.py",
+      "sha256": "b0fe8b782c97cacff953c63c75599d3665063451d07a6912c25a123082e2b9c4"
+    },
+    {
+      "path": "perf_compare.py",
+      "source_path": "tools/perf_compare.py",
+      "sha256": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e"
+    },
+    {
+      "path": "perf_resource_profile.py",
+      "source_path": "tools/perf_resource_profile.py",
+      "sha256": "e80c9706189f942ccce645685dafea8612e5e0dc6ea5e659bd1490ffc3256cc4"
+    },
+    {
+      "path": "validate_perf_corpus_binding.py",
+      "source_path": "tools/validate_perf_corpus_binding.py",
+      "sha256": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558"
+    }
+  ]
+}

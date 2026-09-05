@@ -1,0 +1,84 @@
+{
+  "selector": "pptx_cross_copy_plain_lifecycle",
+  "status": "pass",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0423-candidate-normal",
+    "--case",
+    "pptx_cross_copy_plain_lifecycle",
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0423/checks/functional/pptx_cross_copy_plain_lifecycle/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0423/checks/functional/pptx_cross_copy_plain_lifecycle/catalog.json"
+  ],
+  "verify_argv": [
+    "/usr/bin/python3",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0423/verify.py",
+    "--repo-root",
+    "/home/zhuhe/code/litchi",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0423/checks/functional/pptx_cross_copy_plain_lifecycle/report.json",
+    "--catalog",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0423/checks/functional/pptx_cross_copy_plain_lifecycle/catalog.json",
+    "--lane",
+    "normal",
+    "--contract",
+    "functional",
+    "--samples",
+    "1",
+    "--warmups",
+    "0",
+    "--selector",
+    "pptx_cross_copy_plain_lifecycle"
+  ],
+  "source_revision": "6ca9962c7818e173538a40ed45f3a3c32cc1aa6a",
+  "binary_sha256": "6abd772ec7e5fc8be2b39db21b46739d0e32be26b74d7dce10c5021c56d914dc",
+  "counter_marker_omitted": true,
+  "allocation_unavailable": true,
+  "artifacts": {
+    "catalog.json": {
+      "sha256": "5858eb9bdeb0d9bce95b7d1f8047098c61d2835b6f49128571ccb0b137b8d777",
+      "bytes": 4888
+    },
+    "report.json": {
+      "sha256": "206ce081fd19f25a5a771e06cf1a509b9bf38a0eb8668942d2544a04c163e234",
+      "bytes": 20762
+    },
+    "verification.txt": {
+      "sha256": "63301684bfb4e14052df3e81839804fb0875e3325bfbf8d5d6a493bf86fafa34",
+      "bytes": 434
+    },
+    "stderr.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "stdout.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  }
+}

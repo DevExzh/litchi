@@ -1,0 +1,17 @@
+{
+  "change": 423,
+  "claim_authorized": false,
+  "lane": "normal",
+  "performance_claim": null,
+  "report_count": 1,
+  "reports": [
+    {
+      "catalog_sha256": "5858eb9bdeb0d9bce95b7d1f8047098c61d2835b6f49128571ccb0b137b8d777",
+      "report_sha256": "206ce081fd19f25a5a771e06cf1a509b9bf38a0eb8668942d2544a04c163e234"
+    }
+  ],
+  "samples": 1,
+  "selector": "pptx_cross_copy_plain_lifecycle",
+  "status": "pass",
+  "warmups": 0
+}

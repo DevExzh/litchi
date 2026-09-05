@@ -1,0 +1,142 @@
+{
+  "change": 423,
+  "checks": [
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "tests::pptx_source_backed_cross_copy_lifecycles_cover_plain_and_media_oracles",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "environment_overrides": {},
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T12:36:54.153751+00:00",
+      "log": "validation-ready-source-lifecycle.log",
+      "name": "source-lifecycle",
+      "nonzero_test_selection": true,
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T12:35:38.357212+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "tests::pptx_source_backed_cross_copy_media_lifecycle_gate_rejects_tampered_media_relationship_geometry_and_count",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "environment_overrides": {},
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T12:38:11.119777+00:00",
+      "log": "validation-ready-media-oracle-regression.log",
+      "name": "media-oracle-regression",
+      "nonzero_test_selection": true,
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T12:36:54.154018+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--all-features",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "environment_overrides": {},
+      "exit_code": 101,
+      "finished_utc": "2026-09-05T12:38:18.425950+00:00",
+      "log": "validation-ready-clippy-strict.log",
+      "name": "clippy-strict",
+      "required_for_this_batch": false,
+      "started_utc": "2026-09-05T12:38:11.120115+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--all-features",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-A",
+        "clippy::chunks_exact_to_as_chunks",
+        "-A",
+        "clippy::clone_on_copy",
+        "-A",
+        "clippy::needless_lifetimes"
+      ],
+      "environment_overrides": {},
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T12:38:25.650797+00:00",
+      "log": "validation-ready-clippy-diagnostic.log",
+      "name": "clippy-diagnostic",
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T12:38:18.426254+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "doc",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--no-deps"
+      ],
+      "environment_overrides": {
+        "RUSTDOCFLAGS": "-D warnings"
+      },
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T12:38:27.796435+00:00",
+      "log": "validation-ready-rustdoc.log",
+      "name": "rustdoc",
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T12:38:25.651037+00:00"
+    }
+  ],
+  "scope": "followup",
+  "source_sha256_after": {
+    "docs/performance/crud-coverage-index-v1.json": "44c9ee22ff946977c35fb35151d1654a69ecf0e8ec4a49318d9dcf482debc25e",
+    "tools/perf-baseline/src/lib.rs": "8485cc1d8679f83b78a37d0a3f69fb82af3ec0ca51981bf846b81a87946df62d",
+    "tools/test_crud_coverage_index.py": "a289c5274be43848ea07870627c137204713c62c32181ca0d6a3fe05206cb3f7",
+    "tools/validate_crud_coverage_index.py": "f54473c1fc365e6df1a28a2f84ae12e87bbcaa9fed3f522331329d486314ee42"
+  },
+  "source_sha256_before": {
+    "docs/performance/crud-coverage-index-v1.json": "44c9ee22ff946977c35fb35151d1654a69ecf0e8ec4a49318d9dcf482debc25e",
+    "tools/perf-baseline/src/lib.rs": "8485cc1d8679f83b78a37d0a3f69fb82af3ec0ca51981bf846b81a87946df62d",
+    "tools/test_crud_coverage_index.py": "a289c5274be43848ea07870627c137204713c62c32181ca0d6a3fe05206cb3f7",
+    "tools/validate_crud_coverage_index.py": "f54473c1fc365e6df1a28a2f84ae12e87bbcaa9fed3f522331329d486314ee42"
+  },
+  "status": "pass_with_strict_lint_debt"
+}

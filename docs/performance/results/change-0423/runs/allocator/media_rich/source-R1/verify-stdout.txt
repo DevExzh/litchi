@@ -1,0 +1,17 @@
+{
+  "change": 423,
+  "claim_authorized": false,
+  "lane": "allocator",
+  "performance_claim": null,
+  "report_count": 1,
+  "reports": [
+    {
+      "catalog_sha256": "8b6fb062d0c8d4005a8bc99968216b8205ea146c6961264c24df6cec99fd744e",
+      "report_sha256": "8fa6bb39a69a7cc9e9b5d11021b07836a2a41622999ec08df4fbfde787e3a4e4"
+    }
+  ],
+  "samples": 30,
+  "selector": "pptx_source_backed_cross_copy_media_rich_lifecycle",
+  "status": "pass",
+  "warmups": 3
+}
