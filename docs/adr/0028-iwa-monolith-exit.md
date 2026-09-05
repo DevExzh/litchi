@@ -8121,37 +8121,68 @@ visibility metadata only and does not add cell/formula, filter/pivot, sort,
 or row/column topology CRUD.
 
 The focused graph/codec, identity/COW, and concurrency test files provide E1
-synthetic/self-round-trip coverage. A current locked rerun passed 435 Pages
-library/integration tests plus two Pages doctests (437 total) and 802 protocol
+synthetic/self-round-trip coverage. A fresh locked all-features rerun passed 460
+Pages library/integration tests across 25 binaries and 802 protocol
 library/integration tests (764 library and 38 integration); 170 generated
 protocol doctests were ignored. These are focused-package results only. Clippy,
 boundary, migration-host, sibling, and sanitizer status remain separate gates
 and are not inferred here. Fuzz verification remains tracked with ADR 0008.
 
 Scoped all-target strict Clippy for `litchi-pages` and `litchi-iwa-protos` is
-green. A fresh workspace/all-features lint still reports 111 diagnostics in
-`litchi-iwa`, chiefly deprecated legacy Keynote ID fields plus existing
-dead-code/style findings; no diagnostic path intersects this slice. This is a
-workspace gate limitation separate from the focused Pages/protobuf result.
+green. The workspace/all-features lint now passes under its unchanged strict
+policy after legacy compatibility accesses were confined to explicit host
+boundaries and unused helpers were removed. This is workspace lint evidence;
+focused Pages/protobuf and native-admission results remain separately scoped.
 
 The checked-in [`body-table-visible.pages`](../../test-data/iwork/pages/body-table-visible.pages)
 fixture is a native Pages 14.4 baseline with a visible 5-by-4 body table and a
 body marker. Disposable copies were saved, closed, and reopened in the UI
-without repair; the `Package` exact no-op check succeeds, and the hidden-axis API returns
-`InvalidSource` for this native shape. The fixture contains no user-hidden axes,
-so it is native visible-table/no-op evidence and does not provide positive
-hidden-axis E2 or E3/E4 mutation evidence. An older exploratory Pages 14.4
+without repair; the `Package` exact no-op check succeeds, and the native visible
+profile reads empty and permits an exact empty no-op. A changed hidden-axis
+request is refused as `UnsupportedDependency` before publication. The fixture
+contains no user-hidden axes, so it is native visible-table/read/no-op evidence
+and does not provide positive hidden-axis E2 or E3/E4 mutation evidence. An older exploratory Pages 14.4
 generated-candidate attempt logged an NSCocoa MissingObject/TSPersistence Import
 document error, timed out on save/close, and never reopened; AppleScript table
 creation stalled without GUI inspection. That attempt remains historical
 negative exploratory evidence only.
 
+The native hidden-state envelope is ownerful with one state, but both its row
+and column state lists are empty. The native profile is admitted only for this
+visible producer shape and remains read/no-op only; this does not establish
+native hidden-axis mutation support.
+
 A fresh Computer Use duplicate/save/close/reopen check showed the same body
 marker and visible table without repair UI. The checked-in fixture was restored
 at its recorded SHA-256 after the disposable UI checks, and the focused package
 save path produced identical bytes for the visible-table/no-op operation. This
-is native baseline evidence only; it does not establish hidden-axis parsing or
-a changed native visibility mutation.
+is native baseline evidence only; it does not establish nonempty hidden-axis
+parsing or a changed native visibility mutation.
+
+A separate disposable copy was edited in Pages by entering `Native profile read
+back` in cell A2. Pages saved, closed, and reopened it with the body marker,
+visible five-by-four table, and new cell text intact and without a repair
+prompt. Its post-close SHA-256 was
+`5094270c73ea9a2eec6f6d5d12d8ad388787d8f2a24d77504ad905794e14be65`. This is
+native authoring/save/reopen evidence for the visible profile only; it does
+not establish a Litchi mutation or hidden-axis native parity.
+
+The same Computer Use pass produced the checked-in Keynote discovery sample
+[`table-discovery.key`](../../test-data/iwork/keynote/table-discovery.key) from
+`basic.key`. Keynote received a Plain 5-by-4 table with `Buffa discovery` in
+A1, saved it, closed it, and reopened it without a repair prompt. Its SHA-256
+is `d01742f1dea413581e34469babe0df64b5d46fd2399198c4783149a8019667a7`.
+The sample feeds the bounded migration-host table-model discovery regression;
+it does not certify physical sorting, Litchi table mutation, native byte
+parity, or broader Keynote table support.
+
+The legacy slide-table graph now uses the bounded Buffa
+`table_model_discovery_codec` for the name and dimensions it consumes instead
+of eagerly materializing a complete `TableModelArchive`. Candidate selection
+still admits exactly one valid current or legacy payload and rejects historical
+role aliases; malformed candidates are skipped as before, while resource-limit
+failures remain terminal. Unrelated nested payloads remain opaque, so this
+narrow path does not promise acceptance parity with the full Prost decoder.
 
 The Pages raw-ID `PagesEditor::{table_hidden_axes, set_table_hidden_axes}`
 route, its tests, and the mixed example remain migration-host compatibility.
@@ -8161,6 +8192,12 @@ also preserves Numbers/Keynote compatibility, Numbers sort restoration, and
 row/column-deletion cleanup. Focused refusals remain terminal; supported format
 facades never fall back to the host. Existing functionality is retained until
 ADR 0028's parity and native gates permit removal.
+
+The host cleanup also removed an unused private package identity-regeneration
+helper and its dead tests. No focused `regenerate_document_identity` API was
+found or retired; UUID generation remains for source-built document
+identities. This is dead-code cleanup and does not close a migration or
+deletion gate.
 
 This advances only a focused Pages ownership/projection subgate. Deletion
 gate 1 remains closed and gate 5 remains passing; gates 2, 3, 4, and 6

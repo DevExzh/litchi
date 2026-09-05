@@ -1014,8 +1014,9 @@ fn shape_infos(editor: &KeynoteEditor, slide_index: usize) -> Result<Vec<Keynote
             slides.len()
         ))
     })?;
+    let slide_id = slide.native_ids()?.slide.get();
     let graph = ObjectGraph::read(editor.package())?;
-    let native: kn::SlideArchive = graph.decode_type(slide.slide_id, 5, "KN.SlideArchive")?;
+    let native: kn::SlideArchive = graph.decode_type(slide_id, 5, "KN.SlideArchive")?;
     let mut result = Vec::new();
     for reference in &native.owned_drawables {
         let Some(messages) = graph.objects.get(&reference.identifier) else {
@@ -1060,8 +1061,9 @@ fn shape_graph(
             slides.len()
         ))
     })?;
+    let slide_id = slide.native_ids()?.slide.get();
     let graph = ObjectGraph::read(editor.package())?;
-    let native: kn::SlideArchive = graph.decode_type(slide.slide_id, 5, "KN.SlideArchive")?;
+    let native: kn::SlideArchive = graph.decode_type(slide_id, 5, "KN.SlideArchive")?;
     for (name, references) in [
         ("owned_drawables", &native.owned_drawables),
         ("drawables_z_order", &native.drawables_z_order),
@@ -1086,7 +1088,7 @@ fn shape_graph(
             "Keynote drawable {drawable_object_id} is not an ordinary shape"
         )));
     }
-    let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+    let archive_name = graph.archive_name(slide_id)?.to_owned();
     if graph.archive_name(drawable_object_id)? != archive_name {
         return Err(Error::InvalidFormat(format!(
             "Keynote shape {drawable_object_id} is outside slide component {archive_name}"
@@ -1120,7 +1122,7 @@ fn shape_graph(
         .filter(|identifier| registered.contains(identifier))
         .collect::<Vec<_>>();
     Ok(SlideShapeGraph {
-        slide_id: slide.slide_id,
+        slide_id,
         component_id,
         archive_name,
         info,

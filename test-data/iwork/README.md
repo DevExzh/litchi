@@ -59,14 +59,39 @@ checked-in fixture was restored to the SHA-256 above after those UI checks;
 native close/resave normalization of a disposable copy is not a hidden-axis
 parity result.
 
-This fixture verifies package ingress, exact no-op output, and the current
-focused hidden-axis refusal. Apple's table-info version is `[1, 0, 5]`, but
-its table-model version is `[3, 2, 10]`; the focused owner currently requires
-`[1, 0, 5]`. The native type-4008 formula owner also carries `owner_kind = 1`
-and lacks the focused profile's aggregate drawable reference. The table-model
-metadata lacks its required field-path declarations at 46, 34, and 35.
-The focused hidden-axis read/edit therefore returns `InvalidSource` before
-publication. This is a native package baseline and negative operation-profile
-regression, not evidence of native acceptance of a Litchi visibility mutation
-or successful hidden-axis parsing. Host compatibility must remain until the
-producer differences and native mutation gates are addressed.
+This fixture verifies package ingress, exact no-op output, and the admitted
+native visible-profile read/no-op path. Apple's table-info version is
+`[1, 0, 5]`, while its table-model and type-4008 formula-owner versions are
+`[3, 2, 10]`; the indexed current profile remains separately qualified by
+`[1, 0, 5]`. The native type-4008 formula owner carries `owner_kind = 1`, and
+the native producer omits some aggregate and FieldInfo declarations that the
+indexed profile requires. The native profile admits only this exact
+6000/6001 role pair and validates any declarations that are present.
+The native hidden-state envelope is ownerful with one state, but both its row
+and column state lists are empty, so the native read returns
+`HiddenAxes::empty()`. An exact empty edit is a byte-identical no-op; a changed
+hidden-axis request is refused as `UnsupportedDependency` before publication.
+This is bounded native visible-profile read/no-op evidence, not evidence of a
+Litchi visibility mutation or native hidden-axis mutation parity. Host
+compatibility remains for changed native edits and unsupported producer shapes.
+
+A separate disposable copy was edited in Pages by entering
+`Native profile read back` in cell A2. Pages saved, closed, and reopened that
+copy with the body marker, the five-by-four table, and the new cell text still
+visible and without a repair prompt. Its post-close SHA-256 was
+`5094270c73ea9a2eec6f6d5d12d8ad388787d8f2a24d77504ad905794e14be65`; this is
+native authoring/save/reopen evidence for the visible profile only. It does
+not demonstrate a Litchi mutation, hidden-axis parsing, or hidden-axis native
+mutation parity.
+
+## Keynote table-model discovery profile (2026-09-05)
+
+`keynote/table-discovery.key` is a disposable copy of `keynote/basic.key`
+edited through Computer Use in Keynote 14.4. A Plain 5-by-4 table was added
+with `Buffa discovery` in cell A1; the original title/body text remained
+visible. Keynote saved, closed, and reopened the copy without a repair prompt.
+The checked-in artifact has SHA-256
+`d01742f1dea413581e34469babe0df64b5d46fd2399198c4783149a8019667a7`.
+This fixture supplies native producer input for the bounded Keynote
+table-model discovery reader. It does not certify physical table sorting,
+Litchi table mutation, native byte parity, or broader Keynote table support.

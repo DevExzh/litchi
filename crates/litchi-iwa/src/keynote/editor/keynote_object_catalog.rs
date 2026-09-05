@@ -717,14 +717,6 @@ impl KeynoteObjectCatalog {
             })
     }
 
-    /// Iterate object identifiers in deterministic package order.
-    ///
-    /// The descriptors are sorted once at build completion, so this lookup
-    /// allocates nothing and does not consume any catalog resource axis.
-    pub(super) fn object_identifiers(&self) -> impl Iterator<Item = u64> + '_ {
-        self.objects.iter().map(|object| object.identifier)
-    }
-
     /// Return the number of indexed objects without allocating an identifier
     /// list.  The paired [`Self::object_identifier_at`] method lets callers
     /// walk deterministic catalog order while retaining their own scratch
@@ -772,10 +764,6 @@ impl KeynoteObjectCatalog {
         })
     }
 
-    pub(super) fn message_count(&self, identifier: u64) -> CatalogResult<usize> {
-        Ok(self.message_descriptors(identifier)?.len())
-    }
-
     pub(super) fn message_type_count(
         &self,
         identifier: u64,
@@ -786,16 +774,6 @@ impl KeynoteObjectCatalog {
             .iter()
             .filter(|message| message.type_ == message_type)
             .count())
-    }
-
-    pub(super) fn message_types(
-        &self,
-        identifier: u64,
-    ) -> CatalogResult<impl Iterator<Item = u32> + '_> {
-        Ok(self
-            .message_descriptors(identifier)?
-            .iter()
-            .map(|message| message.type_))
     }
 
     /// Borrow one complete archive object for a bounded callback.
@@ -1037,16 +1015,33 @@ mod tests {
             catalog.archive_name(42).expect("archive name"),
             "Index/Document.iwa"
         );
-        assert_eq!(catalog.message_count(42).expect("message count"), 1);
+        assert_eq!(
+            catalog
+                .message_descriptors(42)
+                .expect("message descriptors")
+                .len(),
+            1
+        );
         assert_eq!(
             catalog.message_type_count(42, 2_011).expect("type count"),
             1
         );
-        assert_eq!(catalog.object_identifiers().collect::<Vec<_>>(), vec![42]);
+        assert_eq!(
+            (0..catalog.object_count())
+                .map(|index| {
+                    catalog
+                        .object_identifier_at(index)
+                        .expect("object identifier")
+                })
+                .collect::<Vec<_>>(),
+            vec![42]
+        );
         assert_eq!(
             catalog
-                .message_types(42)
+                .message_descriptors(42)
                 .expect("message types")
+                .iter()
+                .map(|message| message.type_)
                 .collect::<Vec<_>>(),
             vec![2_011]
         );

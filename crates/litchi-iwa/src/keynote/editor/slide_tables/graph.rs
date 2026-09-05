@@ -6,7 +6,7 @@ use super::super::keynote_object_catalog::{
     KeynoteObjectCatalog, KeynoteObjectCatalogError, map_catalog_error,
 };
 use super::*;
-use crate::protobuf::tst::{TableInfoArchive, TableModelArchive};
+use crate::protobuf::tst::TableInfoArchive;
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::table::appearance::{
     Appearance as CommonTableAppearance, Banding, GridlineVisibility, Gridlines, RowSizing,
@@ -34,6 +34,13 @@ struct CatalogTableModelFacts {
     columns: u32,
     style_identifier: u64,
     style_preset_identifier: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TableModelDiscoveryFacts {
+    name: String,
+    rows: u32,
+    columns: u32,
 }
 
 pub(super) fn require_table_model(
@@ -143,9 +150,9 @@ pub(super) fn slide_table_graph_from_graph(
             slide_id: context.slide_id,
             drawable_object_id,
             model_object_id: model_id,
-            name: model.table_name,
-            rows: model.number_of_rows as usize,
-            columns: model.number_of_columns as usize,
+            name: model.name,
+            rows: model.rows as usize,
+            columns: model.columns as usize,
             geometry: crate::shapes::geometry_from_drawable(&table_info.super_)?,
             appearance,
             lock_state,
@@ -874,7 +881,16 @@ fn table_model_options(source: &[u8]) -> table_model_discovery_codec::DecodeOpti
     table_model_discovery_codec::DecodeOptions::for_source(source)
 }
 
-fn decode_table_model(graph: &ObjectGraph, model_id: u64) -> Result<TableModelArchive> {
+/// Decode the facts needed by the legacy slide-table listing.
+///
+/// This compatibility path intentionally uses the bounded Buffa discovery
+/// projection instead of materializing the complete generated model.  The
+/// projection validates the outer table-model wire shape and required display
+/// fields; nested length-delimited envelopes remain opaque because this caller
+/// never interprets them.  Consequently, this path does not promise identical
+/// acceptance for every malformed payload that Prost's complete model decoder
+/// happened to accept or reject.
+fn decode_table_model(graph: &ObjectGraph, model_id: u64) -> Result<TableModelDiscoveryFacts> {
     let messages = graph.objects.get(&model_id).ok_or_else(|| {
         Error::InvalidFormat(format!("Keynote table model {model_id} is missing"))
     })?;
@@ -886,17 +902,99 @@ fn decode_table_model(graph: &ObjectGraph, model_id: u64) -> Result<TableModelAr
             "Keynote table model {model_id} contains a historical table-model role alias"
         )));
     }
-    let models = messages
+    let mut model = None;
+    for message in messages
         .iter()
         .filter(|message| TABLE_MODEL_MESSAGE_TYPES.contains(&message.type_))
-        .filter_map(|message| TableModelArchive::decode(message.data.as_slice()).ok())
-        .collect::<Vec<_>>();
-    let [model] = models.as_slice() else {
-        return Err(Error::InvalidFormat(format!(
+    {
+        let source = message.data.as_slice();
+        let snapshot = match table_model_discovery_codec::decode_table_model(
+            source,
+            table_model_options(source),
+        ) {
+            Ok(snapshot) => snapshot,
+            // Keep the legacy candidate collector's malformed-message
+            // behavior: an invalid candidate does not become a model.  A
+            // bounded resource failure is different; propagating it prevents
+            // a hostile payload from being silently retried as another role.
+            Err(error) if error.resource_limit().is_some() => {
+                return Err(map_table_model_discovery_error(error));
+            },
+            Err(_error) => continue,
+        };
+        if model.is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote table model {model_id} must contain exactly one table-model payload"
+            )));
+        }
+        model = Some(TableModelDiscoveryFacts {
+            name: own_table_model_name(snapshot.table_name())?,
+            rows: snapshot.number_of_rows(),
+            columns: snapshot.number_of_columns(),
+        });
+    }
+    model.ok_or_else(|| {
+        Error::InvalidFormat(format!(
             "Keynote table model {model_id} must contain exactly one table-model payload"
-        )));
-    };
-    Ok(model.clone())
+        ))
+    })
+}
+
+fn own_table_model_name(table_name: &str) -> Result<String> {
+    if table_name.len() > WireLimits::MAX_OUTPUT_BYTES {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::OutputBytes,
+            observed: table_name.len(),
+            limit: WireLimits::MAX_OUTPUT_BYTES,
+        }));
+    }
+    let mut name = String::new();
+    name.try_reserve_exact(table_name.len()).map_err(|_error| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "Keynote table-model discovery name",
+            amount: table_name.len(),
+        })
+    })?;
+    name.push_str(table_name);
+    Ok(name)
+}
+
+fn map_table_model_discovery_error(error: table_model_discovery_codec::DecodeError) -> Error {
+    use table_model_discovery_codec::DecodeLimit;
+
+    match error.resource_limit() {
+        Some(DecodeLimit::Bytes { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::InputBytes,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(DecodeLimit::Fields { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Fields,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(DecodeLimit::Work { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(DecodeLimit::Nesting { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Nesting,
+                observed: usize::try_from(observed).unwrap_or(usize::MAX),
+                limit: usize::try_from(maximum).unwrap_or(usize::MAX),
+            })
+        },
+        Some(_) | None => Error::InvalidFormat(format!(
+            "Keynote table-model discovery failed strict validation: {error}"
+        )),
+    }
 }
 
 /// Find a table template through the bounded catalog.
@@ -1019,6 +1117,11 @@ mod tests {
             )
             .expect("synthetic archive");
         package
+    }
+
+    fn model_graph(messages: Vec<(u32, Vec<u8>)>) -> ObjectGraph {
+        let package = model_package(messages);
+        ObjectGraph::read(&package).expect("synthetic model graph")
     }
 
     fn table_template_package(model_messages: Vec<(u32, Vec<u8>)>) -> IWorkPackage {
@@ -1392,6 +1495,127 @@ mod tests {
     fn fixed64_field(field: u32, output: &mut Vec<u8>) {
         append_key(field, 1, output);
         output.extend_from_slice(&[0; 8]);
+    }
+
+    #[test]
+    fn graph_model_discovery_owns_only_listing_facts() {
+        let graph = model_graph(vec![(MODEL_TYPE, model_payload())]);
+        let facts = decode_table_model(&graph, 42).expect("model facts");
+
+        assert_eq!(facts.name, "Table");
+        assert_eq!((facts.rows, facts.columns), (3, 4));
+    }
+
+    #[test]
+    fn graph_model_discovery_skips_malformed_candidates() {
+        let graph = model_graph(vec![
+            (MODEL_TYPE, vec![0x08, 0x01]),
+            (LEGACY_MODEL_TYPE, model_payload()),
+        ]);
+        let facts = decode_table_model(&graph, 42).expect("legacy fallback candidate");
+
+        assert_eq!(facts.name, "Table");
+        assert_eq!((facts.rows, facts.columns), (3, 4));
+    }
+
+    #[test]
+    fn graph_model_discovery_rejects_duplicate_valid_candidates() {
+        let payload = model_payload();
+        let graph = model_graph(vec![(MODEL_TYPE, payload.clone()), (MODEL_TYPE, payload)]);
+        let error = decode_table_model(&graph, 42).expect_err("duplicate model candidates");
+
+        assert!(
+            error
+                .to_string()
+                .contains("must contain exactly one table-model payload")
+        );
+    }
+
+    #[test]
+    fn graph_model_discovery_rejects_historical_role_alias() {
+        let graph = model_graph(vec![
+            (MODEL_TYPE, model_payload()),
+            (TABLE_MODEL_ROLE_ALIAS_MESSAGE_TYPE, Vec::new()),
+        ]);
+        let error = decode_table_model(&graph, 42).expect_err("historical role alias");
+
+        assert!(
+            error
+                .to_string()
+                .contains("contains a historical table-model role alias")
+        );
+    }
+
+    #[test]
+    fn graph_model_discovery_keeps_nested_envelopes_opaque() {
+        let mut payload = model_payload();
+        let field = payload
+            .windows(4)
+            .position(|window| window == [0x1a, 0x02, 0x08, 0x01])
+            .expect("table-style envelope");
+        // The discovery contract validates the outer length-delimited framing
+        // only.  A complete Prost TableModelArchive decode would interpret
+        // this nested envelope and reject its truncated varint; no listing
+        // consumer needs that nested value here.
+        payload[field + 2..field + 4].copy_from_slice(&[0xff, 0xff]);
+
+        let graph = model_graph(vec![(MODEL_TYPE, payload)]);
+        let facts = decode_table_model(&graph, 42).expect("opaque nested envelope");
+
+        assert_eq!(facts.name, "Table");
+        assert_eq!((facts.rows, facts.columns), (3, 4));
+    }
+
+    #[test]
+    fn graph_model_discovery_propagates_resource_failure_before_sibling_fallback() {
+        let mut hostile = model_payload();
+        for _ in 0..65 {
+            append_key(100, 3, &mut hostile);
+        }
+        for _ in 0..65 {
+            append_key(100, 4, &mut hostile);
+        }
+        let graph = model_graph(vec![
+            (MODEL_TYPE, hostile),
+            (LEGACY_MODEL_TYPE, model_payload()),
+        ]);
+
+        let error = decode_table_model(&graph, 42).expect_err("deep candidate");
+        assert!(matches!(
+            error,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Nesting,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn graph_model_discovery_reads_checked_in_native_keynote_models() {
+        let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/keynote/table-discovery.key");
+        let source = std::fs::read(fixture).expect("native Keynote fixture");
+        let package = IWorkPackage::from_bytes(&source).expect("native Keynote fixture");
+        let graph = ObjectGraph::read(&package).expect("native Keynote object graph");
+        let mut admitted = Vec::new();
+        for (identifier, messages) in &graph.objects {
+            if messages.iter().any(|message| message.type_ == MODEL_TYPE) {
+                admitted.push(
+                    decode_table_model(&graph, *identifier)
+                        .expect("native table-model discovery candidate"),
+                );
+            }
+        }
+
+        assert_eq!(
+            admitted,
+            vec![TableModelDiscoveryFacts {
+                name: "Table 1".to_owned(),
+                rows: 5,
+                columns: 4,
+            }]
+        );
+        assert_eq!(package.to_bytes().expect("native package bytes"), source);
     }
 
     fn assert_model_rejected_without_fallback(messages: Vec<(u32, Vec<u8>)>) {

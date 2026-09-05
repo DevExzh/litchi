@@ -399,3 +399,6 @@ pub(crate) use package::*;
 #[cfg(test)]
 #[allow(deprecated)]
 mod tests;
+
+#[cfg(test)]
+pub(crate) use tests::{set_test_table_header_settings, test_table_header_settings};

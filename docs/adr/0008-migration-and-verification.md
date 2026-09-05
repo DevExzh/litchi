@@ -16068,9 +16068,9 @@ invalidate the three canonical root previews, reopen and read back the
 candidate, and enforce exact-source apply/inverse/conflict fences.
 
 The focused graph/codec, identity/COW, and concurrency test files establish
-the intended E1 synthetic/source self-round-trip coverage. A current locked
-rerun passed 435 Pages library/integration tests plus two Pages doctests
-(437 total) and 802 protocol library/integration tests (764 library and 38
+the intended E1 synthetic/source self-round-trip coverage. A fresh locked
+all-features rerun passed 460 Pages library/integration tests across 25
+binaries and 802 protocol library/integration tests (764 library and 38
 integration); 170 generated protocol doctests were ignored. These
 results cover the focused packages only and do not constitute workspace
 release certification. Strict Clippy, boundary, migration-host, and sanitizer
@@ -16080,10 +16080,10 @@ checked-in valid, malformed, ownership, and limit descriptors; its current
 sanitizer status is not inferred from the corpus inventory.
 
 Scoped all-target strict Clippy for `litchi-pages` and `litchi-iwa-protos` is
-green. A fresh workspace/all-features lint still reports 111 diagnostics in
-`litchi-iwa`, chiefly deprecated legacy Keynote ID fields plus existing
-dead-code/style findings; no diagnostic path intersects this slice. This is a
-workspace gate limitation separate from the focused Pages/protobuf result.
+green. The workspace/all-features lint now passes under its unchanged strict
+policy after legacy compatibility accesses were confined to explicit host
+boundaries and unused helpers were removed. This is workspace lint evidence;
+focused Pages/protobuf and native-admission results remain separately scoped.
 
 The transaction regression work also bounds codec scratch/retained memory
 against the configured output-byte allowance rather than the smaller encoded
@@ -16104,25 +16104,58 @@ reopened disposable copies without repair UI. The retained checked-in native bas
 with SHA-256
 `7af8179b1174c39d35d4f483c65a86e3801fcea9fba2123fbbf75861af1b3b8d`.
 The row context menu offered insertion/deletion but no hide command. The
-native regression verifies package ingress, body text, exact no-op output,
-and unchanged bytes after the focused hidden-axis read/edit refuses
-`BodyTableHiddenAxesError::InvalidSource`.
+native regression verifies package ingress, body text, an empty hidden-axis
+read, an exact empty no-op, and unchanged bytes after a changed hidden-axis
+edit is refused as `BodyTableHiddenAxesError::UnsupportedDependency`.
 
-The native table-info version is `[1, 0, 5]`, but its table-model version is
-`[3, 2, 10]`; the focused owner currently requires `[1, 0, 5]`. The native
-type-4008 owner carries `owner_kind = 1` and lacks the required aggregate
-drawable reference/FieldInfo. The model also lacks required FieldInfo paths
-46, 34, and 35. These producer differences remain explicit admission gaps.
+The native table-info version is `[1, 0, 5]`, while its table-model and
+type-4008 formula-owner versions are `[3, 2, 10]`; the indexed current
+profile remains separately qualified by `[1, 0, 5]`. The native type-4008
+owner carries `owner_kind = 1`, and the native producer omits some aggregate
+and FieldInfo declarations required by the indexed profile. The native
+visible profile admits only this exact 6000/6001 role pair and validates any
+declarations that are present.
+The native hidden-state envelope is ownerful with one state, but both its row
+and column state lists are empty, so its native read returns
+`HiddenAxes::empty()`. An exact empty edit is a byte-identical no-op; a changed
+hidden-axis request is refused as `UnsupportedDependency` before publication.
 This native baseline contains no user-hidden rows or columns and supplies
-no positive E2 hidden-axis parsing evidence or E3/E4 acceptance of a Litchi
-visibility mutation. Creation and native mutation parity remain open.
+bounded E1/native visible-profile read/no-op evidence, not positive E2 hidden-axis
+mutation or E3/E4 acceptance of a Litchi visibility mutation. Creation and
+native changed-edit parity remain open.
 
 A fresh Computer Use duplicate/save/close/reopen check showed the same body
 marker and visible 5-by-4 table without repair UI. The checked-in fixture was
 restored at the recorded SHA-256 after the disposable UI checks; the focused
 package save path produced byte-identical output for the visible-table/no-op
-operation. This remains native baseline evidence only; it does not establish
-hidden-axis parsing or a changed native visibility mutation.
+operation. Together with the native-profile read/no-op check, this remains
+bounded native baseline evidence only; it does not establish a changed native
+visibility mutation.
+
+A separate disposable copy was edited in Pages by entering `Native profile read
+back` in cell A2. Pages saved, closed, and reopened it with the body marker,
+visible five-by-four table, and new cell text intact and without a repair
+prompt. Its post-close SHA-256 was
+`5094270c73ea9a2eec6f6d5d12d8ad388787d8f2a24d77504ad905794e14be65`. This is
+native authoring/save/reopen evidence for the visible profile only; it does
+not establish a Litchi mutation or hidden-axis native parity.
+
+The same Computer Use pass produced the checked-in Keynote discovery sample
+[`table-discovery.key`](../../test-data/iwork/keynote/table-discovery.key) from
+`basic.key`. Keynote received a Plain 5-by-4 table with `Buffa discovery` in
+A1, saved it, closed it, and reopened it without a repair prompt. Its SHA-256
+is `d01742f1dea413581e34469babe0df64b5d46fd2399198c4783149a8019667a7`.
+The sample feeds the bounded migration-host table-model discovery regression;
+it does not certify physical sorting, Litchi table mutation, native byte
+parity, or broader Keynote table support.
+
+The legacy slide-table graph now uses the bounded Buffa
+`table_model_discovery_codec` for the name and dimensions it consumes instead
+of eagerly materializing a complete `TableModelArchive`. Candidate selection
+still admits exactly one valid current or legacy payload and rejects historical
+role aliases; malformed candidates are skipped as before, while resource-limit
+failures remain terminal. Unrelated nested payloads remain opaque, so this
+narrow path does not promise acceptance parity with the full Prost decoder.
 
 The Pages raw-ID `PagesEditor::{table_hidden_axes, set_table_hidden_axes}`
 route, its tests, and the mixed example remain migration-host compatibility.
@@ -16132,6 +16165,12 @@ also preserves Numbers/Keynote compatibility, Numbers sort restoration, and
 row/column-deletion cleanup. Focused refusals remain terminal; supported format
 facades never fall back to the host. Existing functionality is retained until
 ADR 0028's parity and native gates permit removal.
+
+The host cleanup also removed an unused private package identity-regeneration
+helper and its dead tests. No focused `regenerate_document_identity` API was
+found or retired; UUID generation remains for source-built document
+identities. This is dead-code cleanup and does not close a migration or
+deletion gate.
 
 Sibling regression verification passed `cargo test --locked -p litchi-numbers
 -p litchi-keynote --lib`: 441 Numbers tests and 192 Keynote tests passed; four
@@ -16145,18 +16184,23 @@ migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and
 one migration host.
 
 Final review verification completed the workspace library/integration command
-with 19,664 passing tests and 10 ignored, and the workspace doctest command
+with 19,681 passing tests and 10 ignored, and the workspace doctest command
 with 399 passing tests and 283 ignored. After removing Keynote's public
 common-playback conversion, the affected suites were rerun: 192 Keynote
-library tests and all 1,681 migration-host library tests passed, including
-10 hidden-axis checks. The host audio regression constructs format-owned
-playback settings explicitly. The root and all three leaf compiled public-API
-checks pass, together with 23 API-checker unit tests, 860 boundary-checker
-unit tests, and the final full boundary scan. Final scoped all-target Clippy
-passes; workspace lint still reports the same 111 diagnostics outside changed
-files. That failing lint gate remains recorded for the continuing migration.
+library tests and all 1,684 migration-host library tests passed, including
+seven bounded table-discovery tests, the native fixture exact-byte
+preservation check, and 10 hidden-axis checks. The host audio regression
+constructs format-owned playback settings explicitly. The focused Pages run
+also passed 460 library/integration tests across 25 binaries, including native
+profile metadata refusals and retained-reference budget checks. The root and
+all three leaf compiled public-API checks pass, together with the previously
+recorded 23 API-checker and 860 boundary-checker unit tests and the fresh full
+boundary scan. The unchanged workspace strict library lint passes after legacy
+compatibility accesses were confined to explicit host boundaries and unused
+helpers were removed. These are verification results for the current worktree;
+the broader native and monolith-exit gates remain separately scoped.
 
-The final AddressSanitizer campaign completed 1,000 runs in 12 seconds from
+The prior synthetic AddressSanitizer campaign completed 1,000 runs in 12 seconds from
 a temporary copy of the 78 checked-in hidden-axis descriptors, with a maximum
 input length of 65,536 bytes and no crash. Harness corrections give the trusted
 nested fixture finite accounting budgets, isolate package-byte limits from

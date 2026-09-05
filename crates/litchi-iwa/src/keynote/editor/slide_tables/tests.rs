@@ -36,7 +36,7 @@ impl KeynoteEditor {
         model_object_id: u64,
     ) -> Result<HeaderSettings> {
         require_table_model(self, slide_index, model_object_id)?;
-        crate::numbers::editor::table_header_settings_in_package(self.package(), model_object_id)
+        crate::numbers::editor::test_table_header_settings(self.package(), model_object_id)
     }
 
     fn set_slide_table_header_settings(
@@ -47,7 +47,7 @@ impl KeynoteEditor {
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
-        crate::numbers::editor::set_table_header_settings_in_package(
+        crate::numbers::editor::set_test_table_header_settings(
             &mut staged,
             model_object_id,
             settings,

@@ -91,9 +91,10 @@ impl KeynoteEditor {
                 slides.len()
             ))
         })?;
+        let slide_id = slide.native_ids()?.slide.get();
         let graph = ObjectGraph::read(self.package())?;
         let native: kn::SlideArchive =
-            graph.decode_type(slide.slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
+            graph.decode_type(slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
         native
             .owned_drawables
             .iter()
@@ -666,9 +667,12 @@ impl KeynoteEditor {
                 slides.len()
             ))
         })?;
+        let slide_ids = slide.native_ids()?;
+        let slide_id = slide_ids.slide.get();
+        let node_id = slide_ids.node.get();
         let graph = ObjectGraph::read(self.package())?;
         let native: kn::SlideArchive =
-            graph.decode_type(slide.slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
+            graph.decode_type(slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
         if !native
             .owned_drawables
             .iter()
@@ -678,7 +682,7 @@ impl KeynoteEditor {
                 "Keynote movie {drawable_object_id} is not owned by slide {slide_index}"
             )));
         }
-        let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+        let archive_name = graph.archive_name(slide_id)?.to_owned();
         if graph.archive_name(drawable_object_id)? != archive_name {
             return Err(Error::InvalidFormat(format!(
                 "Keynote movie {drawable_object_id} is outside slide component {archive_name}"
@@ -690,7 +694,7 @@ impl KeynoteEditor {
             [drawable_object_id],
             "slide movie",
         )?;
-        if object_ids.contains(&slide.slide_id) {
+        if object_ids.contains(&slide_id) {
             return Err(Error::InvalidFormat(
                 "Keynote movie private graph reaches its owning slide".to_owned(),
             ));
@@ -740,8 +744,8 @@ impl KeynoteEditor {
             );
         }
         Ok(SlideMovieGraph {
-            slide_id: slide.slide_id,
-            node_id: slide.node_id,
+            slide_id,
+            node_id,
             archive_name,
             info,
             object_ids,

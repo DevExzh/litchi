@@ -1,100 +1,17 @@
-//! Wire-preserving lock state for native iWork table drawables.
+//! Compatibility reads for native iWork table lock state.
 
-use crate::archive::RawMessage;
-use crate::wire::{parse_wire_fields, patch_varint_field, transform_length_delimited_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::wire::parse_wire_fields;
+use crate::{Error, Result};
 use litchi_iwa_common::table::lock::State as TableLockState;
 
-const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_DRAWABLE_SUPER_FIELD: u32 = 1;
 const DRAWABLE_LOCKED_FIELD: u32 = 5;
-
-/// Read one table's effective interactive lock state.
-pub(crate) fn table_lock_state(
-    package: &IWorkPackage,
-    archive_name: &str,
-    drawable_object_id: u64,
-    application: &str,
-) -> Result<TableLockState> {
-    let (_, _, message) = table_message(package, archive_name, drawable_object_id, application)?;
-    table_lock_state_from_message(&message)
-}
 
 /// Read effective lock state directly from a `TST.TableInfoArchive` payload.
 pub(crate) fn table_lock_state_from_message(data: &[u8]) -> Result<TableLockState> {
     Ok(TableLockState::from_locked(
         raw_table_lock_state(data)?.unwrap_or(false),
     ))
-}
-
-/// Set one table's lock state without normalizing unrelated protobuf bytes.
-pub(crate) fn set_table_lock_state(
-    package: &mut IWorkPackage,
-    archive_name: &str,
-    drawable_object_id: u64,
-    application: &str,
-    state: TableLockState,
-) -> Result<()> {
-    set_table_lock_state_inner(
-        package,
-        archive_name,
-        drawable_object_id,
-        application,
-        state,
-    )
-}
-
-fn set_table_lock_state_inner(
-    package: &mut IWorkPackage,
-    archive_name: &str,
-    drawable_object_id: u64,
-    application: &str,
-    state: TableLockState,
-) -> Result<()> {
-    let (message_index, message_type, message) =
-        table_message(package, archive_name, drawable_object_id, application)?;
-    let current = raw_table_lock_state(&message)?;
-    if current.unwrap_or(false) == state.is_locked() {
-        return Ok(());
-    }
-    let data =
-        transform_length_delimited_field(&message, TABLE_DRAWABLE_SUPER_FIELD, |drawable| {
-            patch_varint_field(
-                drawable,
-                DRAWABLE_LOCKED_FIELD,
-                current.is_some(),
-                replacement_presence(current, state.is_locked()).map(u64::from),
-            )
-        })?;
-    if table_lock_state_from_message(&data)? != state {
-        return Err(Error::InvalidFormat(format!(
-            "{application} table {drawable_object_id} lock update failed validation"
-        )));
-    }
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "{application} table drawable {drawable_object_id} is missing"
-            ))
-        })?;
-        Ok(object
-            .replace_message(
-                message_index,
-                RawMessage {
-                    type_: message_type,
-                    data,
-                },
-            )
-            .map(|_| ())?)
-    })
-}
-
-const fn replacement_presence(current: Option<bool>, replacement: bool) -> Option<bool> {
-    if current.is_some() || replacement {
-        Some(replacement)
-    } else {
-        None
-    }
 }
 
 fn raw_table_lock_state(data: &[u8]) -> Result<Option<bool>> {
@@ -106,36 +23,6 @@ fn raw_table_lock_state(data: &[u8]) -> Result<Option<bool>> {
         DRAWABLE_LOCKED_FIELD,
         "table lock",
     )
-}
-
-fn table_message(
-    package: &IWorkPackage,
-    archive_name: &str,
-    drawable_object_id: u64,
-    application: &str,
-) -> Result<(usize, u32, Vec<u8>)> {
-    let archive = package.archive(archive_name)?;
-    let object = archive.object(drawable_object_id).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "{application} table drawable {drawable_object_id} is missing"
-        ))
-    })?;
-    let mut messages = object
-        .messages
-        .iter()
-        .enumerate()
-        .filter(|(_, message)| message.type_ == TABLE_INFO_MESSAGE_TYPE);
-    let Some((message_index, message)) = messages.next() else {
-        return Err(Error::InvalidFormat(format!(
-            "{application} drawable {drawable_object_id} has no table-info payload"
-        )));
-    };
-    if messages.next().is_some() {
-        return Err(Error::InvalidFormat(format!(
-            "{application} drawable {drawable_object_id} has multiple table-info payloads"
-        )));
-    }
-    Ok((message_index, message.type_, message.data.clone()))
 }
 
 fn strict_optional_bool(data: &[u8], field_number: u32, label: &str) -> Result<Option<bool>> {
@@ -203,7 +90,7 @@ mod tests {
 
     use super::*;
     use crate::protobuf::{tsd, tsp, tst};
-    use crate::wire::append_varint_field;
+    use crate::wire::{append_varint_field, transform_length_delimited_field};
 
     fn table_info(locked: Option<bool>) -> Vec<u8> {
         tst::TableInfoArchive {
@@ -221,36 +108,12 @@ mod tests {
     }
 
     #[test]
-    fn lock_patch_preserves_unknowns_and_explicit_defaults() {
-        let mut source = table_info(Some(false));
-        append_varint_field(&mut source, 200, 17).unwrap();
-        let current = raw_table_lock_state(&source).unwrap();
-        let locked =
-            transform_length_delimited_field(&source, TABLE_DRAWABLE_SUPER_FIELD, |drawable| {
-                patch_varint_field(drawable, DRAWABLE_LOCKED_FIELD, current.is_some(), Some(1))
-            })
-            .unwrap();
-        assert_eq!(
-            table_lock_state_from_message(&locked).unwrap(),
-            TableLockState::Locked
-        );
-        let restored =
-            transform_length_delimited_field(&locked, TABLE_DRAWABLE_SUPER_FIELD, |drawable| {
-                patch_varint_field(drawable, DRAWABLE_LOCKED_FIELD, true, Some(0))
-            })
-            .unwrap();
-        assert_eq!(restored, source);
-    }
-
-    #[test]
-    fn missing_lock_stays_absent_when_effectively_unchanged() {
+    fn missing_lock_is_unlocked() {
         let source = table_info(None);
         assert_eq!(
             table_lock_state_from_message(&source).unwrap(),
             TableLockState::Unlocked
         );
-        assert_eq!(replacement_presence(None, false), None);
-        assert_eq!(replacement_presence(None, true), Some(true));
     }
 
     #[test]

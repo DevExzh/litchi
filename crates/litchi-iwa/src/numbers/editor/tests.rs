@@ -300,6 +300,22 @@ fn test_table_model(package: &IWorkPackage) -> TableModelArchive {
     TableModelArchive::decode(object.messages[0].data.as_slice()).unwrap()
 }
 
+pub(crate) fn set_test_table_header_settings(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    settings: HeaderSettings,
+) -> crate::Result<()> {
+    table_headers::set_attached_table_header_settings(package, table_id, settings)
+}
+
+pub(crate) fn test_table_header_settings(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> crate::Result<HeaderSettings> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    table_headers::settings_from_model(&descriptor.model)
+}
+
 fn canonical_table_info(model_identifier: u64) -> Vec<u8> {
     tst::TableInfoArchive {
         super_: tsd::DrawableArchive::default(),
@@ -1705,6 +1721,26 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
     augmented.extend_from_slice(&root_unknown);
     let augmented_headers = crate::wire::repeated_length_delimited_payloads(&augmented, 2)?;
     assert_eq!(augmented_headers.len(), original_headers.len());
+    let header_size_bits = |headers: &[&[u8]], index: u32| -> crate::Result<u32> {
+        let mut size_bits = None;
+        for header in headers {
+            let snapshot = neutral_dimension_codec::decode_header(
+                header,
+                neutral_dimension_options(4096, 4096, 100_000),
+            )
+            .map_err(|error| {
+                Error::InvalidFormat(format!("dimension header failed to decode: {error}"))
+            })?;
+            if snapshot.index() == index && size_bits.replace(snapshot.size_bits()).is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "dimension header index {index} occurs more than once"
+                )));
+            }
+        }
+        size_bits.ok_or_else(|| {
+            Error::InvalidFormat(format!("dimension header index {index} is missing"))
+        })
+    };
     package.update_archive(&archive_name, |archive| {
         let object = archive.object_mut(bucket_id).ok_or_else(|| {
             Error::InvalidFormat("row-header bucket object is missing".to_owned())
@@ -1729,27 +1765,25 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
 
     let source = package.to_bytes()?;
     let dimension = Dimension::Row(0);
-    assert_eq!(
-        table_dimension_size_in_package(&package, table_id, dimension)?,
-        Size::Default
-    );
+    assert_eq!(header_size_bits(&augmented_headers, 0)?, 0.0f32.to_bits());
 
     let mut no_op = package.clone();
     set_table_dimension_size_in_package(&mut no_op, table_id, dimension, Size::Default)?;
     assert_eq!(no_op.to_bytes()?, source);
 
     let explicit = Size::points(31.0).unwrap();
+    let explicit_bits = match explicit {
+        Size::Default => 0.0f32.to_bits(),
+        Size::Points(points) => points.value().to_bits(),
+    };
     let mut changed = package.clone();
     set_table_dimension_size_in_package(&mut changed, table_id, dimension, explicit)?;
     let changed_bytes = changed.to_bytes()?;
     assert_ne!(changed_bytes, source);
-    assert_eq!(
-        table_dimension_size_in_package(&changed, table_id, dimension)?,
-        explicit
-    );
-
     let changed_bucket = bucket_message(&changed)?;
     let changed_headers = crate::wire::repeated_length_delimited_payloads(&changed_bucket, 2)?;
+    assert_eq!(header_size_bits(&changed_headers, 0)?, explicit_bits);
+
     assert_eq!(changed_headers.len(), augmented_headers.len());
     assert_ne!(changed_headers[0], augmented_headers[0]);
     assert_eq!(changed_headers[1], augmented_headers[1]);
@@ -1778,8 +1812,14 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
 
     let reopened = NumbersEditor::from_bytes(&changed_bytes)?;
     assert_eq!(
-        table_dimension_size_in_package(reopened.package(), table_id, dimension)?,
-        explicit
+        header_size_bits(
+            &crate::wire::repeated_length_delimited_payloads(
+                &bucket_message(reopened.package())?,
+                2,
+            )?,
+            0,
+        )?,
+        explicit_bits
     );
     let mut reset = reopened.into_package();
     set_table_dimension_size_in_package(&mut reset, table_id, dimension, Size::Default)?;
@@ -1865,24 +1905,22 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
             Ok(())
         })
     };
-    let assert_dimension_rejected_atomically = |hostile: IWorkPackage,
-                                                hostile_dimension: Dimension|
-     -> crate::Result<()> {
-        let before = hostile.to_bytes()?;
-        assert!(table_dimension_size_in_package(&hostile, table_id, hostile_dimension).is_err());
-        let mut changed = hostile.clone();
-        assert!(
-            set_table_dimension_size_in_package(
-                &mut changed,
-                table_id,
-                hostile_dimension,
-                explicit,
-            )
-            .is_err()
-        );
-        assert_eq!(changed.to_bytes()?, before);
-        Ok(())
-    };
+    let assert_dimension_rejected_atomically =
+        |hostile: IWorkPackage, hostile_dimension: Dimension| -> crate::Result<()> {
+            let before = hostile.to_bytes()?;
+            let mut changed = hostile.clone();
+            assert!(
+                set_table_dimension_size_in_package(
+                    &mut changed,
+                    table_id,
+                    hostile_dimension,
+                    explicit,
+                )
+                .is_err()
+            );
+            assert_eq!(changed.to_bytes()?, before);
+            Ok(())
+        };
     let assert_rejected_atomically =
         |hostile: IWorkPackage| assert_dimension_rejected_atomically(hostile, dimension);
     let rewrite_model = |package: &mut IWorkPackage,
@@ -5131,7 +5169,7 @@ fn row_insert_copy_on_writes_shared_formula_ast_and_remerges_on_delete() {
 #[test]
 fn row_insert_expands_footer_aggregate_and_delete_restores_exact_bytes() {
     let mut package = test_package_with_calculation_engine();
-    set_table_header_settings_in_package(
+    set_test_table_header_settings(
         &mut package,
         10,
         HeaderSettings {
@@ -5232,7 +5270,7 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
     const VERSIONED_ENGINE_ENTRY: &str = "Index/CalculationEngine-10-2.iwa";
 
     let mut package = test_package_with_calculation_engine();
-    set_table_header_settings_in_package(
+    set_test_table_header_settings(
         &mut package,
         10,
         HeaderSettings {
@@ -6060,7 +6098,7 @@ fn column_insert_then_delete_restores_exact_package_bytes() {
 #[test]
 fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
     let mut package = test_package_with_calculation_engine();
-    set_table_header_settings_in_package(
+    set_test_table_header_settings(
         &mut package,
         10,
         HeaderSettings {
@@ -6097,7 +6135,7 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
         .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::header(1))
         .unwrap();
 
-    let settings = table_header_settings_in_package(editor.package(), 10).unwrap();
+    let settings = test_table_header_settings(editor.package(), 10).unwrap();
     assert_eq!(settings.header_row_count(), 2);
     assert_eq!(settings.header_column_count(), 2);
     assert_eq!(settings.footer_row_count(), 1);
@@ -6119,7 +6157,7 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
 #[test]
 fn footer_insertions_do_not_expand_body_formula_ranges() {
     let mut package = test_package_with_calculation_engine();
-    set_table_header_settings_in_package(
+    set_test_table_header_settings(
         &mut package,
         10,
         HeaderSettings {
@@ -6151,7 +6189,7 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::footer(0))
         .unwrap();
     assert_eq!(
-        table_header_settings_in_package(editor.package(), 10)
+        test_table_header_settings(editor.package(), 10)
             .unwrap()
             .footer_row_count(),
         2
@@ -6170,7 +6208,7 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::footer(1))
         .unwrap();
     assert_eq!(
-        table_header_settings_in_package(editor.package(), 10)
+        test_table_header_settings(editor.package(), 10)
             .unwrap()
             .footer_row_count(),
         2
@@ -6195,7 +6233,7 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
     editor
         .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::header(0))
         .unwrap();
-    let settings = table_header_settings_in_package(editor.package(), 10).unwrap();
+    let settings = test_table_header_settings(editor.package(), 10).unwrap();
     assert_eq!(settings.header_row_count(), 1);
     assert_eq!(settings.footer_row_count(), 1);
     assert_eq!(settings.header_column_count(), 1);
@@ -6233,7 +6271,7 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
 #[test]
 fn section_relative_deletions_target_fixed_regions_transactionally() {
     let mut package = test_package();
-    set_table_header_settings_in_package(
+    set_test_table_header_settings(
         &mut package,
         10,
         HeaderSettings {
@@ -6280,7 +6318,7 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
         .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::header(0))
         .unwrap();
 
-    let settings = table_header_settings_in_package(editor.package(), 10).unwrap();
+    let settings = test_table_header_settings(editor.package(), 10).unwrap();
     assert_eq!(settings.header_row_count(), 0);
     assert_eq!(settings.footer_row_count(), 0);
     assert_eq!(settings.header_column_count(), 0);
@@ -7051,7 +7089,7 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
     let mut package = editor.into_package();
-    set_table_header_settings_in_package(
+    set_test_table_header_settings(
         &mut package,
         table_id,
         HeaderSettings {
@@ -7835,7 +7873,7 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
     let mut package = editor.into_package();
-    set_table_header_settings_in_package(
+    set_test_table_header_settings(
         &mut package,
         table_id,
         HeaderSettings {
@@ -7960,7 +7998,7 @@ fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
     let mut package = editor.into_package();
-    set_table_header_settings_in_package(
+    set_test_table_header_settings(
         &mut package,
         table_id,
         HeaderSettings {
@@ -8168,7 +8206,7 @@ fn table_sort_execution_keeps_explicit_border_layers_attached_to_cells() {
             Ok(())
         })
         .unwrap();
-    set_table_header_settings_in_package(
+    set_test_table_header_settings(
         &mut package,
         10,
         HeaderSettings {
