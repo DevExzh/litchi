@@ -1,0 +1,82 @@
+{
+  "change": 423,
+  "declared_utc": "2026-09-05T11:57:52.471086+00:00",
+  "classification": "same-revision owned/source-backed lifecycle baseline; no optimization claim",
+  "baseline_revision": "8cf828e64",
+  "cpu": 2,
+  "workers": 1,
+  "common_flags": [
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm"
+  ],
+  "corpora": [
+    "plain",
+    "media_rich"
+  ],
+  "selectors": [
+    "pptx_cross_copy_plain_lifecycle",
+    "pptx_source_backed_cross_copy_plain_lifecycle",
+    "pptx_cross_copy_media_rich_lifecycle",
+    "pptx_source_backed_cross_copy_media_rich_lifecycle"
+  ],
+  "lanes": {
+    "normal": {
+      "samples": 100,
+      "warmups": 10
+    },
+    "allocator": {
+      "samples": 30,
+      "warmups": 3
+    }
+  },
+  "order": [
+    {
+      "role": "owned",
+      "repeat": "R1"
+    },
+    {
+      "role": "source",
+      "repeat": "R1"
+    },
+    {
+      "role": "source",
+      "repeat": "R2"
+    },
+    {
+      "role": "owned",
+      "repeat": "R2"
+    }
+  ],
+  "expected_run_count": 16,
+  "isolation": "fresh process per lane/corpus/role/repeat; task CPU workloads serialized; shared host background uncontrolled",
+  "sink": "Both roles reserve the same bounded sink before measurement: maximum 2 * owned baseline output bytes + 65536, write chunk 65536 bytes. Source output must fit.",
+  "source_boundary": "Input Vec clones, in-memory instrumented ReadAt adapters, sink construction/reservation outside. Both from_read_at constructors, public plan and publication inside. Read counters reset before opening; no selected-slide cache warming. Reopen, independent preservation/semantic oracles and destruction outside.",
+  "owned_boundary": "Input Vec clones and sink construction/reservation outside. Both Package::from_vec constructors, opened snapshots, plan, commit and publication inside. Reopen, independent preservation/semantic oracles and destruction outside.",
+  "hypothesis": "The two current public APIs can perform the same admitted plain/eight-image slide-copy workload with matching source and destination bytes, selectors, collision pattern and preservation contract. Their internal phase and retained-artifact boundaries differ.",
+  "acceptance": "Strict report schema and sample ordering, source/binary/protocol custody, common inputs/sink ceilings, stable per-role output digest, independent media/relationship/content-type/raw-destination preservation and source/refusal gates. All focused correctness tests pass.",
+  "normal_repeat_drift_ceilings_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  },
+  "claims": "Current per-role normal distributions, allocation vectors, logical read/write behavior and within-role repeat stability only. No source-backed speedup, memory reduction, prior-version delta, zero-copy, physical-I/O or post-drop retention claim. Normal/allocator elapsed values are not compared.",
+  "limits": "In-memory Vec-backed ReadAt includes adapter read-counter overhead. V3 allocator callback-order metrics include pre-existing live bytes and any background callbacks; observer mutex perturbs scheduling. Retained plans and other objects are alive at exit. Whole-process time-v RSS includes setup, validation and teardown. Shared-host drift may withhold acceptance-grade distributions.",
+  "excluded_from_formal_matrix": "Functional one-sample zero-warmup selector checks. No heaptrack capture in this batch; explicit stage/drop memory snapshots and native/cold/range/scaling evidence remain follow-up work."
+}

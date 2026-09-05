@@ -1141,6 +1141,8 @@ enum Case {
     PptxCrossCopyPlainLifecycle,
     PptxCrossCopyMediaRichLifecycle,
     PptxSourceBackedCrossCopyPlain,
+    PptxSourceBackedCrossCopyPlainLifecycle,
+    PptxSourceBackedCrossCopyMediaRichLifecycle,
     PptxSourceBackedImagesQuery,
     PptxSourceBackedImageQuery,
     PptxSourceBackedReadImageQuery,
@@ -1632,6 +1634,12 @@ impl Case {
             Self::PptxCrossCopyPlainLifecycle => "pptx_cross_copy_plain_lifecycle",
             Self::PptxCrossCopyMediaRichLifecycle => "pptx_cross_copy_media_rich_lifecycle",
             Self::PptxSourceBackedCrossCopyPlain => "pptx_source_backed_cross_copy_plain",
+            Self::PptxSourceBackedCrossCopyPlainLifecycle => {
+                "pptx_source_backed_cross_copy_plain_lifecycle"
+            },
+            Self::PptxSourceBackedCrossCopyMediaRichLifecycle => {
+                "pptx_source_backed_cross_copy_media_rich_lifecycle"
+            },
             Self::PptxSourceBackedImagesQuery => "pptx_source_backed_images_query",
             Self::PptxSourceBackedImageQuery => "pptx_source_backed_image_query",
             Self::PptxSourceBackedReadImageQuery => "pptx_source_backed_read_image_query",
@@ -3088,6 +3096,14 @@ impl Case {
         matches!(self, Self::PptxSourceBackedCrossCopyPlain)
     }
 
+    const fn is_pptx_source_backed_cross_copy_lifecycle(self) -> bool {
+        matches!(
+            self,
+            Self::PptxSourceBackedCrossCopyPlainLifecycle
+                | Self::PptxSourceBackedCrossCopyMediaRichLifecycle
+        )
+    }
+
     const fn is_pptx_source_image_query(self) -> bool {
         matches!(
             self,
@@ -3411,16 +3427,19 @@ struct PptxCrossCopyCorpus {
     gates: PptxCrossCopyGateSummary,
 }
 
-/// Source-backed evidence uses the exact plain source/destination corpus already
-/// used by `pptx_cross_copy_plain`. Keeping one corpus identity makes this a
-/// matched control input without presenting the two backend timings as an ABBA
-/// comparison or claiming an eager/source speedup.
+/// Source-backed evidence uses the exact source/destination bytes from the
+/// corresponding owned plain or media-rich cross-copy corpus. Keeping one
+/// corpus identity makes each lifecycle an explicit matched control input
+/// without presenting backend timings as an ABBA comparison or claiming an
+/// eager/source speedup.
 #[derive(Debug)]
 struct PptxSourceBackedCrossCopyCorpus {
     manifest: CorpusManifest,
     source_archive: Vec<u8>,
     destination_archive: Vec<u8>,
     source_backed_expected_output: Vec<u8>,
+    matched_owned_output_bytes: usize,
+    media_rich: bool,
     source_slide: usize,
     destination_slide: usize,
     insertion_position: usize,
@@ -3428,8 +3447,13 @@ struct PptxSourceBackedCrossCopyCorpus {
     destination_slide_name: String,
     source_slide_text: String,
     destination_slide_count: usize,
+    matched_owned_planned_part_count: usize,
+    matched_owned_planned_bytes: usize,
+    matched_owned_external_relationships: usize,
+    matched_owned_collision_remapped_parts: usize,
     added_slide_payload_bytes: usize,
-    gates: PptxSourceBackedCrossCopyGateSummary,
+    gates: Option<PptxSourceBackedCrossCopyGateSummary>,
+    lifecycle_gates: Option<PptxSourceBackedCrossCopyLifecycleGateSummary>,
 }
 
 #[derive(Debug)]
@@ -3462,6 +3486,33 @@ struct PptxCrossCopyOutputChecks {
     semantic_output_verified: bool,
     package_topology_verified: bool,
     dependency_closure_verified: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PptxSourceBackedLifecycleOutputChecks {
+    semantic_output_verified: bool,
+    package_topology_verified: bool,
+    dependency_closure_verified: bool,
+    layout_reuse_verified: bool,
+    untouched_destination_members_verified: bool,
+    added_opc_parts_verified: bool,
+    added_zip_members_verified: bool,
+    media_leaf_payloads_verified: bool,
+    media_leaf_content_types_verified: bool,
+    media_relationships_verified: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PptxSourceBackedCrossCopyLifecycleExpectation<'a> {
+    source_slide_name: &'a str,
+    source_slide_text: &'a str,
+    destination_slide_count: usize,
+    matched_owned_corpus_verified: bool,
+    media_rich: bool,
+    expected_added_part_count: usize,
+    expected_planned_bytes: usize,
+    expected_external_relationships: usize,
+    expected_collision_remapped_parts: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -3969,6 +4020,26 @@ struct PptxSourceBackedCrossCopyGateSummary {
 }
 
 #[derive(Clone, Debug, Serialize)]
+struct PptxSourceBackedCrossCopyLifecycleGateSummary {
+    matched_owned_corpus_verified: bool,
+    semantic_output_verified: bool,
+    package_topology_verified: bool,
+    dependency_boundary_verified: bool,
+    layout_reuse_verified: bool,
+    untouched_destination_members_verified: bool,
+    deterministic_output_verified: bool,
+    source_version_stability_verified: bool,
+    source_revision_refusal_verified: bool,
+    destination_revision_refusal_verified: bool,
+    foreign_destination_refusal_verified: bool,
+    added_opc_parts_verified: bool,
+    added_zip_members_verified: bool,
+    media_leaf_payloads_verified: bool,
+    media_leaf_content_types_verified: bool,
+    media_relationships_verified: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
 struct PptxSourceBackedCrossCopySummary {
     implementation: &'static str,
     workload: &'static str,
@@ -3988,6 +4059,47 @@ struct PptxSourceBackedCrossCopySummary {
     added_archive_member_count: usize,
     added_slide_payload_bytes: usize,
     gates: PptxSourceBackedCrossCopyGateSummary,
+    plan_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    output_sha256: Vec<String>,
+    source_read_calls: Vec<u64>,
+    source_read_bytes: Vec<u64>,
+    destination_read_calls: Vec<u64>,
+    destination_read_bytes: Vec<u64>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct PptxSourceBackedCrossCopyLifecycleSummary {
+    implementation: &'static str,
+    workload: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    source_archive_sha256: String,
+    destination_archive_sha256: String,
+    expected_output_sha256: String,
+    matched_owned_output_bytes: usize,
+    matched_owned_output_ceiling: u64,
+    source_expected_output_bytes: usize,
+    media_rich: bool,
+    source_slide: usize,
+    destination_slide: usize,
+    insertion_position: usize,
+    source_slide_name: String,
+    destination_slide_name: String,
+    destination_slide_count_before: usize,
+    destination_slide_count_after: usize,
+    matched_owned_planned_part_count: usize,
+    matched_owned_planned_bytes: usize,
+    matched_owned_external_relationship_count: usize,
+    matched_owned_collision_remapped_parts: usize,
+    added_opc_part_count: usize,
+    added_archive_member_count: usize,
+    added_slide_payload_bytes: usize,
+    media_leaf_count: usize,
+    media_leaf_bytes: usize,
+    gates: PptxSourceBackedCrossCopyLifecycleGateSummary,
+    lifecycle_ns: Vec<u64>,
+    open_ns: Vec<u64>,
     plan_ns: Vec<u64>,
     publication_ns: Vec<u64>,
     output_sha256: Vec<String>,
@@ -4189,6 +4301,8 @@ struct SourceSummary {
     pptx_cross_copy: Option<PptxCrossCopySummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pptx_source_backed_cross_copy: Option<PptxSourceBackedCrossCopySummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pptx_source_backed_cross_copy_lifecycle: Option<PptxSourceBackedCrossCopyLifecycleSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pptx_source_image_query: Option<PptxSourceImageQuerySummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -8799,6 +8913,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_pptx_cross_copy()
                     && !case.is_pptx_cross_copy_lifecycle()
                     && !case.is_pptx_source_backed_cross_copy()
+                    && !case.is_pptx_source_backed_cross_copy_lifecycle()
                     && !case.is_pptx_source_image_query()
                     && !case.is_pptx_slide_boundary()
                     && !case.is_xlsx_calculation_metadata_edit_save()
@@ -9442,24 +9557,30 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if options
-        .cases
-        .iter()
-        .any(|case| case.is_pptx_source_backed_cross_copy())
-    {
-        for case in options
-            .cases
-            .iter()
-            .copied()
-            .filter(|case| case.is_pptx_source_backed_cross_copy())
-        {
+    if options.cases.iter().any(|case| {
+        case.is_pptx_source_backed_cross_copy() || case.is_pptx_source_backed_cross_copy_lifecycle()
+    }) {
+        for case in options.cases.iter().copied().filter(|case| {
+            case.is_pptx_source_backed_cross_copy()
+                || case.is_pptx_source_backed_cross_copy_lifecycle()
+        }) {
             let corpus = build_pptx_source_backed_cross_copy_corpus(case)?;
-            results.push(run_pptx_source_backed_cross_copy(
-                case,
-                &corpus,
-                options.warmup_iterations,
-                options.samples,
-            )?);
+            let result = if case.is_pptx_source_backed_cross_copy_lifecycle() {
+                run_pptx_source_backed_cross_copy_lifecycle(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?
+            } else {
+                run_pptx_source_backed_cross_copy(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?
+            };
+            results.push(result);
         }
     }
 
@@ -11043,6 +11164,12 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_cross_copy_plain_lifecycle" => Some(Case::PptxCrossCopyPlainLifecycle),
         "pptx_cross_copy_media_rich_lifecycle" => Some(Case::PptxCrossCopyMediaRichLifecycle),
         "pptx_source_backed_cross_copy_plain" => Some(Case::PptxSourceBackedCrossCopyPlain),
+        "pptx_source_backed_cross_copy_plain_lifecycle" => {
+            Some(Case::PptxSourceBackedCrossCopyPlainLifecycle)
+        },
+        "pptx_source_backed_cross_copy_media_rich_lifecycle" => {
+            Some(Case::PptxSourceBackedCrossCopyMediaRichLifecycle)
+        },
         "pptx_source_backed_images_query" => Some(Case::PptxSourceBackedImagesQuery),
         "pptx_source_backed_image_query" => Some(Case::PptxSourceBackedImageQuery),
         "pptx_source_backed_read_image_query" => Some(Case::PptxSourceBackedReadImageQuery),
@@ -11589,6 +11716,8 @@ fn usage_text() -> String {
                                        pptx_cross_copy_plain_lifecycle,\n\
                                        pptx_cross_copy_media_rich_lifecycle,\n\
                                        pptx_source_backed_cross_copy_plain,\n\
+                                       pptx_source_backed_cross_copy_plain_lifecycle,\n\
+                                       pptx_source_backed_cross_copy_media_rich_lifecycle,\n\
                                        pptx_source_backed_images_query,\n\
                                        pptx_source_backed_image_query,\n\
                                        pptx_source_backed_read_image_query,\n\
@@ -14596,25 +14725,44 @@ fn build_pptx_cross_copy_corpus(case: Case) -> Result<PptxCrossCopyCorpus, Box<d
 fn build_pptx_source_backed_cross_copy_corpus(
     case: Case,
 ) -> Result<PptxSourceBackedCrossCopyCorpus, Box<dyn Error>> {
-    if case != Case::PptxSourceBackedCrossCopyPlain {
+    let (owned_case, media_rich) = match case {
+        Case::PptxSourceBackedCrossCopyPlain => (Case::PptxCrossCopyPlain, false),
+        Case::PptxSourceBackedCrossCopyPlainLifecycle => (Case::PptxCrossCopyPlainLifecycle, false),
+        Case::PptxSourceBackedCrossCopyMediaRichLifecycle => {
+            (Case::PptxCrossCopyMediaRichLifecycle, true)
+        },
+        _ => {
+            return Err("invalid source-backed PPTX cross-copy corpus case".into());
+        },
+    };
+
+    if !case.is_pptx_source_backed_cross_copy()
+        && !case.is_pptx_source_backed_cross_copy_lifecycle()
+    {
         return Err("invalid source-backed PPTX cross-copy corpus case".into());
     }
 
-    // Reuse the exact bytes and selectors from the existing plain owned-source
-    // evidence corpus. The source-backed tranche deliberately has no separate
-    // media-rich or synthetic control corpus.
-    let baseline = build_pptx_cross_copy_corpus(Case::PptxCrossCopyPlain)?;
+    // Reuse the exact bytes and selectors from the corresponding owned
+    // evidence corpus. Source-backed lifecycle inputs therefore remain a
+    // matched plain/media control rather than a second synthetic workload.
+    let baseline = build_pptx_cross_copy_corpus(owned_case)?;
     let source_archive = baseline.source_archive.clone();
     let destination_archive = baseline.destination_archive.clone();
-    let expected_source_archive =
-        pptx_cross_copy_bytes(PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT, None, "source")?;
-    let expected_destination_archive =
-        pptx_cross_copy_bytes(PPTX_CROSS_COPY_DESTINATION_SLIDE_COUNT, None, "destination")?;
-    let matched_existing_plain_corpus_verified = source_archive == expected_source_archive
+    let expected_source_archive = pptx_cross_copy_bytes(
+        PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT,
+        media_rich.then_some(PPTX_CROSS_COPY_SOURCE_SLIDE),
+        "source",
+    )?;
+    let expected_destination_archive = pptx_cross_copy_bytes(
+        PPTX_CROSS_COPY_DESTINATION_SLIDE_COUNT,
+        media_rich.then_some(0),
+        "destination",
+    )?;
+    let matched_owned_corpus_verified = source_archive == expected_source_archive
         && destination_archive == expected_destination_archive;
-    if !matched_existing_plain_corpus_verified {
+    if !matched_owned_corpus_verified {
         return Err(
-            "source-backed PPTX cross-copy bytes diverged from the plain control corpus".into(),
+            "source-backed PPTX cross-copy bytes diverged from the matched owned corpus".into(),
         );
     }
 
@@ -14642,16 +14790,47 @@ fn build_pptx_source_backed_cross_copy_corpus(
 
     let source_backed_expected_output =
         publish_pptx_source_backed_cross_copy(&source_archive, &destination_archive)?;
-    let gates = verify_pptx_source_backed_cross_copy_gates(
-        &source_archive,
-        &destination_archive,
-        &source_backed_expected_output,
-        source_slide_name.as_str(),
-        source_slide_text.as_str(),
-        destination_slide_count,
-        matched_existing_plain_corpus_verified,
-    )?;
+    let (gates, lifecycle_gates) = if case == Case::PptxSourceBackedCrossCopyPlain {
+        (
+            Some(verify_pptx_source_backed_cross_copy_gates(
+                &source_archive,
+                &destination_archive,
+                &source_backed_expected_output,
+                source_slide_name.as_str(),
+                source_slide_text.as_str(),
+                destination_slide_count,
+                matched_owned_corpus_verified,
+            )?),
+            None,
+        )
+    } else {
+        let lifecycle_expectation = PptxSourceBackedCrossCopyLifecycleExpectation {
+            source_slide_name: source_slide_name.as_str(),
+            source_slide_text: source_slide_text.as_str(),
+            destination_slide_count,
+            matched_owned_corpus_verified,
+            media_rich,
+            expected_added_part_count: baseline.plan_parts,
+            expected_planned_bytes: baseline.planned_bytes,
+            expected_external_relationships: baseline.external_relationships,
+            expected_collision_remapped_parts: baseline.collision_remapped_parts,
+        };
+        (
+            None,
+            Some(verify_pptx_source_backed_cross_copy_lifecycle_gates(
+                &source_archive,
+                &destination_archive,
+                &source_backed_expected_output,
+                &lifecycle_expectation,
+            )?),
+        )
+    };
 
+    let matched_owned_output_bytes = baseline.expected_output.len();
+    let planned_part_count = baseline.plan_parts;
+    let planned_bytes = baseline.planned_bytes;
+    let external_relationships = baseline.external_relationships;
+    let collision_remapped_parts = baseline.collision_remapped_parts;
     let mut manifest = baseline.manifest;
     manifest.name = case.name().to_owned();
     manifest.generator = PPTX_SOURCE_BACKED_CROSS_COPY_CORPUS_GENERATOR;
@@ -14660,6 +14839,8 @@ fn build_pptx_source_backed_cross_copy_corpus(
         source_archive,
         destination_archive,
         source_backed_expected_output,
+        matched_owned_output_bytes,
+        media_rich,
         source_slide: PPTX_CROSS_COPY_SOURCE_SLIDE,
         destination_slide: PPTX_CROSS_COPY_DESTINATION_SLIDE,
         insertion_position: PPTX_CROSS_COPY_INSERTION_POSITION,
@@ -14667,8 +14848,13 @@ fn build_pptx_source_backed_cross_copy_corpus(
         destination_slide_name,
         source_slide_text,
         destination_slide_count,
+        matched_owned_planned_part_count: planned_part_count,
+        matched_owned_planned_bytes: planned_bytes,
+        matched_owned_external_relationships: external_relationships,
+        matched_owned_collision_remapped_parts: collision_remapped_parts,
         added_slide_payload_bytes,
         gates,
+        lifecycle_gates,
     })
 }
 
@@ -15706,6 +15892,653 @@ fn verify_pptx_source_backed_cross_copy_gates(
     Ok(gates)
 }
 
+fn pptx_xml_relationship_embeds(xml: &[u8]) -> Result<Vec<String>, Box<dyn Error>> {
+    const TRANSITIONAL_RELATIONSHIP_NAMESPACE: &[u8] =
+        b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const STRICT_RELATIONSHIP_NAMESPACE: &[u8] =
+        b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+    let mut reader = NsReader::from_reader(xml);
+    let mut embeds = Vec::new();
+    loop {
+        let (_, event) = reader
+            .read_resolved_event()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+        let element = match event {
+            Event::Start(element) | Event::Empty(element) => element,
+            Event::Eof => break,
+            _ => continue,
+        };
+        for attribute in element.attributes().with_checks(true) {
+            let attribute = attribute
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+            let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+            let relationship_embed = matches!(
+                namespace,
+                ResolveResult::Bound(Namespace(value))
+                    if (value == TRANSITIONAL_RELATIONSHIP_NAMESPACE
+                        || value == STRICT_RELATIONSHIP_NAMESPACE)
+                        && local.as_ref() == b"embed"
+            );
+            if !relationship_embed {
+                continue;
+            }
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?
+                .into_owned();
+            if value.is_empty() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "PPTX picture embed relationship ID is empty",
+                )
+                .into());
+            }
+            embeds.push(value);
+        }
+    }
+    Ok(embeds)
+}
+
+fn pptx_normalized_embedded_slide_xml(
+    source_xml: &[u8],
+    candidate_xml: &[u8],
+    source_embeds: &[String],
+) -> Result<bool, Box<dyn Error>> {
+    const EMBED_MARKER: &[u8] = b"r:embed=\"";
+    let mut normalized = Vec::new();
+    normalized
+        .try_reserve_exact(candidate_xml.len())
+        .map_err(|error| format!("source-backed lifecycle slide XML allocation: {error}"))?;
+    let mut cursor = 0usize;
+    for source_embed in source_embeds {
+        let Some(relative_start) = candidate_xml[cursor..]
+            .windows(EMBED_MARKER.len())
+            .position(|window| window == EMBED_MARKER)
+        else {
+            return Ok(false);
+        };
+        let start = cursor
+            .checked_add(relative_start)
+            .ok_or("source-backed lifecycle slide XML offset overflows")?;
+        let value_start = start
+            .checked_add(EMBED_MARKER.len())
+            .ok_or("source-backed lifecycle slide XML value offset overflows")?;
+        let Some(relative_end) = candidate_xml[value_start..]
+            .iter()
+            .position(|byte| *byte == b'\"')
+        else {
+            return Ok(false);
+        };
+        let end = value_start
+            .checked_add(relative_end)
+            .ok_or("source-backed lifecycle slide XML value end overflows")?;
+        normalized.extend_from_slice(&candidate_xml[cursor..value_start]);
+        normalized.extend_from_slice(source_embed.as_bytes());
+        normalized.push(b'\"');
+        cursor = end + 1;
+    }
+    if candidate_xml[cursor..]
+        .windows(EMBED_MARKER.len())
+        .any(|window| window == EMBED_MARKER)
+    {
+        return Ok(false);
+    }
+    normalized.extend_from_slice(&candidate_xml[cursor..]);
+    Ok(normalized == source_xml)
+}
+
+fn pptx_opc_content_type_map(opc: &OpcPackage) -> BTreeMap<String, String> {
+    opc.iter_parts()
+        .map(|part| {
+            (
+                part.partname().as_str().to_owned(),
+                part.content_type().to_owned(),
+            )
+        })
+        .collect()
+}
+
+/// Verify the source-backed lifecycle corpus through an independent output
+/// oracle. Source-backed publication may rewrite relationship IDs, image
+/// targets, and the content-types XML lexical form, so this deliberately does
+/// not use the owned writer oracle's byte-identity assumptions. It binds each
+/// source picture embed to the candidate relationship and candidate leaf
+/// payload, while comparing content types as a semantic Part map.
+fn verify_pptx_source_backed_lifecycle_output(
+    source_archive: &[u8],
+    destination_archive: &[u8],
+    output: &[u8],
+    expectation: &PptxSourceBackedCrossCopyLifecycleExpectation<'_>,
+) -> Result<PptxSourceBackedLifecycleOutputChecks, Box<dyn Error>> {
+    let source = litchi_pptx::Package::from_vec(source_archive.to_vec())?;
+    let destination = litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
+    let candidate = litchi_pptx::Package::from_vec(output.to_vec())?;
+    let source_opc = source.opc()?;
+    let destination_opc = destination.opc()?;
+    let candidate_opc = candidate.opc()?;
+    let destination_presentation = destination_opc.main_document_part()?;
+    let candidate_presentation = candidate_opc.main_document_part()?;
+    let source_slide_uri = PackURI::new(format!(
+        "/ppt/slides/slide{}.xml",
+        PPTX_CROSS_COPY_SOURCE_SLIDE + 1
+    ))?;
+    let source_slide_part = source_opc.get_part(&source_slide_uri)?;
+    let destination_refs =
+        litchi_pptx::parts::PresentationPart::from_part(destination_presentation)?
+            .slide_references()?;
+    let candidate_refs = litchi_pptx::parts::PresentationPart::from_part(candidate_presentation)?
+        .slide_references()?;
+    let destination_anchor_ref = destination_refs
+        .get(PPTX_CROSS_COPY_DESTINATION_SLIDE)
+        .ok_or("source-backed lifecycle destination anchor reference is missing")?;
+    let destination_anchor_relationship = destination_presentation
+        .rels()
+        .get(destination_anchor_ref.relationship_id())
+        .ok_or("source-backed lifecycle destination anchor relationship is missing")?;
+    let destination_anchor_uri = destination_anchor_relationship.target_partname()?;
+    let destination_anchor_part = destination_opc.get_part(&destination_anchor_uri)?;
+    let destination_layout_relationship = destination_anchor_part
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == relationship_type::SLIDE_LAYOUT)
+        .ok_or("source-backed lifecycle destination layout relationship is missing")?;
+    let destination_layout_uri = destination_layout_relationship.target_partname()?;
+    let inserted_ref = candidate_refs
+        .get(PPTX_CROSS_COPY_INSERTION_POSITION)
+        .ok_or("source-backed lifecycle inserted slide reference is missing")?;
+    let inserted_relationship = candidate_presentation
+        .rels()
+        .get(inserted_ref.relationship_id())
+        .ok_or("source-backed lifecycle inserted slide relationship is missing")?;
+    let inserted_uri = inserted_relationship.target_partname()?;
+    let inserted_part = candidate_opc.get_part(&inserted_uri)?;
+
+    let destination_semantic_slides = destination.presentation()?.slides()?;
+    let mut expected_semantic_projection = Vec::new();
+    expected_semantic_projection
+        .try_reserve_exact(destination_semantic_slides.len() + 1)
+        .map_err(|error| {
+            format!("source-backed lifecycle semantic projection allocation: {error}")
+        })?;
+    for slide in destination_semantic_slides {
+        expected_semantic_projection.push((slide.name()?, slide.text()?));
+    }
+    expected_semantic_projection.insert(
+        PPTX_CROSS_COPY_INSERTION_POSITION,
+        (
+            expectation.source_slide_name.to_owned(),
+            expectation.source_slide_text.to_owned(),
+        ),
+    );
+    let candidate_semantic_slides = candidate.presentation()?.slides()?;
+    let mut candidate_semantic_projection = Vec::new();
+    candidate_semantic_projection
+        .try_reserve_exact(candidate_semantic_slides.len())
+        .map_err(|error| {
+            format!("source-backed lifecycle candidate projection allocation: {error}")
+        })?;
+    for slide in candidate_semantic_slides {
+        candidate_semantic_projection.push((slide.name()?, slide.text()?));
+    }
+    let semantic_output_verified = candidate_refs.len() == expectation.destination_slide_count + 1
+        && candidate_semantic_projection == expected_semantic_projection;
+    if !semantic_output_verified {
+        return Err("source-backed lifecycle semantic output gate failed".into());
+    }
+
+    let source_layout_relationship = source_slide_part
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == relationship_type::SLIDE_LAYOUT)
+        .ok_or("source-backed lifecycle source layout relationship is missing")?;
+    let inserted_layout_relationship = inserted_part
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == relationship_type::SLIDE_LAYOUT)
+        .ok_or("source-backed lifecycle inserted layout relationship is missing")?;
+    let source_layout_uri = source_layout_relationship.target_partname()?;
+    let inserted_layout_uri = inserted_layout_relationship.target_partname()?;
+    let layout_reuse_verified = source_layout_relationship.target_mode() == TargetMode::Internal
+        && inserted_layout_relationship.target_mode() == TargetMode::Internal
+        && !source_layout_relationship.is_external()
+        && !inserted_layout_relationship.is_external()
+        && source_layout_relationship.target_query().is_none()
+        && source_layout_relationship.target_fragment().is_none()
+        && inserted_layout_relationship.target_query().is_none()
+        && inserted_layout_relationship.target_fragment().is_none()
+        && inserted_layout_relationship.r_id() == destination_layout_relationship.r_id()
+        && inserted_layout_uri.is_equivalent_to(&destination_layout_uri)
+        && source_opc.get_part(&source_layout_uri)?.blob()
+            == destination_opc.get_part(&destination_layout_uri)?.blob();
+
+    let source_embeds = pptx_xml_relationship_embeds(source_slide_part.blob())?;
+    let candidate_embeds = pptx_xml_relationship_embeds(inserted_part.blob())?;
+    let embedded_slide_xml_verified = pptx_normalized_embedded_slide_xml(
+        source_slide_part.blob(),
+        inserted_part.blob(),
+        &source_embeds,
+    )?;
+    let expected_media_count = if expectation.media_rich {
+        PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT
+    } else {
+        0
+    };
+    let mut media_relationships_verified = source_embeds.len() == expected_media_count
+        && candidate_embeds.len() == expected_media_count;
+    let destination_part_names = destination_opc
+        .iter_parts()
+        .map(|part| part.partname().as_str().to_owned())
+        .collect::<BTreeSet<_>>();
+    let mut media_leaf_payloads_verified = media_relationships_verified;
+    let mut media_leaf_content_types_verified = media_relationships_verified;
+    let mut candidate_image_uris = Vec::new();
+    if media_relationships_verified {
+        candidate_image_uris
+            .try_reserve_exact(candidate_embeds.len())
+            .map_err(|error| format!("source-backed lifecycle image URI allocation: {error}"))?;
+        let mut candidate_image_uri_set = BTreeSet::new();
+        for (source_rid, candidate_rid) in source_embeds.iter().zip(&candidate_embeds) {
+            let source_relationship = source_slide_part
+                .rels()
+                .get(source_rid)
+                .ok_or("source-backed lifecycle source picture relationship is missing")?;
+            let candidate_relationship = inserted_part
+                .rels()
+                .get(candidate_rid)
+                .ok_or("source-backed lifecycle candidate picture relationship is missing")?;
+            if source_relationship.reltype() != relationship_type::IMAGE
+                || candidate_relationship.reltype() != relationship_type::IMAGE
+                || source_relationship.target_mode() != TargetMode::Internal
+                || candidate_relationship.target_mode() != TargetMode::Internal
+                || source_relationship.is_external()
+                || candidate_relationship.is_external()
+                || source_relationship.target_query().is_some()
+                || source_relationship.target_fragment().is_some()
+                || candidate_relationship.target_query().is_some()
+                || candidate_relationship.target_fragment().is_some()
+            {
+                media_relationships_verified = false;
+                continue;
+            }
+            let source_uri = source_relationship.target_partname()?;
+            let candidate_uri = candidate_relationship.target_partname()?;
+            let source_part = source_opc.get_part(&source_uri)?;
+            let candidate_part = candidate_opc.get_part(&candidate_uri)?;
+            candidate_image_uris.push(candidate_uri.clone());
+            if !candidate_image_uri_set.insert(candidate_uri.as_str().to_owned())
+                || destination_part_names.contains(candidate_uri.as_str())
+                || source_part.content_type() != candidate_part.content_type()
+                || source_part.blob() != candidate_part.blob()
+            {
+                media_leaf_payloads_verified = false;
+            }
+            if source_part.content_type() != "image/png"
+                || candidate_part.content_type() != "image/png"
+                || source_part.blob().len() != PPTX_CROSS_COPY_MEDIA_ENTRY_BYTES
+                || candidate_part.blob().len() != PPTX_CROSS_COPY_MEDIA_ENTRY_BYTES
+            {
+                media_leaf_content_types_verified = false;
+            }
+        }
+        if candidate_image_uris.len() != expected_media_count {
+            media_relationships_verified = false;
+        }
+    }
+    if expectation.media_rich {
+        for index in 0..PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT {
+            let source_uri = PackURI::new(format!(
+                "/ppt/media/litchi-perf-cross-copy-media-{index:02}.png"
+            ))?;
+            let source_part = source_opc.get_part(&source_uri)?;
+            if source_part.content_type() != "image/png"
+                || source_part.blob() != pptx_cross_copy_media_payload(index)
+            {
+                media_leaf_payloads_verified = false;
+                media_leaf_content_types_verified = false;
+            }
+        }
+    }
+    let slide_payload_verified =
+        expectation.media_rich || inserted_part.blob() == source_slide_part.blob();
+    let dependency_closure_verified = source_layout_relationship.reltype()
+        == relationship_type::SLIDE_LAYOUT
+        && inserted_layout_relationship.reltype() == relationship_type::SLIDE_LAYOUT
+        && source_slide_part.rels().len() == 1 + expected_media_count
+        && inserted_part.rels().len() == 1 + expected_media_count
+        && media_relationships_verified
+        && media_leaf_payloads_verified
+        && media_leaf_content_types_verified
+        && slide_payload_verified
+        && embedded_slide_xml_verified
+        && layout_reuse_verified;
+
+    let destination_members = pptx_cross_copy_archive_members(destination_archive)?;
+    let candidate_members = pptx_cross_copy_archive_members(output)?;
+    let destination_raw_members = raw_zip_members(destination_archive)?;
+    let candidate_raw_members = raw_zip_members(output)?;
+    let destination_presentation_member = destination_presentation.partname().membername();
+    let presentation_relationship_member = destination_presentation
+        .partname()
+        .rels_uri()?
+        .membername()
+        .to_owned();
+    let excluded_members = BTreeSet::from([
+        "[Content_Types].xml".to_owned(),
+        destination_presentation_member.to_owned(),
+        presentation_relationship_member.clone(),
+    ]);
+    let mut untouched_destination_members = true;
+    for (name, bytes) in &destination_members {
+        if excluded_members.contains(name) {
+            continue;
+        }
+        if candidate_members.get(name) != Some(bytes)
+            || candidate_raw_members.get(name) != destination_raw_members.get(name)
+        {
+            untouched_destination_members = false;
+        }
+    }
+    let (destination_physical_order, destination_central_order, destination_comment) =
+        raw_zip_layout(destination_archive)?;
+    let (candidate_physical_order, candidate_central_order, candidate_comment) =
+        raw_zip_layout(output)?;
+    let destination_untouched_physical_order = destination_physical_order
+        .iter()
+        .filter(|name| !excluded_members.contains(*name))
+        .cloned()
+        .collect::<Vec<_>>();
+    let candidate_untouched_physical_order = candidate_physical_order
+        .iter()
+        .filter(|name| destination_members.contains_key(*name) && !excluded_members.contains(*name))
+        .cloned()
+        .collect::<Vec<_>>();
+    let destination_untouched_central_order = destination_central_order
+        .iter()
+        .filter(|name| !excluded_members.contains(*name))
+        .cloned()
+        .collect::<Vec<_>>();
+    let candidate_untouched_central_order = candidate_central_order
+        .iter()
+        .filter(|name| destination_members.contains_key(*name) && !excluded_members.contains(*name))
+        .cloned()
+        .collect::<Vec<_>>();
+    let untouched_destination_members_verified = untouched_destination_members
+        && destination_untouched_physical_order == candidate_untouched_physical_order
+        && destination_untouched_central_order == candidate_untouched_central_order
+        && destination_comment == candidate_comment;
+
+    let candidate_part_names = candidate_opc
+        .iter_parts()
+        .map(|part| part.partname().as_str().to_owned())
+        .collect::<BTreeSet<_>>();
+    let added_part_names = candidate_part_names
+        .difference(&destination_part_names)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let expected_added_part_names = std::iter::once(inserted_uri.as_str().to_owned())
+        .chain(
+            candidate_image_uris
+                .iter()
+                .map(|uri| uri.as_str().to_owned()),
+        )
+        .collect::<BTreeSet<_>>();
+    let added_opc_parts_verified = added_part_names.len() == expectation.expected_added_part_count
+        && added_part_names == expected_added_part_names;
+
+    let candidate_member_names = candidate_members.keys().cloned().collect::<BTreeSet<_>>();
+    let destination_member_names = destination_members.keys().cloned().collect::<BTreeSet<_>>();
+    let added_member_names = candidate_member_names
+        .difference(&destination_member_names)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut expected_added_member_names = BTreeSet::from([
+        inserted_uri.membername().to_owned(),
+        inserted_uri.rels_uri()?.membername().to_owned(),
+    ]);
+    expected_added_member_names.extend(
+        candidate_image_uris
+            .iter()
+            .map(|uri| uri.membername().to_owned()),
+    );
+    let added_zip_members_verified = added_member_names.len()
+        == expectation.expected_added_part_count + 1
+        && added_member_names == expected_added_member_names;
+
+    let destination_content_types = pptx_opc_content_type_map(destination_opc);
+    let candidate_content_types = pptx_opc_content_type_map(candidate_opc);
+    let mut semantic_content_types_verified = true;
+    for (name, content_type) in &destination_content_types {
+        if candidate_content_types.get(name) != Some(content_type) {
+            semantic_content_types_verified = false;
+        }
+    }
+    if candidate_content_types
+        .get(inserted_uri.as_str())
+        .map(String::as_str)
+        != Some(opc_content_type::PML_SLIDE)
+    {
+        semantic_content_types_verified = false;
+    }
+    for candidate_uri in &candidate_image_uris {
+        if candidate_content_types
+            .get(candidate_uri.as_str())
+            .map(String::as_str)
+            != Some("image/png")
+        {
+            semantic_content_types_verified = false;
+        }
+    }
+
+    let package_relationships_verified = relationship_signatures(destination_opc.rels())
+        == relationship_signatures(candidate_opc.rels());
+    let mut existing_presentation_relationships_verified = true;
+    for relationship in destination_presentation.rels().iter() {
+        let Some(candidate_relationship) = candidate_presentation.rels().get(relationship.r_id())
+        else {
+            existing_presentation_relationships_verified = false;
+            continue;
+        };
+        if relationship.reltype() != candidate_relationship.reltype()
+            || relationship.target_ref() != candidate_relationship.target_ref()
+            || relationship.target_mode() != candidate_relationship.target_mode()
+        {
+            existing_presentation_relationships_verified = false;
+        }
+    }
+    let destination_bindings = destination_refs
+        .iter()
+        .map(|reference| (reference.id(), reference.relationship_id().to_owned()))
+        .collect::<Vec<_>>();
+    let candidate_existing_bindings = candidate_refs
+        .iter()
+        .enumerate()
+        .filter(|(position, _)| *position != PPTX_CROSS_COPY_INSERTION_POSITION)
+        .map(|(_, reference)| (reference.id(), reference.relationship_id().to_owned()))
+        .collect::<Vec<_>>();
+    let destination_slide_ids = destination_refs
+        .iter()
+        .map(litchi_pptx::parts::SlideReference::id)
+        .collect::<BTreeSet<_>>();
+    let candidate_slide_ids = candidate_refs
+        .iter()
+        .map(litchi_pptx::parts::SlideReference::id)
+        .collect::<BTreeSet<_>>();
+    let candidate_slide_relationship_ids = candidate_refs
+        .iter()
+        .map(litchi_pptx::parts::SlideReference::relationship_id)
+        .collect::<BTreeSet<_>>();
+    let slide_bindings_verified = candidate_existing_bindings == destination_bindings
+        && candidate_slide_ids.len() == candidate_refs.len()
+        && candidate_slide_relationship_ids.len() == candidate_refs.len()
+        && !destination_slide_ids.contains(&inserted_ref.id());
+    let presentation_relationships_verified = existing_presentation_relationships_verified
+        && candidate_presentation.rels().len() == destination_presentation.rels().len() + 1
+        && inserted_relationship.reltype() == relationship_type::SLIDE
+        && !inserted_relationship.is_external()
+        && inserted_relationship.target_mode() == TargetMode::Internal
+        && inserted_relationship.target_query().is_none()
+        && inserted_relationship.target_fragment().is_none();
+    let package_topology_verified = package_relationships_verified
+        && slide_bindings_verified
+        && presentation_relationships_verified
+        && semantic_content_types_verified
+        && untouched_destination_members_verified
+        && added_opc_parts_verified
+        && added_zip_members_verified
+        && candidate_part_names
+            == destination_part_names
+                .union(&expected_added_part_names)
+                .cloned()
+                .collect::<BTreeSet<_>>();
+    if !package_topology_verified || !dependency_closure_verified {
+        return Err("source-backed lifecycle independent package oracle failed".into());
+    }
+    Ok(PptxSourceBackedLifecycleOutputChecks {
+        semantic_output_verified,
+        package_topology_verified,
+        dependency_closure_verified,
+        layout_reuse_verified,
+        untouched_destination_members_verified,
+        added_opc_parts_verified,
+        added_zip_members_verified,
+        media_leaf_payloads_verified,
+        media_leaf_content_types_verified,
+        media_relationships_verified,
+    })
+}
+
+/// Verify the source-backed lifecycle corpus with the independent output
+/// oracle plus source-topology-specific refusal and determinism checks. The
+/// existing plain source-backed phase gate intentionally keeps its historical
+/// schema and one-layout relationship assumptions; this gate is separate so
+/// the media-rich lifecycle can prove remapped leaf relationships without
+/// weakening that phase contract.
+fn verify_pptx_source_backed_cross_copy_lifecycle_gates(
+    source_archive: &[u8],
+    destination_archive: &[u8],
+    output: &[u8],
+    expectation: &PptxSourceBackedCrossCopyLifecycleExpectation<'_>,
+) -> Result<PptxSourceBackedCrossCopyLifecycleGateSummary, Box<dyn Error>> {
+    let source = litchi_pptx::Package::from_vec(source_archive.to_vec())?;
+    let destination = litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
+    let source_snapshot = source.opened_presentation()?;
+    let destination_snapshot = destination.opened_presentation()?;
+    let owned_plan = destination_snapshot.plan_cross_slide_copy(
+        &source_snapshot,
+        PPTX_CROSS_COPY_SOURCE_SLIDE,
+        PPTX_CROSS_COPY_DESTINATION_SLIDE,
+        PPTX_CROSS_COPY_INSERTION_POSITION,
+    )?;
+    let collision_remapped_parts = owned_plan
+        .parts()
+        .iter()
+        .filter(|part| part.source() != part.target())
+        .count();
+    if owned_plan.parts().len() != expectation.expected_added_part_count
+        || owned_plan.planned_bytes() != expectation.expected_planned_bytes
+        || owned_plan.external_relationship_count() != expectation.expected_external_relationships
+        || collision_remapped_parts != expectation.expected_collision_remapped_parts
+        || owned_plan.source_layout() != owned_plan.destination_layout()
+    {
+        return Err("source-backed lifecycle owned plan metadata differs from its corpus".into());
+    }
+    let output_checks = verify_pptx_source_backed_lifecycle_output(
+        source_archive,
+        destination_archive,
+        output,
+        expectation,
+    )?;
+
+    let deterministic_output_verified = output
+        == publish_pptx_source_backed_cross_copy(source_archive, destination_archive)?.as_slice();
+
+    let source_probe = Arc::new(PptxRevisionSource::new(source_archive.to_vec()));
+    let destination_probe = Arc::new(PptxRevisionSource::new(destination_archive.to_vec()));
+    let source_before = source_probe.bytes()?;
+    let source_version_before = source_probe.version()?;
+    let source_read: Arc<dyn ReadAt> = source_probe.clone();
+    let destination_read: Arc<dyn ReadAt> = destination_probe.clone();
+    let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
+    let editor_probe = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let probe_plan = editor_probe.plan_cross_slide_copy(
+        &source_view,
+        PPTX_CROSS_COPY_SOURCE_SLIDE,
+        PPTX_CROSS_COPY_DESTINATION_SLIDE,
+        PPTX_CROSS_COPY_INSERTION_POSITION,
+    )?;
+    let before = source_view
+        .slide(PPTX_CROSS_COPY_SOURCE_SLIDE)
+        .ok_or("source-backed lifecycle source slide disappeared")?
+        .text_and_name()?;
+    source_view.check_source()?;
+    let after = source_view
+        .slide(PPTX_CROSS_COPY_SOURCE_SLIDE)
+        .ok_or("source-backed lifecycle source slide disappeared")?
+        .text_and_name()?;
+    source_view.check_source()?;
+    let mut probe_output = Vec::new();
+    editor_probe.publish_cross_slide_copy_to_stream(&mut probe_output, &probe_plan)?;
+    let source_after = source_probe.bytes()?;
+    let source_version_after = source_probe.version()?;
+    let source_version_stability_verified = before == after
+        && before.0 == expectation.source_slide_text
+        && before.1 == expectation.source_slide_name
+        && source_before == source_after
+        && source_version_before == source_version_after
+        && probe_output == output;
+    let source_revision_refusal_verified =
+        source_backed_cross_copy_revision_refusal(source_archive, destination_archive, true)?;
+    let destination_revision_refusal_verified =
+        source_backed_cross_copy_revision_refusal(source_archive, destination_archive, false)?;
+    let foreign_destination_refusal_verified =
+        source_backed_cross_copy_foreign_destination_refusal(source_archive, destination_archive)?;
+
+    let dependency_boundary_verified = output_checks.dependency_closure_verified;
+    let package_topology_verified = output_checks.package_topology_verified;
+    let gates = PptxSourceBackedCrossCopyLifecycleGateSummary {
+        matched_owned_corpus_verified: expectation.matched_owned_corpus_verified,
+        semantic_output_verified: output_checks.semantic_output_verified,
+        package_topology_verified,
+        dependency_boundary_verified,
+        layout_reuse_verified: output_checks.layout_reuse_verified,
+        untouched_destination_members_verified: output_checks
+            .untouched_destination_members_verified,
+        deterministic_output_verified,
+        source_version_stability_verified,
+        source_revision_refusal_verified,
+        destination_revision_refusal_verified,
+        foreign_destination_refusal_verified,
+        added_opc_parts_verified: output_checks.added_opc_parts_verified,
+        added_zip_members_verified: output_checks.added_zip_members_verified,
+        media_leaf_payloads_verified: output_checks.media_leaf_payloads_verified,
+        media_leaf_content_types_verified: output_checks.media_leaf_content_types_verified,
+        media_relationships_verified: output_checks.media_relationships_verified,
+    };
+    if !gates.matched_owned_corpus_verified
+        || !gates.semantic_output_verified
+        || !gates.package_topology_verified
+        || !gates.dependency_boundary_verified
+        || !gates.layout_reuse_verified
+        || !gates.untouched_destination_members_verified
+        || !gates.deterministic_output_verified
+        || !gates.source_version_stability_verified
+        || !gates.source_revision_refusal_verified
+        || !gates.destination_revision_refusal_verified
+        || !gates.foreign_destination_refusal_verified
+        || !gates.added_opc_parts_verified
+        || !gates.added_zip_members_verified
+        || !gates.media_leaf_payloads_verified
+        || !gates.media_leaf_content_types_verified
+        || !gates.media_relationships_verified
+    {
+        return Err(format!(
+            "source-backed lifecycle PPTX cross-copy gate set is incomplete: {gates:?}"
+        )
+        .into());
+    }
+    Ok(gates)
+}
+
 fn source_backed_cross_copy_revision_refusal(
     source_archive: &[u8],
     destination_archive: &[u8],
@@ -15779,6 +16612,31 @@ fn pptx_cross_copy_archive_members(
         }
     }
     Ok(members)
+}
+
+#[cfg(test)]
+fn rewrite_pptx_archive_member(
+    archive_bytes: &[u8],
+    target_member: &str,
+    mut rewrite: impl FnMut(&[u8]) -> Result<Vec<u8>, Box<dyn Error>>,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let archive = ArchiveReader::new(archive_bytes)?;
+    let mut writer = StreamingArchiveWriter::new();
+    let mut found = false;
+    for member in archive.file_names() {
+        let bytes = archive.read(member)?;
+        let bytes = if member == target_member {
+            found = true;
+            rewrite(&bytes)?
+        } else {
+            bytes
+        };
+        writer.write_stored(member, &bytes)?;
+    }
+    if !found {
+        return Err(format!("PPTX archive member '{target_member}' is missing").into());
+    }
+    Ok(writer.finish_to_bytes()?)
 }
 
 fn raw_zip_layout(bytes: &[u8]) -> Result<(Vec<String>, Vec<String>, Vec<u8>), Box<dyn Error>> {
@@ -21258,7 +22116,9 @@ fn run_case_with_config(
         | Case::PptxCrossCopyMediaRich
         | Case::PptxCrossCopyPlainLifecycle
         | Case::PptxCrossCopyMediaRichLifecycle
-        | Case::PptxSourceBackedCrossCopyPlain => {
+        | Case::PptxSourceBackedCrossCopyPlain
+        | Case::PptxSourceBackedCrossCopyPlainLifecycle
+        | Case::PptxSourceBackedCrossCopyMediaRichLifecycle => {
             Err("PPTX cross-copy cases use their dedicated corpus runner".into())
         },
         Case::PptxSourceBackedImagesQuery
@@ -46909,7 +47769,10 @@ fn run_pptx_source_backed_cross_copy(
     {
         return Err("source-backed PPTX cross-copy archive identity is invalid".into());
     }
-    let gates = &corpus.gates;
+    let gates = corpus
+        .gates
+        .as_ref()
+        .ok_or("source-backed PPTX phase corpus has no phase gate set")?;
     if !gates.matched_existing_plain_corpus_verified
         || !gates.semantic_output_verified
         || !gates.package_topology_verified
@@ -46938,6 +47801,9 @@ fn run_pptx_source_backed_cross_copy(
         .checked_mul(2)
         .and_then(|value| value.checked_add(64 * 1024))
         .ok_or("source-backed PPTX sequential output ceiling overflows u64")?;
+    if corpus.source_backed_expected_output.len() > usize::try_from(maximum)? {
+        return Err("source-backed PPTX output exceeds the matched owned sink ceiling".into());
+    }
     let iterations = iteration_count(warmup_iterations, samples)?;
     let mut elapsed = Vec::with_capacity(samples);
     let mut plan_ns = Vec::with_capacity(samples);
@@ -47086,7 +47952,7 @@ fn run_pptx_source_backed_cross_copy(
         added_opc_part_count: 1,
         added_archive_member_count: 2,
         added_slide_payload_bytes: corpus.added_slide_payload_bytes,
-        gates: corpus.gates.clone(),
+        gates: gates.clone(),
         plan_ns,
         publication_ns,
         output_sha256: output_digests,
@@ -47109,6 +47975,322 @@ fn run_pptx_source_backed_cross_copy(
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
+    })
+}
+
+/// Measure the complete source-backed PPTX cross-copy lifecycle. Input Vec
+/// clones, `Arc<InstrumentedSource>` adaptation, and the sink's owned-baseline
+/// 64 KiB-window reservation are outside the timed and allocator brackets.
+/// Both `from_read_at` ingress calls, source-backed planning, and the final
+/// public sequential publication are inside one lifecycle interval. Source
+/// counters intentionally are not reset after opening, so they cover ingress
+/// as well as planning and publication. Reopen, semantic/raw/media oracles,
+/// refusal checks, and teardown remain after the interval.
+fn run_pptx_source_backed_cross_copy_lifecycle(
+    case: Case,
+    corpus: &PptxSourceBackedCrossCopyCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !case.is_pptx_source_backed_cross_copy_lifecycle()
+        || corpus.manifest.name != case.name()
+        || corpus.manifest.generator != PPTX_SOURCE_BACKED_CROSS_COPY_CORPUS_GENERATOR
+    {
+        return Err("source-backed PPTX lifecycle case requires its fixed corpus".into());
+    }
+    let gates = corpus
+        .lifecycle_gates
+        .as_ref()
+        .ok_or("source-backed PPTX lifecycle corpus has no lifecycle gate set")?;
+    if !gates.matched_owned_corpus_verified
+        || !gates.semantic_output_verified
+        || !gates.package_topology_verified
+        || !gates.dependency_boundary_verified
+        || !gates.layout_reuse_verified
+        || !gates.untouched_destination_members_verified
+        || !gates.deterministic_output_verified
+        || !gates.source_version_stability_verified
+        || !gates.source_revision_refusal_verified
+        || !gates.destination_revision_refusal_verified
+        || !gates.foreign_destination_refusal_verified
+        || !gates.added_opc_parts_verified
+        || !gates.added_zip_members_verified
+        || !gates.media_leaf_payloads_verified
+        || !gates.media_leaf_content_types_verified
+        || !gates.media_relationships_verified
+    {
+        return Err("source-backed PPTX lifecycle corpus has an incomplete gate set".into());
+    }
+    if corpus.destination_slide_count == 0
+        || corpus.source_slide >= PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT
+        || corpus.destination_slide >= corpus.destination_slide_count
+        || corpus.insertion_position > corpus.destination_slide_count
+    {
+        return Err("source-backed PPTX lifecycle corpus has an invalid slide selector".into());
+    }
+    let source_archive_digest = sha256_hex(&corpus.source_archive);
+    let destination_archive_digest = sha256_hex(&corpus.destination_archive);
+    if source_archive_digest == destination_archive_digest
+        || destination_archive_digest != corpus.manifest.archive_sha256
+    {
+        return Err("source-backed PPTX lifecycle archive identity is invalid".into());
+    }
+    let expected_digest = sha256_hex(&corpus.source_backed_expected_output);
+    let maximum = u64::try_from(corpus.matched_owned_output_bytes)?
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("source-backed PPTX lifecycle sink ceiling overflows u64")?;
+    if corpus.source_backed_expected_output.len() > usize::try_from(maximum)? {
+        return Err("source-backed PPTX lifecycle output exceeds owned sink ceiling".into());
+    }
+    let iterations = iteration_count(warmup_iterations, samples)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut lifecycle_ns = Vec::with_capacity(samples);
+    let mut open_ns = Vec::with_capacity(samples);
+    let mut plan_ns = Vec::with_capacity(samples);
+    let mut publication_ns = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut output_digests = Vec::with_capacity(samples);
+    let mut source_read_calls = Vec::with_capacity(samples);
+    let mut source_read_bytes = Vec::with_capacity(samples);
+    let mut destination_read_calls = Vec::with_capacity(samples);
+    let mut destination_read_bytes = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
+
+    for iteration in 0..iterations {
+        // These are immutable corpus preparation and stay outside both
+        // brackets. The trait-object adaptation is intentionally also outside
+        // so ingress starts at the public `from_read_at` constructors.
+        let source = Arc::new(InstrumentedSource::new(
+            corpus.source_archive.clone(),
+            Vec::new(),
+        ));
+        let destination = Arc::new(InstrumentedSource::new(
+            corpus.destination_archive.clone(),
+            Vec::new(),
+        ));
+        let source_read: Arc<dyn ReadAt> = source.clone();
+        let destination_read: Arc<dyn ReadAt> = destination.clone();
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+
+        let process_before = process_metrics::Snapshot::read().ok();
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        let open_started = Instant::now();
+        let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
+        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+        let open_duration = open_started.elapsed();
+        let plan_started = Instant::now();
+        let plan = editor.plan_cross_slide_copy(
+            &source_view,
+            corpus.source_slide,
+            corpus.destination_slide,
+            corpus.insertion_position,
+        )?;
+        let plan_duration = plan_started.elapsed();
+        let publication_started = Instant::now();
+        let snapshot = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+        let publication_duration = publication_started.elapsed();
+        let duration = started.elapsed();
+        let allocation_metrics = match allocation_region.finish() {
+            Some(sample) => Some(sample),
+            None => Some(allocation_metrics::unavailable_sample()),
+        };
+        let process_after = process_metrics::Snapshot::read().ok();
+        let process_metrics = process_before
+            .zip(process_after)
+            .map(|(before, after)| after.delta(before));
+        // Snapshot immediately after the public publication and bracket
+        // finish.  All slide-count, reopen, and semantic checks below are
+        // deliberately after this point so their logical reads cannot enter
+        // the reported source counters.
+        let source_snapshot = source.snapshot();
+        let destination_snapshot = destination.snapshot();
+
+        // Everything below is outside the lifecycle bracket. In particular,
+        // reopening the output may read every media leaf and is not attributed
+        // to the source-backed publication operation.
+        if plan.source_position() != corpus.source_slide
+            || plan.destination_slide_position() != corpus.destination_slide
+            || plan.insertion_position() != corpus.insertion_position
+            || plan.destination_slide_count() != corpus.destination_slide_count + 1
+        {
+            return Err("source-backed PPTX lifecycle plan metadata is not deterministic".into());
+        }
+        if snapshot.destination_slide_count() != corpus.destination_slide_count + 1
+            || snapshot.insertion_position() != corpus.insertion_position
+            || snapshot.name() != corpus.source_slide_name
+            || sink.bytes != corpus.source_backed_expected_output
+            || sink.summary().accepted_bytes != u64::try_from(sink.bytes.len())?
+            || sink.summary().largest_write > 64 * 1024
+        {
+            return Err(
+                "source-backed PPTX lifecycle publication differs from expected output".into(),
+            );
+        }
+        if source_view.slide_count() != PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT {
+            return Err("source-backed PPTX lifecycle setup changed slide counts".into());
+        }
+        let reopened = litchi_pptx::Package::from_bytes(&sink.bytes)?;
+        let reopened_slides = reopened.presentation()?.slides()?;
+        if reopened_slides.len() != corpus.destination_slide_count + 1
+            || reopened_slides
+                .get(corpus.insertion_position)
+                .ok_or("source-backed PPTX lifecycle inserted slide is missing")?
+                .name()?
+                != corpus.source_slide_name
+            || reopened_slides
+                .get(corpus.insertion_position)
+                .ok_or("source-backed PPTX lifecycle inserted slide is missing")?
+                .text()?
+                != corpus.source_slide_text
+        {
+            return Err(
+                "source-backed PPTX lifecycle reopened output failed semantic checks".into(),
+            );
+        }
+        if source_snapshot.read_calls == 0
+            || source_snapshot.read_bytes == 0
+            || destination_snapshot.read_calls == 0
+            || destination_snapshot.read_bytes == 0
+        {
+            return Err("source-backed PPTX lifecycle performed no logical source reads".into());
+        }
+        let lifecycle_elapsed_ns = elapsed_ns(duration)?;
+        let open_elapsed_ns = elapsed_ns(open_duration)?;
+        let plan_elapsed_ns = elapsed_ns(plan_duration)?;
+        let publication_elapsed_ns = elapsed_ns(publication_duration)?;
+        let total = plan_elapsed_ns
+            .checked_add(publication_elapsed_ns)
+            .ok_or("source-backed PPTX lifecycle phase durations overflow nanoseconds")?;
+        // Source ingress and the source-backed preparation between the phase
+        // timers are intentionally part of `lifecycle_ns`; the nested phase
+        // sum is therefore a diagnostic lower bound rather than an identity.
+        if total > lifecycle_elapsed_ns {
+            return Err("source-backed PPTX nested phases exceed lifecycle timer".into());
+        }
+        let digest = sha256_hex(&sink.bytes);
+        if digest != expected_digest {
+            return Err("source-backed PPTX lifecycle output digest differs from expected".into());
+        }
+        if iteration >= warmup_iterations {
+            elapsed.push(lifecycle_elapsed_ns);
+            lifecycle_ns.push(lifecycle_elapsed_ns);
+            open_ns.push(open_elapsed_ns);
+            plan_ns.push(plan_elapsed_ns);
+            publication_ns.push(publication_elapsed_ns);
+            sink_summaries.push(sink.summary());
+            output_digests.push(digest);
+            source_read_calls.push(source_snapshot.read_calls);
+            source_read_bytes.push(source_snapshot.read_bytes);
+            destination_read_calls.push(destination_snapshot.read_calls);
+            destination_read_bytes.push(destination_snapshot.read_bytes);
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns: lifecycle_elapsed_ns,
+                process_metrics,
+                allocation_metrics,
+            });
+        }
+        std::hint::black_box((&source_view, &plan, &snapshot, &sink.bytes));
+    }
+
+    let sink = deterministic_sink_summary(&sink_summaries, case.name())?;
+    if output_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("source-backed PPTX lifecycle output digests are not stable".into());
+    }
+    let elapsed_statistics = statistics(elapsed);
+    let sample_order = elapsed_statistics.sample_order.clone();
+    reorder_sample_vector(&mut lifecycle_ns, &sample_order)?;
+    reorder_sample_vector(&mut open_ns, &sample_order)?;
+    reorder_sample_vector(&mut plan_ns, &sample_order)?;
+    reorder_sample_vector(&mut publication_ns, &sample_order)?;
+    reorder_sample_vector(&mut output_digests, &sample_order)?;
+    reorder_sample_vector(&mut source_read_calls, &sample_order)?;
+    reorder_sample_vector(&mut source_read_bytes, &sample_order)?;
+    reorder_sample_vector(&mut destination_read_calls, &sample_order)?;
+    reorder_sample_vector(&mut destination_read_bytes, &sample_order)?;
+    let media_leaf_count = if corpus.media_rich {
+        PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT
+    } else {
+        0
+    };
+    let media_leaf_bytes = media_leaf_count
+        .checked_mul(PPTX_CROSS_COPY_MEDIA_ENTRY_BYTES)
+        .ok_or("source-backed PPTX lifecycle media byte count overflows usize")?;
+    let cross_copy = PptxSourceBackedCrossCopyLifecycleSummary {
+        implementation: "SourceBackedPresentation::from_read_at + SourceBackedPresentationEditor::from_read_at + SourceTopologyPlan::publish_cross_slide_copy_to_stream",
+        workload: if corpus.media_rich {
+            "matched media-rich owned cross-copy corpus"
+        } else {
+            "matched plain owned cross-copy corpus"
+        },
+        timing_scope: "lifecycle_ns and operation_metrics cover InstrumentedSource-backed source/destination from_read_at ingress, source-backed planning, and final public OPC sequential publication; Vec clones, Arc adapter construction, and owned-baseline sink reservation are outside; source counter vectors cover ingress through publication without a post-open reset; reopen, semantic/raw/media/refusal gates, and teardown are outside; this is an in-memory ReadAt observer and makes no physical-I/O or speedup claim",
+        performance_claim: "none: opt-in correctness, lifecycle, source-counter, sink, and operation-allocation evidence only; no eager/source speedup, ABBA, RSS, physical-I/O, or zero-copy claim",
+        source_archive_sha256: source_archive_digest,
+        destination_archive_sha256: destination_archive_digest,
+        expected_output_sha256: expected_digest.clone(),
+        matched_owned_output_bytes: corpus.matched_owned_output_bytes,
+        matched_owned_output_ceiling: maximum,
+        source_expected_output_bytes: corpus.source_backed_expected_output.len(),
+        media_rich: corpus.media_rich,
+        source_slide: corpus.source_slide,
+        destination_slide: corpus.destination_slide,
+        insertion_position: corpus.insertion_position,
+        source_slide_name: corpus.source_slide_name.clone(),
+        destination_slide_name: corpus.destination_slide_name.clone(),
+        destination_slide_count_before: corpus.destination_slide_count,
+        destination_slide_count_after: corpus.destination_slide_count + 1,
+        matched_owned_planned_part_count: corpus.matched_owned_planned_part_count,
+        matched_owned_planned_bytes: corpus.matched_owned_planned_bytes,
+        matched_owned_external_relationship_count: corpus.matched_owned_external_relationships,
+        matched_owned_collision_remapped_parts: corpus.matched_owned_collision_remapped_parts,
+        added_opc_part_count: corpus.matched_owned_planned_part_count,
+        added_archive_member_count: corpus.matched_owned_planned_part_count + 1,
+        added_slide_payload_bytes: corpus.added_slide_payload_bytes,
+        media_leaf_count,
+        media_leaf_bytes,
+        gates: gates.clone(),
+        lifecycle_ns,
+        open_ns,
+        plan_ns,
+        publication_ns,
+        output_sha256: output_digests,
+        source_read_calls,
+        source_read_bytes,
+        destination_read_calls,
+        destination_read_bytes,
+    };
+    let sink_observation = operation_metrics::SinkObservation {
+        accepted_bytes: sink.accepted_bytes,
+        write_calls: sink.write_calls,
+        largest_write: sink.largest_write,
+        bytes_0: sink.write_size_buckets.bytes_0,
+        bytes_1_to_512: sink.write_size_buckets.bytes_1_to_512,
+        bytes_513_to_4096: sink.write_size_buckets.bytes_513_to_4096,
+        bytes_4097_to_16384: sink.write_size_buckets.bytes_4097_to_16384,
+        bytes_16385_to_65536: sink.write_size_buckets.bytes_16385_to_65536,
+        bytes_over_65536: sink.write_size_buckets.bytes_over_65536,
+    };
+    let operation_metrics =
+        operation_metrics::from_in_process_observations(&observations, sink_observation)?;
+    let source_summary = SourceSummary {
+        pptx_source_backed_cross_copy_lifecycle: Some(cross_copy),
+        ..SourceSummary::default()
+    };
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: elapsed_statistics,
+        sink: Some(sink),
+        source: boxed_source(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
+        operation_metrics: Some(operation_metrics),
     })
 }
 
@@ -55301,6 +56483,13 @@ mod tests {
 
     use litchi_core::{Position, ReadAt};
 
+    use crate::{
+        PPTX_CROSS_COPY_INSERTION_POSITION, PptxSourceBackedCrossCopyLifecycleExpectation,
+        relationship_type, rewrite_pptx_archive_member, run_pptx_source_backed_cross_copy_lifecycle,
+        verify_pptx_source_backed_cross_copy_lifecycle_gates,
+        verify_pptx_source_backed_lifecycle_output,
+    };
+
     use super::operation_metrics::MetricStatus;
     use super::{
         Case, CfbOpenStreamOperation, CfbSelectiveSimulationPhase, CfbSelectiveTarget, CorpusShape,
@@ -59191,6 +60380,242 @@ mod tests {
         assert!(evidence.gates.source_revision_refusal_verified);
         assert!(evidence.gates.destination_revision_refusal_verified);
         assert!(evidence.gates.foreign_destination_refusal_verified);
+    }
+
+    #[test]
+    fn pptx_source_backed_cross_copy_lifecycles_cover_plain_and_media_oracles() {
+        for case in [
+            Case::PptxSourceBackedCrossCopyPlainLifecycle,
+            Case::PptxSourceBackedCrossCopyMediaRichLifecycle,
+        ] {
+            assert!(!Case::DEFAULT.contains(&case));
+            assert_eq!(parse_case(case.name()), Some(case));
+            let corpus = build_pptx_source_backed_cross_copy_corpus(case).unwrap();
+            let measured =
+                run_pptx_source_backed_cross_copy_lifecycle(case, &corpus, 0, 1).unwrap();
+            assert_eq!(measured.case, case.name());
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert_eq!(
+                measured.output_sha256,
+                Some(sha256_hex(&corpus.source_backed_expected_output))
+            );
+            assert!(measured.sink.as_ref().unwrap().largest_write <= 64 * 1024);
+            let source = measured.source.unwrap();
+            let evidence = source
+                .pptx_source_backed_cross_copy_lifecycle
+                .expect("source-backed lifecycle evidence");
+            assert_eq!(evidence.lifecycle_ns.len(), 1);
+            assert_eq!(evidence.open_ns.len(), 1);
+            assert_eq!(evidence.plan_ns.len(), 1);
+            assert_eq!(evidence.publication_ns.len(), 1);
+            assert!(
+                u64::try_from(evidence.source_expected_output_bytes).unwrap()
+                    <= evidence.matched_owned_output_ceiling
+            );
+            assert_eq!(evidence.output_sha256.len(), 1);
+            assert_eq!(evidence.source_read_calls.len(), 1);
+            assert_eq!(evidence.destination_read_calls.len(), 1);
+            assert!(evidence.source_read_calls[0] > 0);
+            assert!(evidence.destination_read_calls[0] > 0);
+            assert_eq!(
+                evidence.added_opc_part_count,
+                if corpus.media_rich { 9 } else { 1 }
+            );
+            assert_eq!(
+                evidence.added_archive_member_count,
+                if corpus.media_rich { 10 } else { 2 }
+            );
+            assert_eq!(
+                evidence.media_leaf_count,
+                if corpus.media_rich {
+                    PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT
+                } else {
+                    0
+                }
+            );
+            assert!(evidence.gates.matched_owned_corpus_verified);
+            assert!(evidence.gates.semantic_output_verified);
+            assert!(evidence.gates.package_topology_verified);
+            assert!(evidence.gates.dependency_boundary_verified);
+            assert!(evidence.gates.layout_reuse_verified);
+            assert!(evidence.gates.untouched_destination_members_verified);
+            assert!(evidence.gates.deterministic_output_verified);
+            assert!(evidence.gates.source_version_stability_verified);
+            assert!(evidence.gates.added_opc_parts_verified);
+            assert!(evidence.gates.added_zip_members_verified);
+            assert!(evidence.gates.media_leaf_payloads_verified);
+            assert!(evidence.gates.media_leaf_content_types_verified);
+            assert!(evidence.gates.media_relationships_verified);
+            let operation_metrics = measured
+                .operation_metrics
+                .expect("source-backed lifecycle operation metrics");
+            assert_eq!(operation_metrics.sample_count, 1);
+            assert_eq!(operation_metrics.sink.write_status, MetricStatus::Measured);
+        }
+    }
+
+    #[test]
+    fn pptx_source_backed_cross_copy_media_lifecycle_gate_rejects_tampered_media_relationship_geometry_and_count()
+     {
+        let case = Case::PptxSourceBackedCrossCopyMediaRichLifecycle;
+        let corpus = build_pptx_source_backed_cross_copy_corpus(case).unwrap();
+        let output = corpus.source_backed_expected_output.clone();
+        let expectation = PptxSourceBackedCrossCopyLifecycleExpectation {
+            source_slide_name: &corpus.source_slide_name,
+            source_slide_text: &corpus.source_slide_text,
+            destination_slide_count: corpus.destination_slide_count,
+            matched_owned_corpus_verified: true,
+            media_rich: true,
+            expected_added_part_count: corpus.matched_owned_planned_part_count,
+            expected_planned_bytes: corpus.matched_owned_planned_bytes,
+            expected_external_relationships: corpus.matched_owned_external_relationships,
+            expected_collision_remapped_parts: corpus.matched_owned_collision_remapped_parts,
+        };
+
+        let candidate = litchi_pptx::Package::from_vec(output.clone()).unwrap();
+        let candidate_opc = candidate.opc().unwrap();
+        let candidate_presentation = candidate_opc.main_document_part().unwrap();
+        let candidate_refs =
+            litchi_pptx::parts::PresentationPart::from_part(candidate_presentation)
+                .unwrap()
+                .slide_references()
+                .unwrap();
+        let inserted_ref = candidate_refs
+            .get(PPTX_CROSS_COPY_INSERTION_POSITION)
+            .unwrap();
+        let inserted_relationship = candidate_presentation
+            .rels()
+            .get(inserted_ref.relationship_id())
+            .unwrap();
+        let inserted_uri = inserted_relationship.target_partname().unwrap();
+        let inserted_part = candidate_opc.get_part(&inserted_uri).unwrap();
+        let image_uris = inserted_part
+            .rels()
+            .iter()
+            .filter(|relationship| relationship.reltype() == relationship_type::IMAGE)
+            .map(|relationship| relationship.target_partname().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(image_uris.len(), PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT);
+        assert_ne!(image_uris[0], image_uris[1]);
+        let inserted_rels_member = inserted_uri.rels_uri().unwrap().membername().to_owned();
+        let presentation_rels_member = candidate_presentation
+            .partname()
+            .rels_uri()
+            .unwrap()
+            .membername()
+            .to_owned();
+
+        let tampered_media =
+            rewrite_pptx_archive_member(&output, image_uris[0].membername(), |bytes| {
+                let mut tampered = bytes.to_vec();
+                let last = tampered
+                    .last_mut()
+                    .ok_or("deterministic media payload is empty")?;
+                *last ^= 1;
+                Ok(tampered)
+            })
+            .unwrap();
+        assert!(
+            verify_pptx_source_backed_cross_copy_lifecycle_gates(
+                &corpus.source_archive,
+                &corpus.destination_archive,
+                &tampered_media,
+                &expectation,
+            )
+            .is_err()
+        );
+
+        let first_target = format!("../media/{}", image_uris[0].filename());
+        let second_target = format!("../media/{}", image_uris[1].filename());
+        let tampered_relationship =
+            rewrite_pptx_archive_member(&output, &inserted_rels_member, |bytes| {
+                let xml = std::str::from_utf8(bytes)?;
+                let target = format!("Target=\"{first_target}\"");
+                let replacement = format!("Target=\"{second_target}\"");
+                if !xml.contains(&target) {
+                    return Err("inserted media relationship target is missing".into());
+                }
+                Ok(xml.replacen(&target, &replacement, 1).into_bytes())
+            })
+            .unwrap();
+        assert!(
+            verify_pptx_source_backed_cross_copy_lifecycle_gates(
+                &corpus.source_archive,
+                &corpus.destination_archive,
+                &tampered_relationship,
+                &expectation,
+            )
+            .is_err()
+        );
+
+        let extra_presentation_relationship = rewrite_pptx_archive_member(
+            &output,
+            &presentation_rels_member,
+            |bytes| {
+                let xml = std::str::from_utf8(bytes)?;
+                let target = format!("media/{}", image_uris[0].filename());
+                let relationship = format!(
+                    "<Relationship Id=\"rIdUnreferencedLifecycle\" Type=\"{}\" Target=\"{target}\"/>",
+                    relationship_type::IMAGE,
+                );
+                let marker = "</Relationships>";
+                if !xml.contains(marker) {
+                    return Err("presentation relationships closing element is missing".into());
+                }
+                Ok(xml.replacen(marker, &format!("{relationship}{marker}"), 1).into_bytes())
+            },
+        )
+        .unwrap();
+        assert!(
+            verify_pptx_source_backed_lifecycle_output(
+                &corpus.source_archive,
+                &corpus.destination_archive,
+                &extra_presentation_relationship,
+                &expectation,
+            )
+            .is_err()
+        );
+
+        let tampered_geometry =
+            rewrite_pptx_archive_member(&output, inserted_uri.membername(), |bytes| {
+                let marker = b"cx=\"";
+                let position = bytes
+                    .windows(marker.len())
+                    .position(|window| window == marker)
+                    .ok_or("inserted slide geometry attribute is missing")?
+                    + marker.len();
+                let mut tampered = bytes.to_vec();
+                let value = tampered
+                    .get_mut(position)
+                    .ok_or("inserted slide geometry value is missing")?;
+                if !value.is_ascii_digit() {
+                    return Err("inserted slide geometry value is not numeric".into());
+                }
+                *value = if *value == b'9' { b'8' } else { *value + 1 };
+                Ok(tampered)
+            })
+            .unwrap();
+        assert!(
+            verify_pptx_source_backed_cross_copy_lifecycle_gates(
+                &corpus.source_archive,
+                &corpus.destination_archive,
+                &tampered_geometry,
+                &expectation,
+            )
+            .is_err()
+        );
+
+        let mut wrong_part_count_expectation = expectation;
+        wrong_part_count_expectation.expected_added_part_count += 1;
+        assert!(
+            verify_pptx_source_backed_cross_copy_lifecycle_gates(
+                &corpus.source_archive,
+                &corpus.destination_archive,
+                &output,
+                &wrong_part_count_expectation,
+            )
+            .is_err()
+        );
     }
 
     #[test]

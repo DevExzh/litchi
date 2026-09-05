@@ -990,6 +990,19 @@ unchanged. These lifecycle selectors provide fixed-corpus correctness and
 allocation evidence only and make no speedup, full-retention memory, or
 release claim.
 
+Change 0423 adds `pptx_source_backed_cross_copy_plain_lifecycle` and
+`pptx_source_backed_cross_copy_media_rich_lifecycle`. Both open the source and
+destination through public `from_read_at`, then plan and publish within one
+timed operation and V3 allocator region. Input clones, in-memory instrumented
+source adapters and a common owned-output-based sink reservation precede the
+region; reopen, preservation checks and destruction follow it. Logical read
+counters include opening. The media fixture copies eight 2 MiB image leaves
+and one slide (nine added OPC parts, ten added ZIP members), with independent
+payload, relationship, content-type and untouched raw-member checks. The
+current APIs retain different artifacts and perform different internal phase
+work; this evidence makes no speedup, memory-reduction, physical-I/O or
+post-drop retention claim. See the [0423 protocol](../../docs/performance/results/change-0423/protocol.json).
+
 Change 0159 adds the independent opt-in
 `pptx_source_backed_cross_copy_plain` selector over the exact same plain
 three-slide-source/two-slide-destination bytes. It calls the public

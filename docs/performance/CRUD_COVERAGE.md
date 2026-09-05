@@ -1,5 +1,20 @@
 # Performance CRUD coverage
 
+## 2026-09-05: change 0423 adds source-backed PPTX lifecycles
+
+The opt-in `pptx_source_backed_cross_copy_plain_lifecycle` and
+`pptx_source_backed_cross_copy_media_rich_lifecycle` selectors use the owned
+fixtures through instrumented in-memory `ReadAt` sources. Opening both
+packages, planning and sequential publication share one operation interval;
+input adaptation, sink reservation, oracles and destruction are outside.
+The admitted media closure is eight 2 MiB image leaves plus one copied slide.
+The registry now has 429 selectors. The representative index adds these two
+correctness-only mappings (15
+categories / 32 selectors, 10 measured and 22 correctness-only); the default
+36-case / 198-row contract is unchanged. The [0423 protocol](results/change-0423/protocol.json)
+separates per-API baseline evidence from optimization claims. Native, cold,
+range-source, post-drop retention, scaling and full CRUD gaps remain open.
+
 ## 2026-09-05: change 0418 adds matched owned PPTX lifecycles
 
 [0418](changes/0418-pptx-cross-copy-candidate-reuse.md) adds opt-in plain and
