@@ -1,0 +1,18 @@
+[
+  "capture/lifecycle-plain-r1-receipt.json",
+  "capture/lifecycle-media-rich-r1-receipt.json",
+  "capture/exact-admission-media-rich-r1-receipt.json",
+  "capture/one-under-media-rich-r1-receipt.json",
+  "capture/pinned-eviction-media-rich-r1-receipt.json",
+  "capture/oversized-bypass-media-rich-r1-receipt.json",
+  "capture/repeated-publication-plain-r1-receipt.json",
+  "capture/repeated-publication-media-rich-r1-receipt.json",
+  "capture/repeated-publication-media-rich-r2-receipt.json",
+  "capture/repeated-publication-plain-r2-receipt.json",
+  "capture/oversized-bypass-media-rich-r2-receipt.json",
+  "capture/pinned-eviction-media-rich-r2-receipt.json",
+  "capture/one-under-media-rich-r2-receipt.json",
+  "capture/exact-admission-media-rich-r2-receipt.json",
+  "capture/lifecycle-media-rich-r2-receipt.json",
+  "capture/lifecycle-plain-r2-receipt.json"
+]

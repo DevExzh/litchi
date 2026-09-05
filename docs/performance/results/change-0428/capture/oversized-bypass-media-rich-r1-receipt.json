@@ -1,0 +1,50 @@
+{
+  "name": "oversized-bypass-media-rich-r1",
+  "corpus": "media-rich",
+  "scenario": "oversized-bypass",
+  "repeat": "R1",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0428/capture/oversized-bypass-media-rich-r1-resource.log",
+    "/tmp/litchi-goal-0428-binaries/litchi-perf-baseline",
+    "cache-retention",
+    "--scenario",
+    "oversized-bypass",
+    "--corpus",
+    "media-rich",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "6d0dc4ff0d3f54b0afae09a3e8fe684593741478",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0428/capture/oversized-bypass-media-rich-r1.json"
+  ],
+  "revision": "6d0dc4ff0d3f54b0afae09a3e8fe684593741478",
+  "binary_sha256": "2f85c419ea29ecb771bffca19c0b1a5f866fbaad80c93651c7b06b5ef68b5c43",
+  "protocol_sha256": "418fe2143a2d822cee91db7b4168363adfe50137c839337bc4ce752fef9490f0",
+  "started_utc": "2026-09-05T22:24:00.669643+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T22:24:08.729041+00:00",
+  "artifacts": {
+    "capture/oversized-bypass-media-rich-r1.json": {
+      "sha256": "b8d9266b7f5bea1fe55fdfad338477edfe66bbaf7e756bcc211e7bb9e6409e92",
+      "bytes": 1001965
+    },
+    "capture/oversized-bypass-media-rich-r1.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "capture/oversized-bypass-media-rich-r1-resource.log": {
+      "sha256": "39d5a2ad0ee7214fb93b3a41c54a3d0329137a20ec4a432a5dead99d06af48ca",
+      "bytes": 1034
+    }
+  }
+}

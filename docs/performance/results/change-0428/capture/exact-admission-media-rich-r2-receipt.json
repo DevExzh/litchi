@@ -1,0 +1,50 @@
+{
+  "name": "exact-admission-media-rich-r2",
+  "corpus": "media-rich",
+  "scenario": "exact-admission",
+  "repeat": "R2",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0428/capture/exact-admission-media-rich-r2-resource.log",
+    "/tmp/litchi-goal-0428-binaries/litchi-perf-baseline",
+    "cache-retention",
+    "--scenario",
+    "exact-admission",
+    "--corpus",
+    "media-rich",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "6d0dc4ff0d3f54b0afae09a3e8fe684593741478",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0428/capture/exact-admission-media-rich-r2.json"
+  ],
+  "revision": "6d0dc4ff0d3f54b0afae09a3e8fe684593741478",
+  "binary_sha256": "2f85c419ea29ecb771bffca19c0b1a5f866fbaad80c93651c7b06b5ef68b5c43",
+  "protocol_sha256": "418fe2143a2d822cee91db7b4168363adfe50137c839337bc4ce752fef9490f0",
+  "started_utc": "2026-09-05T22:25:59.642901+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T22:26:07.874588+00:00",
+  "artifacts": {
+    "capture/exact-admission-media-rich-r2.json": {
+      "sha256": "c533a87c5e6dd664e678bde58f7cb6ab63cafb225d90822023d7c694f08323a4",
+      "bytes": 861293
+    },
+    "capture/exact-admission-media-rich-r2.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "capture/exact-admission-media-rich-r2-resource.log": {
+      "sha256": "da145ccd8f352b947f23c7e510d47192c893af7290297444fc3b15e0392e44d6",
+      "bytes": 1032
+    }
+  }
+}

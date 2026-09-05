@@ -1,0 +1,50 @@
+{
+  "name": "pinned-eviction-media-rich-r1",
+  "corpus": "media-rich",
+  "scenario": "pinned-eviction",
+  "repeat": "R1",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0428/capture/pinned-eviction-media-rich-r1-resource.log",
+    "/tmp/litchi-goal-0428-binaries/litchi-perf-baseline",
+    "cache-retention",
+    "--scenario",
+    "pinned-eviction",
+    "--corpus",
+    "media-rich",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "6d0dc4ff0d3f54b0afae09a3e8fe684593741478",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0428/capture/pinned-eviction-media-rich-r1.json"
+  ],
+  "revision": "6d0dc4ff0d3f54b0afae09a3e8fe684593741478",
+  "binary_sha256": "2f85c419ea29ecb771bffca19c0b1a5f866fbaad80c93651c7b06b5ef68b5c43",
+  "protocol_sha256": "418fe2143a2d822cee91db7b4168363adfe50137c839337bc4ce752fef9490f0",
+  "started_utc": "2026-09-05T22:23:52.266689+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T22:24:00.273503+00:00",
+  "artifacts": {
+    "capture/pinned-eviction-media-rich-r1.json": {
+      "sha256": "53371649341ad6365455f45f68a3506ef1272b22f250a688b40642dc1fd3f7c1",
+      "bytes": 1142063
+    },
+    "capture/pinned-eviction-media-rich-r1.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "capture/pinned-eviction-media-rich-r1-resource.log": {
+      "sha256": "db76fbbbebb11289bd8b72860792530ef5d1ec9ec5f8ee7883fb3c45504ff1c1",
+      "bytes": 1032
+    }
+  }
+}

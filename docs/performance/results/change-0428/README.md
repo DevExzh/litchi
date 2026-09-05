@@ -5,6 +5,13 @@ captures their cache, budget, source-read, and process-RSS observations. It
 does not implement or claim a workload optimization. The allocator checkpoint
 results in 0427 remain a separate experiment.
 
+Implementation revision: `6d0dc4ff0d3f54b0afae09a3e8fe684593741478`. The completed
+release capture retains 480 samples and 5,460 phase points. Every final
+releasable caller budget is zero, and non-RSS numeric phase observations match
+within and across repeats. All 27 repeat flags are process RSS points; see
+[resource-review.md](resource-review.md) for their retained, non-causal
+interpretation and [resource-audit.json](resource-audit.json) for derived checks.
+
 `protocol.json` specifies two repeats of eight lanes, with thirty retained
 samples and three warmups in each fresh release process. Plain and media-rich
 cross-copy lifecycles share the existing deterministic corpus builders and
@@ -32,6 +39,8 @@ one-sample debug executions of the lifecycle-only implementation, bound to
 `checks/debug-lifecycle-build.json`. Their schema predates the final resource
 rows. They are retained as development history and are excluded from formal
 release counts and final-schema validation.
+The one-under control and the failed/verified CLI preflight directories likewise
+remain outside formal release counts.
 
 Reproduction after the implementation commit:
 
@@ -56,6 +65,11 @@ corpus identities, command receipts, all raw observations, summary derivation,
 and the full file inventory. `seal.py` compresses logs losslessly with original
 and stored hashes. Cleanup removes only the hash-bound copied executable and
 preserves both existing target directories.
+
+The recorded portable replays before and after cleanup passed all 16 formal reports and
+272 formal mutation probes, plus changed-output and pinned-validator rejection
+checks. `cleanup.json` records removal of the hash-bound temporary executable
+and preservation of the original build executable and both target directories.
 
 The global performance goal remains open. See `next-work.md` for the next
 evidence gap; no latency, throughput, physical-copy, allocator, general leak,

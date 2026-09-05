@@ -1,0 +1,26 @@
+{
+  "revision": "6d0dc4ff0d3f54b0afae09a3e8fe684593741478",
+  "baseline_revision": "fad708fc19e76de6ddb192995203dc525521cc92",
+  "build_receipt": "checks/release-build.json",
+  "build_receipt_sha256": "967e44d21dcd0016b7a60fdbb5376c67fe7af8c184a5e2a390210649626bc47e",
+  "source_manifest": {
+    "path": "sources/7eef7c63e4568b2b9ebb1ed333197d23ca7f821b57ee7f383b8e2eab0888a6cf.json",
+    "sha256": "7eef7c63e4568b2b9ebb1ed333197d23ca7f821b57ee7f383b8e2eab0888a6cf",
+    "files": 6630
+  },
+  "original_binary": "tools/perf-baseline/target/release/litchi-perf-baseline",
+  "capture_binary": "/tmp/litchi-goal-0428-binaries/litchi-perf-baseline",
+  "binary_sha256": "2f85c419ea29ecb771bffca19c0b1a5f866fbaad80c93651c7b06b5ef68b5c43",
+  "binary_bytes": 450873016,
+  "protocol_sha256": "418fe2143a2d822cee91db7b4168363adfe50137c839337bc4ce752fef9490f0",
+  "planned_checks_sha256": "8afa0152a004449cffde148bdde7bfea0d4185baf58cab402ef89e293e3e6a35",
+  "machine_sha256": "dc414a70c6bda3d5df22ab47035dcd3d5c8d92f898972e820693d51d983ebaa9",
+  "capture_driver_sha256": "f5cc64b4943935e39315907489ce6f27d04889c5dc656cc8d0430b81a9005899",
+  "verifier_sha256": "786490fa4739673a58a4fde5b4078370f2585d18e919c1561f23c491c76c83c5",
+  "probe_sha256": "5cfbf2735e301f59e60da6593468c915e64eafadc49ba408843b652842b4e26f",
+  "summary_driver_sha256": "7bb8d2065e2d05abc4dbc5ced1e8b5f243128a2a28a8473753a4ad1096504e8f",
+  "strict_comparison_driver_sha256": "51e3bf7b65e6d37823fa1c506c9f089e5f2d4dc95d69e3f7f559ea883093a86a",
+  "rust_toolchain": "1.98.1",
+  "profile": "release",
+  "scope": "one frozen diagnostic build; no production optimization or before/after speedup"
+}
