@@ -1,0 +1,265 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline-alloc",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "system_allocator_operation_scoped"
+  },
+  "binary_identity": {
+    "path": "/tmp/litchi-goal-0417-allocator",
+    "binary_sha256": "ff153a4b154c2770673ee166919a01a84f64eaa31aecba17e46f1d8c76bf7491",
+    "binary_bytes": 450143784,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1011-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "2",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 3,
+    "filesystem_cache_states": [
+      "warm"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "xlsx_one_cell_commit"
+    ],
+    "corpus_shapes": [
+      "many-small"
+    ],
+    "payload_kinds": [
+      "compressible"
+    ],
+    "writer_shapes": [
+      "large"
+    ],
+    "xlsx_shapes": [
+      "medium"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium"
+    ],
+    "semantic_shapes": [
+      "medium"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "xlsx_one_cell_commit",
+        "corpus_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "xlsx_one_cell_commit",
+      "corpus": {
+        "name": "xlsx-medium",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 4096,
+        "archive_member_count": 9,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 16384,
+        "archive_bytes": 15254,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 32,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          3548275,
+          3548885,
+          3550745,
+          3551485,
+          3552425,
+          3552625,
+          3553285,
+          3554025,
+          3554305,
+          3554526,
+          3555375,
+          3555745,
+          3558125,
+          3558425,
+          3558635,
+          3558775,
+          3559115,
+          3559135,
+          3559335,
+          3560055,
+          3560615,
+          3561405,
+          3561725,
+          3562126,
+          3562256,
+          3563415,
+          3566985,
+          3567235,
+          3569065,
+          3590725
+        ],
+        "sample_order": [
+          15,
+          3,
+          19,
+          10,
+          8,
+          14,
+          26,
+          24,
+          27,
+          9,
+          22,
+          7,
+          25,
+          6,
+          21,
+          23,
+          29,
+          11,
+          28,
+          2,
+          1,
+          4,
+          18,
+          0,
+          20,
+          17,
+          5,
+          13,
+          12,
+          16
+        ],
+        "min": 3548275,
+        "p50": 3558705,
+        "p95": 3569065,
+        "p99": 3590725,
+        "max": 3590725,
+        "mean": 3558961.7666666666,
+        "standard_deviation": 7979.649351397841,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 3555982.451190244,
+          "upper": 3561941.0821430893
+        }
+      },
+      "sink": null
+    }
+  ],
+  "corpus_catalog": {
+    "manifest_version": 2,
+    "catalog_id": "litchi-perf-corpus-v2",
+    "catalog_sha256": "2ac2eaa3f483c4d2ec73a53561cd237c1cefd4aafe5435af49f9d58c19ec3e65",
+    "content_set_sha256": "70314e9ecb7fb258cab6afd4fe8b3e0d3a0d4961f178708fc271eb38bd5e08d6"
+  }
+}

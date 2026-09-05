@@ -1,0 +1,1073 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline-alloc",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "system_allocator_operation_scoped"
+  },
+  "binary_identity": {
+    "path": "/tmp/litchi-goal-0417-allocator",
+    "binary_sha256": "ff153a4b154c2770673ee166919a01a84f64eaa31aecba17e46f1d8c76bf7491",
+    "binary_bytes": 450143784,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1011-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "2",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 3,
+    "filesystem_cache_states": [
+      "warm"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "xlsx_three_way_disjoint_commit_save"
+    ],
+    "corpus_shapes": [
+      "many-small"
+    ],
+    "payload_kinds": [
+      "compressible"
+    ],
+    "writer_shapes": [
+      "large"
+    ],
+    "xlsx_shapes": [
+      "medium"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium"
+    ],
+    "semantic_shapes": [
+      "medium"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "xlsx_three_way_disjoint_commit_save",
+        "corpus_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "xlsx_three_way_disjoint_commit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-medium",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231168,
+        "archive_bytes": 4226429,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          16230149,
+          16241669,
+          16250799,
+          16258078,
+          16258809,
+          16261009,
+          16263279,
+          16266339,
+          16269419,
+          16276979,
+          16279278,
+          16290629,
+          16292099,
+          16292118,
+          16295649,
+          16296478,
+          16298099,
+          16298869,
+          16303729,
+          16307159,
+          16308349,
+          16316379,
+          16319229,
+          16319979,
+          16328859,
+          16335559,
+          16341069,
+          16341509,
+          16346469,
+          16391839
+        ],
+        "sample_order": [
+          1,
+          7,
+          3,
+          5,
+          24,
+          23,
+          17,
+          8,
+          9,
+          28,
+          16,
+          10,
+          0,
+          13,
+          27,
+          6,
+          2,
+          11,
+          4,
+          14,
+          26,
+          18,
+          25,
+          22,
+          21,
+          15,
+          12,
+          20,
+          29,
+          19
+        ],
+        "min": 16230149,
+        "p50": 16296063,
+        "p95": 16346469,
+        "p99": 16391839,
+        "max": 16391839,
+        "mean": 16295995.866666667,
+        "standard_deviation": 35764.21033681719,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 16282642.790526818,
+          "upper": 16309348.942806516
+        }
+      },
+      "sink": {
+        "accepted_bytes": 4226482,
+        "write_calls": 203,
+        "largest_write": 32768,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 71,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 4,
+          "bytes_16385_to_65536": 128,
+          "bytes_over_65536": 0
+        }
+      },
+      "source": {
+        "read_calls": [],
+        "read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "ordinary_payload_read_bytes": [],
+        "max_in_flight_reads": [],
+        "xlsx_edit_composition": {
+          "implementation": "owned-workbook",
+          "operation": "xlsx_three_way_disjoint_commit_save",
+          "timing_scope": "prepared branches outside timer; timed three-way plan, finish, commit, and 64 KiB write-call-bounded sequential write_to",
+          "performance_claim": "correctness-and-phase evidence only; no latency or speedup claim",
+          "shape": "medium",
+          "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "source_bytes": 4226429,
+          "expected_output_sha256": "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+          "expected_output_bytes": 4226482,
+          "left_effect_count": 1,
+          "right_effect_count": 1,
+          "automatic_branch_count": 2,
+          "conflict_count": 0,
+          "branch_preparation_untimed": true,
+          "branch_preparation_concurrent": true,
+          "output_sha256": [
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+            "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2"
+          ],
+          "join_ns": [],
+          "plan_ns": [
+            16300,
+            16860,
+            16611,
+            17181,
+            16060,
+            17850,
+            17790,
+            17550,
+            18000,
+            18070,
+            17360,
+            16950,
+            17430,
+            17900,
+            18300,
+            17700,
+            16580,
+            17440,
+            18040,
+            16980,
+            17420,
+            17410,
+            18070,
+            18060,
+            18240,
+            18171,
+            17850,
+            17710,
+            17740,
+            17600
+          ],
+          "resolve_ns": [],
+          "finish_ns": [
+            5740,
+            5820,
+            5720,
+            6140,
+            5970,
+            5960,
+            5860,
+            5780,
+            6170,
+            5990,
+            6260,
+            5900,
+            5950,
+            5810,
+            5850,
+            6320,
+            5830,
+            6130,
+            6010,
+            5710,
+            6100,
+            5910,
+            6100,
+            5720,
+            6260,
+            5620,
+            5580,
+            6000,
+            6250,
+            6190
+          ],
+          "commit_ns": [
+            12939385,
+            12898715,
+            12962994,
+            12930044,
+            12959745,
+            12929724,
+            12933604,
+            12905965,
+            12940195,
+            12937235,
+            12958525,
+            12968775,
+            12996025,
+            12954534,
+            12975125,
+            13007395,
+            12936654,
+            12939955,
+            12963344,
+            13053265,
+            12986985,
+            12992065,
+            12995415,
+            12929165,
+            12918885,
+            12982354,
+            12978675,
+            12952704,
+            12950095,
+            13017185
+          ],
+          "publication_ns": [
+            3330674,
+            3308754,
+            3312774,
+            3297434,
+            3321954,
+            3304544,
+            3339224,
+            3312374,
+            3301974,
+            3308124,
+            3308484,
+            3307244,
+            3321664,
+            3313874,
+            3307884,
+            3304144,
+            3320214,
+            3299754,
+            3328985,
+            3315884,
+            3331004,
+            3313474,
+            3300394,
+            3308064,
+            3315424,
+            3313084,
+            3306244,
+            3319235,
+            3302894,
+            3305494
+          ],
+          "reopen_ns": [
+            15857687,
+            15817237,
+            15785137,
+            15936237,
+            15878127,
+            15770017,
+            15812437,
+            15797906,
+            15873337,
+            15858327,
+            15809527,
+            15823777,
+            15817977,
+            15736616,
+            15799936,
+            15883027,
+            15834586,
+            15951868,
+            15846937,
+            15945938,
+            15771887,
+            15773526,
+            15794957,
+            15842126,
+            15732827,
+            15770417,
+            15769077,
+            15961947,
+            15914877,
+            16017087
+          ],
+          "gates": {
+            "source_immutability_verified": true,
+            "branch_lineage_verified": true,
+            "different_snapshot_refusal_verified": true,
+            "disjoint_composition_verified": true,
+            "conflict_refusal_verified": false,
+            "three_way_conflict_verified": false,
+            "explicit_resolution_verified": false,
+            "durable_patch_deterministic_verified": true,
+            "durable_forward_verified": true,
+            "durable_inverse_verified": true,
+            "stale_source_refusal_verified": true,
+            "foreign_source_refusal_verified": true,
+            "exact_noop_verified": true,
+            "empty_join_identity_verified": true,
+            "exact_output_verified": true,
+            "semantic_reopen_verified": true,
+            "sink_write_bound_verified": true
+          }
+        }
+      },
+      "output_sha256": "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+      "operation_metrics": {
+        "sample_count": 30,
+        "sample_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29
+        ],
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "latency_claim": "comparable_timed_operation",
+        "source": {
+          "status": "not_applicable",
+          "counter_scope": "not_applicable_in_process_sink",
+          "logical_read_calls": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_pattern": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at_range_order_not_physical_io"
+          },
+          "compressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary"
+          },
+          "decompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary"
+          },
+          "recompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary"
+          },
+          "max_concurrent_reads": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          }
+        },
+        "process": {
+          "status": "not_applicable",
+          "user_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "system_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "clock_ticks_per_second": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "minor_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "major_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "voluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "nonvoluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "rss_delta_bytes": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta_not_peak"
+          },
+          "peak_rss_bytes": {
+            "status": "not_applicable",
+            "scope": "process_lifetime_high_water_after_not_operation_peak"
+          },
+          "rchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "wchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "read_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "cancelled_write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscr": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscw": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          }
+        },
+        "sink": {
+          "status": "not_applicable",
+          "output_bytes": {
+            "status": "not_applicable",
+            "scope": "post_operation_output_length_not_sink_write_volume"
+          },
+          "write_status": "measured",
+          "accepted_bytes": {
+            "values": [
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482,
+              4226482
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_bytes"
+          },
+          "write_calls": {
+            "values": [
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203,
+              203
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_calls"
+          },
+          "largest_write": {
+            "values": [
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768
+            ],
+            "status": "measured",
+            "scope": "logical_sink_largest_accepted_write"
+          },
+          "write_size_buckets": {
+            "status": "measured",
+            "bytes_0": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_1_to_512": {
+              "values": [
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71,
+                71
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_513_to_4096": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_4097_to_16384": {
+              "values": [
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_16385_to_65536": {
+              "values": [
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128,
+                128
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_over_65536": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            }
+          }
+        },
+        "publication": {
+          "status": "not_applicable",
+          "changed_spans": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          },
+          "published_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          }
+        },
+        "materialization": {
+          "status": "not_applicable",
+          "opc_parts": {
+            "status": "not_applicable",
+            "scope": "logical_materialization_counter"
+          }
+        },
+        "cfb_phases": {
+          "status": "not_applicable",
+          "open": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "atomic_publication": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "corpus_catalog": {
+    "manifest_version": 2,
+    "catalog_id": "litchi-perf-corpus-v2",
+    "catalog_sha256": "be53a4577069b1c15616000eedbbf95ea868f31f5fa9a38a410fe67f9afd2996",
+    "content_set_sha256": "595d1f7c4593d0920380cf118f7baf4b5f5012cf34956a22592db113a1e10f58"
+  }
+}

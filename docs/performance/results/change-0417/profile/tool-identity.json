@@ -1,0 +1,8 @@
+{
+  "path": "/usr/bin/perf",
+  "sha256": "94b3ed36eeedf585d88fedd326fb616f662223193dddbf6d48d2df1cced69009",
+  "bytes": 25221960,
+  "version": "perf version 7.0.14",
+  "captured_utc": "2026-09-05T06:26:45.019135+00:00",
+  "note": "Profile header and current executable identify 7.0.14; earlier environment snapshot recorded 7.0.12. Both retained."
+}

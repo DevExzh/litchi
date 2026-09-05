@@ -1,0 +1,401 @@
+{
+  "scope": "Whole profiled command and descendants, including setup, preflight, warmups, verification and reporting; periods are event weights, not elapsed time",
+  "samples": 33347,
+  "total_period": 145622149815,
+  "lost_samples": 0,
+  "unresolved_leaf_percent": 0.4790475150148778,
+  "leaf": [
+    {
+      "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+      "period": 73784638692,
+      "percent": 50.668554739603024
+    },
+    {
+      "symbol": "sha2::sha256::x86_sha::compress",
+      "period": 30088020088,
+      "percent": 20.661705740661127
+    },
+    {
+      "symbol": "zlib_rs::deflate::longest_match::longest_match",
+      "period": 23419240087,
+      "percent": 16.082196366934607
+    },
+    {
+      "symbol": "<zlib_rs::deflate::Heap>::pqdownheap",
+      "period": 5717671915,
+      "percent": 3.926375158081236
+    },
+    {
+      "symbol": "__memmove_avx512_unaligned_erms",
+      "period": 4028844253,
+      "percent": 2.766642477204387
+    },
+    {
+      "symbol": "crc32fast::specialized::pclmulqdq::calculate",
+      "period": 2034905272,
+      "percent": 1.3973871932155695
+    },
+    {
+      "symbol": "__memcmp_evex_movbe",
+      "period": 1408617590,
+      "percent": 0.9673099812010216
+    },
+    {
+      "symbol": "__memset_avx512_unaligned_erms",
+      "period": 749509489,
+      "percent": 0.5146947012883584
+    },
+    {
+      "symbol": "[unknown]",
+      "period": 697599290,
+      "percent": 0.4790475150148778
+    },
+    {
+      "symbol": "zlib_rs::deflate::flush_block_only",
+      "period": 600164805,
+      "percent": 0.41213840460565654
+    },
+    {
+      "symbol": "zlib_rs::deflate::gen_codes",
+      "period": 360598183,
+      "percent": 0.24762591642693638
+    },
+    {
+      "symbol": "zlib_rs::deflate::slide_hash::avx2::slide_hash_chain",
+      "period": 343019099,
+      "percent": 0.23555420616697068
+    },
+    {
+      "symbol": "<zlib_rs::deflate::Heap>::construct_huffman_tree",
+      "period": 312757613,
+      "percent": 0.2147733798720392
+    },
+    {
+      "symbol": "litchi_perf_baseline::payload_bytes",
+      "period": 204972491,
+      "percent": 0.14075639678469198
+    },
+    {
+      "symbol": "zlib_rs::deflate::scan_tree",
+      "period": 149621635,
+      "percent": 0.1027464813492185
+    },
+    {
+      "symbol": "litchi_pptx::opened::cross_copy_plan::dialect_namespace_flags",
+      "period": 105436831,
+      "percent": 0.07240439118221241
+    },
+    {
+      "symbol": "zlib_rs::inflate::inflate",
+      "period": 96348789,
+      "percent": 0.0661635534995209
+    },
+    {
+      "symbol": "_int_malloc",
+      "period": 94176339,
+      "percent": 0.06467171314229508
+    },
+    {
+      "symbol": "<quick_xml::events::attributes::IterState>::next",
+      "period": 71106976,
+      "percent": 0.04882978042168385
+    },
+    {
+      "symbol": "zlib_rs::inflate::inflate_fast_help_avx2",
+      "period": 68953574,
+      "percent": 0.04735102049214312
+    }
+  ],
+  "inclusive_ancestors": [
+    {
+      "symbol": "__libc_start_main@@GLIBC_2.34",
+      "period": 145536905358,
+      "percent": 99.94146188810679
+    },
+    {
+      "symbol": "__libc_start_call_main",
+      "period": 145536905358,
+      "percent": 99.94146188810679
+    },
+    {
+      "symbol": "_start",
+      "period": 145513646474,
+      "percent": 99.92548980966299
+    },
+    {
+      "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>",
+      "period": 145511169903,
+      "percent": 99.92378912676335
+    },
+    {
+      "symbol": "litchi_perf_baseline::run",
+      "period": 145511169903,
+      "percent": 99.92378912676335
+    },
+    {
+      "symbol": "std::rt::lang_start_internal",
+      "period": 145511169903,
+      "percent": 99.92378912676335
+    },
+    {
+      "symbol": "main",
+      "period": 145511169903,
+      "percent": 99.92378912676335
+    },
+    {
+      "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}",
+      "period": 145511169903,
+      "percent": 99.92378912676335
+    },
+    {
+      "symbol": "litchi_perf_baseline::run_pptx_cross_copy",
+      "period": 127948989776,
+      "percent": 87.86368690377654
+    },
+    {
+      "symbol": "<zlib_rs::stable::Deflate>::compress_uninit",
+      "period": 105676515266,
+      "percent": 72.5689844575517
+    },
+    {
+      "symbol": "<flate2::mem::Compress as flate2::zio::Ops>::run_vec",
+      "period": 105676515266,
+      "percent": 72.5689844575517
+    },
+    {
+      "symbol": "zlib_rs::deflate::deflate",
+      "period": 105676504136,
+      "percent": 72.56897681448365
+    },
+    {
+      "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+      "period": 104933590066,
+      "percent": 72.05881124492998
+    },
+    {
+      "symbol": "soapberry_zip::preserve::generated_entry",
+      "period": 104436130643,
+      "percent": 71.71720152166193
+    },
+    {
+      "symbol": "<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all",
+      "period": 102668106673,
+      "percent": 70.50308404554575
+    },
+    {
+      "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare",
+      "period": 102368934707,
+      "percent": 70.29764004792584
+    },
+    {
+      "symbol": "<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status",
+      "period": 102259334072,
+      "percent": 70.2223763362314
+    },
+    {
+      "symbol": "litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides",
+      "period": 70115382667,
+      "percent": 48.14884463392098
+    },
+    {
+      "symbol": "<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan",
+      "period": 66318364205,
+      "percent": 45.54139894875305
+    },
+    {
+      "symbol": "litchi_pptx::opened::cross_copy_plan::build_candidate",
+      "period": 58601448069,
+      "percent": 40.24212535211706
+    },
+    {
+      "symbol": "litchi_pptx::opened::cross_copy_plan::bounded_package_bytes",
+      "period": 53639271791,
+      "percent": 36.83455563535075
+    },
+    {
+      "symbol": "<litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>",
+      "period": 53489743876,
+      "percent": 36.73187351234271
+    },
+    {
+      "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>",
+      "period": 53437020143,
+      "percent": 36.695667665177986
+    },
+    {
+      "symbol": "litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint",
+      "period": 36767813762,
+      "percent": 25.248778299668174
+    },
+    {
+      "symbol": "<litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>",
+      "period": 36680040714,
+      "percent": 25.188503782287743
+    },
+    {
+      "symbol": "<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>",
+      "period": 35581564618,
+      "percent": 24.434170669230756
+    },
+    {
+      "symbol": "sha2::sha256::x86_sha::compress",
+      "period": 30157613512,
+      "percent": 20.709496151727308
+    },
+    {
+      "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>>>",
+      "period": 27710291104,
+      "percent": 19.028898515235124
+    },
+    {
+      "symbol": "<litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_perf_baseline::CountingSink>",
+      "period": 23993066878,
+      "percent": 16.47624822767763
+    },
+    {
+      "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_perf_baseline::CountingSink>>>",
+      "period": 23966626599,
+      "percent": 16.458091457547816
+    },
+    {
+      "symbol": "zlib_rs::deflate::longest_match::longest_match",
+      "period": 23493933362,
+      "percent": 16.13348889014958
+    },
+    {
+      "symbol": "litchi_pptx::opened::model::package_fingerprint",
+      "period": 16617729524,
+      "percent": 11.411539758966166
+    },
+    {
+      "symbol": "litchi_pptx::opened::model::feed",
+      "period": 16608934399,
+      "percent": 11.405500069941404
+    },
+    {
+      "symbol": "litchi_perf_baseline::build_pptx_cross_copy_corpus",
+      "period": 16456250437,
+      "percent": 11.300650661939962
+    },
+    {
+      "symbol": "litchi_pptx::opened::model::capture_with_provenance",
+      "period": 11297282564,
+      "percent": 7.757942441003785
+    },
+    {
+      "symbol": "<litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter as std::io::Write>::write",
+      "period": 10763092954,
+      "percent": 7.391109778061615
+    },
+    {
+      "symbol": "litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates",
+      "period": 8351624948,
+      "percent": 5.735133672047829
+    },
+    {
+      "symbol": "zlib_rs::deflate::flush_block_only",
+      "period": 7294402108,
+      "percent": 5.009129529585224
+    },
+    {
+      "symbol": "<zlib_rs::deflate::Heap>::pqdownheap",
+      "period": 5726476733,
+      "percent": 3.9324215033736145
+    },
+    {
+      "symbol": "<zlib_rs::deflate::Heap>::construct_huffman_tree",
+      "period": 5432710649,
+      "percent": 3.730689772058561
+    }
+  ],
+  "deflate_leaf_percent": 71.92921253055874,
+  "counters": {
+    "cycles": {
+      "raw": "149675617732",
+      "unit": "",
+      "counter_runtime_ns": 28837388496,
+      "running_percent": 83.0,
+      "status": "measured",
+      "value": 149675617732.0
+    },
+    "instructions": {
+      "raw": "356866231769",
+      "unit": "",
+      "counter_runtime_ns": 28833640491,
+      "running_percent": 83.0,
+      "status": "measured",
+      "value": 356866231769.0
+    },
+    "branches": {
+      "raw": "55830488489",
+      "unit": "",
+      "counter_runtime_ns": 28842731268,
+      "running_percent": 83.0,
+      "status": "measured",
+      "value": 55830488489.0
+    },
+    "branch-misses": {
+      "raw": "1284393039",
+      "unit": "",
+      "counter_runtime_ns": 28841566056,
+      "running_percent": 83.0,
+      "status": "measured",
+      "value": 1284393039.0
+    },
+    "L1-dcache-loads": {
+      "raw": "0",
+      "unit": "",
+      "counter_runtime_ns": 28839019488,
+      "running_percent": 83.0,
+      "status": "unvalidated_alias_zero_not_a_measurement"
+    },
+    "L1-dcache-load-misses": {
+      "raw": "0",
+      "unit": "",
+      "counter_runtime_ns": 28808924861,
+      "running_percent": 83.0,
+      "status": "unvalidated_alias_zero_not_a_measurement"
+    },
+    "LLC-loads": {
+      "raw": "<not supported>",
+      "unit": "",
+      "counter_runtime_ns": 0,
+      "running_percent": 100.0,
+      "status": "unavailable"
+    },
+    "LLC-load-misses": {
+      "raw": "<not supported>",
+      "unit": "",
+      "counter_runtime_ns": 0,
+      "running_percent": 100.0,
+      "status": "unavailable"
+    },
+    "page-faults": {
+      "raw": "1008024",
+      "unit": "",
+      "counter_runtime_ns": 34600654132,
+      "running_percent": 100.0,
+      "status": "measured",
+      "value": 1008024.0
+    },
+    "task-clock": {
+      "raw": "34600.65",
+      "unit": "msec",
+      "counter_runtime_ns": 34600654132,
+      "running_percent": 100.0,
+      "status": "measured",
+      "value": 34600.65
+    }
+  },
+  "whole_command_ipc": 2.3842642988651823,
+  "whole_command_branch_miss_percent": 2.300522660218274,
+  "perf_version": "perf version 7.0.14",
+  "bindings": {
+    "script.txt": "6c815b96fda1891e59f7244839b73ca90de82236958b25ecffc6ab7f51f75db4",
+    "self.txt": "b967a0346636102d217a1444cc58e560dd90ae0585657a8af733caddec52f84d",
+    "stat.csv": "b0c42dc1e1bcffed02b7ab0e5f4d2149133a4eb32c7797427af477d5b82c37bc",
+    "record-command.json": "142fd4fe4221bcccd7dd7c49f26db18aaa590fe1d70d20faee32b3fef270355a",
+    "stat-command.json": "56feefc42b0a93bb1a1950c3dc6c4b2307fe7fa718cbc168257203332cbd55e4"
+  },
+  "performance_claim": "none"
+}

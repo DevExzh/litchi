@@ -1,0 +1,199 @@
+{
+  "taxonomy_sha256": "d3a63f3aa001ad6e3dda7627b6294230ae87b3b5aaa595c45c3327e026dbf02a",
+  "index_sha256": "dad2070de12931c3a1d3043ed9d98ff773d32ff95740b4196483c8482f84c4ff",
+  "scope": "current-revision timing of existing representative selectors; not exhaustive per-format certification",
+  "jobs": [
+    {
+      "selector": "xlsx_full_cell_scan",
+      "category": "content-reading-extraction",
+      "index_status": "measured"
+    },
+    {
+      "selector": "xlsx_list_sheets",
+      "category": "structural-queries-analysis",
+      "index_status": "measured"
+    },
+    {
+      "selector": "rtf_semantic_text_to_sink",
+      "category": "conversion-export",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "odt_semantic_text_to_sink",
+      "category": "conversion-export",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "ods_semantic_text_to_sink",
+      "category": "conversion-export",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "odp_semantic_text_to_sink",
+      "category": "conversion-export",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "doc_fresh_write_to",
+      "category": "creation-from-scratch",
+      "index_status": "measured"
+    },
+    {
+      "selector": "xls_fresh_write_to",
+      "category": "creation-from-scratch",
+      "index_status": "measured"
+    },
+    {
+      "selector": "ppt_fresh_write_to",
+      "category": "creation-from-scratch",
+      "index_status": "measured"
+    },
+    {
+      "selector": "xlsx_one_cell_commit",
+      "category": "template-filling-targeted-replacement",
+      "index_status": "measured"
+    },
+    {
+      "selector": "xlsx_one_percent_commit",
+      "category": "template-filling-targeted-replacement",
+      "index_status": "measured"
+    },
+    {
+      "selector": "xlsx_streaming_create",
+      "category": "append-incremental-generation",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "rtf_streaming_create",
+      "category": "append-incremental-generation",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "xlsx_eager_defined_names_edit_save",
+      "category": "structural-editing",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "xlsx_eager_row_visibility_edit_save",
+      "category": "structural-editing",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "xlsx_eager_cell_remove_edit_save",
+      "category": "content-deletion-sanitization",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "docx_story_hyperlink_redaction_save",
+      "category": "content-deletion-sanitization",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "pptx_source_backed_cross_copy_plain",
+      "category": "cross-document-copying-assembly",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "pptx_cross_copy_media_rich",
+      "category": "cross-document-copying-assembly",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "xlsx_eager_merge_commit_save",
+      "category": "merging-splitting",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "rtf_semantic_split_paragraph_save",
+      "category": "merging-splitting",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "xlsx_join_disjoint_commit_save",
+      "category": "comparison-patching-three-way-merge",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "xlsx_three_way_disjoint_commit_save",
+      "category": "comparison-patching-three-way-merge",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "odf_validation_report",
+      "category": "validation-repair-normalization",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "odf_mimetype_repair_plan",
+      "category": "validation-repair-normalization",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "xls_validation_report",
+      "category": "security-protection-encryption-signing",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "xlsx_eager_sheet_protection_edit_save",
+      "category": "security-protection-encryption-signing",
+      "index_status": "correctness-only"
+    },
+    {
+      "selector": "cfb_list_streams",
+      "category": "low-level-package-part-relationship-stream-extension",
+      "index_status": "measured"
+    },
+    {
+      "selector": "cfb_read_one",
+      "category": "low-level-package-part-relationship-stream-extension",
+      "index_status": "measured"
+    },
+    {
+      "selector": "opc_open",
+      "category": "low-level-package-part-relationship-stream-extension",
+      "index_status": "measured"
+    }
+  ],
+  "unsupported": [
+    {
+      "id": "dynamic-content-calculation-refresh",
+      "name": "Dynamic content calculation and refresh",
+      "checklist_refs": [
+        "Formula behavior is capability-bound",
+        "External targets remain inert"
+      ],
+      "status": "unsupported",
+      "measurement": {
+        "kind": "unsupported",
+        "reason": "No selector-backed evidence is claimed; explicit capability is required."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "status": "unsupported",
+          "reason": "No selector evaluates formulas or refreshes external content; those operations require an explicit caller capability and remain outside the inert performance harness."
+        }
+      ]
+    }
+  ],
+  "common_flags": [
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm"
+  ]
+}

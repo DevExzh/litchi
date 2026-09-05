@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0417: current representative CRUD baseline
+
+[0417](changes/0417-representative-crud-baseline.md) retains all 30 existing
+representative selectors across 14 executable CRUD categories at clean revision
+`b10d6c25a13242ca260a8c897946f4d80ae06c61`. Two 500-sample normal processes
+and two separate 30-sample allocator processes per selector provide 30,000
+normal and 1,800 instrumented observations, plus 30 preflight reports. CPU 2,
+warm generated in-memory sources and per-selector timer boundaries are explicit.
+
+The [table](results/change-0417/baseline-table.md) keeps both repeats and five
+selectors with >5% quantile drift. Media-rich PPTX p50 is approximately 1.152 s;
+this is descriptive evidence, not a speedup. Only RTF streaming and DOCX story
+hyperlink redaction emit allocation attribution; 28 selectors remain unavailable.
+The default matrix and coverage-index statuses are unchanged. Full lifecycle,
+cold/remote, native and scaling coverage remain open.
+
 ## Change 0413: exact CFB scratch reservation
 
 [0413](changes/0413-cfb-chain-scratch-reservation.md) removes a redundant

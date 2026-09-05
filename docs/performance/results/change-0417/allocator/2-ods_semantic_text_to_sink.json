@@ -1,0 +1,821 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline-alloc",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "system_allocator_operation_scoped"
+  },
+  "binary_identity": {
+    "path": "/tmp/litchi-goal-0417-allocator",
+    "binary_sha256": "ff153a4b154c2770673ee166919a01a84f64eaa31aecba17e46f1d8c76bf7491",
+    "binary_bytes": 450143784,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1011-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "2",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 3,
+    "filesystem_cache_states": [
+      "warm"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "ods_semantic_text_to_sink"
+    ],
+    "corpus_shapes": [
+      "many-small"
+    ],
+    "payload_kinds": [
+      "compressible"
+    ],
+    "writer_shapes": [
+      "large"
+    ],
+    "xlsx_shapes": [
+      "medium"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium"
+    ],
+    "semantic_shapes": [
+      "medium"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "ods_semantic_text_to_sink",
+        "corpus_sha256": "e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "ods_semantic_text_to_sink",
+      "corpus": {
+        "name": "ods-semantic-medium",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 2048,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 110592,
+        "archive_bytes": 7011,
+        "archive_sha256": "e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          117661,
+          117710,
+          117791,
+          117851,
+          117911,
+          117960,
+          117990,
+          118010,
+          118021,
+          118021,
+          118030,
+          118030,
+          118050,
+          118051,
+          118060,
+          118061,
+          118070,
+          118090,
+          118100,
+          118101,
+          118110,
+          118111,
+          118131,
+          118140,
+          118190,
+          118201,
+          118210,
+          123991,
+          124581,
+          127331
+        ],
+        "sample_order": [
+          26,
+          27,
+          16,
+          28,
+          2,
+          21,
+          5,
+          29,
+          4,
+          8,
+          13,
+          19,
+          25,
+          24,
+          9,
+          18,
+          7,
+          11,
+          17,
+          0,
+          3,
+          10,
+          20,
+          1,
+          23,
+          12,
+          15,
+          14,
+          6,
+          22
+        ],
+        "min": 117661,
+        "p50": 118060,
+        "p95": 124581,
+        "p99": 127331,
+        "max": 127331,
+        "mean": 118752.16666666663,
+        "standard_deviation": 2272.78709477174,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 117903.58930845468,
+          "upper": 119600.74402487857
+        }
+      },
+      "sink": {
+        "accepted_bytes": 112639,
+        "write_calls": 4095,
+        "largest_write": 54,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 4095,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        },
+        "retained_output_bytes": 0
+      },
+      "output_sha256": "c10b977ef3c3b61ae9cc83c3f665022937559cabffd9f15ce6befdca2852e381",
+      "operation_metrics": {
+        "sample_count": 30,
+        "sample_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29
+        ],
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "latency_claim": "comparable_timed_operation",
+        "source": {
+          "status": "not_applicable",
+          "counter_scope": "not_applicable_in_process_sink",
+          "logical_read_calls": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_pattern": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at_range_order_not_physical_io"
+          },
+          "compressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary"
+          },
+          "decompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary"
+          },
+          "recompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary"
+          },
+          "max_concurrent_reads": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          }
+        },
+        "process": {
+          "status": "not_applicable",
+          "user_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "system_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "clock_ticks_per_second": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "minor_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "major_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "voluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "nonvoluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "rss_delta_bytes": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta_not_peak"
+          },
+          "peak_rss_bytes": {
+            "status": "not_applicable",
+            "scope": "process_lifetime_high_water_after_not_operation_peak"
+          },
+          "rchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "wchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "read_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "cancelled_write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscr": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscw": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          }
+        },
+        "sink": {
+          "status": "not_applicable",
+          "output_bytes": {
+            "status": "not_applicable",
+            "scope": "post_operation_output_length_not_sink_write_volume"
+          },
+          "write_status": "measured",
+          "accepted_bytes": {
+            "values": [
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639,
+              112639
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_bytes"
+          },
+          "write_calls": {
+            "values": [
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095,
+              4095
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_calls"
+          },
+          "largest_write": {
+            "values": [
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54,
+              54
+            ],
+            "status": "measured",
+            "scope": "logical_sink_largest_accepted_write"
+          },
+          "write_size_buckets": {
+            "status": "measured",
+            "bytes_0": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_1_to_512": {
+              "values": [
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095,
+                4095
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_513_to_4096": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_4097_to_16384": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_16385_to_65536": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_over_65536": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            }
+          }
+        },
+        "publication": {
+          "status": "not_applicable",
+          "changed_spans": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          },
+          "published_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          }
+        },
+        "materialization": {
+          "status": "not_applicable",
+          "opc_parts": {
+            "status": "not_applicable",
+            "scope": "logical_materialization_counter"
+          }
+        },
+        "cfb_phases": {
+          "status": "not_applicable",
+          "open": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "atomic_publication": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "corpus_catalog": {
+    "manifest_version": 2,
+    "catalog_id": "litchi-perf-corpus-v2",
+    "catalog_sha256": "b243c25da3ac33931714f084e457b5e0da6743cc4a3a61d027f6825cfcb17a32",
+    "content_set_sha256": "6f224f047f9e7129e19f81179075e7f2e08877dff9f06981aed699df4cbbaa28"
+  }
+}

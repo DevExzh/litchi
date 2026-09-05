@@ -1,0 +1,27 @@
+{
+  "change": 417,
+  "declared_utc": "2026-09-05T05:36:33.753510+00:00",
+  "classification": "descriptive single-revision representative CRUD baseline; no speedup or completion claim",
+  "normal": {
+    "repeats": 2,
+    "samples": 500,
+    "warmups": 20,
+    "order": "matrix order then reverse matrix order"
+  },
+  "allocator": {
+    "repeats": 2,
+    "samples": 30,
+    "warmups": 3,
+    "order": "matrix order then reverse matrix order",
+    "latency_comparison": "excluded",
+    "missing_instrumentation": "report unavailable; never substitute zero"
+  },
+  "cpu": 2,
+  "workers": 1,
+  "cache": "warm generated in-memory sources except explicit source path recorded per case; global filesystem setting does not prove filesystem work",
+  "process_scope": "fresh process per selector per repeat; warmups and samples share that process",
+  "isolation": "serialized against all task-owned builds/tests/profiling/analysis workloads; shared KVM background uncontrolled",
+  "statistics": "exact median and nearest rank p95/p99 per report; both repeats and >5percent drift flags retained; no causal cross-selector or cross-revision ranking claim",
+  "next_action": "profile expensive supported operations after validation; do not infer hot library code from setup-heavy whole-process profiles",
+  "matrix": "matrix.json"
+}

@@ -1,0 +1,14 @@
+{
+  "worktree_removed": "/tmp/litchi-goal-0417-worktree",
+  "removed": [
+    "/tmp/litchi-goal-0417-normal",
+    "/tmp/litchi-goal-0417-allocator",
+    "/tmp/litchi-goal-0417-build.py",
+    "/tmp/litchi-goal-0417-capture.py",
+    "/tmp/litchi-goal-0417-profile.py",
+    "/tmp/litchi-goal-0417-gates.py"
+  ],
+  "remaining_task_temps": [],
+  "user_goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "shared_targets_preserved": true
+}

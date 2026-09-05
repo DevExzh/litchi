@@ -1,5 +1,22 @@
 # Performance CRUD coverage
 
+## 2026-09-05: change 0417 captures the representative index
+
+[0417](changes/0417-representative-crud-baseline.md) adds current opt-in timing
+evidence for all 30 existing representative selectors across 14 executable
+categories, using two 500-sample normal and two 30-sample allocator processes
+per selector. All 120 formal report/catalog pairs and 30 preflight pairs pass
+the bundle verifier. The [timing map](results/change-0417/timing-boundaries.md)
+separates already-open queries, commits, authoring and publication lifecycles.
+
+This evidence does not promote the index's 20 correctness-only selectors into
+the default/full-run measured contract. The 10 measured statuses, 425-selector
+registry and 36-case / 198-row default matrix remain unchanged. The XLS validation
+shape contract is corrected to `tiny,large`; captured input was already `large`.
+Operation allocation is available for only two selectors, and dynamic
+calculation/refresh remains unsupported. Representative category evidence does
+not establish complete end-to-end CRUD coverage.
+
 ## 2026-09-05: change 0412 isolates the XLS observer and adds plain-source selectors
 
 - Change [0412](changes/0412-xls-observer-isolation.md) at committed revision

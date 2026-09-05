@@ -1,0 +1,176 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "52c6d5047705e20d7ac3c4f42558e5498b5c76e7029e4808bd159fe180524639",
+  "content_set_sha256": "3efe1f62a845efba6849d05603fae12c70142fbfb9b6e28abc1feae6c87060a7",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+    "git_worktree_dirty": false,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "xlsx-opc-zip:sha256:4c1f61e3785593dc8a5869b4fcc8289337a3ec362bdc5039f705b03551fa9f77",
+      "name": "xlsx-row-visibility-medium-hide",
+      "legacy_v1": {
+        "name": "xlsx-row-visibility-medium-hide",
+        "generator": "litchi-xlsx-row-visibility-source-edit-media-one-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-one-sheet-row-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 8192,
+        "archive_member_count": 14,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4227072,
+        "archive_bytes": 4222174,
+        "archive_sha256": "4c1f61e3785593dc8a5869b4fcc8289337a3ec362bdc5039f705b03551fa9f77",
+        "target_entry": "worksheet:Sheet1:existing-rows",
+        "target_payload_bytes": 243851,
+        "target_payload_sha256": "e5c98c9b17ffe5ab20f0626d25ae0ab31c66fdf6dbd2f3a438391b6921a0179b",
+        "xlsx": {
+          "sheet_count": 1,
+          "rows_per_sheet": 512,
+          "columns_per_sheet": 16,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "format": "XLSX/OPC/ZIP",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-xlsx-row-visibility-source-edit-media-one-sheet-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "deterministic-one-sheet-row-grid-with-media",
+          "legacy_shape": "medium"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 4222174,
+        "archive_sha256": "4c1f61e3785593dc8a5869b4fcc8289337a3ec362bdc5039f705b03551fa9f77",
+        "logical_payload_bytes": 4227072,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "columns_per_sheet": 16,
+        "entry_bytes": 4,
+        "entry_count": 8192,
+        "rows_per_sheet": 512,
+        "sheet_count": 1
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 4222174,
+          "members": 14,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "worksheet:Sheet1:existing-rows",
+          "logical_bytes": 243851,
+          "sha256": "e5c98c9b17ffe5ab20f0626d25ae0ab31c66fdf6dbd2f3a438391b6921a0179b"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "xlsx_eager_row_visibility_edit_save"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "xlsx_eager_row_visibility_edit_save",
+      "corpus_id": "xlsx-opc-zip:sha256:4c1f61e3785593dc8a5869b4fcc8289337a3ec362bdc5039f705b03551fa9f77",
+      "legacy_name": "xlsx-row-visibility-medium-hide",
+      "legacy_archive_sha256": "4c1f61e3785593dc8a5869b4fcc8289337a3ec362bdc5039f705b03551fa9f77",
+      "role": "timed"
+    }
+  ]
+}

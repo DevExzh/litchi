@@ -1,0 +1,4967 @@
+{
+  "allocator": [
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 314880,
+        "archive_member_count": 256,
+        "archive_sha256": "6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+        "compression": "none",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-many-small-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "80819dec96ac98d30a5ec79f20259e3030b1ab89b75209ef7bddba0b940ccd3b",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-cfb_list_streams.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 23360,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 23530,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 23380,
+          "p95_ns": 25860,
+          "p99_ns": 43000,
+          "repeat": 1,
+          "report": "allocator/1-cfb_list_streams.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-cfb_list_streams.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 23570,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 23770,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 23600,
+          "p95_ns": 24071,
+          "p99_ns": 35770,
+          "repeat": 2,
+          "report": "allocator/2-cfb_list_streams.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "cfb_list_streams"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 314880,
+        "archive_member_count": 256,
+        "archive_sha256": "6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+        "compression": "none",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-many-small-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "80819dec96ac98d30a5ec79f20259e3030b1ab89b75209ef7bddba0b940ccd3b",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-cfb_read_one.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 620,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 640,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 630,
+          "p95_ns": 690,
+          "p99_ns": 770,
+          "repeat": 1,
+          "report": "allocator/1-cfb_read_one.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-cfb_read_one.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 620,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 640,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 630,
+          "p95_ns": 690,
+          "p99_ns": 710,
+          "repeat": 2,
+          "report": "allocator/2-cfb_read_one.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "cfb_read_one"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 97792,
+        "archive_member_count": 5,
+        "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 512,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "doc-large",
+        "package_format": "DOC/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "large",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 81920,
+        "target_payload_sha256": "33e6cd70a45181c28d4a3e7bfa4e7817bd82d7b2e89e39437a589243abdc38eb",
+        "uncompressed_payload_bytes": 32256,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-doc_fresh_write_to.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 256011,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 260012,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 257366,
+          "p95_ns": 267991,
+          "p99_ns": 284972,
+          "repeat": 1,
+          "report": "allocator/1-doc_fresh_write_to.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-doc_fresh_write_to.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 257191,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 260591,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 258541,
+          "p95_ns": 273151,
+          "p99_ns": 285922,
+          "repeat": 2,
+          "report": "allocator/2-doc_fresh_write_to.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "doc_fresh_write_to"
+    },
+    {
+      "allocation_delta": {
+        "metrics": {
+          "allocated_bytes": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 8548090,
+              "p95": 8548090,
+              "p99": 8548090
+            },
+            "repeat_2": {
+              "p50": 8548090,
+              "p95": 8548090,
+              "p99": 8548090
+            }
+          },
+          "allocation_calls": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 4518,
+              "p95": 4518,
+              "p99": 4518
+            },
+            "repeat_2": {
+              "p50": 4518,
+              "p95": 4518,
+              "p99": 4518
+            }
+          },
+          "deallocated_bytes": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 8548090,
+              "p95": 8548090,
+              "p99": 8548090
+            },
+            "repeat_2": {
+              "p50": 8548090,
+              "p95": 8548090,
+              "p99": 8548090
+            }
+          },
+          "deallocation_calls": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 4023,
+              "p95": 4023,
+              "p99": 4023
+            },
+            "repeat_2": {
+              "p50": 4023,
+              "p95": 4023,
+              "p99": 4023
+            }
+          },
+          "failed_allocation_calls": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": null,
+              "p95": null,
+              "p99": null
+            },
+            "repeat_1": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "repeat_2": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            }
+          },
+          "live_bytes_after": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 319050,
+              "p95": 320554,
+              "p99": 320618
+            },
+            "repeat_2": {
+              "p50": 319050,
+              "p95": 320554,
+              "p99": 320618
+            }
+          },
+          "live_bytes_before": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 319050,
+              "p95": 320554,
+              "p99": 320618
+            },
+            "repeat_2": {
+              "p50": 319050,
+              "p95": 320554,
+              "p99": 320618
+            }
+          },
+          "peak_live_bytes_after": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 1013456,
+              "p95": 1013456,
+              "p99": 1013456
+            },
+            "repeat_2": {
+              "p50": 1013456,
+              "p95": 1013456,
+              "p99": 1013456
+            }
+          },
+          "peak_live_bytes_before": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 1013456,
+              "p95": 1013456,
+              "p99": 1013456
+            },
+            "repeat_2": {
+              "p50": 1013456,
+              "p95": 1013456,
+              "p99": 1013456
+            }
+          },
+          "reallocation_calls": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 495,
+              "p95": 495,
+              "p99": 495
+            },
+            "repeat_2": {
+              "p50": 495,
+              "p95": 495,
+              "p99": 495
+            }
+          }
+        },
+        "repeat_status": {
+          "repeat_1": "measured",
+          "repeat_2": "measured"
+        },
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 9900,
+        "archive_member_count": 24,
+        "archive_sha256": "457421e8f86ec8eb52fbe181cebe7d0821ce1e794a08142ff01a4c4e03df0cac",
+        "compression": "deflate",
+        "entry_bytes": 380,
+        "entry_count": 15,
+        "generator": "litchi-docx-story-hyperlink-publication-v1",
+        "name": "docx-story-hyperlink-publication",
+        "package_format": "DOCX/OPC/ZIP",
+        "payload_kind": "deterministic-inert-media-and-opaque-members",
+        "shape": "7-story-kinds-14-links-7-media-1-opaque",
+        "target_entry": "shared-external-hyperlink-relationship",
+        "target_payload_bytes": 40,
+        "target_payload_sha256": "49fd1a50480a739ce32a476b167843315e2b65ecec5d0e8b2b9efe5e0128afad",
+        "uncompressed_payload_bytes": 39564,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "measured",
+          "catalog": "allocator/1-docx_story_hyperlink_redaction_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 533532,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 544553,
+            "upper_rank": 21
+          },
+          "output_sha256": "7f776cb8087680f390c271bee7ff35da31e8ecf1f4469a6d63a89f3e9ded327c",
+          "p50_ns": 538117,
+          "p95_ns": 569972,
+          "p99_ns": 574532,
+          "repeat": 1,
+          "report": "allocator/1-docx_story_hyperlink_redaction_save.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "measured",
+          "catalog": "allocator/2-docx_story_hyperlink_redaction_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 532072,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 539162,
+            "upper_rank": 21
+          },
+          "output_sha256": "7f776cb8087680f390c271bee7ff35da31e8ecf1f4469a6d63a89f3e9ded327c",
+          "p50_ns": 535212,
+          "p95_ns": 549932,
+          "p99_ns": 569272,
+          "repeat": 2,
+          "report": "allocator/2-docx_story_hyperlink_redaction_save.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "docx_story_hyperlink_redaction_save"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 2566,
+        "archive_member_count": 5,
+        "archive_sha256": "7453460d06a512054f00d27e5cae0d4e7a72a1939f3150078679314a606fa90a",
+        "compression": "deflate",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-odf-mimetype-repair-v1",
+        "name": "odf-mimetype-repair-medium",
+        "package_format": "ODT/ODF/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "medium",
+        "target_entry": "mimetype:local-extra:0x5455",
+        "target_payload_bytes": 9,
+        "target_payload_sha256": "872e41134416d98a6a5070ff0b90605697bc144fe29428ea129c75c24c660d04",
+        "uncompressed_payload_bytes": 9800,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-odf_mimetype_repair_plan.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 586182,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 591053,
+            "upper_rank": 21
+          },
+          "output_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+          "p50_ns": 589817,
+          "p95_ns": 601503,
+          "p99_ns": 602182,
+          "repeat": 1,
+          "report": "allocator/1-odf_mimetype_repair_plan.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-odf_mimetype_repair_plan.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 590153,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 596153,
+            "upper_rank": 21
+          },
+          "output_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+          "p50_ns": 592867,
+          "p95_ns": 604253,
+          "p99_ns": 624442,
+          "repeat": 2,
+          "report": "allocator/2-odf_mimetype_repair_plan.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "odf_mimetype_repair_plan"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 2557,
+        "archive_member_count": 5,
+        "archive_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+        "compression": "deflate",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-odt-semantic-v1",
+        "name": "odt-semantic-medium",
+        "package_format": "ODT/ODF/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "medium",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "uncompressed_payload_bytes": 9800,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-odf_validation_report.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 37260,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 37520,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 37360,
+          "p95_ns": 38600,
+          "p99_ns": 60141,
+          "repeat": 1,
+          "report": "allocator/1-odf_validation_report.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-odf_validation_report.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 37240,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 37610,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 37440,
+          "p95_ns": 48811,
+          "p99_ns": 51210,
+          "repeat": 2,
+          "report": "allocator/2-odf_validation_report.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "odf_validation_report"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 2268,
+        "archive_member_count": 5,
+        "archive_sha256": "8efa67b515572855143622f3dab0ba29eaafd39af5f72f441527b07af614562c",
+        "compression": "deflate",
+        "entry_bytes": 43,
+        "entry_count": 12,
+        "generator": "litchi-odp-semantic-v1",
+        "name": "odp-semantic-medium",
+        "package_format": "ODP/ODF/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "medium",
+        "target_entry": "slide:0",
+        "target_payload_bytes": 43,
+        "target_payload_sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e",
+        "uncompressed_payload_bytes": 1044,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-odp_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 32360,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 32611,
+            "upper_rank": 21
+          },
+          "output_sha256": "460bfe509d9c35eb05728c4ff847e0a080aec9bf7a2684ee80b2f9e46b37e3c7",
+          "p50_ns": 32560,
+          "p95_ns": 33100,
+          "p99_ns": 43110,
+          "repeat": 1,
+          "report": "allocator/1-odp_semantic_text_to_sink.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-odp_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 32181,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 32280,
+            "upper_rank": 21
+          },
+          "output_sha256": "460bfe509d9c35eb05728c4ff847e0a080aec9bf7a2684ee80b2f9e46b37e3c7",
+          "p50_ns": 32235,
+          "p95_ns": 32560,
+          "p99_ns": 44970,
+          "repeat": 2,
+          "report": "allocator/2-odp_semantic_text_to_sink.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "odp_semantic_text_to_sink"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 7011,
+        "archive_member_count": 3,
+        "archive_sha256": "e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+        "compression": "deflate",
+        "entry_bytes": 54,
+        "entry_count": 2048,
+        "generator": "litchi-ods-semantic-v1",
+        "name": "ods-semantic-medium",
+        "package_format": "ODS/ODF/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "medium",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "uncompressed_payload_bytes": 110592,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-ods_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 114920,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 115081,
+            "upper_rank": 21
+          },
+          "output_sha256": "c10b977ef3c3b61ae9cc83c3f665022937559cabffd9f15ce6befdca2852e381",
+          "p50_ns": 114981,
+          "p95_ns": 122850,
+          "p99_ns": 123670,
+          "repeat": 1,
+          "report": "allocator/1-ods_semantic_text_to_sink.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-ods_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 118021,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 118110,
+            "upper_rank": 21
+          },
+          "output_sha256": "c10b977ef3c3b61ae9cc83c3f665022937559cabffd9f15ce6befdca2852e381",
+          "p50_ns": 118060,
+          "p95_ns": 124581,
+          "p99_ns": 127331,
+          "repeat": 2,
+          "report": "allocator/2-ods_semantic_text_to_sink.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "ods_semantic_text_to_sink"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 2557,
+        "archive_member_count": 5,
+        "archive_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+        "compression": "deflate",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-odt-semantic-v1",
+        "name": "odt-semantic-medium",
+        "package_format": "ODT/ODF/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "medium",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "uncompressed_payload_bytes": 9800,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-odt_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 44740,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 45040,
+            "upper_rank": 21
+          },
+          "output_sha256": "efd577b210a5effdd558dc56ab8589a0d4a68e8df9c091f948fae201ab6bf099",
+          "p50_ns": 44900,
+          "p95_ns": 49220,
+          "p99_ns": 72270,
+          "repeat": 1,
+          "report": "allocator/1-odt_semantic_text_to_sink.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-odt_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 44320,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 44530,
+            "upper_rank": 21
+          },
+          "output_sha256": "efd577b210a5effdd558dc56ab8589a0d4a68e8df9c091f948fae201ab6bf099",
+          "p50_ns": 44405,
+          "p95_ns": 45150,
+          "p99_ns": 53270,
+          "repeat": 2,
+          "report": "allocator/2-odt_semantic_text_to_sink.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "odt_semantic_text_to_sink"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 54683,
+        "archive_member_count": 258,
+        "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-opc_open.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 832133,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 835113,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 832809,
+          "p95_ns": 841063,
+          "p99_ns": 845564,
+          "repeat": 1,
+          "report": "allocator/1-opc_open.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-opc_open.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 824294,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 827693,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 825668,
+          "p95_ns": 829974,
+          "p99_ns": 850883,
+          "repeat": 2,
+          "report": "allocator/2-opc_open.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "opc_open"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 40960,
+        "archive_member_count": 4,
+        "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 144,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "ppt-large",
+        "package_format": "PPT/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "large",
+        "target_entry": "PowerPoint Document",
+        "target_payload_bytes": 37385,
+        "target_payload_sha256": "bef446ada643821b87531c06be7564b7ff8ca5539bb6a39766fbd28c11f65523",
+        "uncompressed_payload_bytes": 9072,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-ppt_fresh_write_to.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 268931,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 274201,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 270151,
+          "p95_ns": 288391,
+          "p99_ns": 295741,
+          "repeat": 1,
+          "report": "allocator/1-ppt_fresh_write_to.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-ppt_fresh_write_to.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 268452,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 274302,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 269531,
+          "p95_ns": 285471,
+          "p99_ns": 301791,
+          "repeat": 2,
+          "report": "allocator/2-ppt_fresh_write_to.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "ppt_fresh_write_to"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 16814664,
+        "archive_member_count": 49,
+        "archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+        "compression": "deflate",
+        "entry_bytes": 76,
+        "entry_count": 31,
+        "generator": "litchi-pptx-cross-slide-copy-evidence-v1",
+        "name": "pptx_cross_copy_media_rich",
+        "package_format": "PPTX/OPC/ZIP",
+        "payload_kind": "deterministic-incompressible-media-and-slide-text",
+        "shape": "media-rich",
+        "target_entry": "source-slide:2/destination-slide:1/position:1",
+        "target_payload_bytes": 76,
+        "target_payload_sha256": "9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa",
+        "uncompressed_payload_bytes": 16866277,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-pptx_cross_copy_media_rich.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 1163523199,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 1163805903,
+            "upper_rank": 21
+          },
+          "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+          "p50_ns": 1163633805,
+          "p95_ns": 1164306506,
+          "p99_ns": 1164412166,
+          "repeat": 1,
+          "report": "allocator/1-pptx_cross_copy_media_rich.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-pptx_cross_copy_media_rich.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 1166164007,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 1166972358,
+            "upper_rank": 21
+          },
+          "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+          "p50_ns": 1166649253,
+          "p95_ns": 1167514861,
+          "p99_ns": 1167752602,
+          "repeat": 2,
+          "report": "allocator/2-pptx_cross_copy_media_rich.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "pptx_cross_copy_media_rich"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 30539,
+        "archive_member_count": 41,
+        "archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+        "compression": "deflate",
+        "entry_bytes": 76,
+        "entry_count": 23,
+        "generator": "litchi-pptx-source-backed-cross-slide-copy-evidence-v1",
+        "name": "pptx_source_backed_cross_copy_plain",
+        "package_format": "PPTX/OPC/ZIP",
+        "payload_kind": "deterministic-slide-text",
+        "shape": "plain",
+        "target_entry": "source-slide:2/destination-slide:1/position:1",
+        "target_payload_bytes": 76,
+        "target_payload_sha256": "9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa",
+        "uncompressed_payload_bytes": 84715,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-pptx_source_backed_cross_copy_plain.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 1836927,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 1840918,
+            "upper_rank": 21
+          },
+          "output_sha256": "ab5109b0584aacb070b9b33a5769f469464ede991c12fd4da7e9e7bce53f159b",
+          "p50_ns": 1839007,
+          "p95_ns": 1848738,
+          "p99_ns": 1851048,
+          "repeat": 1,
+          "report": "allocator/1-pptx_source_backed_cross_copy_plain.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-pptx_source_backed_cross_copy_plain.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 1846537,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 1853408,
+            "upper_rank": 21
+          },
+          "output_sha256": "ab5109b0584aacb070b9b33a5769f469464ede991c12fd4da7e9e7bce53f159b",
+          "p50_ns": 1849972,
+          "p95_ns": 1868247,
+          "p99_ns": 1873648,
+          "repeat": 2,
+          "report": "allocator/2-pptx_source_backed_cross_copy_plain.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "pptx_source_backed_cross_copy_plain"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 10808,
+        "archive_member_count": 1,
+        "archive_sha256": "f019aa9e063c194689b3e779cf0bd022e62cd6551b1784b32d927245cff0ffda",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-rtf-paragraph-lifecycle-v1",
+        "name": "rtf-paragraph-lifecycle-plain-medium",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-default-formatted-text",
+        "rtf_variant": "plain",
+        "shape": "medium",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 9999,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-rtf_semantic_split_paragraph_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 155261,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 156220,
+            "upper_rank": 21
+          },
+          "output_sha256": "0d3cd9bb43a854e6bea958f38e9801a23332279c8d059eaef610cb42d3f3b63e",
+          "p50_ns": 155531,
+          "p95_ns": 167431,
+          "p99_ns": 167871,
+          "repeat": 1,
+          "report": "allocator/1-rtf_semantic_split_paragraph_save.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-rtf_semantic_split_paragraph_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 154711,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 156500,
+            "upper_rank": 21
+          },
+          "output_sha256": "0d3cd9bb43a854e6bea958f38e9801a23332279c8d059eaef610cb42d3f3b63e",
+          "p50_ns": 155111,
+          "p95_ns": 178910,
+          "p99_ns": 181211,
+          "repeat": 2,
+          "report": "allocator/2-rtf_semantic_split_paragraph_save.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "rtf_semantic_split_paragraph_save"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 10851,
+        "archive_member_count": 1,
+        "archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-medium",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "medium",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 9999,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-rtf_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 12350,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 12440,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 12385,
+          "p95_ns": 12640,
+          "p99_ns": 40580,
+          "repeat": 1,
+          "report": "allocator/1-rtf_semantic_text_to_sink.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-rtf_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 12740,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 12800,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 12760,
+          "p95_ns": 12890,
+          "p99_ns": 12910,
+          "repeat": 2,
+          "report": "allocator/2-rtf_semantic_text_to_sink.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "rtf_semantic_text_to_sink"
+    },
+    {
+      "allocation_delta": {
+        "metrics": {
+          "allocated_bytes": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 1507536,
+              "p95": 1507536,
+              "p99": 1507536
+            },
+            "repeat_2": {
+              "p50": 1507536,
+              "p95": 1507536,
+              "p99": 1507536
+            }
+          },
+          "allocation_calls": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 16387,
+              "p95": 16387,
+              "p99": 16387
+            },
+            "repeat_2": {
+              "p50": 16387,
+              "p95": 16387,
+              "p99": 16387
+            }
+          },
+          "deallocated_bytes": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 1507536,
+              "p95": 1507536,
+              "p99": 1507536
+            },
+            "repeat_2": {
+              "p50": 1507536,
+              "p95": 1507536,
+              "p99": 1507536
+            }
+          },
+          "deallocation_calls": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 16387,
+              "p95": 16387,
+              "p99": 16387
+            },
+            "repeat_2": {
+              "p50": 16387,
+              "p95": 16387,
+              "p99": 16387
+            }
+          },
+          "failed_allocation_calls": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": null,
+              "p95": null,
+              "p99": null
+            },
+            "repeat_1": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "repeat_2": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            }
+          },
+          "live_bytes_after": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 22089,
+              "p95": 22953,
+              "p99": 23017
+            },
+            "repeat_2": {
+              "p50": 22089,
+              "p95": 22953,
+              "p99": 23017
+            }
+          },
+          "live_bytes_before": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 22089,
+              "p95": 22953,
+              "p99": 23017
+            },
+            "repeat_2": {
+              "p50": 22089,
+              "p95": 22953,
+              "p99": 23017
+            }
+          },
+          "peak_live_bytes_after": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 24748220,
+              "p95": 24748220,
+              "p99": 24748220
+            },
+            "repeat_2": {
+              "p50": 24748220,
+              "p95": 24748220,
+              "p99": 24748220
+            }
+          },
+          "peak_live_bytes_before": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": 0.0,
+              "p95": 0.0,
+              "p99": 0.0
+            },
+            "repeat_1": {
+              "p50": 24748220,
+              "p95": 24748220,
+              "p99": 24748220
+            },
+            "repeat_2": {
+              "p50": 24748220,
+              "p95": 24748220,
+              "p99": 24748220
+            }
+          },
+          "reallocation_calls": {
+            "delta": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "delta_percent": {
+              "p50": null,
+              "p95": null,
+              "p99": null
+            },
+            "repeat_1": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            },
+            "repeat_2": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0
+            }
+          }
+        },
+        "repeat_status": {
+          "repeat_1": "measured",
+          "repeat_2": "measured"
+        },
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 630819,
+        "archive_member_count": 0,
+        "archive_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 8192,
+        "generator": "litchi-rtf-streaming-create-v1",
+        "name": "rtf-streaming-create-medium",
+        "package_format": "rtf",
+        "payload_kind": "deterministic-scalar-text",
+        "rtf_variant": "plain-streaming",
+        "shape": "medium",
+        "target_entry": "document",
+        "target_payload_bytes": 630819,
+        "target_payload_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a",
+        "uncompressed_payload_bytes": 425984,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "measured",
+          "catalog": "allocator/1-rtf_streaming_create.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 8490486,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 8499686,
+            "upper_rank": 21
+          },
+          "output_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a",
+          "p50_ns": 8493871,
+          "p95_ns": 8519386,
+          "p99_ns": 8520016,
+          "repeat": 1,
+          "report": "allocator/1-rtf_streaming_create.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "measured",
+          "catalog": "allocator/2-rtf_streaming_create.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 8508146,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 8516186,
+            "upper_rank": 21
+          },
+          "output_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a",
+          "p50_ns": 8512140,
+          "p95_ns": 8620567,
+          "p99_ns": 8720616,
+          "repeat": 2,
+          "report": "allocator/2-rtf_streaming_create.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "rtf_streaming_create"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 163840,
+        "archive_member_count": 1,
+        "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 8192,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "xls-large",
+        "package_format": "XLS/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "large",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 161040,
+        "target_payload_sha256": "f806d23f52c978f5215b05fd232b055725a2605d52122ea74ce0cec357ea9386",
+        "uncompressed_payload_bytes": 65536,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xls_fresh_write_to.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 1201965,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 1206085,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 1204635,
+          "p95_ns": 1222305,
+          "p99_ns": 1225745,
+          "repeat": 1,
+          "report": "allocator/1-xls_fresh_write_to.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xls_fresh_write_to.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 1203116,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 1207225,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 1205685,
+          "p95_ns": 1214835,
+          "p99_ns": 1220275,
+          "repeat": 2,
+          "report": "allocator/2-xls_fresh_write_to.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xls_fresh_write_to"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 163840,
+        "archive_member_count": 1,
+        "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 8192,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "xls-large",
+        "package_format": "XLS/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "large",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 161040,
+        "target_payload_sha256": "f806d23f52c978f5215b05fd232b055725a2605d52122ea74ce0cec357ea9386",
+        "uncompressed_payload_bytes": 65536,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xls_validation_report.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 867354,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 868754,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 867864,
+          "p95_ns": 874603,
+          "p99_ns": 906214,
+          "repeat": 1,
+          "report": "allocator/1-xls_validation_report.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xls_validation_report.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 873624,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 876103,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 875199,
+          "p95_ns": 888914,
+          "p99_ns": 897744,
+          "repeat": 2,
+          "report": "allocator/2-xls_validation_report.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xls_validation_report"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xlsx_eager_cell_remove_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 12135219,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 12152769,
+            "upper_rank": 21
+          },
+          "output_sha256": "e8d2a9bff505a12a4c4026acbf2decd563dd6bbbc03a88ae8cddde496491163e",
+          "p50_ns": 12142809,
+          "p95_ns": 12217489,
+          "p99_ns": 12220349,
+          "repeat": 1,
+          "report": "allocator/1-xlsx_eager_cell_remove_edit_save.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xlsx_eager_cell_remove_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 12125631,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 12145771,
+            "upper_rank": 21
+          },
+          "output_sha256": "e8d2a9bff505a12a4c4026acbf2decd563dd6bbbc03a88ae8cddde496491163e",
+          "p50_ns": 12140581,
+          "p95_ns": 12172391,
+          "p99_ns": 12180241,
+          "repeat": 2,
+          "report": "allocator/2-xlsx_eager_cell_remove_edit_save.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xlsx_eager_cell_remove_edit_save"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 16786830,
+        "archive_member_count": 17,
+        "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+        "compression": "deflate",
+        "entry_bytes": 2097152,
+        "entry_count": 12,
+        "generator": "litchi-xlsx-defined-names-source-edit-media-v1",
+        "name": "xlsx-defined-names-media",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-incompressible-media",
+        "shape": "media-rich",
+        "target_entry": "workbook:definedNames",
+        "target_payload_bytes": 303,
+        "target_payload_sha256": "f20dde8c0c2942754908b7264d7c46cdcdb3d264b34109ca561ed1bd7733bbab",
+        "uncompressed_payload_bytes": 16782412,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xlsx_eager_defined_names_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 238171080,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 238345541,
+            "upper_rank": 21
+          },
+          "output_sha256": "f59c85a4003018c58732db832aff9ac3577cff7e7af37d9372ddc4ca5679a615",
+          "p50_ns": 238268515,
+          "p95_ns": 238569082,
+          "p99_ns": 238679263,
+          "repeat": 1,
+          "report": "allocator/1-xlsx_eager_defined_names_edit_save.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xlsx_eager_defined_names_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 238224644,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 238401295,
+            "upper_rank": 21
+          },
+          "output_sha256": "f59c85a4003018c58732db832aff9ac3577cff7e7af37d9372ddc4ca5679a615",
+          "p50_ns": 238314700,
+          "p95_ns": 238545346,
+          "p99_ns": 238577876,
+          "repeat": 2,
+          "report": "allocator/2-xlsx_eager_defined_names_edit_save.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xlsx_eager_defined_names_edit_save"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 2223,
+        "archive_member_count": 6,
+        "archive_sha256": "72118c9e63decaa2a383568ad7b6c903d8d7f5d41c71563df716fb3bfbb8baf5",
+        "compression": "deflate",
+        "entry_bytes": 395,
+        "entry_count": 3,
+        "generator": "litchi-xlsx-merge-edit-sparse-a1-b2-v1",
+        "name": "xlsx-merge-edit-sparse-a1-b2",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-semantic-cells",
+        "shape": "sparse-a1-b2",
+        "target_entry": "worksheet:Sheet1:merge:A1:B2",
+        "target_payload_bytes": 395,
+        "target_payload_sha256": "692d1a1b71bd6af7bffc8d008d28ba75c5068dc913e0452363950fbe09d5b605",
+        "uncompressed_payload_bytes": 1384,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xlsx_eager_merge_commit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 63080,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 64690,
+            "upper_rank": 21
+          },
+          "output_sha256": "0bf6bb9511b6c0c7f6e06c87718bd9e262994f365766fdbb8e6ea5875de13a4a",
+          "p50_ns": 63770,
+          "p95_ns": 71320,
+          "p99_ns": 82781,
+          "repeat": 1,
+          "report": "allocator/1-xlsx_eager_merge_commit_save.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xlsx_eager_merge_commit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 63481,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 64590,
+            "upper_rank": 21
+          },
+          "output_sha256": "0bf6bb9511b6c0c7f6e06c87718bd9e262994f365766fdbb8e6ea5875de13a4a",
+          "p50_ns": 63970,
+          "p95_ns": 72160,
+          "p99_ns": 82131,
+          "repeat": 2,
+          "report": "allocator/2-xlsx_eager_merge_commit_save.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xlsx_eager_merge_commit_save"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 4222174,
+        "archive_member_count": 14,
+        "archive_sha256": "4c1f61e3785593dc8a5869b4fcc8289337a3ec362bdc5039f705b03551fa9f77",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 8192,
+        "generator": "litchi-xlsx-row-visibility-source-edit-media-one-sheet-v1",
+        "name": "xlsx-row-visibility-medium-hide",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-one-sheet-row-grid-with-media",
+        "shape": "medium",
+        "target_entry": "worksheet:Sheet1:existing-rows",
+        "target_payload_bytes": 243851,
+        "target_payload_sha256": "e5c98c9b17ffe5ab20f0626d25ae0ab31c66fdf6dbd2f3a438391b6921a0179b",
+        "uncompressed_payload_bytes": 4227072,
+        "xlsx": {
+          "columns_per_sheet": 16,
+          "one_percent_update_count": 0,
+          "rows_per_sheet": 512,
+          "sheet_count": 1,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml"
+            ]
+          }
+        }
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xlsx_eager_row_visibility_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 37110867,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 37175548,
+            "upper_rank": 21
+          },
+          "output_sha256": "59b17e475f7b305b2a0f9a69ff0fb05282fd385fafcc511731db0b495c6f2aad",
+          "p50_ns": 37156263,
+          "p95_ns": 37290489,
+          "p99_ns": 37291538,
+          "repeat": 1,
+          "report": "allocator/1-xlsx_eager_row_visibility_edit_save.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xlsx_eager_row_visibility_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 37345827,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 37444707,
+            "upper_rank": 21
+          },
+          "output_sha256": "59b17e475f7b305b2a0f9a69ff0fb05282fd385fafcc511731db0b495c6f2aad",
+          "p50_ns": 37405717,
+          "p95_ns": 37523478,
+          "p99_ns": 37694578,
+          "repeat": 2,
+          "report": "allocator/2-xlsx_eager_row_visibility_edit_save.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xlsx_eager_row_visibility_edit_save"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 16786830,
+        "archive_member_count": 17,
+        "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+        "compression": "deflate",
+        "entry_bytes": 2097152,
+        "entry_count": 12,
+        "generator": "litchi-xlsx-sheet-protection-source-edit-media-v1",
+        "name": "xlsx-sheet-protection-media",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-incompressible-media",
+        "shape": "media-rich",
+        "target_entry": "worksheet:Sheet1:protection",
+        "target_payload_bytes": 207,
+        "target_payload_sha256": "c78af5ae31d6f622b0a9544bd9476c3f6f370258727219d9f62fb27b4e66d91f",
+        "uncompressed_payload_bytes": 16782412,
+        "xlsx": null
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xlsx_eager_sheet_protection_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 238021922,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 238198986,
+            "upper_rank": 21
+          },
+          "output_sha256": "76b3a48e9682479a7dc75b047e37f221c52dc6953c10168e20995adbf992b8f3",
+          "p50_ns": 238077985,
+          "p95_ns": 240010369,
+          "p99_ns": 240031240,
+          "repeat": 1,
+          "report": "allocator/1-xlsx_eager_sheet_protection_edit_save.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xlsx_eager_sheet_protection_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 237963451,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 238141492,
+            "upper_rank": 21
+          },
+          "output_sha256": "76b3a48e9682479a7dc75b047e37f221c52dc6953c10168e20995adbf992b8f3",
+          "p50_ns": 238057001,
+          "p95_ns": 238364523,
+          "p99_ns": 239671928,
+          "repeat": 2,
+          "report": "allocator/2-xlsx_eager_sheet_protection_edit_save.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xlsx_eager_sheet_protection_edit_save"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xlsx_full_cell_scan.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 808354,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 811234,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 809433,
+          "p95_ns": 813624,
+          "p99_ns": 815443,
+          "repeat": 1,
+          "report": "allocator/1-xlsx_full_cell_scan.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xlsx_full_cell_scan.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 821253,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 824794,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 823493,
+          "p95_ns": 830693,
+          "p99_ns": 835053,
+          "repeat": 2,
+          "report": "allocator/2-xlsx_full_cell_scan.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xlsx_full_cell_scan"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xlsx_join_disjoint_commit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 16106828,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 16162498,
+            "upper_rank": 21
+          },
+          "output_sha256": "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+          "p50_ns": 16130498,
+          "p95_ns": 16210738,
+          "p99_ns": 16215878,
+          "repeat": 1,
+          "report": "allocator/1-xlsx_join_disjoint_commit_save.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xlsx_join_disjoint_commit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 16153627,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 16194427,
+            "upper_rank": 21
+          },
+          "output_sha256": "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+          "p50_ns": 16170807,
+          "p95_ns": 16250157,
+          "p99_ns": 16267258,
+          "repeat": 2,
+          "report": "allocator/2-xlsx_join_disjoint_commit_save.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xlsx_join_disjoint_commit_save"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xlsx_list_sheets.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 180,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 190,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 180,
+          "p95_ns": 190,
+          "p99_ns": 300,
+          "repeat": 1,
+          "report": "allocator/1-xlsx_list_sheets.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xlsx_list_sheets.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 180,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 190,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 180,
+          "p95_ns": 190,
+          "p99_ns": 190,
+          "repeat": 2,
+          "report": "allocator/2-xlsx_list_sheets.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xlsx_list_sheets"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xlsx_one_cell_commit.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 3554526,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 3560615,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 3558705,
+          "p95_ns": 3569065,
+          "p99_ns": 3590725,
+          "repeat": 1,
+          "report": "allocator/1-xlsx_one_cell_commit.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xlsx_one_cell_commit.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 3561765,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 3566655,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 3565575,
+          "p95_ns": 3582595,
+          "p99_ns": 3585215,
+          "repeat": 2,
+          "report": "allocator/2-xlsx_one_cell_commit.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xlsx_one_cell_commit"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xlsx_one_percent_commit.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 14182570,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 14199080,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 14188410,
+          "p95_ns": 14231761,
+          "p99_ns": 14254190,
+          "repeat": 1,
+          "report": "allocator/1-xlsx_one_percent_commit.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xlsx_one_percent_commit.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 14223730,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 14260840,
+            "upper_rank": 21
+          },
+          "output_sha256": null,
+          "p50_ns": 14246850,
+          "p95_ns": 14305930,
+          "p99_ns": 14337250,
+          "repeat": 2,
+          "report": "allocator/2-xlsx_one_percent_commit.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xlsx_one_percent_commit"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 167418,
+        "archive_member_count": 6,
+        "archive_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+        "compression": "deflate",
+        "entry_bytes": 0,
+        "entry_count": 32768,
+        "generator": "litchi-xlsx-streaming-create-v1",
+        "name": "xlsx-streaming-create-medium",
+        "package_format": "xlsx",
+        "payload_kind": "deterministic-scalar-text",
+        "shape": "medium",
+        "target_entry": "xl/worksheets/sheet1.xml",
+        "target_payload_bytes": 1795765,
+        "target_payload_sha256": "539f28638970fa5f207bd9686e0d0c7372e9cc9df0aec30e296ae9bdb4b3e226",
+        "uncompressed_payload_bytes": 385024,
+        "xlsx": {
+          "columns_per_sheet": 4,
+          "one_percent_update_count": 0,
+          "rows_per_sheet": 8192,
+          "sheet_count": 1,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml"
+            ]
+          }
+        }
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xlsx_streaming_create.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 12548863,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 12556074,
+            "upper_rank": 21
+          },
+          "output_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+          "p50_ns": 12550763,
+          "p95_ns": 12605583,
+          "p99_ns": 12612273,
+          "repeat": 1,
+          "report": "allocator/1-xlsx_streaming_create.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xlsx_streaming_create.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 12858014,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 12868024,
+            "upper_rank": 21
+          },
+          "output_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+          "p50_ns": 12861419,
+          "p95_ns": 12882464,
+          "p99_ns": 12935564,
+          "repeat": 2,
+          "report": "allocator/2-xlsx_streaming_create.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xlsx_streaming_create"
+    },
+    {
+      "allocation_delta": {
+        "reason": "one_or_more_repeats_have_no_allocation_attribution",
+        "repeat_status": {
+          "repeat_1": "unavailable",
+          "repeat_2": "unavailable"
+        },
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "latency_comparison": "excluded_for_allocator_instrumentation",
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/1-xlsx_three_way_disjoint_commit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 16276979,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 16308349,
+            "upper_rank": 21
+          },
+          "output_sha256": "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+          "p50_ns": 16296063,
+          "p95_ns": 16346469,
+          "p99_ns": 16391839,
+          "repeat": 1,
+          "report": "allocator/1-xlsx_three_way_disjoint_commit_save.json",
+          "sample_count": 30
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "allocator/2-xlsx_three_way_disjoint_commit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 16192717,
+            "lower_rank": 10,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 16229078,
+            "upper_rank": 21
+          },
+          "output_sha256": "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+          "p50_ns": 16199052,
+          "p95_ns": 16282818,
+          "p99_ns": 16285398,
+          "repeat": 2,
+          "report": "allocator/2-xlsx_three_way_disjoint_commit_save.json",
+          "sample_count": 30
+        }
+      ],
+      "selector": "xlsx_three_way_disjoint_commit_save"
+    }
+  ],
+  "binaries": {
+    "allocator": {
+      "bytes": 450143784,
+      "path": "/tmp/litchi-goal-0417-allocator",
+      "sha256": "ff153a4b154c2770673ee166919a01a84f64eaa31aecba17e46f1d8c76bf7491"
+    },
+    "normal": {
+      "bytes": 450139840,
+      "path": "/tmp/litchi-goal-0417-normal",
+      "sha256": "961546034a13148b9cefff71cb549932277cff1814740ac40ff4755eb2595043"
+    }
+  },
+  "configuration": {
+    "allocation_samples": 30,
+    "allocation_warmups": 3,
+    "normal_repeat_drift_threshold_percent": 5.0,
+    "samples": 500,
+    "warmups": 20
+  },
+  "normal": [
+    {
+      "corpus": {
+        "archive_bytes": 314880,
+        "archive_member_count": 256,
+        "archive_sha256": "6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+        "compression": "none",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-many-small-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "80819dec96ac98d30a5ec79f20259e3030b1ab89b75209ef7bddba0b940ccd3b",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": -0.9771986970684039,
+        "p95": -1.0660980810234542,
+        "p99": -1.0551948051948052
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-cfb_list_streams.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 9200,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 9220,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 9210,
+          "p95_ns": 9380,
+          "p99_ns": 12320,
+          "repeat": 1,
+          "report": "normal/1-cfb_list_streams.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-cfb_list_streams.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 9110,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 9120,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 9120,
+          "p95_ns": 9280,
+          "p99_ns": 12190,
+          "repeat": 2,
+          "report": "normal/2-cfb_list_streams.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "cfb_list_streams"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 314880,
+        "archive_member_count": 256,
+        "archive_sha256": "6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+        "compression": "none",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-cfb-synthetic-v1",
+        "name": "cfb-many-small-compressible",
+        "package_format": "CFB/OLE2",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "80819dec96ac98d30a5ec79f20259e3030b1ab89b75209ef7bddba0b940ccd3b",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": -1.6666666666666667
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-cfb_read_one.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 540,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 540,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 540,
+          "p95_ns": 580,
+          "p99_ns": 600,
+          "repeat": 1,
+          "report": "normal/1-cfb_read_one.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-cfb_read_one.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 540,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 540,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 540,
+          "p95_ns": 580,
+          "p99_ns": 590,
+          "repeat": 2,
+          "report": "normal/2-cfb_read_one.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "cfb_read_one"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 97792,
+        "archive_member_count": 5,
+        "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 512,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "doc-large",
+        "package_format": "DOC/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "large",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 81920,
+        "target_payload_sha256": "33e6cd70a45181c28d4a3e7bfa4e7817bd82d7b2e89e39437a589243abdc38eb",
+        "uncompressed_payload_bytes": 32256,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": -0.8466664867927582,
+        "p95": -0.3184173809049233,
+        "p99": -0.9683220362429105
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-doc_fresh_write_to.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 185031,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 185550,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 185315,
+          "p95_ns": 200680,
+          "p99_ns": 209641,
+          "repeat": 1,
+          "report": "normal/1-doc_fresh_write_to.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-doc_fresh_write_to.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 183561,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 183941,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 183746,
+          "p95_ns": 200041,
+          "p99_ns": 207611,
+          "repeat": 2,
+          "report": "normal/2-doc_fresh_write_to.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "doc_fresh_write_to"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 9900,
+        "archive_member_count": 24,
+        "archive_sha256": "457421e8f86ec8eb52fbe181cebe7d0821ce1e794a08142ff01a4c4e03df0cac",
+        "compression": "deflate",
+        "entry_bytes": 380,
+        "entry_count": 15,
+        "generator": "litchi-docx-story-hyperlink-publication-v1",
+        "name": "docx-story-hyperlink-publication",
+        "package_format": "DOCX/OPC/ZIP",
+        "payload_kind": "deterministic-inert-media-and-opaque-members",
+        "shape": "7-story-kinds-14-links-7-media-1-opaque",
+        "target_entry": "shared-external-hyperlink-relationship",
+        "target_payload_bytes": 40,
+        "target_payload_sha256": "49fd1a50480a739ce32a476b167843315e2b65ecec5d0e8b2b9efe5e0128afad",
+        "uncompressed_payload_bytes": 39564,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.5454315019508795,
+        "p95": 0.5216484089723527,
+        "p99": 0.2530033239402214
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-docx_story_hyperlink_redaction_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 440862,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 442822,
+            "upper_rank": 273
+          },
+          "output_sha256": "7f776cb8087680f390c271bee7ff35da31e8ecf1f4469a6d63a89f3e9ded327c",
+          "p50_ns": 441852,
+          "p95_ns": 452412,
+          "p99_ns": 458492,
+          "repeat": 1,
+          "report": "normal/1-docx_story_hyperlink_redaction_save.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-docx_story_hyperlink_redaction_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 442142,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 445191,
+            "upper_rank": 273
+          },
+          "output_sha256": "7f776cb8087680f390c271bee7ff35da31e8ecf1f4469a6d63a89f3e9ded327c",
+          "p50_ns": 444262,
+          "p95_ns": 454772,
+          "p99_ns": 459652,
+          "repeat": 2,
+          "report": "normal/2-docx_story_hyperlink_redaction_save.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "docx_story_hyperlink_redaction_save"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 2566,
+        "archive_member_count": 5,
+        "archive_sha256": "7453460d06a512054f00d27e5cae0d4e7a72a1939f3150078679314a606fa90a",
+        "compression": "deflate",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-odf-mimetype-repair-v1",
+        "name": "odf-mimetype-repair-medium",
+        "package_format": "ODT/ODF/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "medium",
+        "target_entry": "mimetype:local-extra:0x5455",
+        "target_payload_bytes": 9,
+        "target_payload_sha256": "872e41134416d98a6a5070ff0b90605697bc144fe29428ea129c75c24c660d04",
+        "uncompressed_payload_bytes": 9800,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": -0.05288036088148324,
+        "p95": 0.0033819082150110444,
+        "p99": 0.1682435444722
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-odf_mimetype_repair_plan.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 555402,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 556623,
+            "upper_rank": 273
+          },
+          "output_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+          "p50_ns": 555972,
+          "p95_ns": 561813,
+          "p99_ns": 565252,
+          "repeat": 1,
+          "report": "normal/1-odf_mimetype_repair_plan.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-odf_mimetype_repair_plan.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 555172,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 556332,
+            "upper_rank": 273
+          },
+          "output_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+          "p50_ns": 555678,
+          "p95_ns": 561832,
+          "p99_ns": 566203,
+          "repeat": 2,
+          "report": "normal/2-odf_mimetype_repair_plan.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "odf_mimetype_repair_plan"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 2557,
+        "archive_member_count": 5,
+        "archive_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+        "compression": "deflate",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-odt-semantic-v1",
+        "name": "odt-semantic-medium",
+        "package_format": "ODT/ODF/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "medium",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "uncompressed_payload_bytes": 9800,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [
+        "p99"
+      ],
+      "repeat_drift_percent": {
+        "p50": -1.2525487911447712,
+        "p95": -1.4733746217584345,
+        "p99": -6.668183887118798
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-odf_validation_report.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 34270,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 34370,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 34330,
+          "p95_ns": 35361,
+          "p99_ns": 43940,
+          "repeat": 1,
+          "report": "normal/1-odf_validation_report.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-odf_validation_report.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 33870,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 33931,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 33900,
+          "p95_ns": 34840,
+          "p99_ns": 41010,
+          "repeat": 2,
+          "report": "normal/2-odf_validation_report.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "odf_validation_report"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 2268,
+        "archive_member_count": 5,
+        "archive_sha256": "8efa67b515572855143622f3dab0ba29eaafd39af5f72f441527b07af614562c",
+        "compression": "deflate",
+        "entry_bytes": 43,
+        "entry_count": 12,
+        "generator": "litchi-odp-semantic-v1",
+        "name": "odp-semantic-medium",
+        "package_format": "ODP/ODF/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "medium",
+        "target_entry": "slide:0",
+        "target_payload_bytes": 43,
+        "target_payload_sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e",
+        "uncompressed_payload_bytes": 1044,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [
+        "p99"
+      ],
+      "repeat_drift_percent": {
+        "p50": -0.6950330564502458,
+        "p95": -0.5704697986577181,
+        "p99": 5.86445366528354
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-odp_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 29480,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 29510,
+            "upper_rank": 273
+          },
+          "output_sha256": "460bfe509d9c35eb05728c4ff847e0a080aec9bf7a2684ee80b2f9e46b37e3c7",
+          "p50_ns": 29495,
+          "p95_ns": 29800,
+          "p99_ns": 36150,
+          "repeat": 1,
+          "report": "normal/1-odp_semantic_text_to_sink.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-odp_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 29280,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 29300,
+            "upper_rank": 273
+          },
+          "output_sha256": "460bfe509d9c35eb05728c4ff847e0a080aec9bf7a2684ee80b2f9e46b37e3c7",
+          "p50_ns": 29290,
+          "p95_ns": 29630,
+          "p99_ns": 38270,
+          "repeat": 2,
+          "report": "normal/2-odp_semantic_text_to_sink.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "odp_semantic_text_to_sink"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 7011,
+        "archive_member_count": 3,
+        "archive_sha256": "e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+        "compression": "deflate",
+        "entry_bytes": 54,
+        "entry_count": 2048,
+        "generator": "litchi-ods-semantic-v1",
+        "name": "ods-semantic-medium",
+        "package_format": "ODS/ODF/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "medium",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "uncompressed_payload_bytes": 110592,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": -2.718398929910854,
+        "p95": -3.3205077953140125,
+        "p99": -2.611771968563763
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-ods_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 118091,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 118141,
+            "upper_rank": 273
+          },
+          "output_sha256": "c10b977ef3c3b61ae9cc83c3f665022937559cabffd9f15ce6befdca2852e381",
+          "p50_ns": 118121,
+          "p95_ns": 125011,
+          "p99_ns": 126351,
+          "repeat": 1,
+          "report": "normal/1-ods_semantic_text_to_sink.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-ods_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 114900,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 114920,
+            "upper_rank": 273
+          },
+          "output_sha256": "c10b977ef3c3b61ae9cc83c3f665022937559cabffd9f15ce6befdca2852e381",
+          "p50_ns": 114910,
+          "p95_ns": 120860,
+          "p99_ns": 123051,
+          "repeat": 2,
+          "report": "normal/2-ods_semantic_text_to_sink.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "ods_semantic_text_to_sink"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 2557,
+        "archive_member_count": 5,
+        "archive_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+        "compression": "deflate",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-odt-semantic-v1",
+        "name": "odt-semantic-medium",
+        "package_format": "ODT/ODF/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "medium",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "uncompressed_payload_bytes": 9800,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": -0.2012072434607646,
+        "p95": -0.23435669088352473,
+        "p99": 1.1086019297885445
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-odt_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 39710,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 39830,
+            "upper_rank": 273
+          },
+          "output_sha256": "efd577b210a5effdd558dc56ab8589a0d4a68e8df9c091f948fae201ab6bf099",
+          "p50_ns": 39760,
+          "p95_ns": 42670,
+          "p99_ns": 48710,
+          "repeat": 1,
+          "report": "normal/1-odt_semantic_text_to_sink.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-odt_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 39640,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 39750,
+            "upper_rank": 273
+          },
+          "output_sha256": "efd577b210a5effdd558dc56ab8589a0d4a68e8df9c091f948fae201ab6bf099",
+          "p50_ns": 39680,
+          "p95_ns": 42570,
+          "p99_ns": 49250,
+          "repeat": 2,
+          "report": "normal/2-odt_semantic_text_to_sink.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "odt_semantic_text_to_sink"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 54683,
+        "archive_member_count": 258,
+        "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 256,
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-compressible",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53",
+        "uncompressed_payload_bytes": 262144,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.07793086659429864,
+        "p95": 1.1244587973746463,
+        "p99": 1.1278422196827387
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-opc_open.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 652613,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 653622,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 653143,
+          "p95_ns": 659873,
+          "p99_ns": 663302,
+          "repeat": 1,
+          "report": "normal/1-opc_open.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-opc_open.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 652702,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 654863,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 653652,
+          "p95_ns": 667293,
+          "p99_ns": 670783,
+          "repeat": 2,
+          "report": "normal/2-opc_open.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "opc_open"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 40960,
+        "archive_member_count": 4,
+        "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 144,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "ppt-large",
+        "package_format": "PPT/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "large",
+        "target_entry": "PowerPoint Document",
+        "target_payload_bytes": 37385,
+        "target_payload_sha256": "bef446ada643821b87531c06be7564b7ff8ca5539bb6a39766fbd28c11f65523",
+        "uncompressed_payload_bytes": 9072,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.11571897646565316,
+        "p95": -0.04509214481767089,
+        "p99": 1.5576422614939436
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-ppt_fresh_write_to.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 137081,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 139560,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 138266,
+          "p95_ns": 153020,
+          "p99_ns": 157931,
+          "repeat": 1,
+          "report": "normal/1-ppt_fresh_write_to.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-ppt_fresh_write_to.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 137401,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 139620,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 138426,
+          "p95_ns": 152951,
+          "p99_ns": 160391,
+          "repeat": 2,
+          "report": "normal/2-ppt_fresh_write_to.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "ppt_fresh_write_to"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 16814664,
+        "archive_member_count": 49,
+        "archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+        "compression": "deflate",
+        "entry_bytes": 76,
+        "entry_count": 31,
+        "generator": "litchi-pptx-cross-slide-copy-evidence-v1",
+        "name": "pptx_cross_copy_media_rich",
+        "package_format": "PPTX/OPC/ZIP",
+        "payload_kind": "deterministic-incompressible-media-and-slide-text",
+        "shape": "media-rich",
+        "target_entry": "source-slide:2/destination-slide:1/position:1",
+        "target_payload_bytes": 76,
+        "target_payload_sha256": "9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa",
+        "uncompressed_payload_bytes": 16866277,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.032194133865496424,
+        "p95": -0.004063195496350889,
+        "p99": -0.013983313519397722
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-pptx_cross_copy_media_rich.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 1151752980,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 1151955050,
+            "upper_rank": 273
+          },
+          "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+          "p50_ns": 1151843381,
+          "p95_ns": 1154190096,
+          "p99_ns": 1155262662,
+          "repeat": 1,
+          "report": "normal/1-pptx_cross_copy_media_rich.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-pptx_cross_copy_media_rich.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 1152110236,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 1152341970,
+            "upper_rank": 273
+          },
+          "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+          "p50_ns": 1152214207,
+          "p95_ns": 1154143199,
+          "p99_ns": 1155101118,
+          "repeat": 2,
+          "report": "normal/2-pptx_cross_copy_media_rich.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "pptx_cross_copy_media_rich"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 30539,
+        "archive_member_count": 41,
+        "archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+        "compression": "deflate",
+        "entry_bytes": 76,
+        "entry_count": 23,
+        "generator": "litchi-pptx-source-backed-cross-slide-copy-evidence-v1",
+        "name": "pptx_source_backed_cross_copy_plain",
+        "package_format": "PPTX/OPC/ZIP",
+        "payload_kind": "deterministic-slide-text",
+        "shape": "plain",
+        "target_entry": "source-slide:2/destination-slide:1/position:1",
+        "target_payload_bytes": 76,
+        "target_payload_sha256": "9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa",
+        "uncompressed_payload_bytes": 84715,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.05261623443723918,
+        "p95": 0.07025127109108792,
+        "p99": 0.09215452151608979
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-pptx_source_backed_cross_copy_plain.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 1738408,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 1739847,
+            "upper_rank": 273
+          },
+          "output_sha256": "ab5109b0584aacb070b9b33a5769f469464ede991c12fd4da7e9e7bce53f159b",
+          "p50_ns": 1739007,
+          "p95_ns": 1750858,
+          "p99_ns": 1757917,
+          "repeat": 1,
+          "report": "normal/1-pptx_source_backed_cross_copy_plain.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-pptx_source_backed_cross_copy_plain.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 1738917,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 1741008,
+            "upper_rank": 273
+          },
+          "output_sha256": "ab5109b0584aacb070b9b33a5769f469464ede991c12fd4da7e9e7bce53f159b",
+          "p50_ns": 1739922,
+          "p95_ns": 1752088,
+          "p99_ns": 1759537,
+          "repeat": 2,
+          "report": "normal/2-pptx_source_backed_cross_copy_plain.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "pptx_source_backed_cross_copy_plain"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 10808,
+        "archive_member_count": 1,
+        "archive_sha256": "f019aa9e063c194689b3e779cf0bd022e62cd6551b1784b32d927245cff0ffda",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-rtf-paragraph-lifecycle-v1",
+        "name": "rtf-paragraph-lifecycle-plain-medium",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-default-formatted-text",
+        "rtf_variant": "plain",
+        "shape": "medium",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 9999,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 1.5132787706697846,
+        "p95": 1.137070662180179,
+        "p99": 0.5077682347623087
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-rtf_semantic_split_paragraph_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 149551,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 149780,
+            "upper_rank": 273
+          },
+          "output_sha256": "0d3cd9bb43a854e6bea958f38e9801a23332279c8d059eaef610cb42d3f3b63e",
+          "p50_ns": 149675,
+          "p95_ns": 157510,
+          "p99_ns": 161491,
+          "repeat": 1,
+          "report": "normal/1-rtf_semantic_split_paragraph_save.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-rtf_semantic_split_paragraph_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 151831,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 152090,
+            "upper_rank": 273
+          },
+          "output_sha256": "0d3cd9bb43a854e6bea958f38e9801a23332279c8d059eaef610cb42d3f3b63e",
+          "p50_ns": 151940,
+          "p95_ns": 159301,
+          "p99_ns": 162311,
+          "repeat": 2,
+          "report": "normal/2-rtf_semantic_split_paragraph_save.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "rtf_semantic_split_paragraph_save"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 10851,
+        "archive_member_count": 1,
+        "archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-medium",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "medium",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 9999,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.24390243902439024,
+        "p95": 0.321285140562249,
+        "p99": 2.445803224013341
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-rtf_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 12290,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 12310,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 12300,
+          "p95_ns": 12450,
+          "p99_ns": 17990,
+          "repeat": 1,
+          "report": "normal/1-rtf_semantic_text_to_sink.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-rtf_semantic_text_to_sink.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 12320,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 12340,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 12330,
+          "p95_ns": 12490,
+          "p99_ns": 18430,
+          "repeat": 2,
+          "report": "normal/2-rtf_semantic_text_to_sink.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "rtf_semantic_text_to_sink"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 630819,
+        "archive_member_count": 0,
+        "archive_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 8192,
+        "generator": "litchi-rtf-streaming-create-v1",
+        "name": "rtf-streaming-create-medium",
+        "package_format": "rtf",
+        "payload_kind": "deterministic-scalar-text",
+        "rtf_variant": "plain-streaming",
+        "shape": "medium",
+        "target_entry": "document",
+        "target_payload_bytes": 630819,
+        "target_payload_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a",
+        "uncompressed_payload_bytes": 425984,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 4.746680318641672,
+        "p95": 4.879026979201761,
+        "p99": 4.935195751165168
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-rtf_streaming_create.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 8043115,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 8044835,
+            "upper_rank": 273
+          },
+          "output_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a",
+          "p50_ns": 8043769,
+          "p95_ns": 8058615,
+          "p99_ns": 8069224,
+          "repeat": 1,
+          "report": "normal/1-rtf_streaming_create.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-rtf_streaming_create.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 8423797,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 8426927,
+            "upper_rank": 273
+          },
+          "output_sha256": "24e12a9c753a53a8621de2e1bd49e54da8d70143bc588316fbac80a801bd733a",
+          "p50_ns": 8425581,
+          "p95_ns": 8451797,
+          "p99_ns": 8467456,
+          "repeat": 2,
+          "report": "normal/2-rtf_streaming_create.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "rtf_streaming_create"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 163840,
+        "archive_member_count": 1,
+        "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 8192,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "xls-large",
+        "package_format": "XLS/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "large",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 161040,
+        "target_payload_sha256": "f806d23f52c978f5215b05fd232b055725a2605d52122ea74ce0cec357ea9386",
+        "uncompressed_payload_bytes": 65536,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 3.189292733288554,
+        "p95": 3.053611425048803,
+        "p99": 2.6669445500128726
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xls_fresh_write_to.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 1205196,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 1206416,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 1205910,
+          "p95_ns": 1216625,
+          "p99_ns": 1223535,
+          "repeat": 1,
+          "report": "normal/1-xls_fresh_write_to.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xls_fresh_write_to.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 1244005,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 1245015,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 1244370,
+          "p95_ns": 1253776,
+          "p99_ns": 1256166,
+          "repeat": 2,
+          "report": "normal/2-xls_fresh_write_to.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xls_fresh_write_to"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 163840,
+        "archive_member_count": 1,
+        "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+        "compression": "none",
+        "entry_bytes": 0,
+        "entry_count": 8192,
+        "generator": "litchi-legacy-writer-v1",
+        "name": "xls-large",
+        "package_format": "XLS/CFB",
+        "payload_kind": "not-applicable",
+        "shape": "large",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 161040,
+        "target_payload_sha256": "f806d23f52c978f5215b05fd232b055725a2605d52122ea74ce0cec357ea9386",
+        "uncompressed_payload_bytes": 65536,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [
+        "p50",
+        "p95",
+        "p99"
+      ],
+      "repeat_drift_percent": {
+        "p50": 11.551188754006043,
+        "p95": 11.528547500672405,
+        "p99": 11.578263813089794
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xls_validation_report.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 863183,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 863574,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 863383,
+          "p95_ns": 866293,
+          "p99_ns": 868524,
+          "repeat": 1,
+          "report": "normal/1-xls_validation_report.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xls_validation_report.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 962875,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 963364,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 963114,
+          "p95_ns": 966164,
+          "p99_ns": 969084,
+          "repeat": 2,
+          "report": "normal/2-xls_validation_report.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xls_validation_report"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.5139109178581787,
+        "p95": 0.7136053450891465,
+        "p99": 0.25389565204614223
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xlsx_eager_cell_remove_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 9410690,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 9415701,
+            "upper_rank": 273
+          },
+          "output_sha256": "e8d2a9bff505a12a4c4026acbf2decd563dd6bbbc03a88ae8cddde496491163e",
+          "p50_ns": 9413110,
+          "p95_ns": 9459150,
+          "p99_ns": 9527930,
+          "repeat": 1,
+          "report": "normal/1-xlsx_eager_cell_remove_edit_save.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xlsx_eager_cell_remove_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 9456581,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 9466241,
+            "upper_rank": 273
+          },
+          "output_sha256": "e8d2a9bff505a12a4c4026acbf2decd563dd6bbbc03a88ae8cddde496491163e",
+          "p50_ns": 9461485,
+          "p95_ns": 9526651,
+          "p99_ns": 9552121,
+          "repeat": 2,
+          "report": "normal/2-xlsx_eager_cell_remove_edit_save.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xlsx_eager_cell_remove_edit_save"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 16786830,
+        "archive_member_count": 17,
+        "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+        "compression": "deflate",
+        "entry_bytes": 2097152,
+        "entry_count": 12,
+        "generator": "litchi-xlsx-defined-names-source-edit-media-v1",
+        "name": "xlsx-defined-names-media",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-incompressible-media",
+        "shape": "media-rich",
+        "target_entry": "workbook:definedNames",
+        "target_payload_bytes": 303,
+        "target_payload_sha256": "f20dde8c0c2942754908b7264d7c46cdcdb3d264b34109ca561ed1bd7733bbab",
+        "uncompressed_payload_bytes": 16782412,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [
+        "p99"
+      ],
+      "repeat_drift_percent": {
+        "p50": -0.14486229527180994,
+        "p95": 0.645741283163886,
+        "p99": 86.31636318301858
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xlsx_eager_defined_names_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 235905177,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 235999397,
+            "upper_rank": 273
+          },
+          "output_sha256": "f59c85a4003018c58732db832aff9ac3577cff7e7af37d9372ddc4ca5679a615",
+          "p50_ns": 235950286,
+          "p95_ns": 236737071,
+          "p99_ns": 241453646,
+          "repeat": 1,
+          "report": "normal/1-xlsx_eager_defined_names_edit_save.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xlsx_eager_defined_names_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 235578930,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 235651620,
+            "upper_rank": 273
+          },
+          "output_sha256": "f59c85a4003018c58732db832aff9ac3577cff7e7af37d9372ddc4ca5679a615",
+          "p50_ns": 235608483,
+          "p95_ns": 238265780,
+          "p99_ns": 449867652,
+          "repeat": 2,
+          "report": "normal/2-xlsx_eager_defined_names_edit_save.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xlsx_eager_defined_names_edit_save"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 2223,
+        "archive_member_count": 6,
+        "archive_sha256": "72118c9e63decaa2a383568ad7b6c903d8d7f5d41c71563df716fb3bfbb8baf5",
+        "compression": "deflate",
+        "entry_bytes": 395,
+        "entry_count": 3,
+        "generator": "litchi-xlsx-merge-edit-sparse-a1-b2-v1",
+        "name": "xlsx-merge-edit-sparse-a1-b2",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-semantic-cells",
+        "shape": "sparse-a1-b2",
+        "target_entry": "worksheet:Sheet1:merge:A1:B2",
+        "target_payload_bytes": 395,
+        "target_payload_sha256": "692d1a1b71bd6af7bffc8d008d28ba75c5068dc913e0452363950fbe09d5b605",
+        "uncompressed_payload_bytes": 1384,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": -0.3552292121452669,
+        "p95": -0.5748098055790364,
+        "p99": 0.4824837423956367
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xlsx_eager_merge_commit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 50320,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 50480,
+            "upper_rank": 273
+          },
+          "output_sha256": "0bf6bb9511b6c0c7f6e06c87718bd9e262994f365766fdbb8e6ea5875de13a4a",
+          "p50_ns": 50390,
+          "p95_ns": 59150,
+          "p99_ns": 61971,
+          "repeat": 1,
+          "report": "normal/1-xlsx_eager_merge_commit_save.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xlsx_eager_merge_commit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 50160,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 50271,
+            "upper_rank": 273
+          },
+          "output_sha256": "0bf6bb9511b6c0c7f6e06c87718bd9e262994f365766fdbb8e6ea5875de13a4a",
+          "p50_ns": 50211,
+          "p95_ns": 58810,
+          "p99_ns": 62270,
+          "repeat": 2,
+          "report": "normal/2-xlsx_eager_merge_commit_save.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xlsx_eager_merge_commit_save"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 4222174,
+        "archive_member_count": 14,
+        "archive_sha256": "4c1f61e3785593dc8a5869b4fcc8289337a3ec362bdc5039f705b03551fa9f77",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 8192,
+        "generator": "litchi-xlsx-row-visibility-source-edit-media-one-sheet-v1",
+        "name": "xlsx-row-visibility-medium-hide",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-one-sheet-row-grid-with-media",
+        "shape": "medium",
+        "target_entry": "worksheet:Sheet1:existing-rows",
+        "target_payload_bytes": 243851,
+        "target_payload_sha256": "e5c98c9b17ffe5ab20f0626d25ae0ab31c66fdf6dbd2f3a438391b6921a0179b",
+        "uncompressed_payload_bytes": 4227072,
+        "xlsx": {
+          "columns_per_sheet": 16,
+          "one_percent_update_count": 0,
+          "rows_per_sheet": 512,
+          "sheet_count": 1,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml"
+            ]
+          }
+        }
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.3073233069887318,
+        "p95": 0.47519004663004494,
+        "p99": 0.5607217853318703
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xlsx_eager_row_visibility_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 27243032,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 27256196,
+            "upper_rank": 273
+          },
+          "output_sha256": "59b17e475f7b305b2a0f9a69ff0fb05282fd385fafcc511731db0b495c6f2aad",
+          "p50_ns": 27249479,
+          "p95_ns": 27391567,
+          "p99_ns": 27454257,
+          "repeat": 1,
+          "report": "normal/1-xlsx_eager_row_visibility_edit_save.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xlsx_eager_row_visibility_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 27323459,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 27342069,
+            "upper_rank": 273
+          },
+          "output_sha256": "59b17e475f7b305b2a0f9a69ff0fb05282fd385fafcc511731db0b495c6f2aad",
+          "p50_ns": 27333223,
+          "p95_ns": 27521729,
+          "p99_ns": 27608199,
+          "repeat": 2,
+          "report": "normal/2-xlsx_eager_row_visibility_edit_save.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xlsx_eager_row_visibility_edit_save"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 16786830,
+        "archive_member_count": 17,
+        "archive_sha256": "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c",
+        "compression": "deflate",
+        "entry_bytes": 2097152,
+        "entry_count": 12,
+        "generator": "litchi-xlsx-sheet-protection-source-edit-media-v1",
+        "name": "xlsx-sheet-protection-media",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-incompressible-media",
+        "shape": "media-rich",
+        "target_entry": "worksheet:Sheet1:protection",
+        "target_payload_bytes": 207,
+        "target_payload_sha256": "c78af5ae31d6f622b0a9544bd9476c3f6f370258727219d9f62fb27b4e66d91f",
+        "uncompressed_payload_bytes": 16782412,
+        "xlsx": null
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": -0.03795311365514349,
+        "p95": -0.0420912743062164,
+        "p99": 2.9428224233114064
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xlsx_eager_sheet_protection_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 235699795,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 235767957,
+            "upper_rank": 273
+          },
+          "output_sha256": "76b3a48e9682479a7dc75b047e37f221c52dc6953c10168e20995adbf992b8f3",
+          "p50_ns": 235727695,
+          "p95_ns": 236531209,
+          "p99_ns": 238470862,
+          "repeat": 1,
+          "report": "normal/1-xlsx_eager_sheet_protection_edit_save.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xlsx_eager_sheet_protection_edit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 235613505,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 235672133,
+            "upper_rank": 273
+          },
+          "output_sha256": "76b3a48e9682479a7dc75b047e37f221c52dc6953c10168e20995adbf992b8f3",
+          "p50_ns": 235638229,
+          "p95_ns": 236431650,
+          "p99_ns": 245488636,
+          "repeat": 2,
+          "report": "normal/2-xlsx_eager_sheet_protection_edit_save.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xlsx_eager_sheet_protection_edit_save"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.37759669837753734,
+        "p95": 0.3336484457543235,
+        "p99": 0.3586373736007029
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xlsx_full_cell_scan.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 606262,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 607032,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 606732,
+          "p95_ns": 611422,
+          "p99_ns": 613433,
+          "repeat": 1,
+          "report": "normal/1-xlsx_full_cell_scan.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xlsx_full_cell_scan.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 608542,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 609362,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 609023,
+          "p95_ns": 613462,
+          "p99_ns": 615633,
+          "repeat": 2,
+          "report": "normal/2-xlsx_full_cell_scan.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xlsx_full_cell_scan"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.11993669034032681,
+        "p95": 0.5043563565558677,
+        "p99": 0.3307759370348052
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xlsx_join_disjoint_commit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 11630679,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 11639729,
+            "upper_rank": 273
+          },
+          "output_sha256": "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+          "p50_ns": 11636139,
+          "p95_ns": 11700259,
+          "p99_ns": 11760529,
+          "repeat": 1,
+          "report": "normal/1-xlsx_join_disjoint_commit_save.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xlsx_join_disjoint_commit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 11640390,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 11654879,
+            "upper_rank": 273
+          },
+          "output_sha256": "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+          "p50_ns": 11650095,
+          "p95_ns": 11759270,
+          "p99_ns": 11799430,
+          "repeat": 2,
+          "report": "normal/2-xlsx_join_disjoint_commit_save.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xlsx_join_disjoint_commit_save"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "repeat_drift_flags": [
+        "p99"
+      ],
+      "repeat_drift_percent": {
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 9.090909090909092
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xlsx_list_sheets.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 110,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 110,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 110,
+          "p95_ns": 120,
+          "p99_ns": 220,
+          "repeat": 1,
+          "report": "normal/1-xlsx_list_sheets.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xlsx_list_sheets.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 110,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 110,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 110,
+          "p95_ns": 120,
+          "p99_ns": 240,
+          "repeat": 2,
+          "report": "normal/2-xlsx_list_sheets.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xlsx_list_sheets"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": -1.2729095581813672,
+        "p95": -1.1641651342709938,
+        "p99": -1.2275342962669833
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xlsx_one_cell_commit.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 2397850,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 2399611,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 2398835,
+          "p95_ns": 2414520,
+          "p99_ns": 2425920,
+          "repeat": 1,
+          "report": "normal/1-xlsx_one_cell_commit.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xlsx_one_cell_commit.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 2367520,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 2369401,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 2368300,
+          "p95_ns": 2386411,
+          "p99_ns": 2396141,
+          "repeat": 2,
+          "report": "normal/2-xlsx_one_cell_commit.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xlsx_one_cell_commit"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 15254,
+        "archive_member_count": 9,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 4096,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 16384,
+        "xlsx": {
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": -0.39662112055584176,
+        "p95": -0.4455946033967934,
+        "p99": -0.8495938264502192
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xlsx_one_percent_commit.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 9609099,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 9614959,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 9611944,
+          "p95_ns": 9662819,
+          "p99_ns": 9716290,
+          "repeat": 1,
+          "report": "normal/1-xlsx_one_percent_commit.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xlsx_one_percent_commit.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 9571021,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 9575652,
+            "upper_rank": 273
+          },
+          "output_sha256": null,
+          "p50_ns": 9573821,
+          "p95_ns": 9619762,
+          "p99_ns": 9633741,
+          "repeat": 2,
+          "report": "normal/2-xlsx_one_percent_commit.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xlsx_one_percent_commit"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 167418,
+        "archive_member_count": 6,
+        "archive_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+        "compression": "deflate",
+        "entry_bytes": 0,
+        "entry_count": 32768,
+        "generator": "litchi-xlsx-streaming-create-v1",
+        "name": "xlsx-streaming-create-medium",
+        "package_format": "xlsx",
+        "payload_kind": "deterministic-scalar-text",
+        "shape": "medium",
+        "target_entry": "xl/worksheets/sheet1.xml",
+        "target_payload_bytes": 1795765,
+        "target_payload_sha256": "539f28638970fa5f207bd9686e0d0c7372e9cc9df0aec30e296ae9bdb4b3e226",
+        "uncompressed_payload_bytes": 385024,
+        "xlsx": {
+          "columns_per_sheet": 4,
+          "one_percent_update_count": 0,
+          "rows_per_sheet": 8192,
+          "sheet_count": 1,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml"
+            ]
+          }
+        }
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.8421789968829304,
+        "p95": 1.2731792275974914,
+        "p99": 1.2667158844421735
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xlsx_streaming_create.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 12693222,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 12704142,
+            "upper_rank": 273
+          },
+          "output_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+          "p50_ns": 12697182,
+          "p95_ns": 12751072,
+          "p99_ns": 12775872,
+          "repeat": 1,
+          "report": "normal/1-xlsx_streaming_create.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xlsx_streaming_create.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 12799735,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 12807835,
+            "upper_rank": 273
+          },
+          "output_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+          "p50_ns": 12804115,
+          "p95_ns": 12913416,
+          "p99_ns": 12937706,
+          "repeat": 2,
+          "report": "normal/2-xlsx_streaming_create.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xlsx_streaming_create"
+    },
+    {
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "repeat_drift_flags": [],
+      "repeat_drift_percent": {
+        "p50": 0.29407777167870497,
+        "p95": 0.1965046877786781,
+        "p99": 0.13506883629156158
+      },
+      "repeat_drift_threshold_percent": 5.0,
+      "repeats": [
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/1-xlsx_three_way_disjoint_commit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 11641689,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 11650809,
+            "upper_rank": 273
+          },
+          "output_sha256": "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+          "p50_ns": 11646579,
+          "p95_ns": 11735089,
+          "p99_ns": 11779179,
+          "repeat": 1,
+          "report": "normal/1-xlsx_three_way_disjoint_commit_save.json",
+          "sample_count": 500
+        },
+        {
+          "allocation_status": "unavailable",
+          "catalog": "normal/2-xlsx_three_way_disjoint_commit_save.catalog.json",
+          "median_interval_95": {
+            "assumption": "IID samples",
+            "lower_ns": 11675579,
+            "lower_rank": 228,
+            "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+            "upper_ns": 11684722,
+            "upper_rank": 273
+          },
+          "output_sha256": "8c73f1bad5b646817785649ac78555b72376d4511a727d22649299e12c9f82e2",
+          "p50_ns": 11680829,
+          "p95_ns": 11758149,
+          "p99_ns": 11795089,
+          "repeat": 2,
+          "report": "normal/2-xlsx_three_way_disjoint_commit_save.json",
+          "sample_count": 500
+        }
+      ],
+      "selector": "xlsx_three_way_disjoint_commit_save"
+    }
+  ],
+  "normal_repeat_drift_flags": [
+    {
+      "drift_percent": {
+        "p99": -6.668183887118798
+      },
+      "flags": [
+        "p99"
+      ],
+      "selector": "odf_validation_report"
+    },
+    {
+      "drift_percent": {
+        "p99": 5.86445366528354
+      },
+      "flags": [
+        "p99"
+      ],
+      "selector": "odp_semantic_text_to_sink"
+    },
+    {
+      "drift_percent": {
+        "p50": 11.551188754006043,
+        "p95": 11.528547500672405,
+        "p99": 11.578263813089794
+      },
+      "flags": [
+        "p50",
+        "p95",
+        "p99"
+      ],
+      "selector": "xls_validation_report"
+    },
+    {
+      "drift_percent": {
+        "p99": 86.31636318301858
+      },
+      "flags": [
+        "p99"
+      ],
+      "selector": "xlsx_eager_defined_names_edit_save"
+    },
+    {
+      "drift_percent": {
+        "p99": 9.090909090909092
+      },
+      "flags": [
+        "p99"
+      ],
+      "selector": "xlsx_list_sheets"
+    }
+  ],
+  "performance_claim": "none",
+  "revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+  "schema_version": 1,
+  "tool": "litchi-crud-baseline-summarizer",
+  "verification": {
+    "allocator_latency_comparison": "excluded",
+    "allocator_repeat_pairs": 30,
+    "corpus_binding_validated_for_every_run": true,
+    "exact_elapsed_statistics_validated": true,
+    "median_uncertainty": "exact_distribution_free_iid_95_percent_order_statistic_interval",
+    "normal_repeat_pairs": 30,
+    "oracle_cross_repeat_validated": true,
+    "p50_convention": "producer_integer_midpoint_of_middle_sorted_samples",
+    "raw_vectors_validated": true
+  }
+}

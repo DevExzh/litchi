@@ -1,0 +1,1273 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 33K of event 'cycles:u'
+# Event count (approx.): 145622149815
+#
+# Overhead  Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           Shared Object                       IPC   [IPC Coverage]
+# ........  ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................  ..................................  ....................
+#
+    50.67%  [.] zlib_rs::deflate::algorithm::medium::deflate_medium                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             litchi-goal-0417-normal             -      -            
+            |
+            ---zlib_rs::deflate::deflate
+               <zlib_rs::stable::Deflate>::compress_uninit
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |          
+               |--48.87%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status
+               |          <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+               |          soapberry_zip::preserve::generated_entry
+               |          |          
+               |          |--36.60%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+               |          |          |          
+               |          |          |--24.54%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+               |          |          |          <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+               |          |          |          litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+               |          |          |          litchi_pptx::opened::cross_copy_plan::build_candidate
+               |          |          |          litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+               |          |          |          |          
+               |          |          |          |--12.64%--<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>
+               |          |          |          |          |          
+               |          |          |          |          |--11.09%--litchi_perf_baseline::run_pptx_cross_copy
+               |          |          |          |          |          litchi_perf_baseline::run
+               |          |          |          |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |          |          |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |          |          |          |          std::rt::lang_start_internal
+               |          |          |          |          |          main
+               |          |          |          |          |          __libc_start_call_main
+               |          |          |          |          |          __libc_start_main@@GLIBC_2.34
+               |          |          |          |          |          _start
+               |          |          |          |          |          
+               |          |          |          |          |--1.05%--litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+               |          |          |          |          |          litchi_perf_baseline::build_pptx_cross_copy_corpus
+               |          |          |          |          |          litchi_perf_baseline::run
+               |          |          |          |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |          |          |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |          |          |          |          std::rt::lang_start_internal
+               |          |          |          |          |          main
+               |          |          |          |          |          __libc_start_call_main
+               |          |          |          |          |          __libc_start_main@@GLIBC_2.34
+               |          |          |          |          |          _start
+               |          |          |          |          |          
+               |          |          |          |           --0.50%--litchi_perf_baseline::build_pptx_cross_copy_corpus
+               |          |          |          |                     litchi_perf_baseline::run
+               |          |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |          |          |                     std::rt::lang_start_internal
+               |          |          |          |                     main
+               |          |          |          |                     __libc_start_call_main
+               |          |          |          |                     __libc_start_main@@GLIBC_2.34
+               |          |          |          |                     _start
+               |          |          |          |          
+               |          |          |          |--11.46%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+               |          |          |          |          |          
+               |          |          |          |          |--10.99%--litchi_perf_baseline::run_pptx_cross_copy
+               |          |          |          |          |          litchi_perf_baseline::run
+               |          |          |          |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |          |          |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |          |          |          |          std::rt::lang_start_internal
+               |          |          |          |          |          main
+               |          |          |          |          |          __libc_start_call_main
+               |          |          |          |          |          __libc_start_main@@GLIBC_2.34
+               |          |          |          |          |          _start
+               |          |          |          |          |          
+               |          |          |          |           --0.47%--litchi_perf_baseline::build_pptx_cross_copy_corpus
+               |          |          |          |                     litchi_perf_baseline::run
+               |          |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |          |          |                     std::rt::lang_start_internal
+               |          |          |          |                     main
+               |          |          |          |                     __libc_start_call_main
+               |          |          |          |                     __libc_start_main@@GLIBC_2.34
+               |          |          |          |                     _start
+               |          |          |          |          
+               |          |          |           --0.44%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_patch
+               |          |          |                     litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+               |          |          |                     litchi_perf_baseline::build_pptx_cross_copy_corpus
+               |          |          |                     litchi_perf_baseline::run
+               |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |          |                     std::rt::lang_start_internal
+               |          |          |                     main
+               |          |          |                     __libc_start_call_main
+               |          |          |                     __libc_start_main@@GLIBC_2.34
+               |          |          |                     _start
+               |          |          |          
+               |          |           --12.06%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>>>
+               |          |                     <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>
+               |          |                     litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint
+               |          |                     |          
+               |          |                     |--11.56%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+               |          |                     |          |          
+               |          |                     |          |--11.02%--litchi_perf_baseline::run_pptx_cross_copy
+               |          |                     |          |          litchi_perf_baseline::run
+               |          |                     |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |                     |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |                     |          |          std::rt::lang_start_internal
+               |          |                     |          |          main
+               |          |                     |          |          __libc_start_call_main
+               |          |                     |          |          __libc_start_main@@GLIBC_2.34
+               |          |                     |          |          _start
+               |          |                     |          |          
+               |          |                     |           --0.54%--litchi_perf_baseline::build_pptx_cross_copy_corpus
+               |          |                     |                     litchi_perf_baseline::run
+               |          |                     |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |                     |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |                     |                     std::rt::lang_start_internal
+               |          |                     |                     main
+               |          |                     |                     __libc_start_call_main
+               |          |                     |                     __libc_start_main@@GLIBC_2.34
+               |          |                     |                     _start
+               |          |                     |          
+               |          |                      --0.50%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_patch
+               |          |                                litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+               |          |                                litchi_perf_baseline::build_pptx_cross_copy_corpus
+               |          |                                litchi_perf_baseline::run
+               |          |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |                                std::rt::lang_start_internal
+               |          |                                main
+               |          |                                __libc_start_call_main
+               |          |                                __libc_start_main@@GLIBC_2.34
+               |          |                                _start
+               |          |          
+               |          |--11.30%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+               |          |          <soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_perf_baseline::CountingSink>>>
+               |          |          <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_perf_baseline::CountingSink>
+               |          |          litchi_perf_baseline::run_pptx_cross_copy
+               |          |          litchi_perf_baseline::run
+               |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |          std::rt::lang_start_internal
+               |          |          main
+               |          |          __libc_start_call_main
+               |          |          __libc_start_main@@GLIBC_2.34
+               |          |          _start
+               |          |          
+               |           --0.97%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<alloc::vec::Vec<u8>>>
+               |                     <litchi_opc::pkgwriter::PackageWriter>::to_bytes
+               |                     <litchi_pptx::package::model::Package>::to_bytes
+               |                     |          
+               |                     |--0.51%--litchi_perf_baseline::build_pptx_cross_copy_corpus
+               |                     |          litchi_perf_baseline::run
+               |                     |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |                     |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |                     |          std::rt::lang_start_internal
+               |                     |          main
+               |                     |          __libc_start_call_main
+               |                     |          __libc_start_main@@GLIBC_2.34
+               |                     |          _start
+               |                     |          
+               |                      --0.47%--litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+               |                                litchi_perf_baseline::build_pptx_cross_copy_corpus
+               |                                litchi_perf_baseline::run
+               |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |                                std::rt::lang_start_internal
+               |                                main
+               |                                __libc_start_call_main
+               |                                __libc_start_main@@GLIBC_2.34
+               |                                _start
+               |          
+               |--0.96%--<flate2::zio::Writer<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>, flate2::mem::Compress>>::write_with_status
+               |          <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>> as std::io::Write>::write_all
+               |          <soapberry_zip::office::StreamingArchiveWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::write_deflated_with_accounting
+               |          <litchi_opc::phys_pkg::PhysPkgWriter>::write
+               |          <litchi_opc::pkgwriter::PackageWriter>::to_bytes
+               |          <litchi_pptx::package::model::Package>::to_bytes
+               |          litchi_perf_baseline::pptx_cross_copy_bytes
+               |          litchi_perf_baseline::build_pptx_cross_copy_corpus
+               |          litchi_perf_baseline::run
+               |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          std::rt::lang_start_internal
+               |          main
+               |          __libc_start_call_main
+               |          __libc_start_main@@GLIBC_2.34
+               |          _start
+               |          
+                --0.81%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress> as std::io::Write>::flush
+                          <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>>>::finish
+                          soapberry_zip::preserve::generated_entry
+                          |          
+                          |--0.61%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+                          |          |          
+                          |          |--0.41%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+                          |          |          <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+                          |          |          litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+                          |          |          litchi_pptx::opened::cross_copy_plan::build_candidate
+                          |          |          litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+                          |          |          |          
+                          |          |          |--0.22%--<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>
+                          |          |          |          |          
+                          |          |          |           --0.20%--litchi_perf_baseline::run_pptx_cross_copy
+                          |          |          |                     litchi_perf_baseline::run
+                          |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          |          |          |                     std::rt::lang_start_internal
+                          |          |          |                     main
+                          |          |          |                     __libc_start_call_main
+                          |          |          |                     __libc_start_main@@GLIBC_2.34
+                          |          |          |                     _start
+                          |          |          |          
+                          |          |           --0.18%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+                          |          |                     |          
+                          |          |                      --0.17%--litchi_perf_baseline::run_pptx_cross_copy
+                          |          |                                litchi_perf_baseline::run
+                          |          |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          |          |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          |          |                                std::rt::lang_start_internal
+                          |          |                                main
+                          |          |                                __libc_start_call_main
+                          |          |                                __libc_start_main@@GLIBC_2.34
+                          |          |                                _start
+                          |          |          
+                          |           --0.20%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>>>
+                          |                     <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>
+                          |                     litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint
+                          |                     |          
+                          |                      --0.19%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+                          |                                |          
+                          |                                 --0.18%--litchi_perf_baseline::run_pptx_cross_copy
+                          |                                           litchi_perf_baseline::run
+                          |                                           std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          |                                           std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          |                                           std::rt::lang_start_internal
+                          |                                           main
+                          |                                           __libc_start_call_main
+                          |                                           __libc_start_main@@GLIBC_2.34
+                          |                                           _start
+                          |          
+                           --0.19%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+                                     <soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_perf_baseline::CountingSink>>>
+                                     <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_perf_baseline::CountingSink>
+                                     litchi_perf_baseline::run_pptx_cross_copy
+                                     litchi_perf_baseline::run
+                                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                                     std::rt::lang_start_internal
+                                     main
+                                     __libc_start_call_main
+                                     __libc_start_main@@GLIBC_2.34
+                                     _start
+
+    20.66%  [.] sha2::sha256::x86_sha::compress                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 litchi-goal-0417-normal             -      -            
+            |          
+            |--11.38%--litchi_pptx::opened::model::feed
+            |          |          
+            |           --11.38%--litchi_pptx::opened::model::package_fingerprint
+            |                     |          
+            |                     |--7.53%--litchi_pptx::opened::model::capture_with_provenance
+            |                     |          |          
+            |                     |          |--2.46%--litchi_pptx::opened::cross_copy_plan::build_candidate
+            |                     |          |          litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+            |                     |          |          |          
+            |                     |          |          |--1.23%--<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>
+            |                     |          |          |          |          
+            |                     |          |          |           --1.09%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     |          |          |                     litchi_perf_baseline::run
+            |                     |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |          |          |                     std::rt::lang_start_internal
+            |                     |          |          |                     main
+            |                     |          |          |                     __libc_start_call_main
+            |                     |          |          |                     __libc_start_main@@GLIBC_2.34
+            |                     |          |          |                     _start
+            |                     |          |          |          
+            |                     |          |           --1.14%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |                     |          |                     |          
+            |                     |          |                      --1.09%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     |          |                                litchi_perf_baseline::run
+            |                     |          |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |          |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |          |                                std::rt::lang_start_internal
+            |                     |          |                                main
+            |                     |          |                                __libc_start_call_main
+            |                     |          |                                __libc_start_main@@GLIBC_2.34
+            |                     |          |                                _start
+            |                     |          |          
+            |                     |          |--2.39%--<litchi_pptx::package::model::Package>::opened_presentation
+            |                     |          |          |          
+            |                     |          |          |--2.18%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     |          |          |          litchi_perf_baseline::run
+            |                     |          |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |          |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |          |          |          std::rt::lang_start_internal
+            |                     |          |          |          main
+            |                     |          |          |          __libc_start_call_main
+            |                     |          |          |          __libc_start_main@@GLIBC_2.34
+            |                     |          |          |          _start
+            |                     |          |          |          
+            |                     |          |           --0.16%--litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+            |                     |          |                     litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |                     |          |                     litchi_perf_baseline::run
+            |                     |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |          |                     std::rt::lang_start_internal
+            |                     |          |                     main
+            |                     |          |                     __libc_start_call_main
+            |                     |          |                     __libc_start_main@@GLIBC_2.34
+            |                     |          |                     _start
+            |                     |          |          
+            |                     |          |--1.31%--litchi_pptx::opened::patch::apply_with_revision
+            |                     |          |          |          
+            |                     |          |           --1.13%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |                     |          |                     |          
+            |                     |          |                      --1.08%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     |          |                                litchi_perf_baseline::run
+            |                     |          |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |          |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |          |                                std::rt::lang_start_internal
+            |                     |          |                                main
+            |                     |          |                                __libc_start_call_main
+            |                     |          |                                __libc_start_main@@GLIBC_2.34
+            |                     |          |                                _start
+            |                     |          |          
+            |                     |          |--1.13%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |                     |          |          |          
+            |                     |          |           --1.08%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     |          |                     litchi_perf_baseline::run
+            |                     |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |          |                     std::rt::lang_start_internal
+            |                     |          |                     main
+            |                     |          |                     __libc_start_call_main
+            |                     |          |                     __libc_start_main@@GLIBC_2.34
+            |                     |          |                     _start
+            |                     |          |          
+            |                     |           --0.14%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_patch
+            |                     |                     litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+            |                     |                     litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |                     |                     litchi_perf_baseline::run
+            |                     |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |                     std::rt::lang_start_internal
+            |                     |                     main
+            |                     |                     __libc_start_call_main
+            |                     |                     __libc_start_main@@GLIBC_2.34
+            |                     |                     _start
+            |                     |          
+            |                     |--2.43%--litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+            |                     |          |          
+            |                     |          |--1.22%--<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>
+            |                     |          |          |          
+            |                     |          |           --1.07%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     |          |                     litchi_perf_baseline::run
+            |                     |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |          |                     std::rt::lang_start_internal
+            |                     |          |                     main
+            |                     |          |                     __libc_start_call_main
+            |                     |          |                     __libc_start_main@@GLIBC_2.34
+            |                     |          |                     _start
+            |                     |          |          
+            |                     |           --1.12%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |                     |                     |          
+            |                     |                      --1.08%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     |                                litchi_perf_baseline::run
+            |                     |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |                                std::rt::lang_start_internal
+            |                     |                                main
+            |                     |                                __libc_start_call_main
+            |                     |                                __libc_start_main@@GLIBC_2.34
+            |                     |                                _start
+            |                     |          
+            |                     |--1.21%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |                     |          |          
+            |                     |           --1.07%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     |                     litchi_perf_baseline::run
+            |                     |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |                     std::rt::lang_start_internal
+            |                     |                     main
+            |                     |                     __libc_start_call_main
+            |                     |                     __libc_start_main@@GLIBC_2.34
+            |                     |                     _start
+            |                     |          
+            |                      --0.11%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_patch
+            |                                litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+            |                                litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |                                litchi_perf_baseline::run
+            |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                                std::rt::lang_start_internal
+            |                                main
+            |                                __libc_start_call_main
+            |                                __libc_start_main@@GLIBC_2.34
+            |                                _start
+            |          
+            |--7.37%--<litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter as std::io::Write>::write
+            |          |          
+            |          |--6.12%--<litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>
+            |          |          litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint
+            |          |          |          
+            |          |          |--4.87%--litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+            |          |          |          |          
+            |          |          |          |--2.43%--<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>
+            |          |          |          |          |          
+            |          |          |          |          |--2.15%--litchi_perf_baseline::run_pptx_cross_copy
+            |          |          |          |          |          litchi_perf_baseline::run
+            |          |          |          |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |          |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |          |          |          std::rt::lang_start_internal
+            |          |          |          |          |          main
+            |          |          |          |          |          __libc_start_call_main
+            |          |          |          |          |          __libc_start_main@@GLIBC_2.34
+            |          |          |          |          |          _start
+            |          |          |          |          |          
+            |          |          |          |           --0.18%--litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+            |          |          |          |                     litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |          |          |          |                     litchi_perf_baseline::run
+            |          |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |          |                     std::rt::lang_start_internal
+            |          |          |          |                     main
+            |          |          |          |                     __libc_start_call_main
+            |          |          |          |                     __libc_start_main@@GLIBC_2.34
+            |          |          |          |                     _start
+            |          |          |          |          
+            |          |          |           --2.27%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |          |          |                     |          
+            |          |          |                      --2.18%--litchi_perf_baseline::run_pptx_cross_copy
+            |          |          |                                litchi_perf_baseline::run
+            |          |          |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |                                std::rt::lang_start_internal
+            |          |          |                                main
+            |          |          |                                __libc_start_call_main
+            |          |          |                                __libc_start_main@@GLIBC_2.34
+            |          |          |                                _start
+            |          |          |          
+            |          |          |--1.13%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |          |          |          |          
+            |          |          |           --1.09%--litchi_perf_baseline::run_pptx_cross_copy
+            |          |          |                     litchi_perf_baseline::run
+            |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |                     std::rt::lang_start_internal
+            |          |          |                     main
+            |          |          |                     __libc_start_call_main
+            |          |          |                     __libc_start_main@@GLIBC_2.34
+            |          |          |                     _start
+            |          |          |          
+            |          |           --0.12%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_patch
+            |          |                     litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+            |          |                     litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |          |                     litchi_perf_baseline::run
+            |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |                     std::rt::lang_start_internal
+            |          |                     main
+            |          |                     __libc_start_call_main
+            |          |                     __libc_start_main@@GLIBC_2.34
+            |          |                     _start
+            |          |          
+            |           --1.25%--soapberry_zip::accounting::write_all_counted::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>>>
+            |                     soapberry_zip::preserve::write_prepared_local::<core::io::cursor::Cursor<&[u8]>, litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>>>
+            |                     <soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>>>
+            |                     <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>
+            |                     litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint
+            |                     |          
+            |                      --1.13%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |                                |          
+            |                                 --1.08%--litchi_perf_baseline::run_pptx_cross_copy
+            |                                           litchi_perf_baseline::run
+            |                                           std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                                           std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                                           std::rt::lang_start_internal
+            |                                           main
+            |                                           __libc_start_call_main
+            |                                           __libc_start_main@@GLIBC_2.34
+            |                                           _start
+            |          
+            |--1.28%--litchi_perf_baseline::sha256_hex
+            |          |          
+            |           --1.23%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     litchi_perf_baseline::run
+            |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     std::rt::lang_start_internal
+            |                     main
+            |                     __libc_start_call_main
+            |                     __libc_start_main@@GLIBC_2.34
+            |                     _start
+            |          
+             --0.62%--litchi_perf_baseline::current_executable_identity
+                       litchi_perf_baseline::run
+                       std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                       std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                       std::rt::lang_start_internal
+                       main
+                       __libc_start_call_main
+                       __libc_start_main@@GLIBC_2.34
+                       _start
+
+    16.08%  [.] zlib_rs::deflate::longest_match::longest_match                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  litchi-goal-0417-normal             -      -            
+            |          
+            |--15.58%--zlib_rs::deflate::algorithm::medium::deflate_medium
+            |          zlib_rs::deflate::deflate
+            |          <zlib_rs::stable::Deflate>::compress_uninit
+            |          <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+            |          |          
+            |          |--15.03%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status
+            |          |          <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+            |          |          soapberry_zip::preserve::generated_entry
+            |          |          |          
+            |          |          |--11.35%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+            |          |          |          |          
+            |          |          |          |--7.62%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+            |          |          |          |          <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+            |          |          |          |          litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+            |          |          |          |          litchi_pptx::opened::cross_copy_plan::build_candidate
+            |          |          |          |          litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+            |          |          |          |          |          
+            |          |          |          |          |--3.80%--<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>
+            |          |          |          |          |          |          
+            |          |          |          |          |          |--3.43%--litchi_perf_baseline::run_pptx_cross_copy
+            |          |          |          |          |          |          litchi_perf_baseline::run
+            |          |          |          |          |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |          |          |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |          |          |          |          std::rt::lang_start_internal
+            |          |          |          |          |          |          main
+            |          |          |          |          |          |          __libc_start_call_main
+            |          |          |          |          |          |          __libc_start_main@@GLIBC_2.34
+            |          |          |          |          |          |          _start
+            |          |          |          |          |          |          
+            |          |          |          |          |          |--0.25%--litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+            |          |          |          |          |          |          litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |          |          |          |          |          |          litchi_perf_baseline::run
+            |          |          |          |          |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |          |          |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |          |          |          |          std::rt::lang_start_internal
+            |          |          |          |          |          |          main
+            |          |          |          |          |          |          __libc_start_call_main
+            |          |          |          |          |          |          __libc_start_main@@GLIBC_2.34
+            |          |          |          |          |          |          _start
+            |          |          |          |          |          |          
+            |          |          |          |          |           --0.12%--litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |          |          |          |          |                     litchi_perf_baseline::run
+            |          |          |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |          |          |                     std::rt::lang_start_internal
+            |          |          |          |          |                     main
+            |          |          |          |          |                     __libc_start_call_main
+            |          |          |          |          |                     __libc_start_main@@GLIBC_2.34
+            |          |          |          |          |                     _start
+            |          |          |          |          |          
+            |          |          |          |          |--3.64%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |          |          |          |          |          |          
+            |          |          |          |          |          |--3.51%--litchi_perf_baseline::run_pptx_cross_copy
+            |          |          |          |          |          |          litchi_perf_baseline::run
+            |          |          |          |          |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |          |          |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |          |          |          |          std::rt::lang_start_internal
+            |          |          |          |          |          |          main
+            |          |          |          |          |          |          __libc_start_call_main
+            |          |          |          |          |          |          __libc_start_main@@GLIBC_2.34
+            |          |          |          |          |          |          _start
+            |          |          |          |          |          |          
+            |          |          |          |          |           --0.13%--litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |          |          |          |          |                     litchi_perf_baseline::run
+            |          |          |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |          |          |                     std::rt::lang_start_internal
+            |          |          |          |          |                     main
+            |          |          |          |          |                     __libc_start_call_main
+            |          |          |          |          |                     __libc_start_main@@GLIBC_2.34
+            |          |          |          |          |                     _start
+            |          |          |          |          |          
+            |          |          |          |           --0.18%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_patch
+            |          |          |          |                     litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+            |          |          |          |                     litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |          |          |          |                     litchi_perf_baseline::run
+            |          |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |          |                     std::rt::lang_start_internal
+            |          |          |          |                     main
+            |          |          |          |                     __libc_start_call_main
+            |          |          |          |                     __libc_start_main@@GLIBC_2.34
+            |          |          |          |                     _start
+            |          |          |          |          
+            |          |          |           --3.73%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>>>
+            |          |          |                     <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>
+            |          |          |                     litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint
+            |          |          |                     |          
+            |          |          |                     |--3.57%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |          |          |                     |          |          
+            |          |          |                     |          |--3.46%--litchi_perf_baseline::run_pptx_cross_copy
+            |          |          |                     |          |          litchi_perf_baseline::run
+            |          |          |                     |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |                     |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |                     |          |          std::rt::lang_start_internal
+            |          |          |                     |          |          main
+            |          |          |                     |          |          __libc_start_call_main
+            |          |          |                     |          |          __libc_start_main@@GLIBC_2.34
+            |          |          |                     |          |          _start
+            |          |          |                     |          |          
+            |          |          |                     |           --0.11%--litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |          |          |                     |                     litchi_perf_baseline::run
+            |          |          |                     |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |                     |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |                     |                     std::rt::lang_start_internal
+            |          |          |                     |                     main
+            |          |          |                     |                     __libc_start_call_main
+            |          |          |                     |                     __libc_start_main@@GLIBC_2.34
+            |          |          |                     |                     _start
+            |          |          |                     |          
+            |          |          |                      --0.16%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_patch
+            |          |          |                                litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+            |          |          |                                litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |          |          |                                litchi_perf_baseline::run
+            |          |          |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |                                std::rt::lang_start_internal
+            |          |          |                                main
+            |          |          |                                __libc_start_call_main
+            |          |          |                                __libc_start_main@@GLIBC_2.34
+            |          |          |                                _start
+            |          |          |          
+            |          |          |--3.40%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+            |          |          |          <soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_perf_baseline::CountingSink>>>
+            |          |          |          <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_perf_baseline::CountingSink>
+            |          |          |          litchi_perf_baseline::run_pptx_cross_copy
+            |          |          |          litchi_perf_baseline::run
+            |          |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          |          std::rt::lang_start_internal
+            |          |          |          main
+            |          |          |          __libc_start_call_main
+            |          |          |          __libc_start_main@@GLIBC_2.34
+            |          |          |          _start
+            |          |          |          
+            |          |           --0.28%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<alloc::vec::Vec<u8>>>
+            |          |                     <litchi_opc::pkgwriter::PackageWriter>::to_bytes
+            |          |                     <litchi_pptx::package::model::Package>::to_bytes
+            |          |                     |          
+            |          |                     |--0.17%--litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates
+            |          |                     |          litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |          |                     |          litchi_perf_baseline::run
+            |          |                     |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |                     |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |                     |          std::rt::lang_start_internal
+            |          |                     |          main
+            |          |                     |          __libc_start_call_main
+            |          |                     |          __libc_start_main@@GLIBC_2.34
+            |          |                     |          _start
+            |          |                     |          
+            |          |                      --0.11%--litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |          |                                litchi_perf_baseline::run
+            |          |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |                                std::rt::lang_start_internal
+            |          |                                main
+            |          |                                __libc_start_call_main
+            |          |                                __libc_start_main@@GLIBC_2.34
+            |          |                                _start
+            |          |          
+            |          |--0.34%--<flate2::zio::Writer<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>, flate2::mem::Compress>>::write_with_status
+            |          |          <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>> as std::io::Write>::write_all
+            |          |          <soapberry_zip::office::StreamingArchiveWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::write_deflated_with_accounting
+            |          |          <litchi_opc::phys_pkg::PhysPkgWriter>::write
+            |          |          <litchi_opc::pkgwriter::PackageWriter>::to_bytes
+            |          |          <litchi_pptx::package::model::Package>::to_bytes
+            |          |          litchi_perf_baseline::pptx_cross_copy_bytes
+            |          |          litchi_perf_baseline::build_pptx_cross_copy_corpus
+            |          |          litchi_perf_baseline::run
+            |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          |          std::rt::lang_start_internal
+            |          |          main
+            |          |          __libc_start_call_main
+            |          |          __libc_start_main@@GLIBC_2.34
+            |          |          _start
+            |          |          
+            |           --0.21%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress> as std::io::Write>::flush
+            |                     <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>>>::finish
+            |                     soapberry_zip::preserve::generated_entry
+            |                     |          
+            |                      --0.17%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+            |                                |          
+            |                                 --0.12%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+            |                                           <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+            |                                           litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+            |                                           litchi_pptx::opened::cross_copy_plan::build_candidate
+            |                                           litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+            |          
+             --0.50%--zlib_rs::deflate::deflate
+                       <zlib_rs::stable::Deflate>::compress_uninit
+                       <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+                       |          
+                        --0.48%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status
+                                  <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+                                  soapberry_zip::preserve::generated_entry
+                                  |          
+                                  |--0.36%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+                                  |          |          
+                                  |          |--0.23%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+                                  |          |          <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+                                  |          |          litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+                                  |          |          litchi_pptx::opened::cross_copy_plan::build_candidate
+                                  |          |          litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+                                  |          |          |          
+                                  |          |          |--0.12%--<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>
+                                  |          |          |          |          
+                                  |          |          |           --0.11%--litchi_perf_baseline::run_pptx_cross_copy
+                                  |          |          |                     litchi_perf_baseline::run
+                                  |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                                  |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                                  |          |          |                     std::rt::lang_start_internal
+                                  |          |          |                     main
+                                  |          |          |                     __libc_start_call_main
+                                  |          |          |                     __libc_start_main@@GLIBC_2.34
+                                  |          |          |                     _start
+                                  |          |          |          
+                                  |          |           --0.11%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+                                  |          |          
+                                  |           --0.13%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>>>
+                                  |                     <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>
+                                  |                     litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint
+                                  |                     |          
+                                  |                      --0.13%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+                                  |                                |          
+                                  |                                 --0.12%--litchi_perf_baseline::run_pptx_cross_copy
+                                  |                                           litchi_perf_baseline::run
+                                  |                                           std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                                  |                                           std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                                  |                                           std::rt::lang_start_internal
+                                  |                                           main
+                                  |                                           __libc_start_call_main
+                                  |                                           __libc_start_main@@GLIBC_2.34
+                                  |                                           _start
+                                  |          
+                                   --0.11%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+                                             <soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_perf_baseline::CountingSink>>>
+                                             <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_perf_baseline::CountingSink>
+                                             litchi_perf_baseline::run_pptx_cross_copy
+                                             litchi_perf_baseline::run
+                                             std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                                             std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                                             std::rt::lang_start_internal
+                                             main
+                                             __libc_start_call_main
+                                             __libc_start_main@@GLIBC_2.34
+                                             _start
+
+     3.93%  [.] <zlib_rs::deflate::Heap>::pqdownheap                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            litchi-goal-0417-normal             -      -            
+            |          
+            |--3.52%--<zlib_rs::deflate::Heap>::construct_huffman_tree
+            |          zlib_rs::deflate::flush_block_only
+            |          zlib_rs::deflate::algorithm::medium::deflate_medium
+            |          zlib_rs::deflate::deflate
+            |          <zlib_rs::stable::Deflate>::compress_uninit
+            |          <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+            |          |          
+            |           --3.40%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status
+            |                     <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+            |                     soapberry_zip::preserve::generated_entry
+            |                     |          
+            |                     |--2.64%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+            |                     |          |          
+            |                     |          |--1.76%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+            |                     |          |          <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+            |                     |          |          litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+            |                     |          |          litchi_pptx::opened::cross_copy_plan::build_candidate
+            |                     |          |          litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+            |                     |          |          |          
+            |                     |          |          |--0.92%--<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>
+            |                     |          |          |          |          
+            |                     |          |          |           --0.83%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     |          |          |                     litchi_perf_baseline::run
+            |                     |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |          |          |                     std::rt::lang_start_internal
+            |                     |          |          |                     main
+            |                     |          |          |                     __libc_start_call_main
+            |                     |          |          |                     __libc_start_main@@GLIBC_2.34
+            |                     |          |          |                     _start
+            |                     |          |          |          
+            |                     |          |           --0.82%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |                     |          |                     |          
+            |                     |          |                      --0.77%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     |          |                                litchi_perf_baseline::run
+            |                     |          |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |          |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |          |                                std::rt::lang_start_internal
+            |                     |          |                                main
+            |                     |          |                                __libc_start_call_main
+            |                     |          |                                __libc_start_main@@GLIBC_2.34
+            |                     |          |                                _start
+            |                     |          |          
+            |                     |           --0.88%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>>>
+            |                     |                     <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>
+            |                     |                     litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint
+            |                     |                     |          
+            |                     |                      --0.85%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |                     |                                |          
+            |                     |                                 --0.83%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     |                                           litchi_perf_baseline::run
+            |                     |                                           std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |                                           std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |                                           std::rt::lang_start_internal
+            |                     |                                           main
+            |                     |                                           __libc_start_call_main
+            |                     |                                           __libc_start_main@@GLIBC_2.34
+            |                     |                                           _start
+            |                     |          
+            |                      --0.68%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+            |                                <soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_perf_baseline::CountingSink>>>
+            |                                <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_perf_baseline::CountingSink>
+            |                                litchi_perf_baseline::run_pptx_cross_copy
+            |                                litchi_perf_baseline::run
+            |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                                std::rt::lang_start_internal
+            |                                main
+            |                                __libc_start_call_main
+            |                                __libc_start_main@@GLIBC_2.34
+            |                                _start
+            |          
+             --0.38%--zlib_rs::deflate::flush_block_only
+                       zlib_rs::deflate::algorithm::medium::deflate_medium
+                       zlib_rs::deflate::deflate
+                       <zlib_rs::stable::Deflate>::compress_uninit
+                       <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+                       |          
+                        --0.37%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status
+                                  <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+                                  soapberry_zip::preserve::generated_entry
+                                  |          
+                                   --0.30%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+                                             |          
+                                             |--0.19%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+                                             |          <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+                                             |          litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+                                             |          litchi_pptx::opened::cross_copy_plan::build_candidate
+                                             |          litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+                                             |          |          
+                                             |           --0.11%--<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>
+                                             |          
+                                              --0.10%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>>>
+                                                        <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>
+                                                        litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint
+                                                        <litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+
+     2.77%  [.] __memmove_avx512_unaligned_erms                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 libc.so.6                           -      -            
+            |          
+            |--0.63%--<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>> as std::io::Read>::read
+            |          <core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>>> as std::io::Read>::read_buf
+            |          std::io::default_read_to_end::<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>>>>
+            |          <soapberry_zip::office::ArchiveReadSession>::read_with_accounting
+            |          <soapberry_zip::office::LazyArchiveReader>::read_shared_with_reader
+            |          <alloc::vec::Vec<(&str, core::result::Result<alloc::sync::Arc<alloc::vec::Vec<u8>>, soapberry_zip::errors::Error>)> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<(&str, core::result::Result<alloc::sync::Arc<alloc::vec::Vec<u8>>, soapberry_zip::errors::Error>), core::iter::adapters::map::Map<core::slice::iter::Iter<&str>, <soapberry_zip::office::LazyArchiveReader>::read_many_serial_shared::{closure#0}>>>::from_iter
+            |          <soapberry_zip::office::LazyArchiveReader>::read_many_serial_shared
+            |          <litchi_opc::pkgreader::PackageReader>::load_parts_eager::<soapberry_zip::office::LazyArchiveReader, <litchi_opc::pkgreader::PackageReader>::from_phys_reader::{closure#2}>
+            |          <litchi_opc::pkgreader::PackageReader>::from_phys_reader
+            |          |          
+            |           --0.54%--<litchi_opc::package::OpcPackage>::from_owned_bytes_with_limits
+            |                     |          
+            |                     |--0.30%--<litchi_pptx::package::model::Package>::from_vec
+            |                     |          |          
+            |                     |           --0.21%--litchi_perf_baseline::verify_pptx_cross_copy_output
+            |                     |                     |          
+            |                     |                      --0.20%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     |                                litchi_perf_baseline::run
+            |                     |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     |                                std::rt::lang_start_internal
+            |                     |                                main
+            |                     |                                __libc_start_call_main
+            |                     |                                __libc_start_main@@GLIBC_2.34
+            |                     |                                _start
+            |                     |          
+            |                      --0.24%--<litchi_opc::package::OpcPackage>::from_vec
+            |                                litchi_pptx::opened::cross_copy_plan::build_candidate
+            |                                litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+            |                                |          
+            |                                |--0.13%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+            |                                |          |          
+            |                                |           --0.13%--litchi_perf_baseline::run_pptx_cross_copy
+            |                                |                     litchi_perf_baseline::run
+            |                                |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                                |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                                |                     std::rt::lang_start_internal
+            |                                |                     main
+            |                                |                     __libc_start_call_main
+            |                                |                     __libc_start_main@@GLIBC_2.34
+            |                                |                     _start
+            |                                |          
+            |                                 --0.10%--<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>
+            |          
+            |--0.33%--litchi_perf_baseline::run_pptx_cross_copy
+            |          litchi_perf_baseline::run
+            |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          std::rt::lang_start_internal
+            |          main
+            |          __libc_start_call_main
+            |          __libc_start_main@@GLIBC_2.34
+            |          _start
+            |          
+            |--0.22%--zlib_rs::deflate::fill_window
+            |          zlib_rs::deflate::algorithm::medium::deflate_medium
+            |          zlib_rs::deflate::deflate
+            |          <zlib_rs::stable::Deflate>::compress_uninit
+            |          <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+            |          |          
+            |           --0.22%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status
+            |                     <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+            |                     soapberry_zip::preserve::generated_entry
+            |                     |          
+            |                      --0.15%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+            |          
+            |--0.22%--<zlib_rs::stable::Inflate>::decompress
+            |          <flate2::mem::Decompress as flate2::zio::Ops>::run
+            |          |          
+            |           --0.17%--flate2::zio::read::<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>, flate2::mem::Decompress>
+            |                     <soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>> as std::io::Read>::read
+            |                     <core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>>> as std::io::Read>::read_buf
+            |                     std::io::default_read_to_end::<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>>>>
+            |                     <soapberry_zip::office::ArchiveReadSession>::read_with_accounting
+            |                     <soapberry_zip::office::LazyArchiveReader>::read_shared_with_reader
+            |                     <alloc::vec::Vec<(&str, core::result::Result<alloc::sync::Arc<alloc::vec::Vec<u8>>, soapberry_zip::errors::Error>)> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<(&str, core::result::Result<alloc::sync::Arc<alloc::vec::Vec<u8>>, soapberry_zip::errors::Error>), core::iter::adapters::map::Map<core::slice::iter::Iter<&str>, <soapberry_zip::office::LazyArchiveReader>::read_many_serial_shared::{closure#0}>>>::from_iter
+            |                     <soapberry_zip::office::LazyArchiveReader>::read_many_serial_shared
+            |                     <litchi_opc::pkgreader::PackageReader>::load_parts_eager::<soapberry_zip::office::LazyArchiveReader, <litchi_opc::pkgreader::PackageReader>::from_phys_reader::{closure#2}>
+            |                     <litchi_opc::pkgreader::PackageReader>::from_phys_reader
+            |                     |          
+            |                      --0.14%--<litchi_opc::package::OpcPackage>::from_owned_bytes_with_limits
+            |          
+            |--0.18%--soapberry_zip::accounting::write_all_counted::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+            |          soapberry_zip::preserve::write_prepared_local::<core::io::cursor::Cursor<&[u8]>, litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+            |          <soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+            |          <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+            |          litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+            |          litchi_pptx::opened::cross_copy_plan::build_candidate
+            |          litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+            |          
+            |--0.16%--zlib_rs::inflate::inflate
+            |          <zlib_rs::stable::Inflate>::decompress
+            |          <flate2::mem::Decompress as flate2::zio::Ops>::run
+            |          |          
+            |           --0.13%--flate2::zio::read::<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>, flate2::mem::Decompress>
+            |                     <soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>> as std::io::Read>::read
+            |                     <core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>>> as std::io::Read>::read_buf
+            |                     std::io::default_read_to_end::<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>>>>
+            |                     <soapberry_zip::office::ArchiveReadSession>::read_with_accounting
+            |                     <soapberry_zip::office::LazyArchiveReader>::read_shared_with_reader
+            |                     <alloc::vec::Vec<(&str, core::result::Result<alloc::sync::Arc<alloc::vec::Vec<u8>>, soapberry_zip::errors::Error>)> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<(&str, core::result::Result<alloc::sync::Arc<alloc::vec::Vec<u8>>, soapberry_zip::errors::Error>), core::iter::adapters::map::Map<core::slice::iter::Iter<&str>, <soapberry_zip::office::LazyArchiveReader>::read_many_serial_shared::{closure#0}>>>::from_iter
+            |                     <soapberry_zip::office::LazyArchiveReader>::read_many_serial_shared
+            |                     <litchi_opc::pkgreader::PackageReader>::load_parts_eager::<soapberry_zip::office::LazyArchiveReader, <litchi_opc::pkgreader::PackageReader>::from_phys_reader::{closure#2}>
+            |                     <litchi_opc::pkgreader::PackageReader>::from_phys_reader
+            |                     |          
+            |                      --0.10%--<litchi_opc::package::OpcPackage>::from_owned_bytes_with_limits
+            |          
+            |--0.15%--<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<&mut soapberry_zip::accounting::CountingReader<&[u8]>>>> as std::io::Read>::read
+            |          <core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<&mut soapberry_zip::accounting::CountingReader<&[u8]>>>>> as std::io::Read>::read_buf
+            |          std::io::default_read_to_end::<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<&mut soapberry_zip::accounting::CountingReader<&[u8]>>>>>>
+            |          <soapberry_zip::office::ArchiveReader>::read_with_accounting
+            |          <soapberry_zip::office::ArchiveReader>::read
+            |          litchi_perf_baseline::pptx_cross_copy_archive_members
+            |          litchi_perf_baseline::verify_pptx_cross_copy_output
+            |          |          
+            |           --0.15%--litchi_perf_baseline::run_pptx_cross_copy
+            |                     litchi_perf_baseline::run
+            |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |                     std::rt::lang_start_internal
+            |                     main
+            |                     __libc_start_call_main
+            |                     __libc_start_main@@GLIBC_2.34
+            |                     _start
+            |          
+            |--0.15%--zlib_rs::deflate::algorithm::medium::deflate_medium
+            |          zlib_rs::deflate::deflate
+            |          <zlib_rs::stable::Deflate>::compress_uninit
+            |          <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+            |          <flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status
+            |          <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+            |          soapberry_zip::preserve::generated_entry
+            |          |          
+            |           --0.13%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+            |          
+            |--0.14%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status
+            |          <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+            |          soapberry_zip::preserve::generated_entry
+            |          
+            |--0.12%--realloc
+            |          |          
+            |           --0.11%--<alloc::raw_vec::RawVecInner>::finish_grow
+            |                     <litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>> as std::io::Write>::write
+            |                     soapberry_zip::accounting::write_all_counted::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+            |          
+             --0.10%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+                       <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+                       litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+                       litchi_pptx::opened::cross_copy_plan::build_candidate
+                       litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+
+     1.40%  [.] crc32fast::specialized::pclmulqdq::calculate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    litchi-goal-0417-normal             -      -            
+            |
+            ---<crc32fast::Hasher>::update
+               |          
+               |--0.88%--<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>> as std::io::Read>::read
+               |          <core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>>> as std::io::Read>::read_buf
+               |          std::io::default_read_to_end::<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>>>>
+               |          <soapberry_zip::office::ArchiveReadSession>::read_with_accounting
+               |          <soapberry_zip::office::LazyArchiveReader>::read_shared_with_reader
+               |          <alloc::vec::Vec<(&str, core::result::Result<alloc::sync::Arc<alloc::vec::Vec<u8>>, soapberry_zip::errors::Error>)> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<(&str, core::result::Result<alloc::sync::Arc<alloc::vec::Vec<u8>>, soapberry_zip::errors::Error>), core::iter::adapters::map::Map<core::slice::iter::Iter<&str>, <soapberry_zip::office::LazyArchiveReader>::read_many_serial_shared::{closure#0}>>>::from_iter
+               |          <soapberry_zip::office::LazyArchiveReader>::read_many_serial_shared
+               |          <litchi_opc::pkgreader::PackageReader>::load_parts_eager::<soapberry_zip::office::LazyArchiveReader, <litchi_opc::pkgreader::PackageReader>::from_phys_reader::{closure#2}>
+               |          <litchi_opc::pkgreader::PackageReader>::from_phys_reader
+               |          |          
+               |          |--0.74%--<litchi_opc::package::OpcPackage>::from_owned_bytes_with_limits
+               |          |          |          
+               |          |          |--0.46%--<litchi_pptx::package::model::Package>::from_vec
+               |          |          |          |          
+               |          |          |          |--0.28%--litchi_perf_baseline::verify_pptx_cross_copy_output
+               |          |          |          |          |          
+               |          |          |          |           --0.27%--litchi_perf_baseline::run_pptx_cross_copy
+               |          |          |          |                     litchi_perf_baseline::run
+               |          |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |          |          |                     std::rt::lang_start_internal
+               |          |          |          |                     main
+               |          |          |          |                     __libc_start_call_main
+               |          |          |          |                     __libc_start_main@@GLIBC_2.34
+               |          |          |          |                     _start
+               |          |          |          |          
+               |          |          |           --0.14%--litchi_perf_baseline::run_pptx_cross_copy
+               |          |          |                     litchi_perf_baseline::run
+               |          |          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |          |                     std::rt::lang_start_internal
+               |          |          |                     main
+               |          |          |                     __libc_start_call_main
+               |          |          |                     __libc_start_main@@GLIBC_2.34
+               |          |          |                     _start
+               |          |          |          
+               |          |           --0.28%--<litchi_opc::package::OpcPackage>::from_vec
+               |          |                     litchi_pptx::opened::cross_copy_plan::build_candidate
+               |          |                     litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+               |          |                     |          
+               |          |                     |--0.15%--<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>
+               |          |                     |          |          
+               |          |                     |           --0.13%--litchi_perf_baseline::run_pptx_cross_copy
+               |          |                     |                     litchi_perf_baseline::run
+               |          |                     |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |                     |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |                     |                     std::rt::lang_start_internal
+               |          |                     |                     main
+               |          |                     |                     __libc_start_call_main
+               |          |                     |                     __libc_start_main@@GLIBC_2.34
+               |          |                     |                     _start
+               |          |                     |          
+               |          |                      --0.11%--<litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+               |          |                                |          
+               |          |                                 --0.11%--litchi_perf_baseline::run_pptx_cross_copy
+               |          |                                           litchi_perf_baseline::run
+               |          |                                           std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |                                           std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |                                           std::rt::lang_start_internal
+               |          |                                           main
+               |          |                                           __libc_start_call_main
+               |          |                                           __libc_start_main@@GLIBC_2.34
+               |          |                                           _start
+               |          |          
+               |           --0.14%--<litchi_opc::package::OpcPackage>::from_bytes_with_limits
+               |                     <litchi_pptx::package::model::Package>::from_bytes
+               |                     |          
+               |                      --0.13%--litchi_perf_baseline::run_pptx_cross_copy
+               |                                litchi_perf_baseline::run
+               |                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |                                std::rt::lang_start_internal
+               |                                main
+               |                                __libc_start_call_main
+               |                                __libc_start_main@@GLIBC_2.34
+               |                                _start
+               |          
+               |--0.28%--<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+               |          soapberry_zip::preserve::generated_entry
+               |          |          
+               |           --0.22%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+               |                     |          
+               |                      --0.17%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+               |                                <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+               |                                litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+               |                                litchi_pptx::opened::cross_copy_plan::build_candidate
+               |                                litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+               |          
+                --0.23%--<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<&mut soapberry_zip::accounting::CountingReader<&[u8]>>>> as std::io::Read>::read
+                          <core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<&mut soapberry_zip::accounting::CountingReader<&[u8]>>>>> as std::io::Read>::read_buf
+                          std::io::default_read_to_end::<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<&mut soapberry_zip::accounting::CountingReader<&[u8]>>>>>>
+                          <soapberry_zip::office::ArchiveReader>::read_with_accounting
+                          |          
+                           --0.23%--<soapberry_zip::office::ArchiveReader>::read
+                                     litchi_perf_baseline::pptx_cross_copy_archive_members
+                                     litchi_perf_baseline::verify_pptx_cross_copy_output
+                                     |          
+                                      --0.22%--litchi_perf_baseline::run_pptx_cross_copy
+                                                litchi_perf_baseline::run
+                                                std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                                                std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                                                std::rt::lang_start_internal
+                                                main
+                                                __libc_start_call_main
+                                                __libc_start_main@@GLIBC_2.34
+                                                _start
+
+     0.97%  [.] __memcmp_evex_movbe                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             libc.so.6                           -      -            
+            |          
+            |--0.21%--litchi_pptx::opened::cross_copy_plan::prove_package_dialect
+            |          litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+            |          |          
+            |           --0.11%--<litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy::<usize, usize>
+            |          
+            |--0.19%--litchi_perf_baseline::run_pptx_cross_copy
+            |          litchi_perf_baseline::run
+            |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+            |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+            |          std::rt::lang_start_internal
+            |          main
+            |          __libc_start_call_main
+            |          __libc_start_main@@GLIBC_2.34
+            |          _start
+            |          
+             --0.12%--litchi_perf_baseline::run
+                       std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                       std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                       std::rt::lang_start_internal
+                       main
+                       __libc_start_call_main
+                       __libc_start_main@@GLIBC_2.34
+                       _start
+
+     0.51%  [.] __memset_avx512_unaligned_erms                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  libc.so.6                           -      -            
+            |          
+             --0.29%--std::io::default_read_to_end::<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>>>>
+                       <soapberry_zip::office::ArchiveReadSession>::read_with_accounting
+                       <soapberry_zip::office::LazyArchiveReader>::read_shared_with_reader
+                       <alloc::vec::Vec<(&str, core::result::Result<alloc::sync::Arc<alloc::vec::Vec<u8>>, soapberry_zip::errors::Error>)> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<(&str, core::result::Result<alloc::sync::Arc<alloc::vec::Vec<u8>>, soapberry_zip::errors::Error>), core::iter::adapters::map::Map<core::slice::iter::Iter<&str>, <soapberry_zip::office::LazyArchiveReader>::read_many_serial_shared::{closure#0}>>>::from_iter
+                       <soapberry_zip::office::LazyArchiveReader>::read_many_serial_shared
+                       <litchi_opc::pkgreader::PackageReader>::load_parts_eager::<soapberry_zip::office::LazyArchiveReader, <litchi_opc::pkgreader::PackageReader>::from_phys_reader::{closure#2}>
+                       <litchi_opc::pkgreader::PackageReader>::from_phys_reader
+                       |          
+                        --0.25%--<litchi_opc::package::OpcPackage>::from_owned_bytes_with_limits
+                                  |          
+                                   --0.17%--<litchi_pptx::package::model::Package>::from_vec
+
+     0.41%  [.] zlib_rs::deflate::flush_block_only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              litchi-goal-0417-normal             -      -            
+            |          
+             --0.41%--zlib_rs::deflate::algorithm::medium::deflate_medium
+                       zlib_rs::deflate::deflate
+                       <zlib_rs::stable::Deflate>::compress_uninit
+                       <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+                       |          
+                        --0.38%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status
+                                  <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+                                  soapberry_zip::preserve::generated_entry
+                                  |          
+                                   --0.29%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+                                             |          
+                                             |--0.18%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+                                             |          <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+                                             |          litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+                                             |          litchi_pptx::opened::cross_copy_plan::build_candidate
+                                             |          litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+                                             |          
+                                              --0.10%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>>>
+                                                        <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter>
+                                                        litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint
+                                                        <litchi_pptx::package::model::Package>::apply_cross_slide_copy_plan
+                                                        litchi_perf_baseline::run_pptx_cross_copy
+                                                        litchi_perf_baseline::run
+                                                        std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                                                        std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                                                        std::rt::lang_start_internal
+                                                        main
+                                                        __libc_start_call_main
+                                                        __libc_start_main@@GLIBC_2.34
+                                                        _start
+
+     0.27%  [k] 0xffffffff8c800ef0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              [unknown]                           -      -            
+     0.25%  [.] zlib_rs::deflate::gen_codes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     litchi-goal-0417-normal             -      -            
+            |
+            ---zlib_rs::deflate::flush_block_only
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               <zlib_rs::stable::Deflate>::compress_uninit
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |          
+                --0.23%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status
+                          <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+                          soapberry_zip::preserve::generated_entry
+                          |          
+                           --0.16%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+                                     |          
+                                      --0.14%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+                                                <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+                                                litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+                                                litchi_pptx::opened::cross_copy_plan::build_candidate
+                                                litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+
+     0.24%  [.] zlib_rs::deflate::slide_hash::avx2::slide_hash_chain                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            litchi-goal-0417-normal             -      -            
+            |
+            ---zlib_rs::deflate::fill_window
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               <zlib_rs::stable::Deflate>::compress_uninit
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |          
+                --0.23%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status
+                          <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+                          soapberry_zip::preserve::generated_entry
+                          |          
+                           --0.20%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+                                     |          
+                                      --0.13%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::write_to::<litchi_opc::pkgwriter::Chunked<litchi_opc::pkgwriter::Counted<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>>>
+                                                <litchi_opc::pkgwriter::PackageWriter>::write_to_stream::<&mut litchi_pptx::opened::cross_copy_plan::BoundedVecWriter>
+                                                litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+                                                litchi_pptx::opened::cross_copy_plan::build_candidate
+                                                litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides
+
+     0.21%  [.] <zlib_rs::deflate::Heap>::construct_huffman_tree                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                litchi-goal-0417-normal             -      -            
+            |
+            ---zlib_rs::deflate::flush_block_only
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               <zlib_rs::stable::Deflate>::compress_uninit
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |          
+                --0.21%--<flate2::zio::Writer<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>, flate2::mem::Compress>>::write_with_status
+                          <soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::writer::ZipEntryWriter<alloc::vec::Vec<u8>>>> as std::io::Write>::write_all
+                          soapberry_zip::preserve::generated_entry
+                          |          
+                           --0.14%--<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare
+
+     0.14%  [.] litchi_perf_baseline::payload_bytes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             litchi-goal-0417-normal             -      -            
+            |
+            ---litchi_perf_baseline::pptx_cross_copy_bytes
+               litchi_perf_baseline::build_pptx_cross_copy_corpus
+               litchi_perf_baseline::run
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     0.10%  [.] zlib_rs::deflate::scan_tree                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     litchi-goal-0417-normal             -      -            
+            |
+            ---zlib_rs::deflate::flush_block_only
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               <zlib_rs::stable::Deflate>::compress_uninit
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

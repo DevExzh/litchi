@@ -1,0 +1,42 @@
+{
+  "revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+  "lock_scope": "Standalone tools/perf-baseline workspace uses its committed Cargo.lock; root workspace lock is not tracked or used for this build.",
+  "files": {
+    "Cargo.toml": {
+      "sha256": "a9fb5cb4544959d38bc0343abbaa46e5608ae74df38eebc5e88c9a2baa2789bd",
+      "bytes": 9422
+    },
+    "rust-toolchain.toml": {
+      "sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310",
+      "bytes": 86
+    },
+    "tools/perf-baseline/Cargo.toml": {
+      "sha256": "f636fc005101af6497abefcd8a3c006757547dfc646b32ec01ba85bd7e27b344",
+      "bytes": 2023
+    },
+    "tools/perf-baseline/Cargo.lock": {
+      "sha256": "239db7b24e2339f00ece02306bd4748329ca72fc870415906b4f54daa82fad8e",
+      "bytes": 56086
+    },
+    "tools/perf-baseline/src/lib.rs": {
+      "sha256": "85a79cb5ef1c7191b3e12606f8e8219258efb2cd21201b6883164938f1cbc990",
+      "bytes": 2683015
+    },
+    "tools/perf-baseline/src/docx_story_hyperlink_publication.rs": {
+      "sha256": "949c0d8d71a194aa76d8462203466720c80b469ede5fd5372b5495a3bdd131e7",
+      "bytes": 67441
+    },
+    "tools/perf-baseline/src/allocation_metrics.rs": {
+      "sha256": "14bc1349141212a3e890a8ac79d0daa6678cd9ee64b3510455396f1c472b0e26",
+      "bytes": 20451
+    },
+    "crates/litchi-pptx/src/opened/cross_copy_plan.rs": {
+      "sha256": "dcd638338d5802176fb32fa3488342f06afc9dca0fb08b154b70e434aeabcb0c",
+      "bytes": 73822
+    },
+    "crates/litchi-opc/src/pkgwriter.rs": {
+      "sha256": "ef7e4e0f19e3f3f16a05cd3cf549f34f00fc93b20e6394d6533f785cf9a928d5",
+      "bytes": 124388
+    }
+  }
+}

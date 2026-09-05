@@ -1,0 +1,43 @@
+{
+  "revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+  "source_status": "",
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "build",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--release",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline",
+    "--bin",
+    "litchi-perf-baseline-alloc"
+  ],
+  "cwd": "/tmp/litchi-goal-0417-worktree",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/tools/perf-baseline/target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes"
+  },
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:32:48.982806+00:00",
+  "elapsed_seconds": 209.01562736497726,
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0417-normal",
+      "sha256": "961546034a13148b9cefff71cb549932277cff1814740ac40ff4755eb2595043",
+      "bytes": 450139840
+    },
+    "allocator": {
+      "path": "/tmp/litchi-goal-0417-allocator",
+      "sha256": "ff153a4b154c2770673ee166919a01a84f64eaa31aecba17e46f1d8c76bf7491",
+      "bytes": 450143784
+    }
+  }
+}

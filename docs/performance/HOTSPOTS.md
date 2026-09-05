@@ -1,5 +1,27 @@
 # Performance hotspot inventory
 
+## Change 0417: media-rich PPTX investigation
+
+The [0417 representative baseline](changes/0417-representative-crud-baseline.md)
+records media-rich PPTX copy p50 at 1,151.843 / 1,152.214 ms. Its timer sums
+owned planning, commit and final publication. The [static audit](results/change-0417/pptx-static-audit.md)
+traces repeated candidate serialization and image compression through those
+phases. Any optimization must preserve equivalent graph, physical-source and
+publication checks. The existing source-backed API supports a matched media-rich
+experiment, but this matrix's plain source-backed corpus is not comparable.
+
+The broader 30-selector baseline also identifies measurement gaps: 28 selectors
+lack operation allocation attribution, five have >5% repeat drift on at least
+one quantile, and timer boundaries exclude different portions of their complete
+workflows. These gaps constrain optimization claims and remain open.
+
+The separate whole-command profile records 33,347 user-cycle stacks, zero lost
+samples and 0.479% unresolved leaf weight. Deflate contributes 71.929% of leaf
+weight and SHA-256 20.66%; call chains reach candidate construction, re-planning,
+physical fingerprinting and final publication. The observation includes untimed
+setup/verification and therefore does not isolate elapsed phase shares. This
+supports eliminating equivalent repeated work before changing compression loops.
+
 ## Change 0413: exact CFB scratch reservation
 
 [0413](changes/0413-cfb-chain-scratch-reservation.md) removes a redundant

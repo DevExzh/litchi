@@ -1,0 +1,180 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "b3c46c0b6b4b5af39a5b746f672a21f99067be2f73556b35641022956df19819",
+  "content_set_sha256": "277eaf90aef39acb63dc37db43b2d631bf635bb03dcc3220aef88b69c61d494b",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+    "git_worktree_dirty": false,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "cfb-ole2:sha256:6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+      "name": "cfb-many-small-compressible",
+      "legacy_v1": {
+        "name": "cfb-many-small-compressible",
+        "generator": "litchi-cfb-synthetic-v1",
+        "package_format": "CFB/OLE2",
+        "shape": "many-small",
+        "payload_kind": "compressible",
+        "compression": "none",
+        "entry_count": 256,
+        "archive_member_count": 256,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 314880,
+        "archive_sha256": "6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "80819dec96ac98d30a5ec79f20259e3030b1ab89b75209ef7bddba0b940ccd3b",
+        "xlsx": null
+      },
+      "format": "CFB/OLE2",
+      "size_class": "unknown",
+      "categories": [
+        "highly-compressible",
+        "legacy-migrated",
+        "many-small-parts",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-cfb-synthetic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.cfb-payload-v1",
+        "seed_spec": "indexed-formula-v1",
+        "parameters": {
+          "archive_member_count": 256,
+          "compression": "none",
+          "entry_bytes": 1024,
+          "entry_count": 256,
+          "family": "cfb",
+          "legacy_payload_kind": "compressible",
+          "legacy_shape": "many-small",
+          "package_format": "CFB/OLE2",
+          "payload_block_bytes": 45,
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "source_functions": [
+            "build_cfb_corpus",
+            "cfb_entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 255,
+          "target_name_pattern": "benchmark_stream_{index:05}.bin"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 314880,
+        "archive_sha256": "6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+        "logical_payload_bytes": 262144,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 1024,
+        "entry_count": 256
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 314880,
+          "members": 256,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "benchmark_stream_00255.bin",
+          "logical_bytes": 1024,
+          "sha256": "80819dec96ac98d30a5ec79f20259e3030b1ab89b75209ef7bddba0b940ccd3b"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "cfb_read_one"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "cfb_read_one",
+      "corpus_id": "cfb-ole2:sha256:6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+      "legacy_name": "cfb-many-small-compressible",
+      "legacy_archive_sha256": "6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+      "role": "timed"
+    }
+  ]
+}

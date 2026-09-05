@@ -1,0 +1,156 @@
+[
+  {
+    "label": "isolated-export-positive",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": true,
+    "exit_code": 0,
+    "stdout": "{\"capture_runs\": 120, \"change\": 417, \"preflight_runs\": 30, \"revision\": \"b10d6c25a13242ca260a8c897946f4d80ae06c61\", \"selectors\": 30, \"status\": \"verified\", \"summary\": \"matched\"}\n",
+    "stderr": ""
+  },
+  {
+    "label": "missing-run",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "0417 verification failed: capture.json.runs: must contain exactly 120 runs\n"
+  },
+  {
+    "label": "reordered-runs",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "0417 verification failed: capture.json.runs[0].phase: must be 'normal' at capture position 0\n"
+  },
+  {
+    "label": "binary-sha-mismatch",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "0417 verification failed: capture.json.binaries.normal.sha256: does not match build identity\n"
+  },
+  {
+    "label": "overlapping-processes",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "0417 verification failed: capture.json.runs[1]: run overlaps the preceding serialized run\n"
+  },
+  {
+    "label": "wrong-affinity",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "0417 verification failed: capture.json.runs[0].argv: must pin the child to CPU 2 with taskset -c 2\n"
+  },
+  {
+    "label": "raw-percentile-corruption",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "0417 verification failed: normal/1-xlsx_full_cell_scan.json: existing CRUD report/corpus validator rejected it: normal/1-xlsx_full_cell_scan.json.results[0].elapsed_ns.p50 does not match its raw samples\n"
+  },
+  {
+    "label": "source-revision-corruption",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "0417 verification failed: normal/1-xlsx_full_cell_scan.json.environment.git_revision: does not match build revision\n"
+  },
+  {
+    "label": "invented-zero-allocation",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "0417 verification failed: normal/1-xlsx_full_cell_scan.json: existing CRUD report/corpus validator rejected it: normal/1-xlsx_full_cell_scan.json.results[0].operation_metrics failed perf_compare validation: normal/1-xlsx_full_cell_scan.json.results[0].operation_metrics keys mismatch: missing=['alignment', 'cfb_phases', 'latency_claim', 'materialization', 'process', 'publication', 'sample_count', 'sample_indices', 'sink', 'source'], unknown=[]\n"
+  },
+  {
+    "label": "summary-corruption",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "0417 verification failed: summary.json: does not match the bound value\n"
+  },
+  {
+    "label": "taxonomy-byte-corruption",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "0417 verification failed: matrix.taxonomy_sha256: does not match inputs/CRUD_Scenario_Checklist.md\n"
+  },
+  {
+    "label": "index-byte-corruption",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "0417 verification failed: matrix.index_sha256: does not match inputs/original-crud-index.json\n"
+  },
+  {
+    "label": "duplicate-json-key",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "0417 verification failed: protocol.json: duplicate JSON key 'change' is not allowed\n"
+  },
+  {
+    "label": "restored-export-positive",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0417-replay-814yksbq/docs/performance/results/change-0417/verify.py"
+    ],
+    "expected_success": true,
+    "exit_code": 0,
+    "stdout": "{\"capture_runs\": 120, \"change\": 417, \"preflight_runs\": 30, \"revision\": \"b10d6c25a13242ca260a8c897946f4d80ae06c61\", \"selectors\": 30, \"status\": \"verified\", \"summary\": \"matched\"}\n",
+    "stderr": ""
+  }
+]
