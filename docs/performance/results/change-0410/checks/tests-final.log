@@ -1,0 +1,2440 @@
+   Compiling version_check v0.9.5
+   Compiling const-oid v0.9.6
+   Compiling libm v0.2.16
+   Compiling num-traits v0.2.19
+   Compiling getrandom v0.2.17
+   Compiling zerocopy v0.8.56
+   Compiling generic-array v0.14.9
+   Compiling rand_core v0.6.4
+   Compiling base64ct v1.6.0
+   Compiling pem-rfc7468 v0.7.0
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling der_derive v0.7.3
+   Compiling flagset v0.4.7
+   Compiling digest v0.10.7
+   Compiling ff v0.13.1
+   Compiling base16ct v0.2.0
+   Compiling group v0.13.0
+   Compiling der v0.7.10
+   Compiling crypto-bigint v0.5.5
+   Compiling chrono v0.4.45
+   Compiling spki v0.7.3
+   Compiling cpufeatures v0.2.17
+   Compiling num-integer v0.1.47
+   Compiling pkcs8 v0.10.2
+   Compiling sec1 v0.7.3
+   Compiling signature v2.2.0
+   Compiling hmac v0.12.1
+   Compiling num-bigint-dig v0.8.6
+   Compiling elliptic-curve v0.13.8
+   Compiling spin v0.9.9
+   Compiling rfc6979 v0.4.0
+   Compiling lazy_static v1.5.0
+   Compiling num-iter v0.1.46
+   Compiling sha2 v0.10.9
+   Compiling pkcs1 v0.7.5
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling sha1 v0.10.7
+   Compiling x509-cert v0.2.5
+   Compiling p256 v0.13.2
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling ppv-lite86 v0.2.21
+   Compiling rand_chacha v0.3.1
+   Compiling rand v0.8.8
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+   Compiling rsa v0.9.10
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `test` profile [unoptimized] target(s) in 27.27s
+     Running unittests src/lib.rs (/tmp/litchi-goal-0410-tests/debug/deps/litchi_ooxml_common-e5e8878fc0bf2fef)
+
+running 243 tests
+test custom::tests::absent_package_properties_are_empty_but_orphans_are_errors ... ok
+test custom::tests::dtd_unknown_entities_and_malformed_xml_are_rejected ... ok
+test custom::tests::concise_crud_moves_values_and_orders_names ... ok
+test custom::tests::case_insensitive_duplicate_names_are_rejected_on_insert_and_read ... ok
+test custom::tests::forbidden_and_malformed_format_ids_are_rejected ... ok
+test custom::tests::exhausted_pid_space_allows_replacement_but_not_allocation ... ok
+test custom::tests::non_finite_floats_are_rejected_on_insert_and_read ... ok
+test custom::tests::filetime_is_rfc3339_not_a_numeric_windows_counter ... ok
+test custom::tests::malformed_and_duplicate_pids_are_rejected ... ok
+test custom::tests::names_use_canonical_unicode_caseless_identity ... ok
+test custom::tests::malformed_package_graphs_are_never_treated_as_absent ... ok
+test custom::tests::reserved_sensitivity_properties_follow_the_explicit_specification ... ok
+test binding_tracker::tests::declaration_limit_accepts_exactly_256_and_rejects_257 ... ok
+test custom::tests::illegal_xml_characters_are_rejected_before_writing ... ok
+test custom::tests::package_write_read_and_clear_remove_the_complete_graph ... ok
+test custom::tests::root_namespace_and_property_cardinality_are_strict ... ok
+test custom::tests::powerpoint_locations_require_escaped_names_and_host_boundaries ... ok
+test custom::tests::all_supported_values_round_trip_deterministically_in_pid_order ... ok
+test custom_xml::tests::failed_add_is_transactional ... ok
+test custom::tests::word_marking_properties_require_their_documented_text_grammar ... ok
+test custom_xml::tests::attribute_whitespace_round_trips_without_normalization_loss ... ok
+test custom_xml::tests::exact_noop_does_not_unsign_or_rewrite ... ok
+test custom_xml::tests::rejects_invalid_declarations_attributes_and_xml_characters ... ok
+test custom_xml::tests::mce_selects_fallback_schema_reference ... ok
+test embedded::tests::accepts_chart_packages_but_not_chart_objects ... ok
+test custom_xml::tests::strict_writer_is_deterministic_and_round_trips ... ok
+test custom_xml::tests::rejects_malformed_properties_payloads_and_package_graphs ... ok
+test embedded::tests::accepts_strict_relationships_and_returns_external_targets_inertly ... ok
+test embedded::tests::accepts_word_template_and_macro_main_sources ... ok
+test custom_xml::tests::package_writer_round_trips_without_interpreting_payload ... ok
+test embedded::tests::applies_kind_specific_xlsb_source_policy ... ok
+test embedded::tests::rejects_query_and_fragment_components_on_internal_targets ... ok
+test embedded::tests::rejects_missing_targets_invalid_sources_and_package_root_relationships ... ok
+test embedded::tests::ignores_orphans_preserves_duplicate_occurrences_and_sorts_deterministically ... ok
+test external_link::tests::accepts_microsoft_resolution_origin_families ... ok
+test mce::tests::codec_tests::active_offset_markers_skip_source_collisions ... ok
+test mce::tests::codec_tests::active_offsets_fast_path_preserves_order_and_duplicates ... ok
+test mce::alternative::tests::accepts_nested_markup_and_arbitrary_prefixes ... ok
+test mce::tests::codec_tests::active_offsets_reject_invalid_offsets_and_resource_limits ... ok
+test mce::alternative::tests::enforces_byte_depth_node_and_branch_budgets ... ok
+test mce::alternative::tests::rejects_invalid_branch_grammar_and_unsafe_markup ... ok
+test mce::alternative::tests::retains_one_exact_source_and_exposes_typed_branches ... ok
+test mce::tests::codec_tests::alternate_content_allows_ignorable_foreign_children_without_reordering_branches ... ok
+test mce::tests::codec_tests::active_offsets_select_choice_and_fallback_in_caller_order ... ok
+test embedded::tests::duplicate_internal_targets_are_validated_and_charged_once ... ok
+test mce::tests::codec_tests::choice_fallback ... ok
+test custom_xml::tests::properties_edits_retain_future_markup ... ok
+test mce::tests::codec_tests::alternate_content_enforces_element_specific_attribute_constraints ... ok
+test custom_xml::tests::transaction_crud_is_source_checked_and_failure_atomic ... ok
+test mce::tests::codec_tests::directive_token_limit_accepts_exact_and_rejects_over ... ok
+test external_link::tests::accepts_long_path_families ... ok
+test mce::tests::codec_tests::dtd_external_identifiers_and_custom_entities_are_never_expanded ... ok
+test external_link::tests::accepts_the_standard_transitional_and_strict_types ... ok
+test external_link::tests::the_list_has_no_duplicates ... ok
+test external_link::tests::rejects_unrelated_relationship_types ... ok
+test mce::tests::codec_tests::active_offset_allocation_error_retains_allocator_source ... ok
+test embedded::tests::custom_limits_are_checked_and_payload_budget_is_aggregate ... ok
+test mce::tests::codec_tests::input_and_borrowed_output_limits_are_preflighted ... ok
+test mce::tests::codec_tests::ignore_and_unwrap ... ok
+test mce::alternative::tests::selects_first_supported_choice_then_fallback_without_discarding_inactive_data ... ok
+test mce::tests::codec_tests::security_and_limits ... ok
+test mce::tests::codec_tests::redundant_ignorable_keeps_inherited_process_content ... ok
+test mce::tests::codec_tests::transformed_output_limit_is_exact_and_never_overcommitted ... ok
+test mce::tests::codec_tests::process_content_accepts_effective_ignorable_and_namespace_wildcards ... ok
+test mce::tests::preservation_tests::preservation_tokens_respect_the_shared_directive_bound ... ok
+test custom_xml::tests::transaction_preserves_opaque_payload_and_relationship_topology ... ok
+test mce::tests::preservation_tests::preserves_exact_and_wildcard_attributes_by_expanded_name ... ok
+test mce::tests::preservation_tests::understood_attributes_are_not_discarded_and_spoofed_directives_do_not_apply ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_callbacks_disable_independently_and_are_retained ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_processes_preserves_and_keeps_opaque_content ... ok
+test embedded::tests::rejects_forbidden_payload_relationships_and_default_relationship_limit ... ok
+test mce::tests::preservation_tests::preserves_elements_but_still_processes_their_content_and_attributes ... ok
+test mce::tests::preservation_tests::redundant_ignorable_redeclaration_retains_inherited_preservation ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_expands_rebound_and_unqualified_attributes ... ok
+test mce::tests::preservation_tests::rejects_invalid_preservation_tokens_and_duplicates ... ok
+test mce::tests::streaming_0361_raw_attribute_tests::streaming_0361_duplicate_ordinary_attributes_are_raw_before_primary_error ... ok
+test mce::tests::codec_tests::fast_borrowed ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_rejects_direct_alternate_content_data ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_later_failures_keep_callback_errors_as_secondary ... ok
+test mce::tests::streaming_0361_raw_attribute_tests::streaming_0361_namespace_syntax_and_limits_fail_before_raw_delivery ... ok
+test mce::tests::streaming_0361_raw_attribute_tests::streaming_0361_raw_callback_error_is_secondary_to_duplicate_error ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_rejects_bad_document_boundaries ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_prefix_reader_handles_split_bom_and_replays_prefix ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_input_failure_after_recovery_retains_raw_error ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_projects_namespaced_events_and_counts_them ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_event_and_count_limits_are_exact_and_typed ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_raw_sees_inactive_branches_active_sees_selection ... ok
+test mce::tests::streaming_0361_raw_attribute_tests::streaming_0361_alias_attributes_are_raw_before_expanded_duplicate_error ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_rejects_custom_references_in_hidden_branches_and_prolog ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_one_byte_recovery_resolves_nested_namespaces_and_pops_scopes ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_raw_recovers_after_semantic_failure_and_wins_secondary ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_semantic_failure_without_later_errors_is_not_a_report ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_opaque_extension_survives_recovery_state ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_opaque_extension_emits_lexical_mce_content ... ok
+test mce::tests::streaming_0410_name_ownership_tests::streaming_0410_expanded_name_bound_remains_exact ... ok
+test package_encryption::tests::encrypted_provenance_requires_its_retained_mode ... ok
+test properties::keyword::tests::validates_language_without_rewriting_its_lexical_form ... ok
+test embedded::tests::source_duplicate_canonical_targets_are_ordered_and_charged_once ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_deep_expanded_names_have_exact_context_bound ... ok
+test properties::read::tests::rejects_external_dangling_and_wrong_content_type_relationships ... ok
+test properties::read::tests::keywords_preserve_mixed_content_and_language_annotations ... ok
+test properties::read::tests::parses_all_schema_fields_without_normalizing_lexical_values ... ok
+test mce::tests::streaming_0410_name_ownership_tests::streaming_0410_owned_names_survive_raw_and_active_callbacks ... ok
+test package_encryption::tests::plain_provenance_allows_ordinary_output ... ok
+test properties::tests::builder_and_struct_update_stay_concise ... ok
+test properties::keyword::tests::rejects_oversized_language_before_whitespace_collapse ... ok
+test properties::read::tests::rejects_invalid_keyword_children_and_language_placement ... ok
+test properties::read::tests::w3cdtf_supports_partial_and_unzoned_forms_but_xsi_type_is_literal ... ok
+test properties::read::tests::revision_is_a_lossless_string_including_empty_values ... ok
+test custom::tests::byte_depth_node_name_and_text_limits_are_enforced ... ok
+test package_encryption::tests::mark_encrypted_updates_plain_provenance ... ok
+test properties::tests::xml_escapes_text_and_rejects_forbidden_characters ... ok
+test properties::time::tests::accepts_every_w3cdtf_member_and_retains_lexical_form ... ok
+test properties::read::tests::selects_only_relationship_target_and_allows_absence ... ok
+test properties::read::tests::shared_writer_round_trips_through_strict_parser ... ok
+test properties::time::tests::datetime_requires_a_full_valid_date_and_time ... ok
+test properties::time::tests::chrono_conversion_is_ergonomic_without_inventing_unzoned_utc ... ok
+test properties::time::tests::non_ascii_lexical_values_fail_without_panicking ... ok
+test properties::tests::slot_tracks_only_real_edit_intent ... ok
+test embedded::tests::preserves_server_specific_object_content_types_without_sniffing ... ok
+test properties::time::tests::rejects_oversized_times_before_whitespace_collapse ... ok
+test embedded::tests::source_scan_reads_no_payload_until_selected_data_or_stream ... ok
+test embedded::tests::source_limits_stale_sources_and_cancellation_fail_closed ... ok
+test properties::read::tests::poi_no_core_is_empty_and_multiple_relationships_fail_during_package_load ... ok
+test properties::read::tests::rejects_wrong_root_duplicates_invalid_values_dtd_and_entities ... ok
+test properties::write::tests::allocates_around_an_unrelated_canonical_part ... ok
+test properties::write::tests::distinguishes_present_empty_from_absence ... ok
+test relationships::tests::relationship_ids_use_the_xml_ncname_domain ... ok
+test properties::write::tests::preserves_strict_dialect_and_byte_identical_write_is_a_noop ... ok
+test properties::write::tests::equal_put_through_slot_preserves_exact_bytes_and_signature ... ok
+test properties::write::tests::unknown_payload_blocks_write_but_graph_safe_clear_sanitizes_it ... ok
+test properties::write::tests::shared_inbound_allows_read_and_update_but_blocks_clear_before_mutation ... ok
+test properties::write::tests::update_preserves_outbound_extensions_and_clear_leaves_extension_parts ... ok
+test properties::write::tests::revision_writer_validates_even_empty_and_opaque_lexical_values ... ok
+test custom_xml::tests::enforces_guid_depth_size_and_content_type_caps ... ok
+test properties::write::tests::writes_reads_and_clears_nonstandard_target ... ok
+test relationships::tests::accepts_transitional_and_strict_relationship_attributes ... ok
+test properties::read::tests::source_reader_matches_eager_for_present_absent_and_strict_properties ... ok
+test relationships::tests::rejects_duplicate_relationship_attributes ... ok
+test ribbon::tests::aggregate_image_relationships_are_bounded ... ok
+test ribbon::tests::failed_mutations_leave_graph_bytes_and_signatures_untouched ... ok
+test ribbon::tests::fixed_slots_borrow_package_bytes_and_prefer_modern ... ok
+test embedded::tests::preserves_malformed_and_recursive_payload_bytes_opaquely ... ok
+test ribbon::tests::identical_put_is_a_signature_and_allocation_preserving_noop ... ok
+test ribbon::tests::modern_vocabulary_updates_in_place ... ok
+test ribbon::tests::name_collisions_do_not_copy_the_moved_payload ... ok
+test ribbon::tests::relationship_location_cardinality_and_root_family_are_strict ... ok
+test ribbon::tests::remove_collects_unreferenced_ribbon_and_image_parts ... ok
+test spreadsheet_xml_maps::tests::exposes_the_codec_limits ... ok
+test spreadsheet_xml_maps::tests::caller_limits_cover_every_bounded_resource ... ok
+test ribbon::tests::xml_bytes_depth_nodes_entities_and_namespaces_are_bounded ... ok
+test spreadsheet_xml_maps::tests::enforces_office_map_and_binding_boundaries ... ok
+test ribbon::tests::image_cycles_are_collected_unless_reachable_from_a_kept_part ... ok
+test ribbon::tests::remove_preserves_shared_ribbon_and_image_parts ... ok
+test spreadsheet_xml_maps::tests::borrowed_projection_serializes_and_patches_without_payload_clones ... ok
+test ribbon::tests::xml_declarations_characters_namespaces_and_inert_instructions_are_strict ... ok
+test ribbon::tests::shared_ribbon_is_forked_before_update ... ok
+test spreadsheet_xml_maps::tests::source_patch_enforces_the_exact_output_boundary ... ok
+test spreadsheet_xml_maps::tests::schema_language_is_ignored_but_preserved_by_source_patch ... ok
+test ribbon::tests::ribbon_outbound_relationships_are_internal_images_only ... ok
+test spreadsheet_xml_maps::tests::source_patch_preserves_comments_extensions_and_canonicalizes_edits ... ok
+test spreadsheet_xml_maps::tests::detects_conformance_and_canonicalizes_boolean_words ... ok
+test properties::read::tests::source_reader_matches_eager_graph_failures ... ok
+test vba::tests::project_part_reads_through_the_bounded_vba_owner ... ok
+test vba::tests::maps_every_supported_main_part_kind_both_directions ... ok
+test web::codec::tests::semantic_codec_uses_canonical_floating_point_lexical_form ... ok
+test vba::tests::rejects_dangling_inbound_references_to_canonical_word_targets_atomically ... ok
+test web::codec::tests::relationship_codec_rejects_mixed_conformance_attributes ... ok
+test vba::tests::late_content_type_failure_rolls_back_vba_removal ... ok
+test web::tests::absent_feature_skips_the_bounded_full_graph_index ... ok
+test web::codec::tests::namespace_codec_keeps_extension_fragments_self_contained ... ok
+test web::tests::absent_snapshot_metadata_no_ops_do_not_create_a_snapshot ... ok
+test spreadsheet_xml_maps::tests::parses_validates_and_serializes_both_conformance_families ... ok
+test web::tests::case_equivalent_existing_parts_are_rejected_before_put_mutates ... ok
+test spreadsheet_xml_maps::tests::source_patch_preserves_unmodeled_markup ... ok
+test spreadsheet_xml_maps::tests::rejects_numeric_map_and_file_binding_booleans ... ok
+test web::tests::accepts_every_ct_blip_effect_kind_and_rejects_invalid_markup ... ok
+test web::tests::accepts_mce_alternate_content_and_strict_relationship_attributes ... ok
+test web::tests::authored_extension_lists_validate_namespace_placement_and_security ... ok
+test properties::read::tests::matches_poi_success_timezone_and_m4_conformance_fixtures ... ok
+test web::tests::aggregate_xml_and_retained_string_budgets_bound_put_and_load ... ok
+test mce::tests::fixture_tests::libreoffice_pptx_emits_only_fallback_shape ... ok
+test web::tests::byte_identical_put_is_a_signature_preserving_no_op ... ok
+test web::tests::office_safe_parser_rejects_a_storeless_file_reference ... ok
+test web::tests::conflicting_case_equivalent_snapshot_resources_are_rejected_atomically ... ok
+test properties::read::tests::rejects_property_text_beyond_the_declared_budget ... ok
+test web::tests::file_references_require_an_atomic_nonempty_location ... ok
+test web::tests::explicit_limits_bound_both_put_and_load ... ok
+test web::tests::internal_linked_image_is_typed_and_round_trips ... ok
+test custom_xml::tests::loads_poi_and_libreoffice_reference_fixtures ... ok
+test web::tests::checked_update_crud_covers_collections_metadata_and_all_ext_sites ... ok
+test web::tests::package_graph_limits_bound_index_allocation_relationships_and_deletion ... ok
+test web::tests::changed_shared_task_pane_part_is_rejected_without_mutation ... ok
+test web::tests::package_and_authored_relationship_metadata_share_the_string_budget ... ok
+test web::tests::package_crud_round_trips_embedded_and_linked_snapshots ... ok
+test web::tests::internal_web_relationship_targets_reject_queries_and_fragments ... ok
+test web::tests::panes_edit_is_checked_canonical_and_transactional ... ok
+test web::tests::panes_push_rejects_conflicting_resources_within_one_pane_atomically ... ok
+test web::tests::part_name_allocation_probes_are_operation_wide ... ok
+test web::tests::loads_local_omex_and_registry_fixtures_inertly ... ok
+test web::tests::semantic_snapshot_authoring_rejects_bad_mime_and_uri_reference ... ok
+test mce::tests::fixture_tests::poi_styles_select_unsupported_vendor_fallbacks ... ok
+test web::tests::panes_push_canonicalizes_equivalent_resources_within_one_pane ... ok
+test web::tests::package_store_rejects_resource_mismatches_without_mutation ... ok
+test web::tests::rejects_invalid_snapshot_compression_and_effect_order ... ok
+test xml::tests::duplicate_unqualified_attributes_are_rejected ... ok
+test web::tests::semantic_facade_authors_selects_and_removes_without_raw_ids ... ok
+test web::tests::rejects_dtd_bad_order_bad_store_and_nonfinite_width ... ok
+test web::tests::patch_rejects_new_inbound_relationship_to_absent_destination ... ok
+test web::tests::strict_writer_is_deterministic_and_round_trips ... ok
+test web::tests::package_crud_round_trips_every_inert_extension_list ... ok
+test web::tests::panes_push_rekeys_colliding_hidden_relationship_ids ... ok
+test web::tests::snapshot_compression_and_effect_trees_round_trip ... ok
+test web::tests::rejects_external_wrong_content_type_and_dangling_package_graphs ... ok
+test xml::tests::ncname_accepts_unicode_and_rejects_colons_or_invalid_starts ... ok
+test xml::tests::omml_namespace_scan_silently_stops_at_malformed_attributes ... ok
+test xml::tests::rejects_unterminated_omml_without_emitting_partial_content ... ok
+test xml::tests::omml_tracker_preserves_malformed_token_and_unterminated_errors ... ok
+test xml::tests::xsd_token_atom_collapses_only_schema_whitespace_without_allocating ... ok
+test xml::tests::scans_exact_transitional_and_strict_omml_ranges ... ok
+test xml::tests::rejects_omml_structural_depth_over_bound ... ok
+test xml_name::tests::validates_unicode_ncname_and_name_grammar ... ok
+test xml_name::tests::parses_and_writes_prefixed_and_unprefixed_qnames_without_duplicate_storage ... ok
+test xml_name::tests::rejects_empty_parts_multiple_colons_and_invalid_starts ... ok
+test web::tests::preserves_all_extension_list_sites_with_inherited_namespaces_and_mixed_content ... ok
+test web::tests::shared_task_pane_ingress_protects_descendant_image ... ok
+test web::tests::remove_patch_restores_exact_shared_parts ... ok
+test xml::tests::omml_tracker_preserves_explicit_structural_bounds ... ok
+test web::tests::shared_task_pane_ingress_protects_descendant_add_in ... ok
+test web::tests::patch_rechecks_shared_graph_protection_before_mutation ... ok
+test web::tests::put_patch_is_exact_reversible_and_arc_shared ... ok
+test xml::tests::omml_tracker_matches_nsreader_on_event_and_namespace_adversaries ... ok
+test web::tests::patch_rejects_changed_root_and_part_before_mutation ... ok
+test web::tests::inherited_namespace_expansion_is_charged_before_fragment_retention ... ok
+test custom::tests::property_count_is_bounded ... ok
+test mce::tests::codec_tests::deep_scopes_do_not_clone_effective_namespace_or_directive_sets ... ok
+test embedded::tests::inventories_all_seven_real_world_fixtures_without_opening_payloads ... ok
+test embedded::tests::source_scan_matches_eager_metadata_on_real_fixtures ... ok
+test properties::write::tests::bounded_output_rejects_oversized_append_before_mutation ... ok
+test web::tests::enforces_input_and_list_caps ... ok
+test properties::write::tests::rejects_keyword_item_and_encoded_xml_budgets_before_package_mutation ... ok
+test spreadsheet_xml_maps::tests::serializes_a_large_catalog_with_amortized_growth ... ok
+test spreadsheet_xml_maps::tests::source_patch_honors_relaxed_limits_above_default ... ok
+
+test result: ok. 243 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.58s
+
+     Running tests/core_properties.rs (/tmp/litchi-goal-0410-tests/debug/deps/core_properties-96c8fb0fcdf08420)
+
+running 2 tests
+test absent_core_properties_are_idempotent ... ok
+test strict_core_properties_preserve_the_selected_graph ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markup_compatibility.rs (/tmp/litchi-goal-0410-tests/debug/deps/markup_compatibility-630edc63054b16b7)
+
+running 1 test
+test alternate_content_selects_the_fallback_branch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ribbon.rs (/tmp/litchi-goal-0410-tests/debug/deps/ribbon-3fb2960324b20770)
+
+running 4 tests
+test rejects_a_root_that_does_not_match_its_relationship_family ... ok
+test updates_the_modern_family_in_place ... ok
+test keeps_fixed_family_slots_with_modern_precedence ... ok
+test stores_borrows_and_roundtrips_local_ribbon_xml ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/web_extension_packages.rs (/tmp/litchi-goal-0410-tests/debug/deps/web_extension_packages-9ba017a7f2853ac5)
+
+running 3 tests
+test package_graph_discovers_local_task_panes_without_activation ... ok
+test package_authoring_and_removal_round_trip_inert_task_panes ... ok
+test public_web_facade_updates_and_round_trips_crud ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/tmp/litchi-goal-0410-tests/debug/deps/litchi_opc-0b49dbab6bbfa02e)
+
+running 323 tests
+test accounting::tests::merge_copies_all_low_level_counters_without_retaining_the_source_type ... ok
+test accounting::tests::output_counter_overflow_is_typed_and_checked ... ok
+test atomic::tests::caller_owned_write_error_is_not_erased ... ok
+test atomic::tests::failed_finalization_leaves_the_destination_untouched ... ok
+test atomic::tests::directory_sync_failure_reports_that_replacement_already_committed ... ok
+test atomic::tests::symbolic_link_destinations_are_refused_without_touching_the_target ... ok
+test atomic::tests::replacement_preserves_existing_file_permissions ... ok
+test atomic::tests::successful_finalization_replaces_the_destination ... ok
+test content_type::tests::rejects_invalid_override_part_name ... ok
+test error::tests::accounting_overflow_is_not_misclassified_as_unsupported ... ok
+test content_type::tests::requires_the_content_types_root_and_required_attributes ... ok
+test error::tests::allocation_zip_errors_remain_typed ... ok
+test content_type::tests::validates_mime_grammar_without_whitespace_or_comments ... ok
+test error::tests::publication_capability_errors_retain_typed_core_classification ... ok
+test error::tests::execution_io_errors_survive_zip_error_conversion ... ok
+test content_type::tests::rejects_case_equivalent_defaults_and_overrides ... ok
+test content_type::tests::override_precedes_case_insensitive_extension_default ... ok
+test content_type::tests::honors_content_type_resource_limits_at_exact_boundaries ... ok
+test limits::tests::builder_rejects_zero_and_keeps_defaults_checked ... ok
+test package::tests::font_embedding_policy_has_only_three_valid_states ... ok
+test package::tests::package_clone_shares_clean_payloads_and_detaches_mutation ... ok
+test packuri::tests::detects_equivalent_and_derived_part_names ... ok
+test execution::tests::explicit_owned_open_rejects_input_limit_before_zip_and_input_charge ... ok
+test packuri::tests::rejects_ambiguous_or_noncanonical_part_names ... ok
+test members::tests::capacity_planning_is_fallible ... ok
+test execution::tests::explicit_owned_open_rejects_malformed_zip_before_input_charge ... ok
+test packuri::tests::test_filename ... ok
+test packuri::tests::test_idx ... ok
+test execution::tests::explicit_open_keeps_ordinary_payloads_out_of_lazy_cache ... ok
+test members::tests::accepts_distinct_names_and_rejects_the_three_conflicts ... ok
+test package::tests::relationship_provenance_uses_empty_sentinel_and_exact_owned_bytes ... ok
+test packuri::tests::test_base_uri ... ok
+test package::tests::owned_constructors_report_malformed_zip_after_bounded_read ... ok
+test members::tests::maps_ordinary_members_and_rejects_junk_names ... ok
+test members::tests::detects_derived_names_declared_in_either_order ... ok
+test package::tests::signature_detection_covers_orphans_and_relationship_targets ... ok
+test packuri::tests::test_membername ... ok
+test part::tests::blob_part_new_shared_preserves_allocation ... ok
+test package::tests::bounded_package_constructors_reject_oversized_input ... ok
+test members::tests::sibling_folders_sharing_a_prefix_do_not_conflict ... ok
+test package::tests::owned_constructors_check_input_limit_before_zip_validation ... ok
+test package::tests::try_add_part_rejects_conflicts_without_replacing_the_original ... ok
+test packuri::tests::resolves_internal_targets_without_allowing_root_escape ... ok
+test packuri::tests::test_packuri_new ... ok
+test part::tests::part_factory_shared_load_preserves_allocation_for_xml_and_binary ... ok
+test phys_pkg::tests::bounded_ingress_rejects_before_zip_parsing ... ok
+test packuri::tests::test_ext ... ok
+test part::tests::test_is_xml_content_type ... ok
+test package::tests::removing_origin_relationship_does_not_bypass_signature_detection ... ok
+test package::tests::resolves_one_internal_strict_main_document_part ... ok
+test phys_pkg::tests::corrupt_parallel_read_releases_part_count_and_byte_reservations ... ok
+test package::tests::test_main_document_part ... ok
+test phys_pkg::tests::owned_part_writer_reports_typed_partial_progress ... ok
+test phys_pkg::tests::parallel_result_reservation_rejects_capacity_overflow_without_allocating ... ok
+test phys_pkg::tests::dedicated_xml_reads_do_not_consume_generic_part_budgets ... ok
+test phys_pkg::tests::owned_borrowed_readers_share_part_materialization_budget ... ok
+test phys_pkg::tests::corrupt_present_parts_stay_zip_errors_and_bulk_reads_do_not_hide_them ... ok
+test execution::tests::read_limits_reject_before_execution_input_is_charged ... ok
+test part::tests::test_xml_part ... ok
+test part::tests::extract_text_ignores_self_closing_targets_and_nested_elements ... ok
+test execution::tests::explicit_open_refuses_insufficient_in_flight_memory ... ok
+test package::tests::moves_owned_archive_into_package_reader ... ok
+test phys_pkg::tests::part_reads_enforce_declared_per_part_and_total_budgets ... ok
+test part::tests::test_blob_part ... ok
+test package::tests::test_open_package ... ok
+test package::tests::relationship_and_option_mutable_apis_revoke_owned_source ... ok
+test phys_pkg::tests::parallel_part_reads_are_exact_or_fail_without_partial_results ... ok
+test phys_pkg::tests::part_materializations_enforce_exact_max_parts_bound ... ok
+test pkgreader::physical_part_tests::recognizes_only_reserved_relationship_members ... ok
+test phys_pkg::tests::public_owned_reader_still_validates_zip_at_construction ... ok
+test phys_pkg::tests::maps_zip_member_limit_to_opc_resource ... ok
+test phys_pkg::tests::post_materialization_failure_releases_its_declared_reservation ... ok
+test execution::tests::explicit_open_observes_pre_cancellation ... ok
+test package::tests::clone_shares_owned_source_but_revocation_is_independent ... ok
+test phys_pkg::tests::owned_part_writer_streams_and_recovers_the_physical_writer ... ok
+test phys_pkg::tests::test_round_trip ... ok
+test phys_pkg::tests::relationship_reads_share_count_and_byte_budgets_without_charging_failures ... ok
+test package::tests::part_relationship_mutation_retains_signature_policy_tracking ... ok
+test pkgreader::tests::eager_declared_part_preflight_rejects_before_bulk_reader_invocation ... ok
+test phys_pkg::tests::repeated_single_item_parallel_batches_charge_max_parts ... ok
+test phys_pkg::tests::sequential_part_materializations_charge_distinct_and_repeated_uris ... ok
+test pkgreader::tests::eager_serialized_parts_preserve_mixed_storage_and_shared_identity ... ok
+test phys_pkg::tests::target_limit_cannot_exceed_the_universal_xml_attribute_limit ... ok
+test pkgreader::physical_part_tests::eager_serialized_parts_retain_archive_payload_allocation ... ok
+test pkgreader::tests::missing_relationship_parts_are_optional_but_malformed_xml_is_not ... ok
+test package::tests::owned_constructors_preserve_mixed_storage_and_exact_source ... ok
+test phys_pkg::tests::owned_part_name_conflict_is_rejected_before_local_header_output ... ok
+test pkgreader::tests::eager_serialized_parts_follow_physical_order_and_reuse_archive_payloads ... ok
+test phys_pkg::tests::physical_writer_rejects_duplicate_equivalent_and_derived_names ... ok
+test pkgreader::tests::package_rejects_multiple_core_properties_relationships ... ok
+test pkgreader::tests::invalid_internal_relationship_targets_are_rejected ... ok
+test pkgreader::tests::public_reader_probe_rejects_overreported_reads_without_panicking ... ok
+test pkgreader::tests::relationships_manifest_requires_schema_root_and_direct_children ... ok
+test phys_pkg::tests::test_multiple_parts ... ok
+test pkgreader::tests::corrupt_required_parts_report_zip_errors ... ok
+test pkgreader::tests::relationships_require_attributes_ids_and_exact_target_modes ... ok
+test package::tests::mutable_api_entries_revoke_owned_source_even_on_failure_or_noop ... ok
+test pkgreader::tests::test_content_type_map ... ok
+test pkgreader::tests::structural_member_reuses_lazy_shared_decompression_allocation ... ok
+test pkgreader::tests::rejects_equivalent_and_derived_physical_part_names ... ok
+test execution::tests::explicit_owned_open_retains_exact_source_authorization ... ok
+test pkgreader::tests::structural_member_uses_owned_fallback_for_indexed_archive ... ok
+test pkgreader::tests::read_limits_bound_physical_and_retained_parts_before_parallel_loading ... ok
+test pkgreader::tests::relationship_targets_preserve_fragments_and_typed_modes ... ok
+test pkgreader::tests::structural_member_keeps_stored_payload_borrowed ... ok
+test pkgreader::physical_part_tests::preserves_unreferenced_physical_part_across_round_trip ... ok
+test pkgwriter::tests::invalid_packages_never_replace_an_existing_artifact ... ok
+test pkgreader::tests::rejects_poi_relationships_entity_fixture ... ok
+test pkgwriter::tests::incomplete_stream_errors_report_accepted_bytes ... ok
+test pkgreader::tests::read_limits_bound_relationship_resources_at_exact_boundaries ... ok
+test pkgwriter::tests::publication_plan_failure_leaves_sequential_sink_untouched ... ok
+test pkgwriter::tests::rejects_invalid_part_content_type_before_writing ... ok
+test pkgwriter::tests::refuses_arbitrary_authored_xml_bytes_before_publication ... ok
+test pkgwriter::tests::targeted_output_entry_count_rejects_zip32_sentinel ... ok
+test pkgwriter::tests::owned_source_round_trips_exactly_to_bytes_and_stream ... ok
+test pkgreader::tests::serial_eager_payload_error_precedes_later_relationship_error_and_preflight ... ok
+test pkgwriter::tests::test_content_types_xml ... ok
+test pkgwriter::tests::exact_source_xml_bytes_may_remain_opaque ... ok
+test pkgwriter::tests::filesystem_write_replaces_only_with_a_finalized_package ... ok
+test pkgwriter::tests::changed_owned_signed_source_refuses_before_output ... ok
+test pkgwriter::tests::open_and_reader_retain_owned_source_but_borrowed_bytes_do_not ... ok
+test pkgwriter::tests::generic_signature_infrastructure_removal_stays_policy_gated ... ok
+test pkgwriter::tests::topology_add_rejects_relationship_member_prefix_conflict ... ok
+test execution::tests::explicit_opens_match_serial_parts_deterministically ... ok
+test pkgwriter::tests::incomplete_exact_source_stream_reports_accepted_bytes ... ok
+test pkgwriter::tests::exact_source_streaming_respects_the_64_kib_chunk_bound ... ok
+test rel::tests::fallible_insertion_never_replaces_a_duplicate_id ... ok
+test pkgwriter::tests::real_package_enumeration_covers_all_xml_bearing_members ... ok
+test pkgwriter::tests::revoked_part_mutation_preserves_explicit_empty_relationship_member ... ok
+test pkgwriter::tests::topology_add_rejects_packuri_derived_relationship_name_conflict ... ok
+test pkgreader::tests::rejects_apache_poi_derived_part_name_fixture ... ok
+test rel::tests::fallible_relationship_xml_matches_the_canonical_literal ... ok
+test rel::tests::fallible_relationship_xml_preserves_empty_output ... ok
+test rel::tests::target_components_are_preserved_while_the_path_resolves ... ok
+test pkgwriter::tests::topology_add_rejects_part_descending_from_existing_relationship_member ... ok
+test rel::tests::test_get_or_add ... ok
+test pkgwriter::tests::untouched_borrowed_signed_source_refuses_without_exact_bytes ... ok
+test pkgwriter::tests::topology_add_rejects_packuri_prefix_conflict ... ok
+test rel::tests::fallible_relationship_xml_is_deterministic_across_insertion_order ... ok
+test rel::tests::test_relationship_creation ... ok
+test rel::tests::test_next_r_id ... ok
+test pkgwriter::tests::part_edit_revokes_exact_source_and_republishes_edited_package ... ok
+test sign::tests::safe_default_rejects_fixture_sha1 ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_enforces_part_limit_before_callback ... ok
+test sign::tests::rejects_spoofs_duplicates_and_keeps_failed_edits_atomic ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_checks_cancellation_before_callback_and_releases_memory ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_does_not_admit_payload_to_part_cache ... ok
+test source_backed::selected_part_stream_api_tests::execution_io_error_round_trips_through_source_mapping ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_managed_accounting_is_precise_and_not_cached ... ok
+test pkgwriter::tests::topology_add_with_unknown_non_part_refuses_normalization ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_preserves_typed_source_change_transport_error ... ok
+test source_backed::selected_part_stream_api_tests::output_accounting_overflow_is_deferred_until_finalization ... ok
+test source_backed::selected_part_stream_api_tests::selected_part_stream_api_is_sink_oriented ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_returns_custom_callback_error_after_verification ... ok
+test source_backed::tests::aggregate_reservation_counter_overflow_fails_closed_through_wrapper ... ok
+test source_backed::tests::borrowed_materialization_rejects_cancellation_before_payload_reads ... ok
+test source_backed::tests::borrowed_materialization_rejects_managed_package_before_payload_reads ... ok
+test source_backed::tests::borrowed_materialization_rejects_source_changed_during_payload_and_keeps_no_partial_result ... ok
+test source_backed::tests::borrowed_materialization_preserves_source_and_matches_eager_graph ... ok
+test source_backed::tests::borrowed_materialization_rejects_stale_source_before_payload_reads ... ok
+test source_backed::tests::borrowed_materialization_reports_malformed_payload_without_partial_result ... ok
+test source_backed::tests::borrowed_materialization_retains_cached_payload_allocation_after_source_drop ... ok
+test source_backed::tests::cache_limits_reject_zero_bounds ... ok
+test source_backed::tests::borrowed_signed_materialization_retains_publication_policy ... ok
+test source_backed::tests::borrowed_materialization_with_accounting_does_not_charge_preloaded_cache_hits ... ok
+test source_backed::tests::cache_cleanup_is_exact_identity_scoped_and_late_success_cannot_resurrect ... ok
+test source_backed::tests::cache_evicts_by_byte_weight_and_entry_count_and_rejects_oversized_values ... ok
+test pkgwriter::tests::targeted_save_preserves_comments_extras_descriptors_order_and_non_parts ... ok
+test source_backed::tests::cancellation_takes_precedence_over_accounted_archive_failure_and_releases_flight ... ok
+test source_backed::tests::checked_counter_delta_preserves_event_counts_without_gauge_subtraction ... ok
+test source_backed::tests::borrowed_materialization_preserves_opaque_xml_like_eager_unmarshal ... ok
+test source_backed::tests::checked_counter_delta_rejects_a_regression ... ok
+test source_backed::tests::checked_counter_overflow_fails_closed_snapshot ... ok
+test source_backed::tests::catalog_reports_non_parts_and_conversion_matches_loaded_parts ... ok
+test sign::tests::signed_package_survives_zip_round_trip ... ok
+test source_backed::tests::catalog_entry_id_resolves_to_the_same_payload_as_its_member_name ... ok
+test source_backed::tests::casefold_lookup_index_handles_unsorted_parts_without_changing_iteration_order ... ok
+test source_backed::tests::consuming_materialization_retains_cached_payload_allocation ... ok
+test source_backed::tests::consuming_materialization_rejects_managed_package_before_payload_reads ... ok
+test source_backed::tests::content_type_override_insertion_uses_the_parsed_root_close_span ... ok
+test source_backed::tests::consuming_materialization_with_accounting_keeps_malformed_read_progress ... ok
+test source_backed::tests::cache_hits_pin_payloads_and_failures_are_not_retained ... ok
+test source_backed::tests::consuming_materialization_with_accounting_keeps_source_change_read_progress ... ok
+test source_backed::tests::consuming_materialization_with_accounting_refuses_managed_package_before_reads ... ok
+test source_backed::tests::consuming_materialization_with_accounting_reports_mixed_cold_payload_work ... ok
+test source_backed::tests::exact_source_publication_checks_one_fewer_version_per_copy_chunk ... ok
+test source_backed::tests::managed_allocation_admission_bypass_returns_correct_bytes_without_retention ... ok
+test source_backed::tests::managed_budget_rejects_before_payload_io_and_reports_content_free_failure ... ok
+test source_backed::tests::managed_cache_does_not_evict_externally_pinned_entry_and_bypasses_retention ... ok
+test source_backed::tests::managed_cache_hit_honors_cancellation_without_releasing_cached_budget ... ok
+test source_backed::tests::managed_cache_reserves_declared_payload_and_releases_on_package_drop ... ok
+test sign::tests::verifies_certificate_from_a_related_der_part ... ok
+test source_backed::tests::external_relationship_removal_overlay_changes_only_owner_and_rels_member ... ok
+test source_backed::tests::managed_cache_respects_hierarchical_parent_memory_limit ... ok
+test source_backed::tests::managed_cache_eviction_releases_unpinned_reservation_before_next_read ... ok
+test source_backed::tests::managed_constructor_honors_pre_cancellation_without_source_reads ... ok
+test source_backed::tests::managed_cancellation_before_preservation_source_read_is_typed ... ok
+test source_backed::tests::managed_cancellation_after_decompression_prevents_publication ... ok
+test source_backed::tests::managed_cancellation_between_cache_admission_and_source_read_is_typed ... ok
+test sign::tests::resource_limits_reject_hostile_signature_graphs_atomically ... ok
+test source_backed::tests::managed_exact_noop_overlay_charges_physical_output_bytes ... ok
+test source_backed::tests::managed_exact_noop_refuses_the_first_output_write_at_zero_limit ... ok
+test pkgreader::tests::preserves_poi_special_relationship_targets_across_round_trip ... ok
+test source_backed::tests::managed_cumulative_output_retry_exhaustion_refuses_second_exact_publication ... ok
+test source_backed::tests::managed_changed_overlay_charges_exact_accepted_output_bytes ... ok
+test source_backed::tests::managed_exact_output_limit_accepts_exact_small_artifact ... ok
+test source_backed::tests::managed_failed_cold_load_consumes_work_and_input_but_releases_retained_objects ... ok
+test source_backed::tests::managed_exact_output_limit_one_under_refuses_before_small_artifact_output ... ok
+test source_backed::tests::managed_open_checks_cancellation_after_indexing_before_catalog_publication ... ok
+test source_backed::tests::managed_input_budget_refusal_counts_only_the_terminal_read_reservation ... ok
+test source_backed::tests::managed_input_reservation_counter_overflow_fails_closed_through_wrapper ... ok
+test source_backed::tests::managed_flush_failure_reports_exact_output_charge_as_incomplete ... ok
+test source_backed::tests::managed_object_one_under_refuses_payload_before_physical_io ... ok
+test source_backed::tests::managed_input_bytes_are_exact_for_chunked_reads_and_cache_hits_are_free ... ok
+test source_backed::tests::managed_large_exact_publication_refuses_mid_stream_with_exact_partial_charge ... ok
+test source_backed::tests::managed_output_reservation_counter_overflow_fails_closed_through_wrapper ... ok
+test source_backed::tests::managed_output_charge_reaches_hierarchical_parent_and_child_budgets ... ok
+test source_backed::tests::managed_overreporting_sink_does_not_commit_output_budget ... ok
+test source_backed::tests::managed_oversized_bypass_releases_comparison_memory_before_exact_publication ... ok
+test source_backed::tests::managed_failed_loader_releases_reservations_before_waiter_retry ... ok
+test source_backed::tests::managed_partial_sink_failure_commits_only_accepted_output_bytes ... ok
+test source_backed::tests::managed_short_interrupted_source_copy_charges_only_accepted_bytes ... ok
+test source_backed::tests::managed_source_change_drops_reservation_and_does_not_retain_payload ... ok
+test source_backed::tests::managed_publication_checks_before_output_and_between_copy_chunks ... ok
+test source_backed::tests::managed_source_change_after_accepted_output_preserves_partial_accounting ... ok
+test source_backed::tests::managed_work_one_under_refuses_payload_before_physical_io ... ok
+test source_backed::tests::managed_sibling_caches_compete_for_parent_memory_before_payload_io ... ok
+test source_backed::tests::external_relationship_removal_overlay_refuses_ids_and_limits_before_output ... ok
+test source_backed::tests::normal_open_catalog_preserves_raw_source_io_errors ... ok
+test source_backed::tests::mandatory_xml_is_opened_but_ordinary_payload_corruption_is_deferred ... ok
+test source_backed::tests::multi_part_overlay_changes_only_selected_raw_members_and_reopens ... ok
+test source_backed::tests::multi_part_overlay_all_noop_preserves_signed_source_identity ... ok
+test source_backed::tests::one_part_overlay_bounds_writes_and_reports_partial_sink_failure ... ok
+test source_backed::tests::multi_part_overlay_checks_set_bounds_duplicates_and_aggregate_limits ... ok
+test source_backed::tests::one_part_overlay_enforces_replacement_limits_without_output ... ok
+test source_backed::tests::one_part_overlay_exact_noop_preserves_every_source_byte ... ok
+test source_backed::tests::one_part_overlay_refuses_unsupported_physical_layout_before_output ... ok
+test source_backed::tests::one_part_overlay_raw_copies_every_unselected_member_and_reopens ... ok
+test source_backed::tests::one_part_overlay_reports_source_changes_before_and_during_output ... ok
+test source_backed::tests::owned_bytes_open_keeps_ordinary_payloads_deferred ... ok
+test source_backed::tests::one_part_overlay_rejects_invalid_xml_and_signed_changes_before_output ... ok
+test source_backed::tests::part_view_declared_size_is_metadata_only ... ok
+test source_backed::tests::part_lookup_prefers_exact_names_and_matches_ascii_case_insensitive_targets ... ok
+test source_backed::tests::performance_diagnostics_cache_and_flight_scopes_are_reported ... ok
+test sign::tests::compatibility_reports_partial_coverage_and_strict_rejects_it ... ok
+test source_backed::tests::part_view_declared_size_checks_source_and_cancellation ... ok
+test source_backed::tests::performance_diagnostics_finished_panic_drops_flight_guard ... ok
+test source_backed::tests::performance_diagnostics_finished_panic_does_not_abandon_loader_flight ... ok
+test source_backed::tests::performance_diagnostics_failure_retry_and_cancellation_are_balanced ... ok
+test source_backed::tests::performance_diagnostics_poison_preserves_error_and_event_pair ... ok
+test source_backed::tests::performance_diagnostics_finished_panic_drops_guard_and_cache_recovers ... ok
+test source_backed::tests::overlay_mixed_storage_has_semantic_parity_and_managed_cold_work ... ok
+test source_backed::tests::performance_diagnostics_reentrancy_contract_refuses_before_lock ... ok
+test source_backed::tests::multi_part_relationship_removal_checks_combined_part_and_archive_totals ... ok
+test source_backed::tests::poisoned_cache_state_fails_closed_snapshot ... ok
+test source_backed::tests::performance_diagnostics_same_part_loader_and_waiter_are_balanced ... ok
+test source_backed::tests::performance_diagnostics_started_nested_publication_flight_panic_recovers ... ok
+test source_backed::tests::performance_diagnostics_uncontended_hit_reports_only_cache_lock ... ok
+test source_backed::tests::performance_diagnostics_started_panic_has_no_finished_and_cache_recovers ... ok
+test source_backed::tests::poisoned_cache_state_fails_closed_through_wrapper ... ok
+test source_backed::tests::provisional_publication_cancellation_rolls_back_everything ... ok
+test sign::tests::signs_resigns_and_unsigns_with_deterministic_names ... ok
+test source_backed::tests::retained_gauge_aggregation_overflow_fails_closed_through_wrapper ... ok
+test source_backed::tests::performance_diagnostics_started_flight_panic_does_not_strand_waiter ... ok
+test source_backed::tests::provisional_publication_source_change_rolls_back_everything ... ok
+test source_backed::tests::preservation_index_propagates_typed_limit_allocation_and_io_errors ... ok
+test source_backed::tests::source_artifact_copy_rejects_overreporting_sink_without_false_progress ... ok
+test source_backed::tests::shared_overlay_reports_partial_sink_failure_with_bounded_writes ... ok
+test source_backed::tests::shared_overlay_preserves_duplicate_and_limit_refusals_before_output ... ok
+test source_backed::tests::provisional_publication_waiter_joins_and_stable_hit_reuses_allocation ... ok
+test source_backed::tests::source_artifact_paths_reject_overreported_read_counts_without_output ... ok
+test source_backed::tests::shared_multi_overlay_matches_vec_and_reopens ... ok
+test source_backed::tests::source_backed_catalog_enforces_part_limits_during_ordered_admission ... ok
+test source_backed::tests::source_backed_catalog_open_does_not_read_ordinary_payloads ... ok
+test source_backed::tests::source_backed_catalog_matches_eager_part_admission ... ok
+test source_backed::tests::source_backed_part_limit_precedes_later_max_parts_error ... ok
+test source_backed::tests::source_backed_catalog_matches_eager_relationship_typing_and_non_parts ... ok
+test source_backed::tests::source_change_takes_precedence_over_archive_failure_and_releases_flight ... ok
+test source_backed::tests::source_changes_reject_metadata_cache_and_conversion_access ... ok
+test source_backed::tests::source_catalog_still_rejects_case_equivalent_part_names ... ok
+test source_backed::tests::source_backed_part_limit_precedes_later_derived_or_equivalent_conflicts ... ok
+test source_backed::tests::shared_single_overlay_matches_vec_changed_and_signed_noop_publication ... ok
+test source_backed::tests::topology_external_wrappers_refuse_internal_relationships_before_output ... ok
+test source_backed::tests::topology_exact_external_replacement_preserves_noncanonical_source ... ok
+test source_backed::tests::topology_changed_replacement_reads_source_payload_once ... ok
+test source_backed::tests::topology_add_part_inserts_lossless_content_type_override ... ok
+test source_backed::tests::topology_adds_external_relationship_with_exact_uri_reference ... ok
+test source_backed::tests::topology_adds_package_relationship_to_new_part ... ok
+test source_backed::tests::try_cache_diagnostics_matches_compatibility_snapshot_when_healthy ... ok
+test source_backed::tests::validation_archive_index_preserves_raw_source_io_errors ... ok
+test source_backed::tests::topology_signed_noop_copies_and_mutation_refuses_before_output ... ok
+test source_backed::tests::topology_internal_replace_requires_and_preserves_internal_mode ... ok
+test source_backed::tests::topology_signed_part_noop_copies_and_mutation_refuses_before_output ... ok
+test source_backed::tests::unmanaged_exact_source_publication_remains_unbudgeted ... ok
+test source_backed::tests::validation_catalog_preserves_raw_source_io_errors ... ok
+test source_backed::tests::topology_replaces_and_removes_external_relationships ... ok
+test source_backed::tests::topology_relationship_publication_honors_configured_reopen_limits ... ok
+test source_backed::tests::zip64_one_part_overlay_preserves_raw_unknown_members_and_cold_work ... ok
+test source_backed::tests::topology_zip64_add_remove_preserves_untouched_records_and_tail ... ok
+test pkgwriter::tests::revoked_noop_uses_preservation_copy_all ... ok
+test source_backed::tests::managed_open_omits_casefold_lookup_index_and_keeps_linear_fallback ... ok
+test sign::tests::verifies_real_poi_and_microsoft_office_fixtures ... ok
+test pkgwriter::tests::projected_zip64_descriptor_targeted_save_preserves_untouched_member ... ok
+test pkgwriter::tests::appended_suffix_removal_restores_exact_source_bytes ... ok
+test pkgwriter::tests::targeted_relationship_and_content_type_changes_regenerate_only_their_closure ... ok
+test pkgwriter::tests::adding_relationship_member_to_existing_part_preserves_and_appends ... ok
+test pkgwriter::tests::unsupported_owned_source_revoked_noop_refuses_before_output ... ok
+test pkgwriter::tests::non_suffix_part_and_relationship_removals_preserve_retained_members ... ok
+test pkgwriter::tests::trailing_source_bytes_refuse_normalization_before_targeted_preservation ... ok
+test pkgwriter::tests::zip64_targeted_stream_failure_reports_partial_output ... ok
+test pkgwriter::tests::unsupported_prefixed_source_refuses_normalization_before_output ... ok
+test pkgwriter::tests::package_relationship_edit_regenerates_using_raw_source_name ... ok
+test pkgwriter::tests::zip64_source_targeted_save_preserves_untouched_records_and_tail ... ok
+test pkgwriter::tests::topology_part_add_preserves_source_and_appends_deterministic_members ... ok
+test source_backed::tests::casefold_lookup_index_is_retained_at_measured_large_catalog_threshold ... ok
+test pkgwriter::tests::targeted_streaming_keeps_generated_writes_bounded ... ok
+test pkgwriter::tests::targeted_partial_sink_failure_reports_accepted_bytes ... ok
+test pkgwriter::tests::targeted_part_mutation_raw_copies_every_other_member ... ok
+test source_backed::tests::concurrent_cold_reads_share_one_archive_load_and_one_arc ... ok
+test source_backed::tests::managed_same_part_waiters_share_one_reservation_and_flight ... ok
+test source_backed::tests::managed_waiter_cancellation_does_not_block_or_publish_loader_payload ... ok
+test source_backed::tests::multi_part_relationship_removal_has_exact_and_one_over_aggregate_bounds ... ok
+test pkgwriter::tests::streams_large_packages_to_a_non_seekable_bounded_chunk_sink ... ok
+
+test result: ok. 323 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+     Running tests/digital_signatures.rs (/tmp/litchi-goal-0410-tests/debug/deps/digital_signatures-3c5faaa026979106)
+
+running 2 tests
+test digital_signature_mutable_opc_access_drops_stale_signatures ... ok
+test digital_signature_accessors_verify_real_microsoft_packages ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/non_part_classification.rs (/tmp/litchi-goal-0410-tests/debug/deps/non_part_classification-359e1a2ae1852076)
+
+running 8 tests
+test rejects_multiple_case_equivalent_content_types_members ... ok
+test a_part_resolves_when_its_stored_name_differs_only_by_case ... ok
+test reports_members_whose_names_cannot_denote_a_part ... ok
+test reports_unreferenced_untyped_member_without_losing_the_real_parts ... ok
+test rejects_referenced_part_without_content_type_mapping ... ok
+test keeps_dangling_relationships_without_inventing_their_target_part ... ok
+test accepts_the_content_types_stream_under_a_case_variant_name ... ok
+test types_relationship_parts_from_the_reserved_name_but_rejects_contradictions ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/operation_accounting.rs (/tmp/litchi-goal-0410-tests/debug/deps/operation_accounting-67e284f4fdc9830d)
+
+running 13 tests
+test crc_failure_keeps_the_cold_read_counters_and_does_not_cache ... ok
+test streaming_bypasses_cache_and_data_remains_cold ... ok
+test exact_source_publication_reports_actual_raw_and_output_acceptance ... ok
+test exact_source_partial_sink_preserves_checked_progress ... ok
+test repeated_streaming_repeats_physical_work_without_cache_hits ... ok
+test deflate_crc_failure_retains_accounting_and_retries_physical_work ... ok
+test changed_overlay_partial_sink_keeps_raw_and_output_progress ... ok
+test cold_stored_and_deflated_part_reads_are_accounted_but_cache_hits_are_not ... ok
+test streamed_partial_sink_preserves_physical_and_output_accounting ... ok
+test streamed_stored_and_deflated_parts_are_accounted_without_cache_materialization ... ok
+test same_flight_loader_owns_physical_accounting ... ok
+test singular_changed_overlay_distinguishes_raw_and_generated_payloads ... ok
+test singular_exact_noop_overlay_accounts_raw_publication_and_cache_selection ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/package_catalog_probe.rs (/tmp/litchi-goal-0410-tests/debug/deps/package_catalog_probe-b42b4e7bef3009af)
+
+running 5 tests
+test reader_failure_restores_the_cursor_without_fabricating_a_catalog ... ok
+test malformed_probe_is_an_unknown_catalog_error_and_restores_the_cursor ... ok
+test default_probe_reads_zip_metadata_and_structural_members_only ... ok
+test probe_limit_errors_are_typed_and_restore_the_cursor ... ok
+test limited_probe_matches_eager_and_source_catalog_semantics ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/phys_pkg_borrowed.rs (/tmp/litchi-goal-0410-tests/debug/deps/phys_pkg_borrowed-cdd744e555717417)
+
+running 8 tests
+test phys_pkg_borrowed_deflate_returns_none_and_owned_blob_is_exact ... ok
+test phys_pkg_borrowed_slice_lifetime_tracks_input_source ... ok
+test phys_pkg_borrowed_enforces_part_limit_without_materialization_charge ... ok
+test phys_pkg_borrowed_normalizes_pack_uri_to_zip_member_name ... ok
+test phys_pkg_borrowed_store_returns_source_slice_with_identity ... ok
+test phys_pkg_borrowed_rejects_encrypted_store_and_deflate ... ok
+test phys_pkg_borrowed_missing_part_is_typed_error ... ok
+test phys_pkg_borrowed_rejects_corrupt_stored_payload_and_crc ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_backed_path.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_path-d946b82efe18b7c3)
+
+running 3 tests
+test path_default_catalog_and_selected_data_match_from_vec_without_eager_unselected_read ... ok
+test path_source_reports_external_change_without_retargeting_or_stale_hydration ... ok
+test path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_limits ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_backed_reader.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_reader-c926e4b83d98ec0b)
+
+running 6 tests
+test reader_ingress_rejects_invalid_read_count_without_panicking ... ok
+test reader_ingress_rejects_input_above_max_input_bytes ... ok
+test reader_ingress_retries_one_interrupted_read ... ok
+test reader_ingress_consumes_once_and_keeps_ordinary_payloads_cold ... ok
+test stream_to_keeps_raw_source_and_sink_io_errors_typed ... ok
+test indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_backed_topology.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_topology-60a335feec8bdff5)
+
+running 37 tests
+test topology_plan_rejects_duplicate_and_invalid_relationship_requests ... ok
+test managed_cancellation_before_topology_publication_writes_nothing ... ok
+test empty_topology_plan_is_an_exact_source_copy ... ok
+test empty_overlay_and_deletion_batch_is_an_exact_source_copy ... ok
+test malformed_exact_replacement_is_a_byte_exact_noop ... ok
+test signed_part_deletion_is_refused_before_sink_write ... ok
+test noncanonical_existing_relationships_are_refused_before_output ... ok
+test deletion_preserves_untouched_raw_records_and_compressed_payload_bytes ... ok
+test case_equivalent_physical_names_refuse_changed_publication ... ok
+test one_existing_part_can_be_deleted_without_affecting_reopenable_package ... ok
+test noncanonical_content_types_are_preserved_while_new_overrides_are_sorted ... ok
+test signed_exact_noop_replacement_is_byte_exact_but_topology_change_is_refused ... ok
+test topology_publication_reports_incomplete_output_after_partial_sink_progress ... ok
+test topology_plan_has_a_finite_exact_and_one_over_part_bound ... ok
+test topology_addition_of_root_signature_part_is_refused_before_output ... ok
+test deletion_does_not_rewrite_content_types_or_relationships ... ok
+test topology_addition_of_signature_content_type_spoof_is_refused_before_output ... ok
+test missing_duplicate_equivalent_and_overlapping_deletions_fail_before_sink_write ... ok
+test replacement_and_deletion_are_published_in_one_sequential_output ... ok
+test topology_publication_reports_sink_failures_with_partial_output_state ... ok
+test raw_signature_non_part_materialization_is_owned_mutation_locked ... ok
+test topology_remove_part_refuses_dangling_inbound_relationship_before_output ... ok
+test signature_content_type_spoof_is_mutation_locked ... ok
+test unsigned_source_empty_topology_plan_remains_an_exact_copy ... ok
+test topology_addition_of_signature_relationship_or_target_is_refused_before_output ... ok
+test topology_publication_refuses_trailing_data_before_writing ... ok
+test existing_canonical_relationships_are_regenerated_with_new_relationships ... ok
+test topology_publication_refuses_an_encrypted_entry_before_writing ... ok
+test topology_publish_rejects_invalid_xml_and_part_byte_limits_before_output ... ok
+test topology_remove_part_detaches_inbound_relationship_and_omits_owned_members ... ok
+test orphan_non_part_signature_member_is_mutation_locked ... ok
+test topology_publish_refuses_collisions_dangling_targets_and_duplicate_existing_ids ... ok
+test untouched_zip_records_retain_extras_comments_and_payload_records ... ok
+test case_and_nested_signature_member_paths_are_mutation_locked ... ok
+test topology_publish_replaces_adds_and_links_parts_atomically ... ok
+test topology_output_is_deterministic_and_reopens_after_repeated_publication ... ok
+test case_equivalent_relationship_owners_group_once_and_refuse_duplicate_ids ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/tolerated_archive_junk.rs (/tmp/litchi-goal-0410-tests/debug/deps/tolerated_archive_junk-cca3ded8b8ea4570)
+
+running 4 tests
+test dangling_relationship_target_leaves_the_rest_of_the_document_intact ... ok
+test excel_trash_folder_does_not_block_the_workbook ... ok
+test ds_store_does_not_block_the_document ... ok
+test content_types_stream_stored_under_a_case_variant_name_still_opens ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/validation.rs (/tmp/litchi-goal-0410-tests/debug/deps/validation-e24d1df061c8d7c5)
+
+running 13 tests
+test physical_relationship_part_limits_belong_to_catalog_admission ... ok
+test duplicate_physical_entries_are_reported_as_structural_rejection ... ok
+test io_and_source_change_failures_remain_errors ... ok
+test report_limits_are_fallible_errors_not_unbounded_retention ... ok
+test macro_payload_is_inert_and_not_claimed_as_a_validation_capability ... ok
+test relationship_part_source_topology_belongs_to_catalog_admission ... ok
+test loaded_relationship_capability_includes_admitted_unreferenced_parts ... ok
+test signature_presence_is_information_not_signature_validity ... ok
+test malformed_content_types_and_relationships_are_conclusive_issues ... ok
+test zip_and_relationship_ceilings_are_blocked_without_issues ... ok
+test parser_errors_and_invalid_uris_keep_exact_manifest_phase ... ok
+test shared_xml_limits_keep_content_type_and_relationship_phase ... ok
+test valid_catalog_is_complete_deterministic_and_does_not_read_payload ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/litchi-goal-0410-tests/debug/deps/litchi_xlsx-b1c10f09d74dbf21)
+
+running 931 tests
+test active_x::codec::relationships::tests::rejects_reused_relationship_ids ... ok
+test active_x::codec::relationships::tests::emits_nested_relationships_in_stable_order ... ok
+test active_x::validation::tests::rejects_invalid_relationship_name_before_package_mutation ... ok
+test active_x::validation::tests::rejects_duplicate_control_identity ... ok
+test active_x::validation::tests::validates_complete_inert_graph_without_interpreting_payload ... ok
+test active_x::package::tests::direct_xml_mutation_refuses_mce_selected_collection ... ok
+test active_x::package::tests::descriptor_persistence_variants_and_nested_objects ... ok
+test active_x::vba::tests::rejects_invalid_project_before_mutating_workbook ... ok
+test active_x::vba::tests::discovers_macro_project_metadata_without_parsing_payloads ... ok
+test active_x::vba::tests::rejects_project_parts_with_outbound_relationships ... ok
+test active_x::vba::tests::workbooks_without_vba_projects_return_no_metadata ... ok
+test active_x::package::tests::package_validation_and_exact_opaque_roundtrip ... ok
+test active_x::package::tests::malformed_and_resource_matrix ... ok
+test calculation_properties::features::tests::preserves_order_duplicates_and_occurrences ... ok
+test auto_filter::tests::authored_filter_payloads_round_trip_through_shared_serializer ... ok
+test calculation_properties::model::tests::equality_is_effective_but_specification_is_exact ... ok
+test auto_filter::tests::source_publication_refuses_mce_selected_auto_filter ... ok
+test active_x::vba::tests::conflicting_canonical_part_name_is_rejected_atomically ... ok
+test calculation_properties::model::tests::iteration_delta_accepts_the_xsd_double_value_space ... ok
+test calculation_properties::limits::tests::defaults_match_existing_parser_bounds ... ok
+test active_x::package::tests::strict_nested_mce_controls_roundtrip ... ok
+test auto_filter::tests::authored_sort_state_round_trips_and_strict_splice_preserves_neighbors ... ok
+test calculation_properties::features::tests::validates_names_and_nonempty_collection ... ok
+test active_x::vba::tests::template_kind_survives_attach_and_remove ... ok
+test active_x::package::tests::generated_remove_retains_shared_preview_and_rejects_limits ... ok
+test calculation_properties::snapshot::tests::source_binding_ignores_unrelated_workbook_relationships ... ok
+test calculation_properties::snapshot::tests::enforces_raw_limit_before_retaining_source_arc ... ok
+test auto_filter::tests::worksheet_replacement_preserves_dialect_and_unrelated_bytes ... ok
+test calculation_properties::package::tests::contextual_entry_points_share_the_source_bound_lifecycle ... ok
+test calculation_properties::patch::tests::stale_owner_graph_is_rejected_atomically ... ok
+test calculation_properties::tests::rejects_entity_references_inside_calc_pr ... ok
+test calculation_properties::snapshot::tests::resolves_noncanonical_main_part_for_all_workbook_types_and_conformance_modes ... ok
+test active_x::package::tests::generated_replace_rolls_back_on_conflicting_part_name ... ok
+test calculation_properties::tests::parses_ordered_strict_features_and_applies_feature_limits ... ok
+test calculation_properties::limits::tests::rejects_zero_for_every_limit ... ok
+test calculation_properties::tests::rewrite_refuses_mce_projected_calc_pr ... ok
+test calculation_properties::tests::rejects_mixed_dialect_owners_and_out_of_order_calc_pr ... ok
+test calculation_properties::tests::invalidation_preserves_qualified_future_calc_pr_attributes_exactly ... ok
+test calculation_properties::transaction::tests::changed_signed_package_is_rejected_without_mutation ... ok
+test calculation_properties::tests::applies_schema_whitespace_unsigned_and_double_lexicals ... ok
+test calculation_properties::tests::rejects_invalid_values_structure_and_attributes ... ok
+test auto_filter::tests::rejects_malformed_and_security_cases ... ok
+test calculation_properties::patch::tests::inverse_restores_the_exact_source ... ok
+test active_x::vba::tests::stores_preserves_replaces_and_removes_authored_project ... ok
+test calculation_properties::tests::rewrite_is_borrowed_on_noop_and_preserves_unowned_bytes ... ok
+test calculation_properties::tests::understands_xcalcf_choice_and_collapses_extension_uri_token ... ok
+test calculation_properties::tests::supports_strict_namespace_and_mce_fallback ... ok
+test auto_filter::tests::parses_all_variants_strict_and_mce ... ok
+test calculation_properties::tests::unsigned_int_lexicals_are_digits_only_bounded_and_canonically_written ... ok
+test calculation_properties::model::tests::exact_delta_comparison_is_bit_deterministic ... ok
+test cell::tests::borrowed_number_validation_matches_owned_constructor_errors ... ok
+test cell::tests::edit_content_keeps_text_inert_and_formulas_explicit ... ok
+test cell::tests::dates_are_checked_and_keep_their_lexical_form ... ok
+test cell::tests::numbers_preserve_lexemes_and_convert_explicitly ... ok
+test cell::tests::producer_unknown_error_values_are_read_only ... ok
+test calculation_properties::transaction::tests::no_op_preserves_exact_source_even_when_signed ... ok
+test cell::tests::range_cells_handle_sparse_rows_and_grid_edges ... ok
+test cell_values::snapshot::tests::aggregate_cap_accepts_exact_total_and_rejects_one_over ... ok
+test cell::tests::range_cells_skip_columns_outside_each_selected_row ... ok
+test cell_watches::tests::parses_watches_in_document_order ... ok
+test calculation_properties::tests::parses_all_attributes_and_effective_defaults ... ok
+test cell_watches::tests::supports_strict_namespace ... ok
+test cell_watches::tests::write_round_trips_through_the_reader ... ok
+test chain::tests::adversarial_xml_returns_errors_without_unwinding ... ok
+test chain::tests::malformed_duplicate_keys_are_retained_but_never_selected_silently ... ok
+test cell_watches::tests::rejects_structure_attributes_and_references ... ok
+test chain::tests::positional_repairs_refresh_ambiguous_import_state ... ok
+test chain::tests::rejects_chain_sheet_ids_absent_from_workbook_catalog_exactly ... ok
+test calculation_properties::transaction::tests::set_and_remove_publish_exact_authored_state ... ok
+test chain::tests::semantic_and_positional_crud_is_checked_and_failure_atomic ... ok
+test chain::tests::parses_writes_typed_sheets_steps_strict_and_extensions ... ok
+test chain::tests::semantic_mutations_reject_ambiguous_imports_without_changing_order ... ok
+test chain::tests::workbook_mce_expansion_is_rejected_during_bounded_processing ... ok
+test chain::tests::package_calculation_chain_mutators_reject_invalid_existing_graphs ... ok
+test cell_watches::tests::rejects_unsafe_document_boundaries_and_depth ... ok
+test chain::tests::removal_retains_a_calculation_chain_part_referenced_elsewhere ... ok
+test chain::tests::preprocesses_mce_and_rejects_malformed_records ... ok
+test chain::tests::signed_publication_allows_exact_noops_and_rejects_changes ... ok
+test active_x::package::tests::libreoffice_radio_buttons_resolve_five_inert_payloads ... ok
+test chain::tests::stores_rewrites_and_removes_inert_calculation_chain_parts ... ok
+test chart_sheet::package::tests::mce_fallback_selects_chartsheet_views ... ok
+test chain::tests::refuses_to_canonicalize_mce_projected_chain_sources ... ok
+test chart_sheet::package::tests::mce_fallback_selects_custom_chartsheet_views ... ok
+test chart_sheet::package::tests::picture_mce_schema_and_inert_round_trip ... ok
+test chart_sheet::package::tests::chart_ex_strict_mce_selects_extended_choice_and_preserves_classic_fallback_behavior ... ok
+test chart_sheet::package::tests::classic_chart_relationship_metadata_must_match_xml ... ok
+test active_x::package::tests::generated_graph_store_reload_and_remove_preserves_unrelated_xml ... ok
+test active_x::package::tests::libreoffice_stream_init_is_opaque_and_anchored ... ok
+test chart_sheet::package::tests::printer_settings_page_setup_strict_mce_and_schema_order ... ok
+test chart_sheet::package::tests::rejects_existing_background_part_collision_before_mutation ... ok
+test chart_sheet::package::tests::rejects_chart_ex_drawing_shape_roots_cardinality_relationships_and_caps ... ok
+test chain::tests::loads_real_poi_and_synthetic_packages_and_validates_relationships ... ok
+test chart_sheet::package::tests::ext_list_strict_mce_duplicate_uri_and_deterministic_round_trip ... ok
+test chart_sheet::package::tests::rejects_vml_schema_duplicates_order_and_missing_ids ... ok
+test calculation_properties::tests::reads_poi_calculation_fixtures ... ok
+test chart_sheet::package::tests::ext_list_package_round_trip_preserves_inert_internal_and_external_relationships ... ok
+test chart_sheet::package::tests::rejects_printer_settings_pairing_paths_collisions_and_caps_before_mutation ... ok
+test chart_sheet::package::tests::store_is_atomic_when_new_candidate_parts_conflict_case_insensitively ... ok
+test chart_sheet::package::tests::rejects_picture_cardinality_order_metadata_and_caps ... ok
+test chart_sheet::package::tests::store_rejects_non_bijective_drawing_chart_resources ... ok
+test chart_sheet::package::tests::rejects_ext_list_schema_order_uri_payload_and_caps ... ok
+test chart_sheet::package::tests::rejects_web_publish_malformed_duplicates_cardinality_and_order ... ok
+test chart_sheet::package::tests::transitional_custom_view_reference_round_trip ... ok
+test chart_sheet::package::tests::validates_typed_package_graph_without_store_side_effects ... ok
+test chart_sheet::package::tests::strict_typed_xml_round_trip ... ok
+test chart_sheet::package::tests::drawing_chart_reference_cap_is_checked_before_retention_grows ... ok
+test chart_sheet::package::tests::vml_mce_schema_order_and_inert_round_trip ... ok
+test chart_sheet::package::tests::web_publish_mce_fallback_and_inert_references ... ok
+test chart_sheet::package::tests::strict_package_writer_round_trips_complete_leaf_graph ... ok
+test chart_sheet::package::tests::transitional_picture_package_round_trip_preserves_opaque_bytes ... ok
+test chart_sheet::package::tests::web_publish_schema_enum_and_deterministic_round_trip ... ok
+test calculation_properties::tests::reads_libreoffice_calculation_fixtures ... ok
+test chart_sheet::package::tests::web_publish_package_load_store_preserves_metadata_only ... ok
+test chart_sheet::package::tests::classic_chart_embedded_workbook_relationship_round_trips ... ok
+test chart_sheet::package::tests::rejects_vml_pairing_content_type_collision_and_caps ... ok
+test chart_sheet::package::tests::rejects_external_wrong_type_escaped_and_unreferenced_picture_relationships ... ok
+test chart_sheet::tests::semantic_view_children_round_trip_through_the_flat_facade ... ok
+test color::tests::opaque_rgb_uses_ff_alpha_and_canonical_display ... ok
+test color::tests::parse_error_is_specific_and_std_error_compatible ... ok
+test color::tests::parses_exact_argb_wire_order_case_insensitively ... ok
+test color::tests::rejects_non_argb_lengths_and_non_hex_bytes ... ok
+test chart_sheet::package::tests::rejects_external_wrong_type_escaped_orphan_and_outbound_vml_graphs ... ok
+test conditional_formatting::tests::fixed_domains_are_compact_exact_and_strict ... ok
+test chart_sheet::package::tests::printer_settings_package_round_trip_preserves_opaque_bytes ... ok
+test connections::tests::failed_reorder_preserves_the_existing_connection_order ... ok
+test connections::tests::failed_add_preserves_the_existing_connection_set ... ok
+test conditional_formatting::tests::rejects_malformed_and_dangerous_content ... ok
+test column::tests::later_ranges_replace_the_complete_effective_column_record ... ok
+test conditional_formatting::tests::office_2010_icon_sets_are_distinct_from_core_sets ... ok
+test conditional_formatting::tests::parses_core_payloads_and_differential_reference ... ok
+test chart_sheet::package::tests::rejects_printer_settings_external_wrong_type_escape_orphan_content_type_and_outbound_graphs ... ok
+test column::tests::widths_and_outlines_are_checked_before_they_enter_layout_state ... ok
+test connections::tests::rejects_external_wrong_content_and_outbound_package_edges ... ok
+test connections::tests::rejects_malformed_and_unsafe ... ok
+test column::tests::bounded_assignment_tree_matches_a_naive_grid_oracle ... ok
+test connections::tests::standards_parameters_tables_strict_and_mce ... ok
+test connections::tests::transaction_creates_and_removes_the_connections_owner ... ok
+test connections::tests::bounded_serializer_rejects_oversized_output_before_appending ... ok
+test connections::tests::transaction_noop_and_stale_failure_are_source_checked ... ok
+test connections::tests::typed_transaction_preserves_opaque_connection_xml_and_inverse ... ok
+test connections::tests::libreoffice_prefixed_core_namespace ... ok
+test calculation_properties::tests::rejects_oversized_workbook_xml ... ok
+test custom_data::codec::tests::validates_workbook_namespace ... ok
+test custom_data::codec::tests::typed_properties_and_extensions_round_trip ... ok
+test data_consolidation::tests::canonical_writer_round_trips_range_name_relationships_and_flags ... ok
+test data_consolidation::tests::parses_every_function_and_effective_defaults ... ok
+test data_consolidation::tests::supports_strict_mce_preservation_and_exact_schema_position ... ok
+test data_consolidation::tests::rejects_malformed_counts_choices_spoofing_duplicates_unknowns_and_bounds ... ok
+test chart_sheet::package::tests::real_libreoffice_chart_ex_fixture_round_trips_as_inert_resources ... ok
+test custom_data::codec::tests::rejects_hostile_xml_identity_and_bounds ... ok
+test chart_sheet::package::tests::chart_ex_user_shapes_png_svg_transitional_and_strict_round_trip ... ok
+test auto_filter::tests::worksheet_replacement_refuses_mce_and_bounded_hostile_input ... ok
+test drawing::tests::parses_chartsheet_absolute_anchor_chart ... ok
+test drawing::tests::parses_default_namespace_transitional_drawing ... ok
+test connections::tests::libreoffice_text_import_fields ... ok
+test drawing::tests::rejects_malformed_drawing_anchors_and_bounded_marker_text ... ok
+test drawing::tests::parses_prefixed_strict_picture_and_chart_anchors_in_source_order ... ok
+test drawing::tests::retains_unknown_shape_as_inert_structure ... ok
+test error::tests::allocation_preserves_resource_and_source ... ok
+test connections::tests::poi_database_mce_and_strict_roundtrip ... ok
+test data_validation::codec::tests::parses_strict_mce_and_quoted_list ... ok
+test connections::tests::libreoffice_olap_and_extensions ... ok
+test drawing::tests::reuses_shared_drawingml_text_body_types ... ok
+test external_links::tests::parses_sparse_workbook_cache_and_keeps_target_inert ... ok
+test external_links::tests::rejects_external_cached_matrix_mismatch ... ok
+test external_links::tests::canonical_writer_validates_target_relationship_metadata ... ok
+test formula::tests::explicit_formula_construction_rejects_xml_forbidden_characters ... ok
+test formula::tests::explicit_formula_construction_is_checked ... ok
+test external_links::tests::typed_dde_round_trips_without_target_relationships ... ok
+test connections::tests::poi_web_paths_are_inert ... ok
+test header_footer::tests::parses_all_variants_defaults_and_sections ... ok
+test header_footer::tests::preserves_ampersands_and_unrecognized_formatting ... ok
+test hyperlinks::codec::tests::orphan_hyperlink_relationship_is_rejected ... ok
+test header_footer::tests::rejects_duplicates_order_and_nested_markup ... ok
+test hyperlinks::codec::tests::malformed_roots_names_and_event_floods_are_rejected ... ok
+test hyperlinks::codec::tests::malformed_or_opaque_hyperlink_graphs_fail_closed ... ok
+test hyperlinks::codec::tests::hyperlink_relationship_ids_are_exclusively_owned ... ok
+test hyperlinks::codec::tests::transitional_and_strict_links_are_typed_and_inert ... ok
+test ignored_errors::tests::parses_all_flags_ranges_and_defaults ... ok
+test chart_sheet::package::tests::rejects_malformed_caps_and_graphs ... ok
+test chart_sheet::package::tests::chart_ex_user_shapes_rejects_graph_mime_namespace_collision_and_caps ... ok
+test external_links::tests::transaction_edits_known_metadata_without_rebuilding_opaque_xml ... ok
+test layout::tests::numeric_domains_are_const_checked_and_normalize_negative_zero ... ok
+test layout::tests::outline_accessors_preserve_explicit_zero_attribute_presence ... ok
+test merge::tests::rejects_two_dimensional_overlap_without_expanding_ranges ... ok
+test merge::tests::validates_and_finds_sparse_vertical_and_horizontal_merges ... ok
+test named_sheet_view::codec::tests::detailed_authoring_rejects_invalid_relationships_and_filter_values ... ok
+test ignored_errors::tests::supports_strict_mce_and_extension_retention ... ok
+test ignored_errors::tests::rejects_bad_references_structure_attributes_and_limits ... ok
+test ignored_errors::tests::rejects_multiple_roots_direct_text_and_excessive_depth ... ok
+test named_sheet_view::codec::tests::rejects_unsafe_fragments_and_mismatched_color_sort_formats ... ok
+test named_sheet_view::codec::tests::rejects_schema_guid_range_and_security_errors ... ok
+test external_links::tests::package_crud_keeps_relationship_graph_bounded_and_inert ... ok
+test ole_objects::tests::accepts_inert_external_package_target ... ok
+test chain::tests::rejects_raw_oversized_attributes_before_entity_decoding ... ok
+test named_sheet_view::codec::tests::authors_detailed_value_date_and_sort_metadata ... ok
+test merge::tests::interval_tree_finds_many_tall_ranges_without_expanding_rows ... ok
+test header_footer::tests::loads_libreoffice_color_sections_fixture ... ok
+test header_footer::tests::loads_poi_ampersand_fixture ... ok
+test chart_sheet::package::tests::loads_both_poi_chartsheet_graphs ... ok
+test external_links::tests::transaction_noop_and_inverse_are_exact_and_source_checked ... ok
+test named_sheet_view::codec::tests::poi_fixture_has_no_named_sheet_views_relationship ... ok
+test chart_sheet::package::tests::rejects_extension_relationship_missing_orphan_mismatch_duplicate_escape_caps_and_wrong_namespace ... ok
+test ole_objects::tests::strict_round_trip_covers_complete_typed_properties ... ok
+test outline::tests::outline_is_const_checked_for_rows_and_columns ... ok
+test ole_objects::tests::strict_package_writer_round_trips_and_inserts_in_schema_order ... ok
+test outline_properties::tests::parses_all_attributes_and_effective_defaults ... ok
+test outline_properties::tests::rejects_invalid_values_duplicates_spoofing_and_children ... ok
+test ole_objects::tests::no_op_is_byte_exact_and_invalid_edits_are_staged_atomically ... ok
+test outline_properties::tests::rejects_malformed_document_boundaries_and_excessive_depth ... ok
+test package::printer_settings::tests::package_writer_inserts_missing_page_setup_deterministically ... ok
+test outline_properties::tests::supports_strict_mce_and_exact_scoping ... ok
+test package::printer_settings::tests::rejects_case_equivalent_part_without_mutating_for_retry ... ok
+test package::printer_settings::tests::package_writer_reuses_or_avoids_existing_relationship_prefixes ... ok
+test package::xldm::compression::tests::appendix_a_compression_mask_known_answers_and_complete_domain ... ok
+test named_sheet_view::codec::tests::parses_mce_rich_sort_and_extensions ... ok
+test package::printer_settings::tests::strict_package_writer_preserves_page_setup_and_schema_order ... ok
+test package::printer_settings::tests::strict_reference_round_trip_and_mce_fallback ... ok
+test package::xldm::compression::tests::huffman_single_charset_and_invalid_tree ... ok
+test package::xldm::compression::tests::no_split_rejects_bad_size_and_range ... ok
+test package::xldm::compression::tests::huffman_spec_known_answer_female_male ... ok
+test package::xldm::compression::tests::section_3_2_hybrid_idf_known_answer ... ok
+test package::xldm::compression::tests::no_split_known_answers_cover_every_width ... ok
+test package::xldm::compression::tests::hybrid_mixed_round_trip_and_adversarial_offsets ... ok
+test package::xldm::compression::tests::xm123_round_trip_and_bound ... ok
+test package::xldm::compression::tests::xpress_literal_round_trip_and_match_known_answer ... ok
+test package::xldm::crypt::tests::parses_and_recovers_each_specified_algorithm ... ok
+test package::xldm::crypt::tests::rejects_magic_algorithm_size_and_hostile_padding ... ok
+test package::xldm::generated::tests::rejects_bad_names_versions_layouts_and_payloads ... ok
+test package::xldm::generated::tests::rejects_duplicate_or_version_skewed_hierarchy_roles ... ok
+test package::xldm::generated::tests::parses_every_section_2_4_role_as_borrowed_data ... ok
+test package::xldm::generated::tests::validates_complete_hierarchy_sets_and_relationship_alternatives ... ok
+test package::xldm::metadata::tests::enforces_generated_file_presence_and_sparse_relationship_policy ... ok
+test ole_objects::tests::source_bound_anchor_edits_preserve_unknown_markup_and_payload_bytes ... ok
+test ole_objects::tests::source_bound_metadata_edits_insert_and_remove_known_attributes_without_loss ... ok
+test named_sheet_view::codec::tests::discovers_libreoffice_fixture_and_parses_filters ... ok
+test package::xldm::metadata::tests::parses_borrowed_table_metadata_and_writes_exact_bytes ... ok
+test package::xldm::native::tests::rejects_hash_misplacement_collisions_and_statistics ... ok
+test package::xldm::metadata::tests::validates_dictionary_flags_operating_width_and_relationship_layout ... ok
+test package::xldm::native::tests::enforces_column_data_hybrid_pairs_at_the_storage_role_boundary ... ok
+test package::xldm::native::tests::parses_and_writes_hash_index_exactly ... ok
+test package::xldm::native::tests::rejects_truncation_counts_constants_flags_and_ranges ... ok
+test package::xldm::native::tests::parses_borrowed_idf_numeric_and_string_layouts ... ok
+test package::xldm::olap::tests::parses_dimension_information_and_ignored_map_declarations ... ok
+test package::xldm::olap::tests::parses_every_xldm_defined_document_shape_borrowed_and_exact ... ok
+test package::xldm::metadata::tests::rejects_adversarial_schema_and_scalar_inputs ... ok
+test ole_objects::tests::rejects_malformed_markup_caps_and_graphs ... ok
+test ole_objects::tests::loads_real_poi_mce_objects_without_opening_payloads ... ok
+test package::xldm::compression::tests::xpress_framing_round_trip_and_bomb_guard ... ok
+test chart_sheet::package::tests::chart_outbound_tests::chart_ex_complete_outbound_family_round_trips_strict_and_transitional ... ok
+test package::printer_settings::tests::loads_poi_and_libreoffice_reference_packages ... ok
+test ole_objects::tests::patches_replay_exact_sources_invert_and_reject_stale_targets_atomically ... ok
+test package::xldm::olap::tests::rejects_versions_system_paths_sequences_and_hostile_xml ... ok
+test package::xldm::tests::tests::classifies_every_generated_filename_family ... ok
+test package::xldm::tests::tests::rejects_header_signature_version_padding_and_offsets ... ok
+test page_breaks::tests::changed_pretty_xml_is_compact_without_losing_text_whitespace ... ok
+test package::xldm::olap::tests::validates_hierarchy_level_ids_against_section_2_5 ... ok
+test page_breaks::tests::changed_prefixed_worksheet_uses_the_root_namespace_prefix ... ok
+test package::xldm::tests::tests::rejects_directory_count_and_partition_shape_mismatches ... ok
+test page_breaks::tests::changed_collections_refuse_lossy_wire_metadata ... ok
+test page_breaks::tests::parses_defaults_and_manual_counts ... ok
+test page_breaks::tests::strict_and_transitional_page_break_dialects_must_match_the_root ... ok
+test page_breaks::tests::undeclared_element_and_attribute_prefixes_are_rejected ... ok
+test page_breaks::tests::rewrite_preserves_unrelated_bytes_and_schema_order ... ok
+test page_breaks::tests::rejects_count_bounds_grid_and_unsafe_xml ... ok
+test page_margins::tests::accepts_strict_namespace_and_absence ... ok
+test package::xldm::tests::tests::rejects_crc_corruption_without_interpreting_payload ... ok
+test page_breaks::tests::writer_is_byte_minimal_and_round_trips ... ok
+test package::xldm::tests::tests::rejects_overlap_gap_and_nonzero_page_padding ... ok
+test named_sheet_view::codec::tests::package_crud_rejects_invalid_existing_graph_before_replacement ... ok
+test package::xldm::tests::tests::inspects_typed_storage_and_writes_byte_exactly ... ok
+test page_margins::tests::parses_required_values_and_converts_units ... ok
+test package::xldm::tests::tests::rejects_traversal_duplicate_and_ancestor_cycles ... ok
+test page_breaks::tests::supports_strict_and_reads_but_refuses_mce_projected_breaks ... ok
+test page_margins::tests::authors_inserts_and_removes_byte_minimal_margins ... ok
+test page_setup::tests::checked_numeric_types_cover_excel_boundaries ... ok
+test page_setup::tests::closed_tokens_have_one_from_str_and_display_mapping ... ok
+test page_setup::tests::exact_measures_reject_non_schema_numbers_and_oversized_lexicals ... ok
+test page_margins::tests::rejects_missing_nonfinite_out_of_range_and_content ... ok
+test page_setup::tests::preserves_absence_and_resolves_the_printer_default_only_on_request ... ok
+test page_setup::tests::parses_every_attribute_without_erasing_lexical_values ... ok
+test page_breaks::tests::package_transaction_reads_back_and_reverses_page_breaks ... ok
+test page_margins::tests::rejects_malformed_document_boundaries_and_excessive_depth ... ok
+test page_setup::tests::parser_rejects_every_out_of_domain_numeric_family ... ok
+test page_setup::tests::page_setup_attributes_use_expanded_names_strictly ... ok
+test page_setup::tests::relationship_ids_validate_before_borrowed_or_owned_storage ... ok
+test page_setup::tests::relationship_projection_is_independent_from_nonconforming_settings ... ok
+test page_setup::tests::signed_first_page_round_trips_through_the_unsigned_wire_domain ... ok
+test package::xldm::tests::tests::rejects_backup_log_size_class_and_name_mismatches ... ok
+test package::xldm::tests::tests::rejects_malformed_backup_log_flags_and_enums ... ok
+test page_setup::tests::rejects_bad_enums_measures_and_content ... ok
+test pivot::chart::tests::field_types_and_default_options_are_contextual ... ok
+test pivot::chart::tests::resolves_authored_source_names_without_leaking_package_details ... ok
+test phonetic_properties::tests::parses_all_values_and_effective_defaults ... ok
+test pivot::chart::tests::parses_strict_chart_namespace_and_ignores_unknown_extensions ... ok
+test pivot::chart::tests::ordinary_chart_has_no_binding ... ok
+test phonetic_properties::tests::rejects_invalid_missing_duplicate_spoofed_and_non_leaf_values ... ok
+test pivot::chart::tests::parses_transitional_source_and_options ... ok
+test phonetic_properties::tests::supports_strict_mce_and_exact_scoping ... ok
+test named_sheet_view::codec::tests::constructs_core_views_and_extends_libreoffice_metadata ... ok
+test named_sheet_view::codec::tests::serializes_libreoffice_fixture_without_losing_filter_or_sort_metadata ... ok
+test phonetic_properties::tests::rejects_malformed_document_boundaries_and_excessive_depth ... ok
+test pivot::reader::tests::parses_prefixed_pivot_cache_records ... ok
+test pivot::reader::tests::parses_prefixed_pivot_table_definition ... ok
+test pivot::reader::tests::rejects_malformed_pivot_cache_records ... ok
+test pivot::writer::tests::rejects_invalid_pivot_cache_output ... ok
+test pivot::writer::tests::every_public_pivot_writer_emits_compact_xml ... ok
+test pivot::writer::tests::writes_pivot_cache_record_indexes_round_trip ... ok
+test pivot::reader::tests::rejects_malformed_pivot_table_definitions ... ok
+test page_margins::tests::loads_libreoffice_metric_margin_fixture ... ok
+test print_options::tests::accepts_strict_namespace_and_absence ... ok
+test pivot::reader::tests::parses_prefixed_pivot_cache_definition_and_shared_items ... ok
+test pivot::reader::tests::rejects_malformed_pivot_cache_definitions ... ok
+test pivot::reader::tests::resolves_strict_custom_pivot_table_parts ... ok
+test page_margins::tests::loads_poi_custom_margin_fixture ... ok
+test pivot::reader::tests::tolerates_chartsheet_entries_in_sheet_walk ... ok
+test pivot::reader::tests::rejects_external_and_wrong_content_type_pivot_parts ... ok
+test pivot::writer::tests::writes_complete_pivot_cache_definition_round_trip ... ok
+test page_setup::tests::rejects_a_libreoffice_fixture_with_nonconforming_zero_dpi ... ok
+test pivot::reader::tests::rejects_invalid_pivot_cache_relationship_graphs ... ok
+test print_options::tests::loads_libreoffice_gridline_fixture ... ok
+test print_options::tests::parses_flags_defaults_and_derived_gridline_behavior ... ok
+test print_options::tests::rejects_invalid_duplicate_unknown_and_nested_content ... ok
+test package::printer_settings::tests::rejects_malformed_references_caps_and_graphs ... ok
+test raw::catalog::tests::keeps_the_first_of_duplicate_defined_names_in_the_same_scope ... ok
+test print_options::tests::rejects_malformed_document_boundaries_and_excessive_depth ... ok
+test print_options::tests::rejects_malformed_closing_state_without_panicking ... ok
+test raw::catalog::tests::keeps_same_defined_name_in_distinct_scopes ... ok
+test raw::catalog::tests::parses_strict_workbook_pivot_cache_references ... ok
+test raw::catalog::tests::parses_namespaced_sheet_scoped_defined_names ... ok
+test raw::catalog::tests::parses_namespaced_workbook_metadata_and_decodes_attributes ... ok
+test query_table::codec::tests::parses_and_writes_complete_strict_query_table ... ok
+test raw::catalog::tests::rejects_malformed_workbook_pivot_cache_references ... ok
+test raw::catalog::tests::supports_strict_namespaces_and_standalone_sheet_fragments ... ok
+test raw::catalog_edit::tests::active_tab_limit_is_a_typed_block ... ok
+test raw::catalog_edit::tests::append_expands_an_empty_sheet_container_from_root_namespaces ... ok
+test raw::catalog::tests::round_trips_defined_name_scope_and_standard_attributes ... ok
+test raw::catalog::tests::rejects_spoofed_duplicate_and_malformed_workbook_metadata ... ok
+test raw::catalog_edit::tests::append_expands_an_empty_sheet_container_with_a_local_relationship_prefix ... ok
+test raw::catalog::tests::tolerates_unrecognised_sheet_state_values ... ok
+test raw::catalog_edit::tests::blocks_an_effective_sheet_without_a_direct_slot ... ok
+test query_table::codec::tests::processes_mce_fallback_and_preserves_extension_payload ... ok
+test raw::catalog_edit::tests::composes_name_and_visibility_on_one_lossless_sheet_slot ... ok
+test raw::catalog_edit::tests::append_preserves_existing_bytes_and_uses_the_document_prefixes ... ok
+test raw::catalog_edit::tests::blocks_active_view_insertion_beside_alternate_content ... ok
+test raw::catalog_edit::tests::removal_blocks_unmodeled_catalog_payloads ... ok
+test raw::catalog_edit::tests::expands_an_empty_book_views_container ... ok
+test raw::catalog_edit::tests::removal_drops_an_empty_defined_name_container ... ok
+test raw::catalog_edit::tests::inserts_prefixed_book_views_before_sheets ... ok
+test raw::formula::tests::checked_reference_shift_produces_ref_error ... ok
+test raw::catalog_edit::tests::blocks_structure_protection_but_preserves_unrelated_alternate_content ... ok
+test raw::compact::tests::changed_xml_is_compact_without_losing_semantic_whitespace_or_entities ... ok
+test raw::formula::tests::rename_scan_does_not_allocate_without_a_local_match ... ok
+test raw::formula::tests::detects_direct_and_implicit_three_d_sheet_dependencies ... ok
+test raw::formula::tests::renames_local_prefixes_simultaneously_and_preserves_external_references ... ok
+test raw::formula::tests::renames_quoted_apostrophes_and_unicode_caseless_names ... ok
+test raw::formula::tests::translates_reference_forms_without_touching_strings_or_structured_refs ... ok
+test raw::catalog_edit::tests::rewrites_only_selected_states_and_first_view ... ok
+test raw::properties_edit::tests::preserves_stale_sheet_titles_during_removal ... ok
+test raw::catalog_edit::tests::reorder_blocks_unmodeled_catalogs_and_invalid_secondary_views ... ok
+test raw::properties_edit::tests::stale_title_prefix_is_preserved_instead_of_guessed ... ok
+test raw::properties_edit::tests::appends_sheet_titles_and_updates_standard_heading_count ... ok
+test raw::properties_edit::tests::removes_sheet_titles_and_updates_standard_heading_count ... ok
+test raw::catalog_edit::tests::removal_drops_slots_and_scopes_and_remaps_views_losslessly ... ok
+test raw::properties_edit::tests::arranges_sheet_prefix_without_touching_named_range_titles ... ok
+test raw::recalc::tests::inserts_or_updates_calc_properties_without_changing_other_markup ... ok
+test raw::reference_edit::tests::blocks_unmodeled_formula_like_and_compatibility_references ... ok
+test raw::recalc::tests::refuses_to_rewrite_effective_calc_properties_projected_through_mce ... ok
+test raw::reference_scan::tests::classifies_unknown_and_compatibility_carriers ... ok
+test raw::reference_scan::tests::ignores_relationship_backed_and_external_workbook_dependencies ... ok
+test raw::reference_edit::tests::leaves_external_and_inert_values_exact ... ok
+test raw::reference_scan::tests::classifies_modeled_formula_and_direct_dependencies ... ok
+test raw::reference_edit::tests::rewrites_formula_hyperlink_pivot_and_title_dependencies ... ok
+test raw::shared_strings::tests::accepts_strict_namespaces_and_ignores_foreign_lookalikes ... ok
+test raw::shared_strings::tests::oversized_unique_count_hint_does_not_preallocate ... ok
+test raw::recalc::tests::rejects_hostile_nesting_at_the_shared_default_limit ... ok
+test raw::shared_strings::tests::authors_plain_and_rich_items_without_cross_format_deduplication ... ok
+test raw::shared_strings::tests::preserves_indexes_and_decodes_plain_and_rich_text ... ok
+test raw::shared_strings::tests::rejects_bad_counts_structure_and_run_properties ... ok
+test raw::shared_strings::tests::treats_contradictory_and_malformed_count_hints_as_advisory ... ok
+test raw::reference_edit::tests::classifies_namespaces_wrappers_and_vml_conservatively ... ok
+test raw::sheet_view_edit::tests::blocks_missing_views_when_compatibility_payload_may_own_them ... ok
+test raw::sheet_view_edit::tests::inserts_views_in_worksheet_schema_order ... ok
+test raw::sheet_view_edit::tests::expands_empty_views_and_supports_chartsheets ... ok
+test raw::strings::tests::preserves_indexes_and_resolves_plain_rich_and_escaped_text ... ok
+test raw::strings::tests::rejects_mixed_text_and_unpaired_surrogates ... ok
+test raw::sheet_view_edit::tests::toggles_only_the_matching_prefixed_view ... ok
+test query_table::codec::tests::rejects_malformed_and_resource_abuse ... ok
+test raw::catalog_edit::tests::reorders_losslessly_and_remaps_every_positional_dependency ... ok
+test raw::strings::tests::streaming_0364_decodes_split_reference_escapes ... ok
+test raw::strings::tests::streaming_0364_drains_malformed_tail_and_rejects_roots ... ok
+test raw::strings::tests::streaming_0364_accepts_advisory_count_mismatches_and_rejects_bad_hints ... ok
+test raw::strings::tests::streaming_0364_selects_mce_choice_or_fallback ... ok
+test raw::strings::tests::streaming_0364_marks_unsupported_constructs_without_approximation ... ok
+test raw::strings::tests::streaming_0365_accepts_exact_input_event_and_request_bounds ... ok
+test raw::strings::tests::streaming_0365_accepts_empty_request_without_retaining_items ... ok
+test raw::strings::tests::streaming_0365_rejects_unsorted_and_duplicate_requests ... ok
+test raw::strings::tests::streaming_0365_omits_missing_and_out_of_range_indexes ... ok
+test raw::strings::tests::text_encoding_round_trips_controls_and_literal_escape_syntax ... ok
+test raw::strings::tests::streaming_0365_drains_malformed_tail_after_selected_items ... ok
+test raw::strings::tests::streaming_0365_returns_first_middle_last_in_request_order ... ok
+test raw::strings::tests::streaming_0364_selects_plain_requested_indexes ... ok
+test raw::strings::tests::streaming_0365_reports_rich_items_for_requested_and_unrequested_indexes ... ok
+test raw::styles::tests::streaming_0364_counts_direct_cell_xfs ... ok
+test raw::styles::tests::rejects_missing_duplicate_empty_and_mismatched_tables ... ok
+test raw::styles::tests::counts_only_direct_cell_formats_after_mce_processing ... ok
+test raw::styles::tests::streaming_0364_enforces_declared_count ... ok
+test raw::styles::tests::streaming_0364_honors_exact_event_limit ... ok
+test raw::styles::tests::streaming_0364_requires_nonempty_cell_xfs ... ok
+test raw::styles::tests::streaming_0364_ignores_nested_and_unrelated_xfs ... ok
+test raw::styles::tests::streaming_0364_rejects_malformed_tail_and_endings ... ok
+test pivot::reader::tests::poi_fixture_with_chartsheet_reads_pivot_tables ... ok
+test raw::web::tests::retains_strict_spreadsheetml_namespace ... ok
+test raw::web::tests::parses_fixture_and_roundtrips_canonical_xml ... ok
+test raw::web::tests::rejects_wrong_grammar_duplicates_and_empty_writes ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_accepts_event_count_at_limit ... ok
+test raw::worksheet::edit::codec::tests::sibling_names_retain_the_source_prefix ... ok
+test raw::styles::tests::streaming_0364_selects_mce_choice_or_fallback ... ok
+test raw::web::tests::replaces_inserts_and_removes_without_touching_unrelated_xml ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_rejects_mismatched_end_name ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_rejects_flat_event_stream_over_event_limit ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_builds_sorted_edit_slots ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_restores_namespace_scope_after_a_rebinding ... ok
+test print_options::tests::loads_poi_centering_fixture ... ok
+test auto_filter::tests::parses_bundled_fixtures ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_accepts_nesting_at_worksheet_depth_limit ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_rejects_nesting_beyond_worksheet_depth_limit ... ok
+test raw::worksheet::edit::codec::tests::wire_tags_escape_and_replace_attributes_deterministically ... ok
+test page_setup::tests::loads_poi_resolution_and_relationship_fixture ... ok
+test raw::worksheet::edit::tests::blocks_dependencies_instead_of_guessing ... ok
+test raw::worksheet::edit::tests::defaults_edits_refuse_missing_dependencies_before_rewrite ... ok
+test raw::worksheet::edit::tests::column_style_retargeting_splits_ranges_and_resets_sparsely ... ok
+test raw::worksheet::edit::tests::column_layout_facets_split_compactly_and_preserve_unedited_attributes ... ok
+test raw::worksheet::edit::tests::column_visibility_inserts_sparse_cols_and_blocks_unsafe_splits ... ok
+test raw::worksheet::edit::tests::failed_validation_does_not_publish_a_partial_edit ... ok
+test raw::worksheet::edit::tests::no_op_and_redundant_merge_plans_preserve_source_bytes ... ok
+test raw::worksheet::edit::tests::style_only_implicit_column_is_blocked_before_zero_width_materialization ... ok
+test raw::worksheet::edit::tests::dimension_expansion_never_narrows_producer_bounds ... ok
+test raw::worksheet::edit::tests::merge_surgery_is_lossless_ordered_and_dependency_checked ... ok
+test raw::worksheet::edit::tests::style_effects_preserve_payload_and_compose_with_value_effects ... ok
+test raw::worksheet::edit::tests::untouched_xml_fragments_remain_byte_exact ... ok
+test raw::worksheet::edit::tests::column_visibility_splits_effective_owners_and_preserves_other_properties ... ok
+test chart_sheet::package::tests::rejects_chart_ex_wrong_type_orphan_escape_outbound_and_companion_graphs ... ok
+test raw::worksheet::edit::tests::minimally_rewrites_set_clear_remove_and_new_rows ... ok
+test raw::worksheet::edit::tests::new_descent_injects_collision_free_ignorable_namespaces ... ok
+test named_sheet_view::codec::tests::package_crud_round_trips_real_fixture_and_removes_unreferenced_part ... ok
+test raw::worksheet::edit::tests::protected_sheet_blocks_row_visibility_before_rewrite ... ok
+test raw::worksheet::edit::tests::row_style_retargeting_derives_custom_format_and_resets_sparsely ... ok
+test raw::worksheet::tests::namespace_rebinding_to_another_uri_is_not_treated_as_core_content ... ok
+test raw::worksheet::edit::tests::row_layout_facets_preserve_unedited_state_and_materialize_sparsely ... ok
+test raw::worksheet::tests::expands_shared_formulas_and_preserves_cached_values ... ok
+test raw::worksheet::tests::numeric_sheets_do_not_load_an_unneeded_shared_string_table ... ok
+test raw::worksheet::tests::focused_defaults_path_does_not_materialize_unrelated_cells ... ok
+test raw::worksheet::tests::focused_defaults_ignore_malformed_row_extensions ... ok
+test raw::worksheet::tests::parses_exact_sparse_values_formulas_and_explicit_empty_cells ... ok
+test raw::worksheet::tests::rejected_plain_worksheets_keep_extension_error_precedence ... ok
+test raw::worksheet::tests::keeps_declared_stored_content_and_style_extents_distinct ... ok
+test raw::worksheet::edit::tests::row_visibility_surgery_is_sparse_lossless_and_composes_with_cells ... ok
+test raw::worksheet::tests::focused_defaults_follow_the_active_mce_branch ... ok
+test raw::worksheet::tests::malformed_alternate_content_keeps_x14ac_error_precedence ... ok
+test raw::worksheet::tests::parses_checked_grid_defaults_and_effective_x14ac_descent ... ok
+test raw::worksheet::tests::parses_sparse_merges_and_rejects_ambiguous_merge_markup ... ok
+test raw::worksheet::tests::rejects_grid_escape_duplicates_and_broken_shared_groups ... ok
+test raw::worksheet::tests::rejects_extension_xml_beyond_the_depth_limit ... ok
+test phonetic_properties::tests::reads_poi_and_libreoffice_fixtures ... ok
+test raw::worksheet::tests::plain_worksheets_skip_only_the_unneeded_extension_capture ... ok
+test chart_sheet::package::tests::chart_outbound_tests::chart_ex_outbound_rejects_active_external_mismatch_collision_roots_and_caps ... ok
+test raw::worksheet::tests::namespace_equivalent_worksheet_events_have_identical_results ... ok
+test raw::worksheet::edit::tests::worksheet_defaults_and_row_descent_rewrite_losslessly_by_facet ... ok
+test raw::worksheet::tests::rejects_malformed_column_property_records ... ok
+test raw::worksheet::tests::focused_defaults_enforce_root_shape_and_xml_depth ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_captures_start_and_empty_structural_events ... ok
+test raw::worksheet::tests::rejects_missing_shared_strings_bad_indexes_and_formula_markers ... ok
+test raw::worksheet::tests::rejects_malformed_dimensions_and_row_properties ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_diagnostics_keep_primary_input_or_mce_and_callback_secondaries ... ok
+test raw::worksheet::tests::rejects_malformed_grid_defaults_and_descent ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_focused_defaults_skip_malformed_rows_but_keep_raw_guards ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_legacy_adapter_maps_clean_eof_raw_then_active_errors ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_uses_expanded_namespace_after_prefix_rebinding ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_does_not_return_early_before_malformed_tail ... ok
+test raw::worksheet::tests::resolves_complete_last_matching_column_records ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_accepts_exact_depth_event_and_input_limits_but_rejects_one_under ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_raw_errors_survive_inactive_branches_and_later_malformed_tail ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_selects_supported_choice_or_fallback_and_ignores_inactive_bad_values ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_rejects_zero_and_grid_overflow_only_when_rows_are_captured ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_chooses_supported_choice_or_fallback ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_valid_fixture_matches_legacy_capture_and_defaults ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_outcomes_cover_first_last_missing_and_empty ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_preserves_legacy_row_inference_and_order_semantics ... ok
+test raw::worksheet::tests::streaming_0361_tests::streaming_0361_split_bom_and_chunk_sizes_match_cursor ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_marks_unsupported_structures_not_eligible ... ok
+test raw::worksheet::tests::streaming_0364_dependency_metadata_tests::streaming_0364_dependency_metadata_keeps_late_malformed_xml_primary ... ok
+test raw::worksheet::tests::streaming_0364_dependency_metadata_tests::streaming_0364_dependency_metadata_keeps_valid_direct_styles_eligible ... ok
+test raw::worksheet::edit::codec::tests::snapshot_scan_handles_large_flat_event_stream_within_depth_limit ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_accepts_max_cell_style_and_falls_back_above_it ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_rejects_ordering_and_adjacent_duplicates ... ok
+test raw::worksheet::tests::streaming_0364_dependency_metadata_tests::streaming_0364_dependency_metadata_marks_invalid_lexicals_not_eligible ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_is_sparse_row_major_with_explicit_empty_records ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_defers_multiple_shared_strings_and_keeps_global_maxima ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_validates_x14ac_without_retaining_rows ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_payloads_cover_scalar_variants ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_preserves_inline_and_escape_heavy_empty_boundaries ... ok
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_respects_exact_limits_and_split_input ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_marks_formula_and_inherited_styles_not_eligible ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_late_malformed_tail_is_not_published_as_eligible ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_handles_first_last_grid_edges_and_empty_selection ... ok
+test raw::worksheet::tests::streaming_0366_general_reference_tests::streaming_0366_rejects_numeric_inline_references_as_not_eligible ... ok
+test raw::worksheet::tests::streaming_0364_dependency_metadata_tests::streaming_0364_dependency_metadata_tracks_global_maxima_and_target_states ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_range_validates_global_duplicates_order_and_late_xml_errors ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_merge_nested_and_payload_markup_falls_back ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_accepts_unsorted_adjacent_merges ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_merge_count_is_optional_exact_and_nonempty_but_not_mismatched ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_range_selection_remains_sparse_and_physical ... ok
+test raw::worksheet::tests::streaming_0366_general_reference_tests::streaming_0366_bounds_valid_general_reference_tokens ... ok
+test raw::worksheet::tests::streaming_0366_general_reference_tests::streaming_0366_keeps_invalid_references_as_typed_errors_without_early_publication ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_dimension_supports_strict_prefixed_and_ignorable_metadata ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_dimension_content_and_unknown_attributes_fall_back ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_dimension_rejects_malformed_duplicate_and_late_metadata ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_rejects_invalid_merge_references_and_placement ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_unknown_merge_attributes_and_children_fall_back ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_numeric_scratch_decodes_entity_and_cdata_numeric_fragments ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_numeric_scratch_does_not_publish_before_malformed_tail ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_dimension_keeps_scalar_and_range_queries_eligible ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_numeric_scratch_handles_scalar_type_transitions ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_numeric_scratch_preserves_long_to_short_and_exponent_lexemes ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0401_numeric_elision_keeps_formula_cache_ownership_and_parity ... ok
+test revisions::tests::graph_and_reference_errors ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_single_cell_wrapper_classifies_anchor_covered_missing_and_follower ... ok
+test raw::worksheet::tests::validates_typed_date_cells_without_normalizing_the_lexeme ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0400_numeric_scratch_rejects_oversized_selected_and_unselected_values ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0401_numeric_elision_keeps_selected_and_unselected_errors_exact ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0401_numeric_elision_preserves_selected_lexemes_and_unselected_validation ... ok
+test revisions::tests::mce_fallback ... ok
+test revisions::tests::strict_writers_are_deterministic_and_round_trip ... ok
+test revisions::tests::package_writer_round_trip ... ok
+test outline_properties::tests::reads_poi_and_libreoffice_outline_fixtures ... ok
+test revisions::tests::invalid_edit_is_staged_and_failure_atomic ... ok
+test raw::worksheet::tests::streaming_0400_numeric_scratch_tests::streaming_0401_numeric_elision_does_not_skip_unselected_inline_validation ... ok
+test raw::worksheet::tests::streaming_0366_general_reference_tests::streaming_0366_accepts_predefined_and_numeric_references_in_scalar_payloads ... ok
+test revisions::tests::transaction_edits_one_typed_user ... ok
+test active_x::package::tests::poi_property_bag_header_and_footer ... ok
+test raw::worksheet::tests::streaming_0365_range_tests::streaming_0365_single_cell_scan_wrapper_matches_one_cell_ranges ... ok
+test rich_values::tests::package_snapshot_preserves_typed_parts_and_relationship_topology ... ok
+test row::tests::heights_are_const_checked_before_entering_row_state ... ok
+test rich_values::tests::rich_data_structures_and_arrays_are_typed_and_bounded ... ok
+test rich_values::tests::feature_property_bags_keep_checkbox_chain_and_unknown_xml ... ok
+test row_visibility::rewrite::tests::duplicate_row_attributes_fail_closed ... ok
+test row_visibility::rewrite::tests::formula_cells_fail_closed_even_when_the_formula_is_prefixed ... ok
+test revisions::tests::stale_patch_and_shared_relationship_are_rejected_atomically ... ok
+test scenarios::tests::parses_scenarios_attributes_input_cells_and_defaults ... ok
+test revisions::tests::malformed_and_caps ... ok
+test scenarios::tests::preserves_unknown_attributes_and_elements ... ok
+test revisions::tests::transaction_noop_preserves_package_bytes ... ok
+test calculation_properties::tests::serializes_large_feature_collections_with_valid_structure ... ok
+test row_visibility::snapshot::tests::visibility_rewrite_proof_is_bound_to_its_exact_source ... ok
+test scenarios::tests::rejects_malformed_document_boundaries_and_excessive_depth ... ok
+test row_visibility::snapshot::tests::visibility_rewrite_reuses_cells_and_matches_full_candidate_parse ... ok
+test scenarios::tests::supports_strict_namespace_and_skips_extension_markup ... ok
+test scenarios::tests::write_round_trips_through_the_reader ... ok
+test sheet::properties::tests::rejects_malformed_document_boundaries_and_excessive_depth ... ok
+test sheet::properties::tests::parses_complete_metadata_and_effective_defaults ... ok
+test sheet::properties::tests::supports_strict_mce_and_exact_scoping ... ok
+test scenarios::tests::reads_libreoffice_scenario_fixture ... ok
+test sheet::sparklines::tests::parses_namespace_aware_sparkline_groups ... ok
+test shapes::package::tests::loads_shapes_through_the_package_graph ... ok
+test sheet::tests::equality_and_hashing_are_canonical_and_locale_independent ... ok
+test sheet::tests::owned_conversion_reuses_the_supplied_spelling ... ok
+test sheet::properties::tests::rejects_invalid_values_duplicates_spoofing_and_leaf_content ... ok
+test sheet::tests::validates_office_name_domain ... ok
+test sheet::sparklines::tests::writer_preserves_group_membership_and_round_trips ... ok
+test sheet::sparklines::tests::writer_rejects_invalid_groups ... ok
+test raw::catalog::tests::rejects_malformed_defined_names ... ok
+test sheet_calculation_properties::tests::supports_strict_namespace ... ok
+test sheet_calculation_properties::tests::rejects_bad_structure_and_attributes ... ok
+test sheet_calculation_properties::tests::rejects_leaf_content_and_malformed_document_state ... ok
+test sheet_calculation_properties::tests::write_round_trips_through_the_reader ... ok
+test sheet_calculation_properties::tests::parses_full_calc_on_load_and_default ... ok
+test sheet_protection::tests::parses_legacy_verifier_and_schema_defaults ... ok
+test sheet_view::tests::accepts_automatic_remembered_zoom_defaults ... ok
+test sheet_protection::tests::rejects_incomplete_or_conflicting_verifiers ... ok
+test scenarios::tests::rejects_structure_attributes_and_limits ... ok
+test sheet_calculation_properties::tests::rejects_excessive_worksheet_nesting ... ok
+test sheet_protection::tests::parses_x14_extension_range ... ok
+test sheet_view::tests::accepts_spec_absolute_a1_references ... ok
+test sheet_view::tests::rejects_invalid_view_grammar_values_and_security ... ok
+test sheet_protection::tests::rejects_spoofed_unknown_out_of_order_and_noncanonical_metadata ... ok
+test slicer_cache::tests::microsoft_example_is_typed_and_round_trips ... ok
+test sheet_protection::tests::parses_core_strong_ranges_and_column_shorthand ... ok
+test data_validation::codec::tests::rejects_malformed_and_dangerous_input ... ok
+test sheet_protection::tests::deterministic_writer_round_trips_core_x14_and_strict_metadata ... ok
+test revisions::tests::loads_libreoffice_and_poi_reference_packages ... ok
+test sheet_view::tests::reads_strict_mce_pivot_selection_and_defaults ... ok
+test slicer_cache::views::tests::rejects_invalid_package_graphs ... ok
+test slicer_cache::views::tests::microsoft_example_and_typed_values_round_trip ... ok
+test slicer_cache::views::tests::package_store_and_load_round_trip ... ok
+test smart_tags::tests::rejects_ambiguous_or_unsafe_metadata ... ok
+test smart_tags::tests::canonical_writer_round_trips_both_conformance_families ... ok
+test sheet_calculation_properties::tests::reads_fixture_sheet_calc_pr ... ok
+test slicer_cache::tests::writer_rejects_invalid_and_oversized_retained_values ... ok
+test smart_tags::tests::package_transaction_is_semantic_atomic_and_ergonomic ... ok
+test smart_tags::tests::parses_typed_values_and_office_defaults ... ok
+test sort::tests::sort_condition_rejects_mismatched_auxiliary_fields ... ok
+test sort::tests::sort_domains_are_compact_exact_and_strict ... ok
+test smart_tags::tests::replacement_preserves_unrelated_source_bytes_and_schema_order ... ok
+test sheet::properties::tests::reads_libreoffice_and_poi_fixtures ... ok
+test sheet::sparklines::tests::rejects_malformed_sparkline_extensions ... ok
+test streaming::tests::cancellation_during_member_finalization_preserves_typed_progress ... ok
+test streaming::tests::cancellation_during_final_flush_preserves_typed_progress ... ok
+test streaming::tests::cancellation_before_finish_reports_partial_output ... ok
+test shapes::package::tests::poi_fixture_text_boxes_parse ... ok
+test streaming::tests::cancellation_during_central_directory_preserves_typed_progress ... ok
+test streaming::tests::cancellation_during_row_poison_is_typed ... ok
+test streaming::tests::batched_text_escaping_matches_scalar_error_order_and_bytes ... ok
+test raw::strings::tests::streaming_0364_enforces_exact_stream_and_text_limits ... ok
+test streaming::tests::central_directory_failure_reports_partial_output ... ok
+test streaming::tests::coordinate_boundaries_are_checked ... ok
+test streaming::tests::final_flush_failure_reports_partial_output ... ok
+test streaming::tests::empty_workbook_has_compact_canonical_six_part_topology ... ok
+test streaming::tests::row_limit_is_exact_and_one_over ... ok
+test streaming::tests::rows_and_cells_are_strict_and_empty_rows_are_dropped ... ok
+test streaming::tests::non_seek_sink_and_determinism ... ok
+test streaming::tests::nonfinite_and_unknown_errors_are_rejected ... ok
+test streaming::tests::rejected_text_row_can_be_retried_with_exact_scalar_values ... ok
+test streaming::tests::output_limit_is_enforced_before_finalization ... ok
+test streaming::tests::object_charge_covers_writer_parts_rows_and_cells ... ok
+test streaming::tests::cell_limit_is_exact_and_one_over ... ok
+test streaming::tests::cell_text_and_row_scratch_limits_are_exact_and_one_over ... ok
+test streaming::tests::scalar_rows_reopen_without_dimension_or_shared_strings ... ok
+test sheet_view::tests::reads_poi_and_libreoffice_view_fixtures ... ok
+test streaming::tests::short_and_interrupted_sinks_are_retried ... ok
+test streaming::tests::sink_failure_poison_is_observable ... ok
+test streaming::tests::static_member_failure_reports_exact_partial_output ... ok
+test style::format::tests::test_cell_border_line_style_as_str ... ok
+test streaming::tests::write_zero_sink_fails_without_hanging ... ok
+test style::format::tests::test_cell_border_side ... ok
+test style::format::tests::test_cell_fill_pattern_type_as_str ... ok
+test style::format::tests::test_cell_fill_pattern_type_debug ... ok
+test style::format::tests::test_cell_font_clone ... ok
+test slicer_cache::tests::rejects_hostile_grammar_and_bounds ... ok
+test style::format::tests::test_cell_font_default ... ok
+test style::format::tests::test_cell_font_set_color_hex ... ok
+test streaming::tests::maximum_character_text_and_unicode_byte_boundaries_are_checked ... ok
+test ole_objects::tests::mce_choice_and_fallback_sources_remain_editable_without_activation ... ok
+test streaming::tests::text_escaping_rejects_xml_controls ... ok
+test streaming::tests::work_charge_counts_rejected_row_attempts ... ok
+test style::format::tests::test_cell_border_default ... ok
+test style::format::tests::test_cell_format_default ... ok
+test style::format::tests::test_chart_type_debug ... ok
+test style::format::tests::test_data_validation_operator_as_str ... ok
+test style::stylesheet::cell_style::tests::test_cell_style_default ... ok
+test style::format::tests::test_data_validation_types ... ok
+test style::stylesheet::alignment::tests::fixed_tokens_round_trip_without_string_fallbacks ... ok
+test style::stylesheet::alignment::tests::rotation_is_valid_by_construction ... ok
+test style::stylesheet::alignment::tests::struct_update_syntax_keeps_alignment_concise ... ok
+test style::stylesheet::border::tests::authored_diagonal_is_always_complete ... ok
+test style::stylesheet::border::tests::border_reports_only_visible_sides ... ok
+test style::stylesheet::border::tests::line_tokens_round_trip_without_allocating ... ok
+test style::stylesheet::border::tests::rgb_and_tint_are_checked ... ok
+test style::stylesheet::cell_style::tests::test_cell_style_clone ... ok
+test style::stylesheet::cell_style::tests::test_cell_style_has_formatting ... ok
+test style::stylesheet::cell_style::tests::test_cell_style_new ... ok
+test streaming::tests::work_charge_is_exact_for_setup_row_and_cell ... ok
+test streaming::tests::rows_reuse_one_bounded_scratch_buffer ... ok
+test streaming::tests::worksheet_xml_limit_is_exact_and_one_over ... ok
+test style::stylesheet::fill::tests::test_fill_clone ... ok
+test style::stylesheet::fill::tests::test_fill_default ... ok
+test style::stylesheet::fill::tests::test_fill_gradient ... ok
+test style::stylesheet::fill::tests::test_fill_none_is_not_solid ... ok
+test style::stylesheet::fill::tests::test_fill_pattern ... ok
+test style::stylesheet::fill::tests::test_fill_solid ... ok
+test style::stylesheet::font::tests::fixed_font_domains_are_exhaustive_compact_and_strict ... ok
+test style::stylesheet::font::tests::test_font_clone ... ok
+test style::stylesheet::font::tests::test_font_default ... ok
+test style::stylesheet::font::tests::test_font_full ... ok
+test style::stylesheet::font::tests::test_font_has_formatting ... ok
+test style::stylesheet::font::tests::test_font_new ... ok
+test style::stylesheet::number_format::tests::test_builtin_format_code ... ok
+test style::stylesheet::number_format::tests::test_is_date_format ... ok
+test style::stylesheet::number_format::tests::test_is_date_format_edge_cases ... ok
+test style::stylesheet::number_format::tests::test_number_format_clone ... ok
+test style::stylesheet::number_format::tests::test_number_format_is_builtin ... ok
+test slicer_cache::views::tests::rejects_hostile_xml_schema_violations_and_limits ... ok
+test style::stylesheet::number_format::tests::test_number_format_is_date_format ... ok
+test style::stylesheet::number_format::tests::test_number_format_new ... ok
+test style::stylesheet::number_format::tests::test_number_format_validation ... ok
+test style::stylesheet::writer::tests::rejects_conformance_mismatches_instead_of_dropping_edges ... ok
+test style::stylesheet::parser::tests::preserves_explicit_none_and_baseline_font_tokens ... ok
+test survey::tests::accepts_the_survey_namespace_when_it_is_prefixed ... ok
+test style::theme::tests::parses_theme_colors_and_fonts ... ok
+test survey::tests::enforces_survey_constraints ... ok
+test survey::tests::parses_complete_ct_survey_family ... ok
+test table::tests::test_parse_cell_ref ... ok
+test style::stylesheet::parser::tests::supports_strict_aliases_and_empty_sections ... ok
+test table::tests::test_table_column_names ... ok
+test table::tests::test_table_column_new ... ok
+test style::theme::tests::rejects_malformed_themes ... ok
+test table::tests::test_table_initialize_columns ... ok
+test table::tests::test_table_style_info_default ... ok
+test table::tests::test_table_style_info_new ... ok
+test style::stylesheet::writer::tests::publishes_and_parses_canonical_stylesheet_records ... ok
+test table::tests::test_table_style_info_parse ... ok
+test table::tests::test_table_type_as_str ... ok
+test table::tests::test_table_type_parse ... ok
+test table::tests::escapes_writable_table_values ... ok
+test table::tests::test_parse_range ... ok
+test table::tests::test_table_new ... ok
+test data_validation::codec::tests::parses_poi_and_libreoffice_fixtures ... ok
+test table::tests::test_table_style_info_parse_partial ... ok
+test table::tests::test_totals_row_function_as_str ... ok
+test table::tests::parses_prefixed_strict_table_definition ... ok
+test table::tests::rejects_invalid_writable_table_models ... ok
+test table::tests::test_totals_row_function_parse ... ok
+test style::stylesheet::parser::tests::parses_complete_namespaced_style_sheet ... ok
+test table::tests::writes_table_attributes_columns_and_style ... ok
+test threaded_comments::tests::accepts_empty_present_parts ... ok
+test threaded_comments::tests::rejects_invalid_people_and_comments ... ok
+test threaded_comments::tests::writes_schema_valid_people_and_comments ... ok
+test table::tests::rejects_malformed_table_definitions ... ok
+test threaded_comments::tests::parses_prefixed_people_and_threaded_comments ... ok
+test table::tests::writes_auto_filter_sort_and_formulas_losslessly ... ok
+test timelines::tests::xsd_datetime_full_lexical_tests::accepts_and_compares_full_applicable_xsd_datetime_space ... ok
+test timelines::tests::xsd_datetime_full_lexical_tests::rejects_non_xsd_datetime_lexemes_and_indeterminate_mixed_zones ... ok
+test threaded_comments::tests::rejects_malformed_threaded_parts ... ok
+test timelines::tests::xsd_datetime_full_lexical_tests::timeline_range_preserves_extended_lexemes_round_trip ... ok
+test timelines::tests::tests::typed_protocol_shaped_parts_round_trip ... ok
+test timelines::tests::tests::rejects_state_calendar_timezone_range_order_and_filter_presence ... ok
+test style::stylesheet::parser::tests::rejects_malformed_styles ... ok
+test volatile_dependencies::tests::applies_mce_fallback ... ok
+test timelines::tests::tests::rejects_package_graph_and_unknown_cache_errors ... ok
+test volatile_dependencies::tests::package_volatile_dependencies_mutators_reject_invalid_existing_graphs ... ok
+test volatile_dependencies::tests::parses_and_writes_transitional_and_strict ... ok
+test timelines::tests::tests::typed_state_pivot_filter_and_all_filter_types_round_trip ... ok
+test volatile_dependencies::tests::preserves_non_empty_extension_list_and_inherited_namespaces ... ok
+test volatile_dependencies::tests::rejects_malformed_and_unsafe_input ... ok
+test volatile_dependencies::tests::resolves_package_relationship_and_rejects_outbound_relationships ... ok
+test volatile_dependencies::tests::removal_retains_volatile_dependencies_part_referenced_elsewhere ... ok
+test timelines::tests::tests::package_store_load_and_cross_validation_round_trip ... ok
+test volatile_dependencies::tests::serializer_rejects_oversized_output_before_appending_extension ... ok
+test web::tests::failed_edits_leave_the_collection_unchanged ... ok
+test web::tests::supports_semantic_and_checked_positional_crud ... ok
+test web::tests::validates_ranges_and_package_references ... ok
+test workbook::comments::codec::tests::parses_strict_comments_and_rich_text ... ok
+test workbook::comments::codec::tests::writer_round_trips_semantics ... ok
+test workbook::comments::package::tests::stores_loads_and_removes_worksheet_graph ... ok
+test workbook::comments::tests::snapshot_retains_exact_source_and_inert_shape_identity ... ok
+test workbook::comments::tests::semantic_no_op_keeps_exact_bytes_and_relationships ... ok
+test volatile_dependencies::tests::stores_rewrites_and_removes_inert_volatile_dependencies_parts ... ok
+test workbook::comments::tests::checked_edits_are_atomic_and_preserve_vml_shape_ids ... ok
+test workbook::comments::codec::tests::rejects_malformed_comments ... ok
+test workbook::data_model::package::tests::typed_descriptor_round_trip ... ok
+test survey::tests::workbook_view_and_save_preserve_the_original_survey_part ... ok
+test workbook::comments::tests::patch_conflict_does_not_publish_partial_relationship_changes ... ok
+test workbook::comments::tests::patch_replays_exact_source_and_inverse_atomically ... ok
+test task_panes::tests::malformed_task_pane_graph_is_rejected_without_mutation ... ok
+test workbook::edit::tests::cells::clearing_a_cell_created_in_the_same_transaction_keeps_an_empty_record ... ok
+test workbook::edit::tests::cells::commit_adopts_only_the_changed_worksheet_store ... ok
+test timelines::tests::tests::rejects_hostile_grammar_identity_and_bounds ... ok
+test workbook::data_model::package::tests::package_round_trip_preserves_inert_payload_and_inline_metadata ... ok
+test task_panes::tests::unknown_root_parts_survive_task_pane_edits ... ok
+test workbook::data_model::package::tests::inserts_into_existing_empty_extension_list ... ok
+test task_panes::tests::strict_task_panes_round_trip_through_facade ... ok
+test workbook::edit::tests::cells::signed_packages_refuse_edits_before_mutation ... ok
+test workbook::data_model::package::tests::rejects_missing_connection_and_unknown_table_references ... ok
+test workbook::edit::tests::cells::clear_and_remove_have_distinct_missing_and_empty_semantics ... ok
+test workbook::data_model::package::tests::rejects_orphan_duplicate_wrong_path_and_relationship_edges ... ok
+test workbook::data_model::package::tests::rejects_hostile_xml_schema_and_bounds ... ok
+test workbook::edit::tests::layout::worksheet_page_break_cache_hit_still_validates_sheet_kind ... ok
+test workbook::edit::tests::cells::calculation_chain_removal_is_atomic_and_reversible ... ok
+test workbook::edit::tests::cells::cell_crud_is_atomic_reversible_and_source_preserving ... ok
+test workbook::edit::tests::cells::merged_range_reads_share_one_snapshot_without_public_locks ... ok
+test workbook::edit::tests::layout::worksheet_page_break_cache_is_shared_across_unchanged_publication ... ok
+test workbook::edit::tests::layout::worksheet_page_break_projection_cache_has_finite_weighted_retention ... ok
+test workbook::edit::tests::cells::resetting_style_is_distinct_from_removal_and_missing_is_a_no_op ... ok
+test workbook::edit::tests::layout::worksheet_page_break_projection_errors_are_not_cached ... ok
+test workbook::edit::tests::layout::column_layout_patch_guards_and_rebinds_hidden_shared_style_identity ... ok
+test workbook::edit::tests::layout::worksheet_page_break_cache_is_snapshot_local_across_clones_and_noop_edits ... ok
+test workbook::edit::tests::layout::row_layout_patch_guards_and_rebinds_hidden_shared_style_identity ... ok
+test workbook::edit::tests::cells::payload_and_style_effects_on_one_cell_join_without_locks ... ok
+test workbook::edit::tests::cells::rich_shared_string_transfer_keeps_exact_dependency_through_join_replay_and_inverse ... ok
+test workbook::edit::tests::layout::column_layout_is_selector_first_typed_reversible_and_facet_composable ... ok
+test workbook::edit::tests::layout::row_visibility_is_checked_reversible_and_patch_visible ... ok
+test workbook::edit::tests::layout::worksheet_page_break_projection_reuses_successful_snapshot_parse ... ok
+test workbook::edit::tests::layout::new_sheet_defaults_require_height_and_commit_with_short_selectors ... ok
+test workbook::edit::tests::layout::worksheet_page_break_projection_is_invalidated_by_publication ... ok
+test workbook::edit::tests::layout::column_visibility_is_checked_reversible_and_composable ... ok
+test workbook::edit::tests::cells::shared_style_crud_is_lineage_checked_reversible_and_exact ... ok
+test workbook::edit::tests::tabs::tab_rename_validates_names_collisions_swaps_and_join_facets ... ok
+test workbook::edit::tests::tabs::active_tab_requires_final_visibility_and_conflicts_globally ... ok
+test task_panes::tests::crud_is_atomic_and_preserves_relationships_and_opaque_extensions ... ok
+test workbook::edit::tests::layout::worksheet_defaults_are_typed_reversible_and_facet_composable ... ok
+test workbook::edit::tests::tabs::tab_reorder_blocks_protection_and_revision_tracking ... ok
+test workbook::edit::tests::layout::row_layout_is_typed_reversible_and_facet_composable ... ok
+test workbook::edit::tests::transactions::join_conflicts_are_structured_and_return_the_rejected_edit ... ok
+test workbook::edit::tests::transactions::metadata_only_edit_rejects_malformed_worksheet_like_the_source_parser ... ok
+test workbook::edit::tests::tabs::tab_visibility_applies_to_non_worksheet_sheet_kinds ... ok
+test workbook::edit::tests::cells::merged_range_crud_is_sparse_safe_reversible_and_composable ... ok
+test workbook::edit::tests::tabs::showing_an_unknown_producer_state_repairs_it_explicitly ... ok
+test workbook::edit::tests::tabs::tab_visibility_blocks_protected_workbook_structure ... ok
+test workbook::edit::tests::transactions::metadata_only_edit_preserves_strict_namespace_and_unknown_xml ... ok
+test workbook::edit::tests::transactions::independently_prepared_disjoint_edits_join_after_threaded_work ... ok
+test workbook::edit::tests::tabs::tab_visibility_composes_with_cells_and_conflicts_by_facet ... ok
+test workbook::edit::tests::layout::grid_default_styles_are_lineage_checked_reversible_and_facet_composable ... ok
+test workbook::edit::tests::web::task_panes_and_sheet_removal_join_conflicts_are_symmetric ... ok
+test workbook::edit::tests::worksheets::worksheet_add_allocates_strict_graph_identity_without_exposing_it ... ok
+test workbook::edit::tests::worksheets::worksheet_add_blocks_protected_and_compatibility_owned_catalogs ... ok
+test workbook::edit::tests::tabs::defined_name_catalog_write_is_compact_joinable_replayable_and_reversible ... ok
+test workbook::edit::tests::cells::cell_transfer_clones_selected_picture_graph_and_is_reversible ... ok
+test workbook::edit::tests::transactions::metadata_only_edit_with_the_existing_value_is_a_byte_no_op ... ok
+test workbook::edit::tests::transactions::row_visibility_joins_with_cells_and_conflicts_by_row ... ok
+test workbook::edit::tests::tabs::tab_reorder_composes_with_other_facets_and_conflicts_globally ... ok
+test workbook::edit::tests::worksheets::worksheet_insert_join_preserves_explicit_edit_order ... ok
+test workbook::edit::tests::worksheets::worksheet_add_validates_names_visibility_and_parallel_joins ... ok
+test chart_sheet::package::tests::rejects_web_publish_count_and_string_caps ... ok
+test workbook::edit::tests::tabs::tab_visibility_is_selector_first_reversible_and_active_safe ... ok
+test workbook::edit::tests::worksheets::worksheet_remove_accepts_case_equivalent_opc_targets ... ok
+test workbook::edit::tests::worksheets::worksheet_remove_blocks_custom_workbook_view_identity ... ok
+test workbook::edit::tests::worksheets::worksheet_remove_blocks_macro_projects_and_extra_incoming_relationships ... ok
+test merge::tests::interval_tree_matches_a_sparse_grid_oracle ... ok
+test workbook::edit::tests::tabs::active_tab_is_selector_first_reversible_and_composable ... ok
+test workbook::source::tests::final_catalog_check_rejects_revision_flip_after_empty_metadata_build ... ok
+test workbook::source::tests::managed_facade_cancellation_is_typed_before_open_and_on_cached_reads ... ok
+test workbook::edit::tests::tabs::active_relocation_synchronizes_worksheet_and_chart_view_selection ... ok
+test workbook::edit::tests::tabs::tab_rename_is_typed_dependency_aware_move_first_and_reversible ... ok
+test workbook::source::tests::cached_worksheet_queries_do_not_reload_an_evicted_payload ... ok
+test workbook::source::tests::deferred_catalog_and_first_sheet_do_not_reach_second_worksheet_body_marker ... ok
+test workbook::edit::tests::worksheets::worksheet_remove_joins_disjoint_plans_and_blocks_unknown_dependencies ... ok
+test workbook::source::tests::managed_facade_one_under_budget_rejects_before_selected_part_io ... ok
+test workbook::source::tests::managed_package_facade_checks_package_cancellation_on_cached_reads ... ok
+test workbook::edit::tests::worksheets::worksheet_add_is_atomic_populatable_active_and_reversible ... ok
+test workbook::source::tests::streaming_0363_tests::cancellation_0363_does_not_publish_store ... ok
+test workbook::edit::tests::worksheets::worksheet_add_synchronizes_optional_properties_during_a_simultaneous_reorder ... ok
+test workbook::source::tests::source_changes_are_returned_as_typed_opc_errors ... ok
+test workbook::source::tests::streaming_0363_tests::crc_failure_0363_does_not_publish_store ... ok
+test workbook::source::tests::streaming_0363_tests::eligible_scalar_cell_queries_0363_preserve_sparse_states_without_store ... ok
+test workbook::source::tests::streaming_0363_tests::dimension_metadata_0400_keeps_scalar_and_range_queries_streaming ... ok
+test workbook::edit::tests::worksheets::worksheet_remove_blocks_live_formulas_last_sheet_and_mixed_edits ... ok
+test workbook::source::tests::streaming_0363_tests::merge_not_eligible_0363_falls_back_and_initializes_store ... ok
+test workbook::source::tests::streaming_0363_tests::source_change_0363_does_not_publish_store ... ok
+test workbook::source::tests::streaming_0363_tests::unsupported_dimension_metadata_0400_preserves_eager_fallback ... ok
+test workbook::edit::tests::worksheets::worksheet_add_closes_rename_formula_and_extended_property_dependencies ... ok
+test workbook::source::tests::final_cell_and_collection_checks_reject_revision_flips_after_owned_clones ... ok
+test workbook::source::tests::streaming_0363_tests::eligible_scalar_cell_queries_0363_rescan_without_cache ... ok
+test workbook::source::tests::managed_facade_selectively_materializes_with_exact_budget_and_releases_on_drop ... ok
+test workbook::source::tests::streaming_0364_tests::dependency_source_change_and_cancellation_0364_stay_primary ... ok
+test workbook::source::tests::streaming_0364_tests::final_fence_0364_outranks_parser_error ... ok
+test workbook::edit::tests::tabs::tab_reorder_is_selector_first_dependency_aware_and_reversible ... ok
+test workbook::edit::tests::web::web_bindings_and_task_panes_commit_join_and_reverse_atomically ... ok
+test workbook::source::tests::streaming_0364_tests::dependency_crc_errors_0364_do_not_publish_semantics ... ok
+test workbook::source::tests::streaming_0363_tests::malformed_tail_0363_does_not_publish_store ... ok
+test workbook::edit::tests::web::web_patch_cross_graph_validation_is_atomic_on_alternate_snapshots ... ok
+test workbook::source::tests::streaming_0364_tests::plain_shared_string_and_style_stream_0364_avoids_materialization ... ok
+test workbook::source::tests::streaming_0364_tests::repeated_eligible_dependency_query_0364_rescans_source ... ok
+test workbook::source::tests::streaming_0365_tests::callback_error_0365_preserves_exact_prefix ... ok
+test workbook::source::tests::streaming_0365_tests::callback_cancellation_0365_uses_package_owned_context ... ok
+test workbook::source::tests::streaming_0364_tests::semantic_dependency_caches_0364_survive_payload_eviction ... ok
+test workbook::source::tests::streaming_0365_tests::cold_cells_0365_are_sparse_row_major_and_area_bounded ... ok
+test workbook::source::tests::streaming_0364_tests::requested_plain_and_rich_sst_0364_have_eager_parity ... ok
+test workbook::source::tests::streaming_0364_tests::unselected_dependency_maxima_0364_are_validated ... ok
+test workbook::edit::tests::worksheets::worksheet_remove_is_selector_first_active_relocating_and_reversible ... ok
+test workbook::source::tests::streaming_0365_tests::final_source_change_0365_outranks_callback_error ... ok
+test workbook::source::tests::streaming_0365_tests::cold_visit_cells_0365_matches_sparse_sequence_and_count ... ok
+test workbook::source::tests::streaming_0365_tests::warm_store_cells_0365_match_cold_selection ... ok
+test workbook::source::tests::streaming_0365_tests::dependency_crc_0365_has_zero_callbacks_without_publication ... ok
+test workbook::source::tests::streaming_0365_tests::multiple_dependencies_0365_stay_cold_without_store_or_part_cache ... ok
+test workbook::source::tests::streaming_0364_tests::late_dependency_errors_0364_are_primary_without_publication ... ok
+test workbook::source::tests::streaming_0365_tests::malformed_tail_and_worksheet_0365_have_zero_callbacks ... ok
+test workbook::source::tests::streaming_0365_tests::merge_and_shared_formula_0365_fall_back_to_store ... ok
+test workbook::source::tests::streaming_0365_tests::repeated_cells_0365_rescan_without_cache ... ok
+test workbook::source::tests::streaming_0366_tests::cold_visit_cells_0366_stages_decoded_callbacks_without_admission ... ok
+test workbook::source::tests::streaming_0366_tests::cold_cells_0366_are_sparse_row_major_and_stay_cold ... ok
+test workbook::source::tests::streaming_0365_tests::source_change_and_cancellation_0365_have_zero_callbacks ... ok
+test workbook::tests::clones_share_the_snapshot_and_handles_pin_it ... ok
+test workbook::source::tests::streaming_0366_tests::cold_cell_0366_decodes_references_with_exact_eager_parity ... ok
+test workbook::source::tests::streaming_0364_tests::invalid_and_missing_dependency_refs_0364_fall_back_without_store ... ok
+test workbook::edit::tests::cells::cell_transfer_clones_classic_chart_graph_through_merge_and_durable_inverse ... ok
+test workbook::source::tests::streaming_0367_tests::cold_cells_and_visit_0367_are_sparse_physical_and_merge_coverage_is_not_synthetic ... ok
+test workbook::source::tests::streaming_0366_tests::malformed_reference_tail_and_crc_0366_have_no_callbacks_or_publication ... ok
+test workbook::edit::tests::worksheets::worksheet_insert_is_selector_first_order_aware_and_reversible ... ok
+test workbook::source::tests::streaming_0367_tests::cold_merge_cell_views_0367_match_forced_eager_without_admission ... ok
+test workbook::tests::flavor_is_content_derived ... ok
+test workbook::tests::duplicate_names_and_dangling_relationships_are_typed_errors ... ok
+test workbook::source::tests::streaming_0366_tests::valid_overlong_and_numeric_inline_refs_0366_require_eager_fallback ... ok
+test workbook::source::tests::streaming_0367_tests::crc_source_change_and_cancellation_0367_have_zero_callbacks ... ok
+test workbook::source::tests::streaming_0367_tests::numeric_value_scratch_0400_preserves_late_fallback_parity ... ok
+test workbook::tests::cell_facade_is_sparse_exact_and_non_mutating ... ok
+test workbook::source::tests::streaming_0367_tests::malformed_merge_metadata_0367_has_zero_callbacks_and_publication ... ok
+test workbook_metadata::protection::tests::parses_strict_strong_workbook_protection ... ok
+test workbook_metadata::protection::tests::rejects_invalid_or_mixed_verifier_metadata ... ok
+test workbook::tests::worksheet_operations_reject_other_sheet_kinds_without_parsing_them ... ok
+test workbook::tests::validated_worksheet_store_adoption_requires_exact_bytes_and_lineage ... ok
+test workbook::edit::tests::transactions::page_margins_merge_replay_inverse_and_record_history ... ok
+test workbook::worksheet::tests::empty_snapshot_exposes_typed_worksheet_facades ... ok
+test workbook::tests::styles_graph_table_and_cell_references_are_checked ... ok
+test workbook_metadata::protection::tests::writer_escapes_future_algorithm_names_without_weakening_validation ... ok
+test workbook_metadata::protection::tests::writes_and_reparses_all_typed_protection_attributes ... ok
+test workbook::tests::owned_workbook_noop_output_preserves_exact_archive ... ok
+test workbook_metadata::protection::tests::parses_legacy_workbook_and_revision_verifiers ... ok
+test workbook_metadata::tests::rejects_malformed_and_out_of_bounds_values ... ok
+test workbook_metadata::tests::strict_round_trip_preserves_indices_and_extensions ... ok
+test workbook_metadata::tests::mce_choice_selects_understood_metadata_branch ... ok
+test workbook::source::tests::streaming_0367_tests::merge_and_unsupported_semantics_0367_match_eager_with_store_admission ... ok
+test workbook::tests::concurrent_first_cell_read_publishes_one_safe_snapshot ... ok
+test xml_maps::tests::preserves_unrelated_references_when_removing_xml_maps ... ok
+test xml_maps::tests::handles_strict_and_mce_fallback ... ok
+test workbook::tests::new_workbook_is_deterministic_and_selector_first ... ok
+test xml_maps::tests::stores_rewrites_and_removes_inert_xml_maps_parts ... ok
+test xml_maps::tests::reads_poi_real_fixture_and_round_trips_strict ... ok
+test xml_maps::tests::package_xml_maps_mutators_reject_invalid_existing_graphs_before_replacement ... ok
+test workbook::tests::web_facades_are_lazy_borrowed_and_snapshot_scoped ... ok
+test xml_maps::tests::keeps_poi_xxe_schema_inert ... ok
+test xml_maps::tests::borrowed_codec_view_does_not_clone_large_opaque_payloads ... ok
+test workbook::tests::concurrent_snapshot_reads_need_no_public_locking ... ok
+test workbook_metadata::protection::tests::workbook_accessor_reads_a_real_excel_strong_verifier ... ok
+test xml_maps::tests::rejects_malformed_unsafe_and_invalid_models ... ok
+test xml_maps::tests::reads_libreoffice_unqualified_children_and_binding ... ok
+test workbook::tests::poi_and_libreoffice_shared_formula_oracles_match ... ok
+test xml_maps::tests::transaction_crud_preserves_source_payload_and_round_trips_both_conformances ... ok
+test workbook::tests::package_and_workbook_ingress_honor_exact_read_limits ... ok
+test xml_maps::tests::transaction_noop_inverse_and_stale_patch_are_atomic ... ok
+test xml_maps::tests::writes_real_poi_xml_maps_package_without_resolving_schema_payloads ... ok
+test workbook::edit::tests::tabs::numeric_tab_moves_are_checked_and_all_positions_round_trip ... ok
+test workbook::edit::tests::cells::commit_does_not_retain_an_oversized_validated_store ... ok
+test conditional_formatting::tests::parses_poi_and_libreoffice_conditional_formatting_fixtures ... ok
+test xml_maps::tests::serializer_rejects_oversized_output_before_final_append ... ok
+test raw::worksheet::tests::streaming_0367_merge_tests::streaming_0367_merge_cap_is_bounded_without_area_expansion ... ok
+test chain::tests::rejects_oversized_nested_calculation_content_before_decoding ... ok
+test scenarios::tests::writer_rejects_output_over_limit_before_final_append ... ok
+test ignored_errors::tests::reads_poi_ignored_error_fixtures ... ok
+test slicer_cache::tests::rejects_invalid_xml_values_and_event_bombs ... ok
+test streaming::tests::large_row_scaling_keeps_fixed_memory_without_retaining_output ... ok
+test chain::tests::workbook_sheet_catalog_enforces_its_exact_projected_boundary ... ok
+
+test result: ok. 931 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.83s
+
+     Running tests/calculation_metadata.rs (/tmp/litchi-goal-0410-tests/debug/deps/calculation_metadata-88a74f7824207d91)
+
+running 8 tests
+test signed_no_op_is_exact_but_changed_metadata_is_refused ... ok
+test patch_inverse_restores_exact_source_and_stale_application_is_atomic ... ok
+test metadata_removal_restores_workbook_markup_and_preserves_unrelated_part_bytes ... ok
+test feature_name_and_output_limits_fail_without_partial_publication ... ok
+test mce_projected_metadata_is_readable_but_changed_edits_are_refused ... ok
+test formula_edit_exposes_recalculation_invalidation_through_workbook_owner ... ok
+test absent_metadata_round_trips_typed_properties_and_inert_feature_occurrences ... ok
+test encrypted_source_refuses_metadata_mutation_until_explicit_plain_reopen ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/calculation_metadata_formula_security.rs (/tmp/litchi-goal-0410-tests/debug/deps/calculation_metadata_formula_security-f967193827b5f0f6)
+
+running 9 tests
+test calculation_metadata_patch_no_op_is_exact_but_change_is_refused_on_signed_package ... ok
+test style_only_edit_preserves_calc_flags_and_chain ... ok
+test changed_public_patch_is_refused_on_workbook_from_signed_package ... ok
+test formula_invalidation_preserves_ordered_duplicate_calc_features_exactly ... ok
+test empty_and_effective_no_op_patches_preserve_exact_workbook_bytes ... ok
+test recalculation_failure_on_mce_projected_calc_pr_is_atomic ... ok
+test effective_cell_content_transitions_invalidate_flags_and_remove_calc_chain ... ok
+test calculation_metadata_patches_are_refused_exactly_on_encrypted_provenance_package ... ok
+test changed_public_patch_is_refused_on_encrypted_provenance_facade ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/calculation_metadata_limits.rs (/tmp/litchi-goal-0410-tests/debug/deps/calculation_metadata_limits-b4cdfbdfef5d0e7c)
+
+running 8 tests
+test opaque_byte_limit_accepts_exact_n_and_rejects_n_plus_one ... ok
+test depth_event_and_attribute_limits_accept_exact_n_and_reject_n_plus_one ... ok
+test raw_and_mce_byte_limits_accept_exact_n_and_reject_n_plus_one ... ok
+test feature_limits_accept_exact_n_and_reject_n_plus_one ... ok
+test failed_patch_is_atomic_and_retains_the_exact_source ... ok
+test staged_features_are_checked_by_writer_count_and_name_limits ... ok
+test every_limit_builder_rejects_zero_with_a_typed_error ... ok
+test output_limit_accepts_exact_n_and_failed_transaction_is_atomic_at_n_plus_one ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/calculation_metadata_schema.rs (/tmp/litchi-goal-0410-tests/debug/deps/calculation_metadata_schema-f332131a3ef4197a)
+
+running 9 tests
+test malformed_calc_features_schema_boundaries_are_rejected ... ok
+test mce_selected_calc_features_are_readable_but_changed_edit_is_refused ... ok
+test xsd_string_feature_names_preserve_empty_whitespace_and_supplementary_scalars ... ok
+test strict_prefixed_workbook_inserts_calc_features_with_strict_core_qnames ... ok
+test xsd_atomic_whitespace_and_leading_zero_unsigned_are_canonicalized_and_plus_rejected ... ok
+test all_thirteen_calc_pr_setters_insert_and_round_trip_exact_authored_values ... ok
+test strict_prefixed_noncanonical_workbook_writes_and_reopens_calc_pr ... ok
+test complete_xsd_double_special_value_space_round_trips_through_public_setter ... ok
+test existing_calc_pr_rewrite_removes_each_authored_attribute_and_then_the_tag ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/edit_guards.rs (/tmp/litchi-goal-0410-tests/debug/deps/edit_guards-2bd526c47ed34c45)
+
+running 1 test
+test opened_workbooks_edit_through_an_explicit_snapshot_transaction ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/encryption.rs (/tmp/litchi-goal-0410-tests/debug/deps/encryption-808c4a97275331fc)
+
+running 10 tests
+test outer_crypto_limit_is_independent_and_typed ... ok
+test password_aware_ingress_accepts_plain_zip_without_provenance ... ok
+test decrypted_wrong_family_package_is_rejected ... ok
+test restrictive_inner_opc_limits_reject_valid_encrypted_xlsx ... ok
+test encrypted_provenance_blocks_implicit_plaintext_and_mutation ... ok
+test encrypted_source_raw_declassification_is_explicit ... ok
+test byte_generation_does_not_change_source_provenance ... ok
+test signed_inner_opc_survives_encryption_and_reencryption_unchanged ... ok
+test package_and_workbook_round_trip_managed_encryption ... ok
+test reencrypted_output_retains_mode_and_atomic_failure_retains_state ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+
+     Running tests/feature_matrix_boundaries.rs (/tmp/litchi-goal-0410-tests/debug/deps/feature_matrix_boundaries-1ef72067a28b4c17)
+
+running 3 tests
+test worksheet_projections_parse_compact_source_without_rewriting_it ... ok
+test defined_names_are_inert_catalog_records_and_custom_props_use_the_package_facade ... ok
+test untouched_conditional_hyperlink_and_page_break_xml_stays_byte_exact_through_save ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/plain_opc_compat.rs (/tmp/litchi-goal-0410-tests/debug/deps/plain_opc_compat-f06549d15d6d62e8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/reader_tolerance.rs (/tmp/litchi-goal-0410-tests/debug/deps/reader_tolerance-91dbd232a67d4b77)
+
+running 3 tests
+test standalone_reader_retains_sheet_names_from_tolerated_input ... ok
+test standalone_reader_opens_duplicate_names_and_malformed_string_hints ... ok
+test standalone_reader_accepts_producer_external_link_variants ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/source_backed_auto_filter.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_auto_filter-033391637f8f6cd2)
+
+running 6 tests
+test managed_cancellation_is_checked_before_stream_output ... ok
+test managed_snapshot_changed_publication_and_budget_release_are_exact ... ok
+test changed_edit_reopens_inverts_and_preserves_unselected_parts ... ok
+test differential_format_references_bind_the_styles_part ... ok
+test add_replace_clear_noop_protection_and_mce_are_checked ... ok
+test signed_noop_is_exact_and_conflicts_and_partial_output_fail_closed ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/source_backed_calculation_metadata.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_calculation_metadata-e404e2ca5ca02135)
+
+running 6 tests
+test noop_is_byte_exact_and_signed_change_is_refused ... ok
+test managed_one_under_budget_fails_before_payload_retention_and_cancellation_stops_output ... ok
+test managed_workbook_payload_is_budgeted_streamed_and_released ... ok
+test changed_edit_reopens_and_changes_only_workbook_xml ... ok
+test foreign_workbook_and_changed_source_refuse_before_output ... ok
+test mce_limits_and_partial_sink_are_checked ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/source_backed_cell_values.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_cell_values-dbead1a76d330643)
+
+running 59 tests
+test insert_duplicate_and_late_existing_target_batches_are_atomic ... ok
+test managed_empty_multi_edit_iterator_reports_cancellation_before_invalid_batch ... ok
+test managed_one_under_budget_refuses_before_selected_worksheet_io ... ok
+test exact_noop_duplicate_and_late_failure_are_atomic ... ok
+test formula_noop_is_byte_exact_and_retains_calculation_chain ... ok
+test commit_is_bound_to_the_exact_positional_source_identity ... ok
+test changed_positional_source_and_stale_in_memory_patch_are_refused ... ok
+test managed_scalar_exact_noop_publishes_without_detaching_source ... ok
+test managed_cancellation_is_checked_after_snapshot_and_before_stream_output ... ok
+test formula_publication_rejects_a_stale_source_before_output ... ok
+test first_middle_last_batch_reopens_preserves_unselected_parts_and_inverts ... ok
+test insert_accepts_exact_cell_character_limit_and_rejects_one_over ... ok
+test insert_existing_empty_and_style_only_owners_refuse_with_empty_transaction ... ok
+test managed_multi_sheet_exact_noop_publishes_without_detaching_sources ... ok
+test malformed_or_incomplete_shared_formula_groups_are_refused ... ok
+test bounded_multi_sheet_transaction_publishes_one_overlay_and_inverts ... ok
+test merge_markup_is_refused_at_source_open ... ok
+test multi_sheet_duplicate_and_late_failure_are_atomic ... ok
+test managed_multi_sheet_batch_retains_each_selected_payload_and_streams_once ... ok
+test multi_sheet_exact_noop_publishes_source_byte_for_byte ... ok
+test multi_sheet_commit_rejects_foreign_source_lineage ... ok
+test multi_sheet_selector_bounds_and_semantic_duplicates_are_atomic ... ok
+test multi_sheet_publication_rejects_source_revision_before_output ... ok
+test insert_invalidates_calculation_properties_and_chain ... ok
+test multi_sheet_patch_rejects_unselected_graph_tampering ... ok
+test managed_stream_publication_works_and_inverse_materialization_is_explicit ... ok
+test formula_patch_inverse_restores_calculation_topology_and_formula_cache ... ok
+test remove_missing_and_duplicate_selectors_fail_atomically ... ok
+test insert_preserves_untouched_members_relationships_and_content_types ... ok
+test ordinary_cell_edits_refuse_shared_group_without_staging ... ok
+test noop_patch_rejects_added_worksheet_relationship ... ok
+test managed_cancellation_during_batch_iterators_keeps_staging_atomic ... ok
+test insert_holes_inside_merge_array_data_table_and_shared_ranges_refuse_atomically ... ok
+test managed_editor_retains_complete_payload_closure_and_releases_budget ... ok
+test multi_source_insert_uses_selector_first_operations_across_sheets ... ok
+test shared_formula_follower_is_rejected_without_staging ... ok
+test grouped_formula_edits_are_refused_without_staging ... ok
+test scalar_staging_and_batch_staging_are_equivalent_and_clear_retains_record ... ok
+test formula_patch_refuses_another_calc_chain_inbound_edge_atomically ... ok
+test scalar_formula_replacement_drops_cache_invalidates_calculation_and_preserves_members ... ok
+test insert_patch_is_deterministic_and_inverse_restores_exact_source_and_absence ... ok
+test shared_formula_master_noop_is_byte_exact_and_retains_caches_and_chain ... ok
+test multi_sheet_patch_composes_with_unselected_payload_edits_and_inverse ... ok
+test signed_insert_changed_refuses_but_empty_noop_is_exact ... ok
+test managed_patch_cancellation_during_finalization_does_not_publish_candidate ... ok
+test shared_formula_patch_inverse_restores_original_bytes_semantics_and_topology ... ok
+test exact_batch_limit_accepts_n_and_rejects_n_plus_one_atomically ... ok
+test shared_formula_master_edit_preserves_wire_group_and_drops_group_caches ... ok
+test signed_multi_sheet_noop_is_exact_and_changed_publication_refuses ... ok
+test source_backed_date_edit_retains_date_semantics ... ok
+test source_insert_holes_order_rows_expand_dimension_and_read_back ... ok
+test source_version_flip_after_selected_read_rejects_single_and_multi_snapshots ... ok
+test shared_formula_expansion_over_256_members_is_refused ... ok
+test remove_deletes_exact_cell_owners_but_retains_rows_dimension_and_style_table ... ok
+test shared_style_owner_is_preserved_and_bound_into_patch_closure ... ok
+test unrelated_scalar_edit_preserves_an_oversized_shared_formula_group ... ok
+test mce_shared_strings_relationships_and_signed_changes_are_refused ... ok
+test exact_noop_publication_does_not_reparse_an_oversized_selected_worksheet ... ok
+test changed_publication_reuses_selected_semantics_without_extra_source_reads ... ok
+
+test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s
+
+     Running tests/source_backed_conditional_formatting.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_conditional_formatting-0c6a767978aa5231)
+
+running 5 tests
+test publication_reopens_and_preserves_every_unselected_part_and_relationship ... ok
+test managed_snapshot_changed_publication_retains_styles_and_releases_budget ... ok
+test closure_conflicts_signatures_protection_and_partial_sinks_fail_closed ... ok
+test x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused ... ok
+test whole_collection_add_replace_clear_noop_and_order_are_exact ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/source_backed_data_validation.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_data_validation-6e3685b871ad9d3d)
+
+running 8 tests
+test managed_one_under_budget_refuses_before_selected_payload_retention ... ok
+test no_op_signed_source_is_exact_but_changed_signed_source_is_refused ... ok
+test chartsheet_selection_is_refused_and_editor_is_send ... ok
+test managed_snapshot_changed_publication_and_budget_release_are_exact ... ok
+test changed_edit_reopens_inverts_and_preserves_unselected_parts ... ok
+test add_replace_clear_noop_and_atomic_update_are_exact ... ok
+test mce_selected_collections_and_partial_sinks_are_refused ... ok
+test patch_conflicts_on_owner_or_outbound_relationship_change_and_source_version_change ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/source_backed_defined_names.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_defined_names-2a4e1a2539f061c6)
+
+running 6 tests
+test managed_one_under_budget_fails_before_payload_retention_and_cancellation_stops_output ... ok
+test replacement_clear_and_noop_are_exact ... ok
+test managed_workbook_payload_is_budgeted_streamed_and_released ... ok
+test changed_edit_reopens_and_changes_only_workbook_xml ... ok
+test protection_mce_limits_invalid_scopes_and_partial_sink_are_checked ... ok
+test signed_change_foreign_commit_and_changed_source_refuse_before_output ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/source_backed_file.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_file-ba1ea0a467122577)
+
+running 5 tests
+test path_catalog_and_selected_reads_are_lazy_over_unrequested_payloads ... ok
+test path_managed_editor_releases_payload_budget_after_drop ... ok
+test path_replacement_and_limits_are_typed_errors ... ok
+test path_editor_noop_is_byte_exact_and_one_edit_keeps_untouched_members ... ok
+test path_policy_variants_accept_explicit_cache_and_execution_options ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/source_backed_hyperlinks.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_hyperlinks-09e63b125ee3e3f7)
+
+running 6 tests
+test changed_publication_raw_preserves_relationships_and_unselected_members ... ok
+test exact_noop_including_signed_source_bytes_and_changed_signed_source_refusal ... ok
+test managed_limits_cancellation_and_partial_sink_are_typed ... ok
+test internal_edits_and_external_metadata_match_eager_semantics_and_stay_local ... ok
+test patch_forward_inverse_restore_exact_worksheet_and_relationships_and_reject_stale_foreign ... ok
+test relationship_changes_and_opaque_owners_refuse_before_output ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/source_backed_merge.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_merge-957eff908d1fd19c)
+
+running 18 tests
+test source_merge_limit_refusal_is_typed ... ok
+test source_merge_honors_managed_cancellation_before_selected_read ... ok
+test source_merge_selector_miss_is_an_option ... ok
+test source_merge_unmerge_is_a_semantic_noop_for_missing_ranges ... ok
+test source_merge_changed_publication_refuses_signed_source_before_output ... ok
+test source_merge_rejects_stale_and_foreign_lineage_before_output ... ok
+test source_merge_accepts_empty_followers_and_preserves_a_rich_anchor ... ok
+test source_merge_unmerge_removes_existing_range_and_publishes_one_overlay ... ok
+test source_merge_patch_applies_forward_and_inverse_exactly ... ok
+test source_merge_managed_inverse_requires_bounded_materialization ... ok
+test source_merge_structural_refusal_precedes_follower_content ... ok
+test source_merge_noop_publication_preserves_exact_bytes_including_signed_sources ... ok
+test source_merge_commit_unmerge_and_overlay_preserve_unselected_members ... ok
+test source_merge_publication_reports_bounded_sink_and_source_failures ... ok
+test source_merge_refuses_array_data_table_and_shared_formula_groups ... ok
+test source_merge_staging_is_canonical_and_set_based ... ok
+test source_merge_refuses_followers_overlap_protection_and_unknown_payload ... ok
+test source_merge_patch_rejects_shared_strings_payload_and_relationship_drift ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/source_backed_page_breaks.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_page_breaks-51b8c196f3010f24)
+
+running 5 tests
+test noop_is_byte_exact_and_signed_change_is_refused ... ok
+test managed_payload_retention_publication_and_owning_escape_are_explicit ... ok
+test changed_edit_reopens_and_changes_only_the_selected_worksheet ... ok
+test foreign_changed_and_retargeted_sources_are_rejected ... ok
+test mce_limits_and_partial_sink_are_checked ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/source_backed_page_margins.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_page_margins-f155de8005a76f58)
+
+running 7 tests
+test signed_zero_noop_is_exact_and_changed_output_is_canonical ... ok
+test managed_payload_retention_publication_and_owning_escape_are_explicit ... ok
+test changed_edit_reopens_inverts_and_changes_only_the_selected_worksheet ... ok
+test chartsheet_selection_is_refused ... ok
+test add_replace_remove_noop_and_signed_refusal_are_exact ... ok
+test foreign_changed_and_retargeted_sources_are_rejected ... ok
+test mce_limits_and_partial_sink_are_checked ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/source_backed_page_setup.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_page_setup-084b0b6f659ce8d6)
+
+running 7 tests
+test managed_payload_retention_publication_and_owning_escape_are_explicit ... ok
+test source_edit_is_send_and_chartsheets_are_refused ... ok
+test changed_edit_matches_eager_reopens_inverts_and_preserves_every_relationship ... ok
+test foreign_version_retarget_and_outbound_relationship_changes_are_rejected ... ok
+test printer_references_and_relationships_are_refused_without_materializing_resources ... ok
+test mce_limits_and_partial_sink_are_checked ... ok
+test add_replace_remove_noop_and_signed_refusal_are_exact ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/source_backed_print_options.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_print_options-30c691398277d3be)
+
+running 8 tests
+test managed_one_under_budget_refuses_before_selected_worksheet_load ... ok
+test managed_cancellation_is_checked_before_stream_publication ... ok
+test managed_payload_retention_publication_and_owning_escape_are_explicit ... ok
+test changed_edit_reopens_inverts_and_changes_only_the_selected_worksheet ... ok
+test chartsheet_selection_is_refused ... ok
+test foreign_changed_and_retargeted_sources_are_rejected ... ok
+test mce_limits_and_partial_sink_are_checked ... ok
+test add_replace_remove_noop_and_signed_refusal_are_exact ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/source_backed_row_visibility.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_row_visibility-92eb24f03e76cccf)
+
+running 17 tests
+test canonical_requests_are_exact_noops ... ok
+test public_snapshot_distinguishes_missing_and_visible_row_owners ... ok
+test xml_boolean_forms_and_self_closing_layout_state_are_owned_narrowly ... ok
+test stale_package_and_source_revision_are_refused_without_output ... ok
+test managed_one_under_budget_refuses_before_selected_worksheet_io ... ok
+test managed_editor_retains_payload_closure_and_releases_budget ... ok
+test managed_exact_noop_publication_is_byte_exact_and_releases_budget ... ok
+test managed_editor_adopts_an_indexed_package_and_releases_budget ... ok
+test managed_source_revision_is_refused_before_output ... ok
+test managed_changed_publication_refuses_without_planning_headroom ... ok
+test batch_changes_only_hidden_owners_and_exact_inverse_restores_source ... ok
+test duplicate_missing_and_oversized_batches_are_atomic ... ok
+test managed_cancellation_is_checked_before_snapshot_and_stream_output ... ok
+test managed_changed_publication_preserves_unknown_members_and_releases_budget ... ok
+test managed_signature_noop_and_changed_protection_contracts_remain_fail_closed ... ok
+test unsafe_xml_macros_and_signatures_fail_closed ... ok
+test changed_publication_reuses_matched_provenance_without_selected_reload ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
+     Running tests/source_backed_sheet_protection.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_sheet_protection-e74769c30ecd3260)
+
+running 6 tests
+test changed_edit_reopens_inverts_and_changes_only_the_selected_worksheet ... ok
+test managed_snapshot_changed_publication_and_budget_release_are_exact ... ok
+test chartsheet_selection_is_refused ... ok
+test foreign_changed_and_retargeted_sources_are_rejected ... ok
+test mce_limits_and_partial_sink_are_checked ... ok
+test add_replace_remove_noop_and_signed_refusal_are_exact ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/source_backed_tab_state.rs (/tmp/litchi-goal-0410-tests/debug/deps/source_backed_tab_state-30e5c1c409cc2368)
+
+running 11 tests
+test strict_dialog_sheet_kind_matches_eager_and_source_catalogs ... ok
+test staged_activation_can_return_to_source_and_noop_activation_does_not_pin_relocation ... ok
+test managed_one_under_budget_fails_before_payload_retention_and_cancellation_stops_output ... ok
+test visibility_operations_use_one_part_and_preserve_every_unrelated_member ... ok
+test managed_workbook_payload_is_budgeted_streamed_and_released ... ok
+test noop_signed_source_is_exact_and_changed_signatures_are_refused ... ok
+test relationship_source_version_limits_foreign_closure_and_partial_sink_are_checked ... ok
+test selectors_visibility_invariants_and_hidden_activation_fail_closed ... ok
+test malformed_duplicate_external_and_retargeted_sheet_relationships_are_refused ... ok
+test activation_and_implicit_relocation_use_three_parts_and_are_reversible ... ok
+test protection_mce_dtd_pi_owner_and_sheet_kind_refusals_are_typed_or_closed ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/xlsx_array_formula_autofit.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_array_formula_autofit-2079bc93fc807892)
+
+running 2 tests
+test workbook_snapshots_expose_the_first_sheet_by_semantic_name ... ok
+test workbook_serialization_is_stable_without_pending_edits ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_cell_watches_owner.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_cell_watches_owner-1bede214f4760f67)
+
+running 1 test
+test standalone_cell_watches_round_trip_through_the_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_chain_owner.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_chain_owner-8d0927dfb48e1f13)
+
+running 2 tests
+test calculation_chain_package_operations_preserve_the_canonical_owner ... ok
+test calculation_chain_survives_package_publication_and_reopen ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_connections_owner.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_connections_owner-11773ea1594e0c21)
+
+running 2 tests
+test standalone_adapter_retains_query_table_reference_validation ... ok
+test standalone_connections_api_uses_the_canonical_owner ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_connections_query_table_crud.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_connections_query_table_crud-2ec27e854b19fcdd)
+
+running 3 tests
+test removal_preserves_a_query_table_target_shared_by_another_part ... ok
+test missing_connection_and_bad_reorder_are_atomic ... ok
+test generated_connections_and_query_tables_round_trip_inertly ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_cross_workbook_scalar.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_cross_workbook_scalar-ff58426419d9a955)
+
+running 5 tests
+test same_workbook_copy_from_delegates_to_existing_transfer_semantics ... ok
+test cross_workbook_scalar_copies_join_when_targets_are_disjoint_and_conflict_when_overlapping ... ok
+test cross_workbook_scalar_copy_refuses_formula_owned_ranges_beyond_selected_cells ... ok
+test cross_workbook_scalar_copy_is_immutable_reversible_and_reopenable ... ok
+test cross_workbook_scalar_copy_refuses_dependencies_and_occupied_targets_atomically ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/xlsx_custom_properties.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_custom_properties-4b4dfb2fc910eb0a)
+
+running 7 tests
+test custom_properties_absence_is_explicit ... ok
+test custom_properties_reject_reserved_non_excel_host_metadata ... ok
+test custom_properties_are_nameable_through_the_xlsx_context ... ok
+test custom_property_noops_preserve_and_changes_invalidate_signatures ... ok
+test removing_custom_properties_removes_the_complete_package_graph ... ok
+test malformed_external_and_duplicate_custom_property_graphs_map_to_common_errors ... ok
+test custom_properties_round_trip_through_the_xlsx_facade ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_data_validation_mutation.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_data_validation_mutation-3665f05e8ded5d61)
+
+running 2 tests
+test invalid_sqref_is_rejected_before_serialization ... ok
+test data_validation_codec_round_trips_a_typed_collection ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_double_save_staleness.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_double_save_staleness-f8e897b27030b662)
+
+running 1 test
+test repeated_snapshot_publication_is_byte_stable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_external_link_crud.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_external_link_crud-6abb8fef32d636a6)
+
+running 2 tests
+test strict_external_link_parts_keep_the_strict_namespace ... ok
+test external_link_parts_are_built_without_fetching_targets ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_fit_to_page.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_fit_to_page-7005f52c78d4ca1a)
+
+running 1 test
+test page_setup_parser_reads_typed_fit_bounds ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_history.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_history-918f080cb5b85dcb)
+
+running 1 test
+test budgeted_history_tracks_immutable_workbook_snapshots ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_hyperlink_crud.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_hyperlink_crud-6cb39c8a3d571da6)
+
+running 8 tests
+test hyperlink_values_reject_non_stable_xml_whitespace ... ok
+test hyperlink_edit_refuses_unknown_owner_markup ... ok
+test hyperlink_joins_keep_disjoint_ranges_and_reject_same_semantic_range ... ok
+test hyperlinks_add_replace_remove_and_reopen ... ok
+test hyperlink_add_then_remove_is_an_exact_noop ... ok
+test hyperlink_patch_inverse_restores_source_snapshot ... ok
+test strict_worksheet_external_hyperlink_commit_reopens_with_strict_relationship ... ok
+test hyperlink_patch_rejects_stale_relationship_without_mutating_target ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/xlsx_hyperlink_reads.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_hyperlink_reads-1d00a6836785ff89)
+
+running 1 test
+test worksheet_facade_exposes_internal_and_inert_external_hyperlinks ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_ignored_errors_owner.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_ignored_errors_owner-4373adfcdb4446bd)
+
+running 1 test
+test standalone_ignored_errors_round_trip_through_the_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_insert_worksheet.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_insert_worksheet-6d904a0c6e8522f6)
+
+running 1 test
+test edit_transaction_appends_a_validated_worksheet ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_outline_properties_owner.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_outline_properties_owner-45f64eedba4b5978)
+
+running 1 test
+test standalone_outline_properties_parse_through_the_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_page_breaks_owner.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_page_breaks_owner-71adde1595d9e601)
+
+running 4 tests
+test worksheet_facade_uses_the_canonical_owner ... ok
+test no_op_shares_source_and_stale_patch_is_rejected ... ok
+test package_transaction_round_trips_and_inverts_exactly ... ok
+test reads_real_poi_manual_breaks ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/xlsx_page_margins_owner.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_page_margins_owner-e50494274758716b)
+
+running 1 test
+test standalone_page_margins_parse_through_the_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_phonetic_properties_owner.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_phonetic_properties_owner-db723bef5af66792)
+
+running 1 test
+test standalone_phonetic_properties_parse_through_the_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_print_options_owner.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_print_options_owner-cc426c4c20d1fdb2)
+
+running 1 test
+test standalone_print_options_parse_through_the_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_remove_chart_sheet.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_remove_chart_sheet-54183646b254466b)
+
+running 1 test
+test workbook_sheet_handles_report_their_semantic_kind ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_remove_worksheet.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_remove_worksheet-835db6a1f187a32f)
+
+running 1 test
+test edit_transaction_removes_a_worksheet_from_the_new_snapshot ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_scenarios_owner.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_scenarios_owner-1fbc25b99457115e)
+
+running 1 test
+test standalone_scenarios_round_trip_through_the_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_sheet_protection_mutation.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_sheet_protection_mutation-5f30f7c72c75ada6)
+
+running 1 test
+test worksheet_protection_codec_replaces_only_typed_protection_metadata ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_slicer_timeline_crud.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_slicer_timeline_crud-83578302f0dc8e14)
+
+running 4 tests
+test feature_transactions_rollback_and_refuse_host_behavior ... ok
+test removing_last_slicer_keeps_a_target_shared_by_an_unrelated_owner ... ok
+test slicer_cache_and_view_crud_preserves_state_extensions_and_shared_targets ... ok
+test timeline_cache_and_view_crud_preserves_selection_and_reference_integrity ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/xlsx_theme.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_theme-e0b23409a86b3631)
+
+running 2 tests
+test standalone_package_opens_a_theme_bearing_workbook ... ok
+test standalone_workbook_opens_xlsx_theme_variants ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_threaded_comment_crud.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_threaded_comment_crud-95129aea3f88f921)
+
+running 1 test
+test threaded_comment_models_round_trip_through_the_bounded_codecs ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_volatile_dependencies_owner.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_volatile_dependencies_owner-8a75799dab8e80e9)
+
+running 2 tests
+test volatile_dependencies_removal_is_idempotent ... ok
+test volatile_dependencies_survive_direct_package_publication ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_workbook_durable.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_workbook_durable-925b2bba505fe689)
+
+running 9 tests
+test cell_transfer_participates_in_non_applying_three_way_plans ... ok
+test three_way_planning_keeps_disjoint_work_and_requires_conflict_resolution ... ok
+test page_break_copy_and_move_are_atomic_dependency_checked_transfers ... ok
+test durable_json_is_deterministic_stale_checked_reversible_and_reopenable ... ok
+test commits_record_exact_weighted_history_and_refuse_small_budgets ... ok
+test cell_copy_and_move_close_formula_text_and_style_dependencies ... ok
+test real_poi_and_libreoffice_formulas_copy_and_fully_reopen ... ok
+test cell_transfer_is_bounded_and_malformed_package_bytes_stay_test_only ... ok
+test real_poi_fixture_round_trips_and_inverse_preserves_the_exact_package ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests/xlsx_xml_maps_owner.rs (/tmp/litchi-goal-0410-tests/debug/deps/xlsx_xml_maps_owner-9db5bedcdfe346e3)
+
+running 2 tests
+test xml_maps_removal_is_idempotent ... ok
+test xml_maps_survive_direct_package_publication ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xml_maps_api_compat.rs (/tmp/litchi-goal-0410-tests/debug/deps/xml_maps_api_compat-a53f5be147da802e)
+
+running 2 tests
+test legacy_types_struct_literals_and_inherent_methods_remain_usable ... ok
+test xlsx_adapters_retain_the_boxed_error_result_surface ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_ooxml_common
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_opc
+
+running 5 tests
+test crates/litchi-opc/src/package.rs - package::OpcPackage::open (line 260) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::next_partname (line 944) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::to_stream (line 1032) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::save (line 1006) - compile ... ok
+test crates/litchi-opc/src/pkgwriter.rs - pkgwriter::PackageWriter (line 870) - compile ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.26s; merged doctests compilation took 0.25s
+   Doc-tests litchi_xlsx
+
+running 2 tests
+test crates/litchi-xlsx/src/style.rs - style::stylesheet (line 26) - compile ... ok
+test crates/litchi-xlsx/src/style/stylesheet/mod.rs - style::stylesheet::Styles::parse (line 92) - compile ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.19s; merged doctests compilation took 0.19s

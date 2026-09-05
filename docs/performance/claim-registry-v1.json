@@ -133,6 +133,22 @@
         "canonical_sha256": "6a6697f01ac678efbc8c8466bc8f32a5ecef99700b1492437ab081f87bdea4ae",
         "schema_version": 1
       }
+    },
+    {
+      "id": "abba-0410-mce-attribute-names",
+      "kind": "abba_package",
+      "relative_path": "docs/performance/results/change-0410/latency",
+      "manifest": {
+        "path": "0410-mce-attribute-names-abba-manifest.json",
+        "sha256": "9e1f6821e9b8e30642778d8a99a700b95fe645542a583a97180353d17c4f8d6e",
+        "schema_version": 1
+      },
+      "summary": {
+        "path": "normal-summary.json",
+        "sha256": "2b8df8677f699f641249276c85370e0023f4a59758ed8d449830e6d3ef1f677a",
+        "canonical_sha256": "42f4eaee58cca84d4141a62415fd936202a07f559f2e692a55d9d0bc06ce5faf",
+        "schema_version": 1
+      }
     }
   ],
   "claims": [
@@ -689,6 +705,67 @@
       },
       "documentation": [
         "docs/performance/changes/0269-xlsx-repeated-store-cache-abba.md"
+      ]
+    },
+    {
+      "id": "claim-0410-mce-attribute-names",
+      "change_id": "0410-mce-attribute-names-abba",
+      "claim_class": "optimization",
+      "status": "landed",
+      "code_state": "landed",
+      "reason_codes": [
+        "accepted_latency_only"
+      ],
+      "scope": {
+        "format": "xlsx",
+        "selectors": [
+          "xlsx_file_selected_cell"
+        ],
+        "corpora": [
+          {
+            "name": "xlsx-cell-values-medium",
+            "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "shape": "medium",
+            "package_format": "XLSX/OPC/ZIP"
+          }
+        ]
+      },
+      "latency_evidence": {
+        "evidence_id": "abba-0410-mce-attribute-names",
+        "allowed_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "accepted_cells": 4,
+        "adverse_both_cells": 0,
+        "accepted_statistics": [
+          {
+            "case": "xlsx_file_selected_cell",
+            "corpus": "xlsx-cell-values-medium",
+            "statistic": "p50"
+          },
+          {
+            "case": "xlsx_file_selected_cell",
+            "corpus": "xlsx-cell-values-medium",
+            "statistic": "mean"
+          },
+          {
+            "case": "xlsx_file_selected_cell",
+            "corpus": "xlsx-cell-values-medium",
+            "statistic": "p95"
+          },
+          {
+            "case": "xlsx_file_selected_cell",
+            "corpus": "xlsx-cell-values-medium",
+            "statistic": "p99"
+          }
+        ]
+      },
+      "documentation": [
+        "docs/performance/changes/0410-mce-attribute-name-reuse.md"
       ]
     }
   ]

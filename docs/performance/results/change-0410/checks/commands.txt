@@ -1,0 +1,68 @@
+0410 commands, reconstructed from coordinator tool calls; runtime benchmark
+argv, UTC start, duration and exit status are journaled in each capture.
+
+Build worktree: /tmp/litchi-goal-0410-worktree
+Control: 972dc25be0dbd6690c74429839a48288d637e2d5
+Candidate: e4d477466718a8fad38cd55b9babe0b826e7f3a7
+Both revisions had a clean worktree during builds/capture.
+Build environment:
+CARGO_TARGET_DIR=/tmp/litchi-goal-0410-target
+CARGO_BUILD_JOBS=4
+CARGO_INCREMENTAL=0
+CARGO_PROFILE_RELEASE_DEBUG=1
+RUSTFLAGS=-C force-frame-pointers=yes -C force-unwind-tables=yes
+For each revision:
+cargo +1.98.1 build --locked --manifest-path tools/perf-baseline/Cargo.toml --release --features allocator-metrics --bin litchi-perf-baseline --bin litchi-perf-baseline-alloc
+The binaries were copied to separate control/candidate directories before rebuilding.
+
+Initial capture (sequential, no compilation/tests/profiles overlapped):
+python3 /tmp/litchi-goal-0410-run-leg.py a1
+python3 /tmp/litchi-goal-0410-run-leg.py b1
+python3 /tmp/litchi-goal-0410-run-leg.py b2
+python3 /tmp/litchi-goal-0410-run-leg.py a2
+python3 /tmp/litchi-goal-0410-profile.py
+Diagnostic guard repeat (sequential, initial reports retained):
+python3 /tmp/litchi-goal-0410-guard-recheck.py a1
+python3 /tmp/litchi-goal-0410-guard-recheck.py b1
+python3 /tmp/litchi-goal-0410-guard-recheck.py b2
+python3 /tmp/litchi-goal-0410-guard-recheck.py a2
+
+Test/Clippy/rustdoc environment:
+CARGO_TARGET_DIR=/tmp/litchi-goal-0410-tests
+CARGO_BUILD_JOBS=4
+CARGO_INCREMENTAL=0
+CARGO_PROFILE_DEV_DEBUG=0
+CARGO_PROFILE_TEST_DEBUG=0
+Working directory: /home/zhuhe/code/litchi
+cargo +1.98.1 test --locked -p litchi-ooxml-common -p litchi-xlsx --all-features
+cargo +1.98.1 test --locked -p litchi-xlsx --all-features --test source_backed_row_visibility
+# The preceding baseline reproduction used control MCE stream.rs, then restored the candidate.
+cargo +1.98.1 test --locked -p litchi-ooxml-common -p litchi-xlsx --all-features --no-fail-fast
+cargo +1.98.1 clippy --locked -p litchi-ooxml-common -p litchi-xlsx --all-features --all-targets --no-deps -- -D warnings
+# Rerun after the MCE test module rename; XLSX preexisting diagnostics remained.
+cargo +1.98.1 clippy --locked -p litchi-ooxml-common -p litchi-xlsx --all-features --all-targets --no-deps -- -D warnings
+cargo +1.98.1 clippy --locked -p litchi-ooxml-common --all-features --all-targets --no-deps -- -D warnings
+RUSTDOCFLAGS='-D warnings' cargo +1.98.1 doc --locked -p litchi-ooxml-common -p litchi-xlsx --all-features --no-deps
+
+# Final integration after the independent OPC/managed-planning fix:
+cargo +1.98.1 test --locked -p litchi-opc -p litchi-ooxml-common -p litchi-xlsx --all-features --no-fail-fast
+# 1,918 passed, zero failed. Two later OPC test-helper-only lint edits were typechecked below.
+cargo +1.98.1 clippy --locked -p litchi-opc -p litchi-ooxml-common --all-features --all-targets --no-deps -- -D warnings
+# Initial scoped Clippy found two existing test-helper lints; fixed, then:
+cargo +1.98.1 clippy --locked -p litchi-opc -p litchi-ooxml-common --all-features --all-targets --no-deps -- -D warnings
+RUSTDOCFLAGS='-D warnings' cargo +1.98.1 doc --locked -p litchi-opc -p litchi-ooxml-common -p litchi-xlsx --all-features --no-deps
+RUSTUP_TOOLCHAIN=1.98.1 python3 tools/check_crate_boundaries.py
+rustfmt +1.98.1 --edition 2024 --config skip_children=true --check crates/litchi-ooxml-common/src/mce/stream.rs crates/litchi-ooxml-common/src/mce/tests.rs crates/litchi-opc/src/source_backed.rs crates/litchi-opc/tests/phys_pkg_borrowed.rs crates/litchi-xlsx/src/row_visibility/source.rs crates/litchi-xlsx/tests/source_backed_row_visibility.rs
+
+python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict
+# First invocation omitted required --evidence-root; retained claims.log records that CLI refusal.
+python3 tools/check_report_claim_classification.py --repo-root .
+python3 /tmp/litchi-goal-0410-verify.py --root /tmp/litchi-goal-0410-capture --output /tmp/litchi-goal-0410-capture/0410-verification.json
+
+Postprocessing:
+python3 tools/perf_abba_summary.py <a1-normal.json> <b1-normal.json> <b2-normal.json> <a2-normal.json> --json-out <normal-summary.json>
+python3 tools/perf_abba_summary.py <a1-guards.json> <b1-guards.json> <b2-guards.json> <a2-guards.json> --json-out <guards-summary.json>
+# The same guard summary command is applied separately to guard-recheck/.
+python3 tools/perf_abba_package.py --change 0410-mce-attribute-names-abba --output-dir docs/performance/results/change-0410/latency --summary /tmp/litchi-goal-0410-capture/normal-summary.json --artifact a1=/tmp/litchi-goal-0410-capture/a1-normal.json --artifact b1=/tmp/litchi-goal-0410-capture/b1-normal.json --artifact b2=/tmp/litchi-goal-0410-capture/b2-normal.json --artifact a2=/tmp/litchi-goal-0410-capture/a2-normal.json
+python3 /tmp/litchi-goal-0410-profile/attribute_0410.py --script /tmp/litchi-goal-0410-profile/perf-script-no-inline.stdout --report /tmp/litchi-goal-0410-profile/perf-all-self.stdout --capture /tmp/litchi-goal-0410-profile --repo /home/zhuhe/code/litchi --output /tmp/litchi-goal-0410-profile/attribution-summary.json
+# Final attribution completed successfully; immutable capture-commands.json avoids a self-referential journal hash.

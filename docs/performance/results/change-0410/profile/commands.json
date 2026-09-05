@@ -1,0 +1,146 @@
+[
+  {
+    "label": "checkout",
+    "argv": [
+      "git",
+      "checkout",
+      "--detach",
+      "e4d477466718a8fad38cd55b9babe0b826e7f3a7"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:45:21.699161+00:00",
+    "wall_seconds": 0.011597132994211279,
+    "exit_code": 0
+  },
+  {
+    "label": "selected-perf-record",
+    "argv": [
+      "taskset",
+      "-c",
+      "2",
+      "perf",
+      "record",
+      "--no-buildid-cache",
+      "-e",
+      "cycles:u",
+      "-F",
+      "999",
+      "--call-graph",
+      "fp,127",
+      "-o",
+      "/tmp/litchi-goal-0410-profile/perf.data",
+      "--",
+      "/tmp/litchi-goal-0410-binaries/candidate/litchi-perf-baseline",
+      "--case",
+      "xlsx_file_selected_cell",
+      "--filesystem-cache",
+      "warm",
+      "--xlsx-cell-crud-shape",
+      "medium",
+      "--warmup",
+      "10",
+      "--samples",
+      "300",
+      "--json",
+      "/tmp/litchi-goal-0410-profile/selected-perf-record.json",
+      "--corpus-manifest",
+      "/tmp/litchi-goal-0410-profile/selected-perf-record.catalog.json"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:45:22.074628+00:00",
+    "wall_seconds": 81.89304053499654,
+    "exit_code": 0
+  },
+  {
+    "label": "perf-all-self",
+    "argv": [
+      "perf",
+      "report",
+      "--stdio",
+      "--no-inline",
+      "--no-children",
+      "--call-graph=none",
+      "--percent-limit=0",
+      "-i",
+      "/tmp/litchi-goal-0410-profile/perf.data"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:46:43.985228+00:00",
+    "wall_seconds": 0.32284897701174486,
+    "exit_code": 0
+  },
+  {
+    "label": "perf-script-no-inline",
+    "argv": [
+      "perf",
+      "script",
+      "--no-inline",
+      "-i",
+      "/tmp/litchi-goal-0410-profile/perf.data"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:46:44.308221+00:00",
+    "wall_seconds": 0.7854244720074348,
+    "exit_code": 0
+  },
+  {
+    "label": "attribution",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0410-profile/attribute_0410.py",
+      "--script",
+      "/tmp/litchi-goal-0410-profile/perf-script-no-inline.stdout",
+      "--report",
+      "/tmp/litchi-goal-0410-profile/perf-all-self.stdout",
+      "--capture",
+      "/tmp/litchi-goal-0410-profile",
+      "--repo",
+      "/home/zhuhe/code/litchi",
+      "--output",
+      "/tmp/litchi-goal-0410-profile/attribution-summary.json"
+    ],
+    "cwd": "/tmp/litchi-goal-0410-worktree",
+    "started_utc": "2026-09-04T23:46:45.093768+00:00",
+    "wall_seconds": 3.58653436799068,
+    "exit_code": 1
+  },
+  {
+    "label": "attribution-corrected",
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0410-profile/attribute_0410.py",
+      "--script",
+      "/tmp/litchi-goal-0410-profile/perf-script-no-inline.stdout",
+      "--report",
+      "/tmp/litchi-goal-0410-profile/perf-all-self.stdout",
+      "--capture",
+      "/tmp/litchi-goal-0410-profile",
+      "--repo",
+      "/home/zhuhe/code/litchi",
+      "--output",
+      "/tmp/litchi-goal-0410-profile/attribution-summary.json"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-04T23:49:48.536079+00:00",
+    "wall_seconds": 3.8454833249998046,
+    "exit_code": 0
+  },
+  {
+    "label": "flamegraph",
+    "argv": [
+      "flamegraph",
+      "--perfdata",
+      "/tmp/litchi-goal-0410-profile/perf.data",
+      "--no-inline",
+      "--deterministic",
+      "--title",
+      "XLSX selected cell MCE candidate: whole process and children",
+      "--output",
+      "/tmp/litchi-goal-0410-profile/cpu-flamegraph.svg"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-04T23:49:52.381718+00:00",
+    "wall_seconds": 1.0018578140006866,
+    "exit_code": 0
+  }
+]

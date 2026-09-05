@@ -1,0 +1,18 @@
+{
+  "revision": "972dc25be0dbd6690c74429839a48288d637e2d5",
+  "status": "",
+  "binaries": {
+    "litchi-perf-baseline": {
+      "path": "/tmp/litchi-goal-0410-binaries/control/litchi-perf-baseline",
+      "bytes": 449477192,
+      "sha256": "ce324f5574294cd636e6ba79ce0255dedde87c427d68534a4d6e0ad65a6d901e",
+      "build_id_output": "\nDisplaying notes found in: .note.ABI-tag\n  Owner                Data size \tDescription\n  GNU                  0x00000010\tNT_GNU_ABI_TAG (ABI version tag)\n    OS: Linux, ABI: 3.2.0\n\nDisplaying notes found in: .note.gnu.build-id\n  Owner                Data size \tDescription\n  GNU                  0x00000014\tNT_GNU_BUILD_ID (unique build ID bitstring)\n    Build ID: 0255f7275d708d7312a24bc05931b51257f4e772\n"
+    },
+    "litchi-perf-baseline-alloc": {
+      "path": "/tmp/litchi-goal-0410-binaries/control/litchi-perf-baseline-alloc",
+      "bytes": 449481136,
+      "sha256": "b3762520523dcd53c4934d45474d4ecd66ca644415a6da901bb09a02fd3a1c41",
+      "build_id_output": "\nDisplaying notes found in: .note.ABI-tag\n  Owner                Data size \tDescription\n  GNU                  0x00000010\tNT_GNU_ABI_TAG (ABI version tag)\n    OS: Linux, ABI: 3.2.0\n\nDisplaying notes found in: .note.gnu.build-id\n  Owner                Data size \tDescription\n  GNU                  0x00000014\tNT_GNU_BUILD_ID (unique build ID bitstring)\n    Build ID: 234fcb07b03c20331310ca20d6a2d2ee96c43898\n"
+    }
+  }
+}

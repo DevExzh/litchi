@@ -1,0 +1,10 @@
+   Compiling litchi-ooxml-common v0.0.1 (/tmp/litchi-goal-0410-worktree/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/tmp/litchi-goal-0410-worktree/crates/litchi-drawingml)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/tmp/litchi-goal-0410-worktree/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-xlsx v0.0.1 (/tmp/litchi-goal-0410-worktree/crates/litchi-xlsx)
+   Compiling litchi-pptx v0.0.1 (/tmp/litchi-goal-0410-worktree/crates/litchi-pptx)
+   Compiling litchi-docx v0.0.1 (/tmp/litchi-goal-0410-worktree/crates/litchi-docx)
+   Compiling litchi-xlsb v0.0.1 (/tmp/litchi-goal-0410-worktree/crates/litchi-xlsb)
+   Compiling litchi v0.0.1 (/tmp/litchi-goal-0410-worktree/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/tmp/litchi-goal-0410-worktree/tools/perf-baseline)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 56s

@@ -1,0 +1,2 @@
+Previous HEAD position was e4d477466 perf(mce): reuse expanded attribute names during streaming
+HEAD is now at 972dc25be docs(perf): clarify XLSX allocation and CPU attribution counts

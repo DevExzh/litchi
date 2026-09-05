@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "/tmp/litchi-goal-0410-profile.py", line 55, in <module>
+    run('attribution', ['python3',out/'attribute_0410.py',
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        '--script',out/'perf-script-no-inline.stdout','--report',out/'perf-all-self.stdout','--capture',out,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        '--repo','/home/zhuhe/code/litchi','--output',out/'attribution-summary.json'])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/litchi-goal-0410-profile.py", line 30, in run
+    result.check_returncode()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.14/subprocess.py", line 509, in check_returncode
+    raise CalledProcessError(self.returncode, self.args, self.stdout,
+                             self.stderr)
+subprocess.CalledProcessError: Command '['python3', '/tmp/litchi-goal-0410-profile/attribute_0410.py', '--script', '/tmp/litchi-goal-0410-profile/perf-script-no-inline.stdout', '--report', '/tmp/litchi-goal-0410-profile/perf-all-self.stdout', '--capture', '/tmp/litchi-goal-0410-profile', '--repo', '/home/zhuhe/code/litchi', '--output', '/tmp/litchi-goal-0410-profile/attribution-summary.json']' returned non-zero exit status 1.

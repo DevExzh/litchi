@@ -12,6 +12,38 @@ coverage index explicitly describes itself as representative, and the current
 records do not provide a complete, independently reproducible baseline and
 optimization result for the non-iWork CRUD matrix.
 
+## 0410 current update
+
+Change [0410](changes/0410-mce-attribute-name-reuse.md) is a bounded MCE
+expanded-attribute ownership experiment on the XLSX selected-cell path. It
+uses candidate `e4d477466718a8fad38cd55b9babe0b826e7f3a7` and control
+`972dc25be0dbd6690c74429839a48288d637e2d5`, the fixed four-sheet 9,216-cell,
+17-member corpus with 4 MiB of media, and Rust/Cargo/Rustdoc 1.98.1 release
+builds on CPU 2. The primary ABBA p50 candidate-minus-control changes are
+`-3.9447%` and `-4.1373%`; operation-local allocator calls move from 81,918
+to 77,212 and allocated bytes from 10,690,444 to 10,309,094. The seventh
+strict-registry claim entry has been added, and the strict checker passes all
+seven claims.
+
+The initial eager edit/save guard is adverse at +0.53% / +5.66% p50 elapsed
+time. A diagnostic repeat is lower by 1.106% / 0.505%, while same-role p50
+drift is roughly 5–6% for both roles. The edit claim is therefore withheld and
+the initial adverse result retained. Review found that the eager fixture does
+not execute the changed MCE stream; this limits causal interpretation and does
+not prove an eager no-regression result. The residual selected-path profile
+attributes 10.91% of leaf weight to `clone_bounded_name_part` and reports
+`parse_element` at 5.89% self / 23.42% inclusive. These are sampled profile
+figures, not paired CPU evidence.
+
+The final all-feature run passes 1,918 tests across the three crates. The
+OPC/common warning-denied Clippy passes after two preexisting test-lint fixes;
+XLSX all-target Clippy remains blocked by 9 library diagnostics and 28
+library-test diagnostics, including 19 additional test diagnostics. This
+update records scoped progress only; the non-iWork goal remains open.
+The [0410 evidence bundle](results/change-0410/) retains the build identities,
+ABBA reports, allocator captures, profile attribution, and gate logs. Rustdoc,
+crate-boundary, and scoped-format checks pass.
+
 ## Authorities and reading boundary
 
 This audit uses the current goal, the accepted ADRs, and the current
@@ -40,11 +72,11 @@ ADRs 0010/0011.
 | Goal requirement | Evidence at audit time | Assessment |
 | --- | --- | --- |
 | Reproducible CRUD baseline | The coverage index maps 15 categories and 30 representative selectors. Measured rows require a validated `target/perf/container-baseline.json`; the index itself is only an identity/contract artifact. | Partial. The full required scenario matrix and metric set are not evidenced. |
-| Scoped claims | The strict claim-registry check validates 6 claims. The report classifier has 167 rows: 0 `strict_claim`, 145 historical, 14 descriptive, and 8 withheld. | Claims are deliberately scoped; this is not a program completion claim. |
-| Correctness and boundaries | 0409 checks report 862 Python tests run with 20 skips and no failures, 258 release harness tests passing with one ignored, and a passing crate-boundary check. The existing graph has 64 packages, 240 internal declarations, and 14 iWork debts. | Useful gates, but they do not establish latency, memory, I/O, or full CRUD coverage. |
-| OPC/ZIP/ODF correctness | The coordinator's integrated all-feature run reports `soapberry-zip` 362 library tests, `litchi-opc` 316 library tests, ODF 287 library tests, and all three crates’ integration suites and doctests passing (1,227 total passed, two ignored). The earlier local default-feature reruns (358 ZIP and 293 OPC) were superseded by this integrated run. | Strong package/format correctness evidence; not a complete workspace performance or native-producer gate. |
-| Full gate health | The prior ODF MIME/unsafe-text false positive was repaired. Scoped formatter checks now include the inherited ZIP locator/office fixes and the new ODF test fix. The late ZIP64 topology test now passes after its `Result` assertion fix. Warning-denied Clippy remains blocked by the preexisting `large_enum_variant` in `litchi-odf-common/src/package/model.rs:230` (312-byte enum variant versus 8-byte largest alternative). | The integrated package/format scope is green; the warning-denied Clippy gate remains an explicit preexisting blocker. |
-| Hardware/resource profiling | `perf stat` counters, 32 affinity CPUs, 128 GiB RAM, Heaptrack, strace, fincore, and cargo-flamegraph are available. | 0406 retains a pinned release OPC materialization baseline, perf counters and self/inclusive reports, Heaptrack, RSS, syscall traces, and a CPU flamegraph. 0408 adds reusable expectations, operation-local allocations and decoded-byte counters, and usable frame-pointer caller attribution. 0409 extends this to XLSX selected-cell and matched edit/save, corrects member-range attribution, and validates native L2 events. Generic L1 zeroes are unusable and exact LLC events are unavailable in this guest. The wider matrix remains open. |
+| Scoped claims | The earlier strict checker validated 6 claims; 0410 adds a seventh strict-registry entry, and the current strict checker passes all 7 claims. The report classifier snapshot has 167 rows: 0 `strict_claim`, 145 historical, 14 descriptive, and 8 withheld. | Claims are deliberately scoped; the current check and snapshot counts do not establish program completion. |
+| Correctness and boundaries | 0409 checks report 862 Python tests run with 20 skips and no failures, 258 release harness tests passing with one ignored, and a passing crate-boundary check. The final all-feature three-crate run passes 1,918 tests; current rustdoc, crate-boundary, and scoped-format checks pass. The existing graph has 64 packages, 240 internal declarations, and 14 iWork debts. | Useful gates, but they do not establish latency, memory, I/O, or full CRUD coverage. |
+| OPC/ZIP/ODF correctness | The earlier integrated run recorded 362 ZIP, 316 OPC and 287 ODF library tests (1,227 total passed, two ignored). The final all-feature three-crate run now passes 1,918 tests, including the ZIP64 and row-visibility coverage. | Strong package/format correctness evidence for exercised fixtures; not a complete workspace performance or native-producer gate. |
+| Full gate health | The prior ODF MIME/unsafe-text false positive and late ZIP64 topology assertion were repaired. The final OPC/common warning-denied Clippy passes after two preexisting test-lint fixes. XLSX all-target Clippy remains blocked by 9 library diagnostics and 28 library-test diagnostics, including 19 additional test diagnostics. | Correctness and scoped formatting are current; workspace warning-denied Clippy is not green. |
+| Hardware/resource profiling | `perf stat` counters, 32 affinity CPUs, 128 GiB RAM, Heaptrack, strace, fincore, and cargo-flamegraph are available. | 0406 retains a pinned release OPC materialization baseline, perf counters and self/inclusive reports, Heaptrack, RSS, syscall traces, and a CPU flamegraph. 0408 adds reusable expectations, operation-local allocations and decoded-byte counters, and usable frame-pointer caller attribution. 0409 extends this to XLSX selected-cell and matched edit/save, corrects member-range attribution, and validates native L2 events. 0410 measures the selected MCE ownership candidate and reports residual `clone_bounded_name_part` leaf weight of 10.91% and `parse_element` at 5.89% self / 23.42% inclusive; these are not paired CPU deltas. Generic L1 zeroes are unusable and exact LLC events are unavailable in the guest. The wider matrix remains open. |
 
 The passing library suites establish behavior for the exercised fixtures. They
 do not establish the `docs/GOAL.md` requirements for p50/p95/p99, throughput,
@@ -121,7 +153,7 @@ a normalizing fallback for a different unsupported source.
 | P0 | Close the ZIP64 integration and preservation contract | 0404 binds the scoped all-feature results and fixture-generator sources; generated-offset/promotion and broader failure-atomicity coverage remain open. |
 | P0 | Establish the Phase-1 baseline before selecting further optimizations | Build the release harness at the current revision and capture named non-iWork corpora with p50/p95/p99, throughput, `perf stat` counters, allocation/peak RSS, source calls/bytes/ranges, decompressed/recompressed/copied bytes, output bytes, and lock-wait fields. Run cold/warm and one-worker/explicit-bounded-worker cases. |
 | P0 | Turn cache correctness into accepted observation | 0405 now retains validated direct-lock acquisition observations, cache counters, and explicit timing scope in 24 normal and 24 observed smoke rows. The release harness passes 256 tests with one ignored. Extend this descriptive evidence to representative workloads with operation-local attribution. Keep cache observations separate from latency claims until an accepted ABBA protocol exists. |
-| P0 | Capture current hardware/resource evidence | 0406 binds machine, corpus, revision, binary, raw samples, counters, allocation traces, RSS, syscall evidence, and profiling limitations. 0408 improves caller unwinding and verification efficiency and adds operation-local allocation/ZIP evidence. 0409 records XLSX query/edit/save and usable native L2 events; exact LLC is documented unavailable on this guest. Next extend the semantic CRUD and cold-source matrix, including the existing XLS eager/source selected-cell pair, and measure the expanded XML-name cloning candidate before accepting new claims. |
+| P0 | Capture current hardware/resource evidence | 0406 binds machine, corpus, revision, binary, raw samples, counters, allocation traces, RSS, syscall evidence, and profiling limitations. 0408 improves caller unwinding and verification efficiency and adds operation-local allocation/ZIP evidence. 0409 records XLSX query/edit/save and usable native L2 events; exact LLC is documented unavailable on this guest. 0410 measures the expanded-name ownership candidate, with residual selected-path attribution but no paired CPU delta. Next extend the semantic CRUD and cold-source matrix, including the existing XLS eager/source selected-cell pair. |
 | P1 | Finish source-backed OPC CRUD adoption | Extend selective open/read/edit/save across format facades and topology changes; measure the selected-Part/compressor buffer, physical I/O, allocation/RSS, and semantic phase boundaries. The current report calls this migration incomplete. |
 | P1 | Cover the high-impact CRUD categories | Add or explicitly classify conversion, stream append, structural edits, deletion/sanitization, cross-document dependency copy, merge/split, patch and inverse timing, repair/normalize, dynamic calculation, security, malformed, and real-producer scenarios. Correctness-only selectors cannot close the timing requirement. |
 | P1 | Finish CFB consumer evidence | Move exact-range and overlay substrate work into DOC/XLS/PPT semantic owners; add physical-cold and high-latency range-source cases, FAT-tail behavior, and operation-local memory/resource attribution. |

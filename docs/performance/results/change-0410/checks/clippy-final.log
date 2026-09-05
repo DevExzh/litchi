@@ -1,0 +1,265 @@
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+error: using `chunks_exact` with a constant chunk size
+  --> crates/litchi-xlsx/src/color.rs:86:47
+   |
+86 |         for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+   |                                               ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+   = note: `-D clippy::chunks-exact-to-as-chunks` implied by `-D clippy::all`
+   = help: to override `-D clippy::all` add `#[allow(clippy::chunks_exact_to_as_chunks)]`
+
+error: using `chunks_exact` with a constant chunk size
+   --> crates/litchi-xlsx/src/color.rs:114:47
+    |
+114 |         for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+    |                                               ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+error: this call to `as_ref` does nothing
+   --> crates/litchi-xlsx/src/hyperlinks/snapshot.rs:727:56
+    |
+727 |         ResolveResult::Bound(Namespace(value)) => Some(value.as_ref()),
+    |                                                        ^^^^^^^^^^^^^^ help: try: `*value`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_asref
+    = note: `-D clippy::useless-asref` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::useless_asref)]`
+
+error: using `chunks_exact` with a constant chunk size
+   --> crates/litchi-xlsx/src/package/xldm/compression.rs:164:24
+    |
+164 |     for chunk in input.chunks_exact(8) {
+    |                        ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<8>().0`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact` with a constant chunk size
+   --> crates/litchi-xlsx/src/package/xldm/compression.rs:328:34
+    |
+328 |     for entry in primary[..used].chunks_exact(8) {
+    |                                  ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<8>().0`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact` with a constant chunk size
+   --> crates/litchi-xlsx/src/package/xldm/compression.rs:716:52
+    |
+716 |                 if string.len() % 2 != 0 || string.chunks_exact(2).any(|pair| pair[1] != upper_byte)
+    |                                                    ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact` with a constant chunk size
+   --> crates/litchi-xlsx/src/package/xldm/compression.rs:722:24
+    |
+722 |                 string.chunks_exact(2).map(|pair| pair[0]).collect()
+    |                        ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact` with a constant chunk size
+    --> crates/litchi-xlsx/src/package/xldm/metadata/codec.rs:1493:23
+     |
+1493 |     for pair in parts.chunks_exact(2) {
+     |                       ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact` with a constant chunk size
+   --> crates/litchi-xlsx/src/package/xldm/codec.rs:476:14
+    |
+476 |             .chunks_exact(2)
+    |              ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+error: could not compile `litchi-xlsx` (lib) due to 9 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: field assignment outside of initializer for an instance created with Default::default()
+    --> crates/litchi-xlsx/src/raw/strings.rs:1057:9
+     |
+1057 |         event_exact.max_event_bytes = empty.len();
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `litchi_ooxml_common::mce::StreamLimits { max_event_bytes: empty.len(), ..Default::default() }` and removing relevant reassignments
+    --> crates/litchi-xlsx/src/raw/strings.rs:1056:9
+     |
+1056 |         let mut event_exact = StreamLimits::default();
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#field_reassign_with_default
+     = note: `-D clippy::field-reassign-with-default` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::field_reassign_with_default)]`
+
+error: the `Err`-variant returned from this function is very large
+   --> crates/litchi-xlsx/src/raw/styles.rs:462:43
+    |
+462 |     fn streaming_0364_count(xml: &str) -> Streaming0364Result {
+    |                                           ^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+    |
+    = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+    = note: `-D clippy::result-large-err` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::result_large_err)]`
+
+error: the `Err`-variant returned from this function is very large
+   --> crates/litchi-xlsx/src/raw/styles.rs:475:10
+    |
+475 |     ) -> Streaming0364Result {
+    |          ^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+    |
+    = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/litchi-xlsx/src/raw/styles.rs:569:9
+    |
+569 |         exact.max_events = 5;
+    |         ^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `litchi_ooxml_common::mce::StreamLimits { max_events: 5, ..Default::default() }` and removing relevant reassignments
+   --> crates/litchi-xlsx/src/raw/styles.rs:568:9
+    |
+568 |         let mut exact = StreamLimits::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#field_reassign_with_default
+
+error: the `Err`-variant returned from this function is very large
+   --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:590:10
+    |
+590 |     ) -> x14ac::StreamResult<Values> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+    |
+    = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+   --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:599:10
+    |
+599 |     ) -> x14ac::StreamResult<Values> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+    |
+    = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+   --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:604:58
+    |
+604 |     fn default_stream(xml: &[u8], capture_rows: bool) -> x14ac::StreamResult<Values> {
+    |                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+    |
+    = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+   --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:862:10
+    |
+862 |     ) -> x14ac::StreamResult<Values> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+    |
+    = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+    --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:1134:45
+     |
+1134 |     fn scan_xml(xml: &str, target: &str) -> x14ac::StreamResult<ScanOutcome> {
+     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+     |
+     = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+    --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:1145:10
+     |
+1145 |     ) -> x14ac::StreamResult<ScanOutcome> {
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+     |
+     = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+    --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:1556:45
+     |
+1556 |     fn scan_xml(xml: &str, target: &str) -> super::super::selected::StreamResult<ScanOutcome> {
+     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+     |
+     = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+    --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:1700:10
+     |
+1700 |     ) -> super::super::selected::StreamResult<RangeScanOutcome> {
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+     |
+     = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+    --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:1710:45
+     |
+1710 |     fn scan_xml(xml: &str, target: &str) -> super::super::selected::StreamResult<ScanOutcome> {
+     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+     |
+     = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+    --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:2051:45
+     |
+2051 |     fn scan_xml(xml: &str, target: &str) -> StreamResult<ScanOutcome> {
+     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+     |
+     = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+    --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:2061:54
+     |
+2061 |     fn scan_range_xml(xml: &str, reference: &str) -> StreamResult<RangeScanOutcome> {
+     |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+     |
+     = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+    --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:2343:45
+     |
+2343 |     fn scan_xml(xml: &str, target: &str) -> StreamResult<ScanOutcome> {
+     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+     |
+     = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+    --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:2353:54
+     |
+2353 |     fn scan_range_xml(xml: &str, reference: &str) -> StreamResult<RangeScanOutcome> {
+     |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+     |
+     = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+    --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:2560:45
+     |
+2560 |     fn scan_xml(xml: &str, target: &str) -> StreamResult<ScanOutcome> {
+     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+     |
+     = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+    --> crates/litchi-xlsx/src/raw/worksheet/tests.rs:2570:54
+     |
+2570 |     fn scan_range_xml(xml: &str, reference: &str) -> StreamResult<RangeScanOutcome> {
+     |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 208 bytes
+     |
+     = help: try reducing the size of `litchi_ooxml_common::mce::StreamError<error::Error, error::Error>`, for example by boxing large elements or replacing it with `Box<litchi_ooxml_common::mce::StreamError<error::Error, error::Error>>`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: could not compile `litchi-xlsx` (lib test) due to 28 previous errors

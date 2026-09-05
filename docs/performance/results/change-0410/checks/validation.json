@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "production_revision": "6d1588602fe4f682c57992e897583113e03efff6",
+  "measured_candidate_revision": "e4d477466718a8fad38cd55b9babe0b826e7f3a7",
+  "user_goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "final_tests": {
+    "passed": 1918,
+    "failed": 0,
+    "ignored": 0,
+    "suites": 77,
+    "note": "Two subsequent OPC test-helper lint edits passed final all-target Clippy; production behavior unchanged."
+  },
+  "gates": {
+    "common_opc_clippy": "passed",
+    "common_opc_xlsx_rustdoc": "passed",
+    "scoped_rustfmt": "passed",
+    "boundaries": "passed: 64 packages, 240 internal declarations, 14 unchanged iWork debt items",
+    "xlsx_all_target_clippy": "failed: 28 preexisting diagnostics; see clippy-final.log",
+    "strict_claim_registry": "passed: 7 claims"
+  },
+  "source_files": [
+    {
+      "path": "crates/litchi-ooxml-common/src/mce/stream.rs",
+      "bytes": 110931,
+      "sha256": "366ce0e7b10bba3c621c767502d817ef6ca8f31c174b593c29108a7eab47a348"
+    },
+    {
+      "path": "crates/litchi-ooxml-common/src/mce/tests.rs",
+      "bytes": 72572,
+      "sha256": "0e8efd5a308f33dc1295bec1daf5bc2a5477f4e3622f1d2b907e1666f3331ce4"
+    },
+    {
+      "path": "crates/litchi-opc/src/source_backed.rs",
+      "bytes": 618646,
+      "sha256": "72a7384f5ebbb7dab78ba21b1bad50e1d4b3b886ffff81daf10660c576cd44d7"
+    },
+    {
+      "path": "crates/litchi-opc/tests/phys_pkg_borrowed.rs",
+      "bytes": 11192,
+      "sha256": "47453f886fe4145e32f6589414b1fd156f50c5b26d1bc61c2cd55d6190820dd0"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/row_visibility/source.rs",
+      "bytes": 9950,
+      "sha256": "5a7040ad2225785a743978ab29b88787e91e34c723c8c9f732f1f35e5b3dd1a3"
+    },
+    {
+      "path": "crates/litchi-xlsx/tests/source_backed_row_visibility.rs",
+      "bytes": 32213,
+      "sha256": "40975709b53ce8e9363fe77783557f0d32cfede71cdf3ac0e380e61e1a8a6eff"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+Coordinator record of independent agent review, 2026-09-05.
+
+MCE code review: no correctness blocker. Duplicate checking retains value
+equality and bounds; admitted attribute names move only after raw callbacks and
+validation. Element/frame and public raw callback ownership remain intact.
+The changed stream remains byte/namespace/error-order compatible in the
+exercised tests. No concurrency, unsafe-code or dependency change was added.
+
+OPC final review: no blocker. Signed changed replacements are compared before
+physical-member planning; exact signed replacements remain exact no-ops.
+read_part preserves source-version, cancellation, size/Part limit and CRC
+checks. Unsigned replacements read once in the changed-member loop. The focused
+test forces cache bypass, so it detects the earlier duplicate physical read.
+Signed no-op topology plans still perform bounded planning; empty plans and
+XLSX empty commits retain the direct exact-copy route.
+
+Eager guard review: the timed generated eager workflow opens, edits, commits
+and writes, with verification outside timing. Ordinary parsing uses the legacy
+processor; this corpus has neither dyDescent nor a shared-string member.
+It therefore does not directly execute the changed MCE stream. The selected
+cell workflow always reaches capture_stream_with_active. This limits causal
+attribution; it does not prove the absence of an indirect or other-workload
+regression. The original adverse guard and diagnostic repeat remain retained.
+
+Final evidence review: approved; no material unsupported claim or release
+blocker found. The registered selected-cell/corpus/build scope and all four
+normal ABBA statistics match the record. The measured control/candidate are
+separate from the later OPC repair. Timer boundaries, fresh children, profile
+scope and broader gaps are explicit. README, manifests, raw reports/catalogs,
+command journals, build identities and verification scripts support independent
+reproduction. Historical failed check logs are intentionally retained; follow
+README's final verifier commands for the accepted state.
+
+Reviews were read-only; they did not run builds or benchmark workloads.

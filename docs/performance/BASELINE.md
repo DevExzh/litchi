@@ -1,5 +1,47 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0410: MCE expanded-attribute name reuse
+
+[0410](changes/0410-mce-attribute-name-reuse.md) measures candidate
+`e4d477466718a8fad38cd55b9babe0b826e7f3a7` against control
+`972dc25be0dbd6690c74429839a48288d637e2d5`. The narrow change reuses admitted
+expanded attribute names in the shared MCE streaming path after validation.
+The selector is `xlsx_file_selected_cell` on the fixed four-sheet,
+48×48-per-sheet (9,216-cell), 17-member medium corpus with 4 MiB of media
+and archive SHA-256
+`dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036`.
+Stable Rust/Cargo/Rustdoc 1.98.1 release binaries used CPU 2, one worker,
+warm fresh children, and 20 warmups plus 500 samples per ABBA leg. The timed
+scope is prepared sheet selection and the exact M29 read; open and query
+preparation remain outside it.
+
+The primary ABBA p50 candidate-minus-control changes are
+`-3.9447%` and `-4.1373%` (candidate faster by 3.9447% and 4.1373%). The
+separate operation-local allocator runs move from 81,918 to 77,212 calls and
+from 10,690,444 to 10,309,094 allocated bytes. The new strict-registry entry
+is the seventh claim entry; the strict checker passes all seven claims. These results are
+limited to the named selector, corpus, build, and protocol.
+
+The initial eager edit/save guard is adverse at `+0.53%` and `+5.66%`
+candidate elapsed time. A diagnostic repeat is lower by `1.106%` and `0.505%`,
+but same-role p50 drift is about 6% in both roles, so the edit claim is
+withheld and the initial adverse observation is retained. Static review found
+that generated eager fixture does not execute the changed MCE stream (it uses
+the legacy processor, with no `dyDescent` or shared-string member); this
+limits attribution and does not prove absence of an eager regression.
+
+The residual selected-query profile assigns 10.91% of selected leaf weight to
+`clone_bounded_name_part`; `parse_element` is 5.89% self and 23.42%
+inclusive. These are sampled attribution figures, not a paired CPU reduction.
+The final all-feature three-crate run passes 1,918 tests. Warning-denied
+OPC/common Clippy passes after two preexisting test-lint fixes; XLSX
+all-target Clippy still reports 9 library diagnostics and 28 library-test
+diagnostics (including 19 additional test diagnostics). No workspace
+completion or broad speedup claim follows; the non-iWork goal remains open.
+The [0410 evidence bundle](results/change-0410/) retains the clean build
+identities, ABBA reports, allocator captures, profile attribution, and gate
+logs. Rustdoc, crate-boundary, and scoped-format checks pass.
+
 ## Change 0409: XLSX semantic query and edit/save evidence
 
 [0409](changes/0409-xlsx-profile-and-range-accounting.md) captures a medium four-sheet, 9,216-cell corpus with
