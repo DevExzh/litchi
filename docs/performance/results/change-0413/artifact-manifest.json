@@ -13,11 +13,6 @@
       "sha256": "0a3cc1dad958e3995d9bd030941f6f82c9a9bd2f5af5f2d05d6d5a7bc956034c"
     },
     {
-      "path": "analysis/normal-summary-new.json",
-      "bytes": 1521490,
-      "sha256": "8926d9730295b565a563eaad35b22bf47be3230fcfd93d0d12a44b569e8b674c"
-    },
-    {
       "path": "analysis/profile.json",
       "bytes": 440052,
       "sha256": "ead8ca1243b3567efed16336cf3920ded2a55237fd2996b940c4db01482086f9"
