@@ -14,6 +14,7 @@ mod docx_story_hyperlinks;
 mod filesystem;
 mod operation_metrics;
 mod parallel_metrics;
+pub mod pptx_cache_retention;
 pub mod pptx_retention;
 mod pptx_slide_boundaries;
 mod process_metrics;

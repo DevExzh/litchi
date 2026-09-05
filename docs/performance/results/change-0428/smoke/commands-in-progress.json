@@ -1,0 +1,128 @@
+[
+  {
+    "argv": [
+      "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+      "cache-retention",
+      "--scenario",
+      "lifecycle",
+      "--corpus",
+      "plain",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--source-revision",
+      "fad708fc19e76de6ddb192995203dc525521cc92",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/smoke/lifecycle-plain.json"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "expected_success": true
+  },
+  {
+    "argv": [
+      "/usr/bin/python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/verify-report.py",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/smoke/lifecycle-plain.json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"cache_observations\": 18, \"checked_counter_deltas\": 5, \"corpus\": \"plain\", \"samples\": 1, \"scenario\": \"lifecycle\", \"schema\": \"pptx_cache_retention_v1\", \"status\": \"valid\"}\n",
+    "stderr": "",
+    "expected_success": true
+  },
+  {
+    "argv": [
+      "/usr/bin/python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/probe-report.py",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/smoke/lifecycle-plain.json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"mutations\": [{\"mutation\": \"missing_top_level_field\", \"rejected\": true}, {\"mutation\": \"bool_as_integer\", \"rejected\": true}, {\"mutation\": \"u64_overflow\", \"rejected\": true}, {\"mutation\": \"missing_cache_gauge\", \"rejected\": true}, {\"mutation\": \"unavailable_fabricated_zero\", \"rejected\": true}, {\"mutation\": \"checked_counter_delta\", \"rejected\": true}, {\"mutation\": \"scope\", \"rejected\": true}, {\"mutation\": \"availability_state\", \"rejected\": true}, {\"mutation\": \"missing_budget_gauge\", \"rejected\": true}, {\"mutation\": \"refusal_payload_io\", \"rejected\": true}, {\"mutation\": \"configured_limit\", \"rejected\": true}, {\"mutation\": \"output_gate\", \"rejected\": true}, {\"mutation\": \"output_hash_shape\", \"rejected\": true}, {\"mutation\": \"duplicate_json_key\", \"rejected\": true}, {\"mutation\": \"nonfinite_json_constant\", \"rejected\": true}], \"status\": \"pass\"}\n",
+    "stderr": "",
+    "expected_success": true
+  },
+  {
+    "argv": [
+      "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+      "cache-retention",
+      "--scenario",
+      "lifecycle",
+      "--corpus",
+      "media-rich",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--source-revision",
+      "fad708fc19e76de6ddb192995203dc525521cc92",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/smoke/lifecycle-media-rich.json"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "expected_success": true
+  },
+  {
+    "argv": [
+      "/usr/bin/python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/verify-report.py",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/smoke/lifecycle-media-rich.json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"cache_observations\": 18, \"checked_counter_deltas\": 5, \"corpus\": \"media-rich\", \"samples\": 1, \"scenario\": \"lifecycle\", \"schema\": \"pptx_cache_retention_v1\", \"status\": \"valid\"}\n",
+    "stderr": "",
+    "expected_success": true
+  },
+  {
+    "argv": [
+      "/usr/bin/python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/probe-report.py",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/smoke/lifecycle-media-rich.json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"mutations\": [{\"mutation\": \"missing_top_level_field\", \"rejected\": true}, {\"mutation\": \"bool_as_integer\", \"rejected\": true}, {\"mutation\": \"u64_overflow\", \"rejected\": true}, {\"mutation\": \"missing_cache_gauge\", \"rejected\": true}, {\"mutation\": \"unavailable_fabricated_zero\", \"rejected\": true}, {\"mutation\": \"checked_counter_delta\", \"rejected\": true}, {\"mutation\": \"scope\", \"rejected\": true}, {\"mutation\": \"availability_state\", \"rejected\": true}, {\"mutation\": \"missing_budget_gauge\", \"rejected\": true}, {\"mutation\": \"refusal_payload_io\", \"rejected\": true}, {\"mutation\": \"configured_limit\", \"rejected\": true}, {\"mutation\": \"output_gate\", \"rejected\": true}, {\"mutation\": \"output_hash_shape\", \"rejected\": true}, {\"mutation\": \"duplicate_json_key\", \"rejected\": true}, {\"mutation\": \"nonfinite_json_constant\", \"rejected\": true}], \"status\": \"pass\"}\n",
+    "stderr": "",
+    "expected_success": true
+  },
+  {
+    "argv": [
+      "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+      "cache-retention",
+      "--scenario",
+      "exact-admission",
+      "--corpus",
+      "media-rich",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--source-revision",
+      "fad708fc19e76de6ddb192995203dc525521cc92",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/smoke/exact-admission-media-rich.json"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "expected_success": true
+  },
+  {
+    "argv": [
+      "/usr/bin/python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/verify-report.py",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0428/smoke/exact-admission-media-rich.json"
+    ],
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "INVALID: report.samples_raw[0].publication_output_sha256: expected a non-empty string\n",
+    "expected_success": true
+  }
+]

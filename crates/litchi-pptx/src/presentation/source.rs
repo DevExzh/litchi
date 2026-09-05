@@ -1108,6 +1108,23 @@ impl SourceBackedPresentation {
     pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
         self.inner.package.cache_diagnostics()
     }
+
+    /// Return a fail-closed, content-free source-cache diagnostic snapshot.
+    ///
+    /// This is the instrumentation and telemetry entry point for callers that
+    /// must not mistake a poisoned cache-state mutex or checked counter
+    /// overflow for valid data. Like [`Self::cache_diagnostics`], observing the
+    /// snapshot does not load a part. The infallible compatibility method above
+    /// remains available for ordinary callers that accept its recovery
+    /// behavior.
+    pub fn try_cache_diagnostics(
+        &self,
+    ) -> std::result::Result<
+        litchi_opc::SourceCacheDiagnostics,
+        litchi_opc::SourceCacheDiagnosticsError,
+    > {
+        self.inner.package.try_cache_diagnostics()
+    }
 }
 
 impl SourceBackedPresentationEditor {
@@ -1395,6 +1412,23 @@ impl SourceBackedPresentationEditor {
     #[must_use]
     pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
         self.package.cache_diagnostics()
+    }
+
+    /// Return a fail-closed, content-free source-cache diagnostic snapshot.
+    ///
+    /// This is the instrumentation and telemetry entry point for callers that
+    /// must reject a poisoned cache-state mutex or checked counter overflow
+    /// instead of treating the recovered infallible snapshot as valid. Like
+    /// [`Self::cache_diagnostics`], observing the snapshot does not load a
+    /// part. The infallible method remains available for compatibility
+    /// callers.
+    pub fn try_cache_diagnostics(
+        &self,
+    ) -> std::result::Result<
+        litchi_opc::SourceCacheDiagnostics,
+        litchi_opc::SourceCacheDiagnosticsError,
+    > {
+        self.package.try_cache_diagnostics()
     }
 
     /// Capture the exact raw XML of one existing slide.
@@ -3446,6 +3480,7 @@ mod tests {
     struct CountingSource {
         bytes: Vec<u8>,
         marker_offset: usize,
+        read_calls: AtomicUsize,
         second_payload_reads: AtomicUsize,
         revision: AtomicU64,
     }
@@ -3459,6 +3494,7 @@ mod tests {
             Self {
                 bytes,
                 marker_offset,
+                read_calls: AtomicUsize::new(0),
                 second_payload_reads: AtomicUsize::new(0),
                 revision: AtomicU64::new(0),
             }
@@ -3475,6 +3511,7 @@ mod tests {
         }
 
         fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            self.read_calls.fetch_add(1, Ordering::SeqCst);
             let offset = usize::try_from(offset)
                 .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset too large"))?;
             if offset >= self.bytes.len() {
@@ -4204,6 +4241,96 @@ mod tests {
         assert!(selected.budget_cache_reserved_bytes > opening.budget_cache_reserved_bytes);
         drop(presentation);
         assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn try_cache_diagnostics_for_presentation_is_exact_and_payload_free() {
+        let source = Arc::new(CountingSource::new(source_backed_pptx()));
+        let (budget, _cancel, context) = source_backed_context(u64::MAX);
+        let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let opening_reads = source.second_payload_reads.load(Ordering::SeqCst);
+        let opening_io_reads = source.read_calls.load(Ordering::SeqCst);
+        let opening = presentation.try_cache_diagnostics().unwrap();
+        assert_eq!(
+            opening,
+            presentation.inner.package.try_cache_diagnostics().unwrap()
+        );
+        assert!(opening.budget_managed);
+        assert_eq!(opening.retained_entries, 1);
+        assert_eq!(
+            source.second_payload_reads.load(Ordering::SeqCst),
+            opening_reads
+        );
+        assert_eq!(source.read_calls.load(Ordering::SeqCst), opening_io_reads);
+
+        let slide = presentation.slide(1).unwrap();
+        assert_eq!(slide.text().unwrap(), "Second slide");
+        let after_read = source.second_payload_reads.load(Ordering::SeqCst);
+        let after_read_io = source.read_calls.load(Ordering::SeqCst);
+        assert!(after_read > opening_reads);
+        let selected = presentation.try_cache_diagnostics().unwrap();
+        assert_eq!(
+            selected,
+            presentation.inner.package.try_cache_diagnostics().unwrap()
+        );
+        assert!(selected.successful_loads > opening.successful_loads);
+        assert_eq!(
+            source.second_payload_reads.load(Ordering::SeqCst),
+            after_read
+        );
+        assert_eq!(source.read_calls.load(Ordering::SeqCst), after_read_io);
+
+        drop(presentation);
+        assert!(budget.used(Resource::Memory) > 0);
+        drop(slide);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
+    }
+
+    #[test]
+    fn try_cache_diagnostics_for_editor_is_exact_and_releases_selected_budget() {
+        let source = Arc::new(CountingSource::new(source_backed_pptx()));
+        let (budget, _cancel, context) = source_backed_context(u64::MAX);
+        let editor = SourceBackedPresentationEditor::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let opening_reads = source.second_payload_reads.load(Ordering::SeqCst);
+        let opening_io_reads = source.read_calls.load(Ordering::SeqCst);
+        let opening = editor.try_cache_diagnostics().unwrap();
+        assert_eq!(opening, editor.package.try_cache_diagnostics().unwrap());
+        assert!(opening.budget_managed);
+        assert_eq!(opening.retained_entries, 1);
+        assert_eq!(
+            source.second_payload_reads.load(Ordering::SeqCst),
+            opening_reads
+        );
+        assert_eq!(source.read_calls.load(Ordering::SeqCst), opening_io_reads);
+
+        let snapshot = editor.slide_snapshot(1).unwrap();
+        let after_read = source.second_payload_reads.load(Ordering::SeqCst);
+        let after_read_io = source.read_calls.load(Ordering::SeqCst);
+        assert!(after_read > opening_reads);
+        let selected = editor.try_cache_diagnostics().unwrap();
+        assert_eq!(selected, editor.package.try_cache_diagnostics().unwrap());
+        assert!(selected.successful_loads > opening.successful_loads);
+        assert_eq!(
+            source.second_payload_reads.load(Ordering::SeqCst),
+            after_read
+        );
+        assert_eq!(source.read_calls.load(Ordering::SeqCst), after_read_io);
+
+        drop(editor);
+        drop(snapshot);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
     }
 
     #[test]
