@@ -57249,6 +57249,7 @@ mod tests {
 
     #[test]
     fn xls_source_backed_lifecycle_selectors_are_matched_and_local() {
+        let _allocation_test_lock = super::allocation_metrics::TEST_LOCK.lock().unwrap();
         let cases = [
             Case::XlsSourceBackedOpen,
             Case::XlsEagerOpenListWorksheets,
