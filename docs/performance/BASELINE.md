@@ -1,5 +1,25 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0411: matched XLS read allocation baseline
+
+[0411](changes/0411-xls-read-allocation-baseline.md) retains a current six-case
+XLS open/list/one-cell baseline at clean revision `44edf7906`, with four normal
+500-sample processes and two separate 30-sample allocator processes. All use the
+fixed two-sheet, 16,995,840-byte opaque-heavy corpus and Rust 1.98.1; warmups and
+samples share each process. Operation regions exclude input cloning, source
+construction, validation and owner drop.
+
+Source locality passes: open/list read 138,459 bytes, and one-cell reads 138,593
+bytes, including 134 selected-sheet bytes and no opaque/unselected payload.
+Source one-cell allocates 280,542 bytes in 488 calls; eager one-cell allocates
+1,015,781 bytes in 7,260 calls. These are separate descriptive families. The
+source profile assigns 87.35% of whole-process leaf weight to the diagnostic
+`InstrumentedSource::read_at`; its latency cannot stand in for a plain source
+or justify a library rewrite. Whole-process RSS, multiplexed PMU counters,
+flame graphs, sample vectors and validation are retained in the
+[0411 bundle](results/change-0411/). No speedup is claimed, and cold-file,
+remote-source and independent coverage-index support remain open.
+
 ## Change 0410: MCE expanded-attribute name reuse
 
 [0410](changes/0410-mce-attribute-name-reuse.md) measures candidate

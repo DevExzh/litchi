@@ -1,0 +1,1 @@
+{"case": "xls_source_backed_open_one_cell", "eager_new_period": 4684470, "output": "/tmp/litchi-goal-0411-attribution/source-backed-attribution.json", "source_cell_period": 2082736411, "source_open_period": 25467135865, "unknown_frame_lines": 325, "whole_process_blocks": 7057, "whole_process_period": 30600358794}

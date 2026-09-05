@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "/tmp/litchi-goal-0411-verify.py", line 106, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/tmp/litchi-goal-0411-verify.py", line 38, in main
+    perf_compare.validate_parallel_metrics(r)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/zhuhe/code/litchi/tools/perf_compare.py", line 1737, in validate_parallel_metrics
+    _validate_parallel_metrics(_require_object(report, label), label)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/perf_compare.py", line 1571, in _validate_parallel_metrics
+    sample_count, sample_order = _validate_parallel_sample_order(result, result_path)
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/perf_compare.py", line 984, in _validate_parallel_sample_order
+    raise ComparisonInputError(
+        f"{result_path}.elapsed_ns.sample_order must be a complete permutation"
+    )
+tools.perf_compare.ComparisonInputError: report.results[0].elapsed_ns.sample_order must be a complete permutation

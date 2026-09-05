@@ -1,0 +1,30 @@
+[
+  {
+    "mutation": "duplicate-order",
+    "original_sha256": "990cd278fde8b1b516612c32adc04184c10a608f721351d59de0152e3b340a6b",
+    "rejected": true,
+    "exit_code": 1,
+    "diagnostic": "Traceback (most recent call last):\n  File \"/home/zhuhe/code/litchi/docs/performance/results/change-0411/verify-capture.py\", line 109, in <module>\n    if __name__=='__main__':main()\n                            ~~~~^^\n  File \"/home/zhuhe/code/litchi/docs/performance/results/change-0411/verify-capture.py\", line 41, in main\n    perf_compare.validate_parallel_metrics(r)\n    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^\n  File \"/home/zhuhe/code/litchi/tools/perf_compare.py\", line 1737, in validate_parallel_metrics\n    _validate_parallel_metrics(_require_object(report, label), label)\n    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/zhuhe/code/litchi/tools/perf_compare.py\", line 1571, in _validate_parallel_metrics\n    sample_count, sample_order = _validate_parallel_sample_order(result, result_path)\n                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/zhuhe/code/litchi/tools/perf_compare.py\", line 984, in _validate_parallel_sample_order\n    raise ComparisonInputError(\n        f\"{result_path}.elapsed_ns.sample_order must be a complete permutation\"\n    )\ntools.perf_compare.ComparisonInputError: report.results[0].elapsed_ns.sample_order must be a complete permutation\n"
+  },
+  {
+    "mutation": "duplicate-metric-index",
+    "original_sha256": "e676d31ecd0edbddcb4eb9f92e5ba9567c03bbf62816a413f4c2de9d45d959b5",
+    "rejected": true,
+    "exit_code": 1,
+    "diagnostic": "Traceback (most recent call last):\n  File \"/home/zhuhe/code/litchi/docs/performance/results/change-0411/verify-capture.py\", line 109, in <module>\n    if __name__=='__main__':main()\n                            ~~~~^^\n  File \"/home/zhuhe/code/litchi/docs/performance/results/change-0411/verify-capture.py\", line 69, in main\n    perf_compare._validate_operation_metrics(metrics,label,elapsed['samples'],r['schema_version'],elapsed_sample_order=elapsed['sample_order'])\n    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/zhuhe/code/litchi/tools/perf_compare.py\", line 2342, in _validate_operation_metrics\n    raise ComparisonInputError(f\"{path}.sample_indices must be unique\")\ntools.perf_compare.ComparisonInputError: allocator-1.sample_indices must be unique\n"
+  },
+  {
+    "mutation": "opaque-read",
+    "original_sha256": "a0a4fcc4bc1b28b3e7dc786b938b7f8aa4b4b38fe7191c057527b30480fd920a",
+    "rejected": true,
+    "exit_code": 1,
+    "diagnostic": "Traceback (most recent call last):\n  File \"/home/zhuhe/code/litchi/docs/performance/results/change-0411/verify-capture.py\", line 109, in <module>\n    if __name__=='__main__':main()\n                            ~~~~^^\n  File \"/home/zhuhe/code/litchi/docs/performance/results/change-0411/verify-capture.py\", line 92, in main\n    assert len(values)==samples;summary['source']['xls'][field]=constant(values,field)\n                                                                ~~~~~~~~^^^^^^^^^^^^^^\n  File \"/home/zhuhe/code/litchi/docs/performance/results/change-0411/verify-capture.py\", line 23, in constant\n    assert values and len(set(values))==1,label\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: opaque_payload_read_bytes\n"
+  },
+  {
+    "mutation": "wrong-oracle",
+    "original_sha256": "014e2a031b34a1c718203b26312700fc6fe8e58d4417dd4ff26aed80507c2833",
+    "rejected": true,
+    "exit_code": 1,
+    "diagnostic": "Traceback (most recent call last):\n  File \"/home/zhuhe/code/litchi/docs/performance/results/change-0411/verify-capture.py\", line 109, in <module>\n    if __name__=='__main__':main()\n                            ~~~~^^\n  File \"/home/zhuhe/code/litchi/docs/performance/results/change-0411/verify-capture.py\", line 72, in main\n    assert v['output_sha256']==(corpus['archive_sha256'] if op=='open' else digests[op])\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+  }
+]

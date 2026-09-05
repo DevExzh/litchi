@@ -1,0 +1,487 @@
+{
+  "schema_version": 1,
+  "performance_claim": "none",
+  "scope": "whole process: corpus generation, layout/oracle, warmups, operations, cloning, validation and serialization; not operation-local",
+  "rss_kib": {
+    "normal-1": 145124,
+    "normal-2": 145120,
+    "normal-3": 145368,
+    "normal-4": 144672,
+    "allocator-1": 145120,
+    "allocator-2": 144900
+  },
+  "profiles": {
+    "eager": {
+      "lost_samples": 0,
+      "perf_record_command": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "record",
+        "--no-buildid-cache",
+        "-e",
+        "cycles:u",
+        "-F",
+        "999",
+        "--call-graph",
+        "fp,127",
+        "-o",
+        "/tmp/litchi-goal-0411-capture/eager-profile.data",
+        "--",
+        "/tmp/litchi-goal-0411-binaries/litchi-perf-baseline",
+        "--filesystem-cache",
+        "warm",
+        "--case",
+        "xls_eager_open_one_cell",
+        "--samples",
+        "1000",
+        "--warmup",
+        "20",
+        "--json",
+        "/tmp/litchi-goal-0411-capture/eager-profile.json",
+        "--corpus-manifest",
+        "/tmp/litchi-goal-0411-capture/eager-profile.catalog.json"
+      ],
+      "whole_process_event_count": 5270983655
+    },
+    "source_backed": {
+      "lost_samples": 0,
+      "perf_record_command": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "record",
+        "--no-buildid-cache",
+        "-e",
+        "cycles:u",
+        "-F",
+        "999",
+        "--call-graph",
+        "fp,127",
+        "-o",
+        "/tmp/litchi-goal-0411-capture/source_backed-profile.data",
+        "--",
+        "/tmp/litchi-goal-0411-binaries/litchi-perf-baseline",
+        "--filesystem-cache",
+        "warm",
+        "--case",
+        "xls_source_backed_open_one_cell",
+        "--samples",
+        "1000",
+        "--warmup",
+        "20",
+        "--json",
+        "/tmp/litchi-goal-0411-capture/source_backed-profile.json",
+        "--corpus-manifest",
+        "/tmp/litchi-goal-0411-capture/source_backed-profile.catalog.json"
+      ],
+      "whole_process_event_count": 30600358794
+    }
+  },
+  "counters": {
+    "eager-stat-1": {
+      "events": {
+        "task-clock": {
+          "count": 725.26,
+          "unit": "msec",
+          "running_ns": 725263491,
+          "scheduled_percent": 100.0
+        },
+        "cycles": {
+          "count": 2930487893.0,
+          "unit": "",
+          "running_ns": 610167175,
+          "scheduled_percent": 84.0
+        },
+        "instructions": {
+          "count": 5877608237.0,
+          "unit": "",
+          "running_ns": 603708079,
+          "scheduled_percent": 83.0
+        },
+        "branches": {
+          "count": 843742854.0,
+          "unit": "",
+          "running_ns": 605681976,
+          "scheduled_percent": 84.0
+        },
+        "branch-misses": {
+          "count": 2460373.0,
+          "unit": "",
+          "running_ns": 613649254,
+          "scheduled_percent": 84.0
+        },
+        "page-faults": {
+          "count": 57347.0,
+          "unit": "",
+          "running_ns": 725263491,
+          "scheduled_percent": 100.0
+        },
+        "context-switches": {
+          "count": 46.0,
+          "unit": "",
+          "running_ns": 725263491,
+          "scheduled_percent": 100.0
+        },
+        "cpu-migrations": {
+          "count": 0.0,
+          "unit": "",
+          "running_ns": 725263491,
+          "scheduled_percent": 100.0
+        },
+        "l2_cache_req_stat.dc_access_in_l2": {
+          "count": 181305725.0,
+          "unit": "",
+          "running_ns": 613069654,
+          "scheduled_percent": 84.0
+        },
+        "l2_cache_req_stat.dc_hit_in_l2": {
+          "count": 178069026.0,
+          "unit": "",
+          "running_ns": 580041317,
+          "scheduled_percent": 80.0
+        }
+      },
+      "ipc_from_scaled_whole_process_counts": 2.0056756593465987,
+      "branch_miss_percent_from_scaled_whole_process_counts": 0.29160223263947194
+    },
+    "eager-stat-2": {
+      "events": {
+        "task-clock": {
+          "count": 680.32,
+          "unit": "msec",
+          "running_ns": 680321938,
+          "scheduled_percent": 100.0
+        },
+        "cycles": {
+          "count": 2894498246.0,
+          "unit": "",
+          "running_ns": 570176731,
+          "scheduled_percent": 83.0
+        },
+        "instructions": {
+          "count": 5923433001.0,
+          "unit": "",
+          "running_ns": 570304070,
+          "scheduled_percent": 83.0
+        },
+        "branches": {
+          "count": 856600488.0,
+          "unit": "",
+          "running_ns": 569696921,
+          "scheduled_percent": 83.0
+        },
+        "branch-misses": {
+          "count": 2415591.0,
+          "unit": "",
+          "running_ns": 567867292,
+          "scheduled_percent": 83.0
+        },
+        "page-faults": {
+          "count": 57347.0,
+          "unit": "",
+          "running_ns": 680321938,
+          "scheduled_percent": 100.0
+        },
+        "context-switches": {
+          "count": 45.0,
+          "unit": "",
+          "running_ns": 680321938,
+          "scheduled_percent": 100.0
+        },
+        "cpu-migrations": {
+          "count": 0.0,
+          "unit": "",
+          "running_ns": 680321938,
+          "scheduled_percent": 100.0
+        },
+        "l2_cache_req_stat.dc_access_in_l2": {
+          "count": 184730285.0,
+          "unit": "",
+          "running_ns": 559580175,
+          "scheduled_percent": 82.0
+        },
+        "l2_cache_req_stat.dc_hit_in_l2": {
+          "count": 170784104.0,
+          "unit": "",
+          "running_ns": 563984501,
+          "scheduled_percent": 83.0
+        }
+      },
+      "ipc_from_scaled_whole_process_counts": 2.046445531340633,
+      "branch_miss_percent_from_scaled_whole_process_counts": 0.28199738779509076
+    },
+    "eager-stat-3": {
+      "events": {
+        "task-clock": {
+          "count": 687.74,
+          "unit": "msec",
+          "running_ns": 687742796,
+          "scheduled_percent": 100.0
+        },
+        "cycles": {
+          "count": 2917009170.0,
+          "unit": "",
+          "running_ns": 573620369,
+          "scheduled_percent": 83.0
+        },
+        "instructions": {
+          "count": 5914811160.0,
+          "unit": "",
+          "running_ns": 572761520,
+          "scheduled_percent": 83.0
+        },
+        "branches": {
+          "count": 849068917.0,
+          "unit": "",
+          "running_ns": 567130194,
+          "scheduled_percent": 83.0
+        },
+        "branch-misses": {
+          "count": 2458974.0,
+          "unit": "",
+          "running_ns": 572421930,
+          "scheduled_percent": 83.0
+        },
+        "page-faults": {
+          "count": 57339.0,
+          "unit": "",
+          "running_ns": 687742796,
+          "scheduled_percent": 100.0
+        },
+        "context-switches": {
+          "count": 45.0,
+          "unit": "",
+          "running_ns": 687742796,
+          "scheduled_percent": 100.0
+        },
+        "cpu-migrations": {
+          "count": 0.0,
+          "unit": "",
+          "running_ns": 687742796,
+          "scheduled_percent": 100.0
+        },
+        "l2_cache_req_stat.dc_access_in_l2": {
+          "count": 183643649.0,
+          "unit": "",
+          "running_ns": 576618069,
+          "scheduled_percent": 83.0
+        },
+        "l2_cache_req_stat.dc_hit_in_l2": {
+          "count": 171550327.0,
+          "unit": "",
+          "running_ns": 576161898,
+          "scheduled_percent": 83.0
+        }
+      },
+      "ipc_from_scaled_whole_process_counts": 2.027697142960987,
+      "branch_miss_percent_from_scaled_whole_process_counts": 0.28960829336306987
+    },
+    "source_backed-stat-1": {
+      "events": {
+        "task-clock": {
+          "count": 2472.25,
+          "unit": "msec",
+          "running_ns": 2472248829,
+          "scheduled_percent": 100.0
+        },
+        "cycles": {
+          "count": 10590524501.0,
+          "unit": "",
+          "running_ns": 2057547557,
+          "scheduled_percent": 83.0
+        },
+        "instructions": {
+          "count": 44849946608.0,
+          "unit": "",
+          "running_ns": 2062945969,
+          "scheduled_percent": 83.0
+        },
+        "branches": {
+          "count": 2363424897.0,
+          "unit": "",
+          "running_ns": 2064395447,
+          "scheduled_percent": 83.0
+        },
+        "branch-misses": {
+          "count": 1493801.0,
+          "unit": "",
+          "running_ns": 2063043316,
+          "scheduled_percent": 83.0
+        },
+        "page-faults": {
+          "count": 57337.0,
+          "unit": "",
+          "running_ns": 2472248829,
+          "scheduled_percent": 100.0
+        },
+        "context-switches": {
+          "count": 66.0,
+          "unit": "",
+          "running_ns": 2472248829,
+          "scheduled_percent": 100.0
+        },
+        "cpu-migrations": {
+          "count": 0.0,
+          "unit": "",
+          "running_ns": 2472248829,
+          "scheduled_percent": 100.0
+        },
+        "l2_cache_req_stat.dc_access_in_l2": {
+          "count": 1119100916.0,
+          "unit": "",
+          "running_ns": 2061566616,
+          "scheduled_percent": 83.0
+        },
+        "l2_cache_req_stat.dc_hit_in_l2": {
+          "count": 1109541382.0,
+          "unit": "",
+          "running_ns": 2051745240,
+          "scheduled_percent": 83.0
+        }
+      },
+      "ipc_from_scaled_whole_process_counts": 4.234912690468266,
+      "branch_miss_percent_from_scaled_whole_process_counts": 0.06320492781032086
+    },
+    "source_backed-stat-2": {
+      "events": {
+        "task-clock": {
+          "count": 2476.08,
+          "unit": "msec",
+          "running_ns": 2476083507,
+          "scheduled_percent": 100.0
+        },
+        "cycles": {
+          "count": 10609720081.0,
+          "unit": "",
+          "running_ns": 2066279826,
+          "scheduled_percent": 83.0
+        },
+        "instructions": {
+          "count": 44895429673.0,
+          "unit": "",
+          "running_ns": 2067273876,
+          "scheduled_percent": 83.0
+        },
+        "branches": {
+          "count": 2366528373.0,
+          "unit": "",
+          "running_ns": 2066339444,
+          "scheduled_percent": 83.0
+        },
+        "branch-misses": {
+          "count": 1431027.0,
+          "unit": "",
+          "running_ns": 2063914857,
+          "scheduled_percent": 83.0
+        },
+        "page-faults": {
+          "count": 57343.0,
+          "unit": "",
+          "running_ns": 2476083507,
+          "scheduled_percent": 100.0
+        },
+        "context-switches": {
+          "count": 62.0,
+          "unit": "",
+          "running_ns": 2476083507,
+          "scheduled_percent": 100.0
+        },
+        "cpu-migrations": {
+          "count": 0.0,
+          "unit": "",
+          "running_ns": 2476083507,
+          "scheduled_percent": 100.0
+        },
+        "l2_cache_req_stat.dc_access_in_l2": {
+          "count": 1121293270.0,
+          "unit": "",
+          "running_ns": 2056325978,
+          "scheduled_percent": 83.0
+        },
+        "l2_cache_req_stat.dc_hit_in_l2": {
+          "count": 1106020828.0,
+          "unit": "",
+          "running_ns": 2060283554,
+          "scheduled_percent": 83.0
+        }
+      },
+      "ipc_from_scaled_whole_process_counts": 4.231537621185616,
+      "branch_miss_percent_from_scaled_whole_process_counts": 0.060469463046661724
+    },
+    "source_backed-stat-3": {
+      "events": {
+        "task-clock": {
+          "count": 2478.67,
+          "unit": "msec",
+          "running_ns": 2478665896,
+          "scheduled_percent": 100.0
+        },
+        "cycles": {
+          "count": 10636569277.0,
+          "unit": "",
+          "running_ns": 2065289702,
+          "scheduled_percent": 83.0
+        },
+        "instructions": {
+          "count": 44894477016.0,
+          "unit": "",
+          "running_ns": 2058035529,
+          "scheduled_percent": 83.0
+        },
+        "branches": {
+          "count": 2358698612.0,
+          "unit": "",
+          "running_ns": 2061671688,
+          "scheduled_percent": 83.0
+        },
+        "branch-misses": {
+          "count": 1572097.0,
+          "unit": "",
+          "running_ns": 2068867264,
+          "scheduled_percent": 83.0
+        },
+        "page-faults": {
+          "count": 57353.0,
+          "unit": "",
+          "running_ns": 2478665896,
+          "scheduled_percent": 100.0
+        },
+        "context-switches": {
+          "count": 65.0,
+          "unit": "",
+          "running_ns": 2478665896,
+          "scheduled_percent": 100.0
+        },
+        "cpu-migrations": {
+          "count": 0.0,
+          "unit": "",
+          "running_ns": 2478665896,
+          "scheduled_percent": 100.0
+        },
+        "l2_cache_req_stat.dc_access_in_l2": {
+          "count": 1118048066.0,
+          "unit": "",
+          "running_ns": 2069832973,
+          "scheduled_percent": 83.0
+        },
+        "l2_cache_req_stat.dc_hit_in_l2": {
+          "count": 1105066434.0,
+          "unit": "",
+          "running_ns": 2069632324,
+          "scheduled_percent": 83.0
+        }
+      },
+      "ipc_from_scaled_whole_process_counts": 4.220766663277193,
+      "branch_miss_percent_from_scaled_whole_process_counts": 0.06665103341316589
+    }
+  },
+  "limitations": [
+    "Perf scales multiplexed hardware events; retain scheduled percentages and do not infer operation-local IPC.",
+    "Native L2 requests/hits are not exact L1 or LLC metrics.",
+    "RSS is a child high-water mark for the entire six-case dispatch, not a per-case peak.",
+    "No isolated peak live bytes, physical-I/O or exact request-size distribution is inferred."
+  ]
+}

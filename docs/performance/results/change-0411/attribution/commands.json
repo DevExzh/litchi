@@ -1,0 +1,145 @@
+{
+  "artifact_bindings": {
+    "eager_report": {
+      "bytes": 138414,
+      "path": "/tmp/litchi-goal-0411-attribution/eager-attribution.json",
+      "sha256": "b3465351c7f477796cb3b21dd035f935ecad47ac83573c7c989254ba45560256"
+    },
+    "findings": {
+      "bytes": 5105,
+      "path": "/tmp/litchi-goal-0411-attribution/findings.txt",
+      "sha256": "65302b824ab972128b7e49892c5f74f87f876775e92437651b1b77e0ebc1c399"
+    },
+    "readme": {
+      "bytes": 1621,
+      "path": "/tmp/litchi-goal-0411-attribution/README.txt",
+      "sha256": "aebdf3aa1b89dd4f2e42ad08594adf06e66d83cc11966c899bac49bb19dcf435"
+    },
+    "source_backed_report": {
+      "bytes": 240851,
+      "path": "/tmp/litchi-goal-0411-attribution/source-backed-attribution.json",
+      "sha256": "91e026e5b788c5ef7455724f7554ffe9608cb4f66a802b44bcf4dedfd78a6ea0"
+    }
+  },
+  "metadata_reproduction": {
+    "compressed_profile_recipe": [
+      [
+        "mkdir",
+        "-p",
+        "/tmp/litchi-goal-0411-capture-json"
+      ],
+      [
+        "cp",
+        "/path/to/build-identity.json",
+        "/tmp/litchi-goal-0411-capture-json/build-identity.json"
+      ],
+      [
+        "cp",
+        "/path/to/commands.json",
+        "/tmp/litchi-goal-0411-capture-json/commands.json"
+      ],
+      [
+        "zstd",
+        "-dc",
+        "/path/to/eager-profile.json.zst"
+      ],
+      [
+        "zstd",
+        "-dc",
+        "/path/to/source_backed-profile.json.zst"
+      ]
+    ],
+    "recipe_note": "Redirect each zstd output to eager-profile.json/source_backed-profile.json in the temporary capture directory, then use that directory as --capture. Keep the recorded perf script and normal --no-inline report paths unchanged.",
+    "required_materialized_json": [
+      "build-identity.json",
+      "eager-profile.json",
+      "source_backed-profile.json"
+    ],
+    "source_revision_field": "build-identity.json:revision"
+  },
+  "parser": {
+    "bytes": 50595,
+    "path": "/tmp/litchi-goal-0411-attribute.py",
+    "sha256": "740c4dc35d16eaf05cbea2eb76af60cfeda24f6efa14aa61372c63beae673b65"
+  },
+  "purpose": "Reproduce the two bounded XLS perf-script attribution reports",
+  "runs": [
+    {
+      "argv": [
+        "python3",
+        "/tmp/litchi-goal-0411-attribute.py",
+        "--script",
+        "/tmp/litchi-goal-0411-capture/eager-profile-script.stdout",
+        "--report",
+        "/tmp/litchi-goal-0411-capture/eager-profile-self.stdout",
+        "--capture",
+        "/tmp/litchi-goal-0411-capture",
+        "--repo",
+        "/home/zhuhe/code/litchi",
+        "--case",
+        "xls_eager_open_one_cell",
+        "--output",
+        "/tmp/litchi-goal-0411-attribution/eager-attribution.json"
+      ],
+      "exit_code": 0,
+      "inputs": {
+        "capture": "/tmp/litchi-goal-0411-capture",
+        "perf_report": "/tmp/litchi-goal-0411-capture/eager-profile-self.stdout",
+        "perf_script": "/tmp/litchi-goal-0411-capture/eager-profile-script.stdout"
+      },
+      "label": "eager_profile_attribution",
+      "output": "/tmp/litchi-goal-0411-attribution/eager-attribution.json",
+      "stdout_redirection": "/tmp/litchi-goal-0411-attribution/eager-attribution.log"
+    },
+    {
+      "argv": [
+        "python3",
+        "/tmp/litchi-goal-0411-attribute.py",
+        "--script",
+        "/tmp/litchi-goal-0411-capture/source_backed-profile-script.stdout",
+        "--report",
+        "/tmp/litchi-goal-0411-capture/source_backed-profile-self.stdout",
+        "--capture",
+        "/tmp/litchi-goal-0411-capture",
+        "--repo",
+        "/home/zhuhe/code/litchi",
+        "--case",
+        "xls_source_backed_open_one_cell",
+        "--output",
+        "/tmp/litchi-goal-0411-attribution/source-backed-attribution.json"
+      ],
+      "exit_code": 0,
+      "inputs": {
+        "capture": "/tmp/litchi-goal-0411-capture",
+        "perf_report": "/tmp/litchi-goal-0411-capture/source_backed-profile-self.stdout",
+        "perf_script": "/tmp/litchi-goal-0411-capture/source_backed-profile-script.stdout"
+      },
+      "label": "source_backed_profile_attribution",
+      "output": "/tmp/litchi-goal-0411-attribution/source-backed-attribution.json",
+      "stdout_redirection": "/tmp/litchi-goal-0411-attribution/source-backed-attribution.log"
+    }
+  ],
+  "schema_version": "0411-attribution-commands-v1",
+  "validation": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "py_compile",
+        "/tmp/litchi-goal-0411-attribute.py"
+      ],
+      "exit_code": 0,
+      "label": "python_compile"
+    },
+    {
+      "argv": [
+        "python3",
+        "/tmp/litchi-goal-0411-attribute.py",
+        "--help"
+      ],
+      "exit_code": 0,
+      "label": "help",
+      "stdout_redirection": "/tmp/litchi-goal-0411-attribution/attribute-help.txt"
+    }
+  ]
+}

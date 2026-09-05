@@ -1,0 +1,25 @@
+usage: litchi-goal-0411-attribute.py [-h] [--script SCRIPT] [--report REPORT]
+                                     [--capture CAPTURE] [--repo REPO]
+                                     [--case CASE] [--top TOP]
+                                     [--output OUTPUT]
+
+Attribute bounded XLS CPU captures produced with ``perf script --no-inline``.
+This is a read-only diagnostic postprocessor for the 0411 XLS captures. It
+keeps perf's sample period as a weighted event-period value. The value is
+useful for ranking sampled CPU stacks, but it is neither elapsed time nor an
+operation-only latency measurement. The parser intentionally accepts an
+imperfect ``perf script`` export. It retains unknown frames, counts malformed
+headers and unparsed lines, and reports those counts with every result.
+Production subsets are selected by an observed demangled ancestor symbol,
+rather than by treating every ``run_xls_source_backed_case`` descendant as
+part of the timer.
+
+options:
+  -h, --help         show this help message and exit
+  --script SCRIPT
+  --report REPORT
+  --capture CAPTURE
+  --repo REPO
+  --case CASE
+  --top TOP
+  --output OUTPUT

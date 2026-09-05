@@ -1,5 +1,25 @@
 # Performance program phase report
 
+## Current evidence update: change 0411
+
+[0411](changes/0411-xls-read-allocation-baseline.md) adds operation allocation
+observations to the six existing opt-in XLS open/list/one-cell cases and retains
+12,000 normal plus 360 allocator observations from clean revision `44edf7906`.
+The generated two-sheet corpus passes matching result and source-locality
+checks. The source one-cell path uses 488 allocation calls / 280,542 allocated
+bytes; eager uses 7,260 / 1,015,781. These are single-revision descriptive
+observations, with input copies and owner drop outside the operation region.
+
+The CPU evidence identifies a measurement limitation: 87.35% of source-path
+whole-process leaf weight lies in the diagnostic `ReadAt` wrapper. The next
+step is to isolate that accounting cost before selecting production work.
+The bundle retains repeated warm in-memory timings, whole-process RSS/PMU
+captures, profiles and verifiers; no speedup, cold-file or broad XLS/CFB claim
+is added. The default 36-case/198-row contract and seven strict claims remain
+unchanged. XLSX now passes warning-denied all-feature/all-target Clippy and all
+1,238 tests; the XLS/allocator tests pass together (nine tests, four threads).
+The non-iWork goal remains open. See the [0411 evidence](results/change-0411/).
+
 ## Current evidence update: change 0410
 
 [0410](changes/0410-mce-attribute-name-reuse.md) measures a narrow MCE

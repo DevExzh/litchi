@@ -1,5 +1,19 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0411: XLS observation scope and XLSX lint gates
+
+[0411](changes/0411-xls-read-allocation-baseline.md) adds observation regions
+only in the separate performance harness. It reuses the existing isolated
+counting-allocator target and adds no production unsafe code, runtime, source
+behavior or dependency. ADR 0005's measurement contract is preserved by
+separating normal timings, operation allocation deltas and whole-process
+profiles/RSS; diagnostic source overhead is explicit. ADR 0006's malformed
+input and error semantics are unchanged by the XLSX fixed-array iteration and
+test helper lint fixes. ADR 0008 evidence includes passing XLSX all-target
+Clippy, 1,238 tests, nine concurrent harness/allocator tests and unchanged
+crate-boundary checks. The captured corpus, revision and binary hashes are
+retained, with no before/after or broad completion claim.
+
 ## Change 0410: bounded MCE attribute ownership reuse
 
 [0410](changes/0410-mce-attribute-name-reuse.md) replaces temporary owned names

@@ -1,0 +1,52 @@
+{
+  "xlsx_tests": {
+    "passed": 1238,
+    "failed": 0,
+    "ignored": 0
+  },
+  "xlsx_clippy_all_features_all_targets": "passed",
+  "harness_focused_tests": {
+    "passed": 2,
+    "failed": 0
+  },
+  "crate_boundaries": "passed",
+  "strict_claims": {
+    "passed": 7
+  },
+  "report_classification": {
+    "rows": 167,
+    "tables": 2,
+    "strict_claim": 0,
+    "historical": 145,
+    "descriptive": 14,
+    "withheld": 8
+  },
+  "no_benchmark_overlap": true,
+  "command_notes": [
+    "Initial XLSX compile rejected array-reference TryInto and two test qualifications; fixed before passing gates.",
+    "Next Clippy found one additional preexisting integration-test UTF8 temporary allocation; fixed.",
+    "Final release build includes test-only allocator isolation fix44edf7906; benchmark production scope unchanged."
+  ],
+  "harness_xls_allocator_parallel_tests": {
+    "passed": 9,
+    "failed": 0,
+    "test_threads": 4
+  },
+  "rustfmt": "passed",
+  "capture_verification": {
+    "normal_observations": 12000,
+    "allocator_observations": 360,
+    "status": "passed"
+  },
+  "resource_verification": {
+    "rss": 6,
+    "profiles": 2,
+    "pmu_reports": 6,
+    "status": "passed"
+  },
+  "negative_probes": {
+    "uncompressed": 4,
+    "published_expected_rejections": 4,
+    "status": "passed"
+  }
+}

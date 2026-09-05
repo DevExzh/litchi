@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/tmp/litchi-goal-0411-verify.py", line 106, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/tmp/litchi-goal-0411-verify.py", line 66, in main
+    perf_compare._validate_operation_metrics(metrics,label,elapsed['samples'],r['schema_version'],elapsed_sample_order=elapsed['sample_order'])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/perf_compare.py", line 2342, in _validate_operation_metrics
+    raise ComparisonInputError(f"{path}.sample_indices must be unique")
+tools.perf_compare.ComparisonInputError: allocator-1.sample_indices must be unique

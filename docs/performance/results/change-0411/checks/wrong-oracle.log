@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/tmp/litchi-goal-0411-verify.py", line 106, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/tmp/litchi-goal-0411-verify.py", line 69, in main
+    assert v['output_sha256']==(corpus['archive_sha256'] if op=='open' else digests[op])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
