@@ -2753,11 +2753,13 @@ fn stale_and_unsupported_raw_xml_fail_before_publication() -> Result<()> {
         .map_err(|error| Error::Xml(error.to_string()))?
         .replacen("</p:sldIdLst>", "<p:ext/></p:sldIdLst>", 1)
         .into_bytes();
-    package.opc.get_part_mut(&main)?.set_blob(xml);
-    let source = package.opened_presentation()?;
-    let mut edit = source.edit();
-    assert!(edit.move_slide(0, 1).is_err());
-    assert!(!edit.is_changed());
+    package.opc.get_part_mut(&main)?.set_blob(xml.clone());
+    assert!(matches!(
+        package.opened_presentation(),
+        Err(Error::Invalid(detail))
+            if detail == "presentation slide-ID list contains a non-slide child"
+    ));
+    assert_eq!(package.opc.get_part(&main)?.blob(), xml);
 
     let mut package = opened_two_slide_package()?;
     let slide = package.opened_presentation()?.slides()[0]
