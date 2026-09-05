@@ -283,3 +283,44 @@ playback marker`, and showed no repair prompt. The copied resaved fixture is
 [`pages/audio-playback-native-resaved.pages`](pages/audio-playback-native-resaved.pages)
 with SHA-256
 `62e47a4ec6a2d9667b85ea836b2a9bf2bb1dab1118815eed320c9ed3cdf5c102`.
+
+## Image adjustment native sources (2026-09-06)
+
+Computer Use authored each source with `abstract1.jpg`, saved it, closed it,
+and reopened the exact path without a repair prompt. The source wire omits
+exposure and saturation (`None`) and carries explicit `EnhanceDisabled`; the
+applications displayed `0%`, `0%`, Enhance off, and Advanced sharpness `25%`.
+
+- [`keynote/image-adjustments-native.key`](keynote/image-adjustments-native.key)
+  contains the `Native image adjustment marker` title. SHA-256:
+  `f307ef4e215f18f198a81bfa7160ecece59d77d0fdbd069b85a4642a6156f3a8`.
+- [`numbers/image-adjustments-native.numbers`](numbers/image-adjustments-native.numbers)
+  contains the same marker in B2. SHA-256:
+  `653771a15c7a3de99b949b3c0fa628b5c0aa2734d557098ff3a55f75de635d03`.
+- [`pages/image-adjustments-native.pages`](pages/image-adjustments-native.pages)
+  contains `Native Pages image adjustment marker` in the body. SHA-256:
+  `eaf32fb9385d065aeda1c77ad7212ab7bc4962fa17c3c0a4a4c99815819d584f`.
+
+The focused Rust candidates set exposure to `0.25` and saturation to `-0.2`,
+retain `EnhanceDisabled`, change only the selected IWA component, and become
+exact no-ops when repeated. Each application then displayed `25%`, `-20%`,
+Enhance off, and Advanced sharpness `25%` after a forced native text edit,
+save, close, and exact-path reopen; the controls, sharpness, and text
+persisted without repair.
+
+The copied resaved candidates are:
+
+- [`keynote/image-adjustments-native-resaved.key`](keynote/image-adjustments-native-resaved.key)
+  retains the title `Native image adjustment marker saved`. SHA-256:
+  `63e7d13124a72579521047bc5d2740506ebc3b6378fe6a901d346ed53670a658`.
+- [`numbers/image-adjustments-native-resaved.numbers`](numbers/image-adjustments-native-resaved.numbers)
+  retains an extended B2 marker after native UI text append; this record does
+  not claim an exact single saved suffix. SHA-256:
+  `18e00c8ba0e88318c9f298d74af97da756e3cc4150934aa995d84f2972dc52a6`.
+- [`pages/image-adjustments-native-resaved.pages`](pages/image-adjustments-native-resaved.pages)
+  contains `Saved Native Pages image adjustment marker[image]` in the body.
+  SHA-256:
+  `e6736692dc9cbebcc66fc584843da09ae790e6a67261ef4e44052bd47235185c`.
+
+All three focused library suites pass. Native integration remains in progress,
+and full workspace hooks remain pending the root task.

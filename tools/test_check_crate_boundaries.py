@@ -98,6 +98,7 @@ def add_iwa_numbers_model_storage_scaffold(
     *,
     permissive_owner_probe: bool = False,
     direct_storage_parse: bool = False,
+    permissive_attached_role: bool = False,
 ) -> None:
     """Create the strict Numbers model/storage lookup fixture.
 
@@ -111,6 +112,11 @@ def add_iwa_numbers_model_storage_scaffold(
     owner_probe = (
         "        let _ = tst::TableInfoArchive::decode(message.data.as_slice());\n"
         if permissive_owner_probe
+        else ""
+    )
+    attached_role_probe = (
+        "    let _ = tst::TableInfoArchive::decode(message.data.as_slice());\n"
+        if permissive_attached_role
         else ""
     )
     model.write_text(
@@ -129,6 +135,28 @@ def add_iwa_numbers_model_storage_scaffold(
         "        let _ = table_info_message_index(archive);\n"
         f"{owner_probe}"
         "    });\n"
+        "}\n"
+        "fn attached_table_info_model_identifier(message: &RawMessage) {\n"
+        "    let _ = TABLE_INFO_MESSAGE_TYPES;\n"
+        "    let table_info_id = table_info_model_identifier(message);\n"
+        "    if message.type_ != TABLE_INFO_MESSAGE_TYPES[0] { return; }\n"
+        "    let is_table_model = matches!(\n"
+        "        probe_candidate(message.type_, message.data.as_slice()),\n"
+        "        CandidateProbe::Valid,\n"
+        "    );\n"
+        f"{attached_role_probe}"
+        "    match (table_info_id, is_table_model) {\n"
+        "        (Some(_), true) => panic!(\"ambiguous type-6000\"),\n"
+        "        _ => {}\n"
+        "    }\n"
+        "}\n"
+        "fn attached_table_descriptor(package: &IWorkPackage) {\n"
+        "    attached_table_info_model_identifier(message);\n"
+        "    let _ = package;\n"
+        "}\n"
+        "fn attached_table_descriptors(package: &IWorkPackage) {\n"
+        "    attached_table_info_model_identifier(message);\n"
+        "    let _ = package;\n"
         "}\n",
         encoding="utf-8",
     )
@@ -262,6 +290,131 @@ def add_iwa_shared_media_playback_scaffold(
         root_lib = root / boundaries.IWA_FACADE_SOURCE
         root_lib.parent.mkdir(parents=True, exist_ok=True)
         root_lib.write_text("pub(crate) mod media_playback;\n", encoding="utf-8")
+
+
+def add_iwa_shared_image_adjustments_scaffold(
+    root: Path,
+    *,
+    restore_shared_host: bool = False,
+    owner_generated_decode: bool = False,
+    codec_generated_decode: bool = False,
+    host_legacy_helper: bool = False,
+    missing_hidden_gate: bool = False,
+) -> None:
+    """Create the focused image-adjustment owners and thin host ingress."""
+
+    codec = root / boundaries.IWA_IMAGE_ADJUSTMENTS_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::DecodeOptions as BuffaDecodeOptions;\n"
+        "struct ImageAdjustmentsSnapshot;\n"
+        "struct ImageAdjustmentsWrite;\n"
+        "struct DecodeOptions;\n"
+        "fn decode_image_adjustments(source: &[u8], options: DecodeOptions) -> ImageAdjustmentsSnapshot {\n"
+        "    let _ = buffa::decode_view(source, options);\n"
+        "    ImageAdjustmentsSnapshot\n"
+        "}\n"
+        "fn rewrite_image_adjustments(source: &[u8], write: ImageAdjustmentsWrite, options: DecodeOptions) -> Vec<u8> {\n"
+        "    let _ = (source, write, options);\n"
+        "    Vec::new()\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    codec_public = root / boundaries.IWA_IMAGE_ADJUSTMENTS_CODEC_PUBLIC_SOURCE
+    codec_public.parent.mkdir(parents=True, exist_ok=True)
+    codec_public.write_text(
+        "#[doc(hidden)]\n"
+        "pub mod image_adjustments_codec;\n",
+        encoding="utf-8",
+    )
+    if codec_generated_decode:
+        codec.write_text(
+            codec.read_text(encoding="utf-8")
+            + "fn legacy(source: &[u8]) { tsd::ImageArchive::decode(source); }\n",
+            encoding="utf-8",
+        )
+
+    for ecosystem, relative in boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        source = (
+            "#[doc(hidden)]\n"
+            "pub fn __decode_image_adjustments_payload(source: &[u8], limits: WireLimits) "
+            "-> Result<ImageAdjustments, ImageAdjustmentsError> {\n"
+            "    let _ = ImageAdjustment::new(0.0);\n"
+            "    let _ = codec::DecodeOptions::new(source, limits);\n"
+            "    codec::decode_image_adjustments(source, limits)\n"
+            "}\n"
+            "#[doc(hidden)]\n"
+            "pub fn __rewrite_image_adjustments_payload(source: &[u8], adjustments: ImageAdjustments, limits: WireLimits) "
+            "-> Result<Vec<u8>, ImageAdjustmentsError> {\n"
+            "    let _ = (adjustments, limits);\n"
+            "    codec::rewrite_image_adjustments(source, write, limits)\n"
+            "}\n"
+            "use litchi_iwa_protos::image_adjustments_codec as codec;\n"
+            "use litchi_iwa_common::{WireLimits, shape::image::{ImageAdjustment, ImageAdjustments}};\n"
+        )
+        if ecosystem == "Keynote":
+            source = source.replace(
+                "#[doc(hidden)]",
+                '#[cfg(feature = "internal-iwork-source")]\n#[doc(hidden)]',
+            )
+        if owner_generated_decode and ecosystem == "Pages":
+            source += "fn legacy(source: &[u8]) { tsd::ImageAdjustmentsArchive::decode(source); }\n"
+        path.write_text(source, encoding="utf-8")
+
+        package = root / boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES[ecosystem]
+        package.parent.mkdir(parents=True, exist_ok=True)
+        gate = "" if missing_hidden_gate else '#[cfg(feature = "internal-iwork-source")]\n'
+        hidden = "" if missing_hidden_gate else "#[doc(hidden)]\n"
+        package.write_text(
+            gate
+            + "mod image_adjustments;\n"
+            + gate
+            + hidden
+            + "pub use image_adjustments::{__decode_image_adjustments_payload, "
+            "__rewrite_image_adjustments_payload};\n",
+            encoding="utf-8",
+        )
+        export = root / boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[ecosystem]
+        export.parent.mkdir(parents=True, exist_ok=True)
+        export.write_text(
+            gate
+            + hidden
+            + "pub use package::{__decode_image_adjustments_payload, "
+            "__rewrite_image_adjustments_payload};\n",
+            encoding="utf-8",
+        )
+
+    for ecosystem, relative_root in boundaries.IWA_IMAGE_ADJUSTMENTS_HOST_ROOTS.items():
+        path = root / relative_root / "image_adjustments.rs"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        crate_name = ecosystem.lower()
+        source = (
+            f"fn read() {{ litchi_{crate_name}::__decode_image_adjustments_payload(source, limits); }}\n"
+            f"fn write() {{ litchi_{crate_name}::__rewrite_image_adjustments_payload(source, adjustments, limits); }}\n"
+        )
+        if host_legacy_helper and ecosystem == "Pages":
+            source += "use crate::image_adjustments::replace_image_adjustments;\n"
+        if host_legacy_helper and ecosystem == "Numbers":
+            source += "fn legacy() { replace_image_adjustments(source); }\n"
+        if host_legacy_helper and ecosystem == "Keynote":
+            source += "use super::image_adjustments::image_adjustments_from_archive;\n"
+        if host_legacy_helper and ecosystem == "Keynote":
+            source += "fn legacy() { image_adjustments_from_archive(source); }\n"
+        if host_legacy_helper and ecosystem == "Pages":
+            source += "fn legacy() { image_adjustments_from_archive(source); }\n"
+        if host_legacy_helper and ecosystem == "Numbers":
+            source += "fn legacy() { image_adjustments_from_archive(source); }\n"
+        path.write_text(source, encoding="utf-8")
+
+    if restore_shared_host:
+        shared = root / boundaries.IWA_SHARED_IMAGE_ADJUSTMENTS_SOURCE
+        shared.parent.mkdir(parents=True, exist_ok=True)
+        shared.write_text("fn image_adjustments_from_archive() {}\n", encoding="utf-8")
+        root_lib = root / boundaries.IWA_FACADE_SOURCE
+        root_lib.parent.mkdir(parents=True, exist_ok=True)
+        root_lib.write_text("mod image_adjustments;\n", encoding="utf-8")
 
 
 def add_iwa_table_cell_borders_scaffold(root: Path) -> None:
@@ -40163,6 +40316,26 @@ fn rewrite_movie_title_operation(
                 violations,
             )
 
+    def test_iwa_numbers_attached_descriptor_boundary_rejects_generated_role_probe(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_model_storage_scaffold(
+                root,
+                permissive_attached_role=True,
+            )
+
+            violations = boundaries.audit_iwa_numbers_model_storage_source_topology(root)
+
+            self.assertTrue(
+                any(
+                    "attached-table role resolver performs a generated" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
     def test_iwa_numbers_model_storage_boundary_is_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
@@ -40212,6 +40385,56 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_iwa_shared_media_playback_source_topology()",
+            main_source,
+        )
+
+    def test_iwa_shared_image_adjustments_boundary_accepts_focused_owners(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_shared_image_adjustments_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_iwa_shared_image_adjustments_source_topology(root), []
+            )
+
+    def test_iwa_shared_image_adjustments_boundary_rejects_resurrection_and_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_shared_image_adjustments_scaffold(
+                root,
+                restore_shared_host=True,
+                owner_generated_decode=True,
+                codec_generated_decode=True,
+                host_legacy_helper=True,
+                missing_hidden_gate=True,
+            )
+
+            violations = boundaries.audit_iwa_shared_image_adjustments_source_topology(root)
+
+            self.assertTrue(
+                any("source was restored" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("module declaration" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("generated archive ingress" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("shared helper" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("internal-iwork-source gate" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_shared_image_adjustments_boundary_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_shared_image_adjustments_source_topology()",
             main_source,
         )
 

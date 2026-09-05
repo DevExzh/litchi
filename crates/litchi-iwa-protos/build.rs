@@ -105,6 +105,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/pages_movie_caption_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_movie_caption_codec.rs");
     println!("cargo:rerun-if-changed=src/movie_playback_codec.rs");
+    println!("cargo:rerun-if-changed=src/image_adjustments_codec.rs");
+    println!("cargo:rerun-if-changed=src/buffa-projections/TSDImageAdjustmentsArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_movie_geometry_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_marker_codec.rs");
@@ -151,6 +153,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_movie_playback_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_image_adjustments_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_movie_geometry_projection_provenance(
         proto_directory,
         buffa_projection_directory,
@@ -448,6 +451,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_movie_playback_projection_budget(&buffa_movie_playback_out_directory)?;
+
+    // Image adjustments need only the complete ImageArchive envelope and its
+    // optional field-14 scalar controls. Advanced native adjustment fields
+    // stay on the strict source-preserving path.
+    let buffa_image_adjustments_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-image-adjustments");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSDImageAdjustmentsArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_image_adjustments_out_directory)
+        .include_file("iwa_image_adjustments_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_image_adjustments_projection_budget(&buffa_image_adjustments_out_directory)?;
 
     // Keynote movie geometry keeps only the drawable/geometry envelope in the
     // generated lazy view. Point and Size remain opaque bytes so the strict
@@ -1517,6 +1540,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "b42ebea4039c7bee3d049de00b2b7a997b6c8e5d18851aa8c6a916eb9a7986f5",
         ),
         (
+            "TSDImageAdjustmentsArchive.proto",
+            562,
+            "d6414c6f5a1259afa01e432865b1ac964ccc638c63d41b1f671827dd085a6136",
+        ),
+        (
             "TSPPackageMetadataArchive.proto",
             927,
             "cbfdc5b57d0b09153a7fa083f2557bff305aa7463375173cf4fd1eb75f52fced",
@@ -1729,6 +1757,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/movie_playback_codec.rs",
             "crate::buffa_movie_playback_generated::",
             "mod buffa_movie_playback_generated {",
+        ),
+        (
+            "src/image_adjustments_codec.rs",
+            "crate::buffa_image_adjustments_generated::",
+            "mod buffa_image_adjustments_generated {",
         ),
         (
             "src/keynote_movie_geometry_codec.rs",
@@ -3233,6 +3266,92 @@ optional int32 loop_option = 24;\n\
             "movie playback projection/router drifted from canonical TSD MovieArchive fields, lost its private lazy-view boundary, introduced repeated storage, or added production encoding"
                 .into(),
         );
+    }
+    Ok(())
+}
+
+fn enforce_image_adjustments_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaImageAdjustmentsProjection;\n\
+message ImageAdjustmentsArchive {\n\
+optional float exposure = 1;\n\
+optional float saturation = 2;\n\
+optional bool enhance = 13;\n\
+}\n\
+message ImageArchive {\n\
+optional ImageAdjustmentsArchive image_adjustments = 14;\n\
+}";
+    const ROUTER_DECLARATIONS: [&str; 7] = [
+        "const IMAGE_ADJUSTMENTS_FIELD: u32 = 14;",
+        "const EXPOSURE_FIELD: u32 = 1;",
+        "const SATURATION_FIELD: u32 = 2;",
+        "const ENHANCE_FIELD: u32 = 13;",
+        "pub fn decode_image_adjustments(",
+        "pub fn prepare_image_adjustments_rewrite<'source>(",
+        "pub fn rewrite_image_adjustments(",
+    ];
+    const PRIVATE_MODULE_DECLARATION: &str = "mod buffa_image_adjustments_generated {";
+    const PRIVATE_MODULE_PATH: &str =
+        "\"/buffa-image-adjustments/iwa_image_adjustments_buffa_protos.rs\"";
+
+    let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSDImageAdjustmentsArchive.proto"))?;
+    let codec = fs::read_to_string("src/image_adjustments_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let normalize = |source: &str| {
+        source
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let Some(image_archive) = proto_message_block(&tsd, "ImageArchive") else {
+        return Err("image-adjustments provenance lost canonical ImageArchive".into());
+    };
+    let Some(adjustments_archive) = proto_message_block(&tsd, "ImageAdjustmentsArchive") else {
+        return Err("image-adjustments provenance lost canonical ImageAdjustmentsArchive".into());
+    };
+    let projection_digest = sha256_hex(&projection);
+    if proto_field(
+        image_archive,
+        "optional .TSD.ImageAdjustmentsArchive imageAdjustments = 14;",
+    ) != 1
+        || proto_field(adjustments_archive, "optional float exposure = 1;") != 1
+        || proto_field(adjustments_archive, "optional float saturation = 2;") != 1
+        || proto_field(
+            adjustments_archive,
+            "optional bool enhance = 13 [default = false];",
+        ) != 1
+        || normalize(&projection) != normalize(PROJECTION_SCHEMA)
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || projection_digest != "d6414c6f5a1259afa01e432865b1ac964ccc638c63d41b1f671827dd085a6136"
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| production_codec.matches(declaration).count() == 1)
+        || !has_exact_private_module_declaration(&lib, PRIVATE_MODULE_DECLARATION)
+        || lib.matches(PRIVATE_MODULE_PATH).count() != 1
+        || FORBIDDEN_PROST_CODEC_MARKERS
+            .iter()
+            .any(|fragment| production_codec.contains(fragment))
+        || FORBIDDEN_BUFFA_OWNERSHIP_MARKERS
+            .iter()
+            .any(|fragment| production_codec.contains(fragment))
+        || production_codec.contains("RepeatedView")
+        || production_codec.contains("LazyRepeatedView")
+        || production_codec.contains("prost")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err("image-adjustments projection/router drifted from canonical ImageArchive fields, lost its private lazy-view boundary, or introduced generated/encoding ownership".into());
     }
     Ok(())
 }
@@ -9016,6 +9135,43 @@ fn enforce_movie_playback_projection_budget(directory: &Path) -> Result<(), Box<
     {
         return Err(format!(
             "movie playback projection generated {files:?}/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions/digest {aggregate_digest}; expected exactly {EXPECTED_FILES:?}/{EXPECTED_GENERATED_BYTES} bytes/zero repeated views/digest {EXPECTED_DIGEST}"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_image_adjustments_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    // This closure contains two singular messages (the ImageArchive shell and
+    // its field-14 adjustment shell). Keep the bound broad enough for Buffa's
+    // generated source split while rejecting repeated storage and accidental
+    // generated ownership of the advanced controls.
+    const MIN_GENERATED_FILES: usize = 5;
+    const MAX_GENERATED_FILES: usize = 9;
+    const MAX_GENERATED_BYTES: u64 = 128 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("image-adjustments generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("image-adjustments generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        if generated.contains("RepeatedView") || generated.contains("LazyRepeatedView") {
+            return Err("image-adjustments projection generated repeated lazy storage".into());
+        }
+    }
+    if !(MIN_GENERATED_FILES..=MAX_GENERATED_FILES).contains(&files) || bytes > MAX_GENERATED_BYTES
+    {
+        return Err(format!(
+            "image-adjustments projection generated {files} files/{bytes} bytes; expected {MIN_GENERATED_FILES}..={MAX_GENERATED_FILES} files and at most {MAX_GENERATED_BYTES} bytes"
         )
         .into());
     }

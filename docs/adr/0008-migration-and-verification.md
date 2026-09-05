@@ -16630,3 +16630,38 @@ Normal commit hooks enforce formatting, workspace library lint, all-feature
 library/integration tests, and doc tests. The shared host deletion is complete;
 monolith, ordered-debt, and global native-parity gates remain open as separate
 retirement criteria.
+
+## 2026-09-06 follow-up: bounded image-adjustment ownership
+
+The shared 804-line `image_adjustments.rs` host is deleted. The focused
+Numbers, Pages, and Keynote crates now own bounded Buffa lazy projections of
+the whole-image archive, covering the outer field 14 archive and inner fields
+1, 2, and 13. Strict read-before-no-op checks and unknown/advanced-field
+preservation remain in the focused codecs. Numbers attached `TableInfo`
+classification admits the role-aware type-6000 and type-6003 records, rejects
+dual `TableInfo` or legacy `TableModel` overlap, and leaves non-owner
+descriptors best effort. Keynote now exposes selector-first image-adjustment read, edit,
+commit, patch, and inverse APIs from its focused package owner.
+
+Computer Use authored, saved, closed, and reopened exact-path native source
+fixtures containing `abstract1.jpg` without a repair prompt. The source wire
+omits exposure and saturation (`None`) and carries explicit
+`EnhanceDisabled`; the applications displayed `0%`, `0%`, Enhance off, and
+Advanced sharpness `25%`. The source markers and hashes are recorded in the
+[fixture README](../../test-data/iwork/README.md#image-adjustment-native-sources-2026-09-06): Keynote
+`f307ef4e215f18f198a81bfa7160ecece59d77d0fdbd069b85a4642a6156f3a8`, Numbers
+`653771a15c7a3de99b949b3c0fa628b5c0aa2734d557098ff3a55f75de635d03`, and
+Pages `eaf32fb9385d065aeda1c77ad7212ab7bc4962fa17c3c0a4a4c99815819d584f`.
+
+The focused Rust candidates set exposure `0.25` and saturation `-0.2`, retain
+`EnhanceDisabled`, change only the selected IWA component, and become exact
+no-ops when repeated. Each application then showed `25%`, `-20%`, Enhance off,
+and Advanced sharpness `25%` after a forced native text edit, save, close, and
+exact-path reopen; the controls, sharpness, and text persisted without repair.
+The copied resaved fixtures are recorded with their hashes in the README:
+Keynote `63e7d13124a72579521047bc5d2740506ebc3b6378fe6a901d346ed53670a658`,
+Numbers `18e00c8ba0e88318c9f298d74af97da756e3cc4150934aa995d84f2972dc52a6`,
+and Pages `e6736692dc9cbebcc66fc584843da09ae790e6a67261ef4e44052bd47235185c`.
+All three focused library suites and all 12 native integration tests pass.
+The batch is gated by normal workspace formatting, lint, library/integration,
+and documentation-test commit hooks.

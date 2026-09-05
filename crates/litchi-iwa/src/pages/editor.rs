@@ -5326,6 +5326,7 @@ mod body_shapes;
 mod charts;
 mod date_time_fields;
 mod footnotes;
+mod image_adjustments;
 mod images;
 mod media_playback;
 mod movies;

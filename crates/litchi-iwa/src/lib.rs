@@ -137,7 +137,6 @@ mod bundle;
 /// Typed native drawable stacking-order controls.
 pub mod drawable_order;
 mod identity;
-mod image_adjustments;
 mod image_caption;
 pub mod media;
 /// Native movie and audio playback wire adapter.
@@ -339,6 +338,12 @@ impl From<litchi_numbers::table::dimension::Error> for Error {
 
 impl From<litchi_iwa_common::media::playback::Error> for Error {
     fn from(error: litchi_iwa_common::media::playback::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::shape::image::Error> for Error {
+    fn from(error: litchi_iwa_common::shape::image::Error) -> Self {
         Self::ParseError(error.to_string())
     }
 }

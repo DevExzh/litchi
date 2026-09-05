@@ -3,7 +3,7 @@
 use super::*;
 use crate::DrawableTitleCaption;
 use crate::IWorkThemeArchive;
-use crate::image_adjustments::image_adjustments_from_archive;
+use crate::archive::RawMessage;
 use crate::image_caption::{
     CAPTION_INFO_MESSAGE_TYPE, CAPTION_PLACEMENT_MESSAGE_TYPE, CaptionObjectIds, CaptionThemeStyle,
     DrawableCaptionKind, SHAPE_STYLE_MESSAGE_TYPE, STORAGE_MESSAGE_TYPE, caption_objects,
@@ -13,6 +13,7 @@ use crate::shapes::{
     drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
 };
+use litchi_iwa_common::{WireLimits, shape::image::ImageAdjustments};
 
 const NUMBERS_THEME_MESSAGE_TYPE: u32 = 12_009;
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
@@ -24,6 +25,124 @@ const DEFAULT_TEXT_WRAP_MARGIN_POINTS: f32 = 12.0;
 const DEFAULT_TEXT_WRAP_ALPHA_THRESHOLD: f32 = 0.5;
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const STANDIN_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];
+
+/// Derive one bounded image-adjustment profile from the host package's
+/// physical archive ceilings. The focused Numbers owner applies the profile
+/// to its borrowed whole-ImageArchive codec projection.
+pub(super) fn image_adjustments_wire_limits(package: &IWorkPackage) -> Result<WireLimits> {
+    let archive_limits = package.limits().archive_limits();
+    let source_bytes = archive_limits
+        .max_message_bytes()
+        .min(archive_limits.max_archive_bytes())
+        .min(package.limits().max_iwa_stream_bytes())
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    WireLimits::default()
+        .with_input_bytes(source_bytes)
+        .and_then(|limits| {
+            limits.with_fields(
+                source_bytes
+                    .saturating_mul(4)
+                    .clamp(1, WireLimits::MAX_FIELDS),
+            )
+        })
+        .and_then(|limits| limits.with_output_bytes(source_bytes))
+        .and_then(|limits| {
+            limits.with_rewrite_work(
+                source_bytes
+                    .saturating_mul(8)
+                    .clamp(1, WireLimits::MAX_REWRITE_WORK),
+            )
+        })
+        .map_err(|error| {
+            Error::InvalidFormat(format!("invalid Numbers image-adjustment limits: {error}"))
+        })
+}
+
+/// Decode only the focused image-adjustment edge from a caller-owned
+/// ImageArchive payload. Generated ImageArchive decoding remains responsible
+/// for graph identity and geometry validation elsewhere in this module.
+pub(super) fn image_adjustments_from_payload(
+    package: &IWorkPackage,
+    payload: &[u8],
+) -> Result<ImageAdjustments> {
+    let limits = image_adjustments_wire_limits(package)?;
+    litchi_numbers::__decode_image_adjustments_payload(payload, limits).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Numbers image-adjustment payload is invalid: {error}"
+        ))
+    })
+}
+
+/// Stage one strict image-adjustment rewrite in a Numbers component. The
+/// archive callback works on a private transaction copy, so malformed source,
+/// rewrite, and readback failures leave the caller's package unchanged.
+pub(super) fn replace_image_adjustments(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    image_id: u64,
+    context: &str,
+    adjustments: ImageAdjustments,
+) -> Result<ImageAdjustments> {
+    let limits = image_adjustments_wire_limits(package)?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(image_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("{context} object {image_id} is missing"))
+        })?;
+        let mut message_index = None;
+        for (index, message) in object.messages.iter().enumerate() {
+            if message.type_ != IMAGE_MESSAGE_TYPE {
+                continue;
+            }
+            if message_index.replace(index).is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "{context} {image_id} must have exactly one ImageArchive payload"
+                )));
+            }
+        }
+        let message_index = message_index.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "{context} {image_id} must have exactly one ImageArchive payload"
+            ))
+        })?;
+        let original = object.messages[message_index].data.as_slice();
+        let current = litchi_numbers::__decode_image_adjustments_payload(original, limits)
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "{context} {image_id} image-adjustment payload is invalid: {error}"
+                ))
+            })?;
+        if current == adjustments {
+            return Ok(());
+        }
+        let data =
+            litchi_numbers::__rewrite_image_adjustments_payload(original, adjustments, limits)
+                .map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "{context} {image_id} image-adjustment rewrite failed: {error}"
+                    ))
+                })?;
+        let verified =
+            litchi_numbers::__decode_image_adjustments_payload(&data, limits).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "{context} {image_id} rewritten image-adjustment payload is invalid: {error}"
+                ))
+            })?;
+        if verified != adjustments {
+            return Err(Error::InvalidFormat(format!(
+                "{context} {image_id} image-adjustment rewrite failed validation"
+            )));
+        }
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: IMAGE_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        Ok(())
+    })?;
+    Ok(adjustments)
+}
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
@@ -771,7 +890,7 @@ fn image_info(
         thumbnail_data_identifier,
         geometry: geometry_from_drawable(&image.super_)?,
         properties: drawable_properties(&image.super_),
-        image_adjustments: image_adjustments_from_archive(&image)?,
+        image_adjustments: image_adjustments_from_payload(package, message.data.as_slice())?,
         original_size: image.original_size.map(drawable_size),
         natural_size: image.natural_size.map(drawable_size),
     })

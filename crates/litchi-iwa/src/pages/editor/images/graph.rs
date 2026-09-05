@@ -3,7 +3,6 @@
 use super::*;
 use crate::DrawableTitleCaption;
 use crate::IWorkThemeArchive;
-use crate::image_adjustments::image_adjustments_from_archive;
 use crate::image_caption::{
     CAPTION_INFO_MESSAGE_TYPE, CAPTION_PLACEMENT_MESSAGE_TYPE, CaptionObjectIds, CaptionThemeStyle,
     DrawableCaptionKind, SHAPE_STYLE_MESSAGE_TYPE, STORAGE_MESSAGE_TYPE, caption_objects,
@@ -232,17 +231,26 @@ pub(super) fn body_image_infos(editor: &PagesEditor) -> Result<Vec<PagesImageInf
         let object = archive.object(drawable.identifier).ok_or_else(|| {
             Error::InvalidFormat(format!("Pages drawable {} is missing", drawable.identifier))
         })?;
-        if object
+        let messages = object
             .messages
             .iter()
-            .any(|message| message.type_ == IMAGE_MESSAGE_TYPE)
-        {
-            images.push(image_info(
-                editor.package(),
-                drawable.identifier,
-                entry.character_index,
-            )?);
+            .filter(|message| message.type_ == IMAGE_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        if messages.is_empty() {
+            continue;
         }
+        let [message] = messages.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "Pages drawable {} has multiple image payloads",
+                drawable.identifier
+            )));
+        };
+        images.push(image_info(
+            editor.package(),
+            message.data.as_slice(),
+            drawable.identifier,
+            entry.character_index,
+        )?);
     }
     images.sort_by_key(|image| image.anchor_character_index);
     Ok(images)
@@ -632,11 +640,11 @@ fn replace_image_caption_reference(
 
 fn image_info(
     package: &IWorkPackage,
+    payload: &[u8],
     identifier: u64,
     anchor_character_index: u32,
 ) -> Result<PagesImageInfo> {
-    let image: tsd::ImageArchive =
-        decode_typed_package_object(package, identifier, IMAGE_MESSAGE_TYPE, "TSD.ImageArchive")?;
+    let image = tsd::ImageArchive::decode(payload)?;
     let image_data_identifier = MediaAssetId::try_from(
         image
             .data
@@ -651,7 +659,13 @@ fn image_info(
         .thumbnail_data
         .map(|reference| MediaAssetId::try_from(reference.identifier))
         .transpose()?;
-    let image_adjustments: ImageAdjustments = image_adjustments_from_archive(&image)?;
+    let image_adjustments: ImageAdjustments =
+        super::super::image_adjustments::image_adjustments_from_payload(
+            package,
+            payload,
+            identifier,
+            "Pages image",
+        )?;
     Ok(PagesImageInfo {
         drawable_object_id: identifier,
         anchor_character_index,

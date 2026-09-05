@@ -384,6 +384,44 @@ mod buffa_movie_playback_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for the selected image-adjustment edge
+/// of one complete `TSD.ImageArchive`. The outer archive and advanced image
+/// controls remain source-owned by the strict handwritten codec.
+#[doc(hidden)]
+mod buffa_image_adjustments_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated views are private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-image-adjustments/iwa_image_adjustments_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for the selected Keynote MovieArchive
 /// geometry envelopes. Point and Size remain borrowed raw payloads; the
 /// handwritten codec owns their strict fixed32 validation and preservation.
@@ -1770,6 +1808,12 @@ pub mod keynote_movie_caption_codec;
 /// preservation authority.
 #[doc(hidden)]
 pub mod movie_playback_codec;
+
+/// Internal strict raw-preserving ImageArchive image-adjustments codec.
+/// Generated Buffa values remain private and complete caller-owned ImageArchive
+/// bytes remain the preservation authority.
+#[doc(hidden)]
+pub mod image_adjustments_codec;
 
 /// Internal strict raw-preserving Keynote MovieArchive geometry projection.
 /// Generated Buffa values remain private and the source payload is the
