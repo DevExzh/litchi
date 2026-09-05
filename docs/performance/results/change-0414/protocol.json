@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "kind": "zip64-promotion-capability-and-zip32-regression-guard",
+  "control_revision": "6b632726b",
+  "performance_claim": "none",
+  "capability_oracle": "Public sparse-offset preservation and owned/source-backed OPC entry-count promotion tests; test source and command logs retained with this change.",
+  "guard_cases": ["opc_noop_save", "opc_mutated_save"],
+  "guard_shapes": ["tiny", "many-small"],
+  "guard_payloads": ["compressible", "incompressible"],
+  "samples_per_row": 300,
+  "warmups_per_row": 30,
+  "order": ["A1", "B1", "B2", "A2"],
+  "cpu": 2,
+  "toolchain": "1.98.1",
+  "profile": "release",
+  "release_debug": 1,
+  "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+  "build_jobs": 4,
+  "incremental": false,
+  "isolation": "Builds, tests, analysis workloads and measurements are serialized; shared KVM host is not exclusive.",
+  "review_trigger": "Any individual paired p50, p95, p99 or process peak-RSS regression greater than 5 percent requires review; retain original captures and any follow-up.",
+  "scope": "Descriptive warm-memory regression guard, not a speedup or ZIP64 throughput claim. ZIP64 capability tests avoid archive-sized payload allocation; they do not establish bounded-memory generated multi-gigabyte CRUD."
+}

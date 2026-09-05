@@ -1,0 +1,22 @@
+{
+  "control_revision": "6b632726b8abacb4eb28dc14f3211bc6265206aa",
+  "candidate_revision": "a4b7f849b9f34ba000eb912c69e63bad03a71773",
+  "protocol_sha256": "3daf82de6305730686ee888fd2f87ac6d20c73f33d9c7ce79613c8ccb27a6b63",
+  "candidate_sources": {
+    "crates/soapberry-zip/src/preserve.rs": "ffe8761cd30e5fe5d461c7c4e6803a0f5cca5ef92ae43d00b497a150ddf19b39",
+    "crates/soapberry-zip/src/writer.rs": "58bce8448f825add4cb2d23af1da599c57a0ebd113e60d9564786c32cd7acf9c",
+    "crates/soapberry-zip/tests/preservation_zip64_promotion.rs": "31d113bfae3482b93c2cbed957a0e5ef034653511130a9a8d308eff02e6a235b",
+    "crates/litchi-opc/src/package.rs": "fdedf082e1db8a1017d7a9b2ce703f71a5a50bea0d951f5b8e48a6e8303d4a73",
+    "crates/litchi-opc/src/pkgwriter.rs": "ef7e4e0f19e3f3f16a05cd3cf549f34f00fc93b20e6394d6533f785cf9a928d5",
+    "crates/litchi-opc/src/source_backed.rs": "996658f07b6e1e9e3a0087f269bb646031720fe1ac920e0c8ef6a3ccee78c8f8"
+  },
+  "unchanged_gate_sources": {
+    "crates/litchi-core/src/hex.rs": "8d970a678b7b28041a798b34c928043621e9e0ae01ab1e60f61611cabc7ad51d",
+    "crates/litchi-core/src/patch.rs": "08e7f8c2e06c777c02103bd2b9fd2df29163e9003c9bd82f5f789abf6ff73e46",
+    "crates/soapberry-zip/src/office.rs": "07f8541bda8f326e6087cb4250b3eba54d3e1f756cc51504e6cc771a9c5cfcaa",
+    "crates/litchi-odf-common/src/package/model.rs": "d71f1c9fb2297f394fc1d0db7e680bc4c5c97af34964404e72b478e050d98bab",
+    "crates/litchi-odf-common/src/detect.rs": "78237c24568c155e07f445b7cab71875a36a678ba8507d9b95d20ca4473da722",
+    "crates/litchi-docx/tests/glossary_authoring.rs": "9cdb25c9b4721274198a9563b2c5190231b366bca94276c38e33ac78168cb564"
+  },
+  "guard_recheck_protocol_sha256": "95cd6f8d6d9a648caf3468b00e36e3c619b54c8dfbb93a851c4cbdbacbc16476"
+}
