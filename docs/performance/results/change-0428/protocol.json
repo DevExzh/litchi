@@ -1,0 +1,157 @@
+{
+  "change": 428,
+  "classification": "descriptive managed PPTX cache, budget, source-read and process-RSS phase observations",
+  "baseline_revision": "fad708fc19e76de6ddb192995203dc525521cc92",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "rust_toolchain": "1.98.1",
+  "build_profile": "release",
+  "rustflags": "-Cforce-frame-pointers=yes",
+  "release_debug": 1,
+  "cargo_jobs": 4,
+  "cargo_incremental": false,
+  "cpu": 2,
+  "workers": 1,
+  "samples_per_process": 30,
+  "warmups_per_process": 3,
+  "lanes": [
+    {
+      "scenario": "lifecycle",
+      "corpus": "plain"
+    },
+    {
+      "scenario": "lifecycle",
+      "corpus": "media-rich"
+    },
+    {
+      "scenario": "exact-admission",
+      "corpus": "media-rich"
+    },
+    {
+      "scenario": "one-under",
+      "corpus": "media-rich"
+    },
+    {
+      "scenario": "pinned-eviction",
+      "corpus": "media-rich"
+    },
+    {
+      "scenario": "oversized-bypass",
+      "corpus": "media-rich"
+    },
+    {
+      "scenario": "repeated-publication",
+      "corpus": "plain"
+    },
+    {
+      "scenario": "repeated-publication",
+      "corpus": "media-rich"
+    }
+  ],
+  "order": [
+    {
+      "scenario": "lifecycle",
+      "corpus": "plain",
+      "repeat": "R1"
+    },
+    {
+      "scenario": "lifecycle",
+      "corpus": "media-rich",
+      "repeat": "R1"
+    },
+    {
+      "scenario": "exact-admission",
+      "corpus": "media-rich",
+      "repeat": "R1"
+    },
+    {
+      "scenario": "one-under",
+      "corpus": "media-rich",
+      "repeat": "R1"
+    },
+    {
+      "scenario": "pinned-eviction",
+      "corpus": "media-rich",
+      "repeat": "R1"
+    },
+    {
+      "scenario": "oversized-bypass",
+      "corpus": "media-rich",
+      "repeat": "R1"
+    },
+    {
+      "scenario": "repeated-publication",
+      "corpus": "plain",
+      "repeat": "R1"
+    },
+    {
+      "scenario": "repeated-publication",
+      "corpus": "media-rich",
+      "repeat": "R1"
+    },
+    {
+      "scenario": "repeated-publication",
+      "corpus": "media-rich",
+      "repeat": "R2"
+    },
+    {
+      "scenario": "repeated-publication",
+      "corpus": "plain",
+      "repeat": "R2"
+    },
+    {
+      "scenario": "oversized-bypass",
+      "corpus": "media-rich",
+      "repeat": "R2"
+    },
+    {
+      "scenario": "pinned-eviction",
+      "corpus": "media-rich",
+      "repeat": "R2"
+    },
+    {
+      "scenario": "one-under",
+      "corpus": "media-rich",
+      "repeat": "R2"
+    },
+    {
+      "scenario": "exact-admission",
+      "corpus": "media-rich",
+      "repeat": "R2"
+    },
+    {
+      "scenario": "lifecycle",
+      "corpus": "media-rich",
+      "repeat": "R2"
+    },
+    {
+      "scenario": "lifecycle",
+      "corpus": "plain",
+      "repeat": "R2"
+    }
+  ],
+  "expected_processes": 16,
+  "expected_retained_samples": 480,
+  "production_change": "Additive fallible diagnostic forwarding on existing PPTX source owners; no workload optimization.",
+  "capture_constraints": [
+    "Freeze protocol, harness and independent report verifier before release build and formal capture.",
+    "Reuse exact prior plain/media-rich PPTX corpus builders and independently validated exact output/media oracles. Record finite context/cache limits and deterministic calibration inputs.",
+    "Use separate caller-owned source/destination execution contexts. Keep them alive to observe budgets after package owners drop without retaining extra cache or package owners.",
+    "Source-backed publication consumes the destination editor. Its cache becomes unavailable; final source-cache diagnostics likewise become unavailable after its last owner drops. Never fabricate zero snapshots.",
+    "Read cache snapshots through try_cache_diagnostics, validate event intervals through checked_counter_delta, and retain all cache gauges separately.",
+    "Memory and object reservation usage are releasable gauges; InputBytes, OutputBytes and Work are cumulative charges and must not be asserted zero after drop.",
+    "RSS and VmHWM are process points containing corpus/runtime/observer state; sampling includes procfs overhead. They are not object-owned bytes or cache budget.",
+    "Exact/one-under image admission applies to the preprimed selected image request; record zero source-read/output on promised memory refusal.",
+    "Selected-image Memory cap equals same-policy calibrated pinned-root Memory plus declared payload bytes (one-under subtracts one). Record primed metadata separately: reservation retry can evict unpinned metadata, so it is not part of the irreducible admission floor.",
+    "Pinning/eviction and oversized bypass retain actual image handles and report their budget effects; cache capacity and caller-held uncached reservations have distinct scopes.",
+    "Repeated publication exercises three successes at an exact cumulative output-byte ceiling; any additional refusal must preserve its typed error and actual accepted output. Do not call this a measured exact peak-memory ceiling.",
+    "Root serializes all builds/tests/analysis/capture workloads; agents perform source-only work. Host background activity is uncontrolled.",
+    "Retain all raw samples and failures. Review repeat drift >5% per comparable nonzero gauge, every release invariant violation, and RSS noise without claiming causality.",
+    "Portable replay and adversarial mutations must pass after task-temporary executable cleanup."
+  ],
+  "scope_limits": [
+    "No latency, throughput, allocator callback, physical-copy, general leak, or causal optimization claim.",
+    "Fixed synthetic in-memory PPTX corpora; native/cold/range sources and broader CRUD/scaling/streaming remain open.",
+    "Selected-image near-memory limits and repeated cumulative-output limits do not certify every cross-copy transient or global allocation is budget charged."
+  ],
+  "performance_claim": null
+}

@@ -1,0 +1,30 @@
+{
+  "required_pass": [
+    "pptx-forwarding",
+    "pptx-tests",
+    "pptx-clippy",
+    "pptx-doc",
+    "pptx-minimal",
+    "opc-diagnostic-errors",
+    "boundaries",
+    "claims",
+    "crud-index",
+    "harness-unit-verified",
+    "harness-pptx-lifecycle",
+    "rustfmt-final",
+    "harness-doc",
+    "debug-build",
+    "cli-smoke-verified",
+    "python-syntax",
+    "release-build",
+    "release-capture",
+    "report-probes-final"
+  ],
+  "required_review": [
+    "harness-strict",
+    "harness-strict-verified",
+    "harness-strict-final"
+  ],
+  "strict_policy": "No added finding in changed code. Preserve the full strict failure and compare existing harness debt against 0427; do not label a debt-bearing command as passing.",
+  "scope": "Full PPTX suite plus OPC diagnostic error cases; focused new harness unit tests, existing PPTX lifecycle controls, actual CLI reports and adversarial replay. The unrelated 30-minute full harness run from 0427 is not repeated without a new reason."
+}

@@ -1,0 +1,39 @@
+{
+  "change": 428,
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import ast; from pathlib import Path; paths=sorted(Path(\"docs/performance/results/change-0428\").glob(\"*.py\")); [ast.parse(p.read_text(), filename=str(p)) for p in paths]; print(\"Parsed\", len(paths), \"Python drivers\")"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "fad708fc19e76de6ddb192995203dc525521cc92",
+  "driver_sha256": "830b39837f4755b77ddd7b2bca346429a76e78ba5136e36fcc1fa25ee1b67535",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-05T22:21:55.467038+00:00",
+  "source_before": {
+    "path": "sources/7eef7c63e4568b2b9ebb1ed333197d23ca7f821b57ee7f383b8e2eab0888a6cf.json",
+    "sha256": "7eef7c63e4568b2b9ebb1ed333197d23ca7f821b57ee7f383b8e2eab0888a6cf",
+    "files": 6630
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T22:21:55.628057+00:00",
+  "source_after": {
+    "path": "sources/7eef7c63e4568b2b9ebb1ed333197d23ca7f821b57ee7f383b8e2eab0888a6cf.json",
+    "sha256": "7eef7c63e4568b2b9ebb1ed333197d23ca7f821b57ee7f383b8e2eab0888a6cf",
+    "files": 6630
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/python-syntax.log",
+    "bytes": 25,
+    "sha256": "ba9cbd2b3b59db6b097561943e025190934555b8cc02b7c5b130359cda9b31ca"
+  }
+}
