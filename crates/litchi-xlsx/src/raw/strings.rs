@@ -1053,11 +1053,16 @@ mod tests {
         input_exact.processing.max_input_bytes = empty.len() - 1;
         assert!(streaming_0364_run(empty, &Capabilities::default(), &input_exact, &[]).is_err());
 
-        let mut event_exact = StreamLimits::default();
-        event_exact.max_event_bytes = empty.len();
+        let event_exact = StreamLimits {
+            max_event_bytes: empty.len(),
+            ..StreamLimits::default()
+        };
         assert!(streaming_0364_run(empty, &Capabilities::default(), &event_exact, &[]).is_ok());
-        event_exact.max_event_bytes = empty.len() - 1;
-        assert!(streaming_0364_run(empty, &Capabilities::default(), &event_exact, &[]).is_err());
+        let event_under = StreamLimits {
+            max_event_bytes: empty.len() - 1,
+            ..event_exact
+        };
+        assert!(streaming_0364_run(empty, &Capabilities::default(), &event_under, &[]).is_err());
 
         let exact_text = "_xD83D__xDE00_".repeat(MAX_CELL_CHARACTERS);
         let exact_xml = format!(

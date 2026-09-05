@@ -10,6 +10,15 @@ use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex
 const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_S: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 
+type BoxedStreamResult<T> =
+    Result<T, Box<litchi_ooxml_common::mce::StreamError<crate::Error, crate::Error>>>;
+
+fn box_stream_result<T>(
+    result: Result<T, litchi_ooxml_common::mce::StreamError<crate::Error, crate::Error>>,
+) -> BoxedStreamResult<T> {
+    result.map_err(Box::new)
+}
+
 #[test]
 fn plain_worksheets_skip_only_the_unneeded_extension_capture() {
     let plain = format!(
@@ -559,6 +568,8 @@ mod streaming_0361_tests {
     const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     const X14AC: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
 
+    type StreamResult<T> = super::BoxedStreamResult<T>;
+
     fn worksheet(body: &str) -> String {
         format!(
             r#"<worksheet xmlns="{S}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" mc:Ignorable="x14ac">{body}</worksheet>"#
@@ -587,8 +598,13 @@ mod streaming_0361_tests {
         capabilities: &Capabilities,
         limits: &StreamLimits,
         capture_rows: bool,
-    ) -> x14ac::StreamResult<Values> {
-        x14ac::capture_stream(reader, capabilities, limits, capture_rows)
+    ) -> StreamResult<Values> {
+        super::box_stream_result(x14ac::capture_stream(
+            reader,
+            capabilities,
+            limits,
+            capture_rows,
+        ))
     }
 
     fn stream(
@@ -596,12 +612,12 @@ mod streaming_0361_tests {
         capabilities: &Capabilities,
         limits: &StreamLimits,
         capture_rows: bool,
-    ) -> x14ac::StreamResult<Values> {
+    ) -> StreamResult<Values> {
         let mut reader = Cursor::new(xml);
         stream_reader(&mut reader, capabilities, limits, capture_rows)
     }
 
-    fn default_stream(xml: &[u8], capture_rows: bool) -> x14ac::StreamResult<Values> {
+    fn default_stream(xml: &[u8], capture_rows: bool) -> StreamResult<Values> {
         stream(
             xml,
             &Capabilities::default(),
@@ -689,7 +705,7 @@ mod streaming_0361_tests {
         );
         let duplicate_error = default_stream(duplicate.as_bytes(), true).expect_err("duplicate");
         assert!(matches!(
-            duplicate_error,
+            duplicate_error.as_ref(),
             StreamError::Mce {
                 raw_error: Some(raw),
                 ..
@@ -701,7 +717,7 @@ mod streaming_0361_tests {
         );
         let reserved_error = default_stream(reserved.as_bytes(), true).expect_err("reserved");
         assert!(matches!(
-            reserved_error,
+            reserved_error.as_ref(),
             StreamError::Mce {
                 raw_error: Some(raw),
                 ..
@@ -859,7 +875,7 @@ mod streaming_0361_tests {
         xml: &str,
         limits: &StreamLimits,
         capture_rows: bool,
-    ) -> x14ac::StreamResult<Values> {
+    ) -> StreamResult<Values> {
         stream(
             xml.as_bytes(),
             &Capabilities::default(),
@@ -1015,7 +1031,7 @@ mod streaming_0361_tests {
         )
         .expect_err("input failure");
         assert!(matches!(
-            input_error,
+            input_error.as_ref(),
             StreamError::Input {
                 raw_error: Some(raw),
                 active_error: Some(active),
@@ -1028,7 +1044,7 @@ mod streaming_0361_tests {
         let mce_error =
             default_stream(malformed_tail.as_bytes(), true).expect_err("malformed tail");
         assert!(matches!(
-            mce_error,
+            mce_error.as_ref(),
             StreamError::Mce {
                 error: MceError::NonConformant(_) | MceError::Xml(_),
                 raw_error: Some(raw),
@@ -1053,7 +1069,7 @@ mod streaming_0361_tests {
         let body = dual_callback_failure_xml();
         let error = default_stream(body.as_bytes(), true).expect_err("two callbacks");
         assert!(matches!(
-            error,
+            error.as_ref(),
             StreamError::Callback {
                 raw_error: Some(raw),
                 active_error: Some(active),
@@ -1073,7 +1089,7 @@ mod streaming_0361_tests {
             worksheet(r#"<sheetData><row r="1" x14ac:dyDescent="not-a-number"/></sheetData>"#);
         let active_error = default_stream(active_only.as_bytes(), true).expect_err("active error");
         assert!(matches!(
-            active_error,
+            active_error.as_ref(),
             StreamError::Callback {
                 raw_error: None,
                 active_error: Some(active),
@@ -1108,8 +1124,11 @@ mod streaming_0362_selected_tests {
     use crate::cell::{Cell, Value};
 
     const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
     const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
     const X14AC: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
+
+    type StreamResult<T> = super::BoxedStreamResult<T>;
 
     fn address(reference: &str) -> Address {
         Address::from_a1(reference).expect("valid worksheet address")
@@ -1131,7 +1150,7 @@ mod streaming_0362_selected_tests {
         )
     }
 
-    fn scan_xml(xml: &str, target: &str) -> x14ac::StreamResult<ScanOutcome> {
+    fn scan_xml(xml: &str, target: &str) -> StreamResult<ScanOutcome> {
         let capabilities = Capabilities::default();
         let limits = StreamLimits::default();
         scan_xml_with(xml, target, &capabilities, &limits)
@@ -1142,9 +1161,9 @@ mod streaming_0362_selected_tests {
         target: &str,
         capabilities: &Capabilities,
         limits: &StreamLimits,
-    ) -> x14ac::StreamResult<ScanOutcome> {
+    ) -> StreamResult<ScanOutcome> {
         let mut input = Cursor::new(xml.as_bytes());
-        scan(&mut input, capabilities, limits, address(target))
+        super::box_stream_result(scan(&mut input, capabilities, limits, address(target)))
     }
 
     fn eligible(xml: &str, target: &str) -> SelectedCell {
@@ -1545,6 +1564,8 @@ mod streaming_0364_dependency_metadata_tests {
 
     const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
+    type StreamResult<T> = super::BoxedStreamResult<T>;
+
     fn address(reference: &str) -> Address {
         Address::from_a1(reference).expect("valid worksheet address")
     }
@@ -1553,14 +1574,14 @@ mod streaming_0364_dependency_metadata_tests {
         format!(r#"<worksheet xmlns="{SPREADSHEETML}">{body}</worksheet>"#)
     }
 
-    fn scan_xml(xml: &str, target: &str) -> super::super::selected::StreamResult<ScanOutcome> {
+    fn scan_xml(xml: &str, target: &str) -> StreamResult<ScanOutcome> {
         let mut input = Cursor::new(xml.as_bytes());
-        scan(
+        super::box_stream_result(scan(
             &mut input,
             &Capabilities::default(),
             &StreamLimits::default(),
             address(target),
-        )
+        ))
     }
 
     #[test]
@@ -1662,7 +1683,7 @@ mod streaming_0364_dependency_metadata_tests {
         );
         let error = scan_xml(&xml, "A1").expect_err("late malformed XML");
         assert!(matches!(
-            error,
+            error.as_ref(),
             StreamError::Mce {
                 error: MceError::NonConformant(_) | MceError::Xml(_),
                 ..
@@ -1686,6 +1707,8 @@ mod streaming_0365_range_tests {
 
     const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
+    type StreamResult<T> = super::BoxedStreamResult<T>;
+
     fn address(reference: &str) -> Address {
         Address::from_a1(reference).expect("valid worksheet address")
     }
@@ -1694,27 +1717,24 @@ mod streaming_0365_range_tests {
         format!(r#"<worksheet xmlns="{SPREADSHEETML}">{body}</worksheet>"#)
     }
 
-    fn scan_range_xml(
-        xml: &str,
-        reference: &str,
-    ) -> super::super::selected::StreamResult<RangeScanOutcome> {
+    fn scan_range_xml(xml: &str, reference: &str) -> StreamResult<RangeScanOutcome> {
         let mut input = Cursor::new(xml.as_bytes());
-        scan_range(
+        super::box_stream_result(scan_range(
             &mut input,
             &Capabilities::default(),
             &StreamLimits::default(),
             Rect::from_a1(reference).expect("valid worksheet range"),
-        )
+        ))
     }
 
-    fn scan_xml(xml: &str, target: &str) -> super::super::selected::StreamResult<ScanOutcome> {
+    fn scan_xml(xml: &str, target: &str) -> StreamResult<ScanOutcome> {
         let mut input = Cursor::new(xml.as_bytes());
-        scan(
+        super::box_stream_result(scan(
             &mut input,
             &Capabilities::default(),
             &StreamLimits::default(),
             address(target),
-        )
+        ))
     }
 
     fn eligible_range(xml: &str, reference: &str) -> SelectedCells {
@@ -1918,7 +1938,7 @@ mod streaming_0365_range_tests {
         );
         let error = scan_range_xml(&malformed_tail, "A1").expect_err("late malformed XML");
         assert!(matches!(
-            error,
+            error.as_ref(),
             StreamError::Mce {
                 error: MceError::NonConformant(_) | MceError::Xml(_),
                 ..
@@ -2034,7 +2054,7 @@ mod streaming_0367_merge_tests {
     const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     const STREAMING_MERGE_CAP: usize = 16_384;
 
-    type StreamResult<T> = super::super::selected::StreamResult<T>;
+    type StreamResult<T> = super::BoxedStreamResult<T>;
 
     fn address(reference: &str) -> Address {
         Address::from_a1(reference).expect("valid worksheet address")
@@ -2050,22 +2070,22 @@ mod streaming_0367_merge_tests {
 
     fn scan_xml(xml: &str, target: &str) -> StreamResult<ScanOutcome> {
         let mut input = Cursor::new(xml.as_bytes());
-        scan(
+        super::box_stream_result(scan(
             &mut input,
             &Capabilities::default(),
             &StreamLimits::default(),
             address(target),
-        )
+        ))
     }
 
     fn scan_range_xml(xml: &str, reference: &str) -> StreamResult<RangeScanOutcome> {
         let mut input = Cursor::new(xml.as_bytes());
-        scan_range(
+        super::box_stream_result(scan_range(
             &mut input,
             &Capabilities::default(),
             &StreamLimits::default(),
             range(reference),
-        )
+        ))
     }
 
     fn eligible(xml: &str, target: &str) -> SelectedCell {
@@ -2098,10 +2118,13 @@ mod streaming_0367_merge_tests {
 
     fn assert_stream_xml_error<T: Debug>(result: StreamResult<T>) {
         match result {
-            Err(StreamError::Mce {
-                error: MceError::Xml(_) | MceError::NonConformant(_),
-                ..
-            }) => {},
+            Err(error) => match error.as_ref() {
+                StreamError::Mce {
+                    error: MceError::Xml(_) | MceError::NonConformant(_),
+                    ..
+                } => {},
+                other => panic!("expected typed XML stream error, got {other:?}"),
+            },
             other => panic!("expected typed XML stream error, got {other:?}"),
         }
     }
@@ -2318,7 +2341,7 @@ mod streaming_0366_general_reference_tests {
 
     const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    type StreamResult<T> = super::super::selected::StreamResult<T>;
+    type StreamResult<T> = super::BoxedStreamResult<T>;
 
     fn address(reference: &str) -> Address {
         Address::from_a1(reference).expect("valid worksheet address")
@@ -2342,22 +2365,22 @@ mod streaming_0366_general_reference_tests {
 
     fn scan_xml(xml: &str, target: &str) -> StreamResult<ScanOutcome> {
         let mut input = Cursor::new(xml.as_bytes());
-        scan(
+        super::box_stream_result(scan(
             &mut input,
             &Capabilities::default(),
             &StreamLimits::default(),
             address(target),
-        )
+        ))
     }
 
     fn scan_range_xml(xml: &str, reference: &str) -> StreamResult<RangeScanOutcome> {
         let mut input = Cursor::new(xml.as_bytes());
-        scan_range(
+        super::box_stream_result(scan_range(
             &mut input,
             &Capabilities::default(),
             &StreamLimits::default(),
             Rect::from_a1(reference).expect("valid worksheet range"),
-        )
+        ))
     }
 
     fn eligible(xml: &str, target: &str) -> SelectedCell {
@@ -2429,30 +2452,39 @@ mod streaming_0366_general_reference_tests {
 
     fn assert_mce_xml_error<T: Debug>(result: StreamResult<T>) {
         match result {
-            Err(StreamError::Mce {
-                error: MceError::Xml(_),
-                ..
-            }) => {},
+            Err(error) => match error.as_ref() {
+                StreamError::Mce {
+                    error: MceError::Xml(_),
+                    ..
+                } => {},
+                other => panic!("expected typed XML stream error, got {other:?}"),
+            },
             other => panic!("expected typed XML stream error, got {other:?}"),
         }
     }
 
     fn assert_mce_nonconformant<T: Debug>(result: StreamResult<T>) {
         match result {
-            Err(StreamError::Mce {
-                error: MceError::NonConformant(_),
-                ..
-            }) => {},
+            Err(error) => match error.as_ref() {
+                StreamError::Mce {
+                    error: MceError::NonConformant(_),
+                    ..
+                } => {},
+                other => panic!("expected typed MCE conformance error, got {other:?}"),
+            },
             other => panic!("expected typed MCE conformance error, got {other:?}"),
         }
     }
 
     fn assert_mce_error<T: Debug>(result: StreamResult<T>) {
         match result {
-            Err(StreamError::Mce {
-                error: MceError::Xml(_) | MceError::NonConformant(_),
-                ..
-            }) => {},
+            Err(error) => match error.as_ref() {
+                StreamError::Mce {
+                    error: MceError::Xml(_) | MceError::NonConformant(_),
+                    ..
+                } => {},
+                other => panic!("expected typed MCE stream error, got {other:?}"),
+            },
             other => panic!("expected typed MCE stream error, got {other:?}"),
         }
     }
@@ -2547,7 +2579,7 @@ mod streaming_0400_numeric_scratch_tests {
     const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     const STRICT_SPREADSHEETML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 
-    type StreamResult<T> = super::super::selected::StreamResult<T>;
+    type StreamResult<T> = super::BoxedStreamResult<T>;
 
     fn address(reference: &str) -> Address {
         Address::from_a1(reference).expect("valid worksheet address")
@@ -2559,22 +2591,22 @@ mod streaming_0400_numeric_scratch_tests {
 
     fn scan_xml(xml: &str, target: &str) -> StreamResult<ScanOutcome> {
         let mut input = Cursor::new(xml.as_bytes());
-        scan(
+        super::box_stream_result(scan(
             &mut input,
             &Capabilities::default(),
             &StreamLimits::default(),
             address(target),
-        )
+        ))
     }
 
     fn scan_range_xml(xml: &str, reference: &str) -> StreamResult<RangeScanOutcome> {
         let mut input = Cursor::new(xml.as_bytes());
-        scan_range(
+        super::box_stream_result(scan_range(
             &mut input,
             &Capabilities::default(),
             &StreamLimits::default(),
             Rect::from_a1(reference).expect("valid worksheet range"),
-        )
+        ))
     }
 
     fn eligible(xml: &str, target: &str) -> SelectedCell {
@@ -2593,10 +2625,13 @@ mod streaming_0400_numeric_scratch_tests {
 
     fn assert_stream_xml_error<T: Debug>(result: StreamResult<T>) {
         match result {
-            Err(StreamError::Mce {
-                error: MceError::Xml(_) | MceError::NonConformant(_),
-                ..
-            }) => {},
+            Err(error) => match error.as_ref() {
+                StreamError::Mce {
+                    error: MceError::Xml(_) | MceError::NonConformant(_),
+                    ..
+                } => {},
+                other => panic!("expected typed XML stream error, got {other:?}"),
+            },
             other => panic!("expected typed XML stream error, got {other:?}"),
         }
     }

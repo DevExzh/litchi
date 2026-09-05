@@ -1490,7 +1490,7 @@ fn parse_user_hierarchy_store(value: &str) -> MetadataResult<(Vec<String>, Vec<u
     }
     let mut ids = Vec::new();
     let mut offsets = Vec::new();
-    for pair in parts.chunks_exact(2) {
+    for pair in parts.as_chunks::<2>().0 {
         if pair[0].is_empty() || ids.iter().any(|id| id == pair[0]) {
             return Err(MetadataError::new(
                 "user hierarchy TableStore contains an empty or duplicate level ID",
