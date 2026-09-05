@@ -1,0 +1,4989 @@
+{
+  "allowed_result_difference_paths": [
+    "result.source.xls.source_counter_scope"
+  ],
+  "build_identity": {
+    "candidate": {
+      "binaries": {
+        "litchi-perf-baseline": {
+          "bytes": 449775120,
+          "sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8"
+        },
+        "litchi-perf-baseline-alloc": {
+          "bytes": 449779056,
+          "sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a"
+        }
+      },
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7"
+    },
+    "control": {
+      "binaries": {
+        "litchi-perf-baseline": {
+          "bytes": 449566688,
+          "sha256": "024f67f40370d93025f01c161ee7b16690f6f05736154bea820b69eb6ac92d1b"
+        },
+        "litchi-perf-baseline-alloc": {
+          "bytes": 449570656,
+          "sha256": "567128adaa0fb13d35a3769ec8d4f26ef1d7a55ca652a7c6f1109b60ff6da5d8"
+        }
+      },
+      "revision": "70756ae67e6763428759e8f446718ce68a528976"
+    }
+  },
+  "capture_order": {
+    "allocator": [
+      {
+        "label": "allocator-1",
+        "role": "control"
+      },
+      {
+        "label": "allocator-2",
+        "role": "candidate"
+      },
+      {
+        "label": "allocator-3",
+        "role": "candidate"
+      },
+      {
+        "label": "allocator-4",
+        "role": "control"
+      }
+    ],
+    "normal": [
+      {
+        "label": "normal-1",
+        "role": "control"
+      },
+      {
+        "label": "normal-2",
+        "role": "candidate"
+      },
+      {
+        "label": "normal-3",
+        "role": "candidate"
+      },
+      {
+        "label": "normal-4",
+        "role": "control"
+      }
+    ],
+    "owned": [
+      {
+        "label": "owned-1",
+        "role": "candidate"
+      },
+      {
+        "label": "owned-2",
+        "role": "candidate"
+      },
+      {
+        "label": "owned-3",
+        "role": "candidate"
+      },
+      {
+        "label": "owned-4",
+        "role": "candidate"
+      }
+    ],
+    "owned-allocator": [
+      {
+        "label": "owned-allocator-1",
+        "role": "candidate"
+      },
+      {
+        "label": "owned-allocator-2",
+        "role": "candidate"
+      }
+    ]
+  },
+  "commands": {
+    "record_count": 18,
+    "selected": {
+      "allocator": [
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/allocator-1.time.txt",
+            "/tmp/litchi-goal-0412-control-binaries/litchi-perf-baseline-alloc",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+            "--samples",
+            "30",
+            "--warmup",
+            "3",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/allocator-1.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/allocator-1.catalog.json"
+          ],
+          "binary_sha256": "567128adaa0fb13d35a3769ec8d4f26ef1d7a55ca652a7c6f1109b60ff6da5d8",
+          "label": "allocator-1",
+          "position": 4,
+          "revision": "70756ae67e6763428759e8f446718ce68a528976",
+          "role": "control",
+          "started_utc": "2026-09-05T01:15:06.181525+00:00"
+        },
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/allocator-2.time.txt",
+            "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline-alloc",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+            "--samples",
+            "30",
+            "--warmup",
+            "3",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/allocator-2.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/allocator-2.catalog.json"
+          ],
+          "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+          "label": "allocator-2",
+          "position": 5,
+          "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+          "role": "candidate",
+          "started_utc": "2026-09-05T01:15:07.661068+00:00"
+        },
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/allocator-3.time.txt",
+            "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline-alloc",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+            "--samples",
+            "30",
+            "--warmup",
+            "3",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/allocator-3.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/allocator-3.catalog.json"
+          ],
+          "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+          "label": "allocator-3",
+          "position": 6,
+          "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+          "role": "candidate",
+          "started_utc": "2026-09-05T01:15:08.573924+00:00"
+        },
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/allocator-4.time.txt",
+            "/tmp/litchi-goal-0412-control-binaries/litchi-perf-baseline-alloc",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+            "--samples",
+            "30",
+            "--warmup",
+            "3",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/allocator-4.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/allocator-4.catalog.json"
+          ],
+          "binary_sha256": "567128adaa0fb13d35a3769ec8d4f26ef1d7a55ca652a7c6f1109b60ff6da5d8",
+          "label": "allocator-4",
+          "position": 7,
+          "revision": "70756ae67e6763428759e8f446718ce68a528976",
+          "role": "control",
+          "started_utc": "2026-09-05T01:15:09.495327+00:00"
+        }
+      ],
+      "normal": [
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/normal-1.time.txt",
+            "/tmp/litchi-goal-0412-control-binaries/litchi-perf-baseline",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+            "--samples",
+            "500",
+            "--warmup",
+            "20",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/normal-1.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/normal-1.catalog.json"
+          ],
+          "binary_sha256": "024f67f40370d93025f01c161ee7b16690f6f05736154bea820b69eb6ac92d1b",
+          "label": "normal-1",
+          "position": 0,
+          "revision": "70756ae67e6763428759e8f446718ce68a528976",
+          "role": "control",
+          "started_utc": "2026-09-05T01:14:32.668742+00:00"
+        },
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/normal-2.time.txt",
+            "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+            "--samples",
+            "500",
+            "--warmup",
+            "20",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/normal-2.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/normal-2.catalog.json"
+          ],
+          "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+          "label": "normal-2",
+          "position": 1,
+          "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+          "role": "candidate",
+          "started_utc": "2026-09-05T01:14:44.464922+00:00"
+        },
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/normal-3.time.txt",
+            "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+            "--samples",
+            "500",
+            "--warmup",
+            "20",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/normal-3.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/normal-3.catalog.json"
+          ],
+          "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+          "label": "normal-3",
+          "position": 2,
+          "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+          "role": "candidate",
+          "started_utc": "2026-09-05T01:14:47.598414+00:00"
+        },
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/normal-4.time.txt",
+            "/tmp/litchi-goal-0412-control-binaries/litchi-perf-baseline",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+            "--samples",
+            "500",
+            "--warmup",
+            "20",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/normal-4.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/normal-4.catalog.json"
+          ],
+          "binary_sha256": "024f67f40370d93025f01c161ee7b16690f6f05736154bea820b69eb6ac92d1b",
+          "label": "normal-4",
+          "position": 3,
+          "revision": "70756ae67e6763428759e8f446718ce68a528976",
+          "role": "control",
+          "started_utc": "2026-09-05T01:14:50.732615+00:00"
+        }
+      ],
+      "owned": [
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/owned-1.time.txt",
+            "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+            "--samples",
+            "500",
+            "--warmup",
+            "20",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/owned-1.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/owned-1.catalog.json"
+          ],
+          "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+          "label": "owned-1",
+          "position": 8,
+          "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+          "role": "candidate",
+          "started_utc": "2026-09-05T01:15:22.582597+00:00"
+        },
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/owned-2.time.txt",
+            "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+            "--samples",
+            "500",
+            "--warmup",
+            "20",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/owned-2.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/owned-2.catalog.json"
+          ],
+          "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+          "label": "owned-2",
+          "position": 9,
+          "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+          "role": "candidate",
+          "started_utc": "2026-09-05T01:15:24.166761+00:00"
+        },
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/owned-3.time.txt",
+            "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+            "--samples",
+            "500",
+            "--warmup",
+            "20",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/owned-3.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/owned-3.catalog.json"
+          ],
+          "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+          "label": "owned-3",
+          "position": 10,
+          "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+          "role": "candidate",
+          "started_utc": "2026-09-05T01:15:25.733200+00:00"
+        },
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/owned-4.time.txt",
+            "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+            "--samples",
+            "500",
+            "--warmup",
+            "20",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/owned-4.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/owned-4.catalog.json"
+          ],
+          "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+          "label": "owned-4",
+          "position": 11,
+          "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+          "role": "candidate",
+          "started_utc": "2026-09-05T01:15:27.306611+00:00"
+        }
+      ],
+      "owned-allocator": [
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/owned-allocator-1.time.txt",
+            "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline-alloc",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+            "--samples",
+            "30",
+            "--warmup",
+            "3",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/owned-allocator-1.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/owned-allocator-1.catalog.json"
+          ],
+          "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+          "label": "owned-allocator-1",
+          "position": 12,
+          "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+          "role": "candidate",
+          "started_utc": "2026-09-05T01:15:35.118350+00:00"
+        },
+        {
+          "argv": [
+            "taskset",
+            "-c",
+            "2",
+            "/usr/bin/time",
+            "-v",
+            "-o",
+            "/tmp/litchi-goal-0412-capture/owned-allocator-2.time.txt",
+            "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline-alloc",
+            "--filesystem-cache",
+            "warm",
+            "--case",
+            "xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+            "--samples",
+            "30",
+            "--warmup",
+            "3",
+            "--json",
+            "/tmp/litchi-goal-0412-capture/owned-allocator-2.json",
+            "--corpus-manifest",
+            "/tmp/litchi-goal-0412-capture/owned-allocator-2.catalog.json"
+          ],
+          "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+          "label": "owned-allocator-2",
+          "position": 13,
+          "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+          "role": "candidate",
+          "started_utc": "2026-09-05T01:15:35.915332+00:00"
+        }
+      ]
+    }
+  },
+  "comparison_mode": "observer-only fixed warm in-memory XLS capture",
+  "corpus": {
+    "all_report_corpus_digests_equal": true,
+    "archive_bytes": 16995840,
+    "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+    "catalog_content_set_equal": false,
+    "target_payload_bytes": 80946,
+    "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041"
+  },
+  "equivalence_exclusions": {
+    "capture_identity": [
+      "binary_identity",
+      "environment.git_revision",
+      "corpus_catalog"
+    ],
+    "descriptive_measurements": [
+      "result.elapsed_ns",
+      "result.operation_metrics.*.values"
+    ],
+    "reason": "Fresh-child timing, process snapshots, and allocator vectors are summarized per repetition; they are not semantic or logical-I/O equivalence fields."
+  },
+  "identity": {
+    "allocator": {
+      "candidate": {
+        "binary_bytes": 449779056,
+        "binary_path": "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline-alloc",
+        "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7"
+      },
+      "control": {
+        "binary_bytes": 449570656,
+        "binary_path": "/tmp/litchi-goal-0412-control-binaries/litchi-perf-baseline-alloc",
+        "binary_sha256": "567128adaa0fb13d35a3769ec8d4f26ef1d7a55ca652a7c6f1109b60ff6da5d8",
+        "revision": "70756ae67e6763428759e8f446718ce68a528976"
+      }
+    },
+    "normal": {
+      "candidate": {
+        "binary_bytes": 449775120,
+        "binary_path": "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7"
+      },
+      "control": {
+        "binary_bytes": 449566688,
+        "binary_path": "/tmp/litchi-goal-0412-control-binaries/litchi-perf-baseline",
+        "binary_sha256": "024f67f40370d93025f01c161ee7b16690f6f05736154bea820b69eb6ac92d1b",
+        "revision": "70756ae67e6763428759e8f446718ce68a528976"
+      }
+    },
+    "owned": {
+      "candidate": {
+        "binary_bytes": 449775120,
+        "binary_path": "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7"
+      }
+    },
+    "owned-allocator": {
+      "candidate": {
+        "binary_bytes": 449779056,
+        "binary_path": "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline-alloc",
+        "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7"
+      }
+    }
+  },
+  "limitations": [
+    "Elapsed p50/p95/p99 and allocator vectors are per-child descriptive observations.",
+    "This observer-only comparison makes no production speedup or regression claim.",
+    "The warm generated corpus does not establish cold-file, physical-I/O, remote-source, scaling, or cache behavior.",
+    "The source scope marker difference is explicitly permitted only at result.source.xls.source_counter_scope; logical ReadAt vectors, locality flags, output digests, and corpus identity remain equal."
+  ],
+  "neutrality": {
+    "allocator": {
+      "xls_eager_open_list_worksheets": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": false,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_eager_open_one_cell": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": false,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_semantic_open": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": false,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_source_backed_open": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": true,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_source_backed_open_list_worksheets": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": true,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_source_backed_open_one_cell": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": true,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      }
+    },
+    "normal": {
+      "xls_eager_open_list_worksheets": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": false,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_eager_open_one_cell": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": false,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_semantic_open": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": false,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_source_backed_open": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": true,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_source_backed_open_list_worksheets": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": true,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_source_backed_open_one_cell": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": true,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      }
+    },
+    "owned": {
+      "xls_owned_source_open": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": false,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_owned_source_open_list_worksheets": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": false,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_owned_source_open_one_cell": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": false,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      }
+    },
+    "owned-allocator": {
+      "xls_owned_source_open": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": false,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_owned_source_open_list_worksheets": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": false,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      },
+      "xls_owned_source_open_one_cell": {
+        "corpus_digest_equal": true,
+        "logical_io_and_locality_equal": true,
+        "only_allowed_source_scope_difference": false,
+        "output_sha256_equal": true,
+        "semantic_output_equal": true
+      }
+    }
+  },
+  "performance_claim": "none",
+  "protocol": {
+    "acceptance": "All logical I/O counters and output hashes equivalent; observer scope marker must differ explicitly. Source observer result measures instrumentation change only. Review >5% eager latency/RSS regressions. Plain source results single-revision baseline only.",
+    "allocator": {
+      "order": [
+        "control",
+        "candidate",
+        "candidate",
+        "control"
+      ],
+      "samples": 30,
+      "warmup": 3
+    },
+    "candidate_revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+    "cases": [
+      "xls_semantic_open",
+      "xls_source_backed_open",
+      "xls_eager_open_list_worksheets",
+      "xls_source_backed_open_list_worksheets",
+      "xls_eager_open_one_cell",
+      "xls_source_backed_open_one_cell"
+    ],
+    "change": "0412",
+    "control_revision": "70756ae67e6763428759e8f446718ce68a528976",
+    "counters": {
+      "case": "xls_owned_source_open_one_cell",
+      "events": "task-clock,cycles,instructions,branches,branch-misses,page-faults,context-switches,cpu-migrations,l2_cache_req_stat.dc_access_in_l2,l2_cache_req_stat.dc_hit_in_l2",
+      "repetitions": 3,
+      "samples": 3000,
+      "scope": "Whole process, scaled multiplexed events; not operation IPC or cache miss rate",
+      "warmup": 10
+    },
+    "cpu": 2,
+    "filesystem_cache": "warm",
+    "isolation": "Fresh sequential child per repetition; warmup and retained samples share process. No concurrent build/test/benchmark.",
+    "limitations": [
+      "No production before/after claim",
+      "No cold-cache or physical I/O claim",
+      "No filesystem or remote-source claim",
+      "No scaling or exact L1/LLC claim"
+    ],
+    "memory": "Allocation calls include reallocations; peak/live values are process snapshots; RSS is whole-process.",
+    "normal": {
+      "order": [
+        "control",
+        "candidate",
+        "candidate",
+        "control"
+      ],
+      "samples": 500,
+      "warmup": 20
+    },
+    "owned_source": {
+      "allocation_repetitions": 2,
+      "allocation_samples": 30,
+      "allocation_warmup": 3,
+      "repetitions": 4,
+      "samples": 500,
+      "warmup": 20
+    },
+    "profile": {
+      "call_graph": "fp,127",
+      "case": "xls_owned_source_open_one_cell",
+      "event": "cycles:u",
+      "frequency": 999,
+      "samples": 10000,
+      "warmup": 20
+    },
+    "purpose": "Isolate XLS diagnostic observer overhead and establish plain OwnedSource production lifecycle baselines. No production speedup claim.",
+    "timer": "Existing open/query brackets, input clone and source construction outside; output semantic oracle and locality validation outside."
+  },
+  "reports": {
+    "allocator": [
+      {
+        "binary_sha256": "567128adaa0fb13d35a3769ec8d4f26ef1d7a55ca652a7c6f1109b60ff6da5d8",
+        "cases": {
+          "xls_eager_open_list_worksheets": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 1015894,
+                "mean": 1015894.0,
+                "min": 1015894,
+                "p50": 1015894,
+                "p95": 1015894,
+                "p99": 1015894,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 7263,
+                "mean": 7263.0,
+                "min": 7263,
+                "p50": 7263,
+                "p95": 7263,
+                "p99": 7263,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 671607,
+                "mean": 671607.0,
+                "min": 671607,
+                "p50": 671607,
+                "p95": 671607,
+                "p99": 671607,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 3801,
+                "mean": 3801.0,
+                "min": 3801,
+                "p50": 3801,
+                "p95": 3801,
+                "p99": 3801,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52262265,
+                "mean": 52261337.0,
+                "min": 52260409,
+                "p50": 52261337,
+                "p95": 52262201,
+                "p99": 52262265,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51917978,
+                "mean": 51917050.0,
+                "min": 51916122,
+                "p50": 51917050,
+                "p95": 51917914,
+                "p99": 51917978,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 307,
+                "mean": 307.0,
+                "min": 307,
+                "p50": 307,
+                "p95": 307,
+                "p99": 307,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 653003,
+              "mean": 638572.1333333333,
+              "min": 625072,
+              "p50": 637797,
+              "p95": 650703,
+              "p99": 653003,
+              "sample_order_sha256": "248dc841af6cf17eea6a31c41ceaf4df33499abf4d6874b0647958a2c5fb595c",
+              "samples": 30
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_eager_open_one_cell": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 1015781,
+                "mean": 1015781.0,
+                "min": 1015781,
+                "p50": 1015781,
+                "p95": 1015781,
+                "p99": 1015781,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 7260,
+                "mean": 7260.0,
+                "min": 7260,
+                "p50": 7260,
+                "p95": 7260,
+                "p99": 7260,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 671607,
+                "mean": 671607.0,
+                "min": 671607,
+                "p50": 671607,
+                "p95": 671607,
+                "p99": 671607,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 3801,
+                "mean": 3801.0,
+                "min": 3801,
+                "p50": 3801,
+                "p95": 3801,
+                "p99": 3801,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52312206,
+                "mean": 52311278.0,
+                "min": 52310350,
+                "p50": 52311278,
+                "p95": 52312142,
+                "p99": 52312206,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51968032,
+                "mean": 51967104.0,
+                "min": 51966176,
+                "p50": 51967104,
+                "p95": 51967968,
+                "p99": 51968032,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 307,
+                "mean": 307.0,
+                "min": 307,
+                "p50": 307,
+                "p95": 307,
+                "p99": 307,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 654132,
+              "mean": 634331.5333333333,
+              "min": 605033,
+              "p50": 635762,
+              "p95": 652173,
+              "p99": 654132,
+              "sample_order_sha256": "a8493c7d529aab4ce60b0a984fe5c9402f3a9f768e0932f0bbec6aea49639138",
+              "samples": 30
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          },
+          "xls_semantic_open": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 1015781,
+                "mean": 1015781.0,
+                "min": 1015781,
+                "p50": 1015781,
+                "p95": 1015781,
+                "p99": 1015781,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 7260,
+                "mean": 7260.0,
+                "min": 7260,
+                "p50": 7260,
+                "p95": 7260,
+                "p99": 7260,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 671607,
+                "mean": 671607.0,
+                "min": 671607,
+                "p50": 671607,
+                "p95": 671607,
+                "p99": 671607,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 3801,
+                "mean": 3801.0,
+                "min": 3801,
+                "p50": 3801,
+                "p95": 3801,
+                "p99": 3801,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52212098,
+                "mean": 52211170.0,
+                "min": 52210242,
+                "p50": 52211170,
+                "p95": 52212034,
+                "p99": 52212098,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51867924,
+                "mean": 51866996.0,
+                "min": 51866068,
+                "p50": 51866996,
+                "p95": 51867860,
+                "p99": 51867924,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 307,
+                "mean": 307.0,
+                "min": 307,
+                "p50": 307,
+                "p95": 307,
+                "p99": 307,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 652203,
+              "mean": 634497.8,
+              "min": 618582,
+              "p50": 632997,
+              "p95": 651513,
+              "p99": 652203,
+              "sample_order_sha256": "02cab68f29764d0e917a5d3fa24598e3c98861c2f5e711b820dc7f10500cd780",
+              "samples": 30
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 274206,
+                "mean": 274206.0,
+                "min": 274206,
+                "p50": 274206,
+                "p95": 274206,
+                "p99": 274206,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 458,
+                "mean": 458.0,
+                "min": 458,
+                "p50": 458,
+                "p95": 458,
+                "p99": 458,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 131926,
+                "mean": 131926.0,
+                "min": 131926,
+                "p50": 131926,
+                "p95": 131926,
+                "p99": 131926,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 390,
+                "mean": 390.0,
+                "min": 390,
+                "p50": 390,
+                "p95": 390,
+                "p99": 390,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52557731,
+                "mean": 52554800.86666667,
+                "min": 52550531,
+                "p50": 52554195,
+                "p95": 52557667,
+                "p99": 52557731,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 52415451,
+                "mean": 52412520.86666667,
+                "min": 52408251,
+                "p50": 52411915,
+                "p95": 52415387,
+                "p99": 52415451,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 5613722,
+              "mean": 5591555.166666667,
+              "min": 5579192,
+              "p50": 5591207,
+              "p95": 5613693,
+              "p99": 5613722,
+              "sample_order_sha256": "909a6c402e07648efcd495e397fb7290c0f6778838b0cce32c858bab9b902ed7",
+              "samples": 30
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open_list_worksheets": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 274271,
+                "mean": 274271.0,
+                "min": 274271,
+                "p50": 274271,
+                "p95": 274271,
+                "p99": 274271,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 461,
+                "mean": 461.0,
+                "min": 461,
+                "p50": 461,
+                "p95": 461,
+                "p99": 461,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 131926,
+                "mean": 131926.0,
+                "min": 131926,
+                "p50": 131926,
+                "p95": 131926,
+                "p99": 131926,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 390,
+                "mean": 390.0,
+                "min": 390,
+                "p50": 390,
+                "p95": 390,
+                "p99": 390,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52612378,
+                "mean": 52609447.86666667,
+                "min": 52605178,
+                "p50": 52608842,
+                "p95": 52612314,
+                "p99": 52612378,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 52470033,
+                "mean": 52467102.86666667,
+                "min": 52462833,
+                "p50": 52466497,
+                "p95": 52469969,
+                "p99": 52470033,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 5612862,
+              "mean": 5593448.866666666,
+              "min": 5584482,
+              "p50": 5591807,
+              "p95": 5609853,
+              "p99": 5612862,
+              "sample_order_sha256": "87ebd2b33c636b9cb8ab07f21663eba97e32f8ea310718d280fe3dec59d824bb",
+              "samples": 30
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_source_backed_open_one_cell": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 280542,
+                "mean": 280542.0,
+                "min": 280542,
+                "p50": 280542,
+                "p95": 280542,
+                "p99": 280542,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 488,
+                "mean": 488.0,
+                "min": 488,
+                "p50": 488,
+                "p95": 488,
+                "p99": 488,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 138934,
+                "mean": 138934.0,
+                "min": 138934,
+                "p50": 138934,
+                "p95": 138934,
+                "p99": 138934,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 420,
+                "mean": 420.0,
+                "min": 420,
+                "p50": 420,
+                "p95": 420,
+                "p99": 420,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52670751,
+                "mean": 52667820.86666667,
+                "min": 52663551,
+                "p50": 52667215,
+                "p95": 52670687,
+                "p99": 52670751,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 52529143,
+                "mean": 52526212.86666667,
+                "min": 52521943,
+                "p50": 52525607,
+                "p95": 52529079,
+                "p99": 52529143,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 6090434,
+              "mean": 6063834.033333333,
+              "min": 6047404,
+              "p50": 6061699,
+              "p95": 6086124,
+              "p99": 6090434,
+              "sample_order_sha256": "bf4d3b1ca5752a613726bc028b285026ada1012b7a8e2d73f15617f2da5207b6",
+              "samples": 30
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "0b7b605828256859db72959ce819b45db9a8ea6cc569e7b92448a769b5736366",
+        "label": "allocator-1",
+        "revision": "70756ae67e6763428759e8f446718ce68a528976",
+        "role": "control"
+      },
+      {
+        "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+        "cases": {
+          "xls_eager_open_list_worksheets": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 1015894,
+                "mean": 1015894.0,
+                "min": 1015894,
+                "p50": 1015894,
+                "p95": 1015894,
+                "p99": 1015894,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 7263,
+                "mean": 7263.0,
+                "min": 7263,
+                "p50": 7263,
+                "p95": 7263,
+                "p99": 7263,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 671607,
+                "mean": 671607.0,
+                "min": 671607,
+                "p50": 671607,
+                "p95": 671607,
+                "p99": 671607,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 3801,
+                "mean": 3801.0,
+                "min": 3801,
+                "p50": 3801,
+                "p95": 3801,
+                "p99": 3801,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52262265,
+                "mean": 52261337.0,
+                "min": 52260409,
+                "p50": 52261337,
+                "p95": 52262201,
+                "p99": 52262265,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51917978,
+                "mean": 51917050.0,
+                "min": 51916122,
+                "p50": 51917050,
+                "p95": 51917914,
+                "p99": 51917978,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 307,
+                "mean": 307.0,
+                "min": 307,
+                "p50": 307,
+                "p95": 307,
+                "p99": 307,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 638902,
+              "mean": 628052.5,
+              "min": 614082,
+              "p50": 628993,
+              "p95": 638353,
+              "p99": 638902,
+              "sample_order_sha256": "c2fd77d41e723163cc5b8eb0c236d006608e658629050ba42e68322a96b02dd5",
+              "samples": 30
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_eager_open_one_cell": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 1015781,
+                "mean": 1015781.0,
+                "min": 1015781,
+                "p50": 1015781,
+                "p95": 1015781,
+                "p99": 1015781,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 7260,
+                "mean": 7260.0,
+                "min": 7260,
+                "p50": 7260,
+                "p95": 7260,
+                "p99": 7260,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 671607,
+                "mean": 671607.0,
+                "min": 671607,
+                "p50": 671607,
+                "p95": 671607,
+                "p99": 671607,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 3801,
+                "mean": 3801.0,
+                "min": 3801,
+                "p50": 3801,
+                "p95": 3801,
+                "p99": 3801,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52312206,
+                "mean": 52311278.0,
+                "min": 52310350,
+                "p50": 52311278,
+                "p95": 52312142,
+                "p99": 52312206,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51968032,
+                "mean": 51967104.0,
+                "min": 51966176,
+                "p50": 51967104,
+                "p95": 51967968,
+                "p99": 51968032,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 307,
+                "mean": 307.0,
+                "min": 307,
+                "p50": 307,
+                "p95": 307,
+                "p99": 307,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 665562,
+              "mean": 626314.2,
+              "min": 609963,
+              "p50": 626683,
+              "p95": 647312,
+              "p99": 665562,
+              "sample_order_sha256": "0279698502a4ac768f901360718a0351ea7bafc2a0061e2957bc440cf064b747",
+              "samples": 30
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          },
+          "xls_semantic_open": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 1015781,
+                "mean": 1015781.0,
+                "min": 1015781,
+                "p50": 1015781,
+                "p95": 1015781,
+                "p99": 1015781,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 7260,
+                "mean": 7260.0,
+                "min": 7260,
+                "p50": 7260,
+                "p95": 7260,
+                "p99": 7260,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 671607,
+                "mean": 671607.0,
+                "min": 671607,
+                "p50": 671607,
+                "p95": 671607,
+                "p99": 671607,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 3801,
+                "mean": 3801.0,
+                "min": 3801,
+                "p50": 3801,
+                "p95": 3801,
+                "p99": 3801,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52212098,
+                "mean": 52211170.0,
+                "min": 52210242,
+                "p50": 52211170,
+                "p95": 52212034,
+                "p99": 52212098,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51867924,
+                "mean": 51866996.0,
+                "min": 51866068,
+                "p50": 51866996,
+                "p95": 51867860,
+                "p99": 51867924,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 307,
+                "mean": 307.0,
+                "min": 307,
+                "p50": 307,
+                "p95": 307,
+                "p99": 307,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 673573,
+              "mean": 632627.8666666667,
+              "min": 613023,
+              "p50": 631617,
+              "p95": 651752,
+              "p99": 673573,
+              "sample_order_sha256": "e0e144a877d76a073ae374b06c0ebbe82e99e30bbb83184df87467738886ede1",
+              "samples": 30
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 223742,
+                "mean": 223742.0,
+                "min": 223742,
+                "p50": 223742,
+                "p95": 223742,
+                "p99": 223742,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 124,
+                "mean": 124.0,
+                "min": 124,
+                "p50": 124,
+                "p95": 124,
+                "p99": 124,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 82550,
+                "mean": 82550.0,
+                "min": 82550,
+                "p50": 82550,
+                "p95": 82550,
+                "p99": 82550,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 57,
+                "mean": 57.0,
+                "min": 57,
+                "p50": 57,
+                "p95": 57,
+                "p99": 57,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52556643,
+                "mean": 52553712.86666667,
+                "min": 52549443,
+                "p50": 52553107,
+                "p95": 52556579,
+                "p99": 52556643,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 52415451,
+                "mean": 52412520.86666667,
+                "min": 52408251,
+                "p50": 52411915,
+                "p95": 52415387,
+                "p99": 52415451,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 206091,
+              "mean": 185099.7,
+              "min": 179861,
+              "p50": 181446,
+              "p95": 200760,
+              "p99": 206091,
+              "sample_order_sha256": "31067dcef43d412aa8c442f6cfbd34dcf611dd1006737e103c695d6682389dc1",
+              "samples": 30
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open_list_worksheets": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 223807,
+                "mean": 223807.0,
+                "min": 223807,
+                "p50": 223807,
+                "p95": 223807,
+                "p99": 223807,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 127,
+                "mean": 127.0,
+                "min": 127,
+                "p50": 127,
+                "p95": 127,
+                "p99": 127,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 82550,
+                "mean": 82550.0,
+                "min": 82550,
+                "p50": 82550,
+                "p95": 82550,
+                "p99": 82550,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 57,
+                "mean": 57.0,
+                "min": 57,
+                "p50": 57,
+                "p95": 57,
+                "p99": 57,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52611290,
+                "mean": 52608359.86666667,
+                "min": 52604090,
+                "p50": 52607754,
+                "p95": 52611226,
+                "p99": 52611290,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 52470033,
+                "mean": 52467102.86666667,
+                "min": 52462833,
+                "p50": 52466497,
+                "p95": 52469969,
+                "p99": 52470033,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 203040,
+              "mean": 185600.1,
+              "min": 180861,
+              "p50": 182421,
+              "p95": 199451,
+              "p99": 203040,
+              "sample_order_sha256": "61fdfc8ff6d5b739f591b504b792b06b2bac5f3e5927670d06e6c1cbd34cd22d",
+              "samples": 30
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_source_backed_open_one_cell": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 223774,
+                "mean": 223774.0,
+                "min": 223774,
+                "p50": 223774,
+                "p95": 223774,
+                "p99": 223774,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 126,
+                "mean": 126.0,
+                "min": 126,
+                "p50": 126,
+                "p95": 126,
+                "p99": 126,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 82582,
+                "mean": 82582.0,
+                "min": 82582,
+                "p50": 82582,
+                "p95": 82582,
+                "p99": 82582,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 59,
+                "mean": 59.0,
+                "min": 59,
+                "p50": 59,
+                "p95": 59,
+                "p99": 59,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52670335,
+                "mean": 52667404.86666667,
+                "min": 52663135,
+                "p50": 52666799,
+                "p95": 52670271,
+                "p99": 52670335,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 52529143,
+                "mean": 52526212.86666667,
+                "min": 52521943,
+                "p50": 52525607,
+                "p95": 52529079,
+                "p99": 52529143,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 203771,
+              "mean": 188717.43333333332,
+              "min": 182970,
+              "p50": 185170,
+              "p95": 203381,
+              "p99": 203771,
+              "sample_order_sha256": "055e94be8e3f2545de3419c6f8baf7bd4ce87fca981102a67a1ac7d51d6a67cd",
+              "samples": 30
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "0b7b605828256859db72959ce819b45db9a8ea6cc569e7b92448a769b5736366",
+        "label": "allocator-2",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "role": "candidate"
+      },
+      {
+        "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+        "cases": {
+          "xls_eager_open_list_worksheets": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 1015894,
+                "mean": 1015894.0,
+                "min": 1015894,
+                "p50": 1015894,
+                "p95": 1015894,
+                "p99": 1015894,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 7263,
+                "mean": 7263.0,
+                "min": 7263,
+                "p50": 7263,
+                "p95": 7263,
+                "p99": 7263,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 671607,
+                "mean": 671607.0,
+                "min": 671607,
+                "p50": 671607,
+                "p95": 671607,
+                "p99": 671607,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 3801,
+                "mean": 3801.0,
+                "min": 3801,
+                "p50": 3801,
+                "p95": 3801,
+                "p99": 3801,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52262265,
+                "mean": 52261337.0,
+                "min": 52260409,
+                "p50": 52261337,
+                "p95": 52262201,
+                "p99": 52262265,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51917978,
+                "mean": 51917050.0,
+                "min": 51916122,
+                "p50": 51917050,
+                "p95": 51917914,
+                "p99": 51917978,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 307,
+                "mean": 307.0,
+                "min": 307,
+                "p50": 307,
+                "p95": 307,
+                "p99": 307,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 641342,
+              "mean": 626207.1333333333,
+              "min": 610711,
+              "p50": 626802,
+              "p95": 638972,
+              "p99": 641342,
+              "sample_order_sha256": "05869012500036d23aba559958a39d13320234df4b77bba67553c65e4edae207",
+              "samples": 30
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_eager_open_one_cell": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 1015781,
+                "mean": 1015781.0,
+                "min": 1015781,
+                "p50": 1015781,
+                "p95": 1015781,
+                "p99": 1015781,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 7260,
+                "mean": 7260.0,
+                "min": 7260,
+                "p50": 7260,
+                "p95": 7260,
+                "p99": 7260,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 671607,
+                "mean": 671607.0,
+                "min": 671607,
+                "p50": 671607,
+                "p95": 671607,
+                "p99": 671607,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 3801,
+                "mean": 3801.0,
+                "min": 3801,
+                "p50": 3801,
+                "p95": 3801,
+                "p99": 3801,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52312206,
+                "mean": 52311278.0,
+                "min": 52310350,
+                "p50": 52311278,
+                "p95": 52312142,
+                "p99": 52312206,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51968032,
+                "mean": 51967104.0,
+                "min": 51966176,
+                "p50": 51967104,
+                "p95": 51967968,
+                "p99": 51968032,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 307,
+                "mean": 307.0,
+                "min": 307,
+                "p50": 307,
+                "p95": 307,
+                "p99": 307,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 645532,
+              "mean": 626239.2333333333,
+              "min": 608132,
+              "p50": 626427,
+              "p95": 640482,
+              "p99": 645532,
+              "sample_order_sha256": "c55159920cbcbe976fb5110a57866cfc41ee9a4487a072f65eb98c90068e29a3",
+              "samples": 30
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          },
+          "xls_semantic_open": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 1015781,
+                "mean": 1015781.0,
+                "min": 1015781,
+                "p50": 1015781,
+                "p95": 1015781,
+                "p99": 1015781,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 7260,
+                "mean": 7260.0,
+                "min": 7260,
+                "p50": 7260,
+                "p95": 7260,
+                "p99": 7260,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 671607,
+                "mean": 671607.0,
+                "min": 671607,
+                "p50": 671607,
+                "p95": 671607,
+                "p99": 671607,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 3801,
+                "mean": 3801.0,
+                "min": 3801,
+                "p50": 3801,
+                "p95": 3801,
+                "p99": 3801,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52212098,
+                "mean": 52211170.0,
+                "min": 52210242,
+                "p50": 52211170,
+                "p95": 52212034,
+                "p99": 52212098,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51867924,
+                "mean": 51866996.0,
+                "min": 51866068,
+                "p50": 51866996,
+                "p95": 51867860,
+                "p99": 51867924,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 307,
+                "mean": 307.0,
+                "min": 307,
+                "p50": 307,
+                "p95": 307,
+                "p99": 307,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 665012,
+              "mean": 632578.5,
+              "min": 613802,
+              "p50": 631741,
+              "p95": 656132,
+              "p99": 665012,
+              "sample_order_sha256": "bc2e8ca3ef3c53a883aea4b39267a8515c0ba927dcd80200f1f08a43151b3b41",
+              "samples": 30
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 223742,
+                "mean": 223742.0,
+                "min": 223742,
+                "p50": 223742,
+                "p95": 223742,
+                "p99": 223742,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 124,
+                "mean": 124.0,
+                "min": 124,
+                "p50": 124,
+                "p95": 124,
+                "p99": 124,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 82550,
+                "mean": 82550.0,
+                "min": 82550,
+                "p50": 82550,
+                "p95": 82550,
+                "p99": 82550,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 57,
+                "mean": 57.0,
+                "min": 57,
+                "p50": 57,
+                "p95": 57,
+                "p99": 57,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52556643,
+                "mean": 52553712.86666667,
+                "min": 52549443,
+                "p50": 52553107,
+                "p95": 52556579,
+                "p99": 52556643,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 52415451,
+                "mean": 52412520.86666667,
+                "min": 52408251,
+                "p50": 52411915,
+                "p95": 52415387,
+                "p99": 52415451,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 204331,
+              "mean": 183626.86666666667,
+              "min": 178180,
+              "p50": 180150,
+              "p95": 198611,
+              "p99": 204331,
+              "sample_order_sha256": "d1cd407c7f8b2e327689f0af1254d438f6f04d04524d2b127af79eed497bf8f4",
+              "samples": 30
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open_list_worksheets": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 223807,
+                "mean": 223807.0,
+                "min": 223807,
+                "p50": 223807,
+                "p95": 223807,
+                "p99": 223807,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 127,
+                "mean": 127.0,
+                "min": 127,
+                "p50": 127,
+                "p95": 127,
+                "p99": 127,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 82550,
+                "mean": 82550.0,
+                "min": 82550,
+                "p50": 82550,
+                "p95": 82550,
+                "p99": 82550,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 57,
+                "mean": 57.0,
+                "min": 57,
+                "p50": 57,
+                "p95": 57,
+                "p99": 57,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52611290,
+                "mean": 52608359.86666667,
+                "min": 52604090,
+                "p50": 52607754,
+                "p95": 52611226,
+                "p99": 52611290,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 52470033,
+                "mean": 52467102.86666667,
+                "min": 52462833,
+                "p50": 52466497,
+                "p95": 52469969,
+                "p99": 52470033,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 197981,
+              "mean": 184016.63333333333,
+              "min": 179631,
+              "p50": 181545,
+              "p95": 197900,
+              "p99": 197981,
+              "sample_order_sha256": "0f0108ea0ce1d579fc1c9113ce04eee7d5e57bedd241f892a97a7e1817feb833",
+              "samples": 30
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_source_backed_open_one_cell": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 223774,
+                "mean": 223774.0,
+                "min": 223774,
+                "p50": 223774,
+                "p95": 223774,
+                "p99": 223774,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 126,
+                "mean": 126.0,
+                "min": 126,
+                "p50": 126,
+                "p95": 126,
+                "p99": 126,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 82582,
+                "mean": 82582.0,
+                "min": 82582,
+                "p50": 82582,
+                "p95": 82582,
+                "p99": 82582,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 59,
+                "mean": 59.0,
+                "min": 59,
+                "p50": 59,
+                "p95": 59,
+                "p99": 59,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52670335,
+                "mean": 52667404.86666667,
+                "min": 52663135,
+                "p50": 52666799,
+                "p95": 52670271,
+                "p99": 52670335,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 52529143,
+                "mean": 52526212.86666667,
+                "min": 52521943,
+                "p50": 52525607,
+                "p95": 52529079,
+                "p99": 52529143,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 218350,
+              "mean": 191360.53333333333,
+              "min": 185120,
+              "p50": 187125,
+              "p95": 215571,
+              "p99": 218350,
+              "sample_order_sha256": "bec54e678a2347586e53da04569a3982381ddb69faaa3950b853a5356b55669c",
+              "samples": 30
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "0b7b605828256859db72959ce819b45db9a8ea6cc569e7b92448a769b5736366",
+        "label": "allocator-3",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "role": "candidate"
+      },
+      {
+        "binary_sha256": "567128adaa0fb13d35a3769ec8d4f26ef1d7a55ca652a7c6f1109b60ff6da5d8",
+        "cases": {
+          "xls_eager_open_list_worksheets": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 1015894,
+                "mean": 1015894.0,
+                "min": 1015894,
+                "p50": 1015894,
+                "p95": 1015894,
+                "p99": 1015894,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 7263,
+                "mean": 7263.0,
+                "min": 7263,
+                "p50": 7263,
+                "p95": 7263,
+                "p99": 7263,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 671607,
+                "mean": 671607.0,
+                "min": 671607,
+                "p50": 671607,
+                "p95": 671607,
+                "p99": 671607,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 3801,
+                "mean": 3801.0,
+                "min": 3801,
+                "p50": 3801,
+                "p95": 3801,
+                "p99": 3801,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52262265,
+                "mean": 52261337.0,
+                "min": 52260409,
+                "p50": 52261337,
+                "p95": 52262201,
+                "p99": 52262265,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51917978,
+                "mean": 51917050.0,
+                "min": 51916122,
+                "p50": 51917050,
+                "p95": 51917914,
+                "p99": 51917978,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 307,
+                "mean": 307.0,
+                "min": 307,
+                "p50": 307,
+                "p95": 307,
+                "p99": 307,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 644262,
+              "mean": 631767.4666666667,
+              "min": 618842,
+              "p50": 632982,
+              "p95": 642872,
+              "p99": 644262,
+              "sample_order_sha256": "d9e21c7789a180606bcf6200f75a84e2e5eb8bdb28d8c75466082a4b4e0f7bd6",
+              "samples": 30
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_eager_open_one_cell": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 1015781,
+                "mean": 1015781.0,
+                "min": 1015781,
+                "p50": 1015781,
+                "p95": 1015781,
+                "p99": 1015781,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 7260,
+                "mean": 7260.0,
+                "min": 7260,
+                "p50": 7260,
+                "p95": 7260,
+                "p99": 7260,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 671607,
+                "mean": 671607.0,
+                "min": 671607,
+                "p50": 671607,
+                "p95": 671607,
+                "p99": 671607,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 3801,
+                "mean": 3801.0,
+                "min": 3801,
+                "p50": 3801,
+                "p95": 3801,
+                "p99": 3801,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52312206,
+                "mean": 52311278.0,
+                "min": 52310350,
+                "p50": 52311278,
+                "p95": 52312142,
+                "p99": 52312206,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51968032,
+                "mean": 51967104.0,
+                "min": 51966176,
+                "p50": 51967104,
+                "p95": 51967968,
+                "p99": 51968032,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 307,
+                "mean": 307.0,
+                "min": 307,
+                "p50": 307,
+                "p95": 307,
+                "p99": 307,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 663032,
+              "mean": 633537.9,
+              "min": 618942,
+              "p50": 632457,
+              "p95": 651162,
+              "p99": 663032,
+              "sample_order_sha256": "d82869da6d254d2e0c7162db249d921a58dabff80c83ea2b962fa3beef2a6ec1",
+              "samples": 30
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          },
+          "xls_semantic_open": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 1015781,
+                "mean": 1015781.0,
+                "min": 1015781,
+                "p50": 1015781,
+                "p95": 1015781,
+                "p99": 1015781,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 7260,
+                "mean": 7260.0,
+                "min": 7260,
+                "p50": 7260,
+                "p95": 7260,
+                "p99": 7260,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 671607,
+                "mean": 671607.0,
+                "min": 671607,
+                "p50": 671607,
+                "p95": 671607,
+                "p99": 671607,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 3801,
+                "mean": 3801.0,
+                "min": 3801,
+                "p50": 3801,
+                "p95": 3801,
+                "p99": 3801,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52212098,
+                "mean": 52211170.0,
+                "min": 52210242,
+                "p50": 52211170,
+                "p95": 52212034,
+                "p99": 52212098,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51867924,
+                "mean": 51866996.0,
+                "min": 51866068,
+                "p50": 51866996,
+                "p95": 51867860,
+                "p99": 51867924,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 307,
+                "mean": 307.0,
+                "min": 307,
+                "p50": 307,
+                "p95": 307,
+                "p99": 307,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 660282,
+              "mean": 635606.8333333334,
+              "min": 618272,
+              "p50": 636832,
+              "p95": 656512,
+              "p99": 660282,
+              "sample_order_sha256": "69dcfe0107c05228a94eff82b234663803983f9508eec3dcd40efa290e89e3f6",
+              "samples": 30
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 274206,
+                "mean": 274206.0,
+                "min": 274206,
+                "p50": 274206,
+                "p95": 274206,
+                "p99": 274206,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 458,
+                "mean": 458.0,
+                "min": 458,
+                "p50": 458,
+                "p95": 458,
+                "p99": 458,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 131926,
+                "mean": 131926.0,
+                "min": 131926,
+                "p50": 131926,
+                "p95": 131926,
+                "p99": 131926,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 390,
+                "mean": 390.0,
+                "min": 390,
+                "p50": 390,
+                "p95": 390,
+                "p99": 390,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52557731,
+                "mean": 52554800.86666667,
+                "min": 52550531,
+                "p50": 52554195,
+                "p95": 52557667,
+                "p99": 52557731,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 52415451,
+                "mean": 52412520.86666667,
+                "min": 52408251,
+                "p50": 52411915,
+                "p95": 52415387,
+                "p99": 52415451,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 5652787,
+              "mean": 5618975.633333334,
+              "min": 5595647,
+              "p50": 5617392,
+              "p95": 5649726,
+              "p99": 5652787,
+              "sample_order_sha256": "026f2397831bdd2817754dd3482c15fc4d791b6c6248e9e801d22d023b19401b",
+              "samples": 30
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open_list_worksheets": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 274271,
+                "mean": 274271.0,
+                "min": 274271,
+                "p50": 274271,
+                "p95": 274271,
+                "p99": 274271,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 461,
+                "mean": 461.0,
+                "min": 461,
+                "p50": 461,
+                "p95": 461,
+                "p99": 461,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 131926,
+                "mean": 131926.0,
+                "min": 131926,
+                "p50": 131926,
+                "p95": 131926,
+                "p99": 131926,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 390,
+                "mean": 390.0,
+                "min": 390,
+                "p50": 390,
+                "p95": 390,
+                "p99": 390,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52612378,
+                "mean": 52609447.86666667,
+                "min": 52605178,
+                "p50": 52608842,
+                "p95": 52612314,
+                "p99": 52612378,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 52470033,
+                "mean": 52467102.86666667,
+                "min": 52462833,
+                "p50": 52466497,
+                "p95": 52469969,
+                "p99": 52470033,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 5608897,
+              "mean": 5590582.866666666,
+              "min": 5572387,
+              "p50": 5589516,
+              "p95": 5608027,
+              "p99": 5608897,
+              "sample_order_sha256": "b524e0d17e0867e1bcdaf695e16efb80fd07d1a5372d5cde6642fdf6e4e87526",
+              "samples": 30
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_source_backed_open_one_cell": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 280542,
+                "mean": 280542.0,
+                "min": 280542,
+                "p50": 280542,
+                "p95": 280542,
+                "p99": 280542,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 488,
+                "mean": 488.0,
+                "min": 488,
+                "p50": 488,
+                "p95": 488,
+                "p99": 488,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 138934,
+                "mean": 138934.0,
+                "min": 138934,
+                "p50": 138934,
+                "p95": 138934,
+                "p99": 138934,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 420,
+                "mean": 420.0,
+                "min": 420,
+                "p50": 420,
+                "p95": 420,
+                "p99": 420,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52670751,
+                "mean": 52667820.86666667,
+                "min": 52663551,
+                "p50": 52667215,
+                "p95": 52670687,
+                "p99": 52670751,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 52529143,
+                "mean": 52526212.86666667,
+                "min": 52521943,
+                "p50": 52525607,
+                "p95": 52529079,
+                "p99": 52529143,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757606,
+                "mean": 152757606.0,
+                "min": 152757606,
+                "p50": 152757606,
+                "p95": 152757606,
+                "p99": 152757606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 6168519,
+              "mean": 6091932.066666666,
+              "min": 6066238,
+              "p50": 6093153,
+              "p95": 6108188,
+              "p99": 6168519,
+              "sample_order_sha256": "88d81d65f1fa5e4766cc1ccf877a515a222d14ac60f60468103e5adeccec2e3f",
+              "samples": 30
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "0b7b605828256859db72959ce819b45db9a8ea6cc569e7b92448a769b5736366",
+        "label": "allocator-4",
+        "revision": "70756ae67e6763428759e8f446718ce68a528976",
+        "role": "control"
+      }
+    ],
+    "normal": [
+      {
+        "binary_sha256": "024f67f40370d93025f01c161ee7b16690f6f05736154bea820b69eb6ac92d1b",
+        "cases": {
+          "xls_eager_open_list_worksheets": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 540072,
+              "mean": 504359.868,
+              "min": 482002,
+              "p50": 503807,
+              "p95": 518632,
+              "p99": 525592,
+              "sample_order_sha256": "215d494ca220d5cc87df7eefe34a420146f1e1c4441c58ad1205b487565d93a1",
+              "samples": 500
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_eager_open_one_cell": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 553332,
+              "mean": 509669.564,
+              "min": 482792,
+              "p50": 509882,
+              "p95": 524762,
+              "p99": 530722,
+              "sample_order_sha256": "a11ee72d2d70174253a853232e543d5a7a0a5f67efc87632bc1787297a930ac9",
+              "samples": 500
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          },
+          "xls_semantic_open": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 528103,
+              "mean": 504710.486,
+              "min": 482282,
+              "p50": 504722,
+              "p95": 518422,
+              "p99": 524812,
+              "sample_order_sha256": "aabb8dde417b44e9a9a00055cb4211289ae2387ce3e19fe55bd7f92de685e332",
+              "samples": 500
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 5689793,
+              "mean": 5610278.644,
+              "min": 5580652,
+              "p50": 5609687,
+              "p95": 5626142,
+              "p99": 5636472,
+              "sample_order_sha256": "cfd07cc08d80ade6cd835539aa0c0e82541ad4ce2cff233bd6f2e5a40e45d6a0",
+              "samples": 500
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open_list_worksheets": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 5967463,
+              "mean": 5607577.83,
+              "min": 5581142,
+              "p50": 5604942,
+              "p95": 5622572,
+              "p99": 5635202,
+              "sample_order_sha256": "b78cc9d78d1e22ef478f1c8d70df050c15cc7f6e30124154ac4683e206f834b9",
+              "samples": 500
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_source_backed_open_one_cell": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 6373145,
+              "mean": 6072987.69,
+              "min": 6042354,
+              "p50": 6072834,
+              "p95": 6092724,
+              "p99": 6109164,
+              "sample_order_sha256": "095447aa8a0ee802f37a9c24181aae795a469759f2fa54102cdf354f2021bb57",
+              "samples": 500
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "0b7b605828256859db72959ce819b45db9a8ea6cc569e7b92448a769b5736366",
+        "label": "normal-1",
+        "revision": "70756ae67e6763428759e8f446718ce68a528976",
+        "role": "control"
+      },
+      {
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cases": {
+          "xls_eager_open_list_worksheets": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 542093,
+              "mean": 509410.318,
+              "min": 485972,
+              "p50": 508477,
+              "p95": 524902,
+              "p99": 529152,
+              "sample_order_sha256": "51f93c36ed5c44bbdc4d867ae9bb8795a22ac83b441b1a5db0e130392dbcda31",
+              "samples": 500
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_eager_open_one_cell": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 546802,
+              "mean": 512861.686,
+              "min": 493762,
+              "p50": 513377,
+              "p95": 527912,
+              "p99": 534493,
+              "sample_order_sha256": "92d6606ca782558f169018d9d8395cd5c771996da0e4d2141c14fbaa003370b5",
+              "samples": 500
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          },
+          "xls_semantic_open": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 536542,
+              "mean": 503180.386,
+              "min": 479222,
+              "p50": 503767,
+              "p95": 517562,
+              "p99": 522782,
+              "sample_order_sha256": "f97f18f94fa4ab301f4c208777ec60f583c591e4c02a2f5b1b8472e0985c459d",
+              "samples": 500
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 272061,
+              "mean": 178299.986,
+              "min": 170961,
+              "p50": 174466,
+              "p95": 196101,
+              "p99": 201571,
+              "sample_order_sha256": "41bd767d8edcfadf5e921c283fb66e8cf39b966d954a9168dd033265c5ce991e",
+              "samples": 500
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open_list_worksheets": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 218341,
+              "mean": 177800.05,
+              "min": 165811,
+              "p50": 174741,
+              "p95": 194980,
+              "p99": 199121,
+              "sample_order_sha256": "b23da3acac8c00fd772ebc5ca5f0e9877c3a08ee922d37a2681c2dd6a12458f5",
+              "samples": 500
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_source_backed_open_one_cell": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 206001,
+              "mean": 182119.596,
+              "min": 168731,
+              "p50": 179200,
+              "p95": 200021,
+              "p99": 203411,
+              "sample_order_sha256": "17f1575faa7b638703ef4727c6ef542ccd4de984e0a674b5c4f6d1dc256dbffa",
+              "samples": 500
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "0b7b605828256859db72959ce819b45db9a8ea6cc569e7b92448a769b5736366",
+        "label": "normal-2",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "role": "candidate"
+      },
+      {
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cases": {
+          "xls_eager_open_list_worksheets": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 540042,
+              "mean": 509806.924,
+              "min": 492562,
+              "p50": 509777,
+              "p95": 523592,
+              "p99": 527602,
+              "sample_order_sha256": "59b29ac3675a35405038439a71bc04ef9a235bd44a3ca2bdeadac9d8d20dbdf0",
+              "samples": 500
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_eager_open_one_cell": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 529312,
+              "mean": 508170.24,
+              "min": 483562,
+              "p50": 509242,
+              "p95": 520692,
+              "p99": 525172,
+              "sample_order_sha256": "23a28fa3b96a5141b4e16843f7d39e68bc45cfb2901ffd59485242ade0ca9290",
+              "samples": 500
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          },
+          "xls_semantic_open": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 531872,
+              "mean": 504541.822,
+              "min": 482612,
+              "p50": 504692,
+              "p95": 517902,
+              "p99": 521232,
+              "sample_order_sha256": "fe0ab37917213a6784082d5cfa7ca1a3661ddf3aa332ac927ca1501d2ea7f7a1",
+              "samples": 500
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 202171,
+              "mean": 177790.976,
+              "min": 166800,
+              "p50": 174931,
+              "p95": 195171,
+              "p99": 199271,
+              "sample_order_sha256": "031f7869cfd645121959df4106d98af55c8a88889918a319fdd61ab5caa4fa9c",
+              "samples": 500
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open_list_worksheets": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 235071,
+              "mean": 178135.276,
+              "min": 169511,
+              "p50": 174951,
+              "p95": 195180,
+              "p99": 198561,
+              "sample_order_sha256": "d59421f9129d570d27beb1487a6fb9e3895388a1e2a24ea4fbc75f493108e93e",
+              "samples": 500
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_source_backed_open_one_cell": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 217681,
+              "mean": 179599.122,
+              "min": 167571,
+              "p50": 177676,
+              "p95": 198321,
+              "p99": 203101,
+              "sample_order_sha256": "2f1aa11e0b4525a4f3196a259e2de7bd2f58772296dd9a5818dcd5a45a046af0",
+              "samples": 500
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "0b7b605828256859db72959ce819b45db9a8ea6cc569e7b92448a769b5736366",
+        "label": "normal-3",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "role": "candidate"
+      },
+      {
+        "binary_sha256": "024f67f40370d93025f01c161ee7b16690f6f05736154bea820b69eb6ac92d1b",
+        "cases": {
+          "xls_eager_open_list_worksheets": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 542811,
+              "mean": 505317.268,
+              "min": 477981,
+              "p50": 504836,
+              "p95": 522482,
+              "p99": 526432,
+              "sample_order_sha256": "766c4f3f68afe904be07c3a4228749bf2cacf8ad62bc3f4a5665c54a2b5d4ea4",
+              "samples": 500
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_eager_open_one_cell": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 750882,
+              "mean": 515452.934,
+              "min": 499332,
+              "p50": 516107,
+              "p95": 527841,
+              "p99": 538382,
+              "sample_order_sha256": "39f589c617a40091feb38515f218c2270e95c720b73db36a4d3b0d88dea4fae2",
+              "samples": 500
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          },
+          "xls_semantic_open": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 561302,
+              "mean": 510039.978,
+              "min": 481162,
+              "p50": 510237,
+              "p95": 523422,
+              "p99": 528672,
+              "sample_order_sha256": "2787d4b18839fd28c0375e577a05842c6f51bdc298e334ebb540678e42d4b183",
+              "samples": 500
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 5654245,
+              "mean": 5536389.472,
+              "min": 5407335,
+              "p50": 5571505,
+              "p95": 5588354,
+              "p99": 5604765,
+              "sample_order_sha256": "826a6fe8039bc66c296f6d87d715aef38223093edfebfe28acb52ede9e24e6e0",
+              "samples": 500
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_source_backed_open_list_worksheets": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 5822085,
+              "mean": 5544596.23,
+              "min": 5408424,
+              "p50": 5574780,
+              "p95": 5593145,
+              "p99": 5613035,
+              "sample_order_sha256": "50c19a36400fb66fb2bee018a7e17385b8a0ce018d1f2d0be1de81b8b6ae27ab",
+              "samples": 500
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_source_backed_open_one_cell": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 6244266,
+              "mean": 6027177.246,
+              "min": 5866476,
+              "p50": 6032486,
+              "p95": 6049596,
+              "p99": 6061436,
+              "sample_order_sha256": "4ea3826865257c562f18d408674ebb96f5921a0288b536964ee977d9b3ca7a9c",
+              "samples": 500
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "0b7b605828256859db72959ce819b45db9a8ea6cc569e7b92448a769b5736366",
+        "label": "normal-4",
+        "revision": "70756ae67e6763428759e8f446718ce68a528976",
+        "role": "control"
+      }
+    ],
+    "owned": [
+      {
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cases": {
+          "xls_owned_source_open": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 196491,
+              "mean": 166138.214,
+              "min": 156001,
+              "p50": 164141,
+              "p95": 181721,
+              "p99": 185960,
+              "sample_order_sha256": "aa8ef0c9151102481cc80c4f4d0b66cdbc26690079d91f5a3dbe4d67bf4d08a4",
+              "samples": 500
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_owned_source_open_list_worksheets": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 252691,
+              "mean": 167938.598,
+              "min": 155691,
+              "p50": 165856,
+              "p95": 181431,
+              "p99": 185391,
+              "sample_order_sha256": "25cb7e6c85468bcffb85afbc637f29a0fa424bd02980e1f1fe1216cc6d606a76",
+              "samples": 500
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_owned_source_open_one_cell": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 194311,
+              "mean": 169214.768,
+              "min": 156411,
+              "p50": 168560,
+              "p95": 184881,
+              "p99": 188971,
+              "sample_order_sha256": "c78796bbb396811dce6e4b7e631b41d2db4036858cdc1632331d0363e8f06c0b",
+              "samples": 500
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "5fdd3f29c7c98e2cb9269d126523b166cba8782f3eb97bbd2cb7baa67ccdbfd7",
+        "label": "owned-1",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "role": "candidate"
+      },
+      {
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cases": {
+          "xls_owned_source_open": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 199430,
+              "mean": 166083.418,
+              "min": 156720,
+              "p50": 163961,
+              "p95": 181571,
+              "p99": 185301,
+              "sample_order_sha256": "6d4253cf67a1ef050cafcbf402e3788c5bdd58846633330cef857c13104c00b1",
+              "samples": 500
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_owned_source_open_list_worksheets": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 188201,
+              "mean": 166532.864,
+              "min": 155501,
+              "p50": 164370,
+              "p95": 182911,
+              "p99": 185181,
+              "sample_order_sha256": "1fc1af4466b8f26a57f4a255c14bd8adffd97efcfd7fd80974581e4d118ca862",
+              "samples": 500
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_owned_source_open_one_cell": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 208460,
+              "mean": 168230.428,
+              "min": 157480,
+              "p50": 165870,
+              "p95": 185521,
+              "p99": 190380,
+              "sample_order_sha256": "01df41f4153c2e4a2ac8bc9b58f24b0e7f22ba57d12d087e1b965f037c955600",
+              "samples": 500
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "5fdd3f29c7c98e2cb9269d126523b166cba8782f3eb97bbd2cb7baa67ccdbfd7",
+        "label": "owned-2",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "role": "candidate"
+      },
+      {
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cases": {
+          "xls_owned_source_open": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 208971,
+              "mean": 168222.624,
+              "min": 160730,
+              "p50": 165116,
+              "p95": 185151,
+              "p99": 189940,
+              "sample_order_sha256": "9a9bbcefbeeba6497b51c5229b622ae5810fdbf84831926b132ab3898c01250f",
+              "samples": 500
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_owned_source_open_list_worksheets": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 193761,
+              "mean": 167988.174,
+              "min": 160561,
+              "p50": 165231,
+              "p95": 184421,
+              "p99": 187840,
+              "sample_order_sha256": "5395bb4da8f09d1894655e0c4113aac717f1f4714804dc06b34ea4ce7dba0b4d",
+              "samples": 500
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_owned_source_open_one_cell": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 206251,
+              "mean": 169843.6,
+              "min": 161400,
+              "p50": 166825,
+              "p95": 186591,
+              "p99": 189700,
+              "sample_order_sha256": "b0732d49ac4ec637fdef00408c54785bd4a0ab67fe789499b74d56455cf808a0",
+              "samples": 500
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "5fdd3f29c7c98e2cb9269d126523b166cba8782f3eb97bbd2cb7baa67ccdbfd7",
+        "label": "owned-3",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "role": "candidate"
+      },
+      {
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cases": {
+          "xls_owned_source_open": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 192681,
+              "mean": 167477.306,
+              "min": 157340,
+              "p50": 165120,
+              "p95": 185661,
+              "p99": 189321,
+              "sample_order_sha256": "14df64c28f8500662a1808de4c92ae306bc5b3f78a32929bfad925611d671fff",
+              "samples": 500
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_owned_source_open_list_worksheets": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 196731,
+              "mean": 168246.1,
+              "min": 157291,
+              "p50": 165831,
+              "p95": 185840,
+              "p99": 190121,
+              "sample_order_sha256": "7ea96c0ab4eae52c2d95bf50a606860f07c0db559872da8e7c89685dfad1f502",
+              "samples": 500
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_owned_source_open_one_cell": {
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 213150,
+              "mean": 170292.494,
+              "min": 158750,
+              "p50": 168005,
+              "p95": 188400,
+              "p99": 192710,
+              "sample_order_sha256": "aa424bc81e8575c6866b6583d5ee3ff71e1faaecedbac33c3ea8e9f01a3f25f4",
+              "samples": 500
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "5fdd3f29c7c98e2cb9269d126523b166cba8782f3eb97bbd2cb7baa67ccdbfd7",
+        "label": "owned-4",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "role": "candidate"
+      }
+    ],
+    "owned-allocator": [
+      {
+        "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+        "cases": {
+          "xls_owned_source_open": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 223742,
+                "mean": 223742.0,
+                "min": 223742,
+                "p50": 223742,
+                "p95": 223742,
+                "p99": 223742,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 124,
+                "mean": 124.0,
+                "min": 124,
+                "p50": 124,
+                "p95": 124,
+                "p99": 124,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 82550,
+                "mean": 82550.0,
+                "min": 82550,
+                "p50": 82550,
+                "p95": 82550,
+                "p99": 82550,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 57,
+                "mean": 57.0,
+                "min": 57,
+                "p50": 57,
+                "p95": 57,
+                "p99": 57,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52009192,
+                "mean": 52008264.0,
+                "min": 52007336,
+                "p50": 52008264,
+                "p95": 52009128,
+                "p99": 52009192,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51868000,
+                "mean": 51867072.0,
+                "min": 51866144,
+                "p50": 51867072,
+                "p95": 51867936,
+                "p99": 51868000,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757610,
+                "mean": 152757610.0,
+                "min": 152757610,
+                "p50": 152757610,
+                "p95": 152757610,
+                "p99": 152757610,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757610,
+                "mean": 152757610.0,
+                "min": 152757610,
+                "p50": 152757610,
+                "p95": 152757610,
+                "p99": 152757610,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 195250,
+              "mean": 173457.03333333333,
+              "min": 167131,
+              "p50": 170106,
+              "p95": 192891,
+              "p99": 195250,
+              "sample_order_sha256": "ed0a1dee23367b8193a4e626d8edee99a42a1a0bfc7f57db0371c2dc5b08da7e",
+              "samples": 30
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_owned_source_open_list_worksheets": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 223807,
+                "mean": 223807.0,
+                "min": 223807,
+                "p50": 223807,
+                "p95": 223807,
+                "p99": 223807,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 127,
+                "mean": 127.0,
+                "min": 127,
+                "p50": 127,
+                "p95": 127,
+                "p99": 127,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 82550,
+                "mean": 82550.0,
+                "min": 82550,
+                "p50": 82550,
+                "p95": 82550,
+                "p99": 82550,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 57,
+                "mean": 57.0,
+                "min": 57,
+                "p50": 57,
+                "p95": 57,
+                "p99": 57,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52019560,
+                "mean": 52018632.0,
+                "min": 52017704,
+                "p50": 52018632,
+                "p95": 52019496,
+                "p99": 52019560,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51878303,
+                "mean": 51877375.0,
+                "min": 51876447,
+                "p50": 51877375,
+                "p95": 51878239,
+                "p99": 51878303,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757610,
+                "mean": 152757610.0,
+                "min": 152757610,
+                "p50": 152757610,
+                "p95": 152757610,
+                "p99": 152757610,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757610,
+                "mean": 152757610.0,
+                "min": 152757610,
+                "p50": 152757610,
+                "p95": 152757610,
+                "p99": 152757610,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 190550,
+              "mean": 170202.3,
+              "min": 165811,
+              "p50": 166790,
+              "p95": 186560,
+              "p99": 190550,
+              "sample_order_sha256": "0fd1327ec329bf32163fa4d417226413ed54f0788cd264f6d271d760491e53e8",
+              "samples": 30
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_owned_source_open_one_cell": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 223774,
+                "mean": 223774.0,
+                "min": 223774,
+                "p50": 223774,
+                "p95": 223774,
+                "p99": 223774,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 126,
+                "mean": 126.0,
+                "min": 126,
+                "p50": 126,
+                "p95": 126,
+                "p99": 126,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 82582,
+                "mean": 82582.0,
+                "min": 82582,
+                "p50": 82582,
+                "p95": 82582,
+                "p99": 82582,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 59,
+                "mean": 59.0,
+                "min": 59,
+                "p50": 59,
+                "p95": 59,
+                "p99": 59,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52029798,
+                "mean": 52028870.0,
+                "min": 52027942,
+                "p50": 52028870,
+                "p95": 52029734,
+                "p99": 52029798,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51888606,
+                "mean": 51887678.0,
+                "min": 51886750,
+                "p50": 51887678,
+                "p95": 51888542,
+                "p99": 51888606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757610,
+                "mean": 152757610.0,
+                "min": 152757610,
+                "p50": 152757610,
+                "p95": 152757610,
+                "p99": 152757610,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757610,
+                "mean": 152757610.0,
+                "min": 152757610,
+                "p50": 152757610,
+                "p95": 152757610,
+                "p99": 152757610,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 195351,
+              "mean": 174374.26666666666,
+              "min": 169051,
+              "p50": 170960,
+              "p95": 191811,
+              "p99": 195351,
+              "sample_order_sha256": "1e84a621d1a30fddf1cf1d3ae3b651e56a198d5d23da5980f2dbb528355f5f0b",
+              "samples": 30
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "5fdd3f29c7c98e2cb9269d126523b166cba8782f3eb97bbd2cb7baa67ccdbfd7",
+        "label": "owned-allocator-1",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "role": "candidate"
+      },
+      {
+        "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+        "cases": {
+          "xls_owned_source_open": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 223742,
+                "mean": 223742.0,
+                "min": 223742,
+                "p50": 223742,
+                "p95": 223742,
+                "p99": 223742,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 124,
+                "mean": 124.0,
+                "min": 124,
+                "p50": 124,
+                "p95": 124,
+                "p99": 124,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 82550,
+                "mean": 82550.0,
+                "min": 82550,
+                "p50": 82550,
+                "p95": 82550,
+                "p99": 82550,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 57,
+                "mean": 57.0,
+                "min": 57,
+                "p50": 57,
+                "p95": 57,
+                "p99": 57,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52009192,
+                "mean": 52008264.0,
+                "min": 52007336,
+                "p50": 52008264,
+                "p95": 52009128,
+                "p99": 52009192,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51868000,
+                "mean": 51867072.0,
+                "min": 51866144,
+                "p50": 51867072,
+                "p95": 51867936,
+                "p99": 51868000,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757610,
+                "mean": 152757610.0,
+                "min": 152757610,
+                "p50": 152757610,
+                "p95": 152757610,
+                "p99": 152757610,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757610,
+                "mean": 152757610.0,
+                "min": 152757610,
+                "p50": 152757610,
+                "p95": 152757610,
+                "p99": 152757610,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 193971,
+              "mean": 167507.4,
+              "min": 160731,
+              "p50": 163665,
+              "p95": 193410,
+              "p99": 193971,
+              "sample_order_sha256": "866f96a90a5687e3cb86314f30f5a4110749e019d158eca9b421f271a4642662",
+              "samples": 30
+            },
+            "output_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          },
+          "xls_owned_source_open_list_worksheets": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 223807,
+                "mean": 223807.0,
+                "min": 223807,
+                "p50": 223807,
+                "p95": 223807,
+                "p99": 223807,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 127,
+                "mean": 127.0,
+                "min": 127,
+                "p50": 127,
+                "p95": 127,
+                "p99": 127,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 82550,
+                "mean": 82550.0,
+                "min": 82550,
+                "p50": 82550,
+                "p95": 82550,
+                "p99": 82550,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 57,
+                "mean": 57.0,
+                "min": 57,
+                "p50": 57,
+                "p95": 57,
+                "p99": 57,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52019560,
+                "mean": 52018632.0,
+                "min": 52017704,
+                "p50": 52018632,
+                "p95": 52019496,
+                "p99": 52019560,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51878303,
+                "mean": 51877375.0,
+                "min": 51876447,
+                "p50": 51877375,
+                "p95": 51878239,
+                "p99": 51878303,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757610,
+                "mean": 152757610.0,
+                "min": 152757610,
+                "p50": 152757610,
+                "p95": 152757610,
+                "p99": 152757610,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757610,
+                "mean": 152757610.0,
+                "min": 152757610,
+                "p50": 152757610,
+                "p95": 152757610,
+                "p99": 152757610,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 189541,
+              "mean": 166948.0,
+              "min": 161591,
+              "p50": 164625,
+              "p95": 184311,
+              "p99": 189541,
+              "sample_order_sha256": "2f4682c54fb84569ecd14a13a66918fe871494a74d7fa20300bb8c7c9929a43e",
+              "samples": 30
+            },
+            "output_sha256": "e9f1a47d927dddab1c37d497365644e5533a2dbd97d662a471f481d7d384c505"
+          },
+          "xls_owned_source_open_one_cell": {
+            "allocator": {
+              "allocated_bytes": {
+                "max": 223774,
+                "mean": 223774.0,
+                "min": 223774,
+                "p50": 223774,
+                "p95": 223774,
+                "p99": 223774,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "allocation_calls": {
+                "max": 126,
+                "mean": 126.0,
+                "min": 126,
+                "p50": 126,
+                "p95": 126,
+                "p99": 126,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "deallocated_bytes": {
+                "max": 82582,
+                "mean": 82582.0,
+                "min": 82582,
+                "p50": 82582,
+                "p95": 82582,
+                "p99": 82582,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "deallocation_calls": {
+                "max": 59,
+                "mean": 59.0,
+                "min": 59,
+                "p50": 59,
+                "p95": 59,
+                "p99": 59,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "failed_allocation_calls": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "samples": 30,
+                "unit": "calls"
+              },
+              "live_bytes_after": {
+                "max": 52029798,
+                "mean": 52028870.0,
+                "min": 52027942,
+                "p50": 52028870,
+                "p95": 52029734,
+                "p99": 52029798,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "live_bytes_before": {
+                "max": 51888606,
+                "mean": 51887678.0,
+                "min": 51886750,
+                "p50": 51887678,
+                "p95": 51888542,
+                "p99": 51888606,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_after": {
+                "max": 152757610,
+                "mean": 152757610.0,
+                "min": 152757610,
+                "p50": 152757610,
+                "p95": 152757610,
+                "p99": 152757610,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "peak_live_bytes_before": {
+                "max": 152757610,
+                "mean": 152757610.0,
+                "min": 152757610,
+                "p50": 152757610,
+                "p95": 152757610,
+                "p99": 152757610,
+                "samples": 30,
+                "unit": "bytes"
+              },
+              "reallocation_calls": {
+                "max": 25,
+                "mean": 25.0,
+                "min": 25,
+                "p50": 25,
+                "p95": 25,
+                "p99": 25,
+                "samples": 30,
+                "unit": "calls"
+              }
+            },
+            "elapsed_ns": {
+              "claimable": false,
+              "max": 198531,
+              "mean": 174193.2,
+              "min": 170481,
+              "p50": 171410,
+              "p95": 190681,
+              "p99": 198531,
+              "sample_order_sha256": "ef62107931044211fad9a60115d5d461af9219eaeb50667db69500cf168557f1",
+              "samples": 30
+            },
+            "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1"
+          }
+        },
+        "catalog_content_set_sha256": "5fdd3f29c7c98e2cb9269d126523b166cba8782f3eb97bbd2cb7baa67ccdbfd7",
+        "label": "owned-allocator-2",
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "role": "candidate"
+      }
+    ]
+  },
+  "schema_version": "0412-observer-comparison-v1",
+  "source_counter_scope": {
+    "allocator": {
+      "xls_source_backed_open": {
+        "candidate": "caller-provided ReadAt logical ranges: XLS classification catalog v2 (sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; repeated-read union disabled); actual CFB metadata versus opaque payload",
+        "candidate_version_marker": true,
+        "control": "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload",
+        "path": "source.xls.source_counter_scope",
+        "permitted_only_difference": true
+      },
+      "xls_source_backed_open_list_worksheets": {
+        "candidate": "caller-provided ReadAt logical ranges: XLS classification catalog v2 (sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; repeated-read union disabled); actual CFB metadata versus opaque payload",
+        "candidate_version_marker": true,
+        "control": "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload",
+        "path": "source.xls.source_counter_scope",
+        "permitted_only_difference": true
+      },
+      "xls_source_backed_open_one_cell": {
+        "candidate": "caller-provided ReadAt logical ranges: XLS classification catalog v2 (sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; repeated-read union disabled); actual CFB metadata versus opaque payload",
+        "candidate_version_marker": true,
+        "control": "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload",
+        "path": "source.xls.source_counter_scope",
+        "permitted_only_difference": true
+      }
+    },
+    "normal": {
+      "xls_source_backed_open": {
+        "candidate": "caller-provided ReadAt logical ranges: XLS classification catalog v2 (sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; repeated-read union disabled); actual CFB metadata versus opaque payload",
+        "candidate_version_marker": true,
+        "control": "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload",
+        "path": "source.xls.source_counter_scope",
+        "permitted_only_difference": true
+      },
+      "xls_source_backed_open_list_worksheets": {
+        "candidate": "caller-provided ReadAt logical ranges: XLS classification catalog v2 (sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; repeated-read union disabled); actual CFB metadata versus opaque payload",
+        "candidate_version_marker": true,
+        "control": "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload",
+        "path": "source.xls.source_counter_scope",
+        "permitted_only_difference": true
+      },
+      "xls_source_backed_open_one_cell": {
+        "candidate": "caller-provided ReadAt logical ranges: XLS classification catalog v2 (sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; repeated-read union disabled); actual CFB metadata versus opaque payload",
+        "candidate_version_marker": true,
+        "control": "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload",
+        "path": "source.xls.source_counter_scope",
+        "permitted_only_difference": true
+      }
+    },
+    "owned": {},
+    "owned-allocator": {}
+  },
+  "status": "pass",
+  "validation": {
+    "catalog_binding": "catalog corpus/archive/workbook digests and selected-case bindings",
+    "elapsed_sample_order": "exact elapsed-then-original-index permutation",
+    "operation_metrics": "repository perf_compare._validate_operation_metrics"
+  }
+}

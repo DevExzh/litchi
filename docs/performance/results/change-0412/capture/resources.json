@@ -1,0 +1,1596 @@
+{
+  "binary_identity": {
+    "candidate": {
+      "artifact": {
+        "bytes": 4988,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/candidate-build-identity.json",
+        "sha256": "f583368015b224de496952a03e57793aefcc9d9d3cc67885819d4ee930f19350"
+      },
+      "binaries": {
+        "litchi-perf-baseline": {
+          "bytes": 449775120,
+          "sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8"
+        },
+        "litchi-perf-baseline-alloc": {
+          "bytes": 449779056,
+          "sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a"
+        }
+      },
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "source_status": ""
+    },
+    "control": {
+      "artifact": {
+        "bytes": 4986,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/control-build-identity.json",
+        "sha256": "d92ba983ef20b3a2f02385e73e675c83d7344737a4dc1d78f48b956110c42fa4"
+      },
+      "binaries": {
+        "litchi-perf-baseline": {
+          "bytes": 449566688,
+          "sha256": "024f67f40370d93025f01c161ee7b16690f6f05736154bea820b69eb6ac92d1b"
+        },
+        "litchi-perf-baseline-alloc": {
+          "bytes": 449570656,
+          "sha256": "567128adaa0fb13d35a3769ec8d4f26ef1d7a55ca652a7c6f1109b60ff6da5d8"
+        }
+      },
+      "revision": "70756ae67e6763428759e8f446718ce68a528976",
+      "source_status": ""
+    }
+  },
+  "commands": {
+    "artifact": {
+      "bytes": 20279,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/commands.json",
+      "sha256": "4fbf4dc7b8f0bf063ad59a38d2f0ab12e4abbd50ee48af3479164a115d0b3296"
+    },
+    "entries": {
+      "allocator-1": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/allocator-1.time.txt",
+          "/tmp/litchi-goal-0412-control-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/allocator-1.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/allocator-1.catalog.json"
+        ],
+        "binary_sha256": "567128adaa0fb13d35a3769ec8d4f26ef1d7a55ca652a7c6f1109b60ff6da5d8",
+        "cwd": "/tmp/litchi-goal-0412-control-worktree",
+        "exit_code": 0,
+        "revision": "70756ae67e6763428759e8f446718ce68a528976",
+        "started_utc": "2026-09-05T01:15:06.181525+00:00",
+        "variant": "control",
+        "wall_seconds": 1.1087454649969004
+      },
+      "allocator-2": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/allocator-2.time.txt",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/allocator-2.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/allocator-2.catalog.json"
+        ],
+        "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:15:07.661068+00:00",
+        "variant": "candidate",
+        "wall_seconds": 0.5477607320062816
+      },
+      "allocator-3": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/allocator-3.time.txt",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/allocator-3.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/allocator-3.catalog.json"
+        ],
+        "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:15:08.573924+00:00",
+        "variant": "candidate",
+        "wall_seconds": 0.5506635410129093
+      },
+      "allocator-4": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/allocator-4.time.txt",
+          "/tmp/litchi-goal-0412-control-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/allocator-4.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/allocator-4.catalog.json"
+        ],
+        "binary_sha256": "567128adaa0fb13d35a3769ec8d4f26ef1d7a55ca652a7c6f1109b60ff6da5d8",
+        "cwd": "/tmp/litchi-goal-0412-control-worktree",
+        "exit_code": 0,
+        "revision": "70756ae67e6763428759e8f446718ce68a528976",
+        "started_utc": "2026-09-05T01:15:09.495327+00:00",
+        "variant": "control",
+        "wall_seconds": 1.1045947499806061
+      },
+      "normal-1": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/normal-1.time.txt",
+          "/tmp/litchi-goal-0412-control-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+          "--samples",
+          "500",
+          "--warmup",
+          "20",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/normal-1.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/normal-1.catalog.json"
+        ],
+        "binary_sha256": "024f67f40370d93025f01c161ee7b16690f6f05736154bea820b69eb6ac92d1b",
+        "cwd": "/tmp/litchi-goal-0412-control-worktree",
+        "exit_code": 0,
+        "revision": "70756ae67e6763428759e8f446718ce68a528976",
+        "started_utc": "2026-09-05T01:14:32.668742+00:00",
+        "variant": "control",
+        "wall_seconds": 11.417994763003662
+      },
+      "normal-2": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/normal-2.time.txt",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+          "--samples",
+          "500",
+          "--warmup",
+          "20",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/normal-2.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/normal-2.catalog.json"
+        ],
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:14:44.464922+00:00",
+        "variant": "candidate",
+        "wall_seconds": 2.760841826995602
+      },
+      "normal-3": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/normal-3.time.txt",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+          "--samples",
+          "500",
+          "--warmup",
+          "20",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/normal-3.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/normal-3.catalog.json"
+        ],
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:14:47.598414+00:00",
+        "variant": "candidate",
+        "wall_seconds": 2.759941253985744
+      },
+      "normal-4": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/normal-4.time.txt",
+          "/tmp/litchi-goal-0412-control-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_semantic_open,xls_source_backed_open,xls_eager_open_list_worksheets,xls_source_backed_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open_one_cell",
+          "--samples",
+          "500",
+          "--warmup",
+          "20",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/normal-4.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/normal-4.catalog.json"
+        ],
+        "binary_sha256": "024f67f40370d93025f01c161ee7b16690f6f05736154bea820b69eb6ac92d1b",
+        "cwd": "/tmp/litchi-goal-0412-control-worktree",
+        "exit_code": 0,
+        "revision": "70756ae67e6763428759e8f446718ce68a528976",
+        "started_utc": "2026-09-05T01:14:50.732615+00:00",
+        "variant": "control",
+        "wall_seconds": 11.329974514985224
+      },
+      "owned-1": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/owned-1.time.txt",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "500",
+          "--warmup",
+          "20",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/owned-1.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/owned-1.catalog.json"
+        ],
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:15:22.582597+00:00",
+        "variant": "candidate",
+        "wall_seconds": 1.2035815600247588
+      },
+      "owned-2": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/owned-2.time.txt",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "500",
+          "--warmup",
+          "20",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/owned-2.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/owned-2.catalog.json"
+        ],
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:15:24.166761+00:00",
+        "variant": "candidate",
+        "wall_seconds": 1.1952153650054242
+      },
+      "owned-3": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/owned-3.time.txt",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "500",
+          "--warmup",
+          "20",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/owned-3.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/owned-3.catalog.json"
+        ],
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:15:25.733200+00:00",
+        "variant": "candidate",
+        "wall_seconds": 1.2022744709975086
+      },
+      "owned-4": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/owned-4.time.txt",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "500",
+          "--warmup",
+          "20",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/owned-4.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/owned-4.catalog.json"
+        ],
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:15:27.306611+00:00",
+        "variant": "candidate",
+        "wall_seconds": 1.1995377629937138
+      },
+      "owned-allocator-1": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/owned-allocator-1.time.txt",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/owned-allocator-1.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/owned-allocator-1.catalog.json"
+        ],
+        "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:15:35.118350+00:00",
+        "variant": "candidate",
+        "wall_seconds": 0.43110411800444126
+      },
+      "owned-allocator-2": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/owned-allocator-2.time.txt",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline-alloc",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+          "--samples",
+          "30",
+          "--warmup",
+          "3",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/owned-allocator-2.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/owned-allocator-2.catalog.json"
+        ],
+        "binary_sha256": "d2e83324dc44e1db338cfa85712c5209ba4d178084b534273147cc3f69a10b4a",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:15:35.915332+00:00",
+        "variant": "candidate",
+        "wall_seconds": 0.4282410070009064
+      },
+      "owned-profile": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "perf",
+          "record",
+          "--no-buildid-cache",
+          "-e",
+          "cycles:u",
+          "-F",
+          "999",
+          "--call-graph",
+          "fp,127",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/owned-profile.data",
+          "--",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open_one_cell",
+          "--samples",
+          "10000",
+          "--warmup",
+          "20",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/owned-profile.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/owned-profile.catalog.json"
+        ],
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:15:41.817003+00:00",
+        "variant": "candidate",
+        "wall_seconds": 5.907145545992535
+      },
+      "owned-stat-1": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "perf",
+          "stat",
+          "--no-big-num",
+          "-x,",
+          "-e",
+          "task-clock,cycles,instructions,branches,branch-misses,page-faults,context-switches,cpu-migrations,l2_cache_req_stat.dc_access_in_l2,l2_cache_req_stat.dc_hit_in_l2",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/owned-stat-1.csv",
+          "--",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open_one_cell",
+          "--samples",
+          "3000",
+          "--warmup",
+          "10",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/owned-stat-1.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/owned-stat-1.catalog.json"
+        ],
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:15:52.386994+00:00",
+        "variant": "candidate",
+        "wall_seconds": 2.130099533009343
+      },
+      "owned-stat-2": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "perf",
+          "stat",
+          "--no-big-num",
+          "-x,",
+          "-e",
+          "task-clock,cycles,instructions,branches,branch-misses,page-faults,context-switches,cpu-migrations,l2_cache_req_stat.dc_access_in_l2,l2_cache_req_stat.dc_hit_in_l2",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/owned-stat-2.csv",
+          "--",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open_one_cell",
+          "--samples",
+          "3000",
+          "--warmup",
+          "10",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/owned-stat-2.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/owned-stat-2.catalog.json"
+        ],
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:15:54.895313+00:00",
+        "variant": "candidate",
+        "wall_seconds": 2.0989338170038536
+      },
+      "owned-stat-3": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "perf",
+          "stat",
+          "--no-big-num",
+          "-x,",
+          "-e",
+          "task-clock,cycles,instructions,branches,branch-misses,page-faults,context-switches,cpu-migrations,l2_cache_req_stat.dc_access_in_l2,l2_cache_req_stat.dc_hit_in_l2",
+          "-o",
+          "/tmp/litchi-goal-0412-capture/owned-stat-3.csv",
+          "--",
+          "/tmp/litchi-goal-0412-candidate-binaries/litchi-perf-baseline",
+          "--filesystem-cache",
+          "warm",
+          "--case",
+          "xls_owned_source_open_one_cell",
+          "--samples",
+          "3000",
+          "--warmup",
+          "10",
+          "--json",
+          "/tmp/litchi-goal-0412-capture/owned-stat-3.json",
+          "--corpus-manifest",
+          "/tmp/litchi-goal-0412-capture/owned-stat-3.catalog.json"
+        ],
+        "binary_sha256": "e4ef82f7a84320ab821c43399d38fd6c00128de04f1456326dda0aa4aeb1c5f8",
+        "cwd": "/tmp/litchi-goal-0412-candidate-worktree",
+        "exit_code": 0,
+        "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+        "started_utc": "2026-09-05T01:15:57.368196+00:00",
+        "variant": "candidate",
+        "wall_seconds": 2.070308499998646
+      }
+    },
+    "labels": [
+      "normal-1",
+      "normal-2",
+      "normal-3",
+      "normal-4",
+      "allocator-1",
+      "allocator-2",
+      "allocator-3",
+      "allocator-4",
+      "owned-1",
+      "owned-2",
+      "owned-3",
+      "owned-4",
+      "owned-allocator-1",
+      "owned-allocator-2",
+      "owned-profile",
+      "owned-stat-1",
+      "owned-stat-2",
+      "owned-stat-3"
+    ],
+    "sequential_nonoverlap_verified": true
+  },
+  "corpus": {
+    "archive_bytes": 16995840,
+    "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+    "name": "xls-comments-opaque-heavy",
+    "package_format": "XLS/CFB",
+    "target_entry": "Workbook",
+    "target_payload_bytes": 80946,
+    "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041"
+  },
+  "counter_artifacts": {
+    "owned-stat-1": {
+      "bytes": 493,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/owned-stat-1.csv",
+      "sha256": "e2d68d4ccbecc0c2dc5206e31594da0e5d8e0493bb241c87f77ee5bf550ceec5"
+    },
+    "owned-stat-2": {
+      "bytes": 493,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/owned-stat-2.csv",
+      "sha256": "e05c1c9cf933a19bbd36b7c12ab5a413dcc976f56a9623e7927dd2f9b34dd204"
+    },
+    "owned-stat-3": {
+      "bytes": 493,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/owned-stat-3.csv",
+      "sha256": "e35d78b7f8a1021ed6dfaa8edc7e0b4b38253bf729574d1b4a72cdaacb66d085"
+    }
+  },
+  "counters": {
+    "owned-stat-1": {
+      "branch_miss_percent_from_scaled_whole_process_counts": 0.08336294470447778,
+      "events": {
+        "branch-misses": {
+          "count": 2380555.0,
+          "running_ns": 1744696268,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "branches": {
+          "count": 2855651283.0,
+          "running_ns": 1743949092,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "context-switches": {
+          "count": 58.0,
+          "running_ns": 2099406743,
+          "scheduled_percent": 100.0,
+          "unit": ""
+        },
+        "cpu-migrations": {
+          "count": 0.0,
+          "running_ns": 2099406743,
+          "scheduled_percent": 100.0,
+          "unit": ""
+        },
+        "cycles": {
+          "count": 8827942657.0,
+          "running_ns": 1753436037,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "instructions": {
+          "count": 16667825431.0,
+          "running_ns": 1751385976,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "l2_cache_req_stat.dc_access_in_l2": {
+          "count": 1444580788.0,
+          "running_ns": 1751588775,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "l2_cache_req_stat.dc_hit_in_l2": {
+          "count": 1408833024.0,
+          "running_ns": 1751977567,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "page-faults": {
+          "count": 57355.0,
+          "running_ns": 2099406743,
+          "scheduled_percent": 100.0,
+          "unit": ""
+        },
+        "task-clock": {
+          "count": 2099.41,
+          "running_ns": 2099406743,
+          "scheduled_percent": 100.0,
+          "unit": "msec"
+        }
+      },
+      "ipc_from_scaled_whole_process_counts": 1.8880758607764028,
+      "scope": "Whole process, scaled multiplexed events; not operation IPC or cache miss rate"
+    },
+    "owned-stat-2": {
+      "branch_miss_percent_from_scaled_whole_process_counts": 0.08403384630635848,
+      "events": {
+        "branch-misses": {
+          "count": 2405433.0,
+          "running_ns": 1733747483,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "branches": {
+          "count": 2862457338.0,
+          "running_ns": 1734991911,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "context-switches": {
+          "count": 59.0,
+          "running_ns": 2078663459,
+          "scheduled_percent": 100.0,
+          "unit": ""
+        },
+        "cpu-migrations": {
+          "count": 0.0,
+          "running_ns": 2078663459,
+          "scheduled_percent": 100.0,
+          "unit": ""
+        },
+        "cycles": {
+          "count": 8748888910.0,
+          "running_ns": 1735206790,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "instructions": {
+          "count": 16692634120.0,
+          "running_ns": 1735607751,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "l2_cache_req_stat.dc_access_in_l2": {
+          "count": 1450652640.0,
+          "running_ns": 1726122326,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "l2_cache_req_stat.dc_hit_in_l2": {
+          "count": 1419787072.0,
+          "running_ns": 1727641034,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "page-faults": {
+          "count": 57351.0,
+          "running_ns": 2078663459,
+          "scheduled_percent": 100.0,
+          "unit": ""
+        },
+        "task-clock": {
+          "count": 2078.66,
+          "running_ns": 2078663459,
+          "scheduled_percent": 100.0,
+          "unit": "msec"
+        }
+      },
+      "ipc_from_scaled_whole_process_counts": 1.9079718912558463,
+      "scope": "Whole process, scaled multiplexed events; not operation IPC or cache miss rate"
+    },
+    "owned-stat-3": {
+      "branch_miss_percent_from_scaled_whole_process_counts": 0.08502548829194471,
+      "events": {
+        "branch-misses": {
+          "count": 2430016.0,
+          "running_ns": 1711399930,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "branches": {
+          "count": 2857985351.0,
+          "running_ns": 1711424873,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "context-switches": {
+          "count": 57.0,
+          "running_ns": 2050781011,
+          "scheduled_percent": 100.0,
+          "unit": ""
+        },
+        "cpu-migrations": {
+          "count": 0.0,
+          "running_ns": 2050781011,
+          "scheduled_percent": 100.0,
+          "unit": ""
+        },
+        "cycles": {
+          "count": 8623923244.0,
+          "running_ns": 1701260015,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "instructions": {
+          "count": 16641486655.0,
+          "running_ns": 1705215384,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "l2_cache_req_stat.dc_access_in_l2": {
+          "count": 1451156345.0,
+          "running_ns": 1713083452,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "l2_cache_req_stat.dc_hit_in_l2": {
+          "count": 1411452368.0,
+          "running_ns": 1711521401,
+          "scheduled_percent": 83.0,
+          "unit": ""
+        },
+        "page-faults": {
+          "count": 57394.0,
+          "running_ns": 2050781011,
+          "scheduled_percent": 100.0,
+          "unit": ""
+        },
+        "task-clock": {
+          "count": 2050.78,
+          "running_ns": 2050781011,
+          "scheduled_percent": 100.0,
+          "unit": "msec"
+        }
+      },
+      "ipc_from_scaled_whole_process_counts": 1.9296886329059262,
+      "scope": "Whole process, scaled multiplexed events; not operation IPC or cache miss rate"
+    }
+  },
+  "limitations": [
+    "Perf scales multiplexed hardware events; retain scheduled percentages and do not infer operation-local IPC.",
+    "Native L2 requests/hits are not exact L1 or LLC metrics.",
+    "RSS is a child high-water mark for each whole-process dispatch, not an operation peak.",
+    "No production before/after, cold-cache, physical-I/O, remote-source, scaling, or exact request-size claim is inferred."
+  ],
+  "observer_scope": {
+    "allocator_abba_verified": true,
+    "candidate": "caller-provided ReadAt logical ranges: XLS classification catalog v2 (sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; repeated-read union disabled); actual CFB metadata versus opaque payload",
+    "control": "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload",
+    "differ": true,
+    "normal_abba_verified": true,
+    "plain_owned_source_has_no_scope": true
+  },
+  "performance_claim": "none",
+  "profiles": {
+    "owned_source_open_one_cell": {
+      "call_graph": "fp,127",
+      "data_artifact": {
+        "bytes": 893232,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-profile.data",
+        "sha256": "e7cbfb083ff7f9ca69538f0f81a489438950f2cc3ae29a09af94c43a0aec24c7"
+      },
+      "event": "cycles:u",
+      "frequency": 999,
+      "lost_samples": 0,
+      "self_report_artifact": {
+        "bytes": 16159,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-profile-self.stdout",
+        "sha256": "6e8a1a745cb8509792b6565aeab2648f5747d77bc5b2962ca7bdd6c1606dd36b"
+      },
+      "whole_process_event_count": 24451673686
+    }
+  },
+  "protocol": {
+    "allocator": {
+      "order": [
+        "control",
+        "candidate",
+        "candidate",
+        "control"
+      ],
+      "samples": 30,
+      "warmup": 3
+    },
+    "candidate_revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+    "change": "0412",
+    "control_revision": "70756ae67e6763428759e8f446718ce68a528976",
+    "counters": {
+      "case": "xls_owned_source_open_one_cell",
+      "events": "task-clock,cycles,instructions,branches,branch-misses,page-faults,context-switches,cpu-migrations,l2_cache_req_stat.dc_access_in_l2,l2_cache_req_stat.dc_hit_in_l2",
+      "repetitions": 3,
+      "samples": 3000,
+      "scope": "Whole process, scaled multiplexed events; not operation IPC or cache miss rate",
+      "warmup": 10
+    },
+    "cpu": 2,
+    "filesystem_cache": "warm",
+    "normal": {
+      "order": [
+        "control",
+        "candidate",
+        "candidate",
+        "control"
+      ],
+      "samples": 500,
+      "warmup": 20
+    },
+    "owned_source": {
+      "allocation_repetitions": 2,
+      "allocation_samples": 30,
+      "allocation_warmup": 3,
+      "repetitions": 4,
+      "samples": 500,
+      "warmup": 20
+    },
+    "profile": {
+      "call_graph": "fp,127",
+      "case": "xls_owned_source_open_one_cell",
+      "event": "cycles:u",
+      "frequency": 999,
+      "samples": 10000,
+      "warmup": 20
+    },
+    "purpose": "Isolate XLS diagnostic observer overhead and establish plain OwnedSource production lifecycle baselines. No production speedup claim."
+  },
+  "reports": {
+    "allocator-1": {
+      "artifact": {
+        "bytes": 171157,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/allocator-1.json",
+        "sha256": "8b1f272aefd268e1c578e5eed67448394096e2ce8b39d80953ba6051a57259b2"
+      },
+      "binary": "litchi-perf-baseline-alloc",
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 6692,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/allocator-1.catalog.json",
+        "sha256": "31bc751fc29c974f185ab5311d6cfe2b708dc73c7f1e0d5421fa418f4793ca7b"
+      },
+      "instrumentation": "system_allocator_operation_scoped",
+      "revision": "70756ae67e6763428759e8f446718ce68a528976",
+      "samples": 30,
+      "source_scopes": [
+        "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload"
+      ],
+      "variant": "control",
+      "warmup": 3
+    },
+    "allocator-2": {
+      "artifact": {
+        "bytes": 171261,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/allocator-2.json",
+        "sha256": "6b17148c6b48ac98c33d3336bcf226d2a815f0bac86a1b4430c56a1980859a08"
+      },
+      "binary": "litchi-perf-baseline-alloc",
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 6692,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/allocator-2.catalog.json",
+        "sha256": "ecad6cb75db9ff702f51c6eb127f15839e063ce6787375bf5b3e4de8deb2c3ae"
+      },
+      "instrumentation": "system_allocator_operation_scoped",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 30,
+      "source_scopes": [
+        "caller-provided ReadAt logical ranges: XLS classification catalog v2 (sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; repeated-read union disabled); actual CFB metadata versus opaque payload"
+      ],
+      "variant": "candidate",
+      "warmup": 3
+    },
+    "allocator-3": {
+      "artifact": {
+        "bytes": 171277,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/allocator-3.json",
+        "sha256": "3d2f84fd08a4ab3bec99ee7849243b05638c4d0e4af6a33c09283a102b36fd6a"
+      },
+      "binary": "litchi-perf-baseline-alloc",
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 6692,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/allocator-3.catalog.json",
+        "sha256": "ecad6cb75db9ff702f51c6eb127f15839e063ce6787375bf5b3e4de8deb2c3ae"
+      },
+      "instrumentation": "system_allocator_operation_scoped",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 30,
+      "source_scopes": [
+        "caller-provided ReadAt logical ranges: XLS classification catalog v2 (sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; repeated-read union disabled); actual CFB metadata versus opaque payload"
+      ],
+      "variant": "candidate",
+      "warmup": 3
+    },
+    "allocator-4": {
+      "artifact": {
+        "bytes": 171147,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/allocator-4.json",
+        "sha256": "42cf0cdc6c0cb26cb74bd7caef55c4d4e2cc72555e4e8a7a13d58469e1e9c217"
+      },
+      "binary": "litchi-perf-baseline-alloc",
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 6692,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/allocator-4.catalog.json",
+        "sha256": "31bc751fc29c974f185ab5311d6cfe2b708dc73c7f1e0d5421fa418f4793ca7b"
+      },
+      "instrumentation": "system_allocator_operation_scoped",
+      "revision": "70756ae67e6763428759e8f446718ce68a528976",
+      "samples": 30,
+      "source_scopes": [
+        "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload"
+      ],
+      "variant": "control",
+      "warmup": 3
+    },
+    "normal-1": {
+      "artifact": {
+        "bytes": 791825,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/normal-1.json",
+        "sha256": "bbf91aa7812b24cf52d3967f9522cbead131125c1f119d64121360b5f0ba8d8b"
+      },
+      "binary": "litchi-perf-baseline",
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 6692,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/normal-1.catalog.json",
+        "sha256": "31bc751fc29c974f185ab5311d6cfe2b708dc73c7f1e0d5421fa418f4793ca7b"
+      },
+      "instrumentation": "none",
+      "revision": "70756ae67e6763428759e8f446718ce68a528976",
+      "samples": 500,
+      "source_scopes": [
+        "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload"
+      ],
+      "variant": "control",
+      "warmup": 20
+    },
+    "normal-2": {
+      "artifact": {
+        "bytes": 790704,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/normal-2.json",
+        "sha256": "7716915d1453173df0fde821bff124c5614bf6129a8ff83949d8b5607626f72f"
+      },
+      "binary": "litchi-perf-baseline",
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 6692,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/normal-2.catalog.json",
+        "sha256": "ecad6cb75db9ff702f51c6eb127f15839e063ce6787375bf5b3e4de8deb2c3ae"
+      },
+      "instrumentation": "none",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 500,
+      "source_scopes": [
+        "caller-provided ReadAt logical ranges: XLS classification catalog v2 (sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; repeated-read union disabled); actual CFB metadata versus opaque payload"
+      ],
+      "variant": "candidate",
+      "warmup": 20
+    },
+    "normal-3": {
+      "artifact": {
+        "bytes": 790713,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/normal-3.json",
+        "sha256": "15bfc773b8cf443ad7833af1e8376a8a2987bf40c06e87b4ba791171ef288429"
+      },
+      "binary": "litchi-perf-baseline",
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 6692,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/normal-3.catalog.json",
+        "sha256": "ecad6cb75db9ff702f51c6eb127f15839e063ce6787375bf5b3e4de8deb2c3ae"
+      },
+      "instrumentation": "none",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 500,
+      "source_scopes": [
+        "caller-provided ReadAt logical ranges: XLS classification catalog v2 (sorted, exact-adjacent coalescing only; overlaps/duplicates preserved; repeated-read union disabled); actual CFB metadata versus opaque payload"
+      ],
+      "variant": "candidate",
+      "warmup": 20
+    },
+    "normal-4": {
+      "artifact": {
+        "bytes": 791826,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/normal-4.json",
+        "sha256": "e037b0c80ca0f8d2096a7e6e10254ebf7e96a33321c6cdaaf9b76e4dcb45cca4"
+      },
+      "binary": "litchi-perf-baseline",
+      "cases": [
+        "xls_semantic_open",
+        "xls_source_backed_open",
+        "xls_eager_open_list_worksheets",
+        "xls_source_backed_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 6692,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/normal-4.catalog.json",
+        "sha256": "31bc751fc29c974f185ab5311d6cfe2b708dc73c7f1e0d5421fa418f4793ca7b"
+      },
+      "instrumentation": "none",
+      "revision": "70756ae67e6763428759e8f446718ce68a528976",
+      "samples": 500,
+      "source_scopes": [
+        "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload"
+      ],
+      "variant": "control",
+      "warmup": 20
+    },
+    "owned-1": {
+      "artifact": {
+        "bytes": 114330,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-1.json",
+        "sha256": "2d635c1d070618e33707f060ca1ef401989a496231fdec7e68b1fed68a54c31f"
+      },
+      "binary": "litchi-perf-baseline",
+      "cases": [
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 5592,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-1.catalog.json",
+        "sha256": "cbafdee1978e446dcd4dce67a3008b8e485e75a6f04d3fc4ed87783c98335f22"
+      },
+      "instrumentation": "none",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 500,
+      "source_scopes": [],
+      "variant": "candidate",
+      "warmup": 20
+    },
+    "owned-2": {
+      "artifact": {
+        "bytes": 114322,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-2.json",
+        "sha256": "ac6cd13dbc70218f3560d00a8ad5eab658c96931610525e108e013dfc3f9fdf1"
+      },
+      "binary": "litchi-perf-baseline",
+      "cases": [
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 5592,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-2.catalog.json",
+        "sha256": "cbafdee1978e446dcd4dce67a3008b8e485e75a6f04d3fc4ed87783c98335f22"
+      },
+      "instrumentation": "none",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 500,
+      "source_scopes": [],
+      "variant": "candidate",
+      "warmup": 20
+    },
+    "owned-3": {
+      "artifact": {
+        "bytes": 114329,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-3.json",
+        "sha256": "0c0d6c4889be441731ab56bc0a69d97d95d943c4a7648065ace1b27673f17844"
+      },
+      "binary": "litchi-perf-baseline",
+      "cases": [
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 5592,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-3.catalog.json",
+        "sha256": "cbafdee1978e446dcd4dce67a3008b8e485e75a6f04d3fc4ed87783c98335f22"
+      },
+      "instrumentation": "none",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 500,
+      "source_scopes": [],
+      "variant": "candidate",
+      "warmup": 20
+    },
+    "owned-4": {
+      "artifact": {
+        "bytes": 114328,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-4.json",
+        "sha256": "80c1a3f77c0220cfdff7a6a20aeaf34c8f0355761a066236b7865f045afca77d"
+      },
+      "binary": "litchi-perf-baseline",
+      "cases": [
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 5592,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-4.catalog.json",
+        "sha256": "cbafdee1978e446dcd4dce67a3008b8e485e75a6f04d3fc4ed87783c98335f22"
+      },
+      "instrumentation": "none",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 500,
+      "source_scopes": [],
+      "variant": "candidate",
+      "warmup": 20
+    },
+    "owned-allocator-1": {
+      "artifact": {
+        "bytes": 67326,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-allocator-1.json",
+        "sha256": "145ee49afcd9043812df5cae989a88dc03623d1b67aea22edac7ea25849fce3b"
+      },
+      "binary": "litchi-perf-baseline-alloc",
+      "cases": [
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 5592,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-allocator-1.catalog.json",
+        "sha256": "cbafdee1978e446dcd4dce67a3008b8e485e75a6f04d3fc4ed87783c98335f22"
+      },
+      "instrumentation": "system_allocator_operation_scoped",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 30,
+      "source_scopes": [],
+      "variant": "candidate",
+      "warmup": 3
+    },
+    "owned-allocator-2": {
+      "artifact": {
+        "bytes": 67338,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-allocator-2.json",
+        "sha256": "cf0b3c4201db51170af8ab4a0e355e3393639806c6d30e4156d4402e9cb748e4"
+      },
+      "binary": "litchi-perf-baseline-alloc",
+      "cases": [
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 5592,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-allocator-2.catalog.json",
+        "sha256": "cbafdee1978e446dcd4dce67a3008b8e485e75a6f04d3fc4ed87783c98335f22"
+      },
+      "instrumentation": "system_allocator_operation_scoped",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 30,
+      "source_scopes": [],
+      "variant": "candidate",
+      "warmup": 3
+    },
+    "owned-profile": {
+      "artifact": {
+        "bytes": 514310,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-profile.json",
+        "sha256": "86586da4bfcf95a81eb7bd0ee02c6474a0ebe07990f429145c5e3aa7609709d9"
+      },
+      "binary": "litchi-perf-baseline",
+      "cases": [
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 4840,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-profile.catalog.json",
+        "sha256": "2b33d73938f825a0ebf9c6feb01e79663899b51e523b972c37a13b8ac4f11f57"
+      },
+      "instrumentation": "none",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 10000,
+      "source_scopes": [],
+      "variant": "candidate",
+      "warmup": 20
+    },
+    "owned-stat-1": {
+      "artifact": {
+        "bytes": 164307,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-stat-1.json",
+        "sha256": "544bf3dc92f34e0c368b1e50c9da7f4aa4d1e9fab0a79fa331a56d31e26cb58b"
+      },
+      "binary": "litchi-perf-baseline",
+      "cases": [
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 4840,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-stat-1.catalog.json",
+        "sha256": "2b33d73938f825a0ebf9c6feb01e79663899b51e523b972c37a13b8ac4f11f57"
+      },
+      "instrumentation": "none",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 3000,
+      "source_scopes": [],
+      "variant": "candidate",
+      "warmup": 10
+    },
+    "owned-stat-2": {
+      "artifact": {
+        "bytes": 164307,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-stat-2.json",
+        "sha256": "e7f185f1cac5308d892d08618946f3c40480ee437603b5839fd5565c37bfb259"
+      },
+      "binary": "litchi-perf-baseline",
+      "cases": [
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 4840,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-stat-2.catalog.json",
+        "sha256": "2b33d73938f825a0ebf9c6feb01e79663899b51e523b972c37a13b8ac4f11f57"
+      },
+      "instrumentation": "none",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 3000,
+      "source_scopes": [],
+      "variant": "candidate",
+      "warmup": 10
+    },
+    "owned-stat-3": {
+      "artifact": {
+        "bytes": 164308,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-stat-3.json",
+        "sha256": "3544b897c8841b9cac87370e1ac94c47e0d8f2bf3c8ca6bf664e523c1ce1e22e"
+      },
+      "binary": "litchi-perf-baseline",
+      "cases": [
+        "xls_owned_source_open_one_cell"
+      ],
+      "catalog_artifact": {
+        "bytes": 4840,
+        "compressed": false,
+        "path": "/tmp/litchi-goal-0412-capture/owned-stat-3.catalog.json",
+        "sha256": "2b33d73938f825a0ebf9c6feb01e79663899b51e523b972c37a13b8ac4f11f57"
+      },
+      "instrumentation": "none",
+      "revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+      "samples": 3000,
+      "source_scopes": [],
+      "variant": "candidate",
+      "warmup": 10
+    }
+  },
+  "rss_artifacts": {
+    "allocator-1": {
+      "bytes": 1133,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/allocator-1.time.txt",
+      "sha256": "a144d9943ebb32d59fe5b0a28e11f0dec3d224953688ea8b09b29be7db8649a3"
+    },
+    "allocator-2": {
+      "bytes": 1136,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/allocator-2.time.txt",
+      "sha256": "18ceaee9fbe5caa799675c46c847bbb8702b94cf37019aa5e49d80d893a45c86"
+    },
+    "allocator-3": {
+      "bytes": 1135,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/allocator-3.time.txt",
+      "sha256": "6d2bfc3a7555b90dde36cd9425bf01912fddcca1621976ae858b3d787549261f"
+    },
+    "allocator-4": {
+      "bytes": 1133,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/allocator-4.time.txt",
+      "sha256": "5c6b0214385aebc1d8cd244b5b3753619b5c03d10f1346aabf19b39048c27eb1"
+    },
+    "normal-1": {
+      "bytes": 1125,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/normal-1.time.txt",
+      "sha256": "5a74b471779eb74f2f0e089ecd53fd9627f70a56f2130f1617d0b61026f723ad"
+    },
+    "normal-2": {
+      "bytes": 1125,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/normal-2.time.txt",
+      "sha256": "c9630c75db377654a65734f2d584c643779c84d2991619351818e6ef34573980"
+    },
+    "normal-3": {
+      "bytes": 1125,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/normal-3.time.txt",
+      "sha256": "a59f30b919b8a51ea8b2ff62c529095e368487c31c97775b34634f26c2b5bd59"
+    },
+    "normal-4": {
+      "bytes": 1125,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/normal-4.time.txt",
+      "sha256": "5be248b404e849b849f788dfda39beefbdca4ec8178f68b50e4e121797da6b8c"
+    },
+    "owned-1": {
+      "bytes": 1047,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/owned-1.time.txt",
+      "sha256": "9e6c32257db4ea7bd6e31e76201c68fd264a7556ec49f727f654320e1e85fe28"
+    },
+    "owned-2": {
+      "bytes": 1047,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/owned-2.time.txt",
+      "sha256": "b7867faee5a681a1c95c28371d0012545f49a3f023b9b7c37b84c03785bcc945"
+    },
+    "owned-3": {
+      "bytes": 1048,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/owned-3.time.txt",
+      "sha256": "a2eaee05781804bc27db0dc83389a9fb6fc4ab46b4bf6cf0d7c1722133ce6876"
+    },
+    "owned-4": {
+      "bytes": 1047,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/owned-4.time.txt",
+      "sha256": "a4ce0b5da9fa5873335deb4e19d2e2c2c4d04288fd48e091158324ba68af9e93"
+    },
+    "owned-allocator-1": {
+      "bytes": 1071,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/owned-allocator-1.time.txt",
+      "sha256": "bf2e75def4d59d8c462460fcd2be6278a6217f1efe736c4c6efdca4a46271c23"
+    },
+    "owned-allocator-2": {
+      "bytes": 1072,
+      "compressed": false,
+      "path": "/tmp/litchi-goal-0412-capture/owned-allocator-2.time.txt",
+      "sha256": "cb975e267a0fa9ab9d8e4383e685a37412bf23ba2a2f50c0567f5c09267f6d21"
+    }
+  },
+  "rss_kib": {
+    "allocator-1": 145116,
+    "allocator-2": 145080,
+    "allocator-3": 144872,
+    "allocator-4": 144844,
+    "normal-1": 145368,
+    "normal-2": 144636,
+    "normal-3": 145404,
+    "normal-4": 144824,
+    "owned-1": 145144,
+    "owned-2": 144888,
+    "owned-3": 144804,
+    "owned-4": 145148,
+    "owned-allocator-1": 145144,
+    "owned-allocator-2": 145404
+  },
+  "schema_version": 1,
+  "scope": "whole process: corpus generation, layout/oracle, warmups, operations, cloning, validation and serialization; not operation-local",
+  "validation": {
+    "binary_hashes_verified": true,
+    "clean_revisions_verified": true,
+    "exact_command_argv_verified": true,
+    "expected_counter_capture_count": 3,
+    "expected_profile_capture_count": 1,
+    "expected_rss_capture_count": 14,
+    "observed_rss_capture_count": 14,
+    "original_normal_allocator_case_sets_separate": true,
+    "owned_source_reports_source_none": true,
+    "positive_pmu_counts_and_scheduling_verified": true,
+    "sequential_capture_verified": true
+  },
+  "verifier": "0412-resource-verifier-v1"
+}

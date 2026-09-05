@@ -1,5 +1,30 @@
 # Performance CRUD coverage
 
+## 2026-09-05: change 0412 isolates the XLS observer and adds plain-source selectors
+
+- Change [0412](changes/0412-xls-observer-isolation.md) at committed revision
+  `b8f61970d` corrects the XLS observer's category range catalog: it coalesces
+  exactly adjacent spans, preserves overlap multiplicity, and disables the
+  unused generic repeated-read union. It adds three explicit opt-in selectors:
+  `xls_owned_source_open`, `xls_owned_source_open_list_worksheets`, and
+  `xls_owned_source_open_one_cell`.
+- The plain selectors use the same generated two-sheet
+  `xls-comments-opaque-heavy` oracle and time `OwnedSource` open/list/one-cell
+  work. Their reports carry operation/allocation metrics with no source
+  summary; separate instrumented observations retain the logical locality
+  checks. Eleven focused XLS observer/owned/allocator tests plus the registry
+  test pass, as do scoped format, boundary, coverage-index, seven-claim, and
+  classification checks.
+- The clean candidate `63c95bc22` has 18 verified timing/allocation/profile/PMU
+  reports, including four plain-source normal children and two allocator
+  children. All 91 comparator tests pass, including observer-scope rejection.
+  This is descriptive opt-in evidence with no production speedup claim.
+  The raw selector registry is now **425**;
+  the default remains **36 cases / 198 rows**, and the index remains **15
+  categories / 30 representative selectors**. These selectors remain outside
+  the index's `measured` default-matrix contract and do not establish CRUD
+  completion.
+
 ## 2026-09-05: change 0411 adds an opt-in XLS lifecycle and allocation baseline
 
 - Six explicit opt-in selectors now retain a descriptive XLS/CFB baseline:

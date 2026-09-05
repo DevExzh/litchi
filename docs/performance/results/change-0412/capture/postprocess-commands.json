@@ -1,0 +1,63 @@
+[
+  {
+    "label": "owned-profile-script",
+    "argv": [
+      "perf",
+      "script",
+      "--no-inline",
+      "-i",
+      "/tmp/litchi-goal-0412-capture/owned-profile.data"
+    ],
+    "started_utc": "2026-09-05T01:16:03.777802+00:00",
+    "wall_seconds": 0.42145867602084763,
+    "exit_code": 0
+  },
+  {
+    "label": "owned-profile-self",
+    "argv": [
+      "perf",
+      "report",
+      "--stdio",
+      "--no-inline",
+      "--no-children",
+      "--call-graph=none",
+      "--percent-limit=0",
+      "-i",
+      "/tmp/litchi-goal-0412-capture/owned-profile.data"
+    ],
+    "started_utc": "2026-09-05T01:16:04.199392+00:00",
+    "wall_seconds": 0.37676339797326364,
+    "exit_code": 0
+  },
+  {
+    "label": "owned-profile-header",
+    "argv": [
+      "perf",
+      "report",
+      "--header-only",
+      "--stdio",
+      "-i",
+      "/tmp/litchi-goal-0412-capture/owned-profile.data"
+    ],
+    "started_utc": "2026-09-05T01:16:04.576239+00:00",
+    "wall_seconds": 0.013375840993830934,
+    "exit_code": 0
+  },
+  {
+    "label": "owned-profile-flamegraph",
+    "argv": [
+      "flamegraph",
+      "--perfdata",
+      "/tmp/litchi-goal-0412-capture/owned-profile.data",
+      "--no-inline",
+      "--deterministic",
+      "--title",
+      "Plain OwnedSource XLS open and one cell: whole process",
+      "--output",
+      "/tmp/litchi-goal-0412-capture/owned-profile.svg"
+    ],
+    "started_utc": "2026-09-05T01:16:04.589667+00:00",
+    "wall_seconds": 0.43280052798218094,
+    "exit_code": 0
+  }
+]

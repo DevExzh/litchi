@@ -1,0 +1,546 @@
+{
+  "schema_version": 1,
+  "performance_claim": "none",
+  "median_intervals": {
+    "normal-1": {
+      "xls_semantic_open": {
+        "interval_ns": [
+          503142,
+          506172
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_source_backed_open": {
+        "interval_ns": [
+          5608782,
+          5610342
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_eager_open_list_worksheets": {
+        "interval_ns": [
+          502422,
+          505152
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_source_backed_open_list_worksheets": {
+        "interval_ns": [
+          5604372,
+          5605752
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_eager_open_one_cell": {
+        "interval_ns": [
+          508532,
+          511452
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_source_backed_open_one_cell": {
+        "interval_ns": [
+          6070673,
+          6074554
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      }
+    },
+    "normal-2": {
+      "xls_semantic_open": {
+        "interval_ns": [
+          501032,
+          505312
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_source_backed_open": {
+        "interval_ns": [
+          174190,
+          174781
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_eager_open_list_worksheets": {
+        "interval_ns": [
+          507272,
+          510672
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_source_backed_open_list_worksheets": {
+        "interval_ns": [
+          174501,
+          175051
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_eager_open_one_cell": {
+        "interval_ns": [
+          511102,
+          514672
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_source_backed_open_one_cell": {
+        "interval_ns": [
+          178970,
+          179430
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      }
+    },
+    "normal-3": {
+      "xls_semantic_open": {
+        "interval_ns": [
+          503052,
+          506162
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_source_backed_open": {
+        "interval_ns": [
+          174660,
+          175141
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_eager_open_list_worksheets": {
+        "interval_ns": [
+          507702,
+          511282
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_source_backed_open_list_worksheets": {
+        "interval_ns": [
+          174671,
+          175150
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_eager_open_one_cell": {
+        "interval_ns": [
+          506812,
+          511212
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_source_backed_open_one_cell": {
+        "interval_ns": [
+          177401,
+          177901
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      }
+    },
+    "normal-4": {
+      "xls_semantic_open": {
+        "interval_ns": [
+          508892,
+          511532
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_source_backed_open": {
+        "interval_ns": [
+          5569654,
+          5572815
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_eager_open_list_worksheets": {
+        "interval_ns": [
+          503591,
+          506281
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_source_backed_open_list_worksheets": {
+        "interval_ns": [
+          5573195,
+          5576585
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_eager_open_one_cell": {
+        "interval_ns": [
+          514642,
+          517351
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_source_backed_open_one_cell": {
+        "interval_ns": [
+          6031596,
+          6033286
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      }
+    },
+    "owned-1": {
+      "xls_owned_source_open": {
+        "interval_ns": [
+          163811,
+          164351
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_owned_source_open_list_worksheets": {
+        "interval_ns": [
+          165681,
+          166050
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_owned_source_open_one_cell": {
+        "interval_ns": [
+          168090,
+          169060
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      }
+    },
+    "owned-2": {
+      "xls_owned_source_open": {
+        "interval_ns": [
+          163811,
+          164141
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_owned_source_open_list_worksheets": {
+        "interval_ns": [
+          164080,
+          164581
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_owned_source_open_one_cell": {
+        "interval_ns": [
+          165620,
+          166090
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      }
+    },
+    "owned-3": {
+      "xls_owned_source_open": {
+        "interval_ns": [
+          164880,
+          165401
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_owned_source_open_list_worksheets": {
+        "interval_ns": [
+          165040,
+          165440
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_owned_source_open_one_cell": {
+        "interval_ns": [
+          166670,
+          167070
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      }
+    },
+    "owned-4": {
+      "xls_owned_source_open": {
+        "interval_ns": [
+          164880,
+          165400
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_owned_source_open_list_worksheets": {
+        "interval_ns": [
+          165480,
+          166050
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      },
+      "xls_owned_source_open_one_cell": {
+        "interval_ns": [
+          167660,
+          168251
+        ],
+        "order_statistic": 228,
+        "iid_binomial_coverage": 0.9559365304210726,
+        "samples": 500
+      }
+    }
+  },
+  "eager_review": [
+    {
+      "case": "xls_semantic_open",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": -0.1892130717503937,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": -0.1658880217274783,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": -0.3868051797596084,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": -0.3031639013737153,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": -1.086749882897553,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": -1.0545983928837543,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": -1.4072998002542247,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": -1.0779853025560837,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": 0.9269422616200229,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": 1.2089496984374337,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": 0.6773314662323671,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": 1.0013584189455083,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": 0.97873368777186,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": 0.2124475101534573,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": 0.22225092699532656,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": 0.8884825998069168,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": 0.6854527125883969,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": 0.6002721233625996,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": 0.7105414887643713,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": 0.6263120706968994,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": -1.3301505308007888,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": -1.3543851273394858,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": -2.4536481531700516,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": -1.4128727415488762,
+      "exceeds_five_percent_review_trigger": false
+    }
+  ],
+  "limitations": [
+    "Exact IID binomial order-statistic intervals describe within-child sample uncertainty only.",
+    "They exclude host drift, shared heap/cache dependence and between-process uncertainty; use retained repeat spread too.",
+    "Observer versions differ: no production before/after claim.",
+    "Review triggers are descriptive and do not prove equivalence."
+  ]
+}

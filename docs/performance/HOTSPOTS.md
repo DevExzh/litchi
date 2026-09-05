@@ -59,6 +59,34 @@ source edit/save harness also fixes previously unconfigured member ranges;
 corrected compressed overlap includes untouched raw publication and must not
 be read as semantic decoding. No speedup is claimed by 0409.
 
+## Change 0412 update
+
+[0412](changes/0412-xls-observer-isolation.md) commits the XLS observer
+correction and three explicit opt-in plain-source selectors:
+`xls_owned_source_open`, `xls_owned_source_open_list_worksheets`, and
+`xls_owned_source_open_one_cell`. The XLS observer now sorts its category
+ranges and coalesces only exactly adjacent spans; overlap multiplicity remains
+unchanged, and the unused generic repeated-read union is disabled. The plain
+selectors time the same source-backed lifecycle through `OwnedSource` and
+retain operation/allocation metrics with no source summary. A separate
+instrumented replay retains the logical locality observations.
+
+The focused XLS observer/owned/allocator tests and registry test pass, as do
+the scoped format, boundary, coverage-index, seven-claim, and classification
+checks, along with all 91 comparator tests. Plain one-cell p50 is
+0.166–0.169 ms with 126 allocation calls / 223,774 allocated bytes in separate
+allocator captures. The observer correction preserves all logical I/O and
+locality counters; it is not a production speedup.
+
+The plain-source profile has 1,718 observed source-open stack blocks.
+`SectorChainScratch::collect_exact` and `try_push<u32>` account for 24.97% and
+24.87% of that subset's leaf weight. The scratch collector already reserves
+the expected chain length fallibly before walking; test removing its repeated
+per-push reservation while retaining cycle, marker, allocation and source
+checks. Whole-process copy/setup work still dominates, and the selected-cell
+subset has only 21 blocks. These are CPU-attribution observations, not phase
+latencies or a completed optimization. The full goal remains open.
+
 ## Change 0411 update
 
 [0411](changes/0411-xls-read-allocation-baseline.md) supplies a current matched

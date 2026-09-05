@@ -1,0 +1,90 @@
+{
+  "status": "passed",
+  "original_capture_unchanged": true,
+  "probes": [
+    {
+      "mutation": "duplicate-order",
+      "argv": [
+        "python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0412/verify-capture.py",
+        "--root",
+        "/tmp/litchi-goal-0412-negative-80w469ml",
+        "--output",
+        "/tmp/litchi-goal-0412-negative-80w469ml/probe-result.json"
+      ],
+      "exit_code": 2,
+      "expected_diagnostic_marker": "sample_order",
+      "diagnostic": "litchi-goal-0412-compare: FAIL: normal-1.results[0].elapsed_ns.sample_order: must be an exact permutation of retained samples\n"
+    },
+    {
+      "mutation": "duplicate-metric-index",
+      "argv": [
+        "python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0412/verify-capture.py",
+        "--root",
+        "/tmp/litchi-goal-0412-negative-_nx4pwf0",
+        "--output",
+        "/tmp/litchi-goal-0412-negative-_nx4pwf0/probe-result.json"
+      ],
+      "exit_code": 2,
+      "expected_diagnostic_marker": "sample_indices",
+      "diagnostic": "litchi-goal-0412-compare: FAIL: normal-1.results[0].operation_metrics.sample_indices: does not equal elapsed_ns.sample_order\n"
+    },
+    {
+      "mutation": "opaque-read",
+      "argv": [
+        "python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0412/verify-capture.py",
+        "--root",
+        "/tmp/litchi-goal-0412-negative-ube_dqr6",
+        "--output",
+        "/tmp/litchi-goal-0412-negative-ube_dqr6/probe-result.json"
+      ],
+      "exit_code": 2,
+      "expected_diagnostic_marker": "opaque_payload_read_bytes",
+      "diagnostic": "litchi-goal-0412-compare: FAIL: normal-1.results[1].source.xls.opaque_payload_read_bytes: must remain zero for this locality probe\n"
+    },
+    {
+      "mutation": "wrong-oracle",
+      "argv": [
+        "python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0412/verify-capture.py",
+        "--root",
+        "/tmp/litchi-goal-0412-negative-bkiwm42g",
+        "--output",
+        "/tmp/litchi-goal-0412-negative-bkiwm42g/probe-result.json"
+      ],
+      "exit_code": 2,
+      "expected_diagnostic_marker": "output_sha256",
+      "diagnostic": "litchi-goal-0412-compare: FAIL: normal-1.results[0].output_sha256: does not match the independent operation-output oracle\n"
+    },
+    {
+      "mutation": "missing-owned",
+      "argv": [
+        "python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0412/verify-capture.py",
+        "--root",
+        "/tmp/litchi-goal-0412-negative-yrpo1ndu",
+        "--output",
+        "/tmp/litchi-goal-0412-negative-yrpo1ndu/probe-result.json"
+      ],
+      "exit_code": 2,
+      "expected_diagnostic_marker": "owned",
+      "diagnostic": "litchi-goal-0412-compare: FAIL: missing capture artifact: /tmp/litchi-goal-0412-negative-yrpo1ndu/owned-1.json (or /tmp/litchi-goal-0412-negative-yrpo1ndu/owned-1.json.zst)\n"
+    },
+    {
+      "mutation": "bad-binary-identity",
+      "argv": [
+        "python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0412/verify-resources.py",
+        "--root",
+        "/tmp/litchi-goal-0412-negative-dllhofwc",
+        "--output",
+        "/tmp/litchi-goal-0412-negative-dllhofwc/probe-result.json"
+      ],
+      "exit_code": 2,
+      "expected_diagnostic_marker": "binary",
+      "diagnostic": "litchi-goal-0412-resources: FAIL: normal-2: journal binary hash mismatch\n"
+    }
+  ]
+}

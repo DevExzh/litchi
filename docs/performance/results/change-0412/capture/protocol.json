@@ -1,0 +1,70 @@
+{
+  "change": "0412",
+  "purpose": "Isolate XLS diagnostic observer overhead and establish plain OwnedSource production lifecycle baselines. No production speedup claim.",
+  "control_revision": "70756ae67e6763428759e8f446718ce68a528976",
+  "candidate_revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+  "cases": [
+    "xls_semantic_open",
+    "xls_source_backed_open",
+    "xls_eager_open_list_worksheets",
+    "xls_source_backed_open_list_worksheets",
+    "xls_eager_open_one_cell",
+    "xls_source_backed_open_one_cell"
+  ],
+  "normal": {
+    "order": [
+      "control",
+      "candidate",
+      "candidate",
+      "control"
+    ],
+    "samples": 500,
+    "warmup": 20
+  },
+  "allocator": {
+    "order": [
+      "control",
+      "candidate",
+      "candidate",
+      "control"
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "owned_source": {
+    "repetitions": 4,
+    "samples": 500,
+    "warmup": 20,
+    "allocation_repetitions": 2,
+    "allocation_samples": 30,
+    "allocation_warmup": 3
+  },
+  "profile": {
+    "case": "xls_owned_source_open_one_cell",
+    "samples": 10000,
+    "warmup": 20,
+    "event": "cycles:u",
+    "frequency": 999,
+    "call_graph": "fp,127"
+  },
+  "cpu": 2,
+  "filesystem_cache": "warm",
+  "isolation": "Fresh sequential child per repetition; warmup and retained samples share process. No concurrent build/test/benchmark.",
+  "acceptance": "All logical I/O counters and output hashes equivalent; observer scope marker must differ explicitly. Source observer result measures instrumentation change only. Review >5% eager latency/RSS regressions. Plain source results single-revision baseline only.",
+  "timer": "Existing open/query brackets, input clone and source construction outside; output semantic oracle and locality validation outside.",
+  "memory": "Allocation calls include reallocations; peak/live values are process snapshots; RSS is whole-process.",
+  "limitations": [
+    "No production before/after claim",
+    "No cold-cache or physical I/O claim",
+    "No filesystem or remote-source claim",
+    "No scaling or exact L1/LLC claim"
+  ],
+  "counters": {
+    "case": "xls_owned_source_open_one_cell",
+    "repetitions": 3,
+    "samples": 3000,
+    "warmup": 10,
+    "events": "task-clock,cycles,instructions,branches,branch-misses,page-faults,context-switches,cpu-migrations,l2_cache_req_stat.dc_access_in_l2,l2_cache_req_stat.dc_hit_in_l2",
+    "scope": "Whole process, scaled multiplexed events; not operation IPC or cache miss rate"
+  }
+}

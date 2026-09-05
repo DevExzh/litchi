@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "reports": [
+    {
+      "label": "normal-1",
+      "rows": 6,
+      "observations": 3000,
+      "status": "passed"
+    },
+    {
+      "label": "normal-2",
+      "rows": 6,
+      "observations": 3000,
+      "status": "passed"
+    },
+    {
+      "label": "normal-3",
+      "rows": 6,
+      "observations": 3000,
+      "status": "passed"
+    },
+    {
+      "label": "normal-4",
+      "rows": 6,
+      "observations": 3000,
+      "status": "passed"
+    },
+    {
+      "label": "allocator-1",
+      "rows": 6,
+      "observations": 180,
+      "status": "passed"
+    },
+    {
+      "label": "allocator-2",
+      "rows": 6,
+      "observations": 180,
+      "status": "passed"
+    },
+    {
+      "label": "allocator-3",
+      "rows": 6,
+      "observations": 180,
+      "status": "passed"
+    },
+    {
+      "label": "allocator-4",
+      "rows": 6,
+      "observations": 180,
+      "status": "passed"
+    },
+    {
+      "label": "owned-1",
+      "rows": 3,
+      "observations": 1500,
+      "status": "passed"
+    },
+    {
+      "label": "owned-2",
+      "rows": 3,
+      "observations": 1500,
+      "status": "passed"
+    },
+    {
+      "label": "owned-3",
+      "rows": 3,
+      "observations": 1500,
+      "status": "passed"
+    },
+    {
+      "label": "owned-4",
+      "rows": 3,
+      "observations": 1500,
+      "status": "passed"
+    },
+    {
+      "label": "owned-allocator-1",
+      "rows": 3,
+      "observations": 90,
+      "status": "passed"
+    },
+    {
+      "label": "owned-allocator-2",
+      "rows": 3,
+      "observations": 90,
+      "status": "passed"
+    },
+    {
+      "label": "owned-stat-1",
+      "rows": 1,
+      "observations": 3000,
+      "status": "passed"
+    },
+    {
+      "label": "owned-stat-2",
+      "rows": 1,
+      "observations": 3000,
+      "status": "passed"
+    },
+    {
+      "label": "owned-stat-3",
+      "rows": 1,
+      "observations": 3000,
+      "status": "passed"
+    },
+    {
+      "label": "owned-profile",
+      "rows": 1,
+      "observations": 10000,
+      "status": "passed"
+    }
+  ]
+}
