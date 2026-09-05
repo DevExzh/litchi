@@ -143,3 +143,46 @@ Both focused mutations verified semantic reopen, byte-exact no-op behavior,
 and exact inverse restoration before native verification. This qualifies
 these Custom Number replacement and clear cases; Custom Text, Custom DateTime,
 and broader native format parity remain outside this evidence.
+
+## Numbers Custom Text source (2026-09-06)
+
+`numbers/custom-text-native.numbers` was authored through Computer Use in
+Numbers 14.4 from Blank. B2 contains the text `Orchid` with the native Custom
+Text format `Native Label`, whose prefix is `Native [` and suffix is `]`.
+C2 contains `Native Text marker`. Numbers saved, closed, and reopened the
+exact path without a repair prompt; B2 displayed `Native [Orchid]`, and the
+Cell inspector showed `Native Label` with the same sample. The document was
+then closed. SHA-256:
+`77f43ffada11cb5267aaf5f208cfeb1de07bcb944053c8a6679ca014352767e1`.
+
+`numbers/custom-text-native-unicode.numbers` was derived from that native
+source in Numbers by renaming the format to `Native Unicode` and adding an
+emoji before the prefix. Numbers saved, closed, and reopened the exact path
+with `😀Native [Orchid]`, the unchanged C2 marker, and `Native Unicode` in
+the Cell inspector. SHA-256:
+`12c0b819002b5175cc91d15012cb3fc73c5acfd786ca769a93cd30c3d01a6c26`.
+The native pattern's cached `index_from_right_last_integer` is `9` in the
+first fixture and `11` in this Unicode fixture, matching the final UTF-16
+code-unit index of each pattern, including the cell-text token. The emoji
+distinguishes UTF-16 units from UTF-8 bytes and Unicode scalar counts.
+
+The focused Numbers API replaced B2's native format with `Rust Label`, using
+prefix `Rust <` and suffix `>`. Numbers opened the result with `Rust <Orchid>`
+and `Rust Label` in the Cell inspector. After changing C2 to
+`Native Text marker saved`, Numbers saved, closed, and reopened the exact
+candidate path with the value, format, and marker intact and no repair prompt.
+`numbers/custom-text-native-resaved.numbers` retains that native-resaved
+candidate. SHA-256:
+`8bb5fdc9e7c9325a2cccb0d76ba06a1cf2e88bb5ff046d2014aea3d65ff80729`.
+
+The focused API then cleared B2's format from that native-resaved candidate.
+Numbers displayed `Orchid` and `Automatic` in the Cell inspector. After
+changing C2 to `Native Text clear saved`, Numbers saved, closed, and reopened
+the exact clear candidate with the value, format, and marker intact and no
+repair prompt. The temporary native-resaved clear artifact had SHA-256
+`0e9ed395470b2579846fcb8493f0ab58f51d2d41f4b720846a61b2a7fabcad37`.
+Both Rust mutations verified semantic reopen, byte-exact no-op behavior,
+and exact inverse restoration before native verification. Rust also read the
+native-resaved clear result and confirmed that another clear was an exact
+no-op. This qualifies these Custom Text replacement and clear cases; Custom
+DateTime and broader native format parity remain outside this evidence.

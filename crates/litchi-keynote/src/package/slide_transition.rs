@@ -967,6 +967,17 @@ fn transition_projection(
     limits: WireLimits,
 ) -> Result<litchi_iwa_protos::keynote_slide_transition_codec::SlideTransitionSnapshot<'_>, Error> {
     preflight_selected_transition_payload(slide, limits)?;
+    decode_transition_projection(slide, limits)
+}
+
+/// Decode a selected slide payload with the focused codec's caller-owned
+/// budget.  The package mutation path wraps this in the structural preflight
+/// above; the internal adapter read seam deliberately does not, because that
+/// scanner charges nested selected messages against the root input ceiling.
+fn decode_transition_projection(
+    slide: &[u8],
+    limits: WireLimits,
+) -> Result<litchi_iwa_protos::keynote_slide_transition_codec::SlideTransitionSnapshot<'_>, Error> {
     decode_slide_transition(slide, transition_decode_options(slide, limits)?)
         .map_err(map_transition_codec_error)
 }
@@ -977,8 +988,10 @@ fn transition_decode_options(
 ) -> Result<TransitionDecodeOptions, Error> {
     let recursion_limit =
         u32::try_from(limits.max_nesting()).map_err(|_error| Error::InvalidSource)?;
-    Ok(TransitionDecodeOptions::new(source.len(), recursion_limit)
-        .with_resource_limits(limits.max_fields(), limits.max_rewrite_work()))
+    Ok(
+        TransitionDecodeOptions::new(source.len().min(limits.max_input_bytes()), recursion_limit)
+            .with_resource_limits(limits.max_fields(), limits.max_rewrite_work()),
+    )
 }
 
 fn preflight_selected_transition_payload(source: &[u8], limits: WireLimits) -> Result<(), Error> {
@@ -1148,6 +1161,31 @@ fn map_transition_codec_error(
 }
 
 impl Package {
+    /// Project one borrowed slide payload into focused semantic transition
+    /// settings for the internal iWork adapter.
+    ///
+    /// This intentionally accepts only the selected `KN.SlideArchive` payload
+    /// and a caller-owned wire budget. It performs the focused codec's strict
+    /// borrowed projection without constructing any generated archive object
+    /// or retaining the source. Structural preflight remains on the package
+    /// mutation path, where it protects wire edits; applying that aggregate
+    /// scanner here would charge nested selected messages twice against the
+    /// caller's input-byte ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns the focused transition error when the payload is malformed,
+    /// exceeds `limits`, or contains invalid semantic or opaque values.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    pub fn __transition_settings_from_source(
+        payload: &[u8],
+        limits: WireLimits,
+    ) -> Result<Option<Settings>, Error> {
+        let projection = decode_transition_projection(payload, limits)?;
+        optional_settings_from_projection(&projection.settings, limits)
+    }
+
     /// Read one slide's focused transition settings without exposing IWA IDs.
     ///
     /// # Errors
@@ -1806,6 +1844,17 @@ fn settings_from_projection(
     Ok(settings)
 }
 
+fn optional_settings_from_projection(
+    snapshot: &TransitionSettingsSnapshot<'_>,
+    limits: WireLimits,
+) -> Result<Option<Settings>, Error> {
+    if snapshot.animation.is_some() {
+        settings_from_projection(snapshot, limits).map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
 fn validate_requested_opaque_settings(
     settings: &Settings,
     limits: WireLimits,
@@ -2189,10 +2238,19 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
 #[cfg(test)]
 mod tests {
     use super::{
-        Error, LimitKind, preflight_selected_transition_payload, validate_opaque_color,
+        Error, LimitKind, decode_transition_projection, optional_settings_from_projection,
+        preflight_selected_transition_payload, settings_from_projection, validate_opaque_color,
         validate_opaque_path,
     };
+    use crate::transition::{
+        Acceleration, Direction, Effect, MosaicType, TextDelivery, TimingCurveSlot,
+    };
     use litchi_iwa_common::WireLimits;
+    use litchi_iwa_protos::{
+        keynote_slide_transition_codec::{AnimationSnapshot, TransitionSettingsSnapshot},
+        kn, tsd, tsp,
+    };
+    use prost::Message as _;
 
     fn length_delimited(number: u8, payload: &[u8]) -> Vec<u8> {
         assert!(number < 16 && payload.len() < 128);
@@ -2205,6 +2263,260 @@ mod tests {
 
     fn assert_invalid(result: Result<(), Error>) {
         assert!(matches!(result, Err(Error::InvalidSource)));
+    }
+
+    #[test]
+    fn transition_accelerations_map_native_values_losslessly() {
+        for (raw, acceleration) in [
+            (1, Acceleration::Linear),
+            (2, Acceleration::EaseIn),
+            (3, Acceleration::EaseOut),
+            (4, Acceleration::EaseInOut),
+            (5, Acceleration::Custom),
+            (19, Acceleration::from_native(19)),
+            (-1, Acceleration::from_native(-1)),
+        ] {
+            assert_eq!(Acceleration::from_native(raw), acceleration);
+            assert_eq!(acceleration.native_value(), raw);
+        }
+    }
+
+    #[test]
+    fn transition_text_delivery_maps_native_values_losslessly() {
+        for (raw, delivery) in [
+            (1, TextDelivery::ByObject),
+            (2, TextDelivery::ByWord),
+            (3, TextDelivery::ByCharacter),
+            (4, TextDelivery::ByLine),
+            (19, TextDelivery::from_native(19)),
+            (-1, TextDelivery::from_native(-1)),
+        ] {
+            assert_eq!(TextDelivery::from_native(raw), delivery);
+            assert_eq!(delivery.native_value(), raw);
+        }
+    }
+
+    #[test]
+    fn effect_specific_discriminators_round_trip() {
+        assert_eq!(Direction::from_native(42).native_value(), 42);
+        assert_eq!(MosaicType::from_native(7).native_value(), 7);
+    }
+
+    #[test]
+    fn strict_projection_adapter_retains_absence_opaque_payloads_and_unknown_values() {
+        let absent = TransitionSettingsSnapshot {
+            has_legacy_database_fields: false,
+            animation: None,
+            custom_twist: None,
+            custom_mosaic_size: None,
+            custom_mosaic_type: None,
+            custom_bounce: None,
+            custom_magic_move_fade_unmatched_objects: None,
+            custom_timing_curve: None,
+            custom_text_delivery_type: None,
+            custom_motion_blur: None,
+            custom_travel_distance: None,
+        };
+        assert_eq!(
+            optional_settings_from_projection(&absent, WireLimits::default())
+                .expect("absent transition should remain readable"),
+            None
+        );
+
+        let color = tsp::Color {
+            model: tsp::color::ColorModel::White as i32,
+            w: Some(0.5),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let timing_curve = tsd::PathSourceArchive {
+            horizontal_flip: Some(true),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let animation = AnimationSnapshot {
+            animation_type: Some("Transition"),
+            effect: Some("com.example.future-transition"),
+            duration: Some(1.25),
+            direction: Some(42),
+            delay: Some(0.5),
+            is_automatic: Some(false),
+            color: Some(color.as_slice()),
+            custom_effect_timing_curve_1: Some(timing_curve.as_slice()),
+            custom_effect_timing_curve_2: None,
+            custom_effect_timing_curve_3: None,
+            random_number_seed: Some(7),
+            custom_detail: Some(2.0),
+            custom_effect_timing_curve_theme_name_1: Some("future-theme"),
+            custom_effect_timing_curve_theme_name_2: None,
+            custom_effect_timing_curve_theme_name_3: None,
+            writing_direction_is_rtl: Some(true),
+        };
+        let snapshot = TransitionSettingsSnapshot {
+            has_legacy_database_fields: false,
+            animation: Some(animation),
+            custom_twist: Some(2.5),
+            custom_mosaic_size: Some(9),
+            custom_mosaic_type: Some(11),
+            custom_bounce: Some(true),
+            custom_magic_move_fade_unmatched_objects: Some(false),
+            custom_timing_curve: Some(19),
+            custom_text_delivery_type: Some(-1),
+            custom_motion_blur: Some(true),
+            custom_travel_distance: Some(88.0),
+        };
+
+        let settings = settings_from_projection(&snapshot, WireLimits::default())
+            .expect("strict transition projection should map");
+        assert_eq!(
+            settings.effect().map(Effect::identifier),
+            Some("com.example.future-transition")
+        );
+        assert_eq!(settings.direction().map(Direction::native_value), Some(42));
+        assert_eq!(
+            settings.animation_parameters().color_payload(),
+            Some(color.as_slice())
+        );
+        assert_eq!(
+            settings
+                .animation_parameters()
+                .timing_curve_payload(TimingCurveSlot::First),
+            Some(timing_curve.as_slice())
+        );
+        assert_eq!(
+            settings
+                .custom_parameters()
+                .mosaic_type()
+                .map(MosaicType::native_value),
+            Some(11)
+        );
+        assert_eq!(
+            settings
+                .custom_parameters()
+                .acceleration()
+                .map(Acceleration::native_value),
+            Some(19)
+        );
+        assert_eq!(
+            settings
+                .custom_parameters()
+                .text_delivery()
+                .map(TextDelivery::native_value),
+            Some(-1)
+        );
+    }
+
+    #[test]
+    fn strict_projection_adapter_rejects_malformed_opaque_payloads() {
+        let duplicate_color = [0x08, 0x01, 0x08, 0x01];
+        let color_animation = AnimationSnapshot {
+            animation_type: Some("Transition"),
+            effect: Some("none"),
+            duration: Some(1.0),
+            direction: None,
+            delay: None,
+            is_automatic: None,
+            color: Some(&duplicate_color),
+            custom_effect_timing_curve_1: None,
+            custom_effect_timing_curve_2: None,
+            custom_effect_timing_curve_3: None,
+            random_number_seed: None,
+            custom_detail: None,
+            custom_effect_timing_curve_theme_name_1: None,
+            custom_effect_timing_curve_theme_name_2: None,
+            custom_effect_timing_curve_theme_name_3: None,
+            writing_direction_is_rtl: None,
+        };
+        let color_snapshot = TransitionSettingsSnapshot {
+            has_legacy_database_fields: false,
+            animation: Some(color_animation),
+            custom_twist: None,
+            custom_mosaic_size: None,
+            custom_mosaic_type: None,
+            custom_bounce: None,
+            custom_magic_move_fade_unmatched_objects: None,
+            custom_timing_curve: None,
+            custom_text_delivery_type: None,
+            custom_motion_blur: None,
+            custom_travel_distance: None,
+        };
+        assert!(settings_from_projection(&color_snapshot, WireLimits::default()).is_err());
+
+        let invalid_path = [0x4a, 0x01, 0xff];
+        for slot in 0..3 {
+            let mut payloads = [None; 3];
+            payloads[slot] = Some(invalid_path.as_slice());
+            let path_animation = AnimationSnapshot {
+                color: None,
+                custom_effect_timing_curve_1: payloads[0],
+                custom_effect_timing_curve_2: payloads[1],
+                custom_effect_timing_curve_3: payloads[2],
+                ..color_animation
+            };
+            let path_snapshot = TransitionSettingsSnapshot {
+                animation: Some(path_animation),
+                ..color_snapshot
+            };
+            assert!(settings_from_projection(&path_snapshot, WireLimits::default()).is_err());
+        }
+    }
+
+    #[test]
+    fn opaque_codec_errors_preserve_adapter_validation_and_limits() {
+        let malformed = validate_opaque_color(&[0x08, 0x01, 0x08, 0x01], WireLimits::default())
+            .expect_err("duplicate color model must fail");
+        assert!(matches!(malformed, Error::InvalidSource));
+        let missing = validate_opaque_color(&[], WireLimits::default())
+            .expect_err("missing color model must fail");
+        assert!(matches!(missing, Error::InvalidSource));
+
+        let oversized = validate_opaque_color(
+            &[0x08, 0x01],
+            WireLimits::default()
+                .with_input_bytes(1)
+                .expect("one-byte input limit is valid"),
+        )
+        .expect_err("oversized color must fail");
+        assert!(matches!(
+            oversized,
+            Error::LimitExceeded {
+                kind: LimitKind::WireBytes,
+                observed: 2,
+                maximum: 1,
+            }
+        ));
+
+        let too_many_fields = validate_opaque_color(
+            &[0x08, 0x01, 0x08, 0x01],
+            WireLimits::default()
+                .with_fields(1)
+                .expect("one-field limit is valid"),
+        )
+        .expect_err("duplicate fields must exceed the field ceiling");
+        assert!(matches!(
+            too_many_fields,
+            Error::LimitExceeded {
+                kind: LimitKind::WireFields,
+                observed: 2,
+                maximum: 1,
+            }
+        ));
+
+        let too_deep = validate_opaque_path(
+            &[0x1a, 0x02, 0x12, 0x00],
+            WireLimits::default()
+                .with_nesting(1)
+                .expect("one-level nesting limit is valid"),
+        )
+        .expect_err("path nesting above the ceiling must fail");
+        assert!(matches!(
+            too_deep,
+            Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
+                observed: 2,
+                maximum: 1,
+            }
+        ));
     }
 
     #[test]
@@ -2277,5 +2589,82 @@ mod tests {
                 maximum: 3,
             })
         ));
+    }
+
+    #[test]
+    fn transition_read_seam_accepts_unknown_groups_with_source_sized_limits() {
+        let transition = kn::TransitionArchive {
+            attributes: kn::TransitionAttributesArchive {
+                animation_attributes: Some(kn::AnimationAttributesArchive {
+                    animation_type: Some("Transition".to_owned()),
+                    effect: Some("none".to_owned()),
+                    duration: Some(1.0),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        }
+        .encode_to_vec();
+        let mut source = length_delimited(4, &transition);
+        // Unknown groups are source-owned extension records. The focused
+        // decoder validates their framing and leaves them untouched, while
+        // the package mutation preflight rejects them before wire edits.
+        source.extend_from_slice(&[0x9b, 0x06, 0x9c, 0x06]);
+        let limits = WireLimits::default()
+            .with_input_bytes(source.len())
+            .expect("source-sized input limit is valid")
+            .with_fields(source.len())
+            .expect("source-sized field limit is valid")
+            .with_rewrite_work(source.len().saturating_mul(8))
+            .expect("source-sized work limit is valid");
+
+        let projection = decode_transition_projection(&source, limits)
+            .expect("focused read seam should preserve unknown groups");
+        let animation = projection
+            .settings
+            .animation
+            .expect("modern animation should remain present");
+        assert_eq!(animation.effect, Some("none"));
+        let mutation_limits = limits
+            .with_input_bytes(source.len().saturating_mul(4))
+            .expect("mutation preflight has an aggregate input budget");
+        assert!(matches!(
+            preflight_selected_transition_payload(&source, mutation_limits),
+            Err(Error::InvalidSource)
+        ));
+
+        let reduced_byte_limit = WireLimits::default()
+            .with_input_bytes(source.len().saturating_sub(1))
+            .expect("reduced input limit is valid")
+            .with_fields(source.len())
+            .expect("source-sized field limit is valid")
+            .with_rewrite_work(source.len().saturating_mul(8))
+            .expect("source-sized work limit is valid");
+        #[cfg(feature = "internal-iwork-source")]
+        let reduced_result =
+            super::Package::__transition_settings_from_source(&source, reduced_byte_limit);
+        #[cfg(not(feature = "internal-iwork-source"))]
+        let reduced_result = decode_transition_projection(&source, reduced_byte_limit);
+        assert!(matches!(
+            reduced_result,
+            Err(Error::LimitExceeded {
+                kind: LimitKind::WireBytes,
+                observed,
+                maximum,
+            }) if observed == source.len() as u64 && maximum == source.len().saturating_sub(1) as u64
+        ));
+
+        #[cfg(feature = "internal-iwork-source")]
+        {
+            let settings = super::Package::__transition_settings_from_source(&source, limits)
+                .expect("hidden host seam should use the focused decoder");
+            assert_eq!(
+                settings
+                    .expect("modern transition should be present")
+                    .effect()
+                    .map(Effect::identifier),
+                Some("none")
+            );
+        }
     }
 }

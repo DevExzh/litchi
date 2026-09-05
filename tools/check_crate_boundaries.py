@@ -4171,6 +4171,23 @@ IWA_KEYNOTE_SLIDE_DISCOVERY_CATALOG_MARKERS = (
             r"Snapshot)|TableInfoSnapshot)\b"
         ),
     ),
+    (
+        "strict slide-node projection",
+        re.compile(
+            r"\b(?:litchi_keynote[ \t\r\n]*::[ \t\r\n]*)?"
+            r"__decode_slide_node_projection[ \t\r\n]*\("
+        ),
+    ),
+    (
+        "strict slide-drawable projection",
+        re.compile(
+            r"\b(?:litchi_keynote[ \t\r\n]*::[ \t\r\n]*)?"
+            r"__decode_slide_drawable_projection[ \t\r\n]*\(|"
+            r"\b(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
+            r"keynote_slide_drawable_order_codec[ \t\r\n]*::[ \t\r\n]*"
+            r"(?:decode|project)[A-Za-z0-9_]*[ \t\r\n]*\("
+        ),
+    ),
 )
 IWA_KEYNOTE_SLIDE_DISCOVERY_FORBIDDEN_PATTERNS = (
     (
@@ -4213,6 +4230,13 @@ IWA_KEYNOTE_SLIDE_DISCOVERY_FORBIDDEN_PATTERNS = (
         re.compile(
             r"\bSlideNodeArchive\s*::\s*decode\s*\(|"
             r"\bdecode_type\s*::<\s*SlideNodeArchive\b"
+        ),
+    ),
+    (
+        "SlideArchive::decode",
+        re.compile(
+            r"\bSlideArchive\s*::\s*decode\s*\(|"
+            r"\bdecode_type\s*::<\s*SlideArchive\b"
         ),
     ),
 )
@@ -4729,9 +4753,13 @@ RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_METHOD_SET = frozenset(
     RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_METHODS
 )
 RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_SOURCES = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "transition.rs",
     IWA_KEYNOTE_SOURCE_ROOT / "editor" / "transition_lifecycle.rs",
 )
-RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_MODULES = ("transition_lifecycle",)
+RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_MODULES = (
+    "transition",
+    "transition_lifecycle",
+)
 RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_EXAMPLES = (
     Path("crates/litchi-iwa/examples/clear_keynote_transition.rs"),
     Path("crates/litchi-iwa/examples/edit_keynote_transition.rs"),
@@ -4739,7 +4767,7 @@ RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_EXAMPLES = (
 )
 IWA_KEYNOTE_SLIDE_TRANSITION_MODULE = re.compile(
     r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
-    r"mod[ \t\r\n]+(?:r#)?(transition_lifecycle)\b[ \t\r\n]*(?:;|\{)",
+    r"mod[ \t\r\n]+(?:r#)?(transition(?:_lifecycle)?)\b[ \t\r\n]*(?:;|\{)",
     re.MULTILINE,
 )
 IWA_KEYNOTE_README_SLIDE_TRANSITION_CALLS = (
@@ -4771,6 +4799,37 @@ IWA_KEYNOTE_README_SLIDE_TRANSITION_EXAMPLE = re.compile(
 KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "transition.rs",
     KEYNOTE_SOURCE_ROOT / "package" / "slide_transition.rs",
+)
+KEYNOTE_SLIDE_TRANSITION_HIDDEN_SOURCE_SEAM = (
+    "__transition_settings_from_source"
+)
+KEYNOTE_SLIDE_TRANSITION_HIDDEN_SOURCE_SEAM_DECLARATION = re.compile(
+    r"(?s)#\s*\[\s*cfg\s*\(\s*feature\s*=\s*\"internal-iwork-source\"\s*\)\s*\]"
+    r"[\s\S]*?#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\]"
+    r"[\s\S]*?\bpub\s+fn\s+__transition_settings_from_source\b"
+)
+IWA_KEYNOTE_SLIDE_TRANSITION_HOST_DUPLICATE_CONVERTER_NAMES = (
+    "settings_from_projection",
+    "validate_transition_settings",
+    "map_opaque_transition_codec_error",
+    "opaque_transition_decode_options",
+)
+IWA_KEYNOTE_SLIDE_TRANSITION_HOST_DUPLICATE_CONVERTER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    + "|".join(
+        re.escape(name)
+        for name in IWA_KEYNOTE_SLIDE_TRANSITION_HOST_DUPLICATE_CONVERTER_NAMES
+    )
+    + r")(?![A-Za-z0-9_])"
+)
+IWA_KEYNOTE_SLIDE_TRANSITION_HOST_CODEC_REFERENCE = re.compile(
+    r"(?<![A-Za-z0-9_])keynote_slide_transition_codec(?![A-Za-z0-9_])"
+)
+IWA_KEYNOTE_SLIDE_TRANSITION_HOST_SEAM_REFERENCE = re.compile(
+    r"(?<![A-Za-z0-9_])litchi_keynote[ \t\r\n]*::[ \t\r\n]*Package"
+    r"[ \t\r\n]*::[ \t\r\n]*"
+    + re.escape(KEYNOTE_SLIDE_TRANSITION_HIDDEN_SOURCE_SEAM)
+    + r"(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
 KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "lib.rs",
@@ -9552,15 +9611,20 @@ IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_LEGACY_CALL = re.compile(
     r"(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
 
-# The migration host's Custom reset keeps a compatibility writer for source
-# built and legacy-registry packages while admitting the focused owner only
-# after both exact-source and rooted TN.DocumentArchive field-9 gates.  This
-# ratchet scopes those ordering and delegation requirements to the one host
-# method; the focused litchi-numbers package owns the physical rewrite.
+# The migration host's Custom reset keeps a compatibility writer for
+# source-built packages while routing every exact source through the focused
+# owner.  The focused owner performs its own strict registry-route admission;
+# the host must not grow a second, root-field-specific gate or fall back to
+# compatibility after focused admission.  This ratchet scopes those ordering
+# and delegation requirements to the one host method; the focused
+# litchi-numbers package owns the physical rewrite.
 IWA_NUMBERS_CUSTOM_RESET_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs"
 )
 IWA_NUMBERS_CUSTOM_RESET_FUNCTION = "reset_table_cell_custom_format"
+IWA_NUMBERS_CUSTOM_RESET_RETIRED_GATE = re.compile(
+    r"\bhas_focused_custom_registry_edge\b"
+)
 IWA_NUMBERS_CUSTOM_RESET_COMPAT_MODULE_ALIAS = re.compile(
     r"\bcell_data_format\b[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
     r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b"
@@ -9576,10 +9640,6 @@ IWA_NUMBERS_CUSTOM_RESET_REQUIRED_MARKERS = (
     (
         "exact-source gate",
         re.compile(r"\bsource_is_exact[ \t\r\n]*\([ \t\r\n]*\)"),
-    ),
-    (
-        "focused registry gate",
-        re.compile(r"\bhas_focused_custom_registry_edge[ \t\r\n]*\("),
     ),
     (
         "focused owner eligibility",
@@ -12357,10 +12417,11 @@ IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_FORBIDDEN_PATTERNS = (
         ),
     ),
 )
-# Body-anchored drawable graph readers need only the two scalar facts exposed
-# by ``pages_document_root_facts``. Keep this inventory explicit: mutation and
-# theme helpers in the same modules may still use complete generated archives,
-# while these five read sites must not regress to ``root_document``.
+# Body-anchored drawable graph readers need only the compact scalar facts
+# exposed by ``pages_document_root_facts`` (currently z-order, theme, and
+# margin). Keep this inventory explicit: mutation and theme helpers in the same
+# modules may still use complete generated archives, while these five read
+# sites must not regress to ``root_document``.
 IWA_PAGES_ROOT_FACTS_GRAPH_SITES = (
     (
         IWA_PAGES_SOURCE_ROOT / "editor" / "audio" / "graph.rs",
@@ -12415,6 +12476,45 @@ IWA_PAGES_ROOT_FACTS_GRAPH_FORBIDDEN_PATTERNS = (
         "generated DocumentArchive type",
         re.compile(r"\bDocumentArchive\b"),
     ),
+)
+# Generic Pages reachability still has to walk the document's drawable z-order,
+# but that read path needs only the repeated identifiers.  Keep the focused
+# reader on the shared borrowed Buffa projection while the mutation/creation
+# paths continue to own their broader generated archives.  This is separate
+# from the retired body-order API ratchet above: it protects the host's
+# internal read graph rather than a public compatibility surface.
+IWA_PAGES_DRAWABLE_ORDER_READ_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor.rs"
+IWA_PAGES_DRAWABLE_ORDER_READ_FUNCTION = "extend_reachable_drawable_order"
+IWA_PAGES_DRAWABLE_ORDER_READ_CODEC_CALL = re.compile(
+    r"\b(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
+    r"pages_drawable_order_codec[ \t\r\n]*::[ \t\r\n]*"
+    r"decode_drawable_order[ \t\r\n]*\("
+)
+IWA_PAGES_DRAWABLE_ORDER_READ_FORBIDDEN_PATTERNS = (
+    (
+        "generated DrawablesZOrderArchive type",
+        re.compile(r"\b(?:tp[ \t\r\n]*::[ \t\r\n]*)?DrawablesZOrderArchive\b"),
+    ),
+    (
+        "generated DrawablesZOrderArchive decode",
+        re.compile(
+            r"\b(?:tp[ \t\r\n]*::[ \t\r\n]*)?DrawablesZOrderArchive"
+            r"[ \t\r\n]*::[ \t\r\n]*decode[ \t\r\n]*\(|"
+            r"\bdecode_type[ \t\r\n]*::<[\s\S]{0,160}?DrawablesZOrderArchive\b"
+        ),
+    ),
+    (
+        "generic generated message decode",
+        re.compile(
+            r"\b(?:prost[ \t\r\n]*::[ \t\r\n]*)?Message"
+            r"[ \t\r\n]*::[ \t\r\n]*decode[ \t\r\n]*\(|"
+            r"\bdecode_typed_package_object[ \t\r\n]*::<"
+        ),
+    ),
+)
+IWA_PAGES_DRAWABLE_ORDER_READ_TYPE_ALIAS = re.compile(
+    r"\b(?:tp[ \t\r\n]*::[ \t\r\n]*)?DrawablesZOrderArchive"
+    r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b"
 )
 PAGES_PACKAGE_TEST_MODULE = re.compile(
     r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]",
@@ -20646,13 +20746,87 @@ def audit_iwa_keynote_slide_transition_source_topology(
 
     editor_path = root / IWA_KEYNOTE_EDITOR_SOURCE
     if editor_path.is_file():
-        source = _mask_rust_non_code(editor_path.read_text(encoding="utf-8"))
+        raw_source = editor_path.read_text(encoding="utf-8")
+        source = _mask_rust_non_code(raw_source)
         for match in IWA_KEYNOTE_SLIDE_TRANSITION_MODULE.finditer(source):
             line_number = source.count("\n", 0, match.start()) + 1
             violations.append(
                 "retired litchi-iwa Keynote slide-transition module "
                 f"{match.group(1)}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
             )
+
+        # Transition projection and semantic conversion now belong to the
+        # focused Package owner.  Keep the migration host from retaining a
+        # second converter while the old module is being removed.  The scan
+        # is production-only so test fixtures cannot satisfy or bypass the
+        # ownership boundary.
+        production_source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(raw_source)
+        )
+        for match in IWA_KEYNOTE_SLIDE_TRANSITION_HOST_DUPLICATE_CONVERTER.finditer(
+            production_source
+        ):
+            line_number = production_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote slide-transition duplicate host "
+                f"converter {match.group(0)}: "
+                f"{IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+            )
+        for match in IWA_KEYNOTE_SLIDE_TRANSITION_HOST_CODEC_REFERENCE.finditer(
+            production_source
+        ):
+            line_number = production_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote slide-transition host codec reference: "
+                f"{IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+            )
+
+        # Once the host reaches the transition surface, it must call the
+        # feature-gated Package seam.  Check the seam's actual owner path and
+        # signature marker so a similarly named host helper cannot satisfy the
+        # ratchet.
+        host_uses_transition_surface = bool(
+            IWA_KEYNOTE_SLIDE_TRANSITION_HOST_DUPLICATE_CONVERTER.search(
+                production_source
+            )
+            or IWA_KEYNOTE_SLIDE_TRANSITION_HOST_CODEC_REFERENCE.search(
+                production_source
+            )
+            or IWA_KEYNOTE_SLIDE_TRANSITION_HOST_SEAM_REFERENCE.search(
+                production_source
+            )
+        )
+        if host_uses_transition_surface:
+            if (
+                IWA_KEYNOTE_SLIDE_TRANSITION_HOST_SEAM_REFERENCE.search(
+                    production_source
+                )
+                is None
+            ):
+                violations.append(
+                    "focused litchi-keynote Package transition source seam is not "
+                    "used by the migration host: "
+                    f"{IWA_KEYNOTE_EDITOR_SOURCE}"
+                )
+            else:
+                package_path = root / KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[1]
+                package_source = (
+                    _mask_rust_comments(package_path.read_text(encoding="utf-8"))
+                    if package_path.is_file()
+                    else ""
+                )
+                if (
+                    not package_path.is_file()
+                    or KEYNOTE_SLIDE_TRANSITION_HIDDEN_SOURCE_SEAM_DECLARATION.search(
+                        package_source
+                    )
+                    is None
+                ):
+                    violations.append(
+                        "focused litchi-keynote Package transition source seam is "
+                        "missing or not feature-gated/hidden: "
+                        f"{KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[1]}"
+                    )
 
     readme_path = root / IWA_KEYNOTE_README
     if readme_path.is_file():
@@ -20760,6 +20934,20 @@ def audit_keynote_slide_transition_facade_source_topology(
         ) in declarations:
             if not _is_keynote_slide_transition_public_declaration(
                 declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            # This feature-gated hidden method is the narrow migration seam
+            # used by litchi-iwa.  Its bounded wire input is intentionally
+            # private to that compatibility edge; the public semantic API
+            # below still rejects the same vocabulary everywhere else.
+            declaration_identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if (
+                path
+                == root / KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[1]
+                and KEYNOTE_SLIDE_TRANSITION_HIDDEN_SOURCE_SEAM
+                in declaration_identifiers
             ):
                 continue
             owner_declaration = _keynote_slide_transition_owner_declaration(
@@ -25290,14 +25478,15 @@ def audit_iwa_numbers_table_cell_number_format_source_topology(
 def audit_iwa_numbers_custom_reset_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep the migration-host Custom reset behind both owner gates.
+    """Keep the migration-host Custom reset behind one focused owner gate.
 
     ``NumbersEditor::reset_table_cell_custom_format`` has two intentional
-    routes. Exact sources with the rooted TN.DocumentArchive field-9 edge use
-    the focused package owner; builder and legacy-registry sources retain the
-    compatibility writer. Inspect only this method so the generic Custom
-    helpers remain available while a future edit cannot move the legacy reset
-    ahead of focused admission or silently bypass either gate.
+    routes. Exact sources use the focused package owner, whose own strict
+    codec admits the supported native registry profiles; source-built packages
+    retain the compatibility writer. Inspect only this method so a future edit
+    cannot reintroduce the retired root-field-specific gate, move the legacy
+    reset ahead of focused admission, or bypass focused admission on an exact
+    source.
     """
 
     path = root / IWA_NUMBERS_CUSTOM_RESET_SOURCE
@@ -25329,12 +25518,13 @@ def audit_iwa_numbers_custom_reset_source_topology(
                 f"{label} marker: {path.relative_to(root)}:{line_number}"
             )
 
-    focused_gate = re.search(
-        r"\bsource_is_exact[ \t\r\n]*\([ \t\r\n]*\)", production_body
-    )
-    registry_gate = re.search(
-        r"\bhas_focused_custom_registry_edge[ \t\r\n]*\(", production_body
-    )
+    for match in IWA_NUMBERS_CUSTOM_RESET_RETIRED_GATE.finditer(production_body):
+        line = production_body.count("\n", 0, match.start()) + line_number
+        violations.append(
+            "litchi-iwa Numbers Custom reset retains the retired root-field "
+            f"registry gate: {path.relative_to(root)}:{line}"
+        )
+
     focused_commit = re.search(
         r"\bcommit_exact_focused_data_format_with_location"
         r"[ \t\r\n]*\(",
@@ -25345,11 +25535,6 @@ def audit_iwa_numbers_custom_reset_source_topology(
         r"reset_cell_data_format[ \t\r\n]*\(",
         production_body,
     )
-    if focused_gate and registry_gate and focused_gate.start() > registry_gate.start():
-        violations.append(
-            "litchi-iwa Numbers Custom reset must check the exact-source gate "
-            f"before the focused registry gate: {path.relative_to(root)}:{line_number}"
-        )
     if focused_commit and compatibility_reset:
         if compatibility_reset.start() < focused_commit.start():
             violations.append(
@@ -40593,7 +40778,7 @@ def audit_iwa_keynote_slide_table_discovery_source_topology(
     for source in production.values():
         code = _mask_rust_non_code(source)
         for match in re.finditer(
-            r"\b(?:DocumentArchive|ShowArchive|SlideNodeArchive|"
+            r"\b(?:DocumentArchive|ShowArchive|SlideNodeArchive|SlideArchive|"
             r"TableModelArchive|TableInfoArchive)\b"
             r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
             r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
@@ -40606,6 +40791,7 @@ def audit_iwa_keynote_slide_table_discovery_source_topology(
                     "DocumentArchive",
                     "ShowArchive",
                     "SlideNodeArchive",
+                    "SlideArchive",
                     "TableModelArchive",
                     "TableInfoArchive",
                 )
@@ -43943,6 +44129,71 @@ def audit_iwa_pages_root_facts_graph_source_topology(
                     "litchi-iwa Pages graph reader uses eager root data through "
                     f"{label}: {relative}:{line}"
                 )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_pages_drawable_order_read_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep generic Pages z-order reachability on the borrowed codec path.
+
+    ``extend_reachable_drawable_order`` is a read-only graph walk used by
+    document reachability. It only needs the repeated drawable identifiers,
+    so a generated ``TP.DrawablesZOrderArchive`` decode would spend memory on
+    fields that are immediately discarded. The focused body-order owner has a
+    separate retirement audit; this check covers only the host's generic read
+    helper and leaves mutation/creation decodes outside its scope.
+    """
+
+    path = root / IWA_PAGES_DRAWABLE_ORDER_READ_SOURCE
+    if not path.is_file():
+        return []
+
+    masked_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    function = _rust_named_function_body(
+        masked_source, IWA_PAGES_DRAWABLE_ORDER_READ_FUNCTION
+    )
+    if function is None:
+        return []
+
+    body, body_offset = function
+    production_body = _mask_rust_non_code(body)
+    source_code = _mask_rust_non_code(masked_source)
+    line_number = next(
+        (
+            line
+            for name, line in _rust_function_declarations(masked_source)
+            if name == IWA_PAGES_DRAWABLE_ORDER_READ_FUNCTION
+        ),
+        1,
+    )
+    violations: list[str] = []
+
+    if IWA_PAGES_DRAWABLE_ORDER_READ_CODEC_CALL.search(production_body) is None:
+        violations.append(
+            "litchi-iwa Pages drawable-order reachability is missing the strict "
+            f"borrowed {IWA_PAGES_DRAWABLE_ORDER_CODEC_MODULE} decode route: "
+            f"{IWA_PAGES_DRAWABLE_ORDER_READ_SOURCE}:{line_number}"
+        )
+
+    forbidden = list(IWA_PAGES_DRAWABLE_ORDER_READ_FORBIDDEN_PATTERNS)
+    for alias_match in IWA_PAGES_DRAWABLE_ORDER_READ_TYPE_ALIAS.finditer(source_code):
+        alias = alias_match.group("alias")
+        forbidden.append(
+            (
+                f"DrawablesZOrderArchive alias {alias}",
+                re.compile(rf"\b(?:r#)?{re.escape(alias)}\b"),
+            )
+        )
+
+    for label, pattern in forbidden:
+        for match in pattern.finditer(production_body):
+            line = masked_source.count("\n", 0, body_offset + match.start()) + 1
+            violations.append(
+                "litchi-iwa Pages drawable-order reachability uses "
+                f"{label}: {IWA_PAGES_DRAWABLE_ORDER_READ_SOURCE}:{line}"
+            )
 
     return sorted(set(violations))
 
@@ -56722,6 +56973,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_pages_body_storage_discovery_source_topology()
         + audit_iwa_pages_section_template_discovery_source_topology()
         + audit_iwa_pages_root_facts_graph_source_topology()
+        + audit_iwa_pages_drawable_order_read_source_topology()
         + audit_pages_document_public_api()
         + audit_pages_package_output_api_source_topology()
         + audit_iwork_atomic_publication()

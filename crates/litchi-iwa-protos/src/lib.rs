@@ -693,6 +693,46 @@ mod buffa_keynote_speaker_notes_generated {
     ));
 }
 
+/// Private Buffa lazy views for the focused Keynote drawable-order path.
+///
+/// The generated repeated references are intentionally lazy; the companion
+/// codec first performs strict aggregate preflight and then forces only the
+/// scalar identifiers required by catalog discovery.
+#[doc(hidden)]
+mod buffa_keynote_slide_drawables_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "buffa-build output is generated from the derived wire projection."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-slide-drawables/iwa_keynote_slide_drawables_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy views for the focused Keynote slide-number path.
 #[doc(hidden)]
 mod buffa_keynote_slide_number_generated {
@@ -1791,6 +1831,12 @@ pub mod keynote_placeholder_text_codec;
 /// remain inaccessible to downstream crates and source bytes stay authoritative.
 #[doc(hidden)]
 pub mod keynote_speaker_notes_codec;
+
+/// Internal strict Keynote slide drawable-order projection. Generated Buffa
+/// repeated views remain private and the returned snapshot owns only scalar
+/// identifiers.
+#[doc(hidden)]
+pub mod keynote_slide_drawables_codec;
 
 /// Internal strict Keynote slide-number projection. Generated views remain
 /// private; the attachment table is borrowed raw source bytes.

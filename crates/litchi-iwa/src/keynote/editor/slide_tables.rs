@@ -177,15 +177,15 @@ impl KeynoteEditor {
         let mut catalog = KeynoteObjectCatalog::build(self.package()).map_err(map_catalog_error)?;
         let context = catalog_slide_context(self.package(), &mut catalog, slide_index)?;
         let mut tables = Vec::new();
-        for reference in &context.slide.drawables_z_order {
-            if catalog.object_descriptor(reference.identifier).is_err() {
+        for &drawable_object_id in &context.slide.drawables_z_order {
+            if catalog.object_descriptor(drawable_object_id).is_err() {
                 return Err(Error::InvalidFormat(format!(
                     "Keynote slide {} drawable {} is missing",
-                    context.slide_id, reference.identifier
+                    context.slide_id, drawable_object_id
                 )));
             }
             if catalog
-                .message_type_count(reference.identifier, TABLE_INFO_MESSAGE_TYPE)
+                .message_type_count(drawable_object_id, TABLE_INFO_MESSAGE_TYPE)
                 .map_err(map_catalog_error)?
                 > 0
             {
@@ -194,7 +194,7 @@ impl KeynoteEditor {
                         self,
                         &mut catalog,
                         slide_index,
-                        reference.identifier,
+                        drawable_object_id,
                         &context,
                     )?
                     .info,

@@ -36,6 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_placeholder_text_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_slide_drawables_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_number_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_soundtrack_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_media_codec.rs");
@@ -114,6 +115,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/pages_section_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_hidden_state_codec.rs");
     println!("cargo:rerun-if-changed=src/buffa-projections/TSTPagesHiddenStateProjection.proto");
+    println!("cargo:rerun-if-changed=src/buffa-projections/KNSlideDrawableOrderArchive.proto");
     println!("cargo:rerun-if-changed=src/protos/TSPMessages.proto");
     println!("cargo:rerun-if-changed=src/protos/TSTArchives.proto");
     println!("cargo:rerun-if-changed=src/protos/TSCEArchives.proto");
@@ -176,6 +178,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_keynote_speaker_notes_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
+    enforce_keynote_slide_drawables_projection_provenance(
         proto_directory,
         buffa_projection_directory,
     )?;
@@ -1067,6 +1073,29 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile()?;
     enforce_keynote_speaker_notes_projection_budget(&buffa_keynote_speaker_notes_out_directory)?;
 
+    // Read-only table discovery needs only the slide envelope and the two
+    // repeated drawable-reference lists.  Buffa records those nested
+    // elements as lazy byte ranges; the focused codec forces each selected
+    // reference only after its strict aggregate preflight has completed.
+    let buffa_keynote_slide_drawables_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-slide-drawables");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("KNSlideDrawableOrderArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_slide_drawables_out_directory)
+        .include_file("iwa_keynote_slide_drawables_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_slide_drawables_projection_budget(
+        &buffa_keynote_slide_drawables_out_directory,
+    )?;
+
     // Slide numbers need one visibility bit plus a small scalar storage and
     // textual-attachment chain.  The repeated attachment table is raw bytes
     // here and receives one bounded handwritten strict pass in the codec.
@@ -1386,6 +1415,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "KNSpeakerNotesArchive.proto",
             1402,
             "20500304a527d8c0531148217c3302b36eb2cee7a48d7a90533130f9a70acd77",
+        ),
+        (
+            "KNSlideDrawableOrderArchive.proto",
+            995,
+            "634a8bf55f4fdab61a87c78a57acae39c8db230d680f6bd84254ce7de6e9c867",
         ),
         (
             "TNNumbersNamesArchive.proto",
@@ -1735,6 +1769,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/keynote_speaker_notes_codec.rs",
             "crate::buffa_keynote_speaker_notes_generated::",
             "mod buffa_keynote_speaker_notes_generated {",
+        ),
+        (
+            "src/keynote_slide_drawables_codec.rs",
+            "crate::buffa_keynote_slide_drawables_generated::",
+            "mod buffa_keynote_slide_drawables_generated {",
         ),
         (
             "src/keynote_slide_number_codec.rs",
@@ -8183,6 +8222,75 @@ required .LitchiIwaProjection.Reference contained_storage = 1;\n\
     Ok(())
 }
 
+fn enforce_keynote_slide_drawables_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TSP_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const KN_TRANSITION: &str = "message TransitionArchive {\n  required .KN.TransitionAttributesArchive attributes = 2;\n}";
+    const KN_SLIDE_FIELDS: [&str; 5] = [
+        "required .TSP.Reference style = 1;",
+        "required .KN.TransitionArchive transition = 4;",
+        "repeated .TSP.Reference owned_drawables = 7;",
+        "repeated .TSP.Reference drawables_z_order = 42;",
+        "required bool inDocument = 19;",
+    ];
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message Reference {\n\
+required uint64 identifier = 1;\n\
+optional int32 deprecated_type = 2;\n\
+optional bool deprecated_is_external = 3;\n\
+}\n\
+message TransitionAttributesArchive {}\n\
+message TransitionArchive {\n\
+required .LitchiIwaProjection.TransitionAttributesArchive attributes = 2;\n\
+}\n\
+message SlideArchive {\n\
+required .LitchiIwaProjection.Reference style = 1;\n\
+required .LitchiIwaProjection.TransitionArchive transition = 4;\n\
+repeated .LitchiIwaProjection.Reference owned_drawables = 7;\n\
+required bool in_document = 19;\n\
+repeated .LitchiIwaProjection.Reference drawables_z_order = 42;\n\
+}";
+
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let keynote = fs::read_to_string(proto_directory.join("KNArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("KNSlideDrawableOrderArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let slide_block = keynote
+        .split_once("message SlideArchive {")
+        .and_then(|(_prefix, remainder)| remainder.split_once("\n}\n\nmessage SlideNodeArchive"))
+        .map_or("", |(block, _suffix)| block);
+    let codec = fs::read_to_string("src/keynote_slide_drawables_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    if tsp.matches(TSP_REFERENCE).count() != 1
+        || keynote.matches(KN_TRANSITION).count() != 1
+        || !KN_SLIDE_FIELDS
+            .iter()
+            .all(|declaration| slide_block.matches(declaration).count() == 1)
+        || projection_schema != PROJECTION_SCHEMA
+        || projection.len() > 2 * 1024
+        || projection_schema.matches("repeated ").count() != 2
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "derived Keynote slide-drawable projection drifted from canonical KN/TSP fields, exceeded its 2 KiB source budget, or added production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 fn enforce_keynote_slide_number_projection_provenance(
     proto_directory: &Path,
     projection_directory: &Path,
@@ -9888,6 +9996,47 @@ fn enforce_keynote_speaker_notes_projection_budget(directory: &Path) -> Result<(
     {
         return Err(format!(
             "Keynote speaker-notes projection generated {files} files/{bytes} bytes/{generated_repeated_views} RepeatedView mentions/{generated_lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_slide_drawables_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // The repeated references are deliberately generated as lazy byte-range
+    // views. Keep a narrow cap around the reviewed five-file closure so a
+    // future schema expansion cannot silently reintroduce eager storage.
+    const MAX_GENERATED_BYTES: u64 = 224 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut lazy_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(
+                fs::read_to_string(entry.path())?
+                    .matches("LazyRepeatedView")
+                    .count(),
+            )
+            .ok_or("generated lazy-repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || lazy_repeated_views < 2 {
+        return Err(format!(
+            "Keynote slide-drawable projection generated {files} files/{bytes} bytes/{lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and both repeated fields lazy"
         )
         .into());
     }

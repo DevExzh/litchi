@@ -4,7 +4,6 @@ use super::*;
 use crate::image_caption::{DrawableCaptionKind, drawable_caption_slot};
 use crate::package_metadata::component_identifier_for_object_uuid;
 
-const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
 const ATTACHMENT_HORIZONTAL_OFFSET_FIELD: u32 = 3;
 const ATTACHMENT_VERTICAL_OFFSET_FIELD: u32 = 5;
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
@@ -144,19 +143,7 @@ pub(super) fn body_chart_graph(
     let z_order_id = document.drawables_zorder.ok_or_else(|| {
         Error::InvalidFormat("Pages document has no drawable z-order object".into())
     })?;
-    let z_order: tp::DrawablesZOrderArchive = decode_typed_package_object(
-        editor.package(),
-        z_order_id,
-        DRAWABLE_Z_ORDER_MESSAGE_TYPE,
-        "TP.DrawablesZOrderArchive",
-    )?;
-    if z_order
-        .drawables
-        .iter()
-        .filter(|reference| reference.identifier == drawable_object_id)
-        .count()
-        != 1
-    {
+    if pages_drawable_z_order_count(editor.package(), z_order_id, drawable_object_id)? != 1 {
         return Err(Error::InvalidFormat(format!(
             "Pages drawable z-order does not own chart {drawable_object_id} exactly once"
         )));

@@ -16,7 +16,6 @@ use crate::shapes::{
 use litchi_iwa_common::shape::image::ImageAdjustments;
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
-const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
@@ -326,17 +325,8 @@ pub(super) fn body_image_graph(
     let z_order_id = document.drawables_zorder.ok_or_else(|| {
         Error::InvalidFormat("Pages document has no drawable z-order object".to_owned())
     })?;
-    let z_order: tp::DrawablesZOrderArchive = decode_typed_package_object(
-        editor.package(),
-        z_order_id,
-        DRAWABLE_Z_ORDER_MESSAGE_TYPE,
-        "TP.DrawablesZOrderArchive",
-    )?;
-    let z_order_count = z_order
-        .drawables
-        .iter()
-        .filter(|reference| reference.identifier == drawable_object_id)
-        .count();
+    let z_order_count =
+        pages_drawable_z_order_count(editor.package(), z_order_id, drawable_object_id)?;
     if z_order_count != 1 {
         return Err(Error::InvalidFormat(format!(
             "Pages image {drawable_object_id} occurs {z_order_count} times in drawable z-order"

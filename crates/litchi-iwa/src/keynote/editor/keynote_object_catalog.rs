@@ -9,8 +9,6 @@
 use std::mem::size_of;
 use std::sync::Arc;
 
-use prost::Message;
-
 use crate::archive::{Archive, ArchiveObject};
 use crate::{Error, IWorkPackage};
 
@@ -868,23 +866,6 @@ impl KeynoteObjectCatalog {
                     )
                 })?;
             read(message.data.as_slice())
-        })
-    }
-
-    /// Decode exactly one selected message while retaining no source payload.
-    pub(super) fn decode_type<T: Message + Default>(
-        &mut self,
-        package: &IWorkPackage,
-        identifier: u64,
-        message_type: u32,
-        type_name: &str,
-    ) -> CatalogResult<T> {
-        self.with_message_data_type(package, identifier, message_type, type_name, |data| {
-            T::decode(data).map_err(|error| {
-                KeynoteObjectCatalogError::InvalidSource(format!(
-                    "object {identifier} has malformed {type_name} payload: {error}"
-                ))
-            })
         })
     }
 

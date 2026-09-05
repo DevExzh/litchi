@@ -16392,3 +16392,71 @@ declarations, and 11 ordered debts. Workspace formatting, manifest sorting,
 library lint, all-feature library/integration tests, and documentation tests
 pass. No package, dependency edge, ordered debt, migration-host item, or
 ADR 0028 deletion gate is closed here.
+
+## 2026-09-06 follow-up: exact Custom routes, borrowed graph reads, and native Text fixtures
+
+The prior host restriction that admitted focused `Custom` reset only through
+the root field-9 edge has been removed. Every exact-source eligible same-family
+`Custom` transition, valid exact no-op, `Custom` -> `Automatic` clear, and
+reset now uses the focused owner for either the `TN.DocumentArchive` field-9
+route or `TN.super` field 8 -> `TSA.custom_format_list` field 12 route.
+Source-built, cross-family, and authoring cases retain compatibility-writer
+behavior. Reopened builder admission also preserves the known Number and Text
+UTF-16 suffix caches and the legacy DateTime integer-token cache; malformed
+registry routes remain terminal errors.
+
+Pages body graph discovery now reads drawable z-order through one strict
+borrowed codec at five body graph sites. The archive-cache lookup validates
+object and payload ownership and multiplicity before invoking the callback, so
+the callback receives one borrowed payload and the earlier duplicate body
+decode is removed. This remains a read-side projection; mutation and native
+parity gates are unchanged.
+
+Keynote catalog `SlideArchive` discovery now uses the new Buffa lazy codec for
+its compact `Vec<u64>` owned-drawable and z-order projection. Strict
+preflight, lazy repeated views, provenance checks, and the generated-projection
+budget pass focused verification. The 418-line host transition module is
+deleted and its settings conversion now belongs to the focused owner. The
+hidden read seam uses the bounded transition codec directly, retaining unknown
+group framing and the caller's root-byte, field, work, and nesting limits;
+mutation preflight remains in place. Seven focused tests cover the migrated
+conversion, optional and opaque settings, unknown groups, and reduced limits.
+The Keynote library suite passes all 202 tests. This source deletion advances
+migration without closing a global transition or monolith-exit gate.
+
+Computer Use authored and reopened two Numbers 14.4 native Custom Text
+fixtures without repair prompts. `custom-text-native.numbers` contains
+`Native Label` (`Native [` + token + `]`) around `Orchid`, with SHA-256
+`77f43ffada11cb5267aaf5f208cfeb1de07bcb944053c8a6679ca014352767e1` and a
+native cached field-31 last-index value of 9. The Unicode fixture
+`custom-text-native-unicode.numbers` uses `😀Native [` + token + `]`, retains
+the marker and displayed value, reports `Native Unicode`, and has SHA-256
+`12c0b819002b5175cc91d15012cb3fc73c5acfd786ca769a93cd30c3d01a6c26`; its
+field-31 value is 11. The paired values demonstrate that the native cache is
+indexed in UTF-16 code units. A Rust Custom Text candidate replaced the
+pattern with `Rust <` + token + `>` and `Rust Label`; its pre-application
+SHA-256 was
+`2148fb4294349d904d027ca703da2a7f54b7684166c21799245960e0873d228f`, and
+the exact inverse restored the original
+`77f43ffada11cb5267aaf5f208cfeb1de07bcb944053c8a6679ca014352767e1` bytes.
+Numbers 14.4 displayed `Rust <Orchid>` with `Rust Label`; after C2 changed to
+`Native Text marker saved`, save, close, and exact-path reopen preserved the
+format, value, and marker without repair. The resaved artifact's SHA-256 is
+`8bb5fdc9e7c9325a2cccb0d76ba06a1cf2e88bb5ff046d2014aea3d65ff80729`.
+Rust clear from that resaved source displayed `Automatic` and `Orchid`; after
+C2 changed to `Native Text clear saved`, save, close, and exact-path reopen
+preserved both, with post-clear SHA-256
+`0e9ed395470b2579846fcb8493f0ab58f51d2d41f4b720846a61b2a7fabcad37`.
+Both Rust mutations pass three-component/full-reparse, semantic reopen, and
+exact inverse checks. Rust also reads the native-resaved clear result and
+confirms an exact no-op clear. The native UI checks qualify these Text
+replacement and clear cases only. All 30 Custom integration tests pass: 19
+focused cases, five native Number cases, and six native Text cases. Focused
+owner-library runs report 789 protobuf tests, 445 Numbers tests plus four
+ignored, and 150 Pages tests. The host library suite passes all 1,713 tests,
+including the reopened multi-family builder regression. Normal commit hooks
+enforce workspace formatting, library lint, all-feature library/integration
+tests, and documentation tests. The transition module deletion is complete, but the monolithic
+`litchi-iwa` deletion and global parity gates remain open.
+Boundary verification currently reports 890 passing tests with a census of 64
+packages, 238 declarations, and 11 ordered debts.
