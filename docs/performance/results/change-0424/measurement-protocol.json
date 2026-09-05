@@ -1,0 +1,84 @@
+{
+  "change": 424,
+  "declared_utc": "2026-09-05T13:16:52.259687+00:00",
+  "classification": "matched source-backed allocation reuse experiment; no release latency claim",
+  "baseline_revision": "6ca9962c7818e173538a40ed45f3a3c32cc1aa6a",
+  "cpu": 2,
+  "workers": 1,
+  "common_flags": [
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm"
+  ],
+  "corpora": [
+    "plain",
+    "media_rich"
+  ],
+  "selectors": [
+    "pptx_source_backed_cross_copy_plain_lifecycle",
+    "pptx_source_backed_cross_copy_media_rich_lifecycle"
+  ],
+  "lanes": {
+    "normal": {
+      "samples": 100,
+      "warmups": 10
+    },
+    "allocator": {
+      "samples": 30,
+      "warmups": 3
+    }
+  },
+  "order": [
+    {
+      "role": "control",
+      "repeat": "R1"
+    },
+    {
+      "role": "candidate",
+      "repeat": "R1"
+    },
+    {
+      "role": "candidate",
+      "repeat": "R2"
+    },
+    {
+      "role": "control",
+      "repeat": "R2"
+    }
+  ],
+  "expected_run_count": 16,
+  "hypothesis": "Sharing independently staged image/chart Arc<Vec<u8>> storage during exact validated reprepare removes one selected-payload clone per publication. Full preparation, content comparisons, candidate source rereads, source/refusal checks and conservative reservations remain.",
+  "primary_metrics": [
+    "operation allocated_bytes",
+    "operation allocation_calls",
+    "operation region_peak_live_bytes"
+  ],
+  "normal_repeat_drift_ceilings_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  },
+  "review_trigger": "Review each paired normal latency statistic or whole-process RSS regression above5%; disclose unstable repeats and withhold causal timing conclusions. No geometric mean hiding. Retain only material measured resource benefit with correctness/preservation unchanged and explicit tradeoff review.",
+  "latency_claim": "None:100-sample normal lane is diagnostic; allocator/heaptrack elapsed not compared with normal.",
+  "memory_scope": "V3 allocation requests and absolute region live-byte maximum in callback order, not physical copies/RSS/object-owned/post-drop bytes. Report all sample vectors and RSS separately.",
+  "correctness": "Same exact source/destination corpus, selectors, output digests and sinkceiling percorpus; independent source/media/XML/rawZIP and refusal gates; all focused source-backed integration/adversarial/new reuse tests. No harness changes betweencontrol/candidate.",
+  "isolation": "All task CPU workloads serialized; CPU2; shared KVM host background uncontrolled",
+  "claim_authorized": false,
+  "performance_claim": null
+}
