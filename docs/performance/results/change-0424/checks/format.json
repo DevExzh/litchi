@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "rustup",
+    "run",
+    "1.98.1",
+    "rustfmt",
+    "--edition",
+    "2024",
+    "crates/litchi-opc/src/source_backed.rs",
+    "crates/litchi-pptx/src/presentation/source_cross_copy.rs"
+  ],
+  "exit_code": 0,
+  "before": {
+    "crates/litchi-opc/src/source_backed.rs": "33adba1c3646461245ba14157009afaf65ee08e6777e31aef8547a0737b5fe96",
+    "crates/litchi-pptx/src/presentation/source_cross_copy.rs": "575a148c6df59341a5553294a0ceabd9778a7da5b2686fdca5f31c3d48ad5432"
+  },
+  "after": {
+    "crates/litchi-opc/src/source_backed.rs": "33adba1c3646461245ba14157009afaf65ee08e6777e31aef8547a0737b5fe96",
+    "crates/litchi-pptx/src/presentation/source_cross_copy.rs": "575a148c6df59341a5553294a0ceabd9778a7da5b2686fdca5f31c3d48ad5432"
+  }
+}

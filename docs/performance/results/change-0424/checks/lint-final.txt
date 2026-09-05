@@ -1,0 +1,4 @@
+clippy-diagnostic: running
+clippy-diagnostic: exit 0
+rustdoc: running
+rustdoc: exit 0

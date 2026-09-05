@@ -1,0 +1,1 @@
+{"corpus": "media_rich", "status": "pass", "analysis": "/home/zhuhe/code/litchi/docs/performance/results/change-0424/runs/media_rich/analysis.json"}

@@ -1,0 +1,40 @@
+{
+  "batch_temporary_paths_absent": true,
+  "bytecode_caches_absent": true,
+  "change": 424,
+  "compression_roundtrip": "pass",
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "goal_unchanged_and_unstaged": true,
+  "production_sources": [
+    {
+      "matches_production_commit": true,
+      "path": "crates/litchi-opc/src/source_backed.rs",
+      "sha256": "33adba1c3646461245ba14157009afaf65ee08e6777e31aef8547a0737b5fe96"
+    },
+    {
+      "matches_production_commit": true,
+      "path": "crates/litchi-pptx/src/presentation/source_cross_copy.rs",
+      "sha256": "00b624de2d7b2e311b885e1fcfb16fd3366205786bbdd230a387692f3e533889"
+    }
+  ],
+  "python_files_parsed": [
+    "analyze.py",
+    "build.py",
+    "capture.py",
+    "check-report-guards.py",
+    "measure.py",
+    "pinned/analyze-heaptrack.py",
+    "pinned/source-identity.py",
+    "pinned/tools/__init__.py",
+    "pinned/tools/perf_abba_summary.py",
+    "pinned/tools/perf_compare.py",
+    "pinned/tools/perf_resource_profile.py",
+    "pinned/tools/validate_perf_corpus_binding.py",
+    "pinned/verify-report.py",
+    "portable-replay.py",
+    "profile-candidate.py",
+    "summarize.py",
+    "validate.py"
+  ],
+  "status": "pass"
+}

@@ -1,0 +1,41 @@
+{
+  "change": 424,
+  "claims": "No optimization, cross-role, zero-copy, physical-copy, operation-local Heaptrack total or post-drop retention claim. Existing0423 V3 allocation vectors provide separate operation-scope evidence.",
+  "classification": "source-backed lifecycle allocation-stack attribution before production edits",
+  "common_flags": [
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm"
+  ],
+  "control_revision": "6ca9962c7818e173538a40ed45f3a3c32cc1aa6a",
+  "corpora": [
+    "plain",
+    "media_rich"
+  ],
+  "cpu": 2,
+  "declared_utc": "2026-09-05T13:11:24.302244+00:00",
+  "hypothesis": "Source-backed planner staging and publication reprepare allocate overlapping selected media; identify actual stacks before choosing any production reuse. Required source validation must remain.",
+  "isolation": "All task CPU workloads serialized; CPU2; shared KVM host background uncontrolled",
+  "profile_role": "candidate",
+  "profile_source_protocol_sha256": "4d4e50727e3bf5958a99d0ad5c8fa7bd843aaad5d29eb193716f524fab9cfbc2",
+  "role": "candidate",
+  "samples": 1,
+  "scope": "Heaptrack whole command including corpus construction, setup, timed lifecycle, independent oracles, report generation and teardown. Instrumented elapsed and RSS are not normal latency or operation-owned memory.",
+  "warmups": 0,
+  "workers": 1
+}

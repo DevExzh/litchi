@@ -1,0 +1,60 @@
+{
+  "change": 424,
+  "preserved_targets": [
+    {
+      "exists": true,
+      "path": "target"
+    },
+    {
+      "exists": true,
+      "path": "tools/perf-baseline/target"
+    }
+  ],
+  "removed_binaries": [
+    {
+      "absent_after": true,
+      "bytes": 450732392,
+      "path": "/tmp/litchi-goal-0424-control-normal",
+      "sha256": "6abd772ec7e5fc8be2b39db21b46739d0e32be26b74d7dce10c5021c56d914dc"
+    },
+    {
+      "absent_after": true,
+      "bytes": 450737632,
+      "path": "/tmp/litchi-goal-0424-control-allocator",
+      "sha256": "f4ac2eb142c36630ed2d468986106adb21b8e7e5f068e41c5919b7908b9c32e4"
+    },
+    {
+      "absent_after": true,
+      "bytes": 450809880,
+      "path": "/tmp/litchi-goal-0424-candidate-normal",
+      "sha256": "64ee108d7b8c0d7feb34543eb1e4bcc587c81651b05bc79285bf8fc82add1ccb"
+    },
+    {
+      "absent_after": true,
+      "bytes": 450815160,
+      "path": "/tmp/litchi-goal-0424-candidate-allocator",
+      "sha256": "88029e6459fdc75fb22c70fe90fba395437cddcbfab9497182f47e75f32798c0"
+    }
+  ],
+  "removed_cache_directories": [
+    "docs/performance/results/change-0424/__pycache__",
+    "docs/performance/results/change-0424/pinned/__pycache__",
+    "docs/performance/results/change-0424/pinned/tools/__pycache__"
+  ],
+  "removed_worktrees": [
+    {
+      "absent_after": true,
+      "clean_before": true,
+      "path": "/tmp/litchi-goal-0423-candidate",
+      "revision": "6ca9962c7818e173538a40ed45f3a3c32cc1aa6a"
+    },
+    {
+      "absent_after": true,
+      "clean_before": true,
+      "path": "/tmp/litchi-goal-0424-candidate",
+      "revision": "d18bf7db4e01f35b8a936892abcb5751e7763d16"
+    }
+  ],
+  "status": "pass",
+  "unrelated_worktrees_preserved": true
+}

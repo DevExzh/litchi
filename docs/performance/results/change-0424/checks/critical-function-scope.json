@@ -1,0 +1,22 @@
+{
+  "status": "pass",
+  "control_revision": "6ca9962c7",
+  "path": "crates/litchi-pptx/src/presentation/source_cross_copy.rs",
+  "checks": [
+    {
+      "function": "verify_candidate",
+      "sha256": "06914d077be4306f2db388f38bff1142947b4dbc276c93296447d77eea7f250d",
+      "unchanged": true
+    },
+    {
+      "function": "reserve_memory",
+      "sha256": "d470b70237dcc589e3ef0e22b5189d52160e41e758bf62b461feb9ff8c7bf302",
+      "unchanged": true
+    },
+    {
+      "function": "Prepared::matches",
+      "sha256": "a0208bccd94387391a497b253e5d14b2baac39b6467bdb51b4b1a4206a29f9ec",
+      "unchanged": true
+    }
+  ]
+}

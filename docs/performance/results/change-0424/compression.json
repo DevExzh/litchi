@@ -1,0 +1,125 @@
+{
+  "change": 424,
+  "codec": "gzip",
+  "files": [
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 3332,
+      "original_path": "checks/harness-final-cross-copy.log",
+      "original_sha256": "6803bdcb5147898b43bc186a302e39201d8edee215cb623bc3b75db79b858921",
+      "stored_bytes": 715,
+      "stored_path": "checks/harness-final-cross-copy.log.gz",
+      "stored_sha256": "e3bca42b530a5927efdfa138e891e731adfb21334d97e6dcf4f40d980f758286"
+    },
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 1296,
+      "original_path": "checks/lint-final-clippy-diagnostic.log",
+      "original_sha256": "2f75e5864bbdddfa3cf74ee182c797d956968e1770645cf7fb71561b20e113f5",
+      "stored_bytes": 302,
+      "stored_path": "checks/lint-final-clippy-diagnostic.log.gz",
+      "stored_sha256": "dd3048f68199159027d87b2bb6a08bed0af6c3ffbca52b374c16f90015268395"
+    },
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 1457,
+      "original_path": "checks/lint-final-rustdoc.log",
+      "original_sha256": "846192fe1443e8579e26f3e1012bb434c44b7e77589ec8122add401ab4fd8b45",
+      "stored_bytes": 350,
+      "stored_path": "checks/lint-final-rustdoc.log.gz",
+      "stored_sha256": "2353b651fac01e483d180a1e816cf9abc10cf0f385c70526b995bec104f0f894"
+    },
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 2423,
+      "original_path": "checks/lint-initial-clippy-diagnostic.log",
+      "original_sha256": "c638e744bc826b3b923981f3c9f18a0be69588e8c14002a4f378104628f8716b",
+      "stored_bytes": 670,
+      "stored_path": "checks/lint-initial-clippy-diagnostic.log.gz",
+      "stored_sha256": "611bd7891cb0c3e3b32fa26e4eef560171e4abf94ffdd67586dc7b1b00feb1c0"
+    },
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 3851,
+      "original_path": "checks/lint-initial-clippy-strict.log",
+      "original_sha256": "4766182524ff04cc8f74f04d85a46d84c3dc7924e88cb4dccd498f00b0e17cd7",
+      "stored_bytes": 987,
+      "stored_path": "checks/lint-initial-clippy-strict.log.gz",
+      "stored_sha256": "20a7f1e146b8d2bd487d33a65e6f47248deea4f275bab42d94e00bf479b65bd5"
+    },
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 684,
+      "original_path": "checks/repository-final-boundaries.log",
+      "original_sha256": "b6f38b040ac7308af6ec280e204ed817e3c708cdde84d2566f0b5d74758aeeaf",
+      "stored_bytes": 255,
+      "stored_path": "checks/repository-final-boundaries.log.gz",
+      "stored_sha256": "47bc24b362c2d527d2550fd6efef22751d4d4a4efba50b0b2f6d8f7b0fc8b443"
+    },
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 44,
+      "original_path": "checks/repository-final-claims.log",
+      "original_sha256": "33241d1f0ca4f8fba95a039a967f9a5bc41f100a24e94b576942d2e7c4615fc8",
+      "stored_bytes": 64,
+      "stored_path": "checks/repository-final-claims.log.gz",
+      "stored_sha256": "213fceee167de45140392729d792e56798bb0cf20777a6c69664d40c361352ec"
+    },
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 123,
+      "original_path": "checks/repository-final-crud-index.log",
+      "original_sha256": "8a6e2202ee0ae9691a0727a1a9f1ff420c32db2c4fbc4346ba6a57fe24c2220b",
+      "stored_bytes": 128,
+      "stored_path": "checks/repository-final-crud-index.log.gz",
+      "stored_sha256": "9ad6f851cc0c31766916e170175627691d3532529c9f2cde4db900b5c05d6ce0"
+    },
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 2817,
+      "original_path": "checks/rust-initial-opc-topology.log",
+      "original_sha256": "13912839bfbc22ca6791e57fe5efbb1048713abe402e090f2d7a28afd43a5de2",
+      "stored_bytes": 827,
+      "stored_path": "checks/rust-initial-opc-topology.log.gz",
+      "stored_sha256": "3a97ee2d83fa49d32611fe55307f3e745c0894be42461a919f785ddeb5021947"
+    },
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 1674,
+      "original_path": "checks/rust-initial-pptx-reuse.log",
+      "original_sha256": "80e56f9be2cbdd33ed8a3b7f8504cbeb57c53bb99c36a8cd450dc804cdab4300",
+      "stored_bytes": 506,
+      "stored_path": "checks/rust-initial-pptx-reuse.log.gz",
+      "stored_sha256": "d794bd48a0fa85c4d6a6620323f77d36c1f2c0260d2105e1c3dd90bc8cc3c423"
+    },
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 457,
+      "original_path": "checks/rust-pptx-final-pptx-reuse.log",
+      "original_sha256": "71798016f573b4923b0e49ad65320d2e9c6eb7ee43ad09c158a99366604e4614",
+      "stored_bytes": 323,
+      "stored_path": "checks/rust-pptx-final-pptx-reuse.log.gz",
+      "stored_sha256": "ac93dfdf45df8d5d79992e10e4049ede06858d37efa382eb2ec1a65e66258122"
+    },
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 5469,
+      "original_path": "checks/rust-pptx-final-source-api.log",
+      "original_sha256": "c881c078bd33467c6c7b8f7678cb81903dbbc9258164af6e7b856c31121d12b9",
+      "stored_bytes": 1437,
+      "stored_path": "checks/rust-pptx-final-source-api.log.gz",
+      "stored_sha256": "3e76dca0bee9ed82d0d992a63dbdb38a3d707f6decd9ff3830124acb4e211d14"
+    },
+    {
+      "lossless_roundtrip": true,
+      "original_bytes": 2897,
+      "original_path": "measurement-build-candidate.log",
+      "original_sha256": "2d66f7860a4519d0fbc7d13e9bdeeb2c671e41cbb3662386923e3d7abd7bed66",
+      "stored_bytes": 434,
+      "stored_path": "measurement-build-candidate.log.gz",
+      "stored_sha256": "ababd35ba680900a12f54ada3a1eb9ce4d5127f395192547ec5e2469df8f8599"
+    }
+  ],
+  "mtime": 0,
+  "status": "pass"
+}

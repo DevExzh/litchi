@@ -1,0 +1,49 @@
+{
+  "change": 424,
+  "full_check": {
+    "exit_code": 2,
+    "stderr": "",
+    "stdout": "docs/performance/results/change-0424/candidate-profile/runs/media_rich/stderr.txt:1: trailing whitespace.\n+NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent \ndocs/performance/results/change-0424/candidate-profile/runs/plain/stderr.txt:1: trailing whitespace.\n+NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent \ndocs/performance/results/change-0424/runs-initial/plain/stderr.txt:1: trailing whitespace.\n+NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent \ndocs/performance/results/change-0424/runs/media_rich/stderr.txt:1: trailing whitespace.\n+NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent \ndocs/performance/results/change-0424/runs/plain/stderr.txt:1: trailing whitespace.\n+NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent \n"
+  },
+  "raw_artifacts_preserved": [
+    {
+      "path": "docs/performance/results/change-0424/runs/plain/stderr.txt",
+      "sha256": "ec481ae35b7ebd511ece126b575eba5c1e453bc79a9f3c1be6daa43ce15b43a6"
+    },
+    {
+      "path": "docs/performance/results/change-0424/runs/media_rich/stderr.txt",
+      "sha256": "3874de342d89be246e98ce3cbb11f0737902fa256df86235f83d46e1d384fc62"
+    },
+    {
+      "path": "docs/performance/results/change-0424/runs-initial/plain/stderr.txt",
+      "sha256": "13c3113e112f38cef4ce032c921ab6821289702a4b203b0340c03bdb39ba48c5"
+    },
+    {
+      "path": "docs/performance/results/change-0424/candidate-profile/runs/plain/stderr.txt",
+      "sha256": "584bb3e56261968059834afc43ece41a08ebec826a772181f336c0adc1da8adc"
+    },
+    {
+      "path": "docs/performance/results/change-0424/candidate-profile/runs/media_rich/stderr.txt",
+      "sha256": "d6a446811a196d838abd3a47ade1d4f00b63ad783843e16abec6c00f12712adc"
+    }
+  ],
+  "reviewable_source_and_document_check": {
+    "argv": [
+      "git",
+      "diff",
+      "--cached",
+      "--check",
+      "--",
+      ".",
+      ":(exclude)docs/performance/results/change-0424/runs/plain/stderr.txt",
+      ":(exclude)docs/performance/results/change-0424/runs/media_rich/stderr.txt",
+      ":(exclude)docs/performance/results/change-0424/runs-initial/plain/stderr.txt",
+      ":(exclude)docs/performance/results/change-0424/candidate-profile/runs/plain/stderr.txt",
+      ":(exclude)docs/performance/results/change-0424/candidate-profile/runs/media_rich/stderr.txt"
+    ],
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": ""
+  },
+  "status": "pass_with_retained_raw_output_whitespace"
+}
