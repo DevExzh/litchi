@@ -39,6 +39,14 @@ pub(crate) fn instrumentation_identity() -> &'static str {
     }
 }
 
+/// Distinguishes corrected peak observations from older allocator reports.
+/// Normal reports omit this allocator-only compatibility identity.
+pub(crate) fn counter_revision() -> Option<&'static str> {
+    ENABLED
+        .load(Ordering::Acquire)
+        .then_some("post_update_peak_v2")
+}
+
 /// Returns the allocator identity selected by the executable wrapper.
 pub(crate) fn allocator_identity() -> &'static str {
     if ENABLED.load(Ordering::Acquire) {
@@ -404,11 +412,14 @@ impl Counters {
 }
 
 fn checked_add(counter: &AtomicU64, value: u64) -> Option<u64> {
+    // fetch_update returns the previous value. Peak accounting needs the
+    // successful update's new total, even if another thread changes it later.
     counter
         .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
             current.checked_add(value)
         })
         .ok()
+        .and_then(|previous| previous.checked_add(value))
 }
 
 fn checked_sub(counter: &AtomicU64, value: u64) -> Option<u64> {
@@ -500,6 +511,118 @@ mod tests {
         underflow.live_sub(1);
         assert!(underflow.snapshot().overflowed);
         assert_eq!(underflow.snapshot().live_bytes, 0);
+    }
+
+    #[test]
+    fn one_allocation_then_deallocation_retains_peak_live_bytes() {
+        let counters = Counters::default();
+        counters.allocation(64);
+        counters.deallocation(64);
+
+        let snapshot = counters.snapshot();
+        assert_eq!(snapshot.live_bytes, 0);
+        assert_eq!(snapshot.peak_live_bytes, 64);
+        assert_eq!(snapshot.allocation_calls, 1);
+        assert_eq!(snapshot.deallocation_calls, 1);
+    }
+
+    #[test]
+    fn reallocation_growth_and_shrink_update_live_bytes_without_losing_peak() {
+        let counters = Counters::default();
+        counters.allocation(16);
+        counters.reallocation(16, 40);
+
+        let grown = counters.snapshot();
+        assert_eq!(grown.live_bytes, 40);
+        assert_eq!(grown.peak_live_bytes, 40);
+        assert_eq!(grown.reallocation_calls, 1);
+
+        counters.reallocation(40, 8);
+        let shrunk = counters.snapshot();
+        assert_eq!(shrunk.live_bytes, 8);
+        assert_eq!(shrunk.peak_live_bytes, 40);
+        assert_eq!(shrunk.reallocation_calls, 2);
+    }
+
+    #[test]
+    fn failed_allocation_does_not_change_live_or_peak_bytes() {
+        let counters = Counters::default();
+        counters.allocation(48);
+        let before = counters.snapshot();
+
+        counters.failed_allocation();
+
+        let after = counters.snapshot();
+        assert_eq!(before.live_bytes, 48);
+        assert_eq!(before.peak_live_bytes, 48);
+        assert_eq!(after.live_bytes, before.live_bytes);
+        assert_eq!(after.peak_live_bytes, before.peak_live_bytes);
+        assert_eq!(after.failed_allocation_calls, 1);
+        assert_eq!(after.allocation_calls, before.allocation_calls);
+    }
+
+    #[test]
+    fn multi_step_counter_state_matches_an_independent_live_reference() {
+        let counters = Counters::default();
+        let operations = [
+            (true, 10_usize),
+            (true, 20),
+            (false, 10),
+            (true, 5),
+            (false, 20),
+            (false, 5),
+        ];
+        let mut reference_live = 0_u64;
+        let mut reference_peak = 0_u64;
+
+        for (allocate, size) in operations {
+            if allocate {
+                counters.allocation(size);
+                reference_live += size as u64;
+                reference_peak = reference_peak.max(reference_live);
+            } else {
+                counters.deallocation(size);
+                reference_live -= size as u64;
+            }
+            let snapshot = counters.snapshot();
+            assert_eq!(snapshot.live_bytes, reference_live);
+            assert_eq!(snapshot.peak_live_bytes, reference_peak);
+        }
+    }
+
+    #[test]
+    fn concurrent_allocations_retain_the_exact_overlapping_peak() {
+        const THREADS: usize = 6;
+        const SIZE: usize = 17;
+        let counters = Arc::new(Counters::default());
+        let allocated = Arc::new(Barrier::new(THREADS + 1));
+        let release = Arc::new(Barrier::new(THREADS + 1));
+        let handles = (0..THREADS)
+            .map(|_| {
+                let counters = Arc::clone(&counters);
+                let allocated = Arc::clone(&allocated);
+                let release = Arc::clone(&release);
+                std::thread::spawn(move || {
+                    counters.allocation(SIZE);
+                    allocated.wait();
+                    release.wait();
+                    counters.deallocation(SIZE);
+                })
+            })
+            .collect::<Vec<_>>();
+
+        allocated.wait();
+        let during_overlap = counters.snapshot();
+        let expected_peak = (THREADS * SIZE) as u64;
+        release.wait();
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        let after = counters.snapshot();
+        assert_eq!(during_overlap.live_bytes, expected_peak);
+        assert_eq!(during_overlap.peak_live_bytes, expected_peak);
+        assert_eq!(after.live_bytes, 0);
+        assert_eq!(after.peak_live_bytes, expected_peak);
     }
 
     #[test]
