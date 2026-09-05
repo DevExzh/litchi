@@ -1,0 +1,47 @@
+    Checking der v0.7.10
+    Checking chrono v0.4.45
+    Checking sha2 v0.11.0
+    Checking rand_chacha v0.3.1
+    Checking libz-sys v1.1.29
+    Checking num-integer v0.1.47
+    Checking flate2 v1.1.10
+    Checking num-iter v0.1.46
+    Checking rand v0.8.8
+    Checking getrandom v0.3.4
+    Checking spki v0.7.3
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking pkcs8 v0.10.2
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking sec1 v0.7.3
+    Checking num-bigint-dig v0.8.6
+    Checking elliptic-curve v0.13.8
+    Checking primeorder v0.13.6
+    Checking ecdsa v0.16.9
+    Checking pkcs1 v0.7.5
+    Checking x509-cert v0.2.5
+    Checking rsa v0.9.10
+    Checking p256 v0.13.2
+    Checking tempfile v3.27.0
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+error: using `chunks_exact` with a constant chunk size
+   --> crates/litchi-core/src/hex.rs:102:28
+    |
+102 |     for chunk in hex_bytes.chunks_exact(2) {
+    |                            ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+    = note: `-D clippy::chunks-exact-to-as-chunks` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::chunks_exact_to_as_chunks)]`
+
+error: using `chunks_exact` with a constant chunk size
+   --> crates/litchi-core/src/patch.rs:105:46
+    |
+105 |         for (index, pair) in text.as_bytes().chunks_exact(2).enumerate() {
+    |                                              ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking tinyvec v1.12.0
+error: could not compile `litchi-core` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

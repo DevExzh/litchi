@@ -165,6 +165,22 @@
         "canonical_sha256": "e07788703821b84dc4bc2910782882a5ec4a5758d5d9dda33a9e8683c993e3f8",
         "schema_version": 1
       }
+    },
+    {
+      "id": "abba-0418-pptx-cross-copy-lifecycle",
+      "kind": "abba_package",
+      "relative_path": "docs/performance/results/change-0418/latency",
+      "manifest": {
+        "path": "0418-pptx-cross-copy-lifecycle-manifest.json",
+        "sha256": "6d34703c1b571564c346583cc561ee3fc80f20541a0dd030533462fe11ccd0ad",
+        "schema_version": 1
+      },
+      "summary": {
+        "path": "summary.json",
+        "sha256": "f0b753ca394c3061cc60a946ad4b61522785d2ee23ef8d8bb7aee696baacda7d",
+        "canonical_sha256": "cf039272e382cdfe839bb9866fda00dc1810c1bbe8f4cb5b908b3a72d2f3ced1",
+        "schema_version": 1
+      }
     }
   ],
   "claims": [
@@ -1011,6 +1027,67 @@
       },
       "documentation": [
         "docs/performance/changes/0413-cfb-chain-scratch-reservation.md"
+      ]
+    },
+    {
+      "id": "claim-0418-pptx-cross-copy-lifecycle",
+      "change_id": "0418-pptx-cross-copy-lifecycle",
+      "claim_class": "optimization",
+      "status": "landed",
+      "code_state": "landed",
+      "reason_codes": [
+        "accepted_latency_only"
+      ],
+      "scope": {
+        "format": "pptx",
+        "selectors": [
+          "pptx_cross_copy_media_rich_lifecycle"
+        ],
+        "corpora": [
+          {
+            "name": "pptx_cross_copy_media_rich_lifecycle",
+            "archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+            "generator": "litchi-pptx-cross-slide-copy-evidence-v1",
+            "shape": "media-rich",
+            "package_format": "PPTX/OPC/ZIP"
+          }
+        ]
+      },
+      "latency_evidence": {
+        "evidence_id": "abba-0418-pptx-cross-copy-lifecycle",
+        "allowed_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "accepted_cells": 4,
+        "adverse_both_cells": 0,
+        "accepted_statistics": [
+          {
+            "case": "pptx_cross_copy_media_rich_lifecycle",
+            "corpus": "pptx_cross_copy_media_rich_lifecycle",
+            "statistic": "p50"
+          },
+          {
+            "case": "pptx_cross_copy_media_rich_lifecycle",
+            "corpus": "pptx_cross_copy_media_rich_lifecycle",
+            "statistic": "mean"
+          },
+          {
+            "case": "pptx_cross_copy_media_rich_lifecycle",
+            "corpus": "pptx_cross_copy_media_rich_lifecycle",
+            "statistic": "p95"
+          },
+          {
+            "case": "pptx_cross_copy_media_rich_lifecycle",
+            "corpus": "pptx_cross_copy_media_rich_lifecycle",
+            "statistic": "p99"
+          }
+        ]
+      },
+      "documentation": [
+        "docs/performance/changes/0418-pptx-cross-copy-candidate-reuse.md"
       ]
     }
   ]

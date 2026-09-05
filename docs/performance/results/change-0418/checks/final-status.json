@@ -1,0 +1,39 @@
+{
+  "change": 418,
+  "status": "pass_with_documented_existing_clippy_exemptions",
+  "control_pptx_all_features": {
+    "passed": 828,
+    "failed": 0,
+    "ignored": 2,
+    "groups": 74,
+    "log": "checks/control-pptx-all-features.log"
+  },
+  "candidate_pptx_opc_all_features": {
+    "passed": 1270,
+    "failed": 0,
+    "ignored": 3,
+    "groups": 90,
+    "log": "checks/candidate-pptx-opc-all-features-2.log"
+  },
+  "python_tests": 291,
+  "profile_projection_probes": 5,
+  "strict_registered_claims": 9,
+  "formal_and_preflight_reports_verified": 64,
+  "normal_observations": 6400,
+  "allocator_observations": 480,
+  "negative_corruptions_rejected": 12,
+  "portable_replay_after_cleanup": true,
+  "profile_replay_after_cleanup": true,
+  "render_replay_byte_identical_after_cleanup": true,
+  "rustdoc_warnings_denied": true,
+  "existing_clippy_command_exemptions": [
+    "chunks_exact_to_as_chunks",
+    "clone_on_copy",
+    "needless_lifetimes"
+  ],
+  "boundary_log": "checks/boundaries-final.log",
+  "coverage_index_log": "checks/crud-index-final.log",
+  "classification_log": "checks/classification-final.log",
+  "memory_disposition": "retained with reviewed media RSS regression; latency-only claim",
+  "program_goal": "open"
+}

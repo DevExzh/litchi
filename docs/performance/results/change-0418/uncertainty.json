@@ -1,0 +1,1237 @@
+{
+  "allocation_projection": {
+    "latency_comparison": "excluded",
+    "nonclaimable_metrics": [
+      "live_bytes_before",
+      "live_bytes_after",
+      "peak_live_bytes_before",
+      "peak_live_bytes_after"
+    ],
+    "path": "allocation-metrics.json",
+    "review_threshold_percent": 5,
+    "timing_status": "observational_only",
+    "validation": {
+      "all_allocator_statuses_bound": true,
+      "all_vectors_aligned": true,
+      "expected_legacy_unavailable_vector_count": 80,
+      "expected_measured_vector_count": 80,
+      "legacy_unavailable_vector_count": 80,
+      "measured_vector_count": 80,
+      "no_allocator_latency_claim": true
+    }
+  },
+  "bootstrap": {
+    "algorithm": "fixed 64-bit linear-congruential generator; nearest-rank percentile endpoints at 2.5% and 97.5%",
+    "resamples": 1000,
+    "seed_derivation": "SHA-256(change-0418, selector, ABBA leg), first eight bytes"
+  },
+  "change": "0418",
+  "normal_abba": {
+    "pptx_cross_copy_media_rich": {
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "adverse_both_statistics": [],
+      "drift_ceiling_percent": {
+        "mean": 5.0,
+        "p50": 5.0,
+        "p95": 5.0,
+        "p99": 5.0
+      },
+      "legs": {
+        "A1": {
+          "sample_count": 100,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1150392596.27,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "a95cd1f7e650a11c",
+                "upper_ns": 1150782674.05
+              },
+              "observed_ns": 1150576693.8800004,
+              "producer_student_t_interval_95": {
+                "lower_ns": 1150381150.2524679,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 1150772237.5075328
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1150171390,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "a95cd1f7e650a11c",
+                "upper_ns": 1150487011
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1150169971,
+                "lower_rank": 40,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 1150499633,
+                "upper_rank": 61
+              },
+              "observed_ns": 1150346612
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1152190359,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "a95cd1f7e650a11c",
+                "upper_ns": 1152838853
+              },
+              "observed_ns": 1152754553
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1152754553,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "a95cd1f7e650a11c",
+                "upper_ns": 1153546124
+              },
+              "observed_ns": 1153093815
+            }
+          }
+        },
+        "A2": {
+          "sample_count": 100,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1156351302.55,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "8cc536affc8421c7",
+                "upper_ns": 1156757496.42
+              },
+              "observed_ns": 1156547503.9699996,
+              "producer_student_t_interval_95": {
+                "lower_ns": 1156341726.3850517,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 1156753281.5549474
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1156263685,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "8cc536affc8421c7",
+                "upper_ns": 1156550787
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1156198815,
+                "lower_rank": 40,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 1156584527,
+                "upper_rank": 61
+              },
+              "observed_ns": 1156413381
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1157763036,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "8cc536affc8421c7",
+                "upper_ns": 1159244418
+              },
+              "observed_ns": 1158359115
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1158481645,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "8cc536affc8421c7",
+                "upper_ns": 1160688255
+              },
+              "observed_ns": 1159999753
+            }
+          }
+        },
+        "B1": {
+          "sample_count": 100,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 683905703.13,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "d239f9a6a1c8e23f",
+                "upper_ns": 684059633.44
+              },
+              "observed_ns": 683979536.0399998,
+              "producer_student_t_interval_95": {
+                "lower_ns": 683901955.5174081,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 684057116.5625916
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 683860932,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "d239f9a6a1c8e23f",
+                "upper_ns": 684048896
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 683851005,
+                "lower_rank": 40,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 684049986,
+                "upper_rank": 61
+              },
+              "observed_ns": 683943129
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 684412624,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "d239f9a6a1c8e23f",
+                "upper_ns": 684889469
+              },
+              "observed_ns": 684636500
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 684636500,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "d239f9a6a1c8e23f",
+                "upper_ns": 685232282
+              },
+              "observed_ns": 685032062
+            }
+          }
+        },
+        "B2": {
+          "sample_count": 100,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 684695848.09,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "33b77e32f7906bac",
+                "upper_ns": 684819125.4
+              },
+              "observed_ns": 684758024.7100002,
+              "producer_student_t_interval_95": {
+                "lower_ns": 684697851.9627507,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 684818197.4572496
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 684686697,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "33b77e32f7906bac",
+                "upper_ns": 684846480
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 684678640,
+                "lower_rank": 40,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 684848084,
+                "upper_rank": 61
+              },
+              "observed_ns": 684746665
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 685139646,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "33b77e32f7906bac",
+                "upper_ns": 685269189
+              },
+              "observed_ns": 685229907
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 685229907,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "33b77e32f7906bac",
+                "upper_ns": 685488588
+              },
+              "observed_ns": 685312009
+            }
+          }
+        }
+      },
+      "paired_changes_percent": {
+        "a1_to_b1": {
+          "mean": 40.55332950179368,
+          "p50": 40.54460439441882,
+          "p95": 40.60864923775322,
+          "p99": 40.59181888856112
+        },
+        "a2_to_b2": {
+          "mean": 40.79291837477672,
+          "p50": 40.78703375017415,
+          "p95": 40.8447779167344,
+          "p99": 40.921365954808095
+        }
+      },
+      "rejected_statistics": {},
+      "same_revision_drift_percent": {
+        "candidate": {
+          "mean": 0.11381753824207803,
+          "p50": 0.11748579171704787,
+          "p95": 0.08667475368315887,
+          "p99": 0.04086626240276619
+        },
+        "control": {
+          "mean": 0.5189406427019045,
+          "p50": 0.5273861753243465,
+          "p95": 0.4861886674326586,
+          "p99": 0.5989051289812009
+        }
+      }
+    },
+    "pptx_cross_copy_media_rich_lifecycle": {
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "adverse_both_statistics": [],
+      "drift_ceiling_percent": {
+        "mean": 5.0,
+        "p50": 5.0,
+        "p95": 5.0,
+        "p99": 5.0
+      },
+      "legs": {
+        "A1": {
+          "sample_count": 500,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1175167873.658,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "983935760bbef19a",
+                "upper_ns": 1175398198.886
+              },
+              "observed_ns": 1175287328.5299988,
+              "producer_student_t_interval_95": {
+                "lower_ns": 1175171532.0889614,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 1175403124.9710362
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1175345002,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "983935760bbef19a",
+                "upper_ns": 1175540781
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1175336348,
+                "lower_rank": 228,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 1175549210,
+                "upper_rank": 273
+              },
+              "observed_ns": 1175449339
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1176864801,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "983935760bbef19a",
+                "upper_ns": 1178057335
+              },
+              "observed_ns": 1177533392
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1178332106,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "983935760bbef19a",
+                "upper_ns": 1179058589
+              },
+              "observed_ns": 1178774215
+            }
+          }
+        },
+        "A2": {
+          "sample_count": 500,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1172499877.9,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "42ee4c4985a5a4fb",
+                "upper_ns": 1172654341.264
+              },
+              "observed_ns": 1172576221.8280008,
+              "producer_student_t_interval_95": {
+                "lower_ns": 1172497039.873463,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 1172655403.7825387
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1172355842,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "42ee4c4985a5a4fb",
+                "upper_ns": 1172558368
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1172351016,
+                "lower_rank": 228,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 1172570683,
+                "upper_rank": 273
+              },
+              "observed_ns": 1172463108
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1173988976,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "42ee4c4985a5a4fb",
+                "upper_ns": 1174576729
+              },
+              "observed_ns": 1174220584
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 1174725421,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "42ee4c4985a5a4fb",
+                "upper_ns": 1175805247
+              },
+              "observed_ns": 1175103714
+            }
+          }
+        },
+        "B1": {
+          "sample_count": 500,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 720783025.086,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "3903d720d040a6a4",
+                "upper_ns": 721230836.168
+              },
+              "observed_ns": 721006277.9620004,
+              "producer_student_t_interval_95": {
+                "lower_ns": 720778285.1749744,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 721234270.7490263
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 720297743,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "3903d720d040a6a4",
+                "upper_ns": 721122776
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 720267081,
+                "lower_rank": 228,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 721152437,
+                "upper_rank": 273
+              },
+              "observed_ns": 720698255
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 724260495,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "3903d720d040a6a4",
+                "upper_ns": 725663794
+              },
+              "observed_ns": 724745237
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 727259374,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "3903d720d040a6a4",
+                "upper_ns": 734392352
+              },
+              "observed_ns": 730718957
+            }
+          }
+        },
+        "B2": {
+          "sample_count": 500,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 722868175.782,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "bd683cee0dad5e1f",
+                "upper_ns": 723337299.932
+              },
+              "observed_ns": 723114278.53,
+              "producer_student_t_interval_95": {
+                "lower_ns": 722868049.5509512,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 723360507.5090487
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 723566385,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "bd683cee0dad5e1f",
+                "upper_ns": 723856724
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 723580623,
+                "lower_rank": 228,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 723866503,
+                "upper_rank": 273
+              },
+              "observed_ns": 723741233
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 725384022,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "bd683cee0dad5e1f",
+                "upper_ns": 725695973
+              },
+              "observed_ns": 725591962
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 725885905,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "bd683cee0dad5e1f",
+                "upper_ns": 726463395
+              },
+              "observed_ns": 726061446
+            }
+          }
+        }
+      },
+      "paired_changes_percent": {
+        "a1_to_b1": {
+          "mean": 38.65276511882371,
+          "p50": 38.68742521790639,
+          "p95": 38.45225605287973,
+          "p99": 38.01026967662335
+        },
+        "a2_to_b2": {
+          "mean": 38.33114938978612,
+          "p50": 38.27172658467988,
+          "p95": 38.20650294442463,
+          "p99": 38.21299027908612
+        }
+      },
+      "rejected_statistics": {},
+      "same_revision_drift_percent": {
+        "candidate": {
+          "mean": 0.2923692389972089,
+          "p50": 0.42222635879699755,
+          "p95": 0.11683070916132147,
+          "p99": -0.6373874600327359
+        },
+        "control": {
+          "mean": -0.23067607692060602,
+          "p50": -0.25405016625731414,
+          "p95": -0.2813345271146247,
+          "p99": -0.31138287157053224
+        }
+      }
+    },
+    "pptx_cross_copy_plain": {
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "adverse_both_statistics": [],
+      "drift_ceiling_percent": {
+        "mean": 5.0,
+        "p50": 5.0,
+        "p95": 5.0,
+        "p99": 5.0
+      },
+      "legs": {
+        "A1": {
+          "sample_count": 500,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8649682.572,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "258f774c9a8136f2",
+                "upper_ns": 8668344.396
+              },
+              "observed_ns": 8659232.132,
+              "producer_student_t_interval_95": {
+                "lower_ns": 8649994.349837543,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 8668469.914162455
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8635117,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "258f774c9a8136f2",
+                "upper_ns": 8662172
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8635117,
+                "lower_rank": 228,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 8662267,
+                "upper_rank": 273
+              },
+              "observed_ns": 8651347
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8822288,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "258f774c9a8136f2",
+                "upper_ns": 8877398
+              },
+              "observed_ns": 8839438
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8890208,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "258f774c9a8136f2",
+                "upper_ns": 8969678
+              },
+              "observed_ns": 8911298
+            }
+          }
+        },
+        "A2": {
+          "sample_count": 500,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8582915.322,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "1f3f30dcbe462eb2",
+                "upper_ns": 8598221.27
+              },
+              "observed_ns": 8590546.229999997,
+              "producer_student_t_interval_95": {
+                "lower_ns": 8582897.556956492,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 8598194.903043501
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8563807,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "1f3f30dcbe462eb2",
+                "upper_ns": 8591107
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8563546,
+                "lower_rank": 228,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 8591727,
+                "upper_rank": 273
+              },
+              "observed_ns": 8578607
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8730327,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "1f3f30dcbe462eb2",
+                "upper_ns": 8768817
+              },
+              "observed_ns": 8751308
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8775718,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "1f3f30dcbe462eb2",
+                "upper_ns": 8879348
+              },
+              "observed_ns": 8793127
+            }
+          }
+        },
+        "B1": {
+          "sample_count": 500,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8180990.176,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "ba3c6c587fb583c3",
+                "upper_ns": 8200126.592
+              },
+              "observed_ns": 8190900.852000001,
+              "producer_student_t_interval_95": {
+                "lower_ns": 8181351.697459889,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 8200450.006540113
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8159910,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "ba3c6c587fb583c3",
+                "upper_ns": 8195595
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8160185,
+                "lower_rank": 228,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 8195665,
+                "upper_rank": 273
+              },
+              "observed_ns": 8178830
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8355696,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "ba3c6c587fb583c3",
+                "upper_ns": 8406156
+              },
+              "observed_ns": 8389026
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8424016,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "ba3c6c587fb583c3",
+                "upper_ns": 8516646
+              },
+              "observed_ns": 8487267
+            }
+          }
+        },
+        "B2": {
+          "sample_count": 500,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8272933.328,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "c90d5c931551b49a",
+                "upper_ns": 8300499.442
+              },
+              "observed_ns": 8286709.6379999975,
+              "producer_student_t_interval_95": {
+                "lower_ns": 8272992.120255393,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 8300427.155744602
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8248745,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "c90d5c931551b49a",
+                "upper_ns": 8296516
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8248236,
+                "lower_rank": 228,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 8296436,
+                "upper_rank": 273
+              },
+              "observed_ns": 8263475
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8550076,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "c90d5c931551b49a",
+                "upper_ns": 8591887
+              },
+              "observed_ns": 8566917
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 8625467,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "c90d5c931551b49a",
+                "upper_ns": 8693647
+              },
+              "observed_ns": 8651807
+            }
+          }
+        }
+      },
+      "paired_changes_percent": {
+        "a1_to_b1": {
+          "mean": 5.408462007494759,
+          "p50": 5.461773756156122,
+          "p95": 5.095482314599638,
+          "p99": 4.7583528235729515
+        },
+        "a2_to_b2": {
+          "mean": 3.5368716245183327,
+          "p50": 3.6734635355134,
+          "p95": 2.107010746279299,
+          "p99": 1.6071643227716375
+        }
+      },
+      "rejected_statistics": {},
+      "same_revision_drift_percent": {
+        "candidate": {
+          "mean": 1.1696977869852083,
+          "p50": 1.0349279786962196,
+          "p95": 2.12052030831708,
+          "p99": 1.938668831792378
+        },
+        "control": {
+          "mean": -0.7932100785954835,
+          "p50": -0.8407939249229051,
+          "p95": -0.9970090858717489,
+          "p99": -1.326080667485253
+        }
+      }
+    },
+    "pptx_cross_copy_plain_lifecycle": {
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "adverse_both_statistics": [],
+      "drift_ceiling_percent": {
+        "mean": 5.0,
+        "p50": 5.0,
+        "p95": 5.0,
+        "p99": 5.0
+      },
+      "legs": {
+        "A1": {
+          "sample_count": 500,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9927257.758,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "b52afa1070a616d3",
+                "upper_ns": 9947187.972
+              },
+              "observed_ns": 9936832.036000002,
+              "producer_student_t_interval_95": {
+                "lower_ns": 9926897.770279288,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 9946766.301720716
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9918523,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "b52afa1070a616d3",
+                "upper_ns": 9936732
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9917533,
+                "lower_rank": 228,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 9936732,
+                "upper_rank": 273
+              },
+              "observed_ns": 9925957
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 10109653,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "b52afa1070a616d3",
+                "upper_ns": 10185473
+              },
+              "observed_ns": 10165784
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 10207973,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "b52afa1070a616d3",
+                "upper_ns": 10271974
+              },
+              "observed_ns": 10252113
+            }
+          }
+        },
+        "A2": {
+          "sample_count": 500,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9885421.984,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "4875c72048c3a1ed",
+                "upper_ns": 9900947.538
+              },
+              "observed_ns": 9892924.727999983,
+              "producer_student_t_interval_95": {
+                "lower_ns": 9885336.890929548,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 9900512.565070419
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9868904,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "4875c72048c3a1ed",
+                "upper_ns": 9882279
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9868466,
+                "lower_rank": 228,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 9882573,
+                "upper_rank": 273
+              },
+              "observed_ns": 9874076
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 10028427,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "4875c72048c3a1ed",
+                "upper_ns": 10070397
+              },
+              "observed_ns": 10043737
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 10088417,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "4875c72048c3a1ed",
+                "upper_ns": 10157747
+              },
+              "observed_ns": 10110843
+            }
+          }
+        },
+        "B1": {
+          "sample_count": 500,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9519697.718,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "1b82882be093ea38",
+                "upper_ns": 9541605.34
+              },
+              "observed_ns": 9530486.413999997,
+              "producer_student_t_interval_95": {
+                "lower_ns": 9519238.448608678,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 9541734.379391316
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9505751,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "1b82882be093ea38",
+                "upper_ns": 9535331
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9504571,
+                "lower_rank": 228,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 9535331,
+                "upper_rank": 273
+              },
+              "observed_ns": 9524911
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9723022,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "1b82882be093ea38",
+                "upper_ns": 9780022
+              },
+              "observed_ns": 9759612
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9803371,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "1b82882be093ea38",
+                "upper_ns": 9866422
+              },
+              "observed_ns": 9836602
+            }
+          }
+        },
+        "B2": {
+          "sample_count": 500,
+          "statistics": {
+            "mean": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9549184.898,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "410ba144a573aa04",
+                "upper_ns": 9570966.88
+              },
+              "observed_ns": 9559739.193999993,
+              "producer_student_t_interval_95": {
+                "lower_ns": 9549195.183123184,
+                "method": "two-sided Student's t interval for the mean",
+                "upper_ns": 9570283.204876801
+              }
+            },
+            "p50": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9527397,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "410ba144a573aa04",
+                "upper_ns": 9575301
+              },
+              "exact_iid_order_statistic_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9526534,
+                "lower_rank": 228,
+                "method": "exact_distribution_free_iid_95_percent_median_order_statistic",
+                "upper_ns": 9575301,
+                "upper_rank": 273
+              },
+              "observed_ns": 9545602
+            },
+            "p95": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9756775,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "410ba144a573aa04",
+                "upper_ns": 9810252
+              },
+              "observed_ns": 9780996
+            },
+            "p99": {
+              "bootstrap_percentile_interval_95": {
+                "assumption": "IID samples within one isolated process",
+                "lower_ns": 9824036,
+                "method": "deterministic_percentile_bootstrap_95",
+                "resamples": 1000,
+                "seed_hex": "410ba144a573aa04",
+                "upper_ns": 9985733
+              },
+              "observed_ns": 9949173
+            }
+          }
+        }
+      },
+      "paired_changes_percent": {
+        "a1_to_b1": {
+          "mean": 4.089287416028182,
+          "p50": 4.040376157180613,
+          "p95": 3.995481312607075,
+          "p99": 4.052930356893257
+        },
+        "a2_to_b2": {
+          "mean": 3.3679174072453453,
+          "p50": 3.3266302588718175,
+          "p95": 2.6159685384035845,
+          "p99": 1.5989764651671476
+        }
+      },
+      "rejected_statistics": {},
+      "same_revision_drift_percent": {
+        "candidate": {
+          "mean": 0.30693900320789663,
+          "p50": 0.21723037622083818,
+          "p95": 0.21910707105979216,
+          "p99": 1.144409421058207
+        },
+        "control": {
+          "mean": -0.4418642464816522,
+          "p50": -0.5226800801172118,
+          "p95": -1.200566527874289,
+          "p99": -1.3779598410591065
+        }
+      }
+    }
+  },
+  "provenance": {
+    "allocation": {
+      "path": "allocation-metrics.json",
+      "sha256": "b78d245d08b07652fd2c169c4f0860bcb6229c0375f986e728175cbef2d79724"
+    },
+    "summary": {
+      "path": "summary.json",
+      "sha256": "159fc65c20dc0ecbb77053a57c387edcad562a0473ac4132b8910287e24a25f1"
+    }
+  },
+  "replay": {
+    "compressed_report_fallback_supported_by_verifier": true,
+    "raw_vectors_retained": true,
+    "summary_timing_status": "normal ABBA elapsed statistics validated from retained samples"
+  },
+  "schema_version": 1,
+  "scope": {
+    "abba": "paired directions and same-revision repeat drift; no pooled speedup claim",
+    "allocation": "allocator-lane process-leg aggregate vectors; allocator latency excluded",
+    "latency": "retained samples within each fresh process leg after warmups; A1/B1/B2/A2 are kept separate",
+    "population_claim": "none; intervals do not model shared-host or host-population uncertainty",
+    "rss": "whole-process GNU time -v maximum resident set size, including setup and warmups"
+  },
+  "statistics": {
+    "mean": "producer Student-t interval plus deterministic percentile bootstrap interval",
+    "p50": "harness integer-nanosecond midpoint; exact IID order-statistic interval plus bootstrap diagnostic",
+    "p95": "nearest-rank statistic with deterministic percentile bootstrap interval",
+    "p99": "nearest-rank statistic with deterministic percentile bootstrap interval"
+  },
+  "status": "descriptive_uncertainty_only"
+}

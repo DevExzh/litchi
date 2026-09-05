@@ -1,0 +1,12 @@
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+error: unused import: `Part`
+ --> crates/litchi-pptx/tests/source_backed_cross_copy_adversarial.rs:7:54
+  |
+7 | use litchi_opc::{OpcPackage, PackURI, PackageWriter, Part};
+  |                                                      ^^^^
+  |
+  = note: `-D unused-imports` implied by `-D unused`
+  = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error: could not compile `litchi-pptx` (test "source_backed_cross_copy_adversarial") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

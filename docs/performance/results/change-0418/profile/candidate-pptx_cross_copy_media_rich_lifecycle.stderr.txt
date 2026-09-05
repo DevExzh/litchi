@@ -1,0 +1,2 @@
+[ perf record: Woken up 18 times to write data ]
+[ perf record: Captured and wrote 4.451 MB /home/zhuhe/code/litchi/docs/performance/results/change-0418/profile/candidate-pptx_cross_copy_media_rich_lifecycle.perf.data ]

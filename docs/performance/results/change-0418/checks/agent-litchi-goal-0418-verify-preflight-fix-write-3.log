@@ -1,0 +1,4 @@
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0418/verify.py", line 1607
+    fail(f"{leg}/{selector}", "normal and allocator corpus differs")
+    ^^^^
+IndentationError: expected an indented block after 'if' statement on line 1604

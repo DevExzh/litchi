@@ -1,5 +1,23 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0418: reuse proven owned PPTX candidates
+
+[0418](changes/0418-pptx-cross-copy-candidate-reuse.md) measures an owned
+cross-copy lifecycle including ingress, snapshots, planning, atomic application
+and sequential publication. Media-rich p50 falls from 1,175.449 / 1,172.463 ms
+to 720.698 / 723.741 ms, a paired reduction of 38.69% / 38.27%. Both plain
+guards improve, and all declared 5% same-revision drift checks pass.
+
+Media whole-process peak RSS increases about 8%, and end-of-region live bytes
+increase about 65.6 MB. The [memory review](results/change-0418/memory-review.md)
+accepts this scoped latency tradeoff and leaves memory-sensitive and near-limit
+work open. It is not a general memory improvement. The [bundle](results/change-0418/)
+retains 6,400 normal observations, 480 separate allocator observations, paired
+profiles and PMU counters, exact output oracles and portable verification.
+
+The full non-iWork goal remains open. These opt-in owned PPTX lifecycles do not
+establish source-backed, native-producer, cold/remote or scaling coverage.
+
 ## Change 0417: current representative CRUD baseline
 
 [0417](changes/0417-representative-crud-baseline.md) retains all 30 existing

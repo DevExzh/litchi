@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+Change [0418](changes/0418-pptx-cross-copy-candidate-reuse.md) retains a scoped
+owned PPTX candidate-reuse optimization. Media lifecycle p50 improves
+38.27–38.69%, with an explicitly reviewed approximately 8% whole-process RSS
+increase. Two opt-in lifecycle selectors bring the registry to 427; the default
+36-case/198-row matrix and representative index statuses remain unchanged.
+The batch retains 6,400 normal observations, 480 separate allocator observations,
+paired profiles and source/output checks. Retained-memory, broader corpus,
+source-backed, native/cold/remote and scaling work remains open.
+
 Change [0417](changes/0417-representative-crud-baseline.md) broadens current
 descriptive evidence to all 30 representative selectors across 14 executable
 categories at clean revision `b10d6c25a13242ca260a8c897946f4d80ae06c61`.
@@ -54,7 +63,8 @@ of the non-iWork program. Broad scenario, native/cold/remote and scaling gaps
 below remain open.
 
 **Audit date:** 2026-09-05
-**Audit basis:** the 0417 representative baseline at `b10d6c25a` and retained evidence,
+**Audit basis:** the 0418 candidate `f8f9e6667` against control `79dfee502`,
+the 0417 representative baseline at `b10d6c25a` and retained evidence,
 with the 0416 local-framing candidate `d18cd04a2` and retained evidence,
 with the 0415 streaming source batch and its retained evidence,
 with the 0414 source batch and its retained verification evidence,

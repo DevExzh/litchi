@@ -1,0 +1,1 @@
+{"change": 418, "formal_reports": 32, "outputs": ["summary.json", "allocation-metrics.json"], "preflight_reports": 32, "reports": 64, "selectors": ["pptx_cross_copy_media_rich_lifecycle", "pptx_cross_copy_plain_lifecycle", "pptx_cross_copy_plain", "pptx_cross_copy_media_rich"], "status": "pass", "write": true}

@@ -1,0 +1,32 @@
+   Compiling litchi-core v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/litchi-core)
+   Compiling litchi-codepage v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/litchi-codepage)
+   Compiling xml-minifier-macros v0.1.0 (/tmp/litchi-goal-0418-control-worktree/crates/xml-minifier-macros)
+   Compiling soapberry-zip v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/soapberry-zip)
+   Compiling xml-minifier v0.1.0 (/tmp/litchi-goal-0418-control-worktree/crates/xml-minifier)
+   Compiling litchi-cfb v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/litchi-cfb)
+   Compiling litchi-fonts v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/litchi-fonts)
+   Compiling litchi-opc v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/litchi-opc)
+   Compiling litchi-ole-common v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/litchi-ole-common)
+   Compiling litchi-vba v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/litchi-vba)
+   Compiling litchi-crypto v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/litchi-crypto)
+   Compiling litchi-ooxml-common v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/litchi-pptx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 21.17s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi/target/debug/deps/litchi_pptx-8cd625c55eee88f5)
+
+running 1 test
+test opened::tests::stale_and_unsupported_raw_xml_fail_before_publication ... FAILED
+
+failures:
+
+---- opened::tests::stale_and_unsupported_raw_xml_fail_before_publication stdout ----
+Error: Invalid("presentation slide-ID list contains a non-slide child")
+
+
+failures:
+    opened::tests::stale_and_unsupported_raw_xml_fail_before_publication
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 536 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `-p litchi-pptx --lib`

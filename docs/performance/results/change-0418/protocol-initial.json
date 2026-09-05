@@ -1,0 +1,81 @@
+{
+  "change": 418,
+  "declared_utc": "2026-09-05T06:46:54.476856+00:00",
+  "classification": "matched owned PPTX candidate-reuse ABBA; claims pending validation",
+  "order": [
+    "control",
+    "candidate",
+    "candidate",
+    "control"
+  ],
+  "cpu": 2,
+  "workers": 1,
+  "cache": "warm generated in-memory sources; inputs/sink reserve outside timed lifecycle",
+  "isolation": "fresh process per selector per leg; warmups/samples shareprocess; task builds/tests/profiles serialized; sharedKVM background uncontrolled",
+  "jobs": [
+    {
+      "selector": "pptx_cross_copy_media_rich_lifecycle",
+      "role": "primary end-to-end owned lifecycle",
+      "samples": 500,
+      "warmups": 20
+    },
+    {
+      "selector": "pptx_cross_copy_plain_lifecycle",
+      "role": "small lifecycle guard",
+      "samples": 500,
+      "warmups": 20
+    },
+    {
+      "selector": "pptx_cross_copy_plain",
+      "role": "existing phase guard",
+      "samples": 500,
+      "warmups": 20
+    },
+    {
+      "selector": "pptx_cross_copy_media_rich",
+      "role": "existing phase diagnostic",
+      "samples": 100,
+      "warmups": 10
+    }
+  ],
+  "allocator": {
+    "samples": 30,
+    "warmups": 3,
+    "order": "same ABBA",
+    "latency_comparison": "excluded",
+    "scope": "operation region emitted by lifecycle selectors; legacy phase selectors remain unavailable"
+  },
+  "latency_policy": {
+    "drift_ceilings_percent": {
+      "p50": 5,
+      "mean": 5,
+      "p95": 5,
+      "p99": 5
+    },
+    "acceptance": "both paired candidate directions improve and both same-revision drifts within ceilings per statistic; no pooled speedup claim",
+    "guard": "any >5% adverse paired p50/mean/p95/p99 requires review; retain all captures"
+  },
+  "memory_policy": {
+    "metrics": [
+      "allocation_calls",
+      "allocated_bytes",
+      "live_bytes_before",
+      "live_bytes_after",
+      "peak_live_bytes_before",
+      "peak_live_bytes_after",
+      "whole_process_max_rss"
+    ],
+    "scope": "live/peak snapshots retained literally; no per-operation peak claim; RSS includes complete process and preflight",
+    "review": "any >5% paired allocation volume or RSS growth requires explicit tradeoff review before retaining optimization; no blanket memory improvement"
+  },
+  "source_policy": "control includes same harness and independent pre-existing reader/test corrections; only candidate reuse differs in measured production source",
+  "profile": {
+    "samples": 20,
+    "warmups": 3,
+    "event": "cycles:u",
+    "frequency": 999,
+    "call_graph": "fp,127",
+    "scope": "wholecommand plus descendants; no phaseelapsed percentages"
+  },
+  "runtime_toolchain": "RUSTUP_TOOLCHAIN=1.98.1 set during build and capture"
+}

@@ -1,0 +1,27 @@
+{
+  "removed_worktrees": [
+    "/tmp/litchi-goal-0418-control-worktree",
+    "/tmp/litchi-goal-0418-candidate-worktree"
+  ],
+  "removed_files_or_cache_directories": [
+    "/tmp/litchi-goal-0418-verify-preflight-fix-write-6.log",
+    "/tmp/litchi-goal-0418-verify-preflight-fix-write-5.log",
+    "/tmp/litchi-goal-0418-verify-preflight-fix-write-4.log",
+    "/tmp/litchi-goal-0418-verify-preflight-fix-write-3.log",
+    "/tmp/litchi-goal-0418-verify-preflight-fix-write-2.log",
+    "/tmp/litchi-goal-0418-verify-preflight-fix-write.log",
+    "/tmp/litchi-goal-0418-verify-diffcheck.log",
+    "/tmp/0418-verify-head.diff",
+    "/tmp/litchi-goal-0418-control-normal",
+    "/tmp/litchi-goal-0418-control-allocator",
+    "/tmp/litchi-goal-0418-candidate-normal",
+    "/tmp/litchi-goal-0418-candidate-allocator",
+    "docs/performance/results/change-0418/__pycache__"
+  ],
+  "task_temporary_paths_remaining": [],
+  "shared_targets_retained": [
+    "target",
+    "tools/perf-baseline/target"
+  ],
+  "user_goal_sha256_unchanged": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+}

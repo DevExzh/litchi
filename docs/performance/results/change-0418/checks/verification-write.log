@@ -1,0 +1,1 @@
+0418 verification failed: capture.runs[0].report: strict PPTX/report validation rejected report: capture.runs[0].report.configuration.samples_per_case must be at least 15

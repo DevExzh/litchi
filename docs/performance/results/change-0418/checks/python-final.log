@@ -1,0 +1,41 @@
+.............................E...................................................................................................................................................................................................................................................................
+======================================================================
+ERROR: test_pptx_cross_copy_sink_projection_keeps_output_size_only (tools.test_perf_abba_summary.PerfAbbaSummaryTests.test_pptx_cross_copy_sink_projection_keeps_output_size_only)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/tools/test_perf_abba_summary.py", line 2174, in test_pptx_cross_copy_sink_projection_keeps_output_size_only
+    summary = perf_abba_summary.summarize_reports(reports)
+  File "/home/zhuhe/code/litchi/tools/perf_abba_summary.py", line 7200, in summarize_reports
+    return _summarize_reports_impl(
+        a1,
+    ...<8 lines>...
+        profile=profile,
+    )
+  File "/home/zhuhe/code/litchi/tools/perf_abba_summary.py", line 7272, in _summarize_reports_impl
+    label: _validate_report(report, label, profile=profile)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/perf_abba_summary.py", line 2991, in _validate_report
+    _validate_pptx_cross_copy_result_rows(indexed, configuration, label)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/perf_abba_summary.py", line 4875, in _validate_pptx_cross_copy_result_rows
+    sink_object = _validate_pptx_cross_copy_sink(
+        row.get("sink"), f"{label}.{case}.sink"
+    )
+  File "/home/zhuhe/code/litchi/tools/perf_abba_summary.py", line 4570, in _validate_pptx_cross_copy_sink
+    raise AbbaSummaryInputError(
+        f"{location}.largest_write must not exceed accepted_bytes"
+    )
+tools.perf_abba_summary.AbbaSummaryInputError: b1.pptx_cross_copy_plain.sink.largest_write must not exceed accepted_bytes
+
+----------------------------------------------------------------------
+Ran 289 tests in 78.999s
+
+FAILED (errors=1)
+PASS: 1 matched results, 7 metrics, 0 regressions
+Worst latency movement: opc_open elapsed_ns.p50 +4.00% (limit +5.00%)
+REGRESSION: 1 matched results, 7 metrics, 3 regressions
+REGRESSION opc_open[tiny] elapsed_ns.p50: 100 -> 120 (+20.00%; limit +5.00%)
+REGRESSION opc_open[tiny] elapsed_ns.p95: 100 -> 120 (+20.00%; limit +8.00%)
+REGRESSION opc_open[tiny] elapsed_ns.p99: 100 -> 120 (+20.00%; limit +12.00%)
+INVALID: 0 matched results, 0 metrics, 0 regressions
+ERROR: cannot read /tmp/tmpwbvo7e_0/current.json: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
