@@ -379,6 +379,9 @@ fn validate_preserved_member_framing(
             return false;
         };
         if flags & ZIP_DATA_DESCRIPTOR_FLAG == 0 {
+            if local_header_has_zip64_size_sentinel(local_fixed) {
+                return false;
+            }
             if payload_end != local_span.end {
                 return false;
             }
@@ -606,6 +609,10 @@ fn le_u32(bytes: &[u8], offset: usize) -> Option<u32> {
         .get(offset..offset.checked_add(4)?)
         .and_then(|value| value.try_into().ok())
         .map(u32::from_le_bytes)
+}
+
+fn local_header_has_zip64_size_sentinel(local_fixed: &[u8]) -> bool {
+    le_u32(local_fixed, 18) == Some(u32::MAX) || le_u32(local_fixed, 22) == Some(u32::MAX)
 }
 
 fn le_u64(bytes: &[u8], offset: usize) -> Option<u64> {
@@ -841,4 +848,37 @@ pub fn splice(xml: &str, start: usize, end: usize, replacement: &str) -> Result<
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::PackageWriter;
+
+    #[test]
+    fn raw_preservation_rejects_local_zip64_size_sentinels() {
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer.add_file("content.xml", b"<source/>").unwrap();
+        writer
+            .add_file_with_media_type("Pictures/blob.bin", b"opaque", "application/octet-stream")
+            .unwrap();
+        let original = writer.finish_to_bytes().unwrap();
+        let archive = ZipArchive::from_slice(&original)
+            .unwrap()
+            .into_zip_archive();
+        let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let local = index.entries().last().unwrap().local_span();
+        assert!(validate_preserved_member_framing(&original, &index));
+
+        for offset in [18, 22] {
+            let mut mutated = original.clone();
+            let start = usize::try_from(local.start).unwrap() + offset;
+            mutated[start..start + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+            assert!(!validate_preserved_member_framing(&mutated, &index));
+        }
+    }
 }
