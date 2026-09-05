@@ -1,7 +1,16 @@
 # OPC, CFB, OLE2 Office, OOXML, RTF, and ODF performance baseline
 
+Operation-region evidence: [change 0422](../../docs/performance/changes/0422-operation-region-allocator-peak.md)
+adds `region_peak_live_bytes` and identifies allocator reports as
+`serialized_region_peak_v3`. The observer serializes callbacks and region
+boundaries; its peak includes entry live bytes and all process callbacks inside
+the interval. It excludes allocator-internal realloc overlap and RSS. The
+observer mutex can perturb scheduling, so use normal binaries for latency and
+scaling claims. Recapture both sides and update policy identity before using V3
+comparisons; earlier allocator policies remain historical.
+
 Allocator evidence correction: [change 0421](../../docs/performance/changes/0421-allocator-peak-counter.md)
-fixes under-reported `peak_live_bytes_*` values. Corrected allocator reports
+fixes under-reported `peak_live_bytes_*` values. 0421 allocator reports
 include `tool.allocator_counter_revision = "post_update_peak_v2"`; normal reports
 omit this field. Existing markerless allocator policies and baselines remain
 historical and reject corrected reports. Re-capture both sides before opting

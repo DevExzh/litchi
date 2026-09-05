@@ -1,0 +1,27 @@
+{
+  "reason": "Clarify table byte units, replace inherited V2 operation-local limitation with V3 scope, and expose already-checked region invariant at summary level. No raw measurement or numeric result changes.",
+  "initial": [
+    {
+      "path": "summary.json",
+      "sha256": "cf1abbec7279f19a3b8a08975956fbd33e255744a2ce7f2dd960b9e1e60777fd",
+      "retained_as": "checks/initial-derived/summary.json.gz"
+    },
+    {
+      "path": "result-table.md",
+      "sha256": "4aeed1f759a2a4f4ecbd2a39da3a1d9509865d388931da18c54c240e22fc444d",
+      "retained_as": "checks/initial-derived/result-table.md.gz"
+    }
+  ],
+  "overwrite_guard_receipt": "summary-final.log",
+  "all_run_numeric_and_identity_records_unchanged": true,
+  "final": [
+    {
+      "path": "summary.json",
+      "sha256": "0bd5ec3d64149fbbb4e49f6db4811ade15615c401cc70e6397873fa6b718b86a"
+    },
+    {
+      "path": "result-table.md",
+      "sha256": "b842105d9d88249f21a186a62ab79242a0edfc151a3ad5ff951c3d7990f253b0"
+    }
+  ]
+}

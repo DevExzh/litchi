@@ -1,0 +1,38 @@
+{
+  "capture": null,
+  "change": 422,
+  "claim_authorized": false,
+  "claim_withheld_reason": "a four-leg ABBA comparison is required",
+  "classification": "matched allocation/resource diagnostic",
+  "lane": "normal",
+  "performance_claim": null,
+  "report_count": 1,
+  "reports": [
+    {
+      "allocation": {
+        "status": "unavailable"
+      },
+      "binary_sha256": "71515de261e6c5d3ece9b8af6fa85221c8fabb12085148f1d7d67ded9546adde",
+      "corpus_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+      "elapsed": {
+        "max": 9499479,
+        "mean": 9499479.0,
+        "min": 9499479,
+        "p50": 9499479,
+        "p95": 9499479,
+        "p99": 9499479,
+        "sample_count": 1,
+        "standard_deviation": 0.0
+      },
+      "leg": "single",
+      "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "output_vector_sha256": "1a722814a5cbe3e8c27ccfc1b88862b0acd52680ea70d80a136af021d28857a7",
+      "report_sha256": "0fd6f2206339cfff8ec885760f5f082b90ac1e268dc0c87d86d8954e06077407",
+      "revision": "40c40ea89591140e15e68d00f3fce2c4c376e445",
+      "sample_order_sha256": "d0bca111f8628137adc4c16f123496dcdd1d590d06cb5d9acd68b39fe656fb97"
+    }
+  ],
+  "samples": 1,
+  "selector": "pptx_cross_copy_plain_lifecycle",
+  "warmups": 0
+}

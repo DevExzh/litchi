@@ -1,0 +1,205 @@
+{
+  "change": 422,
+  "checks": [
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "allocation_metrics::tests",
+        "--",
+        "--test-threads=1"
+      ],
+      "environment_overrides": {},
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T11:24:35.232978+00:00",
+      "log": "counter-tests.log",
+      "name": "counter-tests",
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T11:24:22.006811+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "operation_metrics::tests",
+        "--",
+        "--test-threads=1"
+      ],
+      "environment_overrides": {},
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T11:24:35.321258+00:00",
+      "log": "aggregation-tests.log",
+      "name": "aggregation-tests",
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T11:24:35.233191+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "filesystem::tests::child_output_keeps_allocation_sample",
+        "--",
+        "--test-threads=1"
+      ],
+      "environment_overrides": {},
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T11:24:35.406258+00:00",
+      "log": "filesystem-serialization.log",
+      "name": "filesystem-serialization",
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T11:24:35.321394+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--",
+        "--test-threads=1"
+      ],
+      "environment_overrides": {},
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T11:24:47.554722+00:00",
+      "log": "allocator-wrapper.log",
+      "name": "allocator-wrapper",
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T11:24:35.406335+00:00"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools",
+        "-p",
+        "test_perf_compare.py"
+      ],
+      "environment_overrides": {},
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T11:24:48.000999+00:00",
+      "log": "comparator-tests.log",
+      "name": "comparator-tests",
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T11:24:47.554912+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--all-features",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "environment_overrides": {},
+      "exit_code": 101,
+      "finished_utc": "2026-09-05T11:24:55.672323+00:00",
+      "log": "clippy-strict.log",
+      "name": "clippy-strict",
+      "required_for_this_batch": false,
+      "started_utc": "2026-09-05T11:24:48.001100+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--all-features",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-A",
+        "clippy::chunks_exact_to_as_chunks",
+        "-A",
+        "clippy::clone_on_copy",
+        "-A",
+        "clippy::needless_lifetimes"
+      ],
+      "environment_overrides": {},
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T11:25:03.043482+00:00",
+      "log": "clippy-diagnostic.log",
+      "name": "clippy-diagnostic",
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T11:24:55.672553+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "doc",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--no-deps"
+      ],
+      "environment_overrides": {
+        "RUSTDOCFLAGS": "-D warnings"
+      },
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T11:25:05.160588+00:00",
+      "log": "rustdoc.log",
+      "name": "rustdoc",
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T11:25:03.043714+00:00"
+    }
+  ],
+  "scope": "focused counter, aggregation, serialization, real allocator wrapper and comparator tests; strict lint debt reported separately",
+  "source_sha256_after": {
+    "tools/perf-baseline/src/allocation_metrics.rs": "f6f7f5874b92147d9b47211d4cfcbb22775d807fb1809a02d2290bc646aa99c1",
+    "tools/perf-baseline/src/filesystem.rs": "ce1934b95cdcec607c647220b330800302e9fa93b6f8d1e61cdae446825966e4",
+    "tools/perf-baseline/src/operation_metrics.rs": "c8ee7587161592d2047e70aa463b47becf86069e7f72631caf818fb65bf414ec",
+    "tools/perf_compare.py": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e",
+    "tools/test_perf_compare.py": "cd3b18a27b3987ae836a38cef57fe4e209d6f59865ad33c237e7bc642779476e"
+  },
+  "source_sha256_before": {
+    "tools/perf-baseline/src/allocation_metrics.rs": "f6f7f5874b92147d9b47211d4cfcbb22775d807fb1809a02d2290bc646aa99c1",
+    "tools/perf-baseline/src/filesystem.rs": "ce1934b95cdcec607c647220b330800302e9fa93b6f8d1e61cdae446825966e4",
+    "tools/perf-baseline/src/operation_metrics.rs": "c8ee7587161592d2047e70aa463b47becf86069e7f72631caf818fb65bf414ec",
+    "tools/perf_compare.py": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e",
+    "tools/test_perf_compare.py": "cd3b18a27b3987ae836a38cef57fe4e209d6f59865ad33c237e7bc642779476e"
+  },
+  "status": "pass_with_strict_lint_debt"
+}

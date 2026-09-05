@@ -1,0 +1,15 @@
+{
+  "status": "pass",
+  "method": "ast.parse, no import or execution",
+  "files": [
+    "build.py",
+    "capture.py",
+    "check-normal-identity.py",
+    "check-portable-tool-binding.py",
+    "check-report-guards.py",
+    "portable-replay.py",
+    "summarize.py",
+    "validate.py",
+    "verify.py"
+  ]
+}

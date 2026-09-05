@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## Change 0422: operation-region allocator peak
+
+[0422](changes/0422-operation-region-allocator-peak.md) adds a serialized
+operation-region maximum, independent from the earlier process lifetime peak.
+The current media-rich/plain PPTX baseline records mean region peaks of 272,736,303
+and 1,360,003 bytes; lifetime peaks in those same reports are 812,687,524 and
+3,559,492 bytes. These are distinct scopes within V3, not a memory-reduction
+comparison. The metric includes entry live bytes and other process callbacks;
+it excludes hidden realloc overlap and RSS. Retention/drop boundaries,
+near-limit cases and matched source-backed lifecycles remain open.
+
 ## Change 0421: allocator high-water correction
 
 [0421](changes/0421-allocator-peak-counter.md) fixes a benchmark counter that
