@@ -1,5 +1,11 @@
 # Non-iWork `docs/GOAL.md` audit
 
+Change [0414](changes/0414-zip64-output-promotion.md) implements preservation
+output promotion at ZIP32 local-offset and member-count boundaries, including
+OPC provenance for reopened packages above 65,535 members. Generated ZIP64
+Deflate through the existing streaming local-header path remains a typed
+refusal. This capability change does not close the performance program.
+
 Change [0413](changes/0413-cfb-chain-scratch-reservation.md) retains a scoped
 production CFB optimization with nine XLS ABBA comparisons, exact allocation
 and logical-I/O checks, a reviewed ~3% CFB guard cost, paired CPU/PMU evidence
@@ -8,7 +14,8 @@ of the non-iWork program. Broad scenario, native/cold/remote and scaling gaps
 below remain open.
 
 **Audit date:** 2026-09-05
-**Audit basis:** the 0412 captured candidate at
+**Audit basis:** the 0414 source batch and its retained verification evidence,
+with the 0413 committed control `6b632726b` and the 0412 captured candidate at
 `63c95bc22d5883c8ecab0872030757e5584254f7`, with the verified 0411 baseline at
 `44edf790669a0aa4dc0aff73af6f7b5f5e709b6d` and the earlier
 `9c6742c5212dd0e7ff2367da585abe357aae8975` ZIP64 control retained for the
@@ -160,10 +167,12 @@ offset fields, retains central/local metadata and ZIP64 extensible data, and
 has malformed, multi-disk, truncation, descriptor, limit, offset, sink, and
 no-output tests.
 
-The integrated work changes public preservation construction to `AllowZip64`,
-records whether the OPC source already uses ZIP64, and avoids the ZIP32
-size/count refusal for an already-ZIP64 source. The source-backed bounds were
-adjusted on the same basis. It adds successful synthetic OPC tests:
+The earlier integration changed public preservation construction to
+`AllowZip64` and admitted already-ZIP64 sources. Change 0414 also promotes
+generated/copied central offsets and synthesizes ZIP64 tails for ZIP32 sources.
+OPC size/count capability guards and the provenance count ceiling are removed;
+arithmetic, limits and structural refusals remain. Earlier synthetic tests
+continue to cover:
 
 - `zip64_source_targeted_save_preserves_untouched_records_and_tail` changes
   one Part in a ZIP64 package, retains a different Part's raw local and central
@@ -189,13 +198,16 @@ they are synthetic in-memory fixtures. They leave the following gates open:
    synthetic graph, including unknown physical members and dependency closures.
    The existing focused add/remove test is valuable correctness evidence but
    does not certify every topology operation.
-3. Resolve the output-promotion boundary. The preservation writer still emits
-   generated central local-offset fields as fixed 32-bit fields and rejects a
-   generated ZIP64 member (`preserve.rs` around `generated_entry`). An existing
-   ZIP64 tail can therefore accept only cases whose generated offsets and
-   records remain representable. Either implement a validated ZIP64 generated
-   record/promotion path or retain and test the typed refusal; do not infer
-   general large-file support from the current tail-preservation tests.
+3. Complete generated-size and streaming creation coverage. Change 0414
+   implements offset/count promotion and known-size Store/precompressed ZIP64
+   headers. Public sparse tests cover generated offsets immediately below, at
+   and above `u32::MAX`; OPC tests cover count promotion and repeated owned
+   publication beyond 65,535 members. Copied-offset promotion has focused
+   layout/metadata tests. The current one-pass generated Deflate local header
+   remains unproven for ZIP64 sizes and is refused before sink output. Generated
+   payloads remain buffered, and the separate full-regeneration
+   `StreamingArchiveWriter` remains ZIP32-only by default. These are explicit
+   remaining capabilities, not established large-file streaming support.
 4. Add at least one real-producer or independently generated large ZIP64 OPC
    corpus and validate all semantic Part bytes, raw member identity, archive
    layout, and reopen behavior. The current two-Part fixture does not exercise
@@ -215,10 +227,10 @@ a normalizing fallback for a different unsupported source.
 
 | Priority | Requirement from `docs/GOAL.md` | Next reviewable evidence |
 | --- | --- | --- |
-| P0 | Close the ZIP64 integration and preservation contract | 0404 binds the scoped all-feature results and fixture-generator sources; generated-offset/promotion and broader failure-atomicity coverage remain open. |
+| P0 | Close the ZIP64 integration and preservation contract | 0414 adds offset/count promotion, sparse public boundary tests and repeated OPC publication beyond the count sentinel. Generated ZIP64 Deflate, bounded-memory creation, independent large-producer evidence and the broader failure-atomicity matrix remain open. |
 | P0 | Establish the Phase-1 baseline before selecting further optimizations | 0411 supplies a clean, descriptive six-selector XLS/CFB warm baseline with normal and allocator observations. Continue the full non-iWork capture with p50/p95/p99, throughput, `perf stat` counters, allocation/peak RSS, source calls/bytes/ranges, decompressed/recompressed/copied bytes, output bytes, lock-wait fields, and cold/warm plus explicit bounded-worker cases. |
 | P0 | Turn cache correctness into accepted observation | 0405 now retains validated direct-lock acquisition observations, cache counters, and explicit timing scope in 24 normal and 24 observed smoke rows. The release harness passes 256 tests with one ignored. Extend this descriptive evidence to representative workloads with operation-local attribution. Keep cache observations separate from latency claims until an accepted ABBA protocol exists. |
-| P0 | Capture current hardware/resource evidence | 0406 binds machine, corpus, revision, binary, raw samples, counters, allocation traces, RSS, syscall evidence, and profiling limitations. 0408 improves caller unwinding and verification efficiency and adds operation-local allocation/ZIP evidence. 0409 records XLSX query/edit/save and usable native L2 events; exact LLC is documented unavailable on this guest. 0410 measures the expanded-name ownership candidate, with residual selected-path attribution but no paired CPU delta. 0411 adds the six-selector XLS/CFB lifecycle and allocation baseline, still without a speedup claim. The source profile is dominated by diagnostic ReadAt accounting (87.35% whole-process leaf weight); isolate that observer cost before selecting production XLS/CFB work. The broader semantic CRUD, cold-source, and resource matrix remains open. |
+| P0 | Capture current hardware/resource evidence | 0406 binds machine, corpus, revision, binary, raw samples, counters, allocation traces, RSS, syscall evidence, and profiling limitations. 0408 improves caller unwinding and verification efficiency and adds operation-local allocation/ZIP evidence. 0409 records XLSX query/edit/save and usable native L2 events; exact LLC is documented unavailable on this guest. 0410 measures the expanded-name ownership candidate, with residual selected-path attribution but no paired CPU delta. 0411 adds the six-selector XLS/CFB lifecycle and allocation baseline, still without a speedup claim. 0412 isolates diagnostic ReadAt observer cost with plain-source selectors; 0413 retains a scoped CFB reservation optimization with paired CPU/PMU evidence and a reviewed CFB guard cost. Remaining CFB FAT/stream/physical validation costs need attribution before further production changes. The broader semantic CRUD, cold-source, and resource matrix remains open. |
 | P1 | Finish source-backed OPC CRUD adoption | Extend selective open/read/edit/save across format facades and topology changes; measure the selected-Part/compressor buffer, physical I/O, allocation/RSS, and semantic phase boundaries. The current report calls this migration incomplete. |
 | P1 | Cover the high-impact CRUD categories | Add or explicitly classify conversion, stream append, structural edits, deletion/sanitization, cross-document dependency copy, merge/split, patch and inverse timing, repair/normalize, dynamic calculation, security, malformed, and real-producer scenarios. Correctness-only selectors cannot close the timing requirement. |
 | P1 | Finish CFB consumer evidence | Move exact-range and overlay substrate work into DOC/XLS/PPT semantic owners; add physical-cold and high-latency range-source cases, FAT-tail behavior, and operation-local memory/resource attribution. |
