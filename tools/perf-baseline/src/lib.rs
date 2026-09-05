@@ -25134,8 +25134,6 @@ fn run_xls_owned_source_case(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    use litchi_core::sheet::Cell as _;
-
     if !case.is_xls_owned_source_case() {
         return Err("non-owned-source case passed to the plain XLS source runner".into());
     }
