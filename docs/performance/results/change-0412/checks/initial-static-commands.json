@@ -1,0 +1,30 @@
+[
+  {
+    "label": "rustfmt",
+    "argv": [
+      "rustfmt",
+      "+1.98.1",
+      "--check",
+      "--edition",
+      "2024",
+      "--config",
+      "skip_children=true",
+      "tools/perf-baseline/src/lib.rs"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:05:35.451094+00:00",
+    "wall_seconds": 0.3899489819887094,
+    "exit_code": 0
+  },
+  {
+    "label": "boundaries",
+    "argv": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:05:35.841228+00:00",
+    "wall_seconds": 0.1377982070116559,
+    "exit_code": 1
+  }
+]

@@ -1,0 +1,66 @@
+[
+  {
+    "label": "harness-xls-allocator-tests",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--lib",
+      "--",
+      "--test-threads=4",
+      "xls_source_",
+      "xls_owned_source",
+      "xls_range_catalog",
+      "allocation_metrics::tests"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:05:29.291329+00:00",
+    "wall_seconds": 47.238433798003825,
+    "exit_code": 0
+  },
+  {
+    "label": "harness-selector-registry",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--lib",
+      "--",
+      "--test-threads=4",
+      "selectable_case_count_matches_current_enumeration"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:06:46.599384+00:00",
+    "wall_seconds": 0.08421685600478668,
+    "exit_code": 0
+  },
+  {
+    "label": "final-harness-xls-allocator-tests",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--lib",
+      "--",
+      "--test-threads=4",
+      "xls_source_",
+      "xls_owned_source",
+      "xls_range_catalog",
+      "allocation_metrics::tests",
+      "selectable_case_count_matches_current_enumeration"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:12:46.364337+00:00",
+    "wall_seconds": 11.766830482985824,
+    "exit_code": 0
+  }
+]

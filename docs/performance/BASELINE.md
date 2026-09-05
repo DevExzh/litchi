@@ -1,5 +1,25 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0412: XLS observer isolation and plain-source baseline
+
+Change [0412](changes/0412-xls-observer-isolation.md) at committed revision
+`b8f61970d` corrects XLS category-range observation by coalescing only exactly
+adjacent spans, preserving overlap multiplicity, and disabling the unused
+generic repeated-read union. Three opt-in plain `OwnedSource` selectors now
+cover open, open plus worksheet listing, and open plus one-cell selection over
+the same generated two-sheet XLS corpus used by 0411.
+
+The plain runner reports operation/allocation metrics without a source summary;
+separate instrumented observations retain locality checks. Eleven focused XLS
+observer/owned/allocator tests plus the registry test, scoped format, boundary,
+coverage-index, seven-claim, and classification checks pass. The clean captured candidate is `63c95bc22`. Plain one-cell p50 is
+0.166–0.169 ms across four fresh children; separate allocation captures record
+126 calls / 223,774 bytes per operation. The corrected observer records
+0.178–0.179 ms versus the old observer's 6.032–6.073 ms, with unchanged
+logical locality. This measures observer cost, not a production speedup.
+Comparator scope enforcement and all 91 comparator tests pass. The full
+non-iWork goal remains open.
+
 ## Change 0411: matched XLS read allocation baseline
 
 [0411](changes/0411-xls-read-allocation-baseline.md) retains a current six-case

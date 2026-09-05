@@ -1,0 +1,68 @@
+{
+  "harness_tests": {
+    "passed": 12,
+    "failed": 0,
+    "ignored": 0,
+    "test_threads": 4,
+    "warnings": 0
+  },
+  "comparator_tests": {
+    "passed": 91,
+    "failed": 0,
+    "python_warnings": "errors"
+  },
+  "rustfmt": "passed",
+  "crate_boundaries": "passed",
+  "coverage": {
+    "categories": 15,
+    "representatives": 30,
+    "registry": 425,
+    "default_cases": 36,
+    "default_rows": 198,
+    "status": "passed; contract only"
+  },
+  "strict_claims": {
+    "passed": 7
+  },
+  "report_classification": {
+    "rows": 167,
+    "tables": 2,
+    "strict_claim": 0,
+    "historical": 145,
+    "descriptive": 14,
+    "withheld": 8
+  },
+  "schema_and_corpus_binding": {
+    "reports": 18,
+    "observations": 37900,
+    "status": "passed"
+  },
+  "corruption_probes": {
+    "passed": 6,
+    "original_capture_unchanged": true
+  },
+  "resource_verifier": {
+    "rss": 14,
+    "profiles": 1,
+    "pmu": 3,
+    "status": "passed"
+  },
+  "measurement_overlap": "No build/test/benchmark workload overlapped captures; command intervals verified sequential.",
+  "initial_diagnostics": [
+    "First boundary invocation selected the unavailable pinned1.95Cargo; explicit1.98.1 environment passed.",
+    "First candidatebuild and focusedtest logs contain one unusedimport warning; removedin63c95bc22 andfinalbuild/tests warningfree.",
+    "Evidence review tightened comparator protocol/build identity and attribution command/event checks beforepublication."
+  ],
+  "attribution": {
+    "required_identity": "verified",
+    "source_binding": "bound",
+    "raw_stack_blocks": 5793,
+    "weighted_event_period": 24451673686,
+    "lost": 0,
+    "malformed": 0,
+    "unparsed": 0,
+    "empty": 0,
+    "negative_probes": 7,
+    "published_replay": "passed"
+  }
+}

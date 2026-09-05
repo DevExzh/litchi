@@ -1,0 +1,22 @@
+[
+  {
+    "argv": [
+      "python3",
+      "docs/performance/results/change-0412/attribution/attribute.py",
+      "--capture",
+      "/tmp/litchi-goal-0412-capture",
+      "--script",
+      "/tmp/litchi-goal-0412-capture/owned-profile-script.stdout",
+      "--report",
+      "/tmp/litchi-goal-0412-capture/owned-profile-self.stdout",
+      "--repo",
+      "/home/zhuhe/code/litchi",
+      "--output",
+      "docs/performance/results/change-0412/attribution/owned-profile-attribution.json"
+    ],
+    "started_utc": "2026-09-05T01:38:20.866941+00:00",
+    "wall_seconds": 1.5207680040039122,
+    "exit_code": 0,
+    "output": "{\"case\": \"xls_owned_source_open_one_cell\", \"empty_stack_period\": 0, \"lost_sample_count\": 0, \"output\": \"/home/zhuhe/code/litchi/docs/performance/results/change-0412/attribution/owned-profile-attribution.json\", \"required_identity\": \"verified\", \"required_identity_failures\": [], \"source_binding\": \"bound\", \"source_cell_period\": 90230459, \"source_open_period\": 7367546363, \"unknown_frame_period\": 299457033, \"whole_process_blocks\": 5793, \"whole_process_period\": 24451673686}\n"
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "-W",
+    "error",
+    "-m",
+    "unittest",
+    "tools.test_perf_compare"
+  ],
+  "started_utc": "2026-09-05T01:12:01.514026+00:00",
+  "wall_seconds": 0.42398238100577146,
+  "exit_code": 0
+}

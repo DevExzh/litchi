@@ -1,8 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
 **Audit date:** 2026-09-05
-**Audit basis:** the verified 0411 baseline at
-`44edf790669a0aa4dc0aff73af6f7b5f5e709b6d`, with the earlier
+**Audit basis:** the 0412 captured candidate at
+`63c95bc22d5883c8ecab0872030757e5584254f7`, with the verified 0411 baseline at
+`44edf790669a0aa4dc0aff73af6f7b5f5e709b6d` and the earlier
 `9c6742c5212dd0e7ff2367da585abe357aae8975` ZIP64 control retained for the
 historical comparison. iWork is outside this audit by the user's instruction.
 
@@ -11,6 +12,29 @@ performance work, but the definition of done in `docs/GOAL.md` is not met. The
 coverage index explicitly describes itself as representative, and the current
 records do not provide a complete, independently reproducible baseline and
 optimization result for the non-iWork CRUD matrix.
+
+## 0412 current implementation
+
+Change [0412](changes/0412-xls-observer-isolation.md) at committed revision
+`b8f61970d` corrects the XLS observer's category range catalog by coalescing
+only exactly adjacent spans, preserving overlap multiplicity, and disabling
+the unused generic repeated-read union. It adds three explicit opt-in plain
+`OwnedSource` lifecycle selectors: `xls_owned_source_open`,
+`xls_owned_source_open_list_worksheets`, and `xls_owned_source_open_one_cell`.
+Their timed reports expose operation/allocation metrics with `source: None`;
+separate instrumented observations retain the logical locality evidence.
+
+Eleven focused XLS observer/owned/allocator tests plus the registry test pass,
+along with scoped formatting, crate boundaries, coverage-index validation, the
+seven-claim strict checker, and report classification. The clean candidate
+`63c95bc22` now has 18 schema/corpus-verified timing, allocation, profile and PMU
+reports. Plain one-cell p50 is 0.166–0.169 ms; separate allocator captures record
+126 calls / 223,774 bytes. Instrumented locality remains unchanged across the
+observer correction. All 91 comparator tests pass, including mismatched observer
+rejection. This is a measurement enabler and baseline, with no production
+speedup claim. The registry is now 425 selectors; the default remains 36 cases / 198 rows and the
+index remains 15 categories / 30 representative selectors. The non-iWork goal
+remains open.
 
 ## 0411 current update
 

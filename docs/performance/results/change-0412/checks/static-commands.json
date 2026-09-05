@@ -1,0 +1,73 @@
+[
+  {
+    "label": "rustfmt",
+    "argv": [
+      "rustfmt",
+      "+1.98.1",
+      "--check",
+      "--edition",
+      "2024",
+      "--config",
+      "skip_children=true",
+      "tools/perf-baseline/src/lib.rs"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:05:52.291475+00:00",
+    "wall_seconds": 0.38921298600325827,
+    "exit_code": 0
+  },
+  {
+    "label": "boundaries",
+    "argv": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:05:52.680908+00:00",
+    "wall_seconds": 29.79022184399946,
+    "exit_code": 0
+  },
+  {
+    "label": "coverage",
+    "argv": [
+      "python3",
+      "tools/validate_crud_coverage_index.py"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:06:22.471297+00:00",
+    "wall_seconds": 0.04270470300980378,
+    "exit_code": 0
+  },
+  {
+    "label": "claims",
+    "argv": [
+      "python3",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--evidence-root",
+      ".",
+      "--mode",
+      "strict"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:06:22.514068+00:00",
+    "wall_seconds": 70.40020217800338,
+    "exit_code": 0
+  },
+  {
+    "label": "classification",
+    "argv": [
+      "python3",
+      "tools/check_report_claim_classification.py",
+      "--repo-root",
+      "."
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T01:07:32.914405+00:00",
+    "wall_seconds": 0.04714890899776947,
+    "exit_code": 0
+  }
+]

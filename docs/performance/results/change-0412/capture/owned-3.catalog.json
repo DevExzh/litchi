@@ -1,0 +1,177 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "6d6a92deca2e3648437999b42b6072a31370ac7bb7afa14b8d3a5d1fe6c0c4ab",
+  "content_set_sha256": "5fdd3f29c7c98e2cb9269d126523b166cba8782f3eb97bbd2cb7baa67ccdbfd7",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "63c95bc22d5883c8ecab0872030757e5584254f7",
+    "git_worktree_dirty": false,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "xls-cfb:sha256:6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "name": "xls-comments-opaque-heavy",
+      "legacy_v1": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "package_format": "XLS/CFB",
+        "shape": "256-comments-opaque-heavy",
+        "payload_kind": "incompressible",
+        "compression": "none",
+        "entry_count": 257,
+        "archive_member_count": 10,
+        "entry_bytes": 2097152,
+        "uncompressed_payload_bytes": 16858200,
+        "archive_bytes": 16995840,
+        "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 80946,
+        "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041",
+        "xlsx": null
+      },
+      "format": "XLS/CFB",
+      "size_class": "unknown",
+      "categories": [
+        "incompressible",
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-xls-comments-opaque-heavy-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "incompressible",
+          "legacy_shape": "256-comments-opaque-heavy"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 16995840,
+        "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+        "logical_payload_bytes": 16858200,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 2097152,
+        "entry_count": 257
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 16995840,
+          "members": 10,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "Workbook",
+          "logical_bytes": 80946,
+          "sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "xls_owned_source_open",
+          "xls_owned_source_open_list_worksheets",
+          "xls_owned_source_open_one_cell"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "xls_owned_source_open",
+      "corpus_id": "xls-cfb:sha256:6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "legacy_name": "xls-comments-opaque-heavy",
+      "legacy_archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "role": "timed"
+    },
+    {
+      "case": "xls_owned_source_open_list_worksheets",
+      "corpus_id": "xls-cfb:sha256:6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "legacy_name": "xls-comments-opaque-heavy",
+      "legacy_archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "role": "timed"
+    },
+    {
+      "case": "xls_owned_source_open_one_cell",
+      "corpus_id": "xls-cfb:sha256:6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "legacy_name": "xls-comments-opaque-heavy",
+      "legacy_archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "role": "timed"
+    }
+  ]
+}
