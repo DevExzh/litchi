@@ -1927,6 +1927,25 @@ impl BoundedVecWriter {
             allocation_failure: None,
         }
     }
+
+    fn into_bytes(self) -> Result<Vec<u8>> {
+        if self.bytes.capacity() == self.bytes.len() {
+            return Ok(self.bytes);
+        }
+        // Owned OPC ingress retains the Vec, including spare capacity. Copy
+        // once into a fallibly reserved buffer instead of retaining geometric
+        // headroom. Both buffers may coexist; the archive limit bounds output
+        // length, not aggregate live memory or allocator rounding.
+        let mut compact = Vec::new();
+        compact
+            .try_reserve_exact(self.bytes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "cross-slide candidate archive",
+                source,
+            })?;
+        compact.extend_from_slice(&self.bytes);
+        Ok(compact)
+    }
 }
 
 impl Write for BoundedVecWriter {
@@ -1945,11 +1964,22 @@ impl Write for BoundedVecWriter {
                 "cross-slide candidate archive exceeds its bound",
             ));
         }
-        if let Err(source) = self.bytes.try_reserve_exact(bytes.len()) {
-            self.allocation_failure = Some(source);
-            return Err(io::Error::other(
-                "cross-slide candidate archive allocation failed",
-            ));
+        if next > self.bytes.capacity() {
+            // Repeated small ZIP writes must not request a new allocation for
+            // every chunk. Keep deliberate growth within the archive bound;
+            // the checked length above guarantees target >= len.
+            let target = self
+                .bytes
+                .capacity()
+                .saturating_mul(2)
+                .max(next)
+                .min(self.limit);
+            if let Err(source) = self.bytes.try_reserve_exact(target - self.bytes.len()) {
+                self.allocation_failure = Some(source);
+                return Err(io::Error::other(
+                    "cross-slide candidate archive allocation failed",
+                ));
+            }
         }
         self.bytes.extend_from_slice(bytes);
         Ok(bytes.len())
@@ -1976,7 +2006,7 @@ fn bounded_package_bytes(package: &OpcPackage, limit: usize) -> Result<Vec<u8>> 
         });
     }
     result?;
-    Ok(writer.bytes)
+    writer.into_bytes()
 }
 
 fn copy_string(value: &str, resource: &'static str) -> Result<String> {
@@ -2109,3 +2139,6 @@ impl<'a> WireInput<'a> {
         self.position == self.bytes.len()
     }
 }
+
+#[cfg(test)]
+mod bounded_writer_tests;

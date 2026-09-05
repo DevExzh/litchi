@@ -209,6 +209,86 @@ fn cross_copy_replans_after_dirty_destination_for_sequential_copies() -> TestRes
 }
 
 #[test]
+fn cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publication() -> TestResult {
+    let source_bytes = authored_package(&["Source A"])?;
+    let destination_bytes = authored_package(&["Destination A", "Destination B"])?;
+
+    let source = Package::from_vec(source_bytes.clone())?;
+    let mut baseline_destination = Package::from_vec(destination_bytes.clone())?;
+    let plan = baseline_destination
+        .opened_presentation()?
+        .plan_cross_slide_copy(&source.opened_presentation()?, 0_usize, 0_usize, 1)?;
+    baseline_destination.apply_cross_slide_copy_plan(&source, &plan)?;
+    let expected = serialized(&mut baseline_destination)?;
+    assert!(expected.len() > source_bytes.len());
+    assert!(expected.len() > destination_bytes.len());
+
+    let limits = |max_patch_bytes| {
+        Limits::new(
+            4_096,
+            max_patch_bytes,
+            8 * 1024 * 1024,
+            64,
+            256 * 1024 * 1024,
+        )
+        .ok_or_else(|| Error::Invalid("test limits are invalid".into()))
+    };
+
+    let exact_limits = limits(expected.len())?;
+    let mut exact_source = Package::from_vec(source_bytes.clone())?;
+    let mut exact_destination = Package::from_vec(destination_bytes.clone())?;
+    let exact_source_before = source_bytes.clone();
+    let exact_destination_before = destination_bytes.clone();
+    let exact_plan = exact_destination
+        .opened_presentation_with_limits(exact_limits)?
+        .plan_cross_slide_copy(
+            &exact_source.opened_presentation_with_limits(exact_limits)?,
+            0_usize,
+            0_usize,
+            1,
+        )?;
+    exact_destination.apply_cross_slide_copy_plan(&exact_source, &exact_plan)?;
+    assert_eq!(serialized(&mut exact_destination)?, expected);
+    assert_eq!(serialized(&mut exact_source)?, exact_source_before);
+    assert_ne!(
+        serialized(&mut exact_destination)?,
+        exact_destination_before
+    );
+
+    let one_short = expected
+        .len()
+        .checked_sub(1)
+        .ok_or_else(|| Error::Invalid("cross-copy output is empty".into()))?;
+    let short_limits = limits(one_short)?;
+    let mut short_source = Package::from_vec(source_bytes.clone())?;
+    let mut short_destination = Package::from_vec(destination_bytes.clone())?;
+    let short_source_before = source_bytes.clone();
+    let short_destination_before = destination_bytes.clone();
+    let error = short_destination
+        .opened_presentation_with_limits(short_limits)?
+        .plan_cross_slide_copy(
+            &short_source.opened_presentation_with_limits(short_limits)?,
+            0_usize,
+            0_usize,
+            1,
+        )
+        .expect_err("one byte below the serialized candidate must fail");
+    assert!(matches!(
+        error,
+        Error::Limit {
+            resource: "cross-slide serialized archive bytes",
+            limit,
+        } if limit == one_short
+    ));
+    assert_eq!(
+        serialized(&mut short_destination)?,
+        short_destination_before
+    );
+    assert_eq!(serialized(&mut short_source)?, short_source_before);
+    Ok(())
+}
+
+#[test]
 fn borrowed_real_producer_fixture_refuses_cross_copy_authorization() -> TestResult {
     let source = Package::from_bytes(include_bytes!("../../../test-data/ooxml/pptx/shapes.pptx"))?;
     let mut destination = Package::from_vec(authored_package(&[
