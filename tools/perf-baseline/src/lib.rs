@@ -56571,7 +56571,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 425);
+        assert_eq!(selectable_count, 427);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
