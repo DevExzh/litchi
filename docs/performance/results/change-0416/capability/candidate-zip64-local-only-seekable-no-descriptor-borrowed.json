@@ -1,0 +1,23 @@
+{
+  "borrowed_store_crc_scan": true,
+  "elapsed_ns": 22050,
+  "input_bytes": 417,
+  "input_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/zip64-local-only-seekable-no-descriptor.zip",
+  "mode": "borrowed",
+  "observation": {
+    "borrowed_crc_scan_bytes": 51,
+    "borrowed_none": 1,
+    "borrowed_some": 1,
+    "compressed_bytes": 127,
+    "crc32_xor": 976433797,
+    "digest": 16559544388260544144,
+    "entries": 2,
+    "name_bytes": 38,
+    "uncompressed_bytes": 377
+  },
+  "operation": "capability",
+  "payload_decompression": false,
+  "schema_version": 1,
+  "status": "ok",
+  "tool": "litchi-goal-0416-zip-strict-probe"
+}

@@ -1,0 +1,35 @@
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+error[E0308]: mismatched types
+   --> crates/litchi-opc/tests/forced_zip64_failures.rs:335:20
+    |
+335 |         Arc::clone(&source_owner),
+    |         ---------- ^^^^^^^^^^^^^ expected `&Arc<dyn ReadAt>`, found `&Arc<VersionedSource>`
+    |         |
+    |         arguments to this function are incorrect
+    |
+    = note: expected reference `&Arc<dyn ReadAt>`
+               found reference `&Arc<VersionedSource>`
+    = help: `VersionedSource` implements `ReadAt` so you could box the found value and coerce it to the trait object `Box<dyn ReadAt>`, you will have to change the expected type as well
+note: method defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/clone.rs:236:7
+
+error[E0308]: mismatched types
+   --> crates/litchi-opc/tests/forced_zip64_failures.rs:362:20
+    |
+362 |         Arc::clone(&source_owner),
+    |         ---------- ^^^^^^^^^^^^^ expected `&Arc<dyn ReadAt>`, found `&Arc<VersionedSource>`
+    |         |
+    |         arguments to this function are incorrect
+    |
+    = note: expected reference `&Arc<dyn ReadAt>`
+               found reference `&Arc<VersionedSource>`
+    = help: `VersionedSource` implements `ReadAt` so you could box the found value and coerce it to the trait object `Box<dyn ReadAt>`, you will have to change the expected type as well
+note: method defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/clone.rs:236:7
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `litchi-opc` (test "forced_zip64_failures") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

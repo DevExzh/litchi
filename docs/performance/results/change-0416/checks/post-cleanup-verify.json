@@ -1,0 +1,8 @@
+{
+  "argv": [
+    "python3",
+    "docs/performance/results/change-0416/verify.py"
+  ],
+  "exit_code": 0,
+  "log": "post-cleanup-verify.log"
+}

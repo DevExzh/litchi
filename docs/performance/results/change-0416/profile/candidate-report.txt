@@ -1,0 +1,649 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 339  of event 'cpu/cycles/P'
+# Event count (approx.): 7523487867
+#
+# Overhead  Command          Shared Object                     Symbol                                                                                                                                                     
+# ........  ...............  ................................  ...........................................................................................................................................................
+#
+     9.97%  litchi-goal-041  libc.so.6                         [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+               |          
+               |--5.81%--<soapberry_zip::preserve::PreservationIndex<&[u8]>>::new_with_limits_and_policy
+               |          zip64_read_probe::indexed_once::<&[u8]>
+               |          zip64_read_probe::run_timed
+               |          zip64_read_probe::main
+               |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          std::rt::lang_start_internal
+               |          main
+               |          __libc_start_call_main
+               |          __libc_start_main@@GLIBC_2.34
+               |          _start
+               |          
+               |--1.49%--zip64_read_probe::indexed_once::<&[u8]>
+               |          zip64_read_probe::run_timed
+               |          zip64_read_probe::main
+               |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          std::rt::lang_start_internal
+               |          main
+               |          __libc_start_call_main
+               |          __libc_start_main@@GLIBC_2.34
+               |          _start
+               |          
+               |--1.19%--soapberry_zip::office::normalized_member_name
+               |          <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               |          zip64_read_probe::indexed_once::<&[u8]>
+               |          zip64_read_probe::run_timed
+               |          zip64_read_probe::main
+               |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          std::rt::lang_start_internal
+               |          main
+               |          __libc_start_call_main
+               |          __libc_start_main@@GLIBC_2.34
+               |          _start
+               |          
+                --0.59%--<soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+                          zip64_read_probe::indexed_once::<&[u8]>
+                          zip64_read_probe::run_timed
+                          zip64_read_probe::main
+                          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          std::rt::lang_start_internal
+                          main
+                          __libc_start_call_main
+                          __libc_start_main@@GLIBC_2.34
+                          _start
+
+     8.03%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <soapberry_zip::preserve::PreservationIndex<&[u8]>>::new_with_limits_and_policy
+            |
+            ---<soapberry_zip::preserve::PreservationIndex<&[u8]>>::new_with_limits_and_policy
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     6.84%  litchi-goal-041  libc.so.6                         [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+               |          
+               |--5.35%--soapberry_zip::preserve::validate_local_span::<&[u8]>
+               |          <soapberry_zip::preserve::PreservationIndex<&[u8]>>::new_with_limits_and_policy
+               |          zip64_read_probe::indexed_once::<&[u8]>
+               |          zip64_read_probe::run_timed
+               |          zip64_read_probe::main
+               |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          std::rt::lang_start_internal
+               |          main
+               |          __libc_start_call_main
+               |          __libc_start_main@@GLIBC_2.34
+               |          _start
+               |          
+                --1.49%--zip64_read_probe::run_timed
+                          zip64_read_probe::main
+                          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          std::rt::lang_start_internal
+                          main
+                          __libc_start_call_main
+                          __libc_start_main@@GLIBC_2.34
+                          _start
+
+     6.25%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <soapberry_zip::archive::ZipLocalFileHeaderFixed>::parse
+            |
+            ---<soapberry_zip::archive::ZipLocalFileHeaderFixed>::parse
+               soapberry_zip::archive::validate_reader_entry_layout_with_name_policy::<&[u8]>
+               soapberry_zip::preserve::validate_local_span::<&[u8]>
+               <soapberry_zip::preserve::PreservationIndex<&[u8]>>::new_with_limits_and_policy
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     6.25%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <soapberry_zip::archive::ZipEntries<&[u8]>>::next_entry
+            |
+            ---<soapberry_zip::archive::ZipEntries<&[u8]>>::next_entry
+               <soapberry_zip::preserve::PreservationIndex<&[u8]>>::new_with_limits_and_policy
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     5.35%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <alloc::vec::Vec<soapberry_zip::office::IndexedEntry>>::push_mut
+            |
+            ---<alloc::vec::Vec<soapberry_zip::office::IndexedEntry>>::push_mut
+               <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     4.76%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] soapberry_zip::office::clone_str_fallibly
+            |
+            ---soapberry_zip::office::clone_str_fallibly
+               |          
+                --4.46%--<soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+                          zip64_read_probe::indexed_once::<&[u8]>
+                          zip64_read_probe::run_timed
+                          zip64_read_probe::main
+                          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          std::rt::lang_start_internal
+                          main
+                          __libc_start_call_main
+                          __libc_start_main@@GLIBC_2.34
+                          _start
+
+     4.48%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <soapberry_zip::archive::DataDescriptor>::parse_complete_with_width
+            |
+            ---<soapberry_zip::archive::DataDescriptor>::parse_complete_with_width
+               <soapberry_zip::archive::DataDescriptor>::parse_complete_at::<&[u8]>
+               soapberry_zip::archive::validate_reader_entry_layout_with_name_policy::<&[u8]>
+               soapberry_zip::preserve::validate_local_span::<&[u8]>
+               <soapberry_zip::preserve::PreservationIndex<&[u8]>>::new_with_limits_and_policy
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     4.17%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] soapberry_zip::office::canonical_member_name
+            |
+            ---soapberry_zip::office::canonical_member_name
+               <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     3.87%  litchi-goal-041  libc.so.6                         [.] _int_malloc
+            |
+            ---_int_malloc
+               |          
+                --3.57%--__libc_malloc2
+                          |          
+                          |--2.38%--<alloc::raw_vec::RawVecInner>::finish_grow
+                          |          <alloc::string::String>::try_reserve_exact
+                          |          |          
+                          |           --2.08%--soapberry_zip::office::clone_str_fallibly
+                          |                     <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+                          |                     zip64_read_probe::indexed_once::<&[u8]>
+                          |                     zip64_read_probe::run_timed
+                          |                     zip64_read_probe::main
+                          |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          |                     std::rt::lang_start_internal
+                          |                     main
+                          |                     __libc_start_call_main
+                          |                     __libc_start_main@@GLIBC_2.34
+                          |                     _start
+                          |          
+                           --0.89%--<alloc::raw_vec::RawVecInner>::finish_grow
+                                     soapberry_zip::office::clone_name_fallibly
+                                     <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+                                     zip64_read_probe::indexed_once::<&[u8]>
+                                     zip64_read_probe::run_timed
+                                     zip64_read_probe::main
+                                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                                     std::rt::lang_start_internal
+                                     main
+                                     __libc_start_call_main
+                                     __libc_start_main@@GLIBC_2.34
+                                     _start
+
+     3.87%  litchi-goal-041  libc.so.6                         [.] _int_free_merge_chunk
+            |
+            ---_int_free_merge_chunk
+               _int_free_chunk
+               |          
+                --3.57%--core::ptr::drop_glue::<soapberry_zip::office::IndexedArchive<&[u8]>>
+                          zip64_read_probe::indexed_once::<&[u8]>
+                          zip64_read_probe::run_timed
+                          zip64_read_probe::main
+                          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          std::rt::lang_start_internal
+                          main
+                          __libc_start_call_main
+                          __libc_start_main@@GLIBC_2.34
+                          _start
+
+     3.57%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] zip64_read_probe::indexed_once::<&[u8]>
+            |
+            ---zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     2.68%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] soapberry_zip::office::normalize_str_fallibly
+            |
+            ---soapberry_zip::office::normalize_str_fallibly
+               soapberry_zip::office::normalized_member_name
+               <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     2.38%  litchi-goal-041  libc.so.6                         [.] unlink_chunk.isra.0
+            |
+            ---unlink_chunk.isra.0
+               |          
+               |--1.78%--_int_free_merge_chunk
+               |          _int_free_chunk
+               |          |          
+               |          |--1.19%--core::ptr::drop_glue::<soapberry_zip::preserve::PreservationIndex<zip64_read_probe::CountingReaderAt<&[u8]>>>
+               |          |          zip64_read_probe::indexed_once::<&[u8]>
+               |          |          zip64_read_probe::run_timed
+               |          |          zip64_read_probe::main
+               |          |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          |          std::rt::lang_start_internal
+               |          |          main
+               |          |          __libc_start_call_main
+               |          |          __libc_start_main@@GLIBC_2.34
+               |          |          _start
+               |          |          
+               |           --0.59%--core::ptr::drop_glue::<soapberry_zip::office::IndexedArchive<&[u8]>>
+               |                     zip64_read_probe::indexed_once::<&[u8]>
+               |                     zip64_read_probe::run_timed
+               |                     zip64_read_probe::main
+               |                     std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |                     std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |                     std::rt::lang_start_internal
+               |                     main
+               |                     __libc_start_call_main
+               |                     __libc_start_main@@GLIBC_2.34
+               |                     _start
+               |          
+                --0.60%--_int_malloc
+                          __libc_malloc2
+
+     2.38%  litchi-goal-041  libc.so.6                         [.] _int_free_maybe_trim
+            |
+            ---_int_free_maybe_trim
+               _int_free_chunk
+               |          
+               |--1.78%--core::ptr::drop_glue::<soapberry_zip::office::IndexedArchive<&[u8]>>
+               |          zip64_read_probe::indexed_once::<&[u8]>
+               |          zip64_read_probe::run_timed
+               |          zip64_read_probe::main
+               |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          std::rt::lang_start_internal
+               |          main
+               |          __libc_start_call_main
+               |          __libc_start_main@@GLIBC_2.34
+               |          _start
+               |          
+                --0.59%--core::ptr::drop_glue::<soapberry_zip::preserve::PreservationIndex<zip64_read_probe::CountingReaderAt<&[u8]>>>
+                          zip64_read_probe::indexed_once::<&[u8]>
+                          zip64_read_probe::run_timed
+                          zip64_read_probe::main
+                          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          std::rt::lang_start_internal
+                          main
+                          __libc_start_call_main
+                          __libc_start_main@@GLIBC_2.34
+                          _start
+
+     2.09%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+            |
+            ---<soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     1.79%  litchi-goal-041  libc.so.6                         [.] __memset_avx512_unaligned_erms
+            |
+            ---__memset_avx512_unaligned_erms
+               |          
+               |--0.60%--<soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               |          zip64_read_probe::indexed_once::<&[u8]>
+               |          zip64_read_probe::run_timed
+               |          zip64_read_probe::main
+               |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          std::rt::lang_start_internal
+               |          main
+               |          __libc_start_call_main
+               |          __libc_start_main@@GLIBC_2.34
+               |          _start
+               |          
+               |--0.60%--zip64_read_probe::main
+               |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          std::rt::lang_start_internal
+               |          main
+               |          __libc_start_call_main
+               |          __libc_start_main@@GLIBC_2.34
+               |          _start
+               |          
+                --0.59%--zip64_read_probe::indexed_once::<&[u8]>
+                          zip64_read_probe::run_timed
+                          zip64_read_probe::main
+                          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          std::rt::lang_start_internal
+                          main
+                          __libc_start_call_main
+                          __libc_start_main@@GLIBC_2.34
+                          _start
+
+     1.78%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <alloc::string::String>::try_reserve
+            |
+            ---<alloc::string::String>::try_reserve
+               soapberry_zip::office::normalized_member_name
+               <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     1.78%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <alloc::vec::Vec<soapberry_zip::office::IndexedLayoutEntry>>::push_mut
+            |
+            ---<alloc::vec::Vec<soapberry_zip::office::IndexedLayoutEntry>>::push_mut
+               <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     1.78%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <soapberry_zip::archive::ZipFileHeaderRecord>::from_parts
+            |
+            ---<soapberry_zip::archive::ZipFileHeaderRecord>::from_parts
+               <soapberry_zip::archive::ZipEntries<&[u8]>>::next_entry
+               <soapberry_zip::preserve::PreservationIndex<&[u8]>>::new_with_limits_and_policy
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     1.19%  litchi-goal-041  libc.so.6                         [.] __libc_malloc2
+            |
+            ---__libc_malloc2
+               |          
+                --0.60%--<alloc::raw_vec::RawVecInner>::finish_grow
+                          <alloc::string::String>::try_reserve_exact
+
+     1.19%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <soapberry_zip::archive::ZipFileHeaderRecord>::from_parts
+            |
+            ---<soapberry_zip::archive::ZipFileHeaderRecord>::from_parts
+               <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     1.19%  litchi-goal-041  libc.so.6                         [.] cfree@GLIBC_2.2.5
+            |
+            ---cfree@GLIBC_2.2.5
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     0.97%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] soapberry_zip::office::clone_name_fallibly
+            |
+            ---soapberry_zip::office::clone_name_fallibly
+               <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     0.92%  litchi-goal-041  [unknown]                         [k] 0xffffffff8c800ef0
+            |
+            ---0xffffffff8c800ef0
+
+     0.89%  litchi-goal-041  libc.so.6                         [.] _int_free_chunk
+            |
+            ---_int_free_chunk
+
+     0.89%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <alloc::string::String>::try_reserve_exact
+            |
+            ---<alloc::string::String>::try_reserve_exact
+               |          
+                --0.59%--soapberry_zip::office::normalize_str_fallibly
+                          soapberry_zip::office::normalized_member_name
+                          <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+                          zip64_read_probe::indexed_once::<&[u8]>
+                          zip64_read_probe::run_timed
+                          zip64_read_probe::main
+                          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          std::rt::lang_start_internal
+                          main
+                          __libc_start_call_main
+                          __libc_start_main@@GLIBC_2.34
+                          _start
+
+     0.89%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <hashbrown::map::HashMap<alloc::string::String, soapberry_zip::office::EntryId, std::hash::random::RandomState>>::contains_key::<alloc::string::String>
+            |
+            ---<hashbrown::map::HashMap<alloc::string::String, soapberry_zip::office::EntryId, std::hash::random::RandomState>>::contains_key::<alloc::string::String>
+               <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     0.89%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&[u8]>
+            |
+            ---<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&[u8]>
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     0.60%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <soapberry_zip::archive::ZipFileHeaderFixed>::parse
+            |
+            ---<soapberry_zip::archive::ZipFileHeaderFixed>::parse
+               <soapberry_zip::preserve::PreservationIndex<&[u8]>>::new_with_limits_and_policy
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     0.60%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] soapberry_zip::office::collect_order_fallibly::<soapberry_zip::office::EntryId>
+            |
+            ---soapberry_zip::office::collect_order_fallibly::<soapberry_zip::office::EntryId>
+               <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     0.59%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&alloc::string::String>
+            |
+            ---<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&alloc::string::String>
+               <hashbrown::map::HashMap<alloc::string::String, soapberry_zip::office::EntryId, std::hash::random::RandomState>>::contains_key::<alloc::string::String>
+               <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     0.59%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] soapberry_zip::office::normalized_member_name
+            |
+            ---soapberry_zip::office::normalized_member_name
+               <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     0.59%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] __rustc::__rust_alloc
+            |
+            ---__rustc::__rust_alloc
+
+     0.59%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <alloc::raw_vec::RawVecInner>::finish_grow
+            |
+            ---<alloc::raw_vec::RawVecInner>::finish_grow
+               soapberry_zip::office::clone_name_fallibly
+               <soapberry_zip::office::IndexedArchive<&[u8]>>::from_reader
+               zip64_read_probe::indexed_once::<&[u8]>
+               zip64_read_probe::run_timed
+               zip64_read_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     0.30%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] __rustc::__rdl_alloc
+     0.30%  litchi-goal-041  [unknown]                         [k] 0xffffffff8df031d2
+     0.30%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write
+     0.30%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <hashbrown::map::HashMap<alloc::string::String, soapberry_zip::office::EntryId, std::hash::random::RandomState>>::insert
+     0.30%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] core::ptr::drop_glue::<soapberry_zip::preserve::PreservationIndex<zip64_read_probe::CountingReaderAt<&[u8]>>>
+     0.30%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] soapberry_zip::reader_at::validate_read_count
+     0.30%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] soapberry_zip::preserve::validate_local_span::<&[u8]>
+     0.30%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] soapberry_zip::preserve::read_vec::<&[u8]>
+     0.30%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] __rustc::__rust_no_alloc_shim_is_unstable_v2
+     0.30%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] core::ptr::drop_glue::<soapberry_zip::office::IndexedArchive<&[u8]>>
+     0.30%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] soapberry_zip::archive::validate_reader_entry_layout_with_name_policy::<&[u8]>
+     0.07%  litchi-goal-041  litchi-goal-0416-candidate-probe  [.] <soapberry_zip::archive::DataDescriptor>::parse_complete_at::<&[u8]>
+     0.00%  litchi-goal-041  [unknown]                         [k] 0xffffffff8ded5232
+     0.00%  perf-exec        [unknown]                         [k] 0xffffffff8df27534
+     0.00%  perf-exec        [unknown]                         [k] 0xffffffff8cf64a25
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

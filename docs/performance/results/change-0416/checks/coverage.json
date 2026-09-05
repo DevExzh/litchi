@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "tools/validate_crud_coverage_index.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:09:36.953223+00:00",
+  "elapsed_seconds": 0.04310847900342196,
+  "log": "coverage.log",
+  "rustup_toolchain": "1.98.1",
+  "rustflags": null
+}

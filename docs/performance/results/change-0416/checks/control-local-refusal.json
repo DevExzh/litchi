@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "/tmp/litchi-goal-0416-control-probe",
+    "capability",
+    "indexed",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/zip64-local-only-signed.zip"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T04:41:47.815374+00:00",
+  "elapsed_seconds": 0.0007549629954155535,
+  "log": "control-local-refusal.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

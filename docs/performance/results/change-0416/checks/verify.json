@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "docs/performance/results/change-0416/verify.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:23:46.280839+00:00",
+  "elapsed_seconds": 0.3439669309882447,
+  "log": "verify.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

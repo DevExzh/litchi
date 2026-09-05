@@ -1,0 +1,28 @@
+   Compiling sha2 v0.10.9
+   Compiling sha1 v0.10.7
+   Compiling p256 v0.13.2
+   Compiling rsa v0.9.10
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.25s
+     Running unittests src/lib.rs (target/debug/deps/litchi_odf_common-8fda9b521b466b86)
+
+running 3 tests
+test package::edit::tests::raw_preservation_rejects_local_zip64_size_sentinels ... FAILED
+test repair::tests::zip32_repair_refuses_local_zip64_descriptor_framing ... ok
+test core::source_publication::tests::raw_publication_rejects_local_zip64_size_sentinels ... ok
+
+failures:
+
+---- package::edit::tests::raw_preservation_rejects_local_zip64_size_sentinels stdout ----
+
+thread 'package::edit::tests::raw_preservation_rejects_local_zip64_size_sentinels' (1636269) panicked at crates/litchi-odf-common/src/package/edit.rs:629:51:
+called `Result::unwrap()` on an `Err` value: InvalidFormat("XML publication rejected for 'content.xml': malformed XML at byte 0: character data outside the document element")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    package::edit::tests::raw_preservation_rejects_local_zip64_size_sentinels
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 287 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-odf-common --lib`

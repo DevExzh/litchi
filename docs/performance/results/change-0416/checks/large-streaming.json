@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "soapberry-zip",
+    "--test",
+    "streaming_zip64_deflate",
+    "--",
+    "--ignored",
+    "--nocapture"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:08:36.956736+00:00",
+  "elapsed_seconds": 9.419930820004083,
+  "log": "large-streaming.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "rustup",
+    "run",
+    "1.98.1",
+    "rustfmt",
+    "--edition",
+    "2021",
+    "--check",
+    "crates/soapberry-zip/src/archive.rs",
+    "crates/soapberry-zip/src/preserve.rs",
+    "crates/soapberry-zip/tests/python_zip64_compat.rs"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:14:02.386768+00:00",
+  "elapsed_seconds": 0.0557809550082311,
+  "log": "zip-fmt.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

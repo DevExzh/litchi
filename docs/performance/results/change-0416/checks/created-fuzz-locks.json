@@ -1,0 +1,10 @@
+[
+  {
+    "path": "crates/soapberry-zip/fuzz/Cargo.lock",
+    "sha256": "469113ba59e79b9b66c7acb0ad3f6f967319d2ae38d78ff132f7ed145e28779f"
+  },
+  {
+    "path": "crates/litchi-opc/fuzz/Cargo.lock",
+    "sha256": "610043585ccb4a8b2f030fd537055a12eb8a477f8bd9473d7dfcfd4e054ea60e"
+  }
+]

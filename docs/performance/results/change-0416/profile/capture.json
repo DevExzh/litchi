@@ -1,0 +1,305 @@
+{
+  "scope": "separate whole-process diagnostics; no latency or allocation improvement claim",
+  "runs": [
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "stat",
+        "-x,",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/control-stat.csv",
+        "-e",
+        "cycles,instructions,branches,branch-misses,page-faults",
+        "--",
+        "/tmp/litchi-goal-0416-control-probe",
+        "index",
+        "indexed",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/many-small-zip32-signed.zip",
+        "20000",
+        "100"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/control-stat-probe.json",
+      "exit_code": 0,
+      "stderr": "",
+      "started_utc": "2026-09-05T05:22:17.257464+00:00"
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "record",
+        "-F",
+        "199",
+        "--call-graph",
+        "fp",
+        "-o",
+        "/tmp/litchi-goal-0416-control-perf.data",
+        "--",
+        "/tmp/litchi-goal-0416-control-probe",
+        "index",
+        "indexed",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/many-small-zip32-signed.zip",
+        "20000",
+        "100"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/control-profile-probe.json",
+      "exit_code": 0,
+      "stderr": "WARNING: Kernel address maps (/proc/{kallsyms,modules}) are restricted,\ncheck /proc/sys/kernel/kptr_restrict and /proc/sys/kernel/perf_event_paranoid.\n\nSamples in kernel functions may not be resolved if a suitable vmlinux\nfile is not found in the buildid cache or in the vmlinux path.\n\nSamples in kernel modules won't be resolved at all.\n\nIf some relocation was applied (e.g. kexec) symbols may be misresolved\neven with a suitable vmlinux or kallsyms file.\n\nCouldn't record kernel reference relocation symbol\nSymbol resolution may be skewed if relocation was used (e.g. kexec).\nCheck /proc/kallsyms permission or run as root.\n[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.052 MB /tmp/litchi-goal-0416-control-perf.data (337 samples) ]\n",
+      "started_utc": "2026-09-05T05:22:19.000438+00:00"
+    },
+    {
+      "argv": [
+        "perf",
+        "report",
+        "--stdio",
+        "--no-children",
+        "--no-inline",
+        "-i",
+        "/tmp/litchi-goal-0416-control-perf.data"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/control-report.txt",
+      "exit_code": 0,
+      "stderr": "Warning:\nKernel address maps (/proc/{kallsyms,modules}) were restricted.\n\nCheck /proc/sys/kernel/kptr_restrict before running 'perf record'.\n\nAs no suitable kallsyms nor vmlinux was found, kernel samples\ncan't be resolved.\n\nSamples in kernel modules can't be resolved as well.\n\n",
+      "started_utc": "2026-09-05T05:22:20.713976+00:00"
+    },
+    {
+      "argv": [
+        "perf",
+        "script",
+        "--no-inline",
+        "-i",
+        "/tmp/litchi-goal-0416-control-perf.data"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/control-perf-script.txt",
+      "exit_code": 0,
+      "stderr": "",
+      "started_utc": "2026-09-05T05:22:20.731723+00:00"
+    },
+    {
+      "argv": [
+        "flamegraph",
+        "--perfdata",
+        "/tmp/litchi-goal-0416-control-perf.data",
+        "--no-inline",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/control-flamegraph.svg"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/control-flamegraph.log",
+      "exit_code": 0,
+      "stderr": "",
+      "started_utc": "2026-09-05T05:22:20.748549+00:00"
+    },
+    {
+      "argv": [
+        "zstd",
+        "-q",
+        "-f",
+        "/tmp/litchi-goal-0416-control-perf.data",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/control-perf.data.zst"
+      ],
+      "stdout": "None",
+      "exit_code": 0,
+      "stderr": "",
+      "started_utc": "2026-09-05T05:22:20.768006+00:00"
+    },
+    {
+      "argv": [
+        "zstd",
+        "-q",
+        "-f",
+        "--rm",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/control-perf-script.txt"
+      ],
+      "stdout": "None",
+      "exit_code": 0,
+      "stderr": "",
+      "started_utc": "2026-09-05T05:22:20.769452+00:00"
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "heaptrack",
+        "-o",
+        "/tmp/litchi-goal-0416-control-heaptrack",
+        "/tmp/litchi-goal-0416-control-probe",
+        "index",
+        "indexed",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/many-small-zip32-signed.zip",
+        "100",
+        "10"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/control-heap-probe.log",
+      "exit_code": 0,
+      "stderr": "NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent \nunintended network delays during recording\nIf you really want to use DEBUGINFOD, export HEAPTRACK_ENABLE_DEBUGINFOD=1\nheaptrack stats:\n\tallocations:          \t143646\n\tleaked allocations:   \t1\n\ttemporary allocations:\t28166\n",
+      "started_utc": "2026-09-05T05:22:20.771340+00:00"
+    },
+    {
+      "argv": [
+        "heaptrack_print",
+        "/tmp/litchi-goal-0416-control-heaptrack.zst"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/control-heap-summary.txt",
+      "exit_code": 0,
+      "stderr": "",
+      "started_utc": "2026-09-05T05:22:20.928014+00:00"
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "stat",
+        "-x,",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/candidate-stat.csv",
+        "-e",
+        "cycles,instructions,branches,branch-misses,page-faults",
+        "--",
+        "/tmp/litchi-goal-0416-candidate-probe",
+        "index",
+        "indexed",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/many-small-zip32-signed.zip",
+        "20000",
+        "100"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/candidate-stat-probe.json",
+      "exit_code": 0,
+      "stderr": "",
+      "started_utc": "2026-09-05T05:22:20.964388+00:00"
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "record",
+        "-F",
+        "199",
+        "--call-graph",
+        "fp",
+        "-o",
+        "/tmp/litchi-goal-0416-candidate-perf.data",
+        "--",
+        "/tmp/litchi-goal-0416-candidate-probe",
+        "index",
+        "indexed",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/many-small-zip32-signed.zip",
+        "20000",
+        "100"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/candidate-profile-probe.json",
+      "exit_code": 0,
+      "stderr": "WARNING: Kernel address maps (/proc/{kallsyms,modules}) are restricted,\ncheck /proc/sys/kernel/kptr_restrict and /proc/sys/kernel/perf_event_paranoid.\n\nSamples in kernel functions may not be resolved if a suitable vmlinux\nfile is not found in the buildid cache or in the vmlinux path.\n\nSamples in kernel modules won't be resolved at all.\n\nIf some relocation was applied (e.g. kexec) symbols may be misresolved\neven with a suitable vmlinux or kallsyms file.\n\nCouldn't record kernel reference relocation symbol\nSymbol resolution may be skewed if relocation was used (e.g. kexec).\nCheck /proc/kallsyms permission or run as root.\n[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.053 MB /tmp/litchi-goal-0416-candidate-perf.data (339 samples) ]\n",
+      "started_utc": "2026-09-05T05:22:22.650544+00:00"
+    },
+    {
+      "argv": [
+        "perf",
+        "report",
+        "--stdio",
+        "--no-children",
+        "--no-inline",
+        "-i",
+        "/tmp/litchi-goal-0416-candidate-perf.data"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/candidate-report.txt",
+      "exit_code": 0,
+      "stderr": "Warning:\nKernel address maps (/proc/{kallsyms,modules}) were restricted.\n\nCheck /proc/sys/kernel/kptr_restrict before running 'perf record'.\n\nAs no suitable kallsyms nor vmlinux was found, kernel samples\ncan't be resolved.\n\nSamples in kernel modules can't be resolved as well.\n\n",
+      "started_utc": "2026-09-05T05:22:24.369628+00:00"
+    },
+    {
+      "argv": [
+        "perf",
+        "script",
+        "--no-inline",
+        "-i",
+        "/tmp/litchi-goal-0416-candidate-perf.data"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/candidate-perf-script.txt",
+      "exit_code": 0,
+      "stderr": "",
+      "started_utc": "2026-09-05T05:22:24.387179+00:00"
+    },
+    {
+      "argv": [
+        "flamegraph",
+        "--perfdata",
+        "/tmp/litchi-goal-0416-candidate-perf.data",
+        "--no-inline",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/candidate-flamegraph.svg"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/candidate-flamegraph.log",
+      "exit_code": 0,
+      "stderr": "",
+      "started_utc": "2026-09-05T05:22:24.406076+00:00"
+    },
+    {
+      "argv": [
+        "zstd",
+        "-q",
+        "-f",
+        "/tmp/litchi-goal-0416-candidate-perf.data",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/candidate-perf.data.zst"
+      ],
+      "stdout": "None",
+      "exit_code": 0,
+      "stderr": "",
+      "started_utc": "2026-09-05T05:22:24.426903+00:00"
+    },
+    {
+      "argv": [
+        "zstd",
+        "-q",
+        "-f",
+        "--rm",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/candidate-perf-script.txt"
+      ],
+      "stdout": "None",
+      "exit_code": 0,
+      "stderr": "",
+      "started_utc": "2026-09-05T05:22:24.428208+00:00"
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "heaptrack",
+        "-o",
+        "/tmp/litchi-goal-0416-candidate-heaptrack",
+        "/tmp/litchi-goal-0416-candidate-probe",
+        "index",
+        "indexed",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/many-small-zip32-signed.zip",
+        "100",
+        "10"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/candidate-heap-probe.log",
+      "exit_code": 0,
+      "stderr": "NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent \nunintended network delays during recording\nIf you really want to use DEBUGINFOD, export HEAPTRACK_ENABLE_DEBUGINFOD=1\nheaptrack stats:\n\tallocations:          \t143646\n\tleaked allocations:   \t1\n\ttemporary allocations:\t28166\n",
+      "started_utc": "2026-09-05T05:22:24.429723+00:00"
+    },
+    {
+      "argv": [
+        "heaptrack_print",
+        "/tmp/litchi-goal-0416-candidate-heaptrack.zst"
+      ],
+      "stdout": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/profile/candidate-heap-summary.txt",
+      "exit_code": 0,
+      "stderr": "",
+      "started_utc": "2026-09-05T05:22:24.586912+00:00"
+    }
+  ]
+}

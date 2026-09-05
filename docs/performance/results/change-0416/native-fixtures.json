@@ -1,0 +1,20 @@
+{
+  "scope": "Existing tracked LibreOffice resave artifacts; archive guard only; no new native-application run",
+  "files": [
+    {
+      "path": "test-data/office-interop/libreoffice-resaved/document-properties-litchi.docx",
+      "bytes": 6825,
+      "sha256": "0c10b6489e3b5c02d0470f213611e32fbaa0143746d69d0333bdca821d2c5e47"
+    },
+    {
+      "path": "test-data/office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx",
+      "bytes": 7311,
+      "sha256": "ade103f651e3f7cac423cd6b01d4d5a004d03470667723234105ba39672bc74d"
+    },
+    {
+      "path": "test-data/office-interop/libreoffice-resaved/shapes-litchi.pptx",
+      "bytes": 53239,
+      "sha256": "fcc8acffad88f5091316f67403c099a4c9eaa372e17927edfee29c35fb132034"
+    }
+  ]
+}

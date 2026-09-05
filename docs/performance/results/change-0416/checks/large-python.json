@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "python3",
+    "docs/performance/results/change-0415/interop.py",
+    "generate",
+    "/tmp/litchi-goal-0416-large.zip"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:08:18.544239+00:00",
+  "elapsed_seconds": 16.264072797988774,
+  "log": "large-python.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "test",
+    "--locked",
+    "-p",
+    "litchi-opc",
+    "--test",
+    "external_zip64_source",
+    "--",
+    "--ignored",
+    "--nocapture"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:08:34.826825+00:00",
+  "elapsed_seconds": 2.1116526239784434,
+  "log": "large-opc.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

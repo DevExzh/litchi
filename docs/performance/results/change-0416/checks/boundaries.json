@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "tools/check_crate_boundaries.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 1,
+  "started_utc": "2026-09-05T05:08:46.395240+00:00",
+  "elapsed_seconds": 0.1390461669943761,
+  "log": "boundaries.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

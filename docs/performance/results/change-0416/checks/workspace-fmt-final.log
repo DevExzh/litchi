@@ -1,0 +1,29 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/tests/glossary_authoring.rs:1:
+[32m+use litchi_docx::Package;
+[m use litchi_docx::glossary::{
+     self, Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Name, Props, raw,
+ };
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/tests/glossary_authoring.rs:4:
+[31m-use litchi_docx::Package;
+[m use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+ use litchi_opc::{PackURI, part::BlobPart};
+ 
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/tests/glossary_authoring.rs:240:
+         );
+     }
+ 
+[31m-    assert!(
+[m[31m-        package
+[m[31m-            .edit_opc(glossary::remove)
+[m[31m-            .unwrap()
+[m[31m-    );
+[m[31m-    assert!(
+[m[31m-        !package
+[m[31m-            .edit_opc(glossary::remove)
+[m[31m-            .unwrap()
+[m[31m-    );
+[m[32m+    assert!(package.edit_opc(glossary::remove).unwrap());
+[m[32m+    assert!(!package.edit_opc(glossary::remove).unwrap());
+[m }
+ 
+ #[test]

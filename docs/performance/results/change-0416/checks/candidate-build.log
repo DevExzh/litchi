@@ -1,0 +1,3 @@
+   Compiling soapberry-zip v0.0.1 (/tmp/litchi-goal-0416-candidate/crates/soapberry-zip)
+   Compiling zip64-stream-probe v0.0.0 (/tmp/litchi-goal-0416-probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.68s

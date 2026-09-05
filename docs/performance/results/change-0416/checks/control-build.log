@@ -1,0 +1,31 @@
+   Compiling crossbeam-utils v0.8.22
+   Compiling crossbeam-epoch v0.9.20
+   Compiling crossbeam-deque v0.8.7
+   Compiling rayon-core v1.13.0
+   Compiling crc32fast v1.5.1
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling zlib-rs v0.6.7
+   Compiling cfg-if v1.0.4
+   Compiling either v1.18.0
+   Compiling serde_json v1.0.151
+   Compiling memchr v2.8.3
+   Compiling rayon v1.12.0
+   Compiling itoa v1.0.18
+   Compiling flate2 v1.1.10
+   Compiling soapberry-zip v0.0.1 (/tmp/litchi-goal-0416-control/crates/soapberry-zip)
+   Compiling zip64-stream-probe v0.0.0 (/tmp/litchi-goal-0416-probe)
+warning: field `is_directory` is never read
+  --> /home/zhuhe/code/litchi/docs/performance/results/change-0416/probe.rs:47:5
+   |
+41 | struct OracleMember {
+   |        ------------ field in this struct
+...
+47 |     is_directory: bool,
+   |     ^^^^^^^^^^^^
+   |
+   = note: `OracleMember` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `zip64-stream-probe` (bin "zip64-read-probe") generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 4.75s

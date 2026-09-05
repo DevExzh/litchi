@@ -1,0 +1,51 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.47
+   Compiling typenum v1.20.1
+   Compiling serde_core v1.0.229
+   Compiling libc v0.2.189
+   Compiling autocfg v1.5.1
+   Compiling rand_core v0.10.1
+   Compiling getrandom v0.4.3
+   Compiling num-traits v0.2.19
+   Compiling syn v3.0.5
+   Compiling hybrid-array v0.4.14
+   Compiling zmij v1.0.23
+   Compiling cpufeatures v0.3.1
+   Compiling memchr v2.8.3
+   Compiling serde v1.0.229
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling const-oid v0.10.2
+   Compiling serde_json v1.0.151
+   Compiling thiserror v2.0.20
+   Compiling rustix v1.1.4
+   Compiling zerocopy v0.8.56
+   Compiling rustversion v1.0.23
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling digest v0.11.3
+   Compiling quick-xml v0.41.0
+   Compiling chacha20 v0.10.2
+   Compiling syn v2.0.119
+   Compiling iana-time-zone v0.1.65
+   Compiling once_cell v1.21.4
+   Compiling bitflags v2.13.1
+   Compiling linux-raw-sys v0.12.1
+   Compiling itoa v1.0.18
+   Compiling chrono v0.4.45
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling base64 v0.22.1
+   Compiling fastrand v2.5.0
+   Compiling fast-float2 v0.2.4
+   Compiling smallvec v1.16.0
+   Compiling debug_unsafe v0.1.4
+   Compiling atoi_simd v0.18.1
+   Compiling tempfile v3.27.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-opc-fuzz v0.0.0 (/home/zhuhe/code/litchi/crates/litchi-opc/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 26.93s

@@ -1,0 +1,35 @@
+{
+  "borrowed_store_crc_scan": false,
+  "elapsed_ns": 115620,
+  "input_bytes": 31766,
+  "input_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/many-small-zip32-signed.zip",
+  "latency_samples_include_reader_at_instrumentation": false,
+  "mode": "indexed",
+  "observation": {
+    "borrowed_crc_scan_bytes": 0,
+    "borrowed_none": 0,
+    "borrowed_some": 0,
+    "compressed_bytes": 1024,
+    "crc32_xor": 0,
+    "digest": 3381050066121387718,
+    "entries": 256,
+    "name_bytes": 3584,
+    "uncompressed_bytes": 1024
+  },
+  "operation": "reader-at-count",
+  "oracle": {
+    "central_entry_count": 256,
+    "compressed_bytes": 1024,
+    "crc32_xor": 0,
+    "file_count": 256,
+    "name_bytes": 3584,
+    "uncompressed_bytes": 1024
+  },
+  "payload_decompression": false,
+  "reader_at": {
+    "bytes": 76890,
+    "calls": 1030
+  },
+  "schema_version": 1,
+  "tool": "litchi-goal-0416-zip-strict-probe"
+}
