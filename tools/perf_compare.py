@@ -77,6 +77,12 @@ _METADATA_FIELD_NAMES = frozenset(
 _ALLOCATOR_INSTRUMENTATION = "system_allocator_operation_scoped"
 _ALLOCATOR_BINARY = "litchi-perf-baseline-alloc"
 _ALLOCATOR_SCOPE = "operation_global_system_allocator"
+_ALLOCATOR_COUNTER_REVISION_V2 = "post_update_peak_v2"
+_ALLOCATOR_COUNTER_REVISION_V3 = "serialized_region_peak_v3"
+_ALLOCATOR_COUNTER_REVISIONS = frozenset(
+    {_ALLOCATOR_COUNTER_REVISION_V2, _ALLOCATOR_COUNTER_REVISION_V3}
+)
+_ALLOCATOR_REGION_VECTOR_FIELD = "region_peak_live_bytes"
 _ALLOCATOR_EVIDENCE_SCOPE_FILESYSTEM = "filesystem"
 _ALLOCATOR_EVIDENCE_SCOPE_OPERATION = "operation"
 _ALLOCATOR_EVIDENCE_SCOPES = frozenset(
@@ -93,6 +99,10 @@ _ALLOCATOR_VECTOR_FIELDS = (
     "live_bytes_after",
     "peak_live_bytes_before",
     "peak_live_bytes_after",
+)
+_ALLOCATOR_VECTOR_FIELDS_V3 = (
+    *_ALLOCATOR_VECTOR_FIELDS,
+    _ALLOCATOR_REGION_VECTOR_FIELD,
 )
 _FILESYSTEM_CASE_PREFIXES = (
     "opc_file_",
@@ -148,6 +158,44 @@ def _require_object(value: Any, location: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ComparisonInputError(f"{location} must be an object")
     return value
+
+
+def _allocator_counter_revision(
+    tool: dict[str, Any], location: str
+) -> str | None:
+    """Validate and return the allocator counter generation in a tool identity.
+
+    The marker is deliberately part of the complete tool identity.  A missing
+    marker is the historical allocator schema; v2 is retained for corrected
+    high-water reports, and v3 additionally serializes the region-local peak
+    vector.  Normal reports may only omit the allocator marker.
+    """
+
+    instrumentation = tool.get("instrumentation")
+    marker_present = "allocator_counter_revision" in tool
+    revision = tool.get("allocator_counter_revision")
+    if marker_present and (
+        not isinstance(revision, str) or revision not in _ALLOCATOR_COUNTER_REVISIONS
+    ):
+        raise ComparisonInputError(
+            f"{location}.allocator_counter_revision must be omitted or one of "
+            f"{sorted(_ALLOCATOR_COUNTER_REVISIONS)}"
+        )
+    if instrumentation == "none":
+        if revision is not None:
+            raise ComparisonInputError(
+                f"{location}.allocator_counter_revision is forbidden for normal "
+                "instrumentation"
+            )
+        return None
+    if instrumentation == _ALLOCATOR_INSTRUMENTATION:
+        return revision
+    if revision is not None:
+        raise ComparisonInputError(
+            f"{location}.allocator_counter_revision requires allocator "
+            f"instrumentation {_ALLOCATOR_INSTRUMENTATION!r}"
+        )
+    return None
 
 
 def _validate_binary_identity(
@@ -376,6 +424,7 @@ def validate_policy(raw: Any) -> dict[str, Any]:
             raise ComparisonInputError(
                 f"policy.tool_identity.{field} must be a non-empty string"
             )
+    _allocator_counter_revision(tool, "policy.tool_identity")
     allocator_evidence_scope = policy.get("allocator_evidence_scope")
     if "allocator_evidence_scope" in policy and (
         tool["instrumentation"] != _ALLOCATOR_INSTRUMENTATION
@@ -1758,6 +1807,7 @@ def _validate_report_identity(
             raise ComparisonInputError(
                 f"{label}.tool does not match the policy tool identity"
             )
+        _allocator_counter_revision(report["tool"], f"{label}.tool")
         if policy.get("require_binary_identity", False) or "binary_identity" in report:
             _validate_binary_identity(
                 report.get("binary_identity"),
@@ -2010,7 +2060,13 @@ _ALLOCATION_VECTOR_KEYS = (
     "peak_live_bytes_before",
     "peak_live_bytes_after",
 )
+_ALLOCATION_VECTOR_KEYS_V3 = (*_ALLOCATION_VECTOR_KEYS, _ALLOCATOR_REGION_VECTOR_FIELD)
 _ALLOCATION_METRICS_KEYS = {"status", "scope", *_ALLOCATION_VECTOR_KEYS}
+_ALLOCATION_METRICS_KEYS_V3 = {
+    "status",
+    "scope",
+    *_ALLOCATION_VECTOR_KEYS_V3,
+}
 _OPC_ZIP_VECTOR_KEYS = (
     "compressed_deflate_payload_bytes_read",
     "stored_payload_bytes_read",
@@ -2276,6 +2332,87 @@ def _validate_status_group(
     return status
 
 
+def _allocation_vector_fields_for_tool(
+    tool_identity: dict[str, Any] | None,
+    allocation: dict[str, Any],
+    path: str,
+) -> tuple[str, ...]:
+    """Select the allocator envelope generation for one operation report.
+
+    Direct historical callers of `_validate_operation_metrics` do not carry a
+    top-level tool object, so they retain the historical field set.  The
+    report comparison path passes the tool identity and admits the additive
+    region vector only for the v3 generation.
+    """
+
+    actual = set(allocation)
+    has_region = _ALLOCATOR_REGION_VECTOR_FIELD in actual
+    if tool_identity is None:
+        return _ALLOCATION_VECTOR_KEYS
+
+    revision = _allocator_counter_revision(tool_identity, f"{path}.tool")
+    instrumentation = tool_identity.get("instrumentation")
+    if instrumentation == _ALLOCATOR_INSTRUMENTATION:
+        return (
+            _ALLOCATION_VECTOR_KEYS_V3
+            if revision == _ALLOCATOR_COUNTER_REVISION_V3
+            else _ALLOCATION_VECTOR_KEYS
+        )
+    if instrumentation == "none" and has_region:
+        # The normal binary may serialize the additive vector as explicitly
+        # unavailable, but it must never publish measured region evidence.
+        if allocation.get("status") != "unavailable":
+            raise ComparisonInputError(
+                f"{path}.{_ALLOCATOR_REGION_VECTOR_FIELD} is only allowed as "
+                "unavailable evidence for normal instrumentation"
+            )
+        return _ALLOCATION_VECTOR_KEYS_V3
+    return _ALLOCATION_VECTOR_KEYS
+
+
+def _validate_region_peak_invariant(
+    allocation: dict[str, Any], path: str
+) -> None:
+    """Check the serialized region peak against the absolute live snapshots."""
+
+    region = allocation[_ALLOCATOR_REGION_VECTOR_FIELD]["values"]
+    live_before = allocation["live_bytes_before"]["values"]
+    live_after = allocation["live_bytes_after"]["values"]
+    peak_after = allocation["peak_live_bytes_after"]["values"]
+    for index, (region_value, before, after, peak) in enumerate(
+        zip(region, live_before, live_after, peak_after)
+    ):
+        if region_value < before or region_value < after:
+            raise ComparisonInputError(
+                f"{path}.{_ALLOCATOR_REGION_VECTOR_FIELD}.values[{index}] "
+                "must be at least live_bytes_before and live_bytes_after"
+            )
+        if region_value > peak:
+            raise ComparisonInputError(
+                f"{path}.{_ALLOCATOR_REGION_VECTOR_FIELD}.values[{index}] "
+                "must not exceed peak_live_bytes_after"
+            )
+
+
+def _validate_region_peak_raw_invariant(
+    values: dict[str, int], path: str
+) -> None:
+    region = values[_ALLOCATOR_REGION_VECTOR_FIELD]
+    before = values["live_bytes_before"]
+    after = values["live_bytes_after"]
+    peak = values["peak_live_bytes_after"]
+    if region < before or region < after:
+        raise ComparisonInputError(
+            f"{path}.{_ALLOCATOR_REGION_VECTOR_FIELD} must be at least "
+            "live_bytes_before and live_bytes_after"
+        )
+    if region > peak:
+        raise ComparisonInputError(
+            f"{path}.{_ALLOCATOR_REGION_VECTOR_FIELD} must not exceed "
+            "peak_live_bytes_after"
+        )
+
+
 def _validate_phase_set(value: Any, path: str, status: str, sample_count: int) -> None:
     obj = _require_exact_keys(value, path, _CFB_PHASE_SET_KEYS)
     for key in sorted(_CFB_PHASE_SET_KEYS):
@@ -2295,6 +2432,7 @@ def _validate_operation_metrics(
     report_schema: int,
     *,
     elapsed_sample_order: Any = _METRIC_SAMPLE_ORDER_MISSING,
+    tool_identity: dict[str, Any] | None = None,
 ) -> None:
     """Validate the exact operation-metrics envelope for report schema 1."""
     # `_validate_report_identity` rejects future report schemas before this
@@ -2652,8 +2790,15 @@ def _validate_operation_metrics(
         )
     allocation = obj.get("allocation")
     if allocation is not None:
+        allocation_path = f"{path}.allocation"
+        allocation = _require_object(allocation, allocation_path)
+        allocation_vector_fields = _allocation_vector_fields_for_tool(
+            tool_identity, allocation, allocation_path
+        )
         allocation = _require_exact_keys(
-            allocation, f"{path}.allocation", _ALLOCATION_METRICS_KEYS
+            allocation,
+            allocation_path,
+            {"status", "scope", *allocation_vector_fields},
         )
         allocation_status = _validate_metric_status(
             allocation["status"], f"{path}.allocation.status"
@@ -2662,7 +2807,7 @@ def _validate_operation_metrics(
             raise ComparisonInputError(
                 f"{path}.allocation.scope must be 'operation_global_system_allocator'"
             )
-        for key in _ALLOCATION_VECTOR_KEYS:
+        for key in allocation_vector_fields:
             vector_status = _validate_metric_vector(
                 allocation[key], f"{path}.allocation.{key}", sample_count
             )
@@ -2671,6 +2816,11 @@ def _validate_operation_metrics(
                     f"{path}.allocation.status does not match "
                     f"{path}.allocation.{key}.status"
                 )
+        if (
+            _ALLOCATOR_REGION_VECTOR_FIELD in allocation_vector_fields
+            and allocation_status == "measured"
+        ):
+            _validate_region_peak_invariant(allocation, allocation_path)
     if "opc_zip" in obj:
         opc_zip = _require_exact_keys(
             obj["opc_zip"], f"{path}.opc_zip", _OPC_ZIP_METRICS_KEYS
@@ -2740,7 +2890,11 @@ def _unwrap_metric_vector(value: Any, path: str) -> Any:
     if not isinstance(value, dict):
         return _METRIC_VECTOR_MISSING
     keys = set(value)
-    if keys == _ALLOCATION_METRICS_KEYS or keys == _OPC_ZIP_METRICS_KEYS:
+    if (
+        keys == _ALLOCATION_METRICS_KEYS
+        or keys == _ALLOCATION_METRICS_KEYS_V3
+        or keys == _OPC_ZIP_METRICS_KEYS
+    ):
         return _METRIC_VECTOR_MISSING
     has_values_or_scope = bool(keys & {"values", "scope"})
     if not has_values_or_scope:
@@ -2874,6 +3028,8 @@ def _collect_metrics(
     result: dict[str, Any],
     policy: dict[str, Any],
     report_schema: int = SUPPORTED_REPORT_SCHEMA,
+    *,
+    tool_identity: dict[str, Any] | None = None,
 ) -> tuple[
     dict[str, tuple[str, float, float, str]],
     dict[str, tuple[str, str]],
@@ -2897,6 +3053,7 @@ def _collect_metrics(
                 elapsed_sample_order=elapsed.get(
                     "sample_order", _METRIC_SAMPLE_ORDER_MISSING
                 ),
+                tool_identity=tool_identity,
             )
             _validate_operation_metric_case_binding(value, root, result.get("case"))
         _walk_metrics(
@@ -2929,6 +3086,8 @@ def _validate_allocator_operation_envelope(
     result: dict[str, Any],
     location: str,
     minimum_samples: int,
+    *,
+    allocator_counter_revision: str | None = None,
 ) -> tuple[str, dict[str, Any], dict[str, Any], list[int]]:
     case = result.get("case")
     if not isinstance(case, str) or not case:
@@ -2961,7 +3120,12 @@ def _validate_allocator_operation_envelope(
     allocation = _require_object(
         operation_metrics.get("allocation"), f"{location}.operation_metrics.allocation"
     )
-    expected_keys = {"status", "scope", *_ALLOCATOR_VECTOR_FIELDS}
+    allocator_vector_fields = (
+        _ALLOCATOR_VECTOR_FIELDS_V3
+        if allocator_counter_revision == _ALLOCATOR_COUNTER_REVISION_V3
+        else _ALLOCATOR_VECTOR_FIELDS
+    )
+    expected_keys = {"status", "scope", *allocator_vector_fields}
     if set(allocation) != expected_keys:
         raise ComparisonInputError(
             f"{location}.operation_metrics.allocation has an invalid schema"
@@ -2976,7 +3140,7 @@ def _validate_allocator_operation_envelope(
             f"'{_ALLOCATOR_SCOPE}'"
         )
     vector_lengths: set[int] = set()
-    for field in _ALLOCATOR_VECTOR_FIELDS:
+    for field in allocator_vector_fields:
         vector = _require_object(
             allocation.get(field), f"{location}.operation_metrics.allocation.{field}"
         )
@@ -3009,6 +3173,10 @@ def _validate_allocator_operation_envelope(
         raise ComparisonInputError(
             f"{location}.operation_metrics.allocation vectors have mismatched cardinality"
         )
+    if allocator_counter_revision == _ALLOCATOR_COUNTER_REVISION_V3:
+        _validate_region_peak_invariant(
+            allocation, f"{location}.operation_metrics.allocation"
+        )
     sample_indices = operation_metrics.get("sample_indices")
     if (
         not isinstance(sample_indices, list)
@@ -3031,6 +3199,8 @@ def _validate_allocator_evidence(
     location: str,
     minimum_samples: int,
     raw_samples: dict[tuple[str, str, int], dict[str, int]],
+    *,
+    allocator_counter_revision: str | None = None,
 ) -> None:
     case = result.get("case")
     if not isinstance(case, str) or not case.startswith(_FILESYSTEM_CASE_PREFIXES):
@@ -3038,7 +3208,15 @@ def _validate_allocator_evidence(
             f"{location}.case must select a filesystem allocator case"
         )
     _, _, allocation, sample_indices = _validate_allocator_operation_envelope(
-        result, location, minimum_samples
+        result,
+        location,
+        minimum_samples,
+        allocator_counter_revision=allocator_counter_revision,
+    )
+    allocator_vector_fields = (
+        _ALLOCATOR_VECTOR_FIELDS_V3
+        if allocator_counter_revision == _ALLOCATOR_COUNTER_REVISION_V3
+        else _ALLOCATOR_VECTOR_FIELDS
     )
     cache_state = result.get("cache_state")
     if not isinstance(cache_state, str) or not cache_state:
@@ -3052,7 +3230,7 @@ def _validate_allocator_evidence(
                 f"{location}.filesystem_evidence has no raw allocator sample "
                 f"for sample_index {sample_index}"
             )
-        for field in _ALLOCATOR_VECTOR_FIELDS:
+        for field in allocator_vector_fields:
             expected = allocation[field]["values"][position]
             observed = raw[field]
             if observed != expected:
@@ -3064,7 +3242,11 @@ def _validate_allocator_evidence(
 
 
 def _validate_allocator_operation_evidence(
-    result: dict[str, Any], location: str, minimum_samples: int
+    result: dict[str, Any],
+    location: str,
+    minimum_samples: int,
+    *,
+    allocator_counter_revision: str | None = None,
 ) -> None:
     """Validate allocator vectors captured by one in-process operation.
 
@@ -3085,7 +3267,10 @@ def _validate_allocator_operation_evidence(
             f"{location}.cache_state is forbidden for operation allocator evidence"
         )
     _, _, _, sample_indices = _validate_allocator_operation_envelope(
-        result, location, minimum_samples
+        result,
+        location,
+        minimum_samples,
+        allocator_counter_revision=allocator_counter_revision,
     )
     elapsed = _require_object(result.get("elapsed_ns"), f"{location}.elapsed_ns")
     elapsed_sample_order = elapsed.get("sample_order")
@@ -3107,17 +3292,29 @@ def _validate_allocator_operation_report(
     results = report.get("results")
     if not isinstance(results, list):
         raise ComparisonInputError(f"{label}.results must be a list")
+    allocator_counter_revision = _allocator_counter_revision(
+        _require_object(report.get("tool"), f"{label}.tool"), f"{label}.tool"
+    )
     for index, raw_result in enumerate(results):
         _validate_allocator_operation_evidence(
             _require_object(raw_result, f"{label}.results[{index}]"),
             f"{label}.results[{index}]",
             policy["minimum_samples"],
+            allocator_counter_revision=allocator_counter_revision,
         )
 
 
 def _validate_allocator_filesystem_evidence(
     report: dict[str, Any], policy: dict[str, Any], label: str
 ) -> dict[tuple[str, str, int], dict[str, int]]:
+    allocator_counter_revision = _allocator_counter_revision(
+        _require_object(report.get("tool"), f"{label}.tool"), f"{label}.tool"
+    )
+    allocator_vector_fields = (
+        _ALLOCATOR_VECTOR_FIELDS_V3
+        if allocator_counter_revision == _ALLOCATOR_COUNTER_REVISION_V3
+        else _ALLOCATOR_VECTOR_FIELDS
+    )
     evidence = report.get("filesystem_evidence")
     if not isinstance(evidence, list) or not evidence:
         raise ComparisonInputError(
@@ -3272,7 +3469,7 @@ def _validate_allocator_filesystem_evidence(
                     f"{label}.filesystem_evidence[{index}].samples[{sample_index}] "
                     "allocation status/scope must be measured/system allocator"
                 )
-            expected_allocation_keys = {"status", "scope", *_ALLOCATOR_VECTOR_FIELDS}
+            expected_allocation_keys = {"status", "scope", *allocator_vector_fields}
             if set(allocation) != expected_allocation_keys:
                 raise ComparisonInputError(
                     f"{label}.filesystem_evidence[{index}].samples[{sample_index}] "
@@ -3280,7 +3477,7 @@ def _validate_allocator_filesystem_evidence(
                     "numeric allocator field"
                 )
             raw_values: dict[str, int] = {}
-            for field in _ALLOCATOR_VECTOR_FIELDS:
+            for field in allocator_vector_fields:
                 value = allocation[field]
                 if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                     raise ComparisonInputError(
@@ -3288,6 +3485,12 @@ def _validate_allocator_filesystem_evidence(
                         f"allocation_metrics.{field} must be a non-negative integer"
                     )
                 raw_values[field] = value
+            if allocator_counter_revision == _ALLOCATOR_COUNTER_REVISION_V3:
+                _validate_region_peak_raw_invariant(
+                    raw_values,
+                    f"{label}.filesystem_evidence[{index}].samples[{sample_index}]"
+                    ".allocation_metrics",
+                )
             if require_child_process_ids:
                 child_process_id = sample.get("child_process_id")
                 if (
@@ -3579,6 +3782,9 @@ def compare_reports(
     operation_allocator_mode = (
         allocator_evidence_scope == _ALLOCATOR_EVIDENCE_SCOPE_OPERATION
     )
+    allocator_counter_revision = _allocator_counter_revision(
+        baseline["tool"], "baseline.tool"
+    )
     baseline_raw_samples: dict[tuple[str, str, int], dict[str, int]] = {}
     current_raw_samples: dict[tuple[str, str, int], dict[str, int]] = {}
     if filesystem_allocator_mode:
@@ -3651,19 +3857,23 @@ def compare_reports(
                 f"baseline.{case}[{cache_state}]",
                 minimum_samples,
                 baseline_raw_samples,
+                allocator_counter_revision=allocator_counter_revision,
             )
             _validate_allocator_evidence(
                 after_result,
                 f"current.{case}[{cache_state}]",
                 minimum_samples,
                 current_raw_samples,
+                allocator_counter_revision=allocator_counter_revision,
             )
         before_latency = _latencies(before_result, f"baseline.{case}", minimum_samples)
         after_latency = _latencies(after_result, f"current.{case}", minimum_samples)
         before_selected, before_vector_metadata = _collect_metrics(
-            before_result, policy
+            before_result, policy, tool_identity=baseline["tool"]
         )
-        after_selected, after_vector_metadata = _collect_metrics(after_result, policy)
+        after_selected, after_vector_metadata = _collect_metrics(
+            after_result, policy, tool_identity=current["tool"]
+        )
         before_latency_claim = _latency_claim(before_result)
         after_latency_claim = _latency_claim(after_result)
         before_source_scope = _source_counter_scope(

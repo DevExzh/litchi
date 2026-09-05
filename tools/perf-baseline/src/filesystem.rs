@@ -6869,12 +6869,17 @@ mod tests {
             live_bytes_after: Some(100),
             peak_live_bytes_before: Some(128),
             peak_live_bytes_after: Some(128),
+            region_peak_live_bytes: Some(128),
         };
         let value = serde_json::to_value(child(Some(sample))).unwrap();
         assert_eq!(value["allocation_metrics"]["status"], "measured");
         assert_eq!(
             value["allocation_metrics"]["live_bytes_before"],
             serde_json::Value::from(100_u64)
+        );
+        assert_eq!(
+            value["allocation_metrics"]["region_peak_live_bytes"],
+            serde_json::Value::from(128_u64)
         );
         let absent = serde_json::to_value(child(None)).unwrap();
         assert!(absent.get("allocation_metrics").is_none());

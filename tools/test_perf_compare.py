@@ -549,15 +549,23 @@ ALLOCATOR_VECTOR_FIELDS = (
     "peak_live_bytes_before",
     "peak_live_bytes_after",
 )
+ALLOCATOR_COUNTER_REVISION_V2 = "post_update_peak_v2"
+ALLOCATOR_COUNTER_REVISION_V3 = "serialized_region_peak_v3"
+ALLOCATOR_REGION_VECTOR_FIELD = "region_peak_live_bytes"
+ALLOCATOR_VECTOR_FIELDS_V3 = (*ALLOCATOR_VECTOR_FIELDS, ALLOCATOR_REGION_VECTOR_FIELD)
 
 
-def allocator_policy_fixture():
+def allocator_policy_fixture(counter_revision=None):
     comparison_policy = policy()
     comparison_policy["tool_identity"] = {
         **copy.deepcopy(TOOL),
         "binary": "litchi-perf-baseline-alloc",
         "instrumentation": "system_allocator_operation_scoped",
     }
+    if counter_revision is not None:
+        comparison_policy["tool_identity"][
+            "allocator_counter_revision"
+        ] = counter_revision
     comparison_policy["expected_build_identity"] = {
         "allocator": "CountingSystemAllocator(std::alloc::System)"
     }
@@ -593,13 +601,20 @@ def allocator_policy_fixture():
     return comparison_policy
 
 
-def allocator_operation_metrics(value=100, sample_count=5):
+def allocator_operation_metrics(
+    value=100, sample_count=5, *, counter_revision=None
+):
     operation_metrics = operation_metrics_report_fields()
     allocation = {
         "status": "measured",
         "scope": "operation_global_system_allocator",
     }
-    for field in ALLOCATOR_VECTOR_FIELDS:
+    vector_fields = (
+        ALLOCATOR_VECTOR_FIELDS_V3
+        if counter_revision == ALLOCATOR_COUNTER_REVISION_V3
+        else ALLOCATOR_VECTOR_FIELDS
+    )
+    for field in vector_fields:
         allocation[field] = {
             "values": [value] * sample_count,
             "status": "measured",
@@ -609,18 +624,25 @@ def allocator_operation_metrics(value=100, sample_count=5):
     return operation_metrics
 
 
-def allocator_raw_metrics(value=100):
+def allocator_raw_metrics(value=100, *, counter_revision=None):
+    vector_fields = (
+        ALLOCATOR_VECTOR_FIELDS_V3
+        if counter_revision == ALLOCATOR_COUNTER_REVISION_V3
+        else ALLOCATOR_VECTOR_FIELDS
+    )
     return {
         "status": "measured",
         "scope": "operation_global_system_allocator",
-        **{field: value for field in ALLOCATOR_VECTOR_FIELDS},
+        **{field: value for field in vector_fields},
     }
 
 
-def allocator_report(value=100, revision="baseline"):
+def allocator_report(value=100, revision="baseline", *, counter_revision=None):
     result = report(value=value, revision=revision)
     result["tool"]["binary"] = "litchi-perf-baseline-alloc"
     result["tool"]["instrumentation"] = "system_allocator_operation_scoped"
+    if counter_revision is not None:
+        result["tool"]["allocator_counter_revision"] = counter_revision
     result["binary_identity"]["path"] = (
         "/tmp/litchi-perf-alloc-candidate"
         if revision != "baseline"
@@ -649,7 +671,9 @@ def allocator_report(value=100, revision="baseline"):
                     "child_process_id": (
                         (1_000 if cache_state == "warm" else 2_000) + sample_index
                     ),
-                    "allocation_metrics": allocator_raw_metrics(value),
+                    "allocation_metrics": allocator_raw_metrics(
+                        value, counter_revision=counter_revision
+                    ),
                 }
                 for cache_state in ("warm", "cold-requested")
                 for sample_index in range(5)
@@ -659,14 +683,16 @@ def allocator_report(value=100, revision="baseline"):
     first = result["results"][0]
     first["case"] = "opc_file_eager_open"
     first["cache_state"] = "warm"
-    first["operation_metrics"] = allocator_operation_metrics(value)
+    first["operation_metrics"] = allocator_operation_metrics(
+        value, counter_revision=counter_revision
+    )
     second = copy.deepcopy(first)
     second["cache_state"] = "cold-requested"
     result["results"].append(second)
     return result
 
 
-def operation_allocator_policy_fixture():
+def operation_allocator_policy_fixture(counter_revision=None):
     comparison_policy = policy()
     comparison_policy["allocator_evidence_scope"] = "operation"
     comparison_policy["tool_identity"] = {
@@ -674,6 +700,10 @@ def operation_allocator_policy_fixture():
         "binary": "litchi-perf-baseline-alloc",
         "instrumentation": "system_allocator_operation_scoped",
     }
+    if counter_revision is not None:
+        comparison_policy["tool_identity"][
+            "allocator_counter_revision"
+        ] = counter_revision
     comparison_policy["expected_build_identity"] = {
         "allocator": "CountingSystemAllocator(std::alloc::System)"
     }
@@ -716,13 +746,18 @@ def operation_allocator_policy_fixture():
     return comparison_policy
 
 
-def operation_allocator_metrics(value=100):
+def operation_allocator_metrics(value=100, *, counter_revision=None):
     operation_metrics = opc_source_materialize_operation_metrics_report_fields()
     allocation = {
         "status": "measured",
         "scope": "operation_global_system_allocator",
     }
-    for field in ALLOCATOR_VECTOR_FIELDS:
+    vector_fields = (
+        ALLOCATOR_VECTOR_FIELDS_V3
+        if counter_revision == ALLOCATOR_COUNTER_REVISION_V3
+        else ALLOCATOR_VECTOR_FIELDS
+    )
+    for field in vector_fields:
         allocation[field] = {
             "values": [value] * 5,
             "status": "measured",
@@ -732,10 +767,14 @@ def operation_allocator_metrics(value=100):
     return operation_metrics
 
 
-def operation_allocator_report(value=100, revision="baseline"):
+def operation_allocator_report(
+    value=100, revision="baseline", *, counter_revision=None
+):
     result = report(value=value, revision=revision)
     result["tool"]["binary"] = "litchi-perf-baseline-alloc"
     result["tool"]["instrumentation"] = "system_allocator_operation_scoped"
+    if counter_revision is not None:
+        result["tool"]["allocator_counter_revision"] = counter_revision
     result["binary_identity"]["path"] = (
         "/tmp/litchi-perf-operation-alloc-candidate"
         if revision != "baseline"
@@ -750,7 +789,9 @@ def operation_allocator_report(value=100, revision="baseline"):
     first = result["results"][0]
     first["case"] = "opc_source_materialize"
     first["elapsed_ns"]["sample_order"] = list(range(5))
-    first["operation_metrics"] = operation_allocator_metrics(value)
+    first["operation_metrics"] = operation_allocator_metrics(
+        value, counter_revision=counter_revision
+    )
     return result
 
 
@@ -1169,7 +1210,7 @@ class PerfCompareTests(unittest.TestCase):
             perf_compare.compare_reports(allocator_report, report(revision="current"), policy())
 
     def test_allocator_counter_revision_separates_peak_counter_generations(self):
-        marker = "post_update_peak_v2"
+        marker = ALLOCATOR_COUNTER_REVISION_V2
         legacy_policy = allocator_policy_fixture()
         versioned_policy = copy.deepcopy(legacy_policy)
         versioned_policy["tool_identity"]["allocator_counter_revision"] = marker
@@ -1205,6 +1246,213 @@ class PerfCompareTests(unittest.TestCase):
             perf_compare.compare_reports(
                 legacy_baseline, versioned_current, legacy_policy
             )
+
+    def test_allocator_v3_requires_region_vector_and_preserves_filesystem_alignment(
+        self,
+    ):
+        policy_v3 = allocator_policy_fixture(
+            counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+        baseline = allocator_report(counter_revision=ALLOCATOR_COUNTER_REVISION_V3)
+        current = allocator_report(
+            revision="current", counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+        self.assertEqual(
+            perf_compare.compare_reports(baseline, current, policy_v3)["status"],
+            "pass",
+        )
+
+        below_endpoint = allocator_report(
+            revision="current", counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+        below_endpoint["filesystem_evidence"][0]["samples"][0][
+            "allocation_metrics"
+        ][ALLOCATOR_REGION_VECTOR_FIELD] = 99
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "region_peak_live_bytes.*must be at least live_bytes_before",
+        ):
+            perf_compare.compare_reports(baseline, below_endpoint, policy_v3)
+
+        above_lifetime_peak = allocator_report(
+            revision="current", counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+        above_lifetime_peak["filesystem_evidence"][0]["samples"][0][
+            "allocation_metrics"
+        ][ALLOCATOR_REGION_VECTOR_FIELD] = 101
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "region_peak_live_bytes.*must not exceed peak_live_bytes_after",
+        ):
+            perf_compare.compare_reports(baseline, above_lifetime_peak, policy_v3)
+
+        missing = allocator_report(
+            revision="current", counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+        missing["results"][0]["operation_metrics"]["allocation"].pop(
+            ALLOCATOR_REGION_VECTOR_FIELD
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "allocation has an invalid schema"
+        ):
+            perf_compare.compare_reports(baseline, missing, policy_v3)
+
+    def test_operation_allocator_v3_enforces_region_peak_invariant(self):
+        policy_v3 = operation_allocator_policy_fixture(
+            counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+        baseline = operation_allocator_report(
+            counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+        current = operation_allocator_report(
+            revision="current", counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+        self.assertEqual(
+            perf_compare.compare_reports(baseline, current, policy_v3)["status"],
+            "pass",
+        )
+
+        over_peak = operation_allocator_report(
+            revision="current", counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+        over_peak["results"][0]["operation_metrics"]["allocation"][
+            ALLOCATOR_REGION_VECTOR_FIELD
+        ]["values"] = [101] * 5
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "region_peak_live_bytes.*must not exceed peak_live_bytes_after",
+        ):
+            perf_compare.compare_reports(baseline, over_peak, policy_v3)
+
+        below_live = operation_allocator_report(
+            revision="current", counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+        below_live["results"][0]["operation_metrics"]["allocation"][
+            ALLOCATOR_REGION_VECTOR_FIELD
+        ]["values"] = [99] * 5
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "region_peak_live_bytes.*must be at least live_bytes_before",
+        ):
+            perf_compare.compare_reports(baseline, below_live, policy_v3)
+
+        missing = operation_allocator_report(
+            revision="current", counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+        missing["results"][0]["operation_metrics"]["allocation"].pop(
+            ALLOCATOR_REGION_VECTOR_FIELD
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "allocation has an invalid schema"
+        ):
+            perf_compare.compare_reports(baseline, missing, policy_v3)
+
+    def test_allocator_v3_region_field_is_rejected_by_older_generations(self):
+        for counter_revision in (None, ALLOCATOR_COUNTER_REVISION_V2):
+            with self.subTest(counter_revision=counter_revision):
+                comparison_policy = allocator_policy_fixture(
+                    counter_revision=counter_revision
+                )
+                baseline = allocator_report(counter_revision=counter_revision)
+                for evidence_kind in ("operation", "filesystem"):
+                    with self.subTest(evidence_kind=evidence_kind):
+                        current = allocator_report(
+                            revision="current", counter_revision=counter_revision
+                        )
+                        if evidence_kind == "operation":
+                            current["results"][0]["operation_metrics"][
+                                "allocation"
+                            ][ALLOCATOR_REGION_VECTOR_FIELD] = {
+                                "values": [100] * 5,
+                                "status": "measured",
+                                "scope": "operation_global_system_allocator",
+                            }
+                        else:
+                            current["filesystem_evidence"][0]["samples"][0][
+                                "allocation_metrics"
+                            ][ALLOCATOR_REGION_VECTOR_FIELD] = 100
+                        with self.assertRaisesRegex(
+                            perf_compare.ComparisonInputError,
+                            "invalid schema|raw allocation_metrics",
+                        ):
+                            perf_compare.compare_reports(
+                                baseline, current, comparison_policy
+                            )
+
+    def test_allocator_v2_and_v3_tool_identities_cannot_be_mixed(self):
+        v2_policy = allocator_policy_fixture(
+            counter_revision=ALLOCATOR_COUNTER_REVISION_V2
+        )
+        v3_policy = allocator_policy_fixture(
+            counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+        v2_baseline = allocator_report(counter_revision=ALLOCATOR_COUNTER_REVISION_V2)
+        v2_current = allocator_report(
+            revision="current", counter_revision=ALLOCATOR_COUNTER_REVISION_V2
+        )
+        v3_baseline = allocator_report(counter_revision=ALLOCATOR_COUNTER_REVISION_V3)
+        v3_current = allocator_report(
+            revision="current", counter_revision=ALLOCATOR_COUNTER_REVISION_V3
+        )
+
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "tool does not match"
+        ):
+            perf_compare.compare_reports(v2_baseline, v3_current, v3_policy)
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "tool does not match"
+        ):
+            perf_compare.compare_reports(v3_baseline, v2_current, v2_policy)
+
+    def test_normal_reports_accept_region_vector_only_when_unavailable(self):
+        def add_allocation(report_value, status):
+            operation_metrics = operation_metrics_report_fields()
+            allocation = {
+                "status": status,
+                "scope": "operation_global_system_allocator",
+            }
+            for field in ALLOCATOR_VECTOR_FIELDS_V3:
+                allocation[field] = metric_vector(
+                    [100] * 5 if status == "measured" else None,
+                    status=status,
+                    scope="operation_global_system_allocator",
+                )
+            operation_metrics["allocation"] = allocation
+            report_value["results"][0]["operation_metrics"] = operation_metrics
+
+        baseline = report()
+        current = report(revision="current")
+        add_allocation(baseline, "unavailable")
+        add_allocation(current, "unavailable")
+        self.assertEqual(
+            perf_compare.compare_reports(baseline, current, policy())["status"],
+            "pass",
+        )
+
+        measured = report(revision="current")
+        add_allocation(measured, "measured")
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "region_peak_live_bytes is only allowed as unavailable",
+        ):
+            perf_compare.compare_reports(baseline, measured, policy())
+
+    def test_allocator_counter_revision_rejects_unknown_or_normal_markers(self):
+        unknown = allocator_policy_fixture()
+        unknown["tool_identity"]["allocator_counter_revision"] = "future_v4"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "allocator_counter_revision"
+        ):
+            perf_compare.validate_policy(unknown)
+
+        normal = policy()
+        normal["tool_identity"]["allocator_counter_revision"] = (
+            ALLOCATOR_COUNTER_REVISION_V3
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "forbidden for normal instrumentation"
+        ):
+            perf_compare.validate_policy(normal)
 
     def test_operation_allocator_policy_compares_only_allocation_and_invariant_work(self):
         comparison_policy = operation_allocator_policy_fixture()

@@ -9,17 +9,28 @@
 //! Counters are absolute process counters. A region records two snapshots and
 //! publishes checked differences; it never resets a counter. The region guard
 //! is deliberately non-reentrant so a nested operation cannot publish a
-//! misleading partial interval. Atomics make totals include allocations made
-//! by worker threads while the operation is active.
+//! misleading partial interval. One observer mutex linearizes each callback,
+//! boundary, and snapshot after the system allocator has returned, so worker
+//! callbacks between the boundaries are included in the region high-water mark.
+//! Same-thread callback reentry fails closed through a const TLS guard because
+//! a callback must never wait on the observer mutex it already owns.
+//! The resulting peak is callback-order evidence: it includes other process
+//! threads, excludes allocator-internal realloc overlap and physical RSS, and
+//! can perturb allocator scheduling while instrumentation is enabled.
 
+use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Mutex, MutexGuard};
 
 use serde::{Deserialize, Serialize};
 
 const SCOPE: Scope = Scope::OperationGlobalSystemAllocator;
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
-static REGION_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+thread_local! {
+    static CALLBACK_ENTRY_ACTIVE: Cell<bool> = const { Cell::new(false) };
+}
 
 #[cfg(test)]
 pub(crate) static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -39,12 +50,12 @@ pub(crate) fn instrumentation_identity() -> &'static str {
     }
 }
 
-/// Distinguishes corrected peak observations from older allocator reports.
+/// Distinguishes observer-ordered region peaks from older allocator reports.
 /// Normal reports omit this allocator-only compatibility identity.
 pub(crate) fn counter_revision() -> Option<&'static str> {
     ENABLED
         .load(Ordering::Acquire)
-        .then_some("post_update_peak_v2")
+        .then_some("serialized_region_peak_v3")
 }
 
 /// Returns the allocator identity selected by the executable wrapper.
@@ -106,6 +117,8 @@ pub struct Snapshot {
     pub live_bytes: u64,
     pub peak_live_bytes: u64,
     pub overflowed: bool,
+    /// Sticky observer failure state. Numeric fields may be incomplete when set.
+    pub observer_invalid: bool,
 }
 
 /// Returns absolute counters without resetting them.
@@ -122,6 +135,7 @@ pub fn snapshot() -> Snapshot {
         live_bytes: snapshot.live_bytes,
         peak_live_bytes: snapshot.peak_live_bytes,
         overflowed: snapshot.overflowed,
+        observer_invalid: snapshot.observer_invalid,
     }
 }
 
@@ -166,6 +180,9 @@ pub(crate) struct Sample {
     /// Absolute process high-water live bytes after the operation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub peak_live_bytes_after: Option<u64>,
+    /// Observer-ordered absolute live-byte high-water mark during this region.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region_peak_live_bytes: Option<u64>,
 }
 
 /// Return an explicit unavailable sample for binaries that do not install the
@@ -191,10 +208,15 @@ impl Sample {
             live_bytes_after: None,
             peak_live_bytes_before: None,
             peak_live_bytes_after: None,
+            region_peak_live_bytes: None,
         }
     }
 
-    fn measured(before: CountersSnapshot, after: CountersSnapshot) -> Self {
+    fn measured(
+        before: CountersSnapshot,
+        after: CountersSnapshot,
+        region_peak_live_bytes: Option<u64>,
+    ) -> Self {
         let values = [
             difference(before.allocation_calls, after.allocation_calls),
             difference(before.deallocation_calls, after.deallocation_calls),
@@ -206,10 +228,20 @@ impl Sample {
             difference(before.allocated_bytes, after.allocated_bytes),
             difference(before.deallocated_bytes, after.deallocated_bytes),
         ];
+        if before.observer_invalid || after.observer_invalid {
+            return Self::unavailable();
+        }
         let overflow = before.overflowed
             || after.overflowed
             || values.iter().any(Option::is_none)
-            || after.peak_live_bytes < before.peak_live_bytes;
+            || after.peak_live_bytes < before.peak_live_bytes
+            || region_peak_live_bytes
+                .map(|peak| {
+                    peak < before.live_bytes
+                        || peak < after.live_bytes
+                        || peak > after.peak_live_bytes
+                })
+                .unwrap_or(true);
         if overflow {
             return Self {
                 status: Status::Overflow,
@@ -229,6 +261,7 @@ impl Sample {
             live_bytes_after: Some(after.live_bytes),
             peak_live_bytes_before: Some(before.peak_live_bytes),
             peak_live_bytes_after: Some(after.peak_live_bytes),
+            region_peak_live_bytes,
         }
     }
 }
@@ -248,15 +281,11 @@ impl Region {
     /// Ends the region and releases its token. No allocator counters are
     /// reset, and this method performs no heap allocation itself.
     pub(crate) fn finish(mut self) -> Option<Sample> {
-        match self.state {
+        let state = std::mem::replace(&mut self.state, RegionState::Disabled);
+        match state {
             RegionState::Disabled => None,
             RegionState::Unavailable => Some(Sample::unavailable()),
-            RegionState::Active(before) => {
-                let after = COUNTERS.snapshot();
-                self.state = RegionState::Disabled;
-                REGION_ACTIVE.store(false, Ordering::Release);
-                Some(Sample::measured(before, after))
-            },
+            RegionState::Active(before) => Some(COUNTERS.finish_sample(before)),
         }
     }
 }
@@ -264,7 +293,7 @@ impl Region {
 impl Drop for Region {
     fn drop(&mut self) {
         if matches!(self.state, RegionState::Active(_)) {
-            REGION_ACTIVE.store(false, Ordering::Release);
+            COUNTERS.release_region();
             self.state = RegionState::Disabled;
         }
     }
@@ -279,17 +308,19 @@ pub(crate) fn begin() -> Region {
             state: RegionState::Disabled,
         };
     }
-    if REGION_ACTIVE
-        .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-        .is_err()
-    {
-        return Region {
+    match COUNTERS.begin_region() {
+        Some(before) => Region {
+            state: RegionState::Active(before),
+        },
+        None => Region {
             state: RegionState::Unavailable,
-        };
+        },
     }
-    Region {
-        state: RegionState::Active(COUNTERS.snapshot()),
-    }
+}
+
+#[derive(Default)]
+struct ObserverState {
+    region_peak_live_bytes: Option<u64>,
 }
 
 #[derive(Default)]
@@ -303,6 +334,9 @@ struct Counters {
     live_bytes: AtomicU64,
     peak_live_bytes: AtomicU64,
     overflowed: AtomicBool,
+    /// Poison/reentry invalidity is distinct from checked arithmetic overflow.
+    observer_invalid: AtomicBool,
+    observer: Mutex<ObserverState>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -316,10 +350,42 @@ struct CountersSnapshot {
     live_bytes: u64,
     peak_live_bytes: u64,
     overflowed: bool,
+    observer_invalid: bool,
+}
+
+struct CallbackEntryGuard;
+
+impl CallbackEntryGuard {
+    fn enter(observer_invalid: &AtomicBool) -> Option<Self> {
+        let already_active = match CALLBACK_ENTRY_ACTIVE.try_with(|active| active.replace(true)) {
+            Ok(already_active) => already_active,
+            Err(_) => {
+                observer_invalid.store(true, Ordering::Release);
+                return None;
+            },
+        };
+        if already_active {
+            observer_invalid.store(true, Ordering::Release);
+            None
+        } else {
+            Some(Self)
+        }
+    }
+}
+
+impl Drop for CallbackEntryGuard {
+    fn drop(&mut self) {
+        let _ = CALLBACK_ENTRY_ACTIVE.try_with(|active| active.set(false));
+    }
 }
 
 impl Counters {
     fn snapshot(&self) -> CountersSnapshot {
+        let _observer = self.lock_observer();
+        self.snapshot_locked()
+    }
+
+    fn snapshot_locked(&self) -> CountersSnapshot {
         CountersSnapshot {
             allocation_calls: self.allocation_calls.load(Ordering::Acquire),
             deallocation_calls: self.deallocation_calls.load(Ordering::Acquire),
@@ -330,7 +396,69 @@ impl Counters {
             live_bytes: self.live_bytes.load(Ordering::Acquire),
             peak_live_bytes: self.peak_live_bytes.load(Ordering::Acquire),
             overflowed: self.overflowed.load(Ordering::Acquire),
+            observer_invalid: self.observer_invalid.load(Ordering::Acquire),
         }
+    }
+
+    fn lock_observer(&self) -> MutexGuard<'_, ObserverState> {
+        match self.observer.lock() {
+            Ok(observer) => observer,
+            Err(poisoned) => {
+                let mut observer = poisoned.into_inner();
+                self.observer_invalid.store(true, Ordering::Release);
+                observer.region_peak_live_bytes = None;
+                observer
+            },
+        }
+    }
+
+    fn begin_region(&self) -> Option<CountersSnapshot> {
+        if self.observer_invalid.load(Ordering::Acquire) {
+            return None;
+        }
+        let mut observer = self.lock_observer();
+        if self.observer_invalid.load(Ordering::Acquire)
+            || observer.region_peak_live_bytes.is_some()
+        {
+            return None;
+        }
+        let before = self.snapshot_locked();
+        observer.region_peak_live_bytes = Some(before.live_bytes);
+        Some(before)
+    }
+
+    fn finish_region(&self) -> (CountersSnapshot, Option<u64>, bool) {
+        let mut observer = self.lock_observer();
+        let after = self.snapshot_locked();
+        let region_peak_live_bytes = observer.region_peak_live_bytes.take();
+        let observer_valid = !self.observer_invalid.load(Ordering::Acquire);
+        (after, region_peak_live_bytes, observer_valid)
+    }
+
+    fn finish_sample(&self, before: CountersSnapshot) -> Sample {
+        let (after, region_peak_live_bytes, observer_valid) = self.finish_region();
+        if observer_valid {
+            Sample::measured(before, after, region_peak_live_bytes)
+        } else {
+            Sample::unavailable()
+        }
+    }
+
+    fn release_region(&self) {
+        let mut observer = self.lock_observer();
+        observer.region_peak_live_bytes = None;
+    }
+
+    fn update_region_peak(&self, observer: &mut ObserverState, live: u64) {
+        if let Some(peak) = observer.region_peak_live_bytes.as_mut()
+            && live > *peak
+        {
+            *peak = live;
+        }
+    }
+
+    fn enter_callback(&self) -> Option<CallbackEntryGuard> {
+        CallbackEntryGuard::enter(&self.observer_invalid)
     }
 
     fn add(&self, counter: &AtomicU64, value: u64) {
@@ -339,11 +467,13 @@ impl Counters {
         }
     }
 
-    fn live_add(&self, value: u64) {
+    fn live_add(&self, value: u64) -> Option<u64> {
         if let Some(live) = checked_add(&self.live_bytes, value) {
             self.update_peak(live);
+            Some(live)
         } else {
             self.overflowed.store(true, Ordering::Release);
+            None
         }
     }
 
@@ -369,16 +499,34 @@ impl Counters {
     }
 
     fn allocation(&self, size: usize) {
+        let Some(_entry) = self.enter_callback() else {
+            return;
+        };
+        let mut observer = self.lock_observer();
+        self.allocation_locked(size, &mut observer);
+    }
+
+    fn allocation_locked(&self, size: usize, observer: &mut ObserverState) {
         let Some(size) = u64::try_from(size).ok() else {
             self.overflowed.store(true, Ordering::Release);
             return;
         };
         self.add(&self.allocation_calls, 1);
         self.add(&self.allocated_bytes, size);
-        self.live_add(size);
+        if let Some(live) = self.live_add(size) {
+            self.update_region_peak(observer, live);
+        }
     }
 
     fn deallocation(&self, size: usize) {
+        let Some(_entry) = self.enter_callback() else {
+            return;
+        };
+        let _observer = self.lock_observer();
+        self.deallocation_locked(size);
+    }
+
+    fn deallocation_locked(&self, size: usize) {
         let Some(size) = u64::try_from(size).ok() else {
             self.overflowed.store(true, Ordering::Release);
             return;
@@ -389,6 +537,14 @@ impl Counters {
     }
 
     fn reallocation(&self, old_size: usize, new_size: usize) {
+        let Some(_entry) = self.enter_callback() else {
+            return;
+        };
+        let mut observer = self.lock_observer();
+        self.reallocation_locked(old_size, new_size, &mut observer);
+    }
+
+    fn reallocation_locked(&self, old_size: usize, new_size: usize, observer: &mut ObserverState) {
         let (Some(old_size), Some(new_size)) =
             (u64::try_from(old_size).ok(), u64::try_from(new_size).ok())
         else {
@@ -400,34 +556,35 @@ impl Counters {
         self.add(&self.allocated_bytes, new_size);
         self.add(&self.deallocated_bytes, old_size);
         if new_size >= old_size {
-            self.live_add(new_size - old_size);
+            if let Some(live) = self.live_add(new_size - old_size) {
+                self.update_region_peak(observer, live);
+            }
         } else {
             self.live_sub(old_size - new_size);
         }
     }
 
     fn failed_allocation(&self) {
+        let Some(_entry) = self.enter_callback() else {
+            return;
+        };
+        let _observer = self.lock_observer();
         self.add(&self.failed_allocation_calls, 1);
     }
 }
 
 fn checked_add(counter: &AtomicU64, value: u64) -> Option<u64> {
-    // fetch_update returns the previous value. Peak accounting needs the
-    // successful update's new total, even if another thread changes it later.
-    counter
-        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
-            current.checked_add(value)
-        })
-        .ok()
-        .and_then(|previous| previous.checked_add(value))
+    let current = counter.load(Ordering::Acquire);
+    let next = current.checked_add(value)?;
+    counter.store(next, Ordering::Release);
+    Some(next)
 }
 
 fn checked_sub(counter: &AtomicU64, value: u64) -> Option<u64> {
-    counter
-        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
-            current.checked_sub(value)
-        })
-        .ok()
+    let current = counter.load(Ordering::Acquire);
+    let next = current.checked_sub(value)?;
+    counter.store(next, Ordering::Release);
+    Some(next)
 }
 
 static COUNTERS: Counters = Counters {
@@ -440,6 +597,10 @@ static COUNTERS: Counters = Counters {
     live_bytes: AtomicU64::new(0),
     peak_live_bytes: AtomicU64::new(0),
     overflowed: AtomicBool::new(false),
+    observer_invalid: AtomicBool::new(false),
+    observer: Mutex::new(ObserverState {
+        region_peak_live_bytes: None,
+    }),
 };
 
 fn difference(before: u64, after: u64) -> Option<u64> {
@@ -477,6 +638,7 @@ mod tests {
             live_bytes_after: None,
             peak_live_bytes_before: None,
             peak_live_bytes_after: None,
+            region_peak_live_bytes: None,
         };
         let value = serde_json::to_value(sample).unwrap();
         assert_eq!(value["status"], "overflow");
@@ -492,7 +654,7 @@ mod tests {
             ..super::CountersSnapshot::default()
         };
         let after = super::CountersSnapshot::default();
-        let sample = Sample::measured(before, after);
+        let sample = Sample::measured(before, after, None);
         assert_eq!(sample.status, Status::Overflow);
         assert!(sample.allocated_bytes.is_none());
         assert_eq!(super::difference(u64::MAX, 0), None);
@@ -511,6 +673,43 @@ mod tests {
         underflow.live_sub(1);
         assert!(underflow.snapshot().overflowed);
         assert_eq!(underflow.snapshot().live_bytes, 0);
+    }
+
+    #[test]
+    fn poisoned_observer_is_recovered_as_unavailable() {
+        let counters = Arc::new(Counters::default());
+        let before = counters.begin_region().unwrap();
+        let poisoned = Arc::clone(&counters);
+        let handle = std::thread::spawn(move || {
+            let _observer = poisoned.observer.lock().unwrap();
+            panic!("deliberately poison the observer mutex");
+        });
+        assert!(handle.join().is_err());
+
+        let sample = counters.finish_sample(before);
+        assert_eq!(sample.status, Status::Unavailable);
+        assert!(sample.allocation_calls.is_none());
+        let snapshot = counters.snapshot();
+        assert!(!snapshot.overflowed);
+        assert!(snapshot.observer_invalid);
+        assert!(counters.begin_region().is_none());
+        counters.failed_allocation();
+        assert!(counters.snapshot().observer_invalid);
+    }
+
+    #[test]
+    fn nested_callback_entry_is_suppressed_and_invalidates_future_regions() {
+        let counters = Counters::default();
+        let outer = counters.enter_callback().unwrap();
+
+        counters.allocation(8);
+
+        drop(outer);
+        let snapshot = counters.snapshot();
+        assert_eq!(snapshot.allocation_calls, 0);
+        assert!(!snapshot.overflowed);
+        assert!(snapshot.observer_invalid);
+        assert!(counters.begin_region().is_none());
     }
 
     #[test]
@@ -626,6 +825,151 @@ mod tests {
     }
 
     #[test]
+    fn region_peak_is_separate_from_historical_process_peak() {
+        let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
+        let baseline = super::COUNTERS.snapshot();
+        super::COUNTERS.allocation(32);
+        super::COUNTERS.deallocation(32);
+
+        let sample = super::begin().finish().unwrap();
+
+        assert_eq!(sample.status, Status::Measured);
+        assert_eq!(sample.region_peak_live_bytes, Some(baseline.live_bytes));
+        assert!(sample.peak_live_bytes_before.unwrap() > baseline.live_bytes);
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
+    fn region_peak_retains_an_entry_allocation_after_it_is_freed() {
+        let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
+        let baseline = super::COUNTERS.snapshot();
+        super::COUNTERS.allocation(24);
+        let entry_live = baseline.live_bytes + 24;
+        let region = super::begin();
+        super::COUNTERS.deallocation(24);
+
+        let sample = region.finish().unwrap();
+
+        assert_eq!(sample.status, Status::Measured);
+        assert_eq!(sample.live_bytes_before, Some(entry_live));
+        assert_eq!(sample.live_bytes_after, Some(baseline.live_bytes));
+        assert_eq!(sample.region_peak_live_bytes, Some(entry_live));
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
+    fn region_reallocation_growth_shrink_and_failed_allocations_are_ordered() {
+        let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
+        let baseline = super::COUNTERS.snapshot();
+        let region = super::begin();
+        super::COUNTERS.allocation(8);
+        super::COUNTERS.reallocation(8, 40);
+        super::COUNTERS.failed_allocation();
+        super::COUNTERS.reallocation(40, 12);
+        super::COUNTERS.deallocation(12);
+
+        let sample = region.finish().unwrap();
+
+        assert_eq!(sample.status, Status::Measured);
+        assert_eq!(sample.live_bytes_before, Some(baseline.live_bytes));
+        assert_eq!(sample.live_bytes_after, Some(baseline.live_bytes));
+        assert_eq!(
+            sample.region_peak_live_bytes,
+            Some(baseline.live_bytes + 40)
+        );
+        assert_eq!(sample.reallocation_calls, Some(2));
+        assert_eq!(sample.failed_allocation_calls, Some(1));
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
+    fn reentrant_callback_makes_active_and_future_regions_unavailable() {
+        let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
+        let was_invalid = super::COUNTERS
+            .observer_invalid
+            .swap(false, std::sync::atomic::Ordering::SeqCst);
+        let region = super::begin();
+        let outer = super::COUNTERS.enter_callback().unwrap();
+        super::COUNTERS.allocation(8);
+        drop(outer);
+
+        let sample = region.finish().unwrap();
+        let future = super::begin().finish().unwrap();
+
+        assert_eq!(sample.status, Status::Unavailable);
+        assert!(sample.allocation_calls.is_none());
+        assert!(sample.region_peak_live_bytes.is_none());
+        assert_eq!(future.status, Status::Unavailable);
+        super::COUNTERS
+            .observer_invalid
+            .store(was_invalid, std::sync::atomic::Ordering::SeqCst);
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
+    fn repeated_boundaries_and_dropped_regions_release_only_the_owner() {
+        let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
+
+        let first = super::begin();
+        let nested = super::begin();
+        assert_eq!(nested.finish().unwrap().status, Status::Unavailable);
+        assert_eq!(first.finish().unwrap().status, Status::Measured);
+
+        let dropped = super::begin();
+        drop(dropped);
+        assert_eq!(super::begin().finish().unwrap().status, Status::Measured);
+
+        let active_after = {
+            let observer = super::COUNTERS.lock_observer();
+            observer.region_peak_live_bytes.is_some()
+        };
+        assert!(!active_after);
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
+    fn region_peak_includes_concurrent_callbacks_before_finish() {
+        let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
+        let baseline = super::COUNTERS.snapshot();
+        let region = super::begin();
+        const THREADS: usize = 2;
+        const SIZE: usize = 19;
+        let ready = Arc::new(Barrier::new(THREADS + 1));
+        let release = Arc::new(Barrier::new(THREADS + 1));
+        let handles = (0..THREADS)
+            .map(|_| {
+                let ready = Arc::clone(&ready);
+                let release = Arc::clone(&release);
+                std::thread::spawn(move || {
+                    super::COUNTERS.allocation(SIZE);
+                    ready.wait();
+                    release.wait();
+                    super::COUNTERS.deallocation(SIZE);
+                })
+            })
+            .collect::<Vec<_>>();
+
+        ready.wait();
+        release.wait();
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        let sample = region.finish().unwrap();
+
+        let expected_peak = baseline.live_bytes + (THREADS * SIZE) as u64;
+        assert_eq!(sample.status, Status::Measured);
+        assert_eq!(sample.region_peak_live_bytes, Some(expected_peak));
+        assert_eq!(sample.live_bytes_after, Some(baseline.live_bytes));
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
     fn region_counts_cross_thread_totals_without_resetting_absolute_counters() {
         let _lock = TEST_LOCK.lock().unwrap();
         let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
@@ -663,8 +1007,11 @@ mod tests {
     fn concurrent_begin_race_grants_one_region_and_marks_others_unavailable() {
         let _lock = TEST_LOCK.lock().unwrap();
         let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
-        let was_active = super::REGION_ACTIVE.swap(false, std::sync::atomic::Ordering::SeqCst);
-        assert!(!was_active, "test region must not already be active");
+        let initially_active = {
+            let observer = super::COUNTERS.lock_observer();
+            observer.region_peak_live_bytes.is_some()
+        };
+        assert!(!initially_active);
         let barrier = Arc::new(Barrier::new(8));
         let handles = (0..8)
             .map(|_| {
@@ -695,8 +1042,11 @@ mod tests {
                 .count(),
             7
         );
-        assert!(!super::REGION_ACTIVE.load(std::sync::atomic::Ordering::SeqCst));
-        super::REGION_ACTIVE.store(was_active, std::sync::atomic::Ordering::SeqCst);
+        let active_after = {
+            let observer = super::COUNTERS.lock_observer();
+            observer.region_peak_live_bytes.is_some()
+        };
+        assert!(!active_after);
         super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
     }
 }
