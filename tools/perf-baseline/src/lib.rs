@@ -3545,6 +3545,10 @@ struct Tool {
     /// Separates normal latency reports from allocator-instrumented reports.
     /// Instrumented elapsed samples are never a latency claim.
     instrumentation: &'static str,
+    /// Allocator policies compare the complete tool identity, preventing a
+    /// comparison with older reports whose peak counter missed allocations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    allocator_counter_revision: Option<&'static str>,
 }
 
 #[derive(Serialize)]
@@ -10635,6 +10639,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             target_os: std::env::consts::OS,
             target_arch: std::env::consts::ARCH,
             instrumentation: allocation_metrics::instrumentation_identity(),
+            allocator_counter_revision: allocation_metrics::counter_revision(),
         },
         binary_identity,
         environment: report_environment,

@@ -1168,6 +1168,44 @@ class PerfCompareTests(unittest.TestCase):
         with self.assertRaisesRegex(perf_compare.ComparisonInputError, "tool does not match"):
             perf_compare.compare_reports(allocator_report, report(revision="current"), policy())
 
+    def test_allocator_counter_revision_separates_peak_counter_generations(self):
+        marker = "post_update_peak_v2"
+        legacy_policy = allocator_policy_fixture()
+        versioned_policy = copy.deepcopy(legacy_policy)
+        versioned_policy["tool_identity"]["allocator_counter_revision"] = marker
+
+        legacy_baseline = allocator_report()
+        legacy_current = allocator_report(revision="current")
+        versioned_baseline = allocator_report()
+        versioned_current = allocator_report(revision="current")
+        for value in (versioned_baseline, versioned_current):
+            value["tool"]["allocator_counter_revision"] = marker
+
+        self.assertEqual(
+            perf_compare.compare_reports(
+                versioned_baseline, versioned_current, versioned_policy
+            )["status"],
+            "pass",
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "tool does not match"
+        ):
+            perf_compare.compare_reports(
+                legacy_baseline, versioned_current, versioned_policy
+            )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "tool does not match"
+        ):
+            perf_compare.compare_reports(
+                versioned_baseline, versioned_current, legacy_policy
+            )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "tool does not match"
+        ):
+            perf_compare.compare_reports(
+                legacy_baseline, versioned_current, legacy_policy
+            )
+
     def test_operation_allocator_policy_compares_only_allocation_and_invariant_work(self):
         comparison_policy = operation_allocator_policy_fixture()
         baseline = operation_allocator_report()
