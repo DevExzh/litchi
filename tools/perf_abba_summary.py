@@ -299,6 +299,70 @@ DOCX_SECTION_LAYOUT_HASHES_PENDING = False
 # historical schema-1 harness.  Keep this exception exact and case-local so an
 # unknown generator or an accidentally substituted corpus still fails closed.
 FIXED_CASE_CORPUS_IDENTITIES: dict[str, dict[str, Any]] = {
+    'pptx_cross_copy_media_rich': {'name': 'pptx_cross_copy_media_rich',
+     'generator': 'litchi-pptx-cross-slide-copy-evidence-v1',
+     'package_format': 'PPTX/OPC/ZIP',
+     'shape': 'media-rich',
+     'payload_kind': 'deterministic-incompressible-media-and-slide-text',
+     'compression': 'deflate',
+     'entry_count': 31,
+     'archive_member_count': 49,
+     'entry_bytes': 76,
+     'uncompressed_payload_bytes': 16866277,
+     'archive_bytes': 16814664,
+     'archive_sha256': 'a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d',
+     'target_entry': 'source-slide:2/destination-slide:1/position:1',
+     'target_payload_bytes': 76,
+     'target_payload_sha256': '9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa',
+     'xlsx': None},
+    'pptx_cross_copy_media_rich_lifecycle': {'name': 'pptx_cross_copy_media_rich_lifecycle',
+     'generator': 'litchi-pptx-cross-slide-copy-evidence-v1',
+     'package_format': 'PPTX/OPC/ZIP',
+     'shape': 'media-rich',
+     'payload_kind': 'deterministic-incompressible-media-and-slide-text',
+     'compression': 'deflate',
+     'entry_count': 31,
+     'archive_member_count': 49,
+     'entry_bytes': 76,
+     'uncompressed_payload_bytes': 16866277,
+     'archive_bytes': 16814664,
+     'archive_sha256': 'a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d',
+     'target_entry': 'source-slide:2/destination-slide:1/position:1',
+     'target_payload_bytes': 76,
+     'target_payload_sha256': '9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa',
+     'xlsx': None},
+    'pptx_cross_copy_plain': {'name': 'pptx_cross_copy_plain',
+     'generator': 'litchi-pptx-cross-slide-copy-evidence-v1',
+     'package_format': 'PPTX/OPC/ZIP',
+     'shape': 'plain',
+     'payload_kind': 'deterministic-slide-text',
+     'compression': 'deflate',
+     'entry_count': 23,
+     'archive_member_count': 41,
+     'entry_bytes': 76,
+     'uncompressed_payload_bytes': 84715,
+     'archive_bytes': 30539,
+     'archive_sha256': '85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f',
+     'target_entry': 'source-slide:2/destination-slide:1/position:1',
+     'target_payload_bytes': 76,
+     'target_payload_sha256': '9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa',
+     'xlsx': None},
+    'pptx_cross_copy_plain_lifecycle': {'name': 'pptx_cross_copy_plain_lifecycle',
+     'generator': 'litchi-pptx-cross-slide-copy-evidence-v1',
+     'package_format': 'PPTX/OPC/ZIP',
+     'shape': 'plain',
+     'payload_kind': 'deterministic-slide-text',
+     'compression': 'deflate',
+     'entry_count': 23,
+     'archive_member_count': 41,
+     'entry_bytes': 76,
+     'uncompressed_payload_bytes': 84715,
+     'archive_bytes': 30539,
+     'archive_sha256': '85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f',
+     'target_entry': 'source-slide:2/destination-slide:1/position:1',
+     'target_payload_bytes': 76,
+     'target_payload_sha256': '9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa',
+     'xlsx': None},
     "ods_source_backed_one_edit_save": {
         "name": "ods-media-publication",
         "generator": "litchi-ods-media-publication-v1",
@@ -1695,8 +1759,13 @@ def _operation_metrics_identity(
             raise AbbaSummaryInputError(str(error)) from error
     projected = _operation_metrics_identity_projection(operation_metrics)
     if (
-        row.get("case") in XLS_LIFECYCLE_CASE_CONTRACTS
-        and row.get("corpus") == XLS_NUMERIC_CORPUS_CONTRACTS["Number"]
+        (
+            (
+                row.get("case") in XLS_LIFECYCLE_CASE_CONTRACTS
+                and row.get("corpus") == XLS_NUMERIC_CORPUS_CONTRACTS["Number"]
+            )
+            or row.get("case") in _PPTX_CROSS_COPY_CASES
+        )
         and operation_metrics.get("alignment")
         == "elapsed_ns.samples_by_elapsed_then_sample_index"
     ):
@@ -2988,6 +3057,7 @@ def _validate_report(
         raise AbbaSummaryInputError(f"{label}.configuration must not be empty")
     _validate_configuration(configuration, label)
     indexed = _index_results(root, label)
+    _validate_pptx_cross_copy_result_rows(indexed, configuration, label)
     _validate_opc_source_overlay_result_rows(indexed, configuration, label)
     _validate_docx_section_layout_result_rows(indexed, configuration, label)
     _validate_doc_owner_public_phases_result_rows(indexed, configuration, label)
@@ -3220,6 +3290,95 @@ _DOCX_SECTION_LAYOUT_ROOT_SOURCE_VECTOR_FIELDS = (
     "ordinary_payload_read_bytes",
     "max_in_flight_reads",
     "ordinary_payload_materializations",
+)
+
+_PPTX_CROSS_COPY_CASES = frozenset(
+    {
+        "pptx_cross_copy_plain",
+        "pptx_cross_copy_media_rich",
+        "pptx_cross_copy_plain_lifecycle",
+        "pptx_cross_copy_media_rich_lifecycle",
+    }
+)
+_PPTX_CROSS_COPY_LIFECYCLE_CASES = frozenset(
+    {
+        "pptx_cross_copy_plain_lifecycle",
+        "pptx_cross_copy_media_rich_lifecycle",
+    }
+)
+_PPTX_CROSS_COPY_DYNAMIC_FIELDS = frozenset(
+    {
+        "plan_ns",
+        "commit_ns",
+        "publication_ns",
+        "reopen_ns",
+        "output_sha256",
+        "lifecycle_ns",
+    }
+)
+_PPTX_CROSS_COPY_VECTOR_FIELDS = (
+    "plan_ns",
+    "commit_ns",
+    "publication_ns",
+    "reopen_ns",
+    "output_sha256",
+)
+_PPTX_CROSS_COPY_SINK_DYNAMIC_FIELDS = frozenset(
+    {
+        "write_calls",
+        "largest_write",
+        "write_size_buckets",
+    }
+)
+_PPTX_CROSS_COPY_SINK_FIELDS = frozenset(
+    {
+        "accepted_bytes",
+        *_PPTX_CROSS_COPY_SINK_DYNAMIC_FIELDS,
+    }
+)
+_PPTX_CROSS_COPY_SINK_BUCKET_FIELDS = (
+    "bytes_0",
+    "bytes_1_to_512",
+    "bytes_513_to_4096",
+    "bytes_4097_to_16384",
+    "bytes_16385_to_65536",
+    "bytes_over_65536",
+)
+_PPTX_CROSS_COPY_SINK_MAX_WRITE = 65_536
+_PPTX_CROSS_COPY_GATE_FIELDS = (
+    "semantic_output_verified",
+    "package_topology_verified",
+    "dependency_closure_verified",
+    "source_immutability_verified",
+    "collision_remap_verified",
+    "durable_patch_round_trip_verified",
+    "borrowed_provenance_refusal_verified",
+    "stale_source_refusal_verified",
+    "stale_destination_refusal_verified",
+    "foreign_source_refusal_verified",
+)
+_PPTX_CROSS_COPY_KEYS = frozenset(
+    {
+        "implementation",
+        "timing_scope",
+        "performance_claim",
+        "source_archive_sha256",
+        "destination_archive_sha256",
+        "expected_output_sha256",
+        "source_slide",
+        "destination_slide",
+        "insertion_position",
+        "source_slide_name",
+        "destination_slide_name",
+        "destination_slide_count_before",
+        "destination_slide_count_after",
+        "planned_part_count",
+        "planned_bytes",
+        "external_relationship_count",
+        "collision_remapped_parts",
+        "gates",
+        *_PPTX_CROSS_COPY_VECTOR_FIELDS,
+    }
 )
 _DOCX_SECTION_LAYOUT_GATE_FIELDS = (
     "phase_sum_verified",
@@ -4452,6 +4611,425 @@ def _validate_doc_owner_public_phases_result_rows(
         )
 
 
+def _validate_pptx_cross_copy_sink(value: Any, location: str) -> dict[str, Any]:
+    """Validate the bounded publication sink before dropping write-shape identity."""
+
+    sink = _require_object(value, location)
+    expected_keys = set(_PPTX_CROSS_COPY_SINK_FIELDS)
+    if set(sink) != expected_keys:
+        missing = sorted(expected_keys - set(sink))
+        unknown = sorted(set(sink) - expected_keys)
+        raise AbbaSummaryInputError(
+            f"{location} schema mismatch (missing={missing!r}, unknown={unknown!r})"
+        )
+    accepted_bytes = _u64(
+        sink["accepted_bytes"], f"{location}.accepted_bytes", positive=True
+    )
+    write_calls = _u64(
+        sink["write_calls"], f"{location}.write_calls", positive=True
+    )
+    largest_write = _u64(
+        sink["largest_write"], f"{location}.largest_write", positive=True
+    )
+    if largest_write > _PPTX_CROSS_COPY_SINK_MAX_WRITE:
+        raise AbbaSummaryInputError(
+            f"{location}.largest_write exceeds the configured 64 KiB sink ceiling"
+        )
+    if largest_write > accepted_bytes:
+        raise AbbaSummaryInputError(
+            f"{location}.largest_write must not exceed accepted_bytes"
+        )
+    buckets = _require_object(sink["write_size_buckets"], f"{location}.write_size_buckets")
+    expected_bucket_keys = set(_PPTX_CROSS_COPY_SINK_BUCKET_FIELDS)
+    if set(buckets) != expected_bucket_keys:
+        missing = sorted(expected_bucket_keys - set(buckets))
+        unknown = sorted(set(buckets) - expected_bucket_keys)
+        raise AbbaSummaryInputError(
+            f"{location}.write_size_buckets schema mismatch "
+            f"(missing={missing!r}, unknown={unknown!r})"
+        )
+    bucket_counts = {
+        field: _u64(buckets[field], f"{location}.write_size_buckets.{field}")
+        for field in _PPTX_CROSS_COPY_SINK_BUCKET_FIELDS
+    }
+    if sum(bucket_counts.values()) != write_calls:
+        raise AbbaSummaryInputError(
+            f"{location}.write_size_buckets counts disagree with write_calls"
+        )
+    if bucket_counts["bytes_over_65536"] != 0:
+        raise AbbaSummaryInputError(
+            f"{location}.write_size_buckets observed a write above the configured ceiling"
+        )
+    bucket_bounds = {
+        "bytes_0": (0, 0),
+        "bytes_1_to_512": (1, 512),
+        "bytes_513_to_4096": (513, 4_096),
+        "bytes_4097_to_16384": (4_097, 16_384),
+        "bytes_16385_to_65536": (16_385, 65_536),
+        "bytes_over_65536": (65_537, None),
+    }
+    accepted_minimum = sum(
+        bucket_counts[field] * bucket_bounds[field][0]
+        for field in _PPTX_CROSS_COPY_SINK_BUCKET_FIELDS
+    )
+    accepted_maximum = sum(
+        bucket_counts[field] * upper
+        for field in _PPTX_CROSS_COPY_SINK_BUCKET_FIELDS
+        if (upper := bucket_bounds[field][1]) is not None
+    )
+    if not accepted_minimum <= accepted_bytes <= accepted_maximum:
+        raise AbbaSummaryInputError(
+            f"{location}.accepted_bytes is outside the write-size bucket bounds"
+        )
+    highest_nonzero_bucket = next(
+        (
+            field
+            for field in reversed(_PPTX_CROSS_COPY_SINK_BUCKET_FIELDS)
+            if bucket_counts[field] != 0
+        ),
+        None,
+    )
+    if highest_nonzero_bucket is None:
+        raise AbbaSummaryInputError(
+            f"{location}.write_size_buckets must contain a non-empty write bucket"
+        )
+    highest_lower, highest_upper = bucket_bounds[highest_nonzero_bucket]
+    if (
+        largest_write < highest_lower
+        or (highest_upper is not None and largest_write > highest_upper)
+    ):
+        raise AbbaSummaryInputError(
+            f"{location}.largest_write does not fit the highest non-empty write bucket"
+        )
+    return sink
+
+
+def _validate_pptx_cross_copy_operation_sink_binding(
+    row: Mapping[str, Any],
+    sink: Mapping[str, Any],
+    location: str,
+    sample_count: int,
+) -> None:
+    """Bind promoted operation sink vectors to the validated top-level sink."""
+
+    operation_metrics = row.get("operation_metrics")
+    if operation_metrics is None:
+        if row.get("case") in _PPTX_CROSS_COPY_LIFECYCLE_CASES:
+            raise AbbaSummaryInputError(
+                f"{location}.operation_metrics is required for PPTX lifecycle selectors"
+            )
+        return
+    operation = _require_object(operation_metrics, f"{location}.operation_metrics")
+    declared_count = _u64(
+        operation.get("sample_count"),
+        f"{location}.operation_metrics.sample_count",
+        positive=True,
+    )
+    if declared_count != sample_count:
+        raise AbbaSummaryInputError(
+            f"{location}.operation_metrics.sample_count must match elapsed samples"
+        )
+    operation_sink = _require_object(
+        operation.get("sink"), f"{location}.operation_metrics.sink"
+    )
+    if operation_sink.get("write_status") != "measured":
+        raise AbbaSummaryInputError(
+            f"{location}.operation_metrics.sink.write_status must be 'measured'"
+        )
+
+    def measured_vector(field: str, expected: int, value: Any = _MISSING) -> None:
+        vector_location = f"{location}.operation_metrics.sink.{field}"
+        vector = _require_object(
+            operation_sink.get(field) if value is _MISSING else value,
+            vector_location,
+        )
+        if set(vector) != {"values", "status", "scope"}:
+            raise AbbaSummaryInputError(
+                f"{vector_location} has an invalid schema"
+            )
+        if vector["status"] != "measured":
+            raise AbbaSummaryInputError(
+                f"{vector_location}.status must be 'measured'"
+            )
+        values = vector["values"]
+        if not isinstance(values, list) or len(values) != sample_count:
+            raise AbbaSummaryInputError(
+                f"{vector_location}.values must match elapsed samples"
+            )
+        for index, value in enumerate(values):
+            observed = _u64(
+                value,
+                f"{vector_location}.values[{index}]",
+            )
+            if observed != expected:
+                raise AbbaSummaryInputError(
+                    f"{vector_location}.values disagrees with result.sink.{field}"
+                )
+
+    for field in ("accepted_bytes", "write_calls", "largest_write"):
+        measured_vector(field, sink[field])
+
+    bucket_metrics = _require_object(
+        operation_sink.get("write_size_buckets"),
+        f"{location}.operation_metrics.sink.write_size_buckets",
+    )
+    expected_bucket_keys = {"status", *_PPTX_CROSS_COPY_SINK_BUCKET_FIELDS}
+    if set(bucket_metrics) != expected_bucket_keys:
+        raise AbbaSummaryInputError(
+            f"{location}.operation_metrics.sink.write_size_buckets has an invalid schema"
+        )
+    if bucket_metrics["status"] != "measured":
+        raise AbbaSummaryInputError(
+            f"{location}.operation_metrics.sink.write_size_buckets.status must be 'measured'"
+        )
+    for field in _PPTX_CROSS_COPY_SINK_BUCKET_FIELDS:
+        measured_vector(
+            f"write_size_buckets.{field}",
+            sink["write_size_buckets"][field],
+            bucket_metrics[field],
+        )
+
+
+def _validate_pptx_cross_copy_result_rows(
+    indexed: Mapping[tuple[str, str], dict[str, Any]],
+    configuration: Mapping[str, Any],
+    label: str,
+) -> None:
+    """Validate PPTX cross-copy vectors before identity projection.
+
+    The phase and lifecycle vectors are observations and therefore cannot be
+    part of ABBA source identity.  The output digest vector is still checked
+    against the independently reported result digest before it is projected
+    away; otherwise a report could graft arbitrary per-sample output hashes
+    into an otherwise matching source identity.
+    """
+
+    samples_per_case = _required_positive_integer(
+        configuration.get("samples_per_case"),
+        f"{label}.configuration",
+        "samples_per_case",
+    )
+    for (case, corpus_identity), row in indexed.items():
+        source = row.get("source")
+        if case not in _PPTX_CROSS_COPY_CASES:
+            if isinstance(source, dict) and source.get("pptx_cross_copy") is not None:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.source.pptx_cross_copy is only valid for PPTX cross-copy selectors"
+                )
+            continue
+
+        source_object = _require_object(source, f"{label}.{case}.source")
+        summary = _require_object(
+            source_object.get("pptx_cross_copy"),
+            f"{label}.{case}.source.pptx_cross_copy",
+        )
+        expected_keys = set(_PPTX_CROSS_COPY_KEYS)
+        if case in _PPTX_CROSS_COPY_LIFECYCLE_CASES:
+            expected_keys.add("lifecycle_ns")
+        keys = set(summary)
+        if keys != expected_keys:
+            missing = sorted(expected_keys - keys)
+            unknown = sorted(keys - expected_keys)
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.source.pptx_cross_copy schema mismatch "
+                f"(missing={missing!r}, unknown={unknown!r})"
+            )
+
+        location = f"{label}.{case}.source.pptx_cross_copy"
+        for field in (
+            "implementation",
+            "timing_scope",
+            "performance_claim",
+            "source_slide_name",
+            "destination_slide_name",
+        ):
+            _required_nonempty_string(summary[field], location, field)
+        if not summary["performance_claim"].startswith("none:"):
+            raise AbbaSummaryInputError(
+                f"{location}.performance_claim must begin with 'none:'"
+            )
+
+        corpus = json.loads(corpus_identity)
+        source_digest = _validate_output_sha256(
+            summary["source_archive_sha256"],
+            f"{location}.source_archive_sha256",
+        )
+        destination_digest = _validate_output_sha256(
+            summary["destination_archive_sha256"],
+            f"{location}.destination_archive_sha256",
+        )
+        corpus_digest = _validate_output_sha256(
+            corpus.get("archive_sha256"),
+            f"{location}.corpus.archive_sha256",
+        )
+        if destination_digest != corpus_digest:
+            raise AbbaSummaryInputError(
+                f"{location}.destination_archive_sha256 disagrees with corpus.archive_sha256"
+            )
+        if source_digest == destination_digest:
+            raise AbbaSummaryInputError(
+                f"{location}.source_archive_sha256 must differ from destination archive"
+            )
+        expected_output_digest = _validate_output_sha256(
+            summary["expected_output_sha256"],
+            f"{location}.expected_output_sha256",
+        )
+        result_output_digest = _validate_output_sha256(
+            row.get("output_sha256"),
+            f"{label}.{case}.output_sha256",
+        )
+        if result_output_digest != expected_output_digest:
+            raise AbbaSummaryInputError(
+                f"{location}.expected_output_sha256 disagrees with result.output_sha256"
+            )
+
+        numeric_fields = (
+            "source_slide",
+            "destination_slide",
+            "insertion_position",
+            "destination_slide_count_before",
+            "destination_slide_count_after",
+            "planned_part_count",
+            "planned_bytes",
+            "external_relationship_count",
+            "collision_remapped_parts",
+        )
+        for field in numeric_fields:
+            _u64(summary[field], f"{location}.{field}")
+        destination_slide_count_before = summary["destination_slide_count_before"]
+        destination_slide = summary["destination_slide"]
+        insertion_position = summary["insertion_position"]
+        planned_part_count = summary["planned_part_count"]
+        collision_remapped_parts = summary["collision_remapped_parts"]
+        if destination_slide >= destination_slide_count_before:
+            raise AbbaSummaryInputError(
+                f"{location}.destination_slide must be less than destination_slide_count_before"
+            )
+        if insertion_position > destination_slide_count_before:
+            raise AbbaSummaryInputError(
+                f"{location}.insertion_position must not exceed destination_slide_count_before"
+            )
+        if collision_remapped_parts > planned_part_count:
+            raise AbbaSummaryInputError(
+                f"{location}.collision_remapped_parts must not exceed planned_part_count"
+            )
+        if summary["destination_slide_count_before"] == U64_MAX or summary[
+            "destination_slide_count_after"
+        ] != summary["destination_slide_count_before"] + 1:
+            raise AbbaSummaryInputError(
+                f"{location}.destination_slide_count_after must be one greater than before"
+            )
+
+        gates = _require_object(summary["gates"], f"{location}.gates")
+        if set(gates) != set(_PPTX_CROSS_COPY_GATE_FIELDS):
+            missing = sorted(set(_PPTX_CROSS_COPY_GATE_FIELDS) - set(gates))
+            unknown = sorted(set(gates) - set(_PPTX_CROSS_COPY_GATE_FIELDS))
+            raise AbbaSummaryInputError(
+                f"{location}.gates schema mismatch "
+                f"(missing={missing!r}, unknown={unknown!r})"
+            )
+        for field in _PPTX_CROSS_COPY_GATE_FIELDS:
+            if not _required_bool(gates[field], f"{location}.gates", field):
+                raise AbbaSummaryInputError(f"{location}.gates.{field} must be true")
+
+        elapsed = _require_object(row.get("elapsed_ns"), f"{label}.{case}.elapsed_ns")
+        elapsed_samples = elapsed.get("samples")
+        if not isinstance(elapsed_samples, list) or len(elapsed_samples) != samples_per_case:
+            raise AbbaSummaryInputError(
+                f"{location} vectors must contain exactly {samples_per_case} samples"
+            )
+        for index, value in enumerate(elapsed_samples):
+            _u64(value, f"{label}.{case}.elapsed_ns.samples[{index}]")
+
+        sink_object = _validate_pptx_cross_copy_sink(
+            row.get("sink"), f"{label}.{case}.sink"
+        )
+        _validate_pptx_cross_copy_operation_sink_binding(
+            row,
+            sink_object,
+            f"{label}.{case}",
+            len(elapsed_samples),
+        )
+
+        raw_sample_order = elapsed.get("sample_order")
+        if raw_sample_order is None:
+            if samples_per_case != 1:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.elapsed_ns.sample_order is required for multiple samples"
+                )
+            sample_order = [0]
+        else:
+            if not isinstance(raw_sample_order, list) or len(raw_sample_order) != samples_per_case:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.elapsed_ns.sample_order must contain exactly {samples_per_case} entries"
+                )
+            sample_order = []
+            for index, value in enumerate(raw_sample_order):
+                original_index = _u64(
+                    value, f"{label}.{case}.elapsed_ns.sample_order[{index}]"
+                )
+                if original_index >= samples_per_case:
+                    raise AbbaSummaryInputError(
+                        f"{label}.{case}.elapsed_ns.sample_order[{index}] is outside the sample range"
+                    )
+                sample_order.append(original_index)
+            if sorted(sample_order) != list(range(samples_per_case)):
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.elapsed_ns.sample_order must be an exact permutation"
+                )
+
+        timing_vectors: dict[str, list[int]] = {}
+        for field in _PPTX_CROSS_COPY_VECTOR_FIELDS:
+            vector = summary[field]
+            if not isinstance(vector, list) or len(vector) != samples_per_case:
+                raise AbbaSummaryInputError(
+                    f"{location}.{field} must contain exactly {samples_per_case} samples"
+                )
+            for index, value in enumerate(vector):
+                vector_location = f"{location}.{field}[{index}]"
+                if field == "output_sha256":
+                    digest = _validate_output_sha256(value, vector_location)
+                    if digest != expected_output_digest:
+                        raise AbbaSummaryInputError(
+                            f"{vector_location} differs from expected_output_sha256"
+                        )
+                else:
+                    _u64(value, vector_location)
+            if field != "output_sha256":
+                timing_vectors[field] = vector
+        if case in _PPTX_CROSS_COPY_LIFECYCLE_CASES:
+            lifecycle = summary["lifecycle_ns"]
+            if not isinstance(lifecycle, list) or len(lifecycle) != samples_per_case:
+                raise AbbaSummaryInputError(
+                    f"{location}.lifecycle_ns must contain exactly {samples_per_case} samples"
+                )
+            for index, value in enumerate(lifecycle):
+                _u64(value, f"{location}.lifecycle_ns[{index}]")
+            for index, value in enumerate(lifecycle):
+                if value != elapsed_samples[index]:
+                    raise AbbaSummaryInputError(
+                        f"{location}.lifecycle_ns[{index}] must equal elapsed_ns.samples[{index}]"
+                    )
+                phase_total = sum(
+                    timing_vectors[field][index]
+                    for field in ("plan_ns", "commit_ns", "publication_ns")
+                )
+                if phase_total > value:
+                    raise AbbaSummaryInputError(
+                        f"{location} plan/commit/publication total exceeds lifecycle_ns[{index}]"
+                    )
+        else:
+            for sorted_index, original_index in enumerate(sample_order):
+                phase_total = sum(
+                    timing_vectors[field][original_index]
+                    for field in ("plan_ns", "commit_ns", "publication_ns")
+                )
+                if phase_total != elapsed_samples[sorted_index]:
+                    raise AbbaSummaryInputError(
+                        f"{location} plan/commit/publication total does not match elapsed_ns.samples"
+                    )
+
+
 def _validate_opc_source_overlay_result_rows(
     indexed: Mapping[tuple[str, str], dict[str, Any]],
     configuration: Mapping[str, Any],
@@ -4657,6 +5235,8 @@ def _identity_value(row: dict[str, Any], field: str, location: str) -> tuple[boo
     value = row[field] if present else None
     if field == "source":
         value = _source_identity_projection(value)
+    elif field == "sink":
+        value = _sink_identity_projection(value, row.get("case"))
     return present, _canonical_json(value, f"{location}.{field}")
 
 
@@ -6120,6 +6700,23 @@ def _source_identity_projection(value: Any) -> Any:
         projected["docx_section_layout"] = projected_docx
         for field in _DOCX_SECTION_LAYOUT_ROOT_SOURCE_VECTOR_FIELDS:
             projected.pop(field, None)
+    pptx_cross_copy = projected.get("pptx_cross_copy")
+    if isinstance(pptx_cross_copy, dict):
+        projected_pptx = dict(pptx_cross_copy)
+        for field in _PPTX_CROSS_COPY_DYNAMIC_FIELDS:
+            projected_pptx.pop(field, None)
+        projected["pptx_cross_copy"] = projected_pptx
+    return projected
+
+
+def _sink_identity_projection(value: Any, case: Any) -> Any:
+    """Drop only PPTX write-shape counters after their bounds are checked."""
+
+    if case not in _PPTX_CROSS_COPY_CASES or not isinstance(value, dict):
+        return value
+    projected = dict(value)
+    for field in _PPTX_CROSS_COPY_SINK_DYNAMIC_FIELDS:
+        projected.pop(field, None)
     return projected
 
 
@@ -6147,6 +6744,8 @@ def _compare_row_identity(
     value = rows["a1"][field]
     if field == "source":
         value = _source_identity_projection(value)
+    elif field == "sink":
+        value = _sink_identity_projection(value, rows["a1"].get("case"))
     return "verified_equal", True, expected_identity, value
 
 
@@ -6338,9 +6937,11 @@ def _project_report(
         for field in ("source", "sink", "output_sha256"):
             if field in row:
                 value = row[field]
-                projected_row[field] = (
-                    _source_identity_projection(value) if field == "source" else value
-                )
+                if field == "source":
+                    value = _source_identity_projection(value)
+                elif field == "sink":
+                    value = _sink_identity_projection(value, case)
+                projected_row[field] = value
             present, identity = _identity_value(
                 row, field, f"{label}.{case}[{corpus_identity}]"
             )
