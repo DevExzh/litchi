@@ -241,6 +241,19 @@ impl OpcPackage {
         &self.save_options
     }
 
+    /// Whether this package still represents its unmodified owned source.
+    ///
+    /// This requires both owned ingress (built-in parts and default save
+    /// preferences) and unrevoked exact-source authorization. Every mutable API
+    /// entry point must revoke it for that package clone, including failed or
+    /// no-op mutations and save-option changes. Borrowed ingress and newly
+    /// authored packages return `false`. This query neither exposes source
+    /// bytes nor restores authorization.
+    #[must_use]
+    pub fn is_unmodified_owned_source(&self) -> bool {
+        self.exact_source().is_some()
+    }
+
     /// Configure font embedding with one self-documenting policy.
     pub fn with_fonts(&mut self, policy: FontEmbedding) -> &mut Self {
         self.revoke_exact_source();
@@ -1590,6 +1603,15 @@ mod tests {
         let package = OpcPackage::from_vec(bytes).expect("open owned package");
         let mut clone = package.clone();
 
+        assert!(package.is_unmodified_owned_source());
+        assert!(clone.is_unmodified_owned_source());
+        assert!(!OpcPackage::new().is_unmodified_owned_source());
+        assert!(
+            !OpcPackage::from_bytes(&create_minimal_docx())
+                .unwrap()
+                .is_unmodified_owned_source()
+        );
+
         assert!(Arc::ptr_eq(
             package.source_archive.as_ref().expect("source authorized"),
             clone
@@ -1600,6 +1622,8 @@ mod tests {
 
         let unchanged_options = clone.save_options().clone();
         clone.set_save_options(unchanged_options);
+        assert!(!clone.is_unmodified_owned_source());
+        assert!(package.is_unmodified_owned_source());
         assert!(!clone.exact_source_authorized);
         assert!(clone.source_archive.is_some());
         assert!(clone.preservation.is_some());
