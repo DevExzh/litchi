@@ -203,6 +203,17 @@ pub fn __is_valid_pages_text_storage(source: &[u8]) -> bool {
     text_storage::is_valid(source)
 }
 
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use text_storage::BodyStorageDiscovery;
+
+/// Project the compact body fields needed by the legacy migration host.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub fn __pages_body_storage_discovery(source: &[u8]) -> PackageResult<BodyStorageDiscovery> {
+    text_storage::body_discovery(source)
+}
+
 /// Bounded physical ingress limits for a Pages package.
 ///
 /// This is the shared iWork ZIP/IWA resource profile. It remains a separate

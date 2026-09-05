@@ -95,3 +95,17 @@ The checked-in artifact has SHA-256
 This fixture supplies native producer input for the bounded Keynote
 table-model discovery reader. It does not certify physical table sorting,
 Litchi table mutation, native byte parity, or broader Keynote table support.
+
+## Pages Unicode body and section discovery (2026-09-05)
+
+`pages/body-sections-unicode.pages` was created through Computer Use in Pages
+14.4 using Blank. The first section contains `Pages borrowed body 😀`, a
+paragraph break, and `First section marker.`. **Insert → Section Break**
+created a second section containing `Second section marker — end.`. Pages
+saved, closed, and reopened the document with both pages and their markers
+intact and no repair prompt, then closed it. The artifact's SHA-256 is
+`8d26202b6a184c92e8c232d4886ba64ce6efb929bfe30818e506a24b041c6a22`.
+
+The fixture verifies native body/section discovery across a UTF-16 surrogate
+pair and exact source preservation. It is native authoring and read evidence;
+it does not qualify a Litchi section mutation or hidden-axis operation.

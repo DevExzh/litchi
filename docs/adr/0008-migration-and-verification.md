@@ -16264,3 +16264,65 @@ No workspace package, manifest/dependency edge, ordered debt, migration-host
 item, or ADR 0028 deletion gate is removed or closed by this follow-up. The
 previously recorded verification figures remain historical; these new results
 qualify the focused operation and do not close native mutation gates.
+
+## 2026-09-05 follow-up: focused discovery and Custom-format delegation
+
+The migration-host Pages discovery path now uses focused
+`BodyStorageDiscovery` instead of materializing a complete
+`TSWP.StorageArchive`. It retains only validated body UTF-16 length and
+compact section references. Strict source-borrowed text-wire qualification
+remains authoritative, and each selected section entry uses the existing
+bounded Buffa projection. The malformed optional footnote field-16 fallback
+remains deferred and temporary; malformed section data still fails closed.
+
+Pages section-template discovery also uses the bounded Buffa header/footer
+codec and fallibly retains only the two identifier vectors. Unrelated
+drawable and page-template fields remain opaque on this discovery route;
+full graph and mutation operations retain their existing projections.
+
+Computer Use authored the checked-in
+[`body-sections-unicode.pages`](../../test-data/iwork/pages/body-sections-unicode.pages)
+fixture in Pages 14.4 from a Blank document: the first section contains
+`Pages borrowed body 😀\nFirst section marker.`, `Insert > Section Break` starts
+the second section, and it contains `Second section marker — end.`. The
+document was saved, closed, reopened with both section markers and no repair
+prompt, and closed again. Its SHA-256 is
+`8d26202b6a184c92e8c232d4886ba64ce6efb929bfe30818e506a24b041c6a22`.
+Three focused native-fixture tests pass, including exact output for this
+two-section source. The filtered `pages::editor` host suite reports 205
+passing tests, including the Unicode source, malformed-footnote deferral, and
+two section-template projections; seven focused text-storage projection tests
+also pass. This is bounded discovery and read/no-op evidence and adds no native
+mutation-parity claim.
+
+The Pages section-boundary projection rejects a noncanonical deprecated
+`Reference.type` value outside signed `i32` (including positive `2^31`) before
+any narrowing that could reproduce permissive text-wire or older Prost
+truncation. Canonical negative signed-`i32` encodings and explicit `false`
+remain supported.
+
+The Keynote catalog's document/show root reads now use the existing bounded
+Buffa projections. The focused `slide_tables` suite reports 52 passing tests,
+including 21 graph tests. Its template-identifier helper requires the
+`KN.super`/`TSA.super` base preflight; ignored optional graph payloads remain
+opaque. Complete generated document/show materialization and full Prost
+acceptance parity are not claimed. Numbers exact-source existing-cell
+`Custom` same-family Number/Text/Date & Time replacement and no-op, together
+with `Custom` -> `Automatic` clear, now delegate to the focused owner.
+Authoring, cross-family, and source-built cases remain on the compatibility
+writer. An absent legacy root-field-9 registry uses explicit compatibility
+preselection; a present malformed or duplicate field-9 registry remains a
+strict terminal refusal. The synthetic `custom-focused.numbers` fixture is
+E1 evidence only, not native evidence. Five focused tests pass, covering
+replacement, shared-registry/value/locality, no-op `Arc` and exact-byte
+identity, malformed-refcount no-op terminal behavior, duplicate field-9
+terminal behavior, and actual-builder `Custom` serialize/reopen
+replacement/no-op/clear/value checks. This bounded evidence does not claim
+native Numbers mutation parity.
+
+Workspace formatting, library lint, all-feature library/integration tests,
+and doc tests pass. Boundary verification reports 873 passing
+policy tests and a valid scanner census of 64 packages, 238 declarations, and
+11 ordered debts. No workspace package, manifest edge, ordered migration debt,
+migration-host item, or deletion gate is removed or closed by this follow-up;
+the monolithic `litchi-iwa` crate remains.

@@ -7,6 +7,27 @@ fn fixture_path() -> PathBuf {
 }
 
 #[test]
+fn native_unicode_body_sections_open_with_exact_source_preservation()
+-> Result<(), Box<dyn std::error::Error>> {
+    let source = std::fs::read(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/pages/body-sections-unicode.pages"),
+    )?;
+    let package = Package::from_bytes(&source)?;
+    package.validate()?;
+    let text = package.text()?;
+    assert!(text.contains("Pages borrowed body 😀"));
+    assert!(text.contains("First section marker."));
+    assert!(text.contains("Second section marker — end."));
+    assert_eq!(package.stats().section_count(), 2);
+    assert!(package.select_section(SectionSelector::index(1))?.is_some());
+    let mut output = Vec::new();
+    package.write_to(&mut output)?;
+    assert_eq!(output, source);
+    Ok(())
+}
+
+#[test]
 fn native_pages_fixture_opens_from_path_and_bytes() -> Result<(), Box<dyn std::error::Error>> {
     let path = fixture_path();
     let package = Package::open(&path)?;
