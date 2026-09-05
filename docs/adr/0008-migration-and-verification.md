@@ -16460,3 +16460,52 @@ tests, and documentation tests. The transition module deletion is complete, but 
 `litchi-iwa` deletion and global parity gates remain open.
 Boundary verification currently reports 890 passing tests with a census of 64
 packages, 238 declarations, and 11 ordered debts.
+
+
+## 2026-09-06 follow-up: focused catalog appearance reads and native DateTime
+
+The shared host `table_appearance.rs` and `table_appearance/wire.rs` reader
+and its module declaration are deleted. The Pages compatibility helper and
+its documentation-only module are also deleted. Numbers source-built table
+listing and Pages body-table listing now delegate appearance interpretation
+to their concrete format crates through hidden `internal-iwork-source`
+seams. Keynote catalog appearance traversal and style-edge projection likewise
+belong to the focused Keynote owner. The migrated compatibility adapters retain physical object
+indexes and borrow selected payloads from the existing archive cache without
+serializing and reopening a package or cloning archive payloads. The existing
+exact-source Numbers/Keynote facade ingress still constructs one focused
+package per listing; sharing its source with the host remains future work.
+
+The focused readers use the strict Buffa appearance codec, finite aggregate
+wire budgets, and bounded inheritance. Child values take precedence; the
+established native defaults and direct-style precedence over unused presets
+remain intact. Numbers source-built and Pages reads retain their early stop
+once all seven appearance values are resolved. Keynote retains its existing
+full parent-chain validation. Exact-source Numbers reads still enter the
+public selector-first focused owner, with failures terminal. These temporary
+read seams do not expand public raw-ID APIs or relax mutation admission.
+
+Computer Use authored, saved, closed, and reopened a Numbers 14.4 Custom
+DateTime source with B2 storing January 2, 2024 at 15:04:05 and displaying
+`Jan 2, 2024` under `Native Calendar` (`MMM d, y`). The focused API replaced
+that format with `Rust Calendar` (`yyyy-MM-dd HH:mm:ss`); Numbers displayed
+`2024-01-02 15:04:05`, retained the actual value, and preserved the adjacent
+marker through save, close, and exact-path reopen without repair. Clearing
+from the native-resaved candidate restored `Automatic`; the full actual
+date/time and edited marker again survived save, close, and reopen. Rust
+confirmed another clear was an exact no-op. Checked source/resaved fixtures,
+SHA-256 hashes, and the temporary clear artifact evidence are recorded in the
+[fixture README](../../test-data/iwork/README.md#numbers-custom-datetime-source-2026-09-06).
+The Rust replacement and clear also verify three-component locality, semantic
+reopen, exact source no-op, cache/value preservation, and inverse restoration.
+
+This qualifies the recorded DateTime replacement and clear cases only. The
+monolithic `litchi-iwa` crate, remaining compatibility writers, ordered
+migration debts, and global native-parity/deletion gates remain open.
+
+Focused validation passes 1,713 host library tests, 452 Numbers tests plus four
+ignored, 153 Pages tests, 202 Keynote tests, and five native DateTime integration
+tests. Boundary policy verification passes 895 tests; the scanner retains
+64 packages, 238 internal dependency declarations, and 11 ordered debts.
+Formatting, manifest sorting, and diff checks pass. Normal commit hooks enforce
+library lint, workspace all-feature library/integration tests, and doc tests.

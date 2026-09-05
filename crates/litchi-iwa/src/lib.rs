@@ -150,7 +150,6 @@ mod protobuf;
 mod registry;
 mod snappy;
 /// Typed copy-on-write appearance controls shared by Pages, Numbers, and Keynote.
-pub mod table_appearance;
 mod table_hidden_axes;
 /// Typed native table lock controls shared by Pages, Numbers, and Keynote.
 mod table_lock;

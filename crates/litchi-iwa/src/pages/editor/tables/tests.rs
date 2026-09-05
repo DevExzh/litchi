@@ -274,6 +274,7 @@ fn table_model_discovery_projects_borrowed_name_and_dimensions() {
     assert_eq!(graph.len(), 1);
     assert_eq!(graph[0].info.name, "Discovery");
     assert_eq!((graph[0].info.rows, graph[0].info.columns), (3, 4));
+    assert_eq!(graph[0].info.appearance, TableAppearance::default());
 }
 
 #[test]
@@ -285,6 +286,14 @@ fn native_body_table_discovery_preserves_the_source_package() {
     let tables = editor.tables().expect("bounded native table discovery");
     assert_eq!(tables.len(), 1);
     assert_eq!((tables[0].rows, tables[0].columns), (5, 4));
+    assert_eq!(
+        tables[0].appearance,
+        TableAppearance {
+            row_banding: litchi_iwa_common::table::appearance::Banding::Enabled,
+            row_sizing: litchi_iwa_common::table::appearance::RowSizing::FitCellContents,
+            ..TableAppearance::default()
+        }
+    );
     assert!(
         editor
             .body_text()

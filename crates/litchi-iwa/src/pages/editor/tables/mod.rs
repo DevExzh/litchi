@@ -1,6 +1,5 @@
 //! Native table discovery and cell editing for Pages body attachments.
 
-mod appearance;
 mod comments;
 mod conditional_highlight;
 mod formula;

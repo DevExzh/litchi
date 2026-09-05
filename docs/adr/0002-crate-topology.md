@@ -4368,3 +4368,20 @@ save/close/reopen evidence for each operation. No dependency edge, ordered
 migration debt, or ADR 0028 deletion gate closes here. Soundtrack creation,
 general media-asset CRUD, and durable patch serialization remain outside this
 increment.
+
+
+## 2026-09-06 amendment: focused catalog appearance reads
+
+The historical shared appearance-reader exception is retired. The host
+`table_appearance.rs` and `table_appearance/wire.rs` modules and their public
+module declaration are deleted. Numbers source-built and Pages body-table
+listing now delegate appearance interpretation to hidden, feature-gated
+read seams in their concrete format crates. Keynote catalog listing likewise
+keeps only its physical adapter in the host. These adapters borrow the
+existing parsed-archive cache through payload-free object indexes.
+
+Supported facades remain semantic and ID-free. The temporary migration seams
+are limited to `internal-iwork-source`; they do not broaden mutation admission
+or close a package, dependency, ordered-debt, or monolith-exit gate. See the
+[ADR 0028 follow-up](0028-iwa-monolith-exit.md#2026-09-06-follow-up-focused-catalog-appearance-reads-and-native-datetime)
+for the source-retirement and verification scope.

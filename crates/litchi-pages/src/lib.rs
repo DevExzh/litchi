@@ -78,6 +78,12 @@ pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::{
+    __CatalogBodyTableAppearanceSource, __catalog_body_table_appearance,
+    __catalog_body_table_style_edges,
+};
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use package::{
     __is_valid_pages_text_storage, __pages_body_storage_discovery,
     __semantic_document_from_prepared_source, BodyStorageDiscovery,
 };

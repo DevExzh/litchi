@@ -6,6 +6,140 @@ use super::super::selectors;
 use super::*;
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 
+const TABLE_APPEARANCE_STYLE_MESSAGE_TYPES: &[u32] = &[6_003];
+const TABLE_APPEARANCE_PRESET_MESSAGE_TYPES: &[u32] = &[6_008];
+const TABLE_APPEARANCE_NETWORK_MESSAGE_TYPES: &[u32] = &[6_247];
+
+#[derive(Debug, Clone, Copy)]
+struct SourceBuiltAppearanceObjectLocation {
+    archive_index: usize,
+    object_index: usize,
+}
+
+/// Payload-free source-built appearance object index.
+///
+/// The package keeps parsed archives in its bounded cache. This catalog owns
+/// only archive names and object slots, so appearance reads can borrow one
+/// selected message at a time without cloning every archive in the package.
+struct SourceBuiltAppearanceCatalog<'package> {
+    package: &'package IWorkPackage,
+    archive_names: Vec<String>,
+    objects: HashMap<u64, SourceBuiltAppearanceObjectLocation>,
+}
+
+impl<'package> SourceBuiltAppearanceCatalog<'package> {
+    fn build(package: &'package IWorkPackage) -> Result<Self> {
+        let archive_count = package.iwa_entry_names().count();
+        let mut archive_names = Vec::new();
+        archive_names
+            .try_reserve_exact(archive_count)
+            .map_err(|_| {
+                Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                    resource: "Numbers table appearance archive names",
+                    amount: archive_count,
+                })
+            })?;
+        for name in package.iwa_entry_names() {
+            let mut owned = String::new();
+            owned.try_reserve_exact(name.len()).map_err(|_| {
+                Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                    resource: "Numbers table appearance archive name",
+                    amount: name.len(),
+                })
+            })?;
+            owned.push_str(name);
+            archive_names.push(owned);
+        }
+
+        let mut objects = HashMap::new();
+        objects.try_reserve(archive_names.len()).map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers table appearance object index",
+                amount: archive_names.len(),
+            })
+        })?;
+        for (archive_index, archive_name) in archive_names.iter().enumerate() {
+            package.with_parsed_archive(archive_name, |archive| {
+                objects.try_reserve(archive.objects.len()).map_err(|_| {
+                    Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                        resource: "Numbers table appearance object index",
+                        amount: archive.objects.len(),
+                    })
+                })?;
+                for (object_index, object) in archive.objects.iter().enumerate() {
+                    let identifier = object.archive_info.identifier.ok_or_else(|| {
+                        Error::InvalidFormat(format!("Object in {archive_name} has no identifier"))
+                    })?;
+                    if objects
+                        .insert(
+                            identifier,
+                            SourceBuiltAppearanceObjectLocation {
+                                archive_index,
+                                object_index,
+                            },
+                        )
+                        .is_some()
+                    {
+                        return Err(Error::InvalidFormat(format!(
+                            "Numbers appearance object {identifier} is repeated"
+                        )));
+                    }
+                }
+                Ok(())
+            })?;
+        }
+        Ok(Self {
+            package,
+            archive_names,
+            objects,
+        })
+    }
+
+    fn with_payload(
+        &self,
+        identifier: u64,
+        message_types: &[u32],
+        context: &str,
+        read: &mut dyn FnMut(&[u8]),
+    ) -> Result<()> {
+        let location = self.objects.get(&identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers {context} object {identifier} is missing"))
+        })?;
+        let archive_name = self
+            .archive_names
+            .get(location.archive_index)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers table appearance archive is missing".to_owned())
+            })?;
+        self.package.with_parsed_archive(archive_name, |archive| {
+            let object = archive.objects.get(location.object_index).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers {context} object {identifier} is missing"))
+            })?;
+            if object.archive_info.identifier != Some(identifier) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers {context} object {identifier} location changed"
+                )));
+            }
+            let mut messages = object
+                .messages
+                .iter()
+                .filter(|message| message_types.contains(&message.type_));
+            let message = messages.next().ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers {context} object {identifier} has no supported payload"
+                ))
+            })?;
+            if messages.next().is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers {context} object {identifier} has multiple supported payloads"
+                )));
+            }
+            read(message.data.as_slice());
+            Ok(())
+        })
+    }
+}
+
 impl NumbersEditor {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::from_package(IWorkPackage::open(path)?)
@@ -69,11 +203,18 @@ impl NumbersEditor {
 
     pub fn tables(&self) -> Result<Vec<NumbersTableInfo>> {
         let source_built = !self.package.source_is_exact();
+        let descriptors = table_models(&self.package)?;
         // Source-built and older compatibility packages may not carry the
-        // strict Metadata ownership required for focused appearance reads.
-        // Preserve their read-only table catalog behavior through the shared
-        // legacy projector. Once an exact source is admitted to the focused
-        // owner, every ingress/read failure is terminal.
+        // exact-source metadata required by focused transactions. Their
+        // read-only appearance projection still belongs to the focused
+        // Numbers owner through its bounded compatibility seam. Once an exact
+        // source is admitted to the focused owner, every ingress/read failure
+        // is terminal.
+        let source_built_catalog = if source_built {
+            Some(SourceBuiltAppearanceCatalog::build(&self.package)?)
+        } else {
+            None
+        };
         let focused_package = if source_built {
             None
         } else {
@@ -89,29 +230,34 @@ impl NumbersEditor {
             })?)
         };
         let read_focused_appearance = litchi_numbers::Package::table_appearance;
-        let read_compatibility_appearance = crate::table_appearance::table_appearance;
-        let mut tables = table_models(&self.package)?
+        let mut tables = descriptors
             .into_iter()
             .map(|descriptor| {
+                let appearance = if let Some(package) = focused_package.as_ref() {
+                    let (sheet_selector, table_selector) =
+                        selectors::focused_table_location(self, descriptor.object_id)?;
+                    read_focused_appearance(package, sheet_selector, table_selector).map_err(
+                        |error| {
+                            Error::InvalidFormat(format!(
+                                "focused Numbers table-appearance read failed: {error}"
+                            ))
+                        },
+                    )?
+                } else {
+                    let catalog = source_built_catalog.as_ref().ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "source-built Numbers appearance catalog is missing".to_owned(),
+                        )
+                    })?;
+                    source_built_table_appearance(catalog, &descriptor)?
+                };
                 Ok(NumbersTableInfo {
                     object_id: descriptor.object_id,
                     index: 0,
                     name: descriptor.model.table_name,
                     rows: descriptor.model.number_of_rows as usize,
                     columns: descriptor.model.number_of_columns as usize,
-                    appearance: if let Some(package) = focused_package.as_ref() {
-                        let (sheet_selector, table_selector) =
-                            selectors::focused_table_location(self, descriptor.object_id)?;
-                        read_focused_appearance(package, sheet_selector, table_selector).map_err(
-                            |error| {
-                                Error::InvalidFormat(format!(
-                                    "focused Numbers table-appearance read failed: {error}"
-                                ))
-                            },
-                        )?
-                    } else {
-                        read_compatibility_appearance(&self.package, descriptor.object_id)?
-                    },
+                    appearance,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
@@ -636,4 +782,41 @@ impl NumbersEditor {
         }
         Ok(())
     }
+}
+
+fn source_built_table_appearance(
+    catalog: &SourceBuiltAppearanceCatalog<'_>,
+    descriptor: &TableDescriptor,
+) -> Result<litchi_numbers::Appearance> {
+    let style_identifier = descriptor.model.table_style.identifier;
+    let style_preset_identifier = descriptor
+        .model
+        .table_style_preset
+        .as_ref()
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0);
+    litchi_numbers::Package::__table_appearance_from_source_built(
+        style_identifier,
+        style_preset_identifier,
+        |identifier, kind, consume| {
+            let (message_types, context) = match kind {
+                litchi_numbers::SourceBuiltAppearancePayload::TableStyle => {
+                    (TABLE_APPEARANCE_STYLE_MESSAGE_TYPES, "table style")
+                },
+                litchi_numbers::SourceBuiltAppearancePayload::TableStylePreset => {
+                    (TABLE_APPEARANCE_PRESET_MESSAGE_TYPES, "table style preset")
+                },
+                litchi_numbers::SourceBuiltAppearancePayload::TableStyleNetwork => (
+                    TABLE_APPEARANCE_NETWORK_MESSAGE_TYPES,
+                    "table style network",
+                ),
+            };
+            catalog.with_payload(identifier, message_types, context, consume)
+        },
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "focused Numbers source-built table-appearance read failed: {error}"
+        ))
+    })
 }

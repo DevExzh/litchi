@@ -7,7 +7,7 @@ use crate::bundle::Bundle;
 use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
-use crate::table_appearance::TableAppearance;
+use litchi_iwa_common::table::appearance::Appearance as TableAppearance;
 use litchi_iwa_common::table::cell::{BorderSide, Borders};
 use litchi_iwa_common::table::lock::State as TableLockState;
 use litchi_numbers::cell::data_format::control::{Slider, Stepper};

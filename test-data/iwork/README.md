@@ -186,3 +186,34 @@ and exact inverse restoration before native verification. Rust also read the
 native-resaved clear result and confirmed that another clear was an exact
 no-op. This qualifies these Custom Text replacement and clear cases; Custom
 DateTime and broader native format parity remain outside this evidence.
+
+## Numbers Custom DateTime source (2026-09-06)
+
+`numbers/custom-datetime-native.numbers` was authored through Computer Use in
+Numbers 14.4 from Blank. B2 stores January 2, 2024 at 15:04:05 with the native
+Custom Date & Time format `Native Calendar` (`MMM d, y`); C2 contains
+`Native DateTime marker`. Numbers saved, closed, and reopened the exact path
+without a repair prompt. B2 displayed `Jan 2, 2024`, while the Cell inspector
+retained the actual value `1/2/2024 3:04:05 PM` and `Native Calendar`. SHA-256:
+`1ca74fb3e89ee2cdc913ad0a125f8f8118f14d684d9633e9038024e4c3d8ac27`.
+
+The focused Numbers API replaced B2's format with `Rust Calendar`
+(`yyyy-MM-dd HH:mm:ss`). Numbers displayed `2024-01-02 15:04:05` and confirmed
+`Rust Calendar` in the Cell inspector. After changing C2 to
+`Native DateTime marker saved`, Numbers saved, closed, and reopened the exact
+candidate path with the value, format, and marker intact and no repair prompt.
+`numbers/custom-datetime-native-resaved.numbers` retains this artifact. SHA-256:
+`8e7843c6d68ea5088a39c28dc517c552747d6231029e67d4e66a237975e24987`.
+
+The focused API cleared B2's Custom format from the native-resaved candidate.
+Numbers displayed `1/2/24 3:04 PM` with `Automatic` in the Cell inspector and
+the full actual value `1/2/2024 3:04:05 PM`. After changing C2 to
+`Native DateTime clear saved`, save, close, and exact-path reopen preserved
+these values without a repair prompt. The temporary native-resaved clear
+artifact had SHA-256
+`78c2a0a9fbfcc8bc5fcc0615c3430e684109985b3280bf4c0878a4ff165ee758`.
+Both Rust mutations verified semantic reopen, three-component locality,
+byte-exact no-op behavior, and exact inverse restoration. Rust also read the
+native-resaved clear result and confirmed another clear was an exact no-op.
+This qualifies these Custom DateTime replacement and clear cases; broader
+native format parity remains open.

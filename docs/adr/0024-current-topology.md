@@ -4354,3 +4354,19 @@ replay, and 100-run AddressSanitizer smoke pass for this follow-up.
 No package, dependency edge, ordered debt, migration-host item, or ADR 0028
 deletion gate is removed or closed. The authoritative inventory above is
 unchanged.
+
+
+## 2026-09-06 amendment: Pages appearance listing ownership
+
+The earlier `legacy_table_appearance_compatibility_read` exception and its
+documentation-only Pages module are deleted together with the shared host
+appearance reader. A focused Pages catalog read seam now owns style-edge
+projection, preset/network traversal, inheritance, defaults, and bounded
+Buffa decoding. The host supplies a payload-free index and borrows selected
+payloads from its existing parsed-archive cache. Listing does not serialize
+or reopen the whole package, and source-built defaults do not depend on
+mutation metadata admission.
+
+This retires a read-side compatibility implementation. Public selector-first
+mutation admission, native changed-edit parity, and the remaining monolith
+exit gates are unchanged. See the [ADR 0028 follow-up](0028-iwa-monolith-exit.md#2026-09-06-follow-up-focused-catalog-appearance-reads-and-native-datetime).

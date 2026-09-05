@@ -334,6 +334,9 @@ pub use document::{
 };
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
+pub use package::table_appearance::SourceBuiltAppearancePayload;
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
 pub use package::{
     __compatibility_tables_from_prepared_source, __semantic_document_from_prepared_source,
 };

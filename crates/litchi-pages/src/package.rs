@@ -12,6 +12,8 @@ pub(crate) mod body_table_hidden_axes;
 pub(crate) mod body_table_name;
 pub(crate) mod body_table_sort;
 pub(crate) mod body_table_title;
+#[cfg(feature = "internal-iwork-source")]
+mod catalog_body_table_appearance;
 pub(crate) mod document_settings;
 mod drawable_order;
 mod footnote_text;
@@ -90,6 +92,11 @@ pub use body_table_sort::{
 pub use body_table_title::{
     BodyTableTitleCommit, BodyTableTitleDiagnostics, BodyTableTitleEdit, BodyTableTitleError,
     BodyTableTitleLimitKind, BodyTableTitlePatch,
+};
+#[cfg(feature = "internal-iwork-source")]
+pub use catalog_body_table_appearance::{
+    __CatalogBodyTableAppearanceSource, __catalog_body_table_appearance,
+    __catalog_body_table_style_edges,
 };
 pub use drawable_order::{
     BodyDrawableOrderCommit, BodyDrawableOrderDiagnostics, BodyDrawableOrderEdit,
