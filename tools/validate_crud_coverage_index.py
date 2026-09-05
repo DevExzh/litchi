@@ -114,6 +114,8 @@ GENERATED_SELECTOR_SHAPES = {
     "xlsx_eager_cell_remove_edit_save": ("dense-sparse", "medium"),
     "docx_story_hyperlink_redaction_save": ("media-rich",),
     "pptx_source_backed_cross_copy_plain": ("plain",),
+    "pptx_source_backed_cross_copy_plain_lifecycle": ("plain",),
+    "pptx_source_backed_cross_copy_media_rich_lifecycle": ("media-rich",),
     "pptx_cross_copy_media_rich": ("media-rich",),
     "xlsx_eager_merge_commit_save": ("sparse-a1-b2",),
     "rtf_semantic_split_paragraph_save": ("large", "medium", "tiny"),

@@ -384,6 +384,26 @@
           "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
         },
         {
+          "selector": "pptx_source_backed_cross_copy_plain_lifecycle",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["plain"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "pptx_source_backed_cross_copy_media_rich_lifecycle",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["media-rich"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
           "selector": "pptx_cross_copy_media_rich",
           "status": "correctness-only",
           "corpus": {
