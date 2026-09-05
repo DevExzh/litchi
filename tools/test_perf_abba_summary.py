@@ -174,6 +174,139 @@ def row(shape, samples, *, source=None, sink=None, output_sha256=None):
     return result
 
 
+def pptx_cross_copy_source(sample_count, *, lifecycle, timing_offset=0):
+    output_digest = "d" * 64
+    summary = {
+        "implementation": "test PPTX cross-copy implementation",
+        "timing_scope": "test PPTX cross-copy timing scope",
+        "performance_claim": "none: test-only correctness/evidence; no performance claim",
+        "source_archive_sha256": "b" * 64,
+        "destination_archive_sha256": "a" * 64,
+        "expected_output_sha256": output_digest,
+        "source_slide": 2,
+        "destination_slide": 1,
+        "insertion_position": 1,
+        "source_slide_name": "Source slide",
+        "destination_slide_name": "Destination slide",
+        "destination_slide_count_before": 2,
+        "destination_slide_count_after": 3,
+        "planned_part_count": 9,
+        "planned_bytes": 900,
+        "external_relationship_count": 0,
+        "collision_remapped_parts": 9,
+        "gates": {
+            field: True for field in perf_abba_summary._PPTX_CROSS_COPY_GATE_FIELDS
+        },
+        "plan_ns": [10 + timing_offset] * sample_count,
+        "commit_ns": [20 + timing_offset] * sample_count,
+        "publication_ns": [70 - timing_offset] * sample_count,
+        "reopen_ns": [40 + timing_offset] * sample_count,
+        "output_sha256": [output_digest] * sample_count,
+    }
+    if lifecycle:
+        summary["lifecycle_ns"] = [100 + timing_offset] * sample_count
+    return {
+        "read_calls": [],
+        "read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "ordinary_payload_read_bytes": [],
+        "max_in_flight_reads": [],
+        "pptx_cross_copy": summary,
+    }
+
+
+def pptx_cross_copy_row(samples, *, lifecycle, timing_offset=0):
+    samples = list(samples)
+    case = (
+        "pptx_cross_copy_plain_lifecycle"
+        if lifecycle
+        else "pptx_cross_copy_plain"
+    )
+    elapsed_ns = elapsed(samples)
+    elapsed_ns["sample_order"] = list(range(len(samples)))
+    result = {
+        "case": case,
+        "corpus": {
+            "name": case,
+            "generator": "test-pptx-cross-copy",
+            "package_format": "PPTX/OPC/ZIP",
+            "shape": "plain",
+            "archive_sha256": "a" * 64,
+        },
+        "elapsed_ns": elapsed_ns,
+        "source": pptx_cross_copy_source(
+            len(samples), lifecycle=lifecycle, timing_offset=timing_offset
+        ),
+        "sink": {
+            "accepted_bytes": 1,
+            "write_calls": 1,
+            "largest_write": 1,
+            "write_size_buckets": {
+                "bytes_0": 0,
+                "bytes_1_to_512": 1,
+                "bytes_513_to_4096": 0,
+                "bytes_4097_to_16384": 0,
+                "bytes_16385_to_65536": 0,
+                "bytes_over_65536": 0,
+            },
+        },
+        "output_sha256": "d" * 64,
+    }
+    if lifecycle:
+        from tools.test_perf_compare import operation_metrics_report_fields
+
+        operation_metrics = operation_metrics_report_fields()
+        operation_metrics["sample_count"] = len(samples)
+        operation_metrics["sample_indices"] = list(range(len(samples)))
+        _resize_operation_metric_vectors(operation_metrics, len(samples))
+        sink_metrics = operation_metrics["sink"]
+        sink_metrics["accepted_bytes"]["values"] = [1] * len(samples)
+        sink_metrics["write_calls"]["values"] = [1] * len(samples)
+        sink_metrics["largest_write"]["values"] = [1] * len(samples)
+        sink_metrics["write_size_buckets"]["bytes_0"]["values"] = [0] * len(samples)
+        sink_metrics["write_size_buckets"]["bytes_1_to_512"]["values"] = [1] * len(samples)
+        for field in (
+            "bytes_513_to_4096",
+            "bytes_4097_to_16384",
+            "bytes_16385_to_65536",
+            "bytes_over_65536",
+        ):
+            sink_metrics["write_size_buckets"][field]["values"] = [0] * len(samples)
+        result["operation_metrics"] = operation_metrics
+    return result
+
+
+def pptx_cross_copy_legs(*, lifecycle):
+    revisions = (
+        "control-revision",
+        "candidate-revision",
+        "candidate-revision",
+        "control-revision",
+    )
+    legs = []
+    for index, revision in enumerate(revisions):
+        leg = report(
+            [
+                pptx_cross_copy_row(
+                    [100 + index] * CONFIGURATION["samples_per_case"],
+                    lifecycle=lifecycle,
+                    timing_offset=index,
+                )
+            ],
+            revision=revision,
+        )
+        leg["configuration"].update(
+            cases=[
+                "pptx_cross_copy_plain_lifecycle"
+                if lifecycle
+                else "pptx_cross_copy_plain"
+            ],
+            corpus_shapes=["plain"],
+        )
+        legs.append(leg)
+    return legs
+
+
 def opc_multi_source(
     samples,
     mode,
@@ -1966,6 +2099,197 @@ class PerfAbbaSummaryTests(unittest.TestCase):
                 profile=perf_abba_summary.detect_report_profile(malformed, "a1"),
                 report_role="a1",
             )
+
+    def test_pptx_fixed_shapes_require_bound_corpus_identity(self):
+        for case, corpus in perf_abba_summary.FIXED_CASE_CORPUS_IDENTITIES.items():
+            if not case.startswith("pptx_cross_copy_"):
+                continue
+            configuration = {"cases": [case], "shapes": ["many-small"],
+                             "samples_per_case": 15}
+            row = {"case": case, "corpus": copy.deepcopy(corpus),
+                   "elapsed_ns": {"samples": [1] * 15}}
+            def validate():
+                indexed = {(case, json.dumps(row["corpus"], sort_keys=True)): row}
+                perf_abba_summary._validate_configuration_rows(configuration, indexed, "test")
+            with self.subTest(case=case):
+                validate()
+                row["corpus"]["archive_sha256"] = "0" * 64
+                with self.assertRaisesRegex(perf_abba_summary.AbbaSummaryInputError,
+                                            "shape declarations do not cover"):
+                    validate()
+
+    def test_pptx_cross_copy_projection_drops_timing_vectors_only(self):
+        for lifecycle in (False, True):
+            with self.subTest(lifecycle=lifecycle):
+                reports = pptx_cross_copy_legs(lifecycle=lifecycle)
+                summary = perf_abba_summary.summarize_reports(reports)
+                identity = summary["results"][0]["identity"]
+                self.assertEqual(identity["source_status"], "verified_equal")
+                self.assertNotIn('"plan_ns"', identity["source_canonical_json"])
+                self.assertNotIn('"output_sha256"', identity["source_canonical_json"])
+                if lifecycle:
+                    self.assertNotIn('"lifecycle_ns"', identity["source_canonical_json"])
+                self.assertIn('"expected_output_sha256"', identity["source_canonical_json"])
+                self.assertIn("d" * 64, identity["source_canonical_json"])
+
+                stable_mutation = copy.deepcopy(reports)
+                stable_mutation[1]["results"][0]["source"]["pptx_cross_copy"][
+                    "planned_bytes"
+                ] += 1
+                with self.assertRaisesRegex(
+                    perf_abba_summary.AbbaSummaryInputError,
+                    "source identity differs",
+                ):
+                    perf_abba_summary.summarize_reports(stable_mutation)
+
+    def test_pptx_lifecycle_identity_accepts_only_valid_sample_permutations(self):
+        reports = pptx_cross_copy_legs(lifecycle=True)
+        row = pptx_cross_copy_row(range(101, 116), lifecycle=True, timing_offset=1)
+        row["source"]["pptx_cross_copy"]["lifecycle_ns"] = list(range(101, 116))
+        reports[1]["results"][0] = row
+        order = list(reversed(row["operation_metrics"]["sample_indices"]))
+        row["operation_metrics"]["sample_indices"] = order
+        row["elapsed_ns"]["sample_order"] = order
+        perf_abba_summary.summarize_reports(reports)
+        row["operation_metrics"]["sample_indices"][0] = order[1]
+        with self.assertRaises(perf_abba_summary.AbbaSummaryInputError):
+            perf_abba_summary.summarize_reports(reports)
+
+    def test_pptx_cross_copy_output_digest_vector_is_validated_before_projection(self):
+        reports = pptx_cross_copy_legs(lifecycle=True)
+        reports[1]["results"][0]["source"]["pptx_cross_copy"]["output_sha256"][0] = (
+            "e" * 64
+        )
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            r"output_sha256\[0\].*expected_output_sha256",
+        ):
+            perf_abba_summary.summarize_reports(reports)
+
+    def test_pptx_cross_copy_vectors_bind_to_lifecycle_and_phase_totals(self):
+        lifecycle_reports = pptx_cross_copy_legs(lifecycle=True)
+        lifecycle_reports[1]["results"][0]["source"]["pptx_cross_copy"][
+            "lifecycle_ns"
+        ][0] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            r"lifecycle_ns\[0\].*elapsed_ns.samples\[0\]",
+        ):
+            perf_abba_summary.summarize_reports(lifecycle_reports)
+
+        phase_reports = pptx_cross_copy_legs(lifecycle=False)
+        phase_reports[1]["results"][0]["source"]["pptx_cross_copy"]["plan_ns"][0] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "plan/commit/publication total does not match elapsed_ns.samples",
+        ):
+            perf_abba_summary.summarize_reports(phase_reports)
+
+        bounded_reports = pptx_cross_copy_legs(lifecycle=True)
+        bounded_reports[1]["results"][0]["source"]["pptx_cross_copy"][
+            "destination_slide"
+        ] = 2
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "destination_slide must be less than destination_slide_count_before",
+        ):
+            perf_abba_summary.summarize_reports(bounded_reports)
+
+    def test_pptx_cross_copy_sink_projection_keeps_output_size_only(self):
+        reports = pptx_cross_copy_legs(lifecycle=False)
+        for leg_index, (write_calls, largest_write) in enumerate(
+            ((1, 6), (2, 3), (3, 2), (1, 6))
+        ):
+            sink = reports[leg_index]["results"][0]["sink"]
+            sink["accepted_bytes"] = 6
+            sink["write_calls"] = write_calls
+            sink["largest_write"] = largest_write
+            sink["write_size_buckets"]["bytes_1_to_512"] = write_calls
+        summary = perf_abba_summary.summarize_reports(reports)
+        result = summary["results"][0]
+        self.assertEqual(result["sink"], {"accepted_bytes": 6})
+        self.assertEqual(
+            json.loads(result["identity"]["sink_canonical_json"]),
+            {"accepted_bytes": 6},
+        )
+        projected = perf_abba_summary._project_report(
+            reports[0], "a1", report_role="a1"
+        )
+        projected_row = next(iter(projected["results"].values()))
+        self.assertEqual(projected_row["sink"], {"accepted_bytes": 6})
+
+    def test_pptx_cross_copy_sink_counts_and_bounds_fail_closed(self):
+        mutations = (
+            (
+                lambda sink: sink["write_size_buckets"].update(bytes_1_to_512=2),
+                "write_size_buckets counts disagree with write_calls",
+            ),
+            (
+                lambda sink: sink.update(largest_write=65_537),
+                "largest_write exceeds the configured 64 KiB sink ceiling",
+            ),
+            (
+                lambda sink: sink.update(accepted_bytes=513),
+                "accepted_bytes is outside the write-size bucket bounds",
+            ),
+            (
+                lambda sink: sink.update(
+                    accepted_bytes=1_024,
+                    write_calls=2,
+                    largest_write=513,
+                    write_size_buckets={
+                        **sink["write_size_buckets"],
+                        "bytes_1_to_512": 2,
+                    },
+                ),
+                "largest_write does not fit the highest non-empty write bucket",
+            ),
+            (
+                lambda sink: sink.update(accepted_bytes=1, largest_write=2),
+                "largest_write must not exceed accepted_bytes",
+            ),
+            (
+                lambda sink: sink.update(write_calls=0),
+                "write_calls must be a positive unsigned 64-bit integer",
+            ),
+            (
+                lambda sink: sink["write_size_buckets"].update(
+                    bytes_1_to_512=0, bytes_over_65536=1
+                ),
+                "write_size_buckets observed a write above the configured ceiling",
+            ),
+        )
+        for mutation, message in mutations:
+            reports = pptx_cross_copy_legs(lifecycle=False)
+            mutation(reports[1]["results"][0]["sink"])
+            with self.subTest(message=message), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                perf_abba_summary.summarize_reports(reports)
+
+    def test_pptx_cross_copy_sink_output_size_and_lifecycle_metrics_bind(self):
+        changed_output_size = pptx_cross_copy_legs(lifecycle=False)
+        changed_output_size[1]["results"][0]["sink"]["accepted_bytes"] = 2
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "sink identity differs between ABBA legs",
+        ):
+            perf_abba_summary.summarize_reports(changed_output_size)
+
+        lifecycle_reports = pptx_cross_copy_legs(lifecycle=True)
+        summary = perf_abba_summary.summarize_reports(lifecycle_reports)
+        self.assertEqual(
+            summary["results"][0]["identity"]["operation_metrics_status"],
+            "verified_equal",
+        )
+        lifecycle_reports[1]["results"][0]["operation_metrics"]["sink"][
+            "accepted_bytes"
+        ]["values"][0] = 2
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "operation_metrics.sink.accepted_bytes.values disagrees with result.sink.accepted_bytes",
+        ):
+            perf_abba_summary.summarize_reports(lifecycle_reports)
 
     def test_xlsx_repeated_store_timing_binds_to_sample_order_and_result(self):
         reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
