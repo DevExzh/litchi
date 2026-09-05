@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "command_receipts": 17,
+  "processes": 8,
+  "samples": 240,
+  "inventory_files": 103,
+  "performance_claim": null,
+  "portable_export": "pass; copied executable not needed",
+  "pinned_validator_mutation": "rejected",
+  "valid_digest_repeat_output_mutation": "rejected",
+  "phase": "before task-temporary binary cleanup",
+  "wrapper_source_revision": "392a11a1e7fca51ec930adff024b0f7a7f20d4fd"
+}

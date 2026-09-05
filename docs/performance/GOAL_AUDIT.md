@@ -1,8 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0426
+## Current evidence through 0427
 
-The latest completed performance batch is
+[0427](changes/0427-pptx-allocator-drop-checkpoints.md) adds explicit allocator
+phase/drop observations for the current plain/media-rich PPTX APIs. Eight
+fresh processes retain 240 samples, all returning to their entry callback
+live-byte value after the final sink drop, with identical repeat phase changes.
+This closes the narrow missing caller-drop callback observation. It does not
+close the full retention/cache/managed-budget/near-limit gate or establish RSS
+release, object-owned bytes or a leak finding. The
+[next-work record](results/change-0427/next-work.md) identifies additive
+fallible PPTX cache-diagnostic forwarding using existing managed constructors.
+Composite harness coverage is 288 passes and one ignored after a baseline-
+reproduced stale selector assertion is corrected; the full failed command is
+retained. Existing harness strict debt remains the same 29 findings.
+
+The latest retained optimization is
 [0424](changes/0424-staged-pptx-payload-reuse.md), based on production revision
 `d18bf7db4` and evidence revision `340cc91ae`. Its matched source-backed media
 lifecycle records 14.266% fewer requested allocation bytes and a 7.317% lower

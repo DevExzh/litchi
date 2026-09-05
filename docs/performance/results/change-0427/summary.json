@@ -1,0 +1,3835 @@
+{
+  "classification": "descriptive callback-order allocator checkpoints",
+  "performance_claim": null,
+  "processes": 8,
+  "repeat_drift": [
+    {
+      "api": "owned",
+      "corpus": "plain",
+      "phase": "baseline_before_inputs",
+      "r1_mean_change_bytes": 0,
+      "r2_mean_change_bytes": 0,
+      "repeat_change_percent": 0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "plain",
+      "phase": "prepared_inputs_and_sink",
+      "r1_mean_change_bytes": 190663,
+      "r2_mean_change_bytes": 190663,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "plain",
+      "phase": "opened_documents",
+      "r1_mean_change_bytes": 525916,
+      "r2_mean_change_bytes": 525916,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "plain",
+      "phase": "planned",
+      "r1_mean_change_bytes": 533746,
+      "r2_mean_change_bytes": 533746,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "plain",
+      "phase": "published",
+      "r1_mean_change_bytes": 618915,
+      "r2_mean_change_bytes": 618915,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "plain",
+      "phase": "drop_result",
+      "r1_mean_change_bytes": 585256,
+      "r2_mean_change_bytes": 585256,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "plain",
+      "phase": "drop_plan",
+      "r1_mean_change_bytes": 577426,
+      "r2_mean_change_bytes": 577426,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "plain",
+      "phase": "drop_document_handles",
+      "r1_mean_change_bytes": 128626,
+      "r2_mean_change_bytes": 128626,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "plain",
+      "phase": "drop_sink",
+      "r1_mean_change_bytes": 0,
+      "r2_mean_change_bytes": 0,
+      "repeat_change_percent": 0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "plain",
+      "phase": "baseline_before_inputs",
+      "r1_mean_change_bytes": 0,
+      "r2_mean_change_bytes": 0,
+      "repeat_change_percent": 0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "plain",
+      "phase": "prepared_inputs_and_sink",
+      "r1_mean_change_bytes": 192119,
+      "r2_mean_change_bytes": 192119,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "plain",
+      "phase": "opened_documents",
+      "r1_mean_change_bytes": 301382,
+      "r2_mean_change_bytes": 301382,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "plain",
+      "phase": "planned",
+      "r1_mean_change_bytes": 356145,
+      "r2_mean_change_bytes": 356145,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "plain",
+      "phase": "published",
+      "r1_mean_change_bytes": 277062,
+      "r2_mean_change_bytes": 277062,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "plain",
+      "phase": "drop_result",
+      "r1_mean_change_bytes": 277053,
+      "r2_mean_change_bytes": 277053,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "plain",
+      "phase": "drop_plan",
+      "r1_mean_change_bytes": 274612,
+      "r2_mean_change_bytes": 274612,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "plain",
+      "phase": "drop_document_handles",
+      "r1_mean_change_bytes": 192119,
+      "r2_mean_change_bytes": 192119,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "plain",
+      "phase": "drop_caller_source_arcs",
+      "r1_mean_change_bytes": 128626,
+      "r2_mean_change_bytes": 128626,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "plain",
+      "phase": "drop_sink",
+      "r1_mean_change_bytes": 0,
+      "r2_mean_change_bytes": 0,
+      "repeat_change_percent": 0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "media-rich",
+      "phase": "baseline_before_inputs",
+      "r1_mean_change_bytes": 0,
+      "r2_mean_change_bytes": 0,
+      "repeat_change_percent": 0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "media-rich",
+      "phase": "prepared_inputs_and_sink",
+      "r1_mean_change_bytes": 100895567,
+      "r2_mean_change_bytes": 100895567,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "media-rich",
+      "phase": "opened_documents",
+      "r1_mean_change_bytes": 134833032,
+      "r2_mean_change_bytes": 134833032,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "media-rich",
+      "phase": "planned",
+      "r1_mean_change_bytes": 134846894,
+      "r2_mean_change_bytes": 134846894,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "media-rich",
+      "phase": "published",
+      "r1_mean_change_bytes": 168526835,
+      "r2_mean_change_bytes": 168526835,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "media-rich",
+      "phase": "drop_result",
+      "r1_mean_change_bytes": 168480480,
+      "r2_mean_change_bytes": 168480480,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "media-rich",
+      "phase": "drop_plan",
+      "r1_mean_change_bytes": 168466618,
+      "r2_mean_change_bytes": 168466618,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "media-rich",
+      "phase": "drop_document_handles",
+      "r1_mean_change_bytes": 67265282,
+      "r2_mean_change_bytes": 67265282,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "owned",
+      "corpus": "media-rich",
+      "phase": "drop_sink",
+      "r1_mean_change_bytes": 0,
+      "r2_mean_change_bytes": 0,
+      "repeat_change_percent": 0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "media-rich",
+      "phase": "baseline_before_inputs",
+      "r1_mean_change_bytes": 0,
+      "r2_mean_change_bytes": 0,
+      "repeat_change_percent": 0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "media-rich",
+      "phase": "prepared_inputs_and_sink",
+      "r1_mean_change_bytes": 100897023,
+      "r2_mean_change_bytes": 100897023,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "media-rich",
+      "phase": "opened_documents",
+      "r1_mean_change_bytes": 101028502,
+      "r2_mean_change_bytes": 101028502,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "media-rich",
+      "phase": "planned",
+      "r1_mean_change_bytes": 124150658,
+      "r2_mean_change_bytes": 124150658,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "media-rich",
+      "phase": "published",
+      "r1_mean_change_bytes": 124056121,
+      "r2_mean_change_bytes": 124056121,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "media-rich",
+      "phase": "drop_result",
+      "r1_mean_change_bytes": 124056112,
+      "r2_mean_change_bytes": 124056112,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "media-rich",
+      "phase": "drop_plan",
+      "r1_mean_change_bytes": 107262760,
+      "r2_mean_change_bytes": 107262760,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "media-rich",
+      "phase": "drop_document_handles",
+      "r1_mean_change_bytes": 100897023,
+      "r2_mean_change_bytes": 100897023,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "media-rich",
+      "phase": "drop_caller_source_arcs",
+      "r1_mean_change_bytes": 67265282,
+      "r2_mean_change_bytes": 67265282,
+      "repeat_change_percent": 0.0,
+      "review_required": false
+    },
+    {
+      "api": "source-backed",
+      "corpus": "media-rich",
+      "phase": "drop_sink",
+      "r1_mean_change_bytes": 0,
+      "r2_mean_change_bytes": 0,
+      "repeat_change_percent": 0,
+      "review_required": false
+    }
+  ],
+  "runs": [
+    {
+      "api": "owned",
+      "corpus": "plain",
+      "destination_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+      "expected_output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "name": "plain-owned-r1",
+      "repeat": "R1",
+      "source_archive_sha256": "8ab4513642f48d99fa46e83b2c2764e8b20d417d3933ce3d5efe0825b21f918e",
+      "stages": [
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 184507,
+            "mean": 184507,
+            "median": 184507.0,
+            "min": 184507,
+            "sum": 5535210
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "phase": "baseline_before_inputs"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 375170,
+            "mean": 375170,
+            "median": 375170.0,
+            "min": 375170,
+            "sum": 11255100
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 190663,
+            "mean": 190663,
+            "median": 190663.0,
+            "min": 190663,
+            "sum": 5719890
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 190663,
+            "mean": 190663,
+            "median": 190663.0,
+            "min": 190663,
+            "sum": 5719890
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 190663,
+            "mean": 190663,
+            "median": 190663.0,
+            "min": 190663,
+            "sum": 5719890
+          },
+          "phase": "prepared_inputs_and_sink"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 710423,
+            "mean": 710423,
+            "median": 710423.0,
+            "min": 710423,
+            "sum": 21312690
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 4693299,
+            "mean": 4693299,
+            "median": 4693299.0,
+            "min": 4693299,
+            "sum": 140798970
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 4167383,
+            "mean": 4167383,
+            "median": 4167383.0,
+            "min": 4167383,
+            "sum": 125021490
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 525916,
+            "mean": 525916,
+            "median": 525916.0,
+            "min": 525916,
+            "sum": 15777480
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 335253,
+            "mean": 335253,
+            "median": 335253.0,
+            "min": 335253,
+            "sum": 10057590
+          },
+          "phase": "opened_documents"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 718253,
+            "mean": 718253,
+            "median": 718253.0,
+            "min": 718253,
+            "sum": 21547590
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9998554,
+            "mean": 9998554,
+            "median": 9998554.0,
+            "min": 9998554,
+            "sum": 299956620
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9464808,
+            "mean": 9464808,
+            "median": 9464808.0,
+            "min": 9464808,
+            "sum": 283944240
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 533746,
+            "mean": 533746,
+            "median": 533746.0,
+            "min": 533746,
+            "sum": 16012380
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 7830,
+            "mean": 7830,
+            "median": 7830.0,
+            "min": 7830,
+            "sum": 234900
+          },
+          "phase": "planned"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 803422,
+            "mean": 803422,
+            "median": 803422.0,
+            "min": 803422,
+            "sum": 24102660
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15854980,
+            "mean": 15854980,
+            "median": 15854980.0,
+            "min": 15854980,
+            "sum": 475649400
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15236065,
+            "mean": 15236065,
+            "median": 15236065.0,
+            "min": 15236065,
+            "sum": 457081950
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 618915,
+            "mean": 618915,
+            "median": 618915.0,
+            "min": 618915,
+            "sum": 18567450
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 85169,
+            "mean": 85169,
+            "median": 85169.0,
+            "min": 85169,
+            "sum": 2555070
+          },
+          "phase": "published"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 769763,
+            "mean": 769763,
+            "median": 769763.0,
+            "min": 769763,
+            "sum": 23092890
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15854980,
+            "mean": 15854980,
+            "median": 15854980.0,
+            "min": 15854980,
+            "sum": 475649400
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15269724,
+            "mean": 15269724,
+            "median": 15269724.0,
+            "min": 15269724,
+            "sum": 458091720
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 585256,
+            "mean": 585256,
+            "median": 585256.0,
+            "min": 585256,
+            "sum": 17557680
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -33659,
+            "mean": -33659,
+            "median": -33659.0,
+            "min": -33659,
+            "sum": -1009770
+          },
+          "phase": "drop_result"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 761933,
+            "mean": 761933,
+            "median": 761933.0,
+            "min": 761933,
+            "sum": 22857990
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15854980,
+            "mean": 15854980,
+            "median": 15854980.0,
+            "min": 15854980,
+            "sum": 475649400
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15277554,
+            "mean": 15277554,
+            "median": 15277554.0,
+            "min": 15277554,
+            "sum": 458326620
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 577426,
+            "mean": 577426,
+            "median": 577426.0,
+            "min": 577426,
+            "sum": 17322780
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -7830,
+            "mean": -7830,
+            "median": -7830.0,
+            "min": -7830,
+            "sum": -234900
+          },
+          "phase": "drop_plan"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 313133,
+            "mean": 313133,
+            "median": 313133.0,
+            "min": 313133,
+            "sum": 9393990
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15854980,
+            "mean": 15854980,
+            "median": 15854980.0,
+            "min": 15854980,
+            "sum": 475649400
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15726354,
+            "mean": 15726354,
+            "median": 15726354.0,
+            "min": 15726354,
+            "sum": 471790620
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 128626,
+            "mean": 128626,
+            "median": 128626.0,
+            "min": 128626,
+            "sum": 3858780
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -448800,
+            "mean": -448800,
+            "median": -448800.0,
+            "min": -448800,
+            "sum": -13464000
+          },
+          "phase": "drop_document_handles"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 184507,
+            "mean": 184507,
+            "median": 184507.0,
+            "min": 184507,
+            "sum": 5535210
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15854980,
+            "mean": 15854980,
+            "median": 15854980.0,
+            "min": 15854980,
+            "sum": 475649400
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15854980,
+            "mean": 15854980,
+            "median": 15854980.0,
+            "min": 15854980,
+            "sum": 475649400
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -128626,
+            "mean": -128626,
+            "median": -128626.0,
+            "min": -128626,
+            "sum": -3858780
+          },
+          "phase": "drop_sink"
+        }
+      ],
+      "whole_probe_peak_above_entry_bytes": {
+        "count": 30,
+        "max": 1181495,
+        "mean": 1181495,
+        "median": 1181495.0,
+        "min": 1181495,
+        "sum": 35444850
+      },
+      "whole_probe_region_peak_live_bytes": {
+        "count": 30,
+        "max": 1366002,
+        "mean": 1366002,
+        "median": 1366002.0,
+        "min": 1366002,
+        "sum": 40980060
+      }
+    },
+    {
+      "api": "source-backed",
+      "corpus": "plain",
+      "destination_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+      "expected_output_sha256": "ab5109b0584aacb070b9b33a5769f469464ede991c12fd4da7e9e7bce53f159b",
+      "name": "plain-source-backed-r1",
+      "repeat": "R1",
+      "source_archive_sha256": "8ab4513642f48d99fa46e83b2c2764e8b20d417d3933ce3d5efe0825b21f918e",
+      "stages": [
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 154519,
+            "mean": 154519,
+            "median": 154519.0,
+            "min": 154519,
+            "sum": 4635570
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "phase": "baseline_before_inputs"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 346638,
+            "mean": 346638,
+            "median": 346638.0,
+            "min": 346638,
+            "sum": 10399140
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 192119,
+            "mean": 192119,
+            "median": 192119.0,
+            "min": 192119,
+            "sum": 5763570
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 192119,
+            "mean": 192119,
+            "median": 192119.0,
+            "min": 192119,
+            "sum": 5763570
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 192119,
+            "mean": 192119,
+            "median": 192119.0,
+            "min": 192119,
+            "sum": 5763570
+          },
+          "phase": "prepared_inputs_and_sink"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 455901,
+            "mean": 455901,
+            "median": 455901.0,
+            "min": 455901,
+            "sum": 13677030
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 4047233,
+            "mean": 4047233,
+            "median": 4047233.0,
+            "min": 4047233,
+            "sum": 121416990
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 3745851,
+            "mean": 3745851,
+            "median": 3745851.0,
+            "min": 3745851,
+            "sum": 112375530
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 301382,
+            "mean": 301382,
+            "median": 301382.0,
+            "min": 301382,
+            "sum": 9041460
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 109263,
+            "mean": 109263,
+            "median": 109263.0,
+            "min": 109263,
+            "sum": 3277890
+          },
+          "phase": "opened_documents"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 510664,
+            "mean": 510664,
+            "median": 510664.0,
+            "min": 510664,
+            "sum": 15319920
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 5027713,
+            "mean": 5027713,
+            "median": 5027713.0,
+            "min": 5027713,
+            "sum": 150831390
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 4671568,
+            "mean": 4671568,
+            "median": 4671568.0,
+            "min": 4671568,
+            "sum": 140147040
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 356145,
+            "mean": 356145,
+            "median": 356145.0,
+            "min": 356145,
+            "sum": 10684350
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 54763,
+            "mean": 54763,
+            "median": 54763.0,
+            "min": 54763,
+            "sum": 1642890
+          },
+          "phase": "planned"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 431581,
+            "mean": 431581,
+            "median": 431581.0,
+            "min": 431581,
+            "sum": 12947430
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 8831552,
+            "mean": 8831552,
+            "median": 8831552.0,
+            "min": 8831552,
+            "sum": 264946560
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 277062,
+            "mean": 277062,
+            "median": 277062.0,
+            "min": 277062,
+            "sum": 8311860
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -79083,
+            "mean": -79083,
+            "median": -79083.0,
+            "min": -79083,
+            "sum": -2372490
+          },
+          "phase": "published"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 431572,
+            "mean": 431572,
+            "median": 431572.0,
+            "min": 431572,
+            "sum": 12947160
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 8831561,
+            "mean": 8831561,
+            "median": 8831561.0,
+            "min": 8831561,
+            "sum": 264946830
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 277053,
+            "mean": 277053,
+            "median": 277053.0,
+            "min": 277053,
+            "sum": 8311590
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -9,
+            "mean": -9,
+            "median": -9.0,
+            "min": -9,
+            "sum": -270
+          },
+          "phase": "drop_result"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 429131,
+            "mean": 429131,
+            "median": 429131.0,
+            "min": 429131,
+            "sum": 12873930
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 8834002,
+            "mean": 8834002,
+            "median": 8834002.0,
+            "min": 8834002,
+            "sum": 265020060
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 274612,
+            "mean": 274612,
+            "median": 274612.0,
+            "min": 274612,
+            "sum": 8238360
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -2441,
+            "mean": -2441,
+            "median": -2441.0,
+            "min": -2441,
+            "sum": -73230
+          },
+          "phase": "drop_plan"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 346638,
+            "mean": 346638,
+            "median": 346638.0,
+            "min": 346638,
+            "sum": 10399140
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 8916495,
+            "mean": 8916495,
+            "median": 8916495.0,
+            "min": 8916495,
+            "sum": 267494850
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 192119,
+            "mean": 192119,
+            "median": 192119.0,
+            "min": 192119,
+            "sum": 5763570
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -82493,
+            "mean": -82493,
+            "median": -82493.0,
+            "min": -82493,
+            "sum": -2474790
+          },
+          "phase": "drop_document_handles"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 283145,
+            "mean": 283145,
+            "median": 283145.0,
+            "min": 283145,
+            "sum": 8494350
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 8979988,
+            "mean": 8979988,
+            "median": 8979988.0,
+            "min": 8979988,
+            "sum": 269399640
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 128626,
+            "mean": 128626,
+            "median": 128626.0,
+            "min": 128626,
+            "sum": 3858780
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -63493,
+            "mean": -63493,
+            "median": -63493.0,
+            "min": -63493,
+            "sum": -1904790
+          },
+          "phase": "drop_caller_source_arcs"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 154519,
+            "mean": 154519,
+            "median": 154519.0,
+            "min": 154519,
+            "sum": 4635570
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -128626,
+            "mean": -128626,
+            "median": -128626.0,
+            "min": -128626,
+            "sum": -3858780
+          },
+          "phase": "drop_sink"
+        }
+      ],
+      "whole_probe_peak_above_entry_bytes": {
+        "count": 30,
+        "max": 909874,
+        "mean": 909874,
+        "median": 909874.0,
+        "min": 909874,
+        "sum": 27296220
+      },
+      "whole_probe_region_peak_live_bytes": {
+        "count": 30,
+        "max": 1064393,
+        "mean": 1064393,
+        "median": 1064393.0,
+        "min": 1064393,
+        "sum": 31931790
+      }
+    },
+    {
+      "api": "source-backed",
+      "corpus": "plain",
+      "destination_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+      "expected_output_sha256": "ab5109b0584aacb070b9b33a5769f469464ede991c12fd4da7e9e7bce53f159b",
+      "name": "plain-source-backed-r2",
+      "repeat": "R2",
+      "source_archive_sha256": "8ab4513642f48d99fa46e83b2c2764e8b20d417d3933ce3d5efe0825b21f918e",
+      "stages": [
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 154519,
+            "mean": 154519,
+            "median": 154519.0,
+            "min": 154519,
+            "sum": 4635570
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "phase": "baseline_before_inputs"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 346638,
+            "mean": 346638,
+            "median": 346638.0,
+            "min": 346638,
+            "sum": 10399140
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 192119,
+            "mean": 192119,
+            "median": 192119.0,
+            "min": 192119,
+            "sum": 5763570
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 192119,
+            "mean": 192119,
+            "median": 192119.0,
+            "min": 192119,
+            "sum": 5763570
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 192119,
+            "mean": 192119,
+            "median": 192119.0,
+            "min": 192119,
+            "sum": 5763570
+          },
+          "phase": "prepared_inputs_and_sink"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 455901,
+            "mean": 455901,
+            "median": 455901.0,
+            "min": 455901,
+            "sum": 13677030
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 4047233,
+            "mean": 4047233,
+            "median": 4047233.0,
+            "min": 4047233,
+            "sum": 121416990
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 3745851,
+            "mean": 3745851,
+            "median": 3745851.0,
+            "min": 3745851,
+            "sum": 112375530
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 301382,
+            "mean": 301382,
+            "median": 301382.0,
+            "min": 301382,
+            "sum": 9041460
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 109263,
+            "mean": 109263,
+            "median": 109263.0,
+            "min": 109263,
+            "sum": 3277890
+          },
+          "phase": "opened_documents"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 510664,
+            "mean": 510664,
+            "median": 510664.0,
+            "min": 510664,
+            "sum": 15319920
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 5027713,
+            "mean": 5027713,
+            "median": 5027713.0,
+            "min": 5027713,
+            "sum": 150831390
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 4671568,
+            "mean": 4671568,
+            "median": 4671568.0,
+            "min": 4671568,
+            "sum": 140147040
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 356145,
+            "mean": 356145,
+            "median": 356145.0,
+            "min": 356145,
+            "sum": 10684350
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 54763,
+            "mean": 54763,
+            "median": 54763.0,
+            "min": 54763,
+            "sum": 1642890
+          },
+          "phase": "planned"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 431581,
+            "mean": 431581,
+            "median": 431581.0,
+            "min": 431581,
+            "sum": 12947430
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 8831552,
+            "mean": 8831552,
+            "median": 8831552.0,
+            "min": 8831552,
+            "sum": 264946560
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 277062,
+            "mean": 277062,
+            "median": 277062.0,
+            "min": 277062,
+            "sum": 8311860
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -79083,
+            "mean": -79083,
+            "median": -79083.0,
+            "min": -79083,
+            "sum": -2372490
+          },
+          "phase": "published"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 431572,
+            "mean": 431572,
+            "median": 431572.0,
+            "min": 431572,
+            "sum": 12947160
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 8831561,
+            "mean": 8831561,
+            "median": 8831561.0,
+            "min": 8831561,
+            "sum": 264946830
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 277053,
+            "mean": 277053,
+            "median": 277053.0,
+            "min": 277053,
+            "sum": 8311590
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -9,
+            "mean": -9,
+            "median": -9.0,
+            "min": -9,
+            "sum": -270
+          },
+          "phase": "drop_result"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 429131,
+            "mean": 429131,
+            "median": 429131.0,
+            "min": 429131,
+            "sum": 12873930
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 8834002,
+            "mean": 8834002,
+            "median": 8834002.0,
+            "min": 8834002,
+            "sum": 265020060
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 274612,
+            "mean": 274612,
+            "median": 274612.0,
+            "min": 274612,
+            "sum": 8238360
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -2441,
+            "mean": -2441,
+            "median": -2441.0,
+            "min": -2441,
+            "sum": -73230
+          },
+          "phase": "drop_plan"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 346638,
+            "mean": 346638,
+            "median": 346638.0,
+            "min": 346638,
+            "sum": 10399140
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 8916495,
+            "mean": 8916495,
+            "median": 8916495.0,
+            "min": 8916495,
+            "sum": 267494850
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 192119,
+            "mean": 192119,
+            "median": 192119.0,
+            "min": 192119,
+            "sum": 5763570
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -82493,
+            "mean": -82493,
+            "median": -82493.0,
+            "min": -82493,
+            "sum": -2474790
+          },
+          "phase": "drop_document_handles"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 283145,
+            "mean": 283145,
+            "median": 283145.0,
+            "min": 283145,
+            "sum": 8494350
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 8979988,
+            "mean": 8979988,
+            "median": 8979988.0,
+            "min": 8979988,
+            "sum": 269399640
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 128626,
+            "mean": 128626,
+            "median": 128626.0,
+            "min": 128626,
+            "sum": 3858780
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -63493,
+            "mean": -63493,
+            "median": -63493.0,
+            "min": -63493,
+            "sum": -1904790
+          },
+          "phase": "drop_caller_source_arcs"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 154519,
+            "mean": 154519,
+            "median": 154519.0,
+            "min": 154519,
+            "sum": 4635570
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9108614,
+            "mean": 9108614,
+            "median": 9108614.0,
+            "min": 9108614,
+            "sum": 273258420
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -128626,
+            "mean": -128626,
+            "median": -128626.0,
+            "min": -128626,
+            "sum": -3858780
+          },
+          "phase": "drop_sink"
+        }
+      ],
+      "whole_probe_peak_above_entry_bytes": {
+        "count": 30,
+        "max": 909874,
+        "mean": 909874,
+        "median": 909874.0,
+        "min": 909874,
+        "sum": 27296220
+      },
+      "whole_probe_region_peak_live_bytes": {
+        "count": 30,
+        "max": 1064393,
+        "mean": 1064393,
+        "median": 1064393.0,
+        "min": 1064393,
+        "sum": 31931790
+      }
+    },
+    {
+      "api": "owned",
+      "corpus": "plain",
+      "destination_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+      "expected_output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "name": "plain-owned-r2",
+      "repeat": "R2",
+      "source_archive_sha256": "8ab4513642f48d99fa46e83b2c2764e8b20d417d3933ce3d5efe0825b21f918e",
+      "stages": [
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 184507,
+            "mean": 184507,
+            "median": 184507.0,
+            "min": 184507,
+            "sum": 5535210
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "phase": "baseline_before_inputs"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 375170,
+            "mean": 375170,
+            "median": 375170.0,
+            "min": 375170,
+            "sum": 11255100
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 190663,
+            "mean": 190663,
+            "median": 190663.0,
+            "min": 190663,
+            "sum": 5719890
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 190663,
+            "mean": 190663,
+            "median": 190663.0,
+            "min": 190663,
+            "sum": 5719890
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 190663,
+            "mean": 190663,
+            "median": 190663.0,
+            "min": 190663,
+            "sum": 5719890
+          },
+          "phase": "prepared_inputs_and_sink"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 710423,
+            "mean": 710423,
+            "median": 710423.0,
+            "min": 710423,
+            "sum": 21312690
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 4693299,
+            "mean": 4693299,
+            "median": 4693299.0,
+            "min": 4693299,
+            "sum": 140798970
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 4167383,
+            "mean": 4167383,
+            "median": 4167383.0,
+            "min": 4167383,
+            "sum": 125021490
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 525916,
+            "mean": 525916,
+            "median": 525916.0,
+            "min": 525916,
+            "sum": 15777480
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 335253,
+            "mean": 335253,
+            "median": 335253.0,
+            "min": 335253,
+            "sum": 10057590
+          },
+          "phase": "opened_documents"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 718253,
+            "mean": 718253,
+            "median": 718253.0,
+            "min": 718253,
+            "sum": 21547590
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9998554,
+            "mean": 9998554,
+            "median": 9998554.0,
+            "min": 9998554,
+            "sum": 299956620
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 9464808,
+            "mean": 9464808,
+            "median": 9464808.0,
+            "min": 9464808,
+            "sum": 283944240
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 533746,
+            "mean": 533746,
+            "median": 533746.0,
+            "min": 533746,
+            "sum": 16012380
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 7830,
+            "mean": 7830,
+            "median": 7830.0,
+            "min": 7830,
+            "sum": 234900
+          },
+          "phase": "planned"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 803422,
+            "mean": 803422,
+            "median": 803422.0,
+            "min": 803422,
+            "sum": 24102660
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15854980,
+            "mean": 15854980,
+            "median": 15854980.0,
+            "min": 15854980,
+            "sum": 475649400
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15236065,
+            "mean": 15236065,
+            "median": 15236065.0,
+            "min": 15236065,
+            "sum": 457081950
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 618915,
+            "mean": 618915,
+            "median": 618915.0,
+            "min": 618915,
+            "sum": 18567450
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 85169,
+            "mean": 85169,
+            "median": 85169.0,
+            "min": 85169,
+            "sum": 2555070
+          },
+          "phase": "published"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 769763,
+            "mean": 769763,
+            "median": 769763.0,
+            "min": 769763,
+            "sum": 23092890
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15854980,
+            "mean": 15854980,
+            "median": 15854980.0,
+            "min": 15854980,
+            "sum": 475649400
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15269724,
+            "mean": 15269724,
+            "median": 15269724.0,
+            "min": 15269724,
+            "sum": 458091720
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 585256,
+            "mean": 585256,
+            "median": 585256.0,
+            "min": 585256,
+            "sum": 17557680
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -33659,
+            "mean": -33659,
+            "median": -33659.0,
+            "min": -33659,
+            "sum": -1009770
+          },
+          "phase": "drop_result"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 761933,
+            "mean": 761933,
+            "median": 761933.0,
+            "min": 761933,
+            "sum": 22857990
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15854980,
+            "mean": 15854980,
+            "median": 15854980.0,
+            "min": 15854980,
+            "sum": 475649400
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15277554,
+            "mean": 15277554,
+            "median": 15277554.0,
+            "min": 15277554,
+            "sum": 458326620
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 577426,
+            "mean": 577426,
+            "median": 577426.0,
+            "min": 577426,
+            "sum": 17322780
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -7830,
+            "mean": -7830,
+            "median": -7830.0,
+            "min": -7830,
+            "sum": -234900
+          },
+          "phase": "drop_plan"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 313133,
+            "mean": 313133,
+            "median": 313133.0,
+            "min": 313133,
+            "sum": 9393990
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15854980,
+            "mean": 15854980,
+            "median": 15854980.0,
+            "min": 15854980,
+            "sum": 475649400
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15726354,
+            "mean": 15726354,
+            "median": 15726354.0,
+            "min": 15726354,
+            "sum": 471790620
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 128626,
+            "mean": 128626,
+            "median": 128626.0,
+            "min": 128626,
+            "sum": 3858780
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -448800,
+            "mean": -448800,
+            "median": -448800.0,
+            "min": -448800,
+            "sum": -13464000
+          },
+          "phase": "drop_document_handles"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 184507,
+            "mean": 184507,
+            "median": 184507.0,
+            "min": 184507,
+            "sum": 5535210
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15854980,
+            "mean": 15854980,
+            "median": 15854980.0,
+            "min": 15854980,
+            "sum": 475649400
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 15854980,
+            "mean": 15854980,
+            "median": 15854980.0,
+            "min": 15854980,
+            "sum": 475649400
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -128626,
+            "mean": -128626,
+            "median": -128626.0,
+            "min": -128626,
+            "sum": -3858780
+          },
+          "phase": "drop_sink"
+        }
+      ],
+      "whole_probe_peak_above_entry_bytes": {
+        "count": 30,
+        "max": 1181495,
+        "mean": 1181495,
+        "median": 1181495.0,
+        "min": 1181495,
+        "sum": 35444850
+      },
+      "whole_probe_region_peak_live_bytes": {
+        "count": 30,
+        "max": 1366002,
+        "mean": 1366002,
+        "median": 1366002.0,
+        "min": 1366002,
+        "sum": 40980060
+      }
+    },
+    {
+      "api": "owned",
+      "corpus": "media-rich",
+      "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "expected_output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "name": "media-rich-owned-r1",
+      "repeat": "R1",
+      "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+      "stages": [
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 68932380,
+            "mean": 68932380,
+            "median": 68932380.0,
+            "min": 68932380,
+            "sum": 2067971400
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "phase": "baseline_before_inputs"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 169827947,
+            "mean": 169827947,
+            "median": 169827947.0,
+            "min": 169827947,
+            "sum": 5094838410
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 100895567,
+            "mean": 100895567,
+            "median": 100895567.0,
+            "min": 100895567,
+            "sum": 3026867010
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 100895567,
+            "mean": 100895567,
+            "median": 100895567.0,
+            "min": 100895567,
+            "sum": 3026867010
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 100895567,
+            "mean": 100895567,
+            "median": 100895567.0,
+            "min": 100895567,
+            "sum": 3026867010
+          },
+          "phase": "prepared_inputs_and_sink"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 203765412,
+            "mean": 203765412,
+            "median": 203765412.0,
+            "min": 203765412,
+            "sum": 6112962360
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 139333285,
+            "mean": 139328451.93333334,
+            "median": 139326981.0,
+            "min": 139326981,
+            "sum": 4179853558
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 4500253,
+            "mean": 4495419.933333334,
+            "median": 4493949.0,
+            "min": 4493949,
+            "sum": 134862598
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 134833032,
+            "mean": 134833032,
+            "median": 134833032.0,
+            "min": 134833032,
+            "sum": 4044990960
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 33937465,
+            "mean": 33937465,
+            "median": 33937465.0,
+            "min": 33937465,
+            "sum": 1018123950
+          },
+          "phase": "opened_documents"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 203779274,
+            "mean": 203779274,
+            "median": 203779274.0,
+            "min": 203779274,
+            "sum": 6113378220
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 304791226,
+            "mean": 304787863.8666667,
+            "median": 304788074.0,
+            "min": 304784922,
+            "sum": 9143635916
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 169944332,
+            "mean": 169940969.86666667,
+            "median": 169941180.0,
+            "min": 169938028,
+            "sum": 5098229096
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 134846894,
+            "mean": 134846894,
+            "median": 134846894.0,
+            "min": 134846894,
+            "sum": 4045406820
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 13862,
+            "mean": 13862,
+            "median": 13862.0,
+            "min": 13862,
+            "sum": 415860
+          },
+          "phase": "planned"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 237459215,
+            "mean": 237459215,
+            "median": 237459215.0,
+            "min": 237459215,
+            "sum": 7123776450
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 470882282,
+            "mean": 470876608.4,
+            "median": 470875978.0,
+            "min": 470872826,
+            "sum": 14126298252
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 302355447,
+            "mean": 302349773.4,
+            "median": 302349143.0,
+            "min": 302345991,
+            "sum": 9070493202
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 168526835,
+            "mean": 168526835,
+            "median": 168526835.0,
+            "min": 168526835,
+            "sum": 5055805050
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 33679941,
+            "mean": 33679941,
+            "median": 33679941.0,
+            "min": 33679941,
+            "sum": 1010398230
+          },
+          "phase": "published"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 237412860,
+            "mean": 237412860,
+            "median": 237412860.0,
+            "min": 237412860,
+            "sum": 7122385800
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 470882282,
+            "mean": 470876608.4,
+            "median": 470875978.0,
+            "min": 470872826,
+            "sum": 14126298252
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 302401802,
+            "mean": 302396128.4,
+            "median": 302395498.0,
+            "min": 302392346,
+            "sum": 9071883852
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 168480480,
+            "mean": 168480480,
+            "median": 168480480.0,
+            "min": 168480480,
+            "sum": 5054414400
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -46355,
+            "mean": -46355,
+            "median": -46355.0,
+            "min": -46355,
+            "sum": -1390650
+          },
+          "phase": "drop_result"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 237398998,
+            "mean": 237398998,
+            "median": 237398998.0,
+            "min": 237398998,
+            "sum": 7121969940
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 470882282,
+            "mean": 470876608.4,
+            "median": 470875978.0,
+            "min": 470872826,
+            "sum": 14126298252
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 302415664,
+            "mean": 302409990.4,
+            "median": 302409360.0,
+            "min": 302406208,
+            "sum": 9072299712
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 168466618,
+            "mean": 168466618,
+            "median": 168466618.0,
+            "min": 168466618,
+            "sum": 5053998540
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -13862,
+            "mean": -13862,
+            "median": -13862.0,
+            "min": -13862,
+            "sum": -415860
+          },
+          "phase": "drop_plan"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 136197662,
+            "mean": 136197662,
+            "median": 136197662.0,
+            "min": 136197662,
+            "sum": 4085929860
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 470882282,
+            "mean": 470876608.4,
+            "median": 470875978.0,
+            "min": 470872826,
+            "sum": 14126298252
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 403617000,
+            "mean": 403611326.4,
+            "median": 403610696.0,
+            "min": 403607544,
+            "sum": 12108339792
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 67265282,
+            "mean": 67265282,
+            "median": 67265282.0,
+            "min": 67265282,
+            "sum": 2017958460
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -101201336,
+            "mean": -101201336,
+            "median": -101201336.0,
+            "min": -101201336,
+            "sum": -3036040080
+          },
+          "phase": "drop_document_handles"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 68932380,
+            "mean": 68932380,
+            "median": 68932380.0,
+            "min": 68932380,
+            "sum": 2067971400
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 470882282,
+            "mean": 470876608.4,
+            "median": 470875978.0,
+            "min": 470872826,
+            "sum": 14126298252
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 470882282,
+            "mean": 470876608.4,
+            "median": 470875978.0,
+            "min": 470872826,
+            "sum": 14126298252
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -67265282,
+            "mean": -67265282,
+            "median": -67265282.0,
+            "min": -67265282,
+            "sum": -2017958460
+          },
+          "phase": "drop_sink"
+        }
+      ],
+      "whole_probe_peak_above_entry_bytes": {
+        "count": 30,
+        "max": 203809932,
+        "mean": 203809932,
+        "median": 203809932.0,
+        "min": 203809932,
+        "sum": 6114297960
+      },
+      "whole_probe_region_peak_live_bytes": {
+        "count": 30,
+        "max": 272742312,
+        "mean": 272742312,
+        "median": 272742312.0,
+        "min": 272742312,
+        "sum": 8182269360
+      }
+    },
+    {
+      "api": "source-backed",
+      "corpus": "media-rich",
+      "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "expected_output_sha256": "495c1b6dbdb5ef412da1b4b626c134df5f5439603d0a3936b9ead4ac4bf1a588",
+      "name": "media-rich-source-backed-r1",
+      "repeat": "R1",
+      "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+      "stages": [
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 68888104,
+            "mean": 68888104,
+            "median": 68888104.0,
+            "min": 68888104,
+            "sum": 2066643120
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "phase": "baseline_before_inputs"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 169785127,
+            "mean": 169785127,
+            "median": 169785127.0,
+            "min": 169785127,
+            "sum": 5093553810
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 100897023,
+            "mean": 100897023,
+            "median": 100897023.0,
+            "min": 100897023,
+            "sum": 3026910690
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 100897023,
+            "mean": 100897023,
+            "median": 100897023.0,
+            "min": 100897023,
+            "sum": 3026910690
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 100897023,
+            "mean": 100897023,
+            "median": 100897023.0,
+            "min": 100897023,
+            "sum": 3026910690
+          },
+          "phase": "prepared_inputs_and_sink"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 169916606,
+            "mean": 169916606,
+            "median": 169916606.0,
+            "min": 169916606,
+            "sum": 5097498180
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 104957323,
+            "mean": 104957323,
+            "median": 104957323.0,
+            "min": 104957323,
+            "sum": 3148719690
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 3928821,
+            "mean": 3928821,
+            "median": 3928821.0,
+            "min": 3928821,
+            "sum": 117864630
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 101028502,
+            "mean": 101028502,
+            "median": 101028502.0,
+            "min": 101028502,
+            "sum": 3030855060
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 131479,
+            "mean": 131479,
+            "median": 131479.0,
+            "min": 131479,
+            "sum": 3944370
+          },
+          "phase": "opened_documents"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 193038762,
+            "mean": 193038762,
+            "median": 193038762.0,
+            "min": 193038762,
+            "sum": 5791162860
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 140182862,
+            "mean": 140182862,
+            "median": 140182862.0,
+            "min": 140182862,
+            "sum": 4205485860
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 16032204,
+            "mean": 16032204,
+            "median": 16032204.0,
+            "min": 16032204,
+            "sum": 480966120
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 124150658,
+            "mean": 124150658,
+            "median": 124150658.0,
+            "min": 124150658,
+            "sum": 3724519740
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 23122156,
+            "mean": 23122156,
+            "median": 23122156.0,
+            "min": 23122156,
+            "sum": 693664680
+          },
+          "phase": "planned"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 192944225,
+            "mean": 192944225,
+            "median": 192944225.0,
+            "min": 192944225,
+            "sum": 5788326750
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 77672039,
+            "mean": 77672039,
+            "median": 77672039.0,
+            "min": 77672039,
+            "sum": 2330161170
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 124056121,
+            "mean": 124056121,
+            "median": 124056121.0,
+            "min": 124056121,
+            "sum": 3721683630
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -94537,
+            "mean": -94537,
+            "median": -94537.0,
+            "min": -94537,
+            "sum": -2836110
+          },
+          "phase": "published"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 192944216,
+            "mean": 192944216,
+            "median": 192944216.0,
+            "min": 192944216,
+            "sum": 5788326480
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 77672048,
+            "mean": 77672048,
+            "median": 77672048.0,
+            "min": 77672048,
+            "sum": 2330161440
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 124056112,
+            "mean": 124056112,
+            "median": 124056112.0,
+            "min": 124056112,
+            "sum": 3721683360
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -9,
+            "mean": -9,
+            "median": -9.0,
+            "min": -9,
+            "sum": -270
+          },
+          "phase": "drop_result"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 176150864,
+            "mean": 176150864,
+            "median": 176150864.0,
+            "min": 176150864,
+            "sum": 5284525920
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 94465400,
+            "mean": 94465400,
+            "median": 94465400.0,
+            "min": 94465400,
+            "sum": 2833962000
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 107262760,
+            "mean": 107262760,
+            "median": 107262760.0,
+            "min": 107262760,
+            "sum": 3217882800
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -16793352,
+            "mean": -16793352,
+            "median": -16793352.0,
+            "min": -16793352,
+            "sum": -503800560
+          },
+          "phase": "drop_plan"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 169785127,
+            "mean": 169785127,
+            "median": 169785127.0,
+            "min": 169785127,
+            "sum": 5093553810
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 100831137,
+            "mean": 100831137,
+            "median": 100831137.0,
+            "min": 100831137,
+            "sum": 3024934110
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 100897023,
+            "mean": 100897023,
+            "median": 100897023.0,
+            "min": 100897023,
+            "sum": 3026910690
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -6365737,
+            "mean": -6365737,
+            "median": -6365737.0,
+            "min": -6365737,
+            "sum": -190972110
+          },
+          "phase": "drop_document_handles"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 136153386,
+            "mean": 136153386,
+            "median": 136153386.0,
+            "min": 136153386,
+            "sum": 4084601580
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 134462878,
+            "mean": 134462878,
+            "median": 134462878.0,
+            "min": 134462878,
+            "sum": 4033886340
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 67265282,
+            "mean": 67265282,
+            "median": 67265282.0,
+            "min": 67265282,
+            "sum": 2017958460
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -33631741,
+            "mean": -33631741,
+            "median": -33631741.0,
+            "min": -33631741,
+            "sum": -1008952230
+          },
+          "phase": "drop_caller_source_arcs"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 68888104,
+            "mean": 68888104,
+            "median": 68888104.0,
+            "min": 68888104,
+            "sum": 2066643120
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -67265282,
+            "mean": -67265282,
+            "median": -67265282.0,
+            "min": -67265282,
+            "sum": -2017958460
+          },
+          "phase": "drop_sink"
+        }
+      ],
+      "whole_probe_peak_above_entry_bytes": {
+        "count": 30,
+        "max": 143640102,
+        "mean": 143640102,
+        "median": 143640102.0,
+        "min": 143640102,
+        "sum": 4309203060
+      },
+      "whole_probe_region_peak_live_bytes": {
+        "count": 30,
+        "max": 212528206,
+        "mean": 212528206,
+        "median": 212528206.0,
+        "min": 212528206,
+        "sum": 6375846180
+      }
+    },
+    {
+      "api": "source-backed",
+      "corpus": "media-rich",
+      "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "expected_output_sha256": "495c1b6dbdb5ef412da1b4b626c134df5f5439603d0a3936b9ead4ac4bf1a588",
+      "name": "media-rich-source-backed-r2",
+      "repeat": "R2",
+      "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+      "stages": [
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 68888104,
+            "mean": 68888104,
+            "median": 68888104.0,
+            "min": 68888104,
+            "sum": 2066643120
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "phase": "baseline_before_inputs"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 169785127,
+            "mean": 169785127,
+            "median": 169785127.0,
+            "min": 169785127,
+            "sum": 5093553810
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 100897023,
+            "mean": 100897023,
+            "median": 100897023.0,
+            "min": 100897023,
+            "sum": 3026910690
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 100897023,
+            "mean": 100897023,
+            "median": 100897023.0,
+            "min": 100897023,
+            "sum": 3026910690
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 100897023,
+            "mean": 100897023,
+            "median": 100897023.0,
+            "min": 100897023,
+            "sum": 3026910690
+          },
+          "phase": "prepared_inputs_and_sink"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 169916606,
+            "mean": 169916606,
+            "median": 169916606.0,
+            "min": 169916606,
+            "sum": 5097498180
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 104957323,
+            "mean": 104957323,
+            "median": 104957323.0,
+            "min": 104957323,
+            "sum": 3148719690
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 3928821,
+            "mean": 3928821,
+            "median": 3928821.0,
+            "min": 3928821,
+            "sum": 117864630
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 101028502,
+            "mean": 101028502,
+            "median": 101028502.0,
+            "min": 101028502,
+            "sum": 3030855060
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 131479,
+            "mean": 131479,
+            "median": 131479.0,
+            "min": 131479,
+            "sum": 3944370
+          },
+          "phase": "opened_documents"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 193038762,
+            "mean": 193038762,
+            "median": 193038762.0,
+            "min": 193038762,
+            "sum": 5791162860
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 140182862,
+            "mean": 140182862,
+            "median": 140182862.0,
+            "min": 140182862,
+            "sum": 4205485860
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 16032204,
+            "mean": 16032204,
+            "median": 16032204.0,
+            "min": 16032204,
+            "sum": 480966120
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 124150658,
+            "mean": 124150658,
+            "median": 124150658.0,
+            "min": 124150658,
+            "sum": 3724519740
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 23122156,
+            "mean": 23122156,
+            "median": 23122156.0,
+            "min": 23122156,
+            "sum": 693664680
+          },
+          "phase": "planned"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 192944225,
+            "mean": 192944225,
+            "median": 192944225.0,
+            "min": 192944225,
+            "sum": 5788326750
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 77672039,
+            "mean": 77672039,
+            "median": 77672039.0,
+            "min": 77672039,
+            "sum": 2330161170
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 124056121,
+            "mean": 124056121,
+            "median": 124056121.0,
+            "min": 124056121,
+            "sum": 3721683630
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -94537,
+            "mean": -94537,
+            "median": -94537.0,
+            "min": -94537,
+            "sum": -2836110
+          },
+          "phase": "published"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 192944216,
+            "mean": 192944216,
+            "median": 192944216.0,
+            "min": 192944216,
+            "sum": 5788326480
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 77672048,
+            "mean": 77672048,
+            "median": 77672048.0,
+            "min": 77672048,
+            "sum": 2330161440
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 124056112,
+            "mean": 124056112,
+            "median": 124056112.0,
+            "min": 124056112,
+            "sum": 3721683360
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -9,
+            "mean": -9,
+            "median": -9.0,
+            "min": -9,
+            "sum": -270
+          },
+          "phase": "drop_result"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 176150864,
+            "mean": 176150864,
+            "median": 176150864.0,
+            "min": 176150864,
+            "sum": 5284525920
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 94465400,
+            "mean": 94465400,
+            "median": 94465400.0,
+            "min": 94465400,
+            "sum": 2833962000
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 107262760,
+            "mean": 107262760,
+            "median": 107262760.0,
+            "min": 107262760,
+            "sum": 3217882800
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -16793352,
+            "mean": -16793352,
+            "median": -16793352.0,
+            "min": -16793352,
+            "sum": -503800560
+          },
+          "phase": "drop_plan"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 169785127,
+            "mean": 169785127,
+            "median": 169785127.0,
+            "min": 169785127,
+            "sum": 5093553810
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 100831137,
+            "mean": 100831137,
+            "median": 100831137.0,
+            "min": 100831137,
+            "sum": 3024934110
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 100897023,
+            "mean": 100897023,
+            "median": 100897023.0,
+            "min": 100897023,
+            "sum": 3026910690
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -6365737,
+            "mean": -6365737,
+            "median": -6365737.0,
+            "min": -6365737,
+            "sum": -190972110
+          },
+          "phase": "drop_document_handles"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 136153386,
+            "mean": 136153386,
+            "median": 136153386.0,
+            "min": 136153386,
+            "sum": 4084601580
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 134462878,
+            "mean": 134462878,
+            "median": 134462878.0,
+            "min": 134462878,
+            "sum": 4033886340
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 67265282,
+            "mean": 67265282,
+            "median": 67265282.0,
+            "min": 67265282,
+            "sum": 2017958460
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -33631741,
+            "mean": -33631741,
+            "median": -33631741.0,
+            "min": -33631741,
+            "sum": -1008952230
+          },
+          "phase": "drop_caller_source_arcs"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 68888104,
+            "mean": 68888104,
+            "median": 68888104.0,
+            "min": 68888104,
+            "sum": 2066643120
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 201728160,
+            "mean": 201728160,
+            "median": 201728160.0,
+            "min": 201728160,
+            "sum": 6051844800
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -67265282,
+            "mean": -67265282,
+            "median": -67265282.0,
+            "min": -67265282,
+            "sum": -2017958460
+          },
+          "phase": "drop_sink"
+        }
+      ],
+      "whole_probe_peak_above_entry_bytes": {
+        "count": 30,
+        "max": 143640102,
+        "mean": 143640102,
+        "median": 143640102.0,
+        "min": 143640102,
+        "sum": 4309203060
+      },
+      "whole_probe_region_peak_live_bytes": {
+        "count": 30,
+        "max": 212528206,
+        "mean": 212528206,
+        "median": 212528206.0,
+        "min": 212528206,
+        "sum": 6375846180
+      }
+    },
+    {
+      "api": "owned",
+      "corpus": "media-rich",
+      "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "expected_output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "name": "media-rich-owned-r2",
+      "repeat": "R2",
+      "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+      "stages": [
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 68932380,
+            "mean": 68932380,
+            "median": 68932380.0,
+            "min": 68932380,
+            "sum": 2067971400
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "phase": "baseline_before_inputs"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 169827947,
+            "mean": 169827947,
+            "median": 169827947.0,
+            "min": 169827947,
+            "sum": 5094838410
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 100895567,
+            "mean": 100895567,
+            "median": 100895567.0,
+            "min": 100895567,
+            "sum": 3026867010
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 100895567,
+            "mean": 100895567,
+            "median": 100895567.0,
+            "min": 100895567,
+            "sum": 3026867010
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 100895567,
+            "mean": 100895567,
+            "median": 100895567.0,
+            "min": 100895567,
+            "sum": 3026867010
+          },
+          "phase": "prepared_inputs_and_sink"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 203765412,
+            "mean": 203765412,
+            "median": 203765412.0,
+            "min": 203765412,
+            "sum": 6112962360
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 139333285,
+            "mean": 139328031.66666666,
+            "median": 139326981.0,
+            "min": 139326981,
+            "sum": 4179840950
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 4500253,
+            "mean": 4494999.666666667,
+            "median": 4493949.0,
+            "min": 4493949,
+            "sum": 134849990
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 134833032,
+            "mean": 134833032,
+            "median": 134833032.0,
+            "min": 134833032,
+            "sum": 4044990960
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 33937465,
+            "mean": 33937465,
+            "median": 33937465.0,
+            "min": 33937465,
+            "sum": 1018123950
+          },
+          "phase": "opened_documents"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 203779274,
+            "mean": 203779274,
+            "median": 203779274.0,
+            "min": 203779274,
+            "sum": 6113378220
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 304794378,
+            "mean": 304786813.2,
+            "median": 304784922.0,
+            "min": 304784922,
+            "sum": 9143604396
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 169947484,
+            "mean": 169939919.2,
+            "median": 169938028.0,
+            "min": 169938028,
+            "sum": 5098197576
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 134846894,
+            "mean": 134846894,
+            "median": 134846894.0,
+            "min": 134846894,
+            "sum": 4045406820
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 13862,
+            "mean": 13862,
+            "median": 13862.0,
+            "min": 13862,
+            "sum": 415860
+          },
+          "phase": "planned"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 237459215,
+            "mean": 237459215,
+            "median": 237459215.0,
+            "min": 237459215,
+            "sum": 7123776450
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 470885434,
+            "mean": 470875452.6666667,
+            "median": 470875978.0,
+            "min": 470872826,
+            "sum": 14126263580
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 302358599,
+            "mean": 302348617.6666667,
+            "median": 302349143.0,
+            "min": 302345991,
+            "sum": 9070458530
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 168526835,
+            "mean": 168526835,
+            "median": 168526835.0,
+            "min": 168526835,
+            "sum": 5055805050
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": 33679941,
+            "mean": 33679941,
+            "median": 33679941.0,
+            "min": 33679941,
+            "sum": 1010398230
+          },
+          "phase": "published"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 237412860,
+            "mean": 237412860,
+            "median": 237412860.0,
+            "min": 237412860,
+            "sum": 7122385800
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 470885434,
+            "mean": 470875452.6666667,
+            "median": 470875978.0,
+            "min": 470872826,
+            "sum": 14126263580
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 302404954,
+            "mean": 302394972.6666667,
+            "median": 302395498.0,
+            "min": 302392346,
+            "sum": 9071849180
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 168480480,
+            "mean": 168480480,
+            "median": 168480480.0,
+            "min": 168480480,
+            "sum": 5054414400
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -46355,
+            "mean": -46355,
+            "median": -46355.0,
+            "min": -46355,
+            "sum": -1390650
+          },
+          "phase": "drop_result"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 237398998,
+            "mean": 237398998,
+            "median": 237398998.0,
+            "min": 237398998,
+            "sum": 7121969940
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 470885434,
+            "mean": 470875452.6666667,
+            "median": 470875978.0,
+            "min": 470872826,
+            "sum": 14126263580
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 302418816,
+            "mean": 302408834.6666667,
+            "median": 302409360.0,
+            "min": 302406208,
+            "sum": 9072265040
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 168466618,
+            "mean": 168466618,
+            "median": 168466618.0,
+            "min": 168466618,
+            "sum": 5053998540
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -13862,
+            "mean": -13862,
+            "median": -13862.0,
+            "min": -13862,
+            "sum": -415860
+          },
+          "phase": "drop_plan"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 136197662,
+            "mean": 136197662,
+            "median": 136197662.0,
+            "min": 136197662,
+            "sum": 4085929860
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 470885434,
+            "mean": 470875452.6666667,
+            "median": 470875978.0,
+            "min": 470872826,
+            "sum": 14126263580
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 403620152,
+            "mean": 403610170.6666667,
+            "median": 403610696.0,
+            "min": 403607544,
+            "sum": 12108305120
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 67265282,
+            "mean": 67265282,
+            "median": 67265282.0,
+            "min": 67265282,
+            "sum": 2017958460
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -101201336,
+            "mean": -101201336,
+            "median": -101201336.0,
+            "min": -101201336,
+            "sum": -3036040080
+          },
+          "phase": "drop_document_handles"
+        },
+        {
+          "absolute_live_bytes": {
+            "count": 30,
+            "max": 68932380,
+            "mean": 68932380,
+            "median": 68932380.0,
+            "min": 68932380,
+            "sum": 2067971400
+          },
+          "allocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 470885434,
+            "mean": 470875452.6666667,
+            "median": 470875978.0,
+            "min": 470872826,
+            "sum": 14126263580
+          },
+          "deallocation_requests_from_entry_bytes": {
+            "count": 30,
+            "max": 470885434,
+            "mean": 470875452.6666667,
+            "median": 470875978.0,
+            "min": 470872826,
+            "sum": 14126263580
+          },
+          "live_change_from_entry_bytes": {
+            "count": 30,
+            "max": 0,
+            "mean": 0,
+            "median": 0.0,
+            "min": 0,
+            "sum": 0
+          },
+          "live_change_from_previous_bytes": {
+            "count": 30,
+            "max": -67265282,
+            "mean": -67265282,
+            "median": -67265282.0,
+            "min": -67265282,
+            "sum": -2017958460
+          },
+          "phase": "drop_sink"
+        }
+      ],
+      "whole_probe_peak_above_entry_bytes": {
+        "count": 30,
+        "max": 203809932,
+        "mean": 203809932,
+        "median": 203809932.0,
+        "min": 203809932,
+        "sum": 6114297960
+      },
+      "whole_probe_region_peak_live_bytes": {
+        "count": 30,
+        "max": 272742312,
+        "mean": 272742312,
+        "median": 272742312.0,
+        "min": 272742312,
+        "sum": 8182269360
+      }
+    }
+  ]
+}

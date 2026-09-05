@@ -1,0 +1,10 @@
+[
+  "capture/plain-owned-r1-receipt.json",
+  "capture/plain-source-backed-r1-receipt.json",
+  "capture/plain-source-backed-r2-receipt.json",
+  "capture/plain-owned-r2-receipt.json",
+  "capture/media-rich-owned-r1-receipt.json",
+  "capture/media-rich-source-backed-r1-receipt.json",
+  "capture/media-rich-source-backed-r2-receipt.json",
+  "capture/media-rich-owned-r2-receipt.json"
+]

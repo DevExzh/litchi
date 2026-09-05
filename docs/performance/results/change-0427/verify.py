@@ -33,10 +33,17 @@ def verify(root):
     assert sha((root / 'probe-report.py').read_bytes()) == build['probe_sha256']
     assert sha((root / 'summarize.py').read_bytes()) == build['summary_driver_sha256']
     assert sha((root / build['build_receipt']).read_bytes()) == build['build_receipt_sha256']
+    build_receipt = json.loads((root / build['build_receipt']).read_text())
+    assert build_receipt['status'] == 'pass' and build_receipt['revision'] == build['revision']
+    assert build_receipt['source_before'] == build_receipt['source_after'] == build['source_manifest']
+    capture_receipt = json.loads((root / 'checks/release-capture.json').read_text())
+    assert capture_receipt['status'] == 'pass' and capture_receipt['revision'] == build['revision']
+    assert capture_receipt['source_before'] == capture_receipt['source_after'] == build['source_manifest']
     checks = json.loads((root / 'expected-checks.json').read_text())
     for name, status in checks.items():
         row = json.loads((root / 'checks' / (name + '.json')).read_text())
         assert row['status'] == status and row['source_unchanged'], name
+        assert row['driver_sha256'] == sha((root / 'check.py').read_bytes()), name
         assert row['source_before'] == row['source_after'], name
         source = row['source_after']
         source_raw = (root / source['path']).read_bytes()
