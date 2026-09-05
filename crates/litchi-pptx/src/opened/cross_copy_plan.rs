@@ -492,7 +492,7 @@ pub(crate) fn apply_plan(
         plan.patch.patch.limits(),
         destination_physical_source_provenance,
     )?;
-    let fresh = plan_cross_slide_copy_for_slides(
+    let (fresh, candidate) = prepare_cross_slide_copy_for_slides(
         &source_snapshot,
         &destination_snapshot,
         plan.source.clone(),
@@ -512,12 +512,13 @@ pub(crate) fn apply_plan(
             reason: "the durable cross-slide plan does not match a freshly proven candidate",
         });
     }
-    let mut candidate = destination.clone();
-    let snapshot = super::patch::apply_exact_revision(
-        &mut candidate,
+    let (candidate, snapshot) = validate_application_candidate(
+        destination,
+        candidate,
         &plan.patch.patch,
         plan.target_revision,
         destination_physical_source_provenance,
+        true,
     )?;
     if physical_package_fingerprint(&candidate, plan.patch.patch.limits())?
         != plan.target_physical_revision
@@ -577,23 +578,24 @@ pub(crate) fn apply_patch(
     )?;
     let source_slide = find_slide_by_part(&source_snapshot, &patch.source_slide)?;
     let destination_slide = find_slide_by_part(&destination_snapshot, &patch.destination_slide)?;
-    let forward_matches = plan_cross_slide_copy_for_slides(
+    let forward_candidate = prepare_cross_slide_copy_for_slides(
         &source_snapshot,
         &destination_snapshot,
         source_slide.clone(),
         destination_slide.clone(),
         patch.position,
     )
-    .map(|fresh| {
-        fresh.patch == *patch
+    .ok()
+    .and_then(|(fresh, candidate)| {
+        (fresh.patch == *patch
             && fresh.target_revision == patch.target_revision
             && fresh.target_physical_revision == patch.target_physical_revision
             && fresh.slide_id == patch.slide_id
-            && fresh.presentation_relationship_id == patch.presentation_relationship_id
-    })
-    .unwrap_or(false);
-    let inverse_matches = if forward_matches {
-        true
+            && fresh.presentation_relationship_id == patch.presentation_relationship_id)
+            .then_some((candidate, true))
+    });
+    let candidate = if let Some(candidate) = forward_candidate {
+        Some(candidate)
     } else {
         // An inverse patch is validated by restoring a detached candidate to
         // its forward source revision, freshly replanning the forward copy,
@@ -608,18 +610,18 @@ pub(crate) fn apply_patch(
         )
         .is_err()
         {
-            false
+            None
         } else if physical_package_fingerprint(&restored, patch.patch.limits()).ok()
             != Some(patch.target_physical_revision)
         {
-            false
+            None
         } else {
             let restored_snapshot = super::model::capture(
                 &restored,
                 patch.patch.limits(),
                 destination_physical_source_provenance,
             );
-            restored_snapshot
+            let inverse_matches = restored_snapshot
                 .ok()
                 .and_then(|base| {
                     let restored_destination =
@@ -634,21 +636,21 @@ pub(crate) fn apply_patch(
                     .ok()?;
                     Some(forward.patch.inverse() == *patch)
                 })
-                .unwrap_or(false)
+                .unwrap_or(false);
+            inverse_matches.then_some((restored, false))
         }
     };
-    if !forward_matches && !inverse_matches {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the durable cross-slide patch does not match a freshly proven candidate",
-        });
-    }
-    let mut candidate = destination.clone();
-    let snapshot = super::patch::apply_exact_revision(
-        &mut candidate,
+    let (candidate, reopened) = candidate.ok_or(Error::UnsafeEdit {
+        operation: "apply_cross_slide_copy_patch",
+        reason: "the durable cross-slide patch does not match a freshly proven candidate",
+    })?;
+    let (candidate, snapshot) = validate_application_candidate(
+        destination,
+        candidate,
         &patch.patch,
         patch.target_revision,
         destination_physical_source_provenance,
+        reopened,
     )?;
     if physical_package_fingerprint(&candidate, patch.patch.limits())?
         != patch.target_physical_revision
@@ -662,6 +664,38 @@ pub(crate) fn apply_patch(
     Ok(snapshot)
 }
 
+fn validate_application_candidate(
+    destination: &OpcPackage,
+    candidate: OpcPackage,
+    patch: &Patch,
+    target_revision: [u8; 32],
+    physical_source_provenance: bool,
+    reopened: bool,
+) -> Result<(OpcPackage, Snapshot)> {
+    // Reopening preserves the observable state of untouched owned ingress.
+    // Dirty packages can carry caller-defined parts or save preferences that
+    // are absent from the archive, so retain their clone-and-apply behavior.
+    if reopened && !destination.is_unmodified_owned_source() {
+        drop(candidate);
+        let mut candidate = destination.clone();
+        let snapshot = super::patch::apply_exact_revision(
+            &mut candidate,
+            patch,
+            target_revision,
+            physical_source_provenance,
+        )?;
+        return Ok((candidate, snapshot));
+    }
+    let snapshot = super::patch::validate_candidate(
+        destination,
+        &candidate,
+        patch,
+        target_revision,
+        physical_source_provenance,
+    )?;
+    Ok((candidate, snapshot))
+}
+
 fn plan_cross_slide_copy_for_slides(
     source: &Snapshot,
     destination: &Snapshot,
@@ -669,6 +703,25 @@ fn plan_cross_slide_copy_for_slides(
     destination_slide: Slide,
     position: usize,
 ) -> Result<CrossSlideCopyPlan> {
+    prepare_cross_slide_copy_for_slides(
+        source,
+        destination,
+        source_slide,
+        destination_slide,
+        position,
+    )
+    .map(|(plan, _candidate)| plan)
+}
+
+// Keep the reopened candidate only within an application call. Public plans
+// retain their existing descriptor and durable patch representation.
+fn prepare_cross_slide_copy_for_slides(
+    source: &Snapshot,
+    destination: &Snapshot,
+    source_slide: Slide,
+    destination_slide: Slide,
+    position: usize,
+) -> Result<(CrossSlideCopyPlan, OpcPackage)> {
     if position > destination.slides.len() {
         return Err(Error::SlideIndexOutOfBounds {
             index: position,
@@ -882,25 +935,28 @@ fn plan_cross_slide_copy_for_slides(
         cross_patch.slide_id,
         &cross_patch.presentation_relationship_id,
     )?;
-    Ok(CrossSlideCopyPlan {
-        source: source_slide,
-        destination: destination_slide,
-        position,
-        slide_id,
-        presentation_relationship_id,
-        parts: parts.into_boxed_slice(),
-        source_layout,
-        destination_layout,
-        external_relationships,
-        planned_bytes,
-        source_revision: source.revision,
-        destination_revision: destination.revision,
-        target_revision,
-        source_physical_revision,
-        destination_physical_revision,
-        target_physical_revision,
-        patch: cross_patch,
-    })
+    Ok((
+        CrossSlideCopyPlan {
+            source: source_slide,
+            destination: destination_slide,
+            position,
+            slide_id,
+            presentation_relationship_id,
+            parts: parts.into_boxed_slice(),
+            source_layout,
+            destination_layout,
+            external_relationships,
+            planned_bytes,
+            source_revision: source.revision,
+            destination_revision: destination.revision,
+            target_revision,
+            source_physical_revision,
+            destination_physical_revision,
+            target_physical_revision,
+            patch: cross_patch,
+        },
+        candidate,
+    ))
 }
 
 fn build_candidate(

@@ -772,6 +772,36 @@ pub(crate) fn apply_exact_revision(
     )
 }
 
+/// Validate a detached candidate already constructed from a freshly proven
+/// patch. This retains the application checks without rebuilding that same
+/// candidate and discarding its validated physical package representation.
+pub(crate) fn validate_candidate(
+    source: &OpcPackage,
+    candidate: &OpcPackage,
+    patch: &Patch,
+    result_revision: [u8; 32],
+    physical_source_provenance: bool,
+) -> Result<Snapshot> {
+    let current_main = crate::parts::PresentationPart::from_package(source)?
+        .part()
+        .partname()
+        .clone();
+    if current_main != patch.presentation_name {
+        return Err(invalid(
+            "opened-presentation patch targets a different presentation root",
+        ));
+    }
+    validate_before(source, patch)?;
+    let snapshot = capture(candidate, patch.limits, physical_source_provenance)?;
+    validate_after(candidate, patch)?;
+    if snapshot.revision() != result_revision {
+        return Err(invalid(
+            "opened-presentation candidate has an unexpected complete-package revision",
+        ));
+    }
+    Ok(snapshot)
+}
+
 fn apply_with_revision(
     package: &mut OpcPackage,
     patch: &Patch,
