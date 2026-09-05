@@ -161,12 +161,8 @@ pub fn decompress_no_split(
     let per_word = 64 / bits;
     let mask = (1u64 << bits) - 1;
     let mut result = Vec::with_capacity(count);
-    for chunk in input.chunks_exact(8) {
-        let word = u64::from_le_bytes(
-            chunk
-                .try_into()
-                .unwrap_or_else(|error| crate::error::panic_error_invariant("exact chunk", error)),
-        );
+    for chunk in input.as_chunks::<8>().0 {
+        let word = u64::from_le_bytes(*chunk);
         for slot in 0..per_word {
             if result.len() == count {
                 break;
@@ -325,7 +321,7 @@ pub fn decompress_hybrid(
     let mut entries = Vec::with_capacity(used / 8);
     let mut packed_count = 0usize;
     let mut logical_count = 0usize;
-    for entry in primary[..used].chunks_exact(8) {
+    for entry in primary[..used].as_chunks::<8>().0 {
         let value_or_offset = i32::from_le_bytes(
             entry[0..4]
                 .try_into()
@@ -713,13 +709,23 @@ pub fn compress_huffman_strings(
         let symbols: Vec<u8> = match mode {
             HuffmanMode::MultipleCharacterSets => string.to_vec(),
             HuffmanMode::SingleCharacterSet { upper_byte } => {
-                if string.len() % 2 != 0 || string.chunks_exact(2).any(|pair| pair[1] != upper_byte)
+                if string.len() % 2 != 0
+                    || string
+                        .as_chunks::<2>()
+                        .0
+                        .iter()
+                        .any(|pair| pair[1] != upper_byte)
                 {
                     return Err(CodecError::Invalid(
                         "single-character-set input is not matching UTF-16LE",
                     ));
                 }
-                string.chunks_exact(2).map(|pair| pair[0]).collect()
+                string
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|pair| pair[0])
+                    .collect()
             },
         };
         for symbol in symbols {

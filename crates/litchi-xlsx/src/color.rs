@@ -83,7 +83,7 @@ impl Rgb {
             return Err(ParseRgbError);
         }
         let mut components = [0u8; 3];
-        for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+        for (index, pair) in value.as_bytes().as_chunks::<2>().0.iter().enumerate() {
             let component = parse_hex_pair(pair).ok_or(ParseRgbError)?;
             let slot = components.get_mut(index).ok_or(ParseRgbError)?;
             *slot = component;
@@ -111,7 +111,7 @@ impl FromStr for Rgb {
             return Err(ParseRgbError);
         }
         let mut components = [0u8; 4];
-        for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+        for (index, pair) in value.as_bytes().as_chunks::<2>().0.iter().enumerate() {
             let component = parse_hex_pair(pair).ok_or(ParseRgbError)?;
             let slot = components.get_mut(index).ok_or(ParseRgbError)?;
             *slot = component;

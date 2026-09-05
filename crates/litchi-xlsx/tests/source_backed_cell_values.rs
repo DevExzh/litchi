@@ -2765,12 +2765,11 @@ fn shared_formula_patch_inverse_restores_original_bytes_semantics_and_topology()
     for reference in ["A1", "B1", "A2", "B2"] {
         assert!(
             !worksheet_cell_fragment(
-                &String::from_utf8(
+                std::str::from_utf8(
                     replay
                         .get_part(&PackURI::new(SHEET).unwrap())
                         .unwrap()
-                        .blob()
-                        .to_vec(),
+                        .blob(),
                 )
                 .unwrap(),
                 reference,

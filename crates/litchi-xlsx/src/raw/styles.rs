@@ -457,7 +457,8 @@ mod tests {
     const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
-    type Streaming0364Result = std::result::Result<u32, StreamError<crate::Error, crate::Error>>;
+    type Streaming0364Result =
+        std::result::Result<u32, Box<StreamError<crate::Error, crate::Error>>>;
 
     fn streaming_0364_count(xml: &str) -> Streaming0364Result {
         let mut input = std::io::Cursor::new(xml.as_bytes());
@@ -466,6 +467,7 @@ mod tests {
             &Capabilities::default(),
             &StreamLimits::default(),
         )
+        .map_err(Box::new)
     }
 
     fn streaming_0364_count_with(
@@ -474,7 +476,7 @@ mod tests {
         limits: &StreamLimits,
     ) -> Streaming0364Result {
         let mut input = std::io::Cursor::new(xml.as_bytes());
-        stream_count(&mut input, capabilities, limits)
+        stream_count(&mut input, capabilities, limits).map_err(Box::new)
     }
 
     #[test]
@@ -565,15 +567,19 @@ mod tests {
     #[test]
     fn streaming_0364_honors_exact_event_limit() {
         let xml = format!(r#"<styleSheet xmlns="{S}"><cellXfs><xf/></cellXfs></styleSheet>"#);
-        let mut exact = StreamLimits::default();
-        exact.max_events = 5;
+        let exact = StreamLimits {
+            max_events: 5,
+            ..StreamLimits::default()
+        };
         assert_eq!(
             streaming_0364_count_with(&xml, &Capabilities::default(), &exact).expect("five events"),
             1
         );
 
-        let mut under = exact;
-        under.max_events = 4;
+        let under = StreamLimits {
+            max_events: 4,
+            ..exact
+        };
         assert!(streaming_0364_count_with(&xml, &Capabilities::default(), &under).is_err());
     }
 }

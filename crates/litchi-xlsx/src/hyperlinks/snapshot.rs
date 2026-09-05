@@ -724,7 +724,7 @@ fn validate_owner_element(
 
 fn resolve_namespace<'a>(value: &'a ResolveResult<'a>) -> Option<&'a [u8]> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Some(value.as_ref()),
+        ResolveResult::Bound(Namespace(value)) => Some(*value),
         ResolveResult::Unbound | ResolveResult::Unknown(_) => None,
     }
 }
