@@ -121,7 +121,10 @@ GENERATED_SELECTOR_SHAPES = {
     "xlsx_three_way_disjoint_commit_save": ("medium",),
     "odf_validation_report": ("large", "medium", "tiny"),
     "odf_mimetype_repair_plan": ("large", "medium", "tiny"),
-    "xls_validation_report": ("large", "medium", "tiny"),
+    # XLS validation is the only indexed generated case that uses the
+    # legacy-writer shape parser. Its runner excludes payload-heavy, and
+    # WriterShape has no medium variant.
+    "xls_validation_report": ("large", "tiny"),
     "xlsx_eager_sheet_protection_edit_save": ("media-rich",),
 }
 APPROVED_NAVIGATION_PATHS = {

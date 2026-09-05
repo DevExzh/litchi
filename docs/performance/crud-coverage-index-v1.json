@@ -527,7 +527,7 @@
           "status": "correctness-only",
           "corpus": {
             "kind": "generated-per-run",
-            "shapes": ["large", "medium", "tiny"],
+            "shapes": ["large", "tiny"],
             "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
           },
           "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
