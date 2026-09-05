@@ -134,6 +134,34 @@ def report(value=100, revision="baseline", corpus_sha="abc"):
     }
 
 
+_MISSING_XLS_SCOPE = object()
+
+
+def xls_source_scope_reports(baseline_scope, current_scope):
+    case = "xls_source_backed_open"
+    baseline = report()
+    current = report(revision="current")
+    for item, scope in ((baseline, baseline_scope), (current, current_scope)):
+        item["configuration"]["cases"] = [case]
+        item["results"][0]["case"] = case
+        if scope is not _MISSING_XLS_SCOPE:
+            item["results"][0]["source"]["xls"] = {
+                "source_counter_scope": scope,
+            }
+    comparison_policy = policy()
+    comparison_policy["required_cases"] = [case]
+    corpus_identity = json.dumps(
+        baseline["results"][0]["corpus"],
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    comparison_policy["expected_result_keys_sha256"] = (
+        perf_compare.result_key_manifest_sha256([(case, corpus_identity)])
+    )
+    return baseline, current, comparison_policy
+
+
 def managed_xlsx_reports():
     case = "xlsx_source_backed_managed_cell_values_one_edit_save"
     payload_limit = 100
@@ -2689,6 +2717,91 @@ class PerfCompareTests(unittest.TestCase):
             perf_compare.compare_reports(
                 baseline, current, self.operation_metrics_policy()
             )
+
+    def test_xls_source_counter_scope_match_is_accepted(self):
+        scope = "xls_classification_catalog_v2"
+        baseline, current, comparison_policy = xls_source_scope_reports(scope, scope)
+
+        result = perf_compare.compare_reports(baseline, current, comparison_policy)
+
+        self.assertEqual(result["status"], "pass")
+
+    def test_xls_source_counter_scope_change_fails_closed(self):
+        baseline, current, comparison_policy = xls_source_scope_reports(
+            "xls_classification_catalog_v1", "xls_classification_catalog_v2"
+        )
+
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "XLS source counter scope mismatch",
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+    def test_xls_source_counter_scope_asymmetric_presence_fails_closed(self):
+        for baseline_scope, current_scope in (
+            ("xls_classification_catalog_v2", _MISSING_XLS_SCOPE),
+            (_MISSING_XLS_SCOPE, "xls_classification_catalog_v2"),
+        ):
+            with self.subTest(baseline_scope=baseline_scope, current_scope=current_scope):
+                baseline, current, comparison_policy = xls_source_scope_reports(
+                    baseline_scope, current_scope
+                )
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError,
+                    "XLS source counter scope mismatch",
+                ):
+                    perf_compare.compare_reports(
+                        baseline, current, comparison_policy
+                    )
+
+    def test_xls_source_counter_scope_malformed_fails_closed(self):
+        for malformed_scope in (None, "", 7, False):
+            with self.subTest(malformed_scope=malformed_scope):
+                baseline, current, comparison_policy = xls_source_scope_reports(
+                    malformed_scope, malformed_scope
+                )
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError,
+                    r"source\.xls\.source_counter_scope must be a non-empty string",
+                ):
+                    perf_compare.compare_reports(
+                        baseline, current, comparison_policy
+                    )
+        for malformed_xls in ({}, []):
+            with self.subTest(malformed_xls=malformed_xls):
+                baseline, current, comparison_policy = xls_source_scope_reports(
+                    "xls_classification_catalog_v2", "xls_classification_catalog_v2"
+                )
+                current["results"][0]["source"]["xls"] = malformed_xls
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError,
+                    (
+                        r"source\.xls\.source_counter_scope must be a non-empty string"
+                        if isinstance(malformed_xls, dict)
+                        else r"source\.xls must be an object"
+                    ),
+                ):
+                    perf_compare.compare_reports(
+                        baseline, current, comparison_policy
+                    )
+
+    def test_non_xls_source_rows_ignore_unrelated_source_shape(self):
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["source"] = {
+            "read_calls": [10] * 5,
+            "observer": "legacy",
+        }
+        current["results"][0]["source"] = {
+            "read_calls": [10] * 5,
+            "observer": "current",
+        }
+
+        result = perf_compare.compare_reports(
+            baseline, current, self.operation_metrics_policy()
+        )
+
+        self.assertEqual(result["status"], "pass")
 
     def test_filesystem_xlsx_counter_scope_is_valid_for_not_applicable_source(self):
         baseline = report()

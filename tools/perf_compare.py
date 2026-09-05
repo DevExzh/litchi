@@ -3399,6 +3399,31 @@ def _source_counter_scope(result: dict[str, Any], location: str) -> str | None:
     return counter_scope
 
 
+def _xls_source_counter_scope(result: dict[str, Any], location: str) -> str | None:
+    """Return the observer-catalog scope carried by an instrumented XLS row.
+
+    XLS category counters are published in the result-level source evidence,
+    independently of the generic operation-metrics source enum.  A missing
+    ``source.xls`` means that this result is not an instrumented XLS row; when
+    it is present, its scope is required to be a non-empty string so a change
+    in the observer catalog cannot be compared as though it were the same
+    measurement.
+    """
+    source = result.get("source")
+    if source is None:
+        return None
+    source_object = _require_object(source, f"{location}.source")
+    if "xls" not in source_object:
+        return None
+    xls = _require_object(source_object["xls"], f"{location}.source.xls")
+    counter_scope = xls.get("source_counter_scope")
+    if not isinstance(counter_scope, str) or not counter_scope:
+        raise ComparisonInputError(
+            f"{location}.source.xls.source_counter_scope must be a non-empty string"
+        )
+    return counter_scope
+
+
 def _optional_metrics_from_selected(
     selected: dict[str, tuple[str, float, float, str]]
 ) -> dict[str, tuple[str, float, float, str]]:
@@ -3656,6 +3681,18 @@ def compare_reports(
             raise ComparisonInputError(
                 f"latency claim mismatch for {case!r}: "
                 f"baseline={before_latency_claim!r}, current={after_latency_claim!r}"
+            )
+        before_xls_source_scope = _xls_source_counter_scope(
+            before_result, f"baseline.{case}"
+        )
+        after_xls_source_scope = _xls_source_counter_scope(
+            after_result, f"current.{case}"
+        )
+        if before_xls_source_scope != after_xls_source_scope:
+            raise ComparisonInputError(
+                f"XLS source counter scope mismatch for {case!r}: "
+                f"baseline={before_xls_source_scope!r}, "
+                f"current={after_xls_source_scope!r}"
             )
         corpus = before_result["corpus"]
         if allocator_mode or before_latency_claim in _EVIDENCE_ONLY_LATENCY_CLAIMS:
