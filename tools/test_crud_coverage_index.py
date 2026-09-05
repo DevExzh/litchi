@@ -258,6 +258,26 @@ class CrudCoverageIndexTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             self.validate(index)
 
+    def test_xls_validation_uses_supported_writer_shapes_only(self) -> None:
+        scenario = next(
+            scenario
+            for category in self.index["categories"]
+            for scenario in category["scenarios"]
+            if scenario.get("selector") == "xls_validation_report"
+        )
+        self.assertEqual(scenario["corpus"]["shapes"], ["large", "tiny"])
+
+        index = copy.deepcopy(self.index)
+        scenario = next(
+            scenario
+            for category in index["categories"]
+            for scenario in category["scenarios"]
+            if scenario.get("selector") == "xls_validation_report"
+        )
+        scenario["corpus"]["shapes"] = ["large", "medium", "tiny"]
+        with self.assertRaises(ValidationError):
+            self.validate(index)
+
     def test_index_and_category_claim_representative_coverage(self) -> None:
         index = copy.deepcopy(self.index)
         index["coverage_claim"] = "complete"
