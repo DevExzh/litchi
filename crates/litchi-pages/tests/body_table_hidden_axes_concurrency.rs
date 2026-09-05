@@ -89,17 +89,38 @@ mod fixture {
         let fork = package.clone();
         let fork_target = HiddenAxes::new([AxisIndex::column(0)])?;
         let fork_before = fork.exact_bytes();
-        let fork_result = fork
+        let fork_commit = fork
             .edit_body_table_hidden_axes(1usize)?
-            .set(fork_target)
-            .commit();
-        assert!(matches!(
-            fork_result,
-            Err(Error::UnsupportedDependency | Error::UnsupportedSource)
-        ));
+            .set(fork_target.clone())
+            .commit()
+            .expect("indexed owner creation succeeds on the private fork");
         assert_eq!(fork.exact_bytes(), fork_before);
         assert_eq!(package.exact_bytes(), original);
         assert_eq!(package.body_table_hidden_axes(1usize)?, HiddenAxes::empty());
+        assert_eq!(
+            fork_commit.package().body_table_hidden_axes(1usize)?,
+            fork_target
+        );
+        let fork_target_bytes = fork_commit.package().exact_bytes();
+        assert_eq!(
+            Package::from_bytes(&fork_target_bytes)
+                .expect("created fork snapshot reopens")
+                .body_table_hidden_axes(1usize)
+                .expect("created fork snapshot reads"),
+            fork_target
+        );
+        let fork_restored = fork_commit
+            .package()
+            .apply_body_table_hidden_axes(&fork_commit.patch().inverse())
+            .expect("fork inverse restores its source");
+        assert_eq!(fork_restored.package().exact_bytes(), fork_before);
+        assert_eq!(
+            fork_restored
+                .package()
+                .body_table_hidden_axes(1usize)
+                .expect("fork inverse reads"),
+            HiddenAxes::empty()
+        );
 
         let package = Arc::new(package);
         let start = Arc::new(Barrier::new(WORKERS));
@@ -127,19 +148,48 @@ mod fixture {
                     } else {
                         HiddenAxes::new([AxisIndex::row(3)]).expect("row edit is valid")
                     };
-                    let result = package
+                    let source_before = package.exact_bytes();
+                    let commit = package
                         .edit_body_table_hidden_axes(1usize)
                         .expect("editor opens from an immutable source")
                         .set(target.clone())
-                        .commit();
-                    assert!(matches!(
-                        result,
-                        Err(Error::UnsupportedDependency | Error::UnsupportedSource)
-                    ));
+                        .commit()
+                        .expect("indexed owner creation succeeds from an immutable source");
+                    assert_eq!(
+                        commit
+                            .package()
+                            .body_table_hidden_axes(1usize)
+                            .expect("created worker snapshot reads"),
+                        target
+                    );
+                    let target_bytes = commit.package().exact_bytes();
+                    let reopened = Package::from_bytes(&target_bytes)
+                        .expect("created worker snapshot reopens");
+                    for _ in 0..READ_ROUNDS {
+                        assert_eq!(
+                            reopened
+                                .body_table_hidden_axes(1usize)
+                                .expect("reopened worker snapshot reads"),
+                            target
+                        );
+                    }
+                    let restored = commit
+                        .package()
+                        .apply_body_table_hidden_axes(&commit.patch().inverse())
+                        .expect("worker inverse restores its source");
+                    assert_eq!(restored.package().exact_bytes(), source_before);
                     assert_eq!(
                         package
                             .body_table_hidden_axes(1usize)
                             .expect("source remains unchanged"),
+                        HiddenAxes::empty()
+                    );
+                    assert_eq!(package.exact_bytes(), source_before);
+                    assert_eq!(
+                        restored
+                            .package()
+                            .body_table_hidden_axes(1usize)
+                            .expect("worker inverse reads"),
                         HiddenAxes::empty()
                     );
                 }

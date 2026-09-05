@@ -32,6 +32,7 @@ use litchi_pages::{
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
+const METADATA_MEMBER: &str = "Index/Metadata.iwa";
 const ROOT_IDENTIFIER: u64 = 1;
 const BODY_IDENTIFIER: u64 = 42;
 const TABLE_COUNT: usize = 2;
@@ -54,6 +55,12 @@ const FILTER_SET_MESSAGE_TYPE: u32 = 6_220;
 const ROOT_MESSAGE_TYPE: u32 = 10_000;
 const BODY_MESSAGE_TYPE: u32 = 2_001;
 const ATTACHMENT_MESSAGE_TYPE: u32 = 2_003;
+const METADATA_OBJECT_IDENTIFIER: u64 = 50_000;
+const METADATA_MESSAGE_TYPE: u32 = 11_006;
+const METADATA_WATERMARK: u64 = METADATA_OBJECT_IDENTIFIER;
+const METADATA_ORPHAN_IDENTIFIER: u64 = 90_000;
+const METADATA_UUID_LOWER_OFFSET: u64 = 10_000;
+const METADATA_UUID_UPPER_OFFSET: u64 = 20_000;
 const TABLE_ROWS: u32 = 4;
 const TABLE_COLUMNS: u32 = 4;
 const PREVIEWS: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
@@ -134,6 +141,37 @@ struct TableOptions {
     /// keeps the semantic resolver honest: positional edits must go through
     /// the map rather than relying on sorted payload order.
     non_identity_uid_map: bool,
+}
+
+/// Optional archive metadata used to exercise the allocator's package-wide
+/// identity census.  The ordinary fixture stays metadata-free so both the
+/// metadata-free and metadata-bearing owner-creation paths remain reachable.
+/// Metadata-bearing descriptors are selected explicitly below and use the same
+/// shape as the Pages metadata fixtures in the focused integration tests.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MetadataProfile {
+    None,
+    Valid,
+}
+
+impl MetadataProfile {
+    const fn present(self) -> bool {
+        matches!(self, Self::Valid)
+    }
+}
+
+fn metadata_uuid(identifier: u64) -> tsp::Uuid {
+    uuid(
+        identifier.saturating_add(METADATA_UUID_LOWER_OFFSET),
+        identifier.saturating_add(METADATA_UUID_UPPER_OFFSET),
+    )
+}
+
+fn metadata_uuid_entry(identifier: u64) -> tsp::ObjectUuidMapEntry {
+    tsp::ObjectUuidMapEntry {
+        identifier,
+        uuid: metadata_uuid(identifier),
+    }
 }
 
 fn reference(identifier: u64) -> tsp::Reference {
@@ -482,9 +520,10 @@ fn hidden_state_uuid(index: usize) -> tsp::Uuid {
     )
 }
 
-fn synthetic_package(
+fn synthetic_package_with_metadata(
     options: [TableOptions; TABLE_COUNT],
     names: [&str; TABLE_COUNT],
+    metadata_profile: MetadataProfile,
 ) -> TestResult<Vec<u8>> {
     let root = tp::DocumentArchive {
         super_: tsa::DocumentArchive::default(),
@@ -609,7 +648,7 @@ fn synthetic_package(
 
         // Every native table has the formula-owner dependency record.  The
         // hidden-state owner itself is optional; absent-owner reads are empty
-        // and non-empty creation requests must fail closed.
+        // and admitted non-empty requests exercise native owner creation.
         let formula_owner_object = object(
             table_formula_owner(index),
             FORMULA_OWNER_MESSAGE_TYPE,
@@ -670,10 +709,62 @@ fn synthetic_package(
             .into_iter()
             .map(|name| (name, b"preview".as_slice())),
     );
+    let metadata_component = metadata_profile
+        .present()
+        .then(|| metadata_archive(&archive))
+        .transpose()?
+        .unwrap_or_default();
+    if !metadata_component.is_empty() {
+        members.push((METADATA_MEMBER, metadata_component.as_slice()));
+    }
     Ok(litchi_iwa_archive::package::to_bytes(
         members,
         Limits::default(),
     )?)
+}
+
+fn metadata_archive(document: &Archive) -> TestResult<Vec<u8>> {
+    let mut document_identifiers = document
+        .objects
+        .iter()
+        .map(|object| {
+            object
+                .archive_info
+                .identifier
+                .ok_or_else(|| "document fixture object has no identifier".to_owned())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    document_identifiers.sort_unstable();
+    document_identifiers.dedup();
+    let metadata = tsp::PackageMetadata {
+        last_object_identifier: METADATA_WATERMARK,
+        save_token: Some(1),
+        // Native Pages metadata identifies the current Document component by
+        // preferred locator alone.  The Metadata.iwa archive object is a
+        // package resource and is intentionally absent from this registry.
+        components: vec![tsp::ComponentInfo {
+            identifier: 1,
+            preferred_locator: "Document".to_owned(),
+            locator: None,
+            save_token: Some(1),
+            object_uuid_map_entries: document_identifiers
+                .into_iter()
+                .map(metadata_uuid_entry)
+                .collect(),
+            ..tsp::ComponentInfo::default()
+        }],
+        ..tsp::PackageMetadata::default()
+    }
+    .encode_to_vec();
+    let archive = Archive {
+        objects: vec![object(
+            METADATA_OBJECT_IDENTIFIER,
+            METADATA_MESSAGE_TYPE,
+            metadata,
+            &[],
+        )?],
+    };
+    Ok(SnappyStream::compress(&archive.to_bytes()?)?)
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
@@ -709,6 +800,168 @@ fn rewrite_document_archive(
     let component = SnappyStream::compress(&archive.to_bytes()?)?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
+        Limits::default(),
+    )?)
+}
+
+fn metadata_payload_from_package(package: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA_MEMBER)
+        .ok_or("missing metadata member")?;
+    let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    Ok(archive
+        .object(METADATA_OBJECT_IDENTIFIER)
+        .ok_or("missing metadata object")?
+        .messages
+        .iter()
+        .find(|message| message.type_ == METADATA_MESSAGE_TYPE)
+        .ok_or("missing metadata message")?
+        .data
+        .clone())
+}
+
+fn rewrite_metadata(
+    package: &[u8],
+    mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA_MEMBER)
+        .ok_or("missing metadata member")?;
+    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let metadata_object = archive
+        .object_mut(METADATA_OBJECT_IDENTIFIER)
+        .ok_or("missing metadata object")?;
+    let message = metadata_object
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == METADATA_MESSAGE_TYPE)
+        .ok_or("missing metadata message")?;
+    let mut metadata = tsp::PackageMetadata::decode(message.data.as_slice())?;
+    mutate(&mut metadata)?;
+    message.data = metadata.encode_to_vec();
+    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(METADATA_MEMBER, component.as_slice())],
+        Limits::default(),
+    )?)
+}
+
+fn metadata_component_mut(
+    metadata: &mut tsp::PackageMetadata,
+) -> TestResult<&mut tsp::ComponentInfo> {
+    metadata
+        .components
+        .iter_mut()
+        .find(|component| {
+            component.identifier == 1
+                && component.preferred_locator == "Document"
+                && component.locator.is_none()
+        })
+        .ok_or_else(|| "missing Document metadata component".into())
+}
+
+fn metadata_dangling_registry(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_metadata(package, |metadata| {
+        metadata_component_mut(metadata)?
+            .object_uuid_map_entries
+            .push(metadata_uuid_entry(METADATA_ORPHAN_IDENTIFIER));
+        Ok(())
+    })
+}
+
+fn metadata_duplicate_registry(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_metadata(package, |metadata| {
+        let component = metadata_component_mut(metadata)?;
+        let mut duplicate = component
+            .object_uuid_map_entries
+            .first()
+            .cloned()
+            .ok_or("metadata registry is empty")?;
+        duplicate.uuid = uuid(0xdead_beef, 0xcafe_babe);
+        component.object_uuid_map_entries.push(duplicate);
+        Ok(())
+    })
+}
+
+fn metadata_watermark_near_max(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_metadata(package, |metadata| {
+        metadata.last_object_identifier = u64::MAX - 2;
+        Ok(())
+    })
+}
+
+fn metadata_uuid_collision(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_metadata(package, |metadata| {
+        let component = metadata_component_mut(metadata)?;
+        let first_uuid = component
+            .object_uuid_map_entries
+            .first()
+            .cloned()
+            .ok_or("metadata registry is empty")?;
+        let duplicate = component
+            .object_uuid_map_entries
+            .get_mut(1)
+            .ok_or("metadata registry has no second binding")?;
+        // Reuse a UUID on a different physical Document object so this probe
+        // isolates duplicate-UUID authority without adding a dangling ID or
+        // changing the allocator's maximum identifier.
+        duplicate.uuid = first_uuid.uuid;
+        Ok(())
+    })
+}
+
+fn remove_metadata_member(package: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let members = catalog
+        .iter()
+        .filter(|entry| entry.name() != METADATA_MEMBER)
+        .map(|entry| (entry.name(), entry.data()))
+        .collect::<Vec<_>>();
+    Ok(litchi_iwa_archive::package::to_bytes(
+        members,
+        Limits::default(),
+    )?)
+}
+
+fn metadata_physical_id_collision(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document_archive(package, |archive| {
+        archive.insert_object(object(
+            METADATA_OBJECT_IDENTIFIER,
+            FILTER_SET_MESSAGE_TYPE,
+            filter_set_payload(),
+            &[],
+        )?)?;
+        Ok(())
+    })
+}
+
+fn metadata_misrouted_member(package: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let metadata = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA_MEMBER)
+        .ok_or("missing metadata member")?
+        .data()
+        .to_vec();
+    let members = catalog
+        .iter()
+        .filter(|entry| entry.name() != METADATA_MEMBER)
+        .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
+        .chain(std::iter::once((
+            "Index/NotMetadata.iwa".to_owned(),
+            metadata,
+        )))
+        .collect::<Vec<_>>();
+    let references = members
+        .iter()
+        .map(|(name, data)| (name.as_str(), data.as_slice()))
+        .collect::<Vec<_>>();
+    Ok(litchi_iwa_archive::package::to_bytes(
+        references,
         Limits::default(),
     )?)
 }
@@ -1251,7 +1504,38 @@ const MODE_MODEL_MAP_METADATA_MISSING: u8 = 35;
 const MODE_MODEL_MAP_METADATA_PATH: u8 = 36;
 const MODE_INFO_MAP_METADATA_MISSING: u8 = 37;
 const MODE_FILTER_METADATA: u8 = 38;
-const MODE_COUNT: u8 = 39;
+// Registry-aware owner creation probes.  These modes force a valid metadata
+// member before applying one narrowly-scoped metadata mutation.
+const MODE_METADATA_DANGLING_REGISTRY: u8 = 39;
+const MODE_METADATA_DUPLICATE_REGISTRY: u8 = 40;
+const MODE_METADATA_WATERMARK_NEAR_MAX: u8 = 41;
+const MODE_METADATA_UUID_COLLISION: u8 = 42;
+const MODE_METADATA_MISSING: u8 = 43;
+const MODE_METADATA_PHYSICAL_ID_COLLISION: u8 = 44;
+const MODE_METADATA_MISROUTED_MEMBER: u8 = 45;
+const MODE_COUNT: u8 = 46;
+
+fn is_metadata_mode(mode: u8) -> bool {
+    matches!(
+        mode,
+        MODE_METADATA_DANGLING_REGISTRY
+            | MODE_METADATA_DUPLICATE_REGISTRY
+            | MODE_METADATA_WATERMARK_NEAR_MAX
+            | MODE_METADATA_UUID_COLLISION
+            | MODE_METADATA_MISSING
+            | MODE_METADATA_PHYSICAL_ID_COLLISION
+            | MODE_METADATA_MISROUTED_MEMBER
+    )
+}
+
+fn metadata_profile_for_descriptor(descriptor: &[u8]) -> MetadataProfile {
+    let mode = descriptor.get(3).copied().unwrap_or_default() % MODE_COUNT;
+    if is_metadata_mode(mode) || descriptor.get(7).copied().unwrap_or_default() >> 4 != 0 {
+        MetadataProfile::Valid
+    } else {
+        MetadataProfile::None
+    }
+}
 
 fuzz_target!(|data: &[u8]| {
     let descriptor = normalize_descriptor(data);
@@ -1343,9 +1627,9 @@ fn base_fixture(descriptor: &[u8]) -> TestResult<Vec<u8>> {
     let mode = descriptor.get(3).copied().unwrap_or_default() % MODE_COUNT;
     let flags = descriptor.first().copied().unwrap_or_default();
 
-    // A changed clear/reset/no-op needs an existing owner; a nonempty set with
-    // the owner bit clear deliberately reaches the terminal unsupported-
-    // creation path.
+    // A changed clear/reset/no-op needs an existing owner.  Metadata probes
+    // deliberately keep the owner absent so their malformed variants reach
+    // the registry-aware creation path after the primary valid-source pass.
     let existing_owner = flags & 1 != 0
         || command != COMMAND_SET
         || matches!(
@@ -1404,7 +1688,11 @@ fn base_fixture(descriptor: &[u8]) -> TestResult<Vec<u8>> {
         locked: false,
         non_identity_uid_map: flags & 0x80 != 0,
     };
-    synthetic_package([first, second], ["Revenue", "Costs"])
+    synthetic_package_with_metadata(
+        [first, second],
+        ["Revenue", "Costs"],
+        metadata_profile_for_descriptor(descriptor),
+    )
 }
 
 fn malformed_fixture(source: &[u8], mode: u8) -> TestResult<Vec<u8>> {
@@ -1454,6 +1742,13 @@ fn malformed_fixture(source: &[u8], mode: u8) -> TestResult<Vec<u8>> {
         MODE_MODEL_MAP_METADATA_PATH => wrong_model_map_metadata_path(source, 0),
         MODE_INFO_MAP_METADATA_MISSING => remove_info_map_metadata(source, 1),
         MODE_FILTER_METADATA => invalid_filter_metadata(source, 0),
+        MODE_METADATA_DANGLING_REGISTRY => metadata_dangling_registry(source),
+        MODE_METADATA_DUPLICATE_REGISTRY => metadata_duplicate_registry(source),
+        MODE_METADATA_WATERMARK_NEAR_MAX => metadata_watermark_near_max(source),
+        MODE_METADATA_UUID_COLLISION => metadata_uuid_collision(source),
+        MODE_METADATA_MISSING => remove_metadata_member(source),
+        MODE_METADATA_PHYSICAL_ID_COLLISION => metadata_physical_id_collision(source),
+        MODE_METADATA_MISROUTED_MEMBER => metadata_misrouted_member(source),
         _ => Ok(source.to_vec()),
     }
 }
@@ -1509,6 +1804,9 @@ fn exercise_primary(source: &[u8], descriptor: &[u8]) {
     assert_eq!(source_bytes, source);
     let source_archive = document_archive(&source_bytes)
         .unwrap_or_else(|error| panic!("valid document archive must reopen: {error}"));
+    if metadata_profile_for_descriptor(descriptor).present() {
+        assert_metadata_fixture(&source_bytes, &source_archive);
+    }
     for index in 0..TABLE_COUNT {
         assert_canonical_uid_map_message(&source_archive, index);
         assert_uid_map_route(&source_bytes, index);
@@ -1534,6 +1832,8 @@ fn exercise_primary(source: &[u8], descriptor: &[u8]) {
 
     let command = descriptor.get(1).copied().unwrap_or(COMMAND_SET) % 4;
     let requested = requested_axes(descriptor);
+    let flags = descriptor.first().copied().unwrap_or_default();
+    let mode = descriptor.get(3).copied().unwrap_or_default() % MODE_COUNT;
     let edit = package
         .edit_body_table_hidden_axes(selector)
         .unwrap_or_else(|error| panic!("valid descriptor edit must start: {error}"));
@@ -1548,29 +1848,58 @@ fn exercise_primary(source: &[u8], descriptor: &[u8]) {
         COMMAND_CLEAR | COMMAND_RESET => before.is_empty(),
         _ => true,
     };
-    let ownerless_nonempty_set =
-        command == COMMAND_SET && before.is_empty() && !requested.is_empty();
+    // Derive ownerlessness from the fixture's graph controls.  A filtered,
+    // pivot, or locked table can also read as empty in some native shapes,
+    // but those dependency states must retain refusal precedence.  Creation
+    // is admitted only for the indexed, unlocked, unfiltered, ownerless
+    // profile; PackageMetadata is optional and, when present, must be valid.
+    let selected_index = selected_table_index(descriptor);
+    let selected_ownerless = match hidden_owner_payload_from_package(&source_bytes, selected_index)
+    {
+        Ok(_) => false,
+        Err(error) => {
+            assert!(
+                error.to_string().contains("missing hidden-state owner"),
+                "valid fixture owner probe failed for an unexpected reason: {error}"
+            );
+            true
+        },
+    };
+    let selected_dependency_present = match selected_index {
+        0 => flags & 0x0e != 0 || matches!(mode, MODE_WRONG_DIRECTION | MODE_SHARED_OWNER),
+        1 => flags & 0x20 != 0,
+        _ => unreachable!("fixture has exactly two tables"),
+    };
+    let indexed_ownerless_nonempty_set = command == COMMAND_SET
+        && selected_ownerless
+        && !selected_dependency_present
+        && !requested.is_empty();
+    let owner_creation_admitted =
+        indexed_ownerless_nonempty_set && (mode == MODE_VALID || is_metadata_mode(mode));
     let commit = match staged.commit() {
         Ok(commit) => commit,
         Err(error) => {
-            // A valid graph may refuse a changed lock/filter/pivot topology or
-            // an absent-owner nonempty set, but every such refusal must be
-            // atomic. Ordinary valid graphs must publish (or publish an exact
-            // no-op), so this assertion keeps each input on a substantive
-            // success or explicitly expected error branch.
+            // A valid graph may refuse a changed lock/filter/pivot topology;
+            // every such refusal must be atomic. Ordinary valid graphs must
+            // publish (or publish an exact no-op), so this assertion keeps
+            // each input on a substantive success or explicitly expected
+            // error branch.
             assert_eq!(package.exact_bytes(), source_bytes);
-            let flags = descriptor.first().copied().unwrap_or_default();
+            assert!(
+                !owner_creation_admitted,
+                "admitted ownerless creation unexpectedly rejected: {error:?}"
+            );
             assert!(
                 !expected_noop,
                 "valid no-op edit unexpectedly rejected: {error}"
             );
             assert!(
-                ownerless_nonempty_set || flags & 0x0c != 0,
+                indexed_ownerless_nonempty_set || selected_dependency_present,
                 "valid descriptor edit unexpectedly rejected: {error}"
             );
-            if ownerless_nonempty_set {
+            if indexed_ownerless_nonempty_set {
                 assert_eq!(error, Error::UnsupportedDependency);
-            } else if flags & 0x08 != 0 {
+            } else if selected_index == 0 && flags & 0x08 != 0 {
                 assert_eq!(error, Error::TableLocked);
             } else {
                 assert_eq!(error, Error::UnsupportedDependency);
@@ -1586,6 +1915,13 @@ fn exercise_primary(source: &[u8], descriptor: &[u8]) {
         _ => before.clone(),
     };
     let target_bytes = commit.package().exact_bytes();
+    let owner_created = owner_creation_observed(&source_bytes, &target_bytes);
+    if owner_creation_admitted {
+        assert!(
+            owner_created,
+            "admitted ownerless creation did not add the four helper objects"
+        );
+    }
     let after = commit
         .package()
         .body_table_hidden_axes(selector)
@@ -1603,7 +1939,13 @@ fn exercise_primary(source: &[u8], descriptor: &[u8]) {
     } else {
         assert_ne!(target_bytes, source_bytes);
         assert!(commit.diagnostics().changed());
-        assert_eq!(commit.diagnostics().touched_components(), 1);
+        let expected_touched_components = 1usize.saturating_add(usize::from(
+            owner_created && metadata_profile_for_descriptor(descriptor).present(),
+        ));
+        assert_eq!(
+            commit.diagnostics().touched_components(),
+            expected_touched_components
+        );
         assert!(commit.diagnostics().full_reparse_performed());
         assert_preview_diagnostic(
             &source_bytes,
@@ -1616,14 +1958,34 @@ fn exercise_primary(source: &[u8], descriptor: &[u8]) {
         &source_bytes,
         &target_bytes,
         selected_table_index(descriptor),
+        owner_created,
     );
     if !commit.patch().is_noop() {
-        assert_existing_owner_wire_state_preserved(
-            &source_bytes,
-            &target_bytes,
-            selected_table_index(descriptor),
-            &after,
-        );
+        if owner_created {
+            assert_owner_creation_state(
+                &source_bytes,
+                &target_bytes,
+                selected_table_index(descriptor),
+                &after,
+            );
+        } else {
+            assert_existing_owner_wire_state_preserved(
+                &source_bytes,
+                &target_bytes,
+                selected_table_index(descriptor),
+                &after,
+            );
+        }
+        if owner_created && metadata_profile_for_descriptor(descriptor).present() {
+            let source_archive = document_archive(&source_bytes).unwrap_or_else(|error| {
+                panic!("owner-creation source archive is present: {error}")
+            });
+            let target_archive = document_archive(&target_bytes).unwrap_or_else(|error| {
+                panic!("owner-creation target archive is present: {error}")
+            });
+            let added_ids = assert_owner_creation_objects(&source_archive, &target_archive);
+            assert_owner_creation_metadata(&source_bytes, &target_bytes, &added_ids);
+        }
     }
     assert_reopen_and_patch_invariants(
         &package,
@@ -1634,6 +1996,142 @@ fn exercise_primary(source: &[u8], descriptor: &[u8]) {
         &source_bytes,
         &target_bytes,
     );
+}
+
+fn metadata_from_package(package: &[u8]) -> TestResult<tsp::PackageMetadata> {
+    Ok(tsp::PackageMetadata::decode(
+        metadata_payload_from_package(package)?.as_slice(),
+    )?)
+}
+
+fn assert_metadata_fixture(package: &[u8], document: &Archive) {
+    let metadata = metadata_from_package(package)
+        .unwrap_or_else(|error| panic!("valid metadata fixture must decode: {error}"));
+    assert_eq!(metadata.last_object_identifier, METADATA_WATERMARK);
+    assert!(
+        !document
+            .objects
+            .iter()
+            .any(|object| object.archive_info.identifier == Some(METADATA_OBJECT_IDENTIFIER))
+    );
+    assert_eq!(metadata.components.len(), 1);
+    let component = metadata
+        .components
+        .iter()
+        .find(|component| component.identifier == 1)
+        .unwrap_or_else(|| panic!("valid metadata fixture is missing Document component"));
+    assert_eq!(component.preferred_locator, "Document");
+    assert_eq!(component.locator, None);
+    let mut document_identifiers = document
+        .objects
+        .iter()
+        .filter_map(|object| object.archive_info.identifier)
+        .collect::<Vec<_>>();
+    document_identifiers.sort_unstable();
+    document_identifiers.dedup();
+    assert_eq!(
+        component.object_uuid_map_entries.len(),
+        document_identifiers.len()
+    );
+    for identifier in document_identifiers {
+        let entry = component
+            .object_uuid_map_entries
+            .iter()
+            .find(|entry| entry.identifier == identifier)
+            .unwrap_or_else(|| panic!("metadata registry lost identifier {identifier}"));
+        assert_eq!(entry.uuid, metadata_uuid(identifier));
+    }
+    assert!(
+        !component
+            .object_uuid_map_entries
+            .iter()
+            .any(|entry| entry.identifier == METADATA_OBJECT_IDENTIFIER)
+    );
+}
+
+fn assert_owner_creation_metadata(source: &[u8], target: &[u8], added_ids: &[u64]) {
+    let source_metadata = metadata_from_package(source)
+        .unwrap_or_else(|error| panic!("owner-creation source metadata is present: {error}"));
+    let target_metadata = metadata_from_package(target)
+        .unwrap_or_else(|error| panic!("owner-creation target metadata is present: {error}"));
+    let source_component = source_metadata
+        .components
+        .iter()
+        .find(|component| {
+            component.identifier == 1
+                && component.preferred_locator == "Document"
+                && component.locator.is_none()
+        })
+        .unwrap_or_else(|| panic!("owner-creation source Document component is present"));
+    let target_component = target_metadata
+        .components
+        .iter()
+        .find(|component| {
+            component.identifier == 1
+                && component.preferred_locator == "Document"
+                && component.locator.is_none()
+        })
+        .unwrap_or_else(|| panic!("owner-creation target Document component is present"));
+    assert_eq!(
+        target_metadata.components.len(),
+        source_metadata.components.len()
+    );
+    assert_eq!(added_ids.len(), 4);
+    assert_eq!(
+        target_metadata.last_object_identifier,
+        *added_ids.last().expect("created IDs are nonempty")
+    );
+    assert_eq!(
+        target_component.object_uuid_map_entries.len(),
+        source_component.object_uuid_map_entries.len() + added_ids.len()
+    );
+    assert!(
+        !target_component
+            .object_uuid_map_entries
+            .iter()
+            .any(|entry| entry.identifier == METADATA_OBJECT_IDENTIFIER)
+    );
+
+    for source_entry in &source_component.object_uuid_map_entries {
+        let target_entry = target_component
+            .object_uuid_map_entries
+            .iter()
+            .find(|entry| entry.identifier == source_entry.identifier)
+            .unwrap_or_else(|| {
+                panic!(
+                    "owner-creation metadata lost source identifier {}",
+                    source_entry.identifier
+                )
+            });
+        assert_eq!(target_entry.uuid, source_entry.uuid);
+    }
+    for identifier in added_ids.iter().copied() {
+        let target_entry = target_component
+            .object_uuid_map_entries
+            .iter()
+            .find(|entry| entry.identifier == identifier)
+            .unwrap_or_else(|| panic!("owner-creation metadata lost helper {identifier}"));
+        assert!(
+            target_entry.uuid.lower != 0 || target_entry.uuid.upper != 0,
+            "owner-creation helper {identifier} received a zero UUID"
+        );
+        assert!(
+            !source_component
+                .object_uuid_map_entries
+                .iter()
+                .any(|entry| entry.uuid == target_entry.uuid)
+        );
+    }
+    for (index, entry) in target_component.object_uuid_map_entries.iter().enumerate() {
+        for other in target_component
+            .object_uuid_map_entries
+            .iter()
+            .skip(index + 1)
+        {
+            assert_ne!(entry.identifier, other.identifier);
+            assert_ne!(entry.uuid, other.uuid);
+        }
+    }
 }
 
 fn exercise_shared_ownership(
@@ -1726,13 +2224,38 @@ fn selected_table_index(descriptor: &[u8]) -> usize {
     usize::from(descriptor.get(4).copied().unwrap_or_default() % 4 >= 2)
 }
 
-fn assert_member_locality(source: &[u8], target: &[u8], selected_index: usize) {
+fn owner_creation_observed(source: &[u8], target: &[u8]) -> bool {
+    let source_archive = document_archive(source).expect("source document archive");
+    let target_archive = document_archive(target).expect("target document archive");
+    let source_ids = source_archive
+        .objects
+        .iter()
+        .filter_map(|object| object.archive_info.identifier)
+        .collect::<Vec<_>>();
+    target_archive
+        .objects
+        .iter()
+        .filter_map(|object| object.archive_info.identifier)
+        .filter(|identifier| !source_ids.contains(identifier))
+        .count()
+        == 4
+}
+
+fn assert_member_locality(
+    source: &[u8],
+    target: &[u8],
+    selected_index: usize,
+    owner_created: bool,
+) {
     let source_catalog = Catalog::from_bytes(source).expect("source catalog is valid");
     let target_catalog = Catalog::from_bytes(target).expect("target catalog is valid");
 
     for source_entry in source_catalog.iter() {
         let name = source_entry.name();
-        if name == DOCUMENT_MEMBER || PREVIEWS.contains(&name) {
+        if name == DOCUMENT_MEMBER
+            || PREVIEWS.contains(&name)
+            || (owner_created && name == METADATA_MEMBER)
+        {
             continue;
         }
         let target_entry = target_catalog
@@ -1748,7 +2271,12 @@ fn assert_member_locality(source: &[u8], target: &[u8], selected_index: usize) {
 
     let source_archive = document_archive(source).expect("source document archive");
     let target_archive = document_archive(target).expect("target document archive");
-    let selected_ids = [
+    let added_ids = if owner_created {
+        assert_owner_creation_objects(&source_archive, &target_archive)
+    } else {
+        Vec::new()
+    };
+    let mut selected_ids = vec![
         table_attachment(selected_index),
         table_drawable(selected_index),
         table_model(selected_index),
@@ -1759,6 +2287,7 @@ fn assert_member_locality(source: &[u8], target: &[u8], selected_index: usize) {
         table_formula_object(selected_index, true),
         table_formula_object(selected_index, false),
     ];
+    selected_ids.extend_from_slice(&added_ids);
     let source_unselected = source_archive
         .objects
         .iter()
@@ -1818,6 +2347,17 @@ fn assert_member_locality(source: &[u8], target: &[u8], selected_index: usize) {
     ] {
         let source_object = source_archive.object(identifier);
         let target_object = target_archive.object(identifier);
+        if owner_created && added_ids.contains(&identifier) {
+            assert!(
+                source_object.is_none(),
+                "created helper {identifier} unexpectedly existed in the source"
+            );
+            assert!(
+                target_object.is_some(),
+                "created helper {identifier} is missing from the target"
+            );
+            continue;
+        }
         assert_eq!(
             source_object.is_some(),
             target_object.is_some(),
@@ -1830,6 +2370,51 @@ fn assert_member_locality(source: &[u8], target: &[u8], selected_index: usize) {
             );
         }
     }
+}
+
+fn assert_owner_creation_objects(source: &Archive, target: &Archive) -> Vec<u64> {
+    let source_ids = source
+        .objects
+        .iter()
+        .filter_map(|object| object.archive_info.identifier)
+        .collect::<Vec<_>>();
+    let mut added = target
+        .objects
+        .iter()
+        .filter_map(|object| object.archive_info.identifier)
+        .filter(|identifier| !source_ids.contains(identifier))
+        .collect::<Vec<_>>();
+    added.sort_unstable();
+    assert_eq!(
+        added.len(),
+        4,
+        "owner creation must append exactly four objects"
+    );
+    assert!(added.windows(2).all(|pair| pair[0] < pair[1]));
+    assert!(added.iter().all(|identifier| {
+        source_ids
+            .iter()
+            .all(|source_identifier| identifier > source_identifier)
+    }));
+    let mut types = added
+        .iter()
+        .map(|identifier| {
+            let object = target
+                .object(*identifier)
+                .unwrap_or_else(|| panic!("created object {identifier} disappeared"));
+            assert_eq!(object.messages.len(), 1);
+            object.messages[0].type_
+        })
+        .collect::<Vec<_>>();
+    types.sort_unstable();
+    assert_eq!(
+        types,
+        [HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE; 2]
+            .into_iter()
+            .chain([FILTER_SET_MESSAGE_TYPE; 2])
+            .collect::<Vec<_>>()
+    );
+    added
 }
 
 fn assert_canonical_uid_map_message(archive: &Archive, index: usize) {
@@ -2024,6 +2609,173 @@ fn assert_nested_unknown_wire_fields_exact(
         nested_unknown_raw_fields(target, outer_field, field_numbers),
         "nested unknown wire records changed during the focused rewrite"
     );
+}
+
+fn assert_owner_creation_state(source: &[u8], target: &[u8], index: usize, after: &HiddenAxes) {
+    assert!(
+        hidden_owner_payload_from_package(source, index).is_err(),
+        "owner-creation source unexpectedly contains a hidden-state owner"
+    );
+    let source_archive = document_archive(source)
+        .unwrap_or_else(|error| panic!("owner-creation source archive is present: {error}"));
+    let target_archive = document_archive(target)
+        .unwrap_or_else(|error| panic!("owner-creation target archive is present: {error}"));
+    let added_ids = assert_owner_creation_objects(&source_archive, &target_archive);
+    let formula_ids = &added_ids[..2];
+    let filter_ids = &added_ids[2..];
+
+    let target_model_object = target_archive
+        .object(table_model(index))
+        .unwrap_or_else(|| panic!("target table {index} model is present"));
+    let model_message_index = target_model_object
+        .messages
+        .iter()
+        .position(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
+        .unwrap_or_else(|| panic!("target table {index} model message is present"));
+    let model_info = target_model_object
+        .archive_info
+        .message_infos
+        .get(model_message_index)
+        .unwrap_or_else(|| panic!("target table {index} model metadata is present"));
+    assert!(
+        model_info
+            .object_references
+            .iter()
+            .all(|identifier| !added_ids.contains(identifier)
+                || target_archive.object(*identifier).is_some()),
+        "model metadata points at a missing created helper"
+    );
+    for identifier in &added_ids {
+        assert!(
+            model_info.object_references.contains(identifier),
+            "model metadata lost created helper reference {identifier}"
+        );
+    }
+    for (path, identifier) in [(34_u32, formula_ids[0]), (35_u32, formula_ids[1])] {
+        let matches = model_info
+            .field_infos
+            .iter()
+            .filter(|field| field.path.as_slice() == [path])
+            .collect::<Vec<_>>();
+        assert_eq!(
+            matches.len(),
+            1,
+            "model FieldInfo path {path} was not added exactly once"
+        );
+        assert_eq!(matches[0].object_references.as_slice(), [identifier]);
+    }
+
+    let model_payload = target_model_object
+        .messages
+        .get(model_message_index)
+        .map(|message| message.data.as_slice())
+        .unwrap_or_else(|| panic!("target model payload is present"));
+    let owner_payload = hidden_owner_payload_from_package(target, index)
+        .unwrap_or_else(|error| panic!("owner-created hidden-state owner is present: {error}"));
+    let owner = tst::HiddenStatesOwnerArchive::decode(owner_payload.as_slice())
+        .unwrap_or_else(|error| panic!("owner-created hidden-state owner decodes: {error}"));
+    assert_eq!(owner.hidden_states.len(), 1);
+    let active = owner
+        .hidden_states
+        .first()
+        .unwrap_or_else(|| panic!("owner-created hidden-state owner has an active state"));
+    assert_eq!(active.hidden_states_uid, owner.owner_uid);
+
+    let target_info_payload = info_payload(target, index)
+        .unwrap_or_else(|error| panic!("target table-info payload is present: {error}"));
+    let target_info = tst::TableInfoArchive::decode(target_info_payload.as_slice())
+        .unwrap_or_else(|error| panic!("target table-info payload decodes: {error}"));
+    assert_eq!(target_info.hidden_states_uuid, Some(owner.owner_uid));
+    assert!(
+        !model_payload.is_empty(),
+        "owner-created model payload must remain nonempty"
+    );
+
+    let uid_map = target_archive
+        .object(table_uid_map(index))
+        .and_then(|object| {
+            object
+                .messages
+                .iter()
+                .find(|message| message.type_ == UID_MAP_MESSAGE_TYPE)
+        })
+        .and_then(|message| tst::ColumnRowUidMapArchive::decode(message.data.as_slice()).ok())
+        .unwrap_or_else(|| panic!("target table {index} UID map is present and decodable"));
+    let expected_uids = |row: bool| {
+        after
+            .iter()
+            .filter_map(|axis| match (row, axis) {
+                (true, AxisIndex::Row(index)) => uid_map
+                    .row_uid_for_index
+                    .get(index)
+                    .and_then(|stable| usize::try_from(*stable).ok())
+                    .and_then(|stable| uid_map.sorted_row_uids.get(stable))
+                    .cloned(),
+                (false, AxisIndex::Column(index)) => uid_map
+                    .column_uid_for_index
+                    .get(index)
+                    .and_then(|stable| usize::try_from(*stable).ok())
+                    .and_then(|stable| uid_map.sorted_column_uids.get(stable))
+                    .cloned(),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    for (row, extent, expected_filter, expected) in [
+        (
+            true,
+            &active.row_hidden_state_extent,
+            filter_ids[1],
+            expected_uids(true),
+        ),
+        (
+            false,
+            &active.column_hidden_state_extent,
+            filter_ids[0],
+            expected_uids(false),
+        ),
+    ] {
+        assert_eq!(
+            extent
+                .filter_set
+                .as_ref()
+                .map(|reference| reference.identifier),
+            Some(expected_filter)
+        );
+        assert_eq!(extent.base_hidden_states.len(), expected.len());
+        for state in &extent.base_hidden_states {
+            assert!(expected.contains(&state.row_or_column_uid));
+            assert_eq!(state.user_hidden, Some(true));
+            assert_eq!(state.filtered, None);
+            assert_eq!(state.pivot_hidden, None);
+        }
+        assert_eq!(
+            extent.row_or_column_direction,
+            if row {
+                tst::hidden_state_extent_archive::RowOrColumnDirection::RowDirection as i32
+            } else {
+                tst::hidden_state_extent_archive::RowOrColumnDirection::ColumnDirection as i32
+            }
+        );
+    }
+
+    for (identifier, expected_type) in [
+        (formula_ids[0], HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE),
+        (formula_ids[1], HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE),
+        (filter_ids[0], FILTER_SET_MESSAGE_TYPE),
+        (filter_ids[1], FILTER_SET_MESSAGE_TYPE),
+    ] {
+        let object = target_archive
+            .object(identifier)
+            .unwrap_or_else(|| panic!("created helper {identifier} is present"));
+        assert_eq!(object.messages[0].type_, expected_type);
+        assert!(
+            object.archive_info.message_infos[0]
+                .object_references
+                .is_empty(),
+            "created helper {identifier} unexpectedly carries archive references"
+        );
+    }
 }
 
 fn assert_existing_owner_wire_state_preserved(
@@ -2330,8 +3082,142 @@ fn exercise_malformed(source: &[u8], descriptor: &[u8]) {
         },
     };
     let before = package.exact_bytes();
+    let mode = descriptor.get(3).copied().unwrap_or_default() % MODE_COUNT;
     let selector = malformed_selector(descriptor);
     let read = package.body_table_hidden_axes(selector);
+    if is_metadata_mode(mode) {
+        let before_axes = match read {
+            Ok(value) => {
+                assert_canonical_and_bounded(&value);
+                Some(value)
+            },
+            Err(error) => {
+                assert_eq!(mode, MODE_METADATA_PHYSICAL_ID_COLLISION);
+                black_box(error);
+                None
+            },
+        };
+        let requested = requested_axes(descriptor);
+        let command = descriptor.get(1).copied().unwrap_or_default() % 4;
+        let flags = descriptor.first().copied().unwrap_or_default();
+        let metadata_creation_probe =
+            command == COMMAND_SET && flags & 1 == 0 && flags & 0x0e == 0 && !requested.is_empty();
+        let expected_noop = before_axes.as_ref().is_some_and(|before| match command {
+            COMMAND_SET => requested == *before,
+            COMMAND_CLEAR | COMMAND_RESET => before.is_empty(),
+            _ => true,
+        });
+        let result = package
+            .edit_body_table_hidden_axes(selector)
+            .and_then(|edit| {
+                let edit = match command {
+                    COMMAND_CLEAR => edit.clear(),
+                    COMMAND_RESET => edit.reset(),
+                    _ => edit.set(requested.clone()),
+                };
+                edit.commit()
+            });
+        if before_axes.is_none() {
+            let error = result.expect_err("physical metadata identity collision was accepted");
+            assert_eq!(mode, MODE_METADATA_PHYSICAL_ID_COLLISION);
+            assert_eq!(package.exact_bytes(), before);
+            black_box(error);
+        } else if expected_noop {
+            let commit = result
+                .unwrap_or_else(|error| panic!("valid metadata no-op was rejected: {error:?}"));
+            assert!(commit.patch().is_noop());
+            assert_eq!(commit.package().exact_bytes(), before);
+        } else if !metadata_creation_probe {
+            // A malformed metadata resource is not consulted by an existing
+            // owner edit or by a dependency refusal.  Preserve the ordinary
+            // semantic oracle for those descriptor combinations instead of
+            // misattributing their outcome to owner creation.
+            match result {
+                Ok(commit) => {
+                    let before_axes = before_axes
+                        .as_ref()
+                        .expect("metadata non-creation source read was present");
+                    let after = match command {
+                        COMMAND_SET => requested,
+                        COMMAND_CLEAR | COMMAND_RESET => HiddenAxes::empty(),
+                        _ => before_axes.clone(),
+                    };
+                    assert!(!commit.patch().is_noop());
+                    let target = commit.package().exact_bytes();
+                    assert_eq!(
+                        commit
+                            .package()
+                            .body_table_hidden_axes(selector)
+                            .unwrap_or_else(|error| {
+                                panic!("metadata non-creation read failed: {error}")
+                            }),
+                        after
+                    );
+                    assert_member_locality(&before, &target, 0, false);
+                    assert_existing_owner_wire_state_preserved(&before, &target, 0, &after);
+                    assert_reopen_and_patch_invariants(
+                        &package,
+                        &commit,
+                        selector,
+                        before_axes,
+                        &after,
+                        &before,
+                        &target,
+                    );
+                },
+                Err(error) => {
+                    assert_eq!(package.exact_bytes(), before);
+                    if flags & 0x08 != 0 {
+                        assert_eq!(error, Error::TableLocked);
+                    } else if flags & 0x06 != 0 {
+                        assert_eq!(error, Error::UnsupportedDependency);
+                    } else {
+                        panic!("metadata non-creation edit unexpectedly rejected: {error:?}");
+                    }
+                },
+            }
+        } else if mode == MODE_METADATA_MISSING {
+            // Metadata-free owner creation is a supported native shape.  The
+            // mutation removes an optional package resource, so this case
+            // must still publish the four-helper owner graph atomically.
+            let commit = result
+                .unwrap_or_else(|error| panic!("metadata-free creation was rejected: {error:?}"));
+            let after = match command {
+                COMMAND_SET => requested,
+                COMMAND_CLEAR | COMMAND_RESET => HiddenAxes::empty(),
+                _ => before_axes
+                    .clone()
+                    .expect("metadata-free source read was present"),
+            };
+            assert!(!commit.patch().is_noop());
+            let target = commit.package().exact_bytes();
+            assert_eq!(
+                commit
+                    .package()
+                    .body_table_hidden_axes(selector)
+                    .unwrap_or_else(|error| panic!("metadata-free creation read failed: {error}")),
+                after
+            );
+            assert_owner_creation_state(&before, &target, 0, &after);
+            assert_member_locality(&before, &target, 0, true);
+            assert_reopen_and_patch_invariants(
+                &package,
+                &commit,
+                selector,
+                before_axes
+                    .as_ref()
+                    .expect("metadata-free source read was present"),
+                &after,
+                &before,
+                &target,
+            );
+        } else {
+            let error = result.expect_err("invalid metadata edit was accepted");
+            assert_metadata_edit_error(mode, error);
+            assert_eq!(package.exact_bytes(), before);
+        };
+        return;
+    }
     assert!(
         read.is_err(),
         "malformed fixture mode {} was readable",
@@ -2409,6 +3295,27 @@ fn assert_precise_malformed_error(mode: u8, error: Error) {
         error, expected,
         "malformed fixture mode {mode} returned an imprecise error"
     );
+}
+
+fn assert_metadata_edit_error(mode: u8, error: Error) {
+    match mode {
+        MODE_METADATA_WATERMARK_NEAR_MAX => assert!(
+            matches!(
+                error,
+                Error::LimitExceeded {
+                    kind: BodyTableHiddenAxesLimitKind::PayloadObjects,
+                    ..
+                }
+            ),
+            "watermark-overflow metadata returned an imprecise error: {error:?}"
+        ),
+        MODE_METADATA_DANGLING_REGISTRY
+        | MODE_METADATA_DUPLICATE_REGISTRY
+        | MODE_METADATA_UUID_COLLISION
+        | MODE_METADATA_PHYSICAL_ID_COLLISION
+        | MODE_METADATA_MISROUTED_MEMBER => assert_eq!(error, Error::InvalidSource),
+        _ => panic!("unexpected metadata mode {mode}"),
+    }
 }
 
 fn malformed_selector(descriptor: &[u8]) -> BodyTableSelector<'static> {
@@ -2612,7 +3519,12 @@ fn exercise_nested_codec_limits() {
     );
 
     let prepared = hidden_codec::prepare_hidden_states_owner_rewrite(&payload, &decoded, options)
-        .unwrap_or_else(|error| panic!("bounded hidden-state rewrite preparation failed: {error}"));
+        .unwrap_or_else(|error| {
+            panic!(
+                "bounded hidden-state rewrite preparation failed: {error}; debug={error:?}; limit={:?}",
+                error.resource_limit()
+            )
+        });
     let requirements = prepared.execution_requirements();
     let output = prepared
         .execute(hidden_codec::RewriteExecutionLimits::exact(requirements))
@@ -2765,7 +3677,11 @@ fn nested_codec_options(source: &[u8]) -> hidden_codec::DecodeOptions {
         128,
     )
     .with_max_allocations(4_096)
-    .with_max_retained_bytes(source.len().saturating_mul(8).max(1))
+    // A source-preserving rewrite retains the source, decoded projection,
+    // candidate verification state, and desired snapshots concurrently.
+    // Keep this finite while allowing the bounded fixture's complete
+    // rewrite call graph to pass its baseline admission.
+    .with_max_retained_bytes(source.len().saturating_mul(16).max(1))
     .with_max_scratch_bytes(source.len().saturating_mul(128).max(1))
 }
 

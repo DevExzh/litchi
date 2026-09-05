@@ -4227,9 +4227,12 @@ not a map owner. Bounded UID permutations must match model dimensions and
 owner/reference cardinality must be unique.
 
 The complete type-4008 -> type-6204/type-6220 dependency closure is admitted
-and validated only for an existing hidden-state owner. An ownerless table
-reads as empty and may take an exact empty no-op, but that path does not claim
-or create the dependency closure.
+and validated for an existing hidden-state owner. An ownerless table reads as
+empty and may take an exact empty no-op. For a qualified exact `Indexed`
+source, a changed request may now create a bounded owner/dependency closure
+after physical, UUID, registry, metadata, and wire-limit preflight; this path
+is unavailable to the `NativeVisible` profile and unsupported producer
+shapes.
 
 The `TableInfoArchive` active UUID is a read selector for one uniquely
 matching stored view. A changed edit refuses multiple stored views, even when
@@ -4241,11 +4244,18 @@ members, and admitted filtered/pivot markers stay source-owned.
 
 Malformed, duplicate, stale, dangling, wrong-wire, ambiguous, out-of-bounds,
 finite-limit, pivot, and unsupported-dependency graphs refuse publication.
-For an exact, unlocked source, a nonempty absent-owner request is refused as
-`UnsupportedDependency` because owner creation is unsupported; a non-exact
-source reports `UnsupportedSource` before that check. `TableLocked` takes
-precedence for a changed edit on a locked selected table, while exact no-ops
-remain permitted subject to read/graph admission. Existing-owner changes are
+For an exact, unlocked, qualified `Indexed` source, a nonempty absent-owner
+request now prepares four helper objects for column/row formula and filter
+records, adds selected model references through the core canonical
+object-reference `FieldInfo` primitive, and updates the strict
+`Index/Metadata.iwa` registry/save-token route when present. A valid
+metadata-free source is also supported. Physical object/reference/UUID census,
+registry collision/misroute checks, and finite retained/output/wire budgets
+run before allocation and publication. `NativeVisible` and unsupported
+producer shapes remain `UnsupportedDependency`; a non-exact source reports
+`UnsupportedSource` before that profile check. `TableLocked` takes precedence
+for a changed edit on a locked selected table, while exact no-ops remain
+permitted subject to read/graph admission. Existing-owner changes are
 copy-on-write, selected-component-local, preview-invalidating,
 candidate-reopened/read back, and exactly invertible.
 
@@ -4285,14 +4295,18 @@ A fresh Computer Use duplicate/save/close/reopen check showed the same body
 marker and visible table without repair UI. The checked-in fixture was restored
 at its recorded SHA-256 after the disposable UI checks, and the focused package
 save path produced identical bytes for the visible-table/no-op operation. This
-is native baseline evidence only; it does not establish nonempty hidden-axis
-parsing or a changed native visibility mutation.
+is native baseline evidence for empty hidden-axis parsing and an exact no-op
+only; it does not establish parsing of nonempty hidden axes or a changed native
+visibility mutation.
 
 The Pages raw-ID `PagesEditor::{table_hidden_axes, set_table_hidden_axes}`
 route, its tests, and the mixed example remain migration-host compatibility.
-Retirement is deferred because the focused owner refuses absent-owner creation
-and has no native changed-edit parity evidence. The shared hidden-axis helper
-also preserves Numbers/Keynote compatibility, Numbers sort restoration, and
+Retirement remains deferred because `NativeVisible` changed edits still return
+`UnsupportedDependency`, native changed-edit parity is unproven, and the
+migration host still carries compatibility behavior. Qualified `Indexed`
+absent-owner creation is now owned by the focused route; it does not authorize
+raw-ID retirement or broaden native scope. The shared hidden-axis helper also
+preserves Numbers/Keynote compatibility, Numbers sort restoration, and
 row/column-deletion cleanup. Focused refusals remain terminal; supported format
 facades never fall back to the host. Existing functionality is retained until
 ADR 0028's parity and native gates permit removal.
@@ -4314,3 +4328,29 @@ item, or deletion gate is removed or closed. The authoritative topology
 remains 64 workspace packages, 238 internal dependency declarations, 227
 canonical edges, 11 development-only edges, 11 ordered migration debts with
 IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-05 follow-up: Indexed hidden-state owner creation
+
+The focused Pages owner now has a qualified exact `Indexed` owner-creation
+transaction for an absent hidden-state owner. It supports a valid
+metadata-free source and a current `Index/Metadata.iwa` source, adds four
+helper objects for column/row formula and filter records, and uses the core
+canonical object-reference `FieldInfo` primitive for the selected model edges.
+Physical object/reference/UUID census, current registry collision and misroute
+checks, metadata save-token planning, finite resource budgets, candidate
+reopen, exact source/inverse checks, and component/object locality remain the
+publication boundary. Empty ownerless reads and exact empty no-ops remain
+supported.
+
+`NativeVisible` changed edits still refuse `UnsupportedDependency` before
+candidate allocation or publication, and native changed-edit parity remains
+open. The raw-ID host route remains compatibility; Indexed creation does not
+retire it or broaden the native profile. Admitted Numbers numeric-family and
+control-to-numeric routes remain focused-owner work, while the scoped native
+Currency `$42.00` save/close/reopen observation does not alter topology or
+native-parity gates. The 34-test hidden-axis integration suite, 87-seed corpus
+replay, and 100-run AddressSanitizer smoke pass for this follow-up.
+
+No package, dependency edge, ordered debt, migration-host item, or ADR 0028
+deletion gate is removed or closed. The authoritative inventory above is
+unchanged.

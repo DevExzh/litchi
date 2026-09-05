@@ -101,6 +101,22 @@ const MAX_RECURSION: u32 = 64;
 const MAX_CONSTRUCTED_STATES: usize = 16_384;
 const BUFFA_MAX_MESSAGE_BYTES: usize = buffa::MAX_MESSAGE_BYTES as usize;
 const MAX_CFUUID_BYTES: usize = 16;
+// A TableModel rewrite with a matched owner and row records is the deepest
+// source-preserving path. Its complete raw call graph is preparation's model
+// -> owner -> hidden-state -> extent -> state-UID/row measurement; execution's
+// owner premeasure; owner emission's hidden-state premeasure; hidden-state
+// emission's extent premeasure; and extent emission's state-UID/row
+// measurement plus row emission. `source_leaf`/`count_message_fields` add the
+// nested UUID/message walks. Counting those visits gives a 17-pass ceiling for
+// every source byte; each pass is bounded by the containing message span,
+// including unknown fields and unknown groups. The initial strict
+// `scan_fields` admission is one additional source pass. Raw walks are charged
+// as byte work, strict source admissions by `Budget`, and candidate admissions
+// by `CandidateVerificationAccounting`.
+const SOURCE_REWRITE_RAW_PASS_BOUND: usize = 17;
+const SOURCE_REWRITE_STRICT_PASS_COUNT: usize = 1;
+const SOURCE_REWRITE_AGGREGATE_FIELD_PASS_BOUND: usize =
+    SOURCE_REWRITE_STRICT_PASS_COUNT + SOURCE_REWRITE_RAW_PASS_BOUND;
 
 const fn clamp_buffa_message_bytes(value: usize) -> usize {
     if value > BUFFA_MAX_MESSAGE_BYTES {
@@ -731,6 +747,18 @@ impl fmt::Debug for HiddenStateFormulaOwnerSnapshot {
 }
 
 impl HiddenStateFormulaOwnerSnapshot {
+    /// Construct a borrow-free projection of a type-6204 formula owner.
+    #[must_use]
+    pub const fn new(
+        owner_id: Option<CfuuidSnapshot>,
+        needs_to_update_filter_set_for_import: Option<bool>,
+    ) -> Self {
+        Self {
+            owner_id,
+            needs_to_update_filter_set_for_import,
+        }
+    }
+
     #[must_use]
     pub const fn owner_id(&self) -> Option<&CfuuidSnapshot> {
         self.owner_id.as_ref()
@@ -1457,6 +1485,11 @@ impl RewriteExecutionLimits {
 }
 
 /// Conservative prepared execution budget.
+///
+/// `fields` aggregates the strict source admission, raw source-preserving
+/// visits, and strict candidate admissions. Repeated raw source rewalks are
+/// also charged as byte work so the field and byte ceilings cover the same
+/// complete call graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RewriteExecutionRequirements {
     output_bytes: usize,
@@ -1888,6 +1921,115 @@ pub fn decode_filter_set_with_report(
     let parsed = parse_filter_set(source, options, &mut budget, 1)?;
     cross_check_filter_set(source, &parsed, options)?;
     Ok((parsed, budget.report(source.len(), source.len())))
+}
+
+/// Measure a fresh type-6204 formula-owner payload without allocating output.
+///
+/// The returned report is the bounded resource charge used by
+/// [`encode_hidden_state_formula_owner`], allowing a caller to charge its own
+/// budget before asking this codec to allocate candidate bytes.
+pub fn measure_hidden_state_formula_owner(
+    value: &HiddenStateFormulaOwnerSnapshot,
+    options: DecodeOptions,
+) -> Result<DecodeReport, DecodeError> {
+    validate_hidden_state_formula_owner_for_encode(value)?;
+    let output_bytes = canonical_hidden_state_formula_owner_len(value)?;
+    let fields = canonical_hidden_state_formula_owner_fields(value)?;
+    let report = canonical_encode_report(
+        output_bytes,
+        fields,
+        canonical_hidden_state_formula_owner_depth(value),
+        0,
+        canonical_hidden_state_formula_owner_allocations(value, output_bytes, fields)?,
+        canonical_hidden_state_formula_owner_retained_bytes(value, output_bytes)?,
+        canonical_hidden_state_formula_owner_scratch_bytes(value, output_bytes, fields)?,
+    )?;
+    validate_canonical_encode_report(report, options)?;
+    Ok(report)
+}
+
+/// Encode one fresh type-6204 formula-owner payload canonically.
+///
+/// The generated Buffa types remain private to this crate.  The returned
+/// [`RewriteOutput`] owns the canonical bytes and carries the complete finite
+/// resource report used for the preflight and readback verification passes.
+pub fn encode_hidden_state_formula_owner(
+    value: &HiddenStateFormulaOwnerSnapshot,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let report = measure_hidden_state_formula_owner(value, options)?;
+    let output_bytes = report.output_bytes;
+
+    let mut output = Vec::new();
+    reserve_encode_output(&mut output, output_bytes)?;
+    emit_hidden_state_formula_owner_canonical(value, &mut output)?;
+    if output.len() != output_bytes {
+        return Err(DecodeError::projection());
+    }
+    let verify_options = canonical_encode_verify_options(report);
+    let decoded = decode_hidden_state_formula_owner(&output, verify_options)?;
+    if decoded != *value {
+        return Err(DecodeError::projection());
+    }
+    Ok(RewriteOutput {
+        bytes: output,
+        report,
+    })
+}
+
+/// Measure a fresh type-6220 filter-set payload without allocating output.
+///
+/// Filter rules and their other native envelopes are intentionally outside
+/// this selected projection.  The report covers the bounded scalar/offset
+/// view exposed by [`FilterSetSnapshot`].
+pub fn measure_filter_set(
+    value: &FilterSetSnapshot,
+    options: DecodeOptions,
+) -> Result<DecodeReport, DecodeError> {
+    validate_filter_set_for_encode(value)?;
+    let output_bytes = canonical_filter_set_len(value)?;
+    let fields = canonical_filter_set_fields(value)?;
+    let report = canonical_encode_report(
+        output_bytes,
+        fields,
+        1,
+        value.filter_offsets.len(),
+        canonical_filter_set_allocations(output_bytes, fields, value.filter_offsets.len())?,
+        output_bytes,
+        canonical_filter_set_scratch_bytes(output_bytes, fields, value.filter_offsets.len())?,
+    )?;
+    validate_canonical_encode_report(report, options)?;
+    Ok(report)
+}
+
+/// Encode one fresh type-6220 filter-set payload canonically.
+///
+/// Filter rules and their other native envelopes are intentionally outside
+/// this selected projection.  The helper emits the bounded scalar/offset
+/// view exposed by [`FilterSetSnapshot`] and never exposes generated Buffa
+/// values to callers.
+pub fn encode_filter_set(
+    value: &FilterSetSnapshot,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let report = measure_filter_set(value, options)?;
+    let output_bytes = report.output_bytes;
+
+    let mut output = Vec::new();
+    reserve_encode_output(&mut output, output_bytes)?;
+    emit_filter_set_canonical(value, &mut output)?;
+    if output.len() != output_bytes {
+        return Err(DecodeError::projection());
+    }
+    let verify_options = canonical_encode_verify_options(report);
+    let decoded = decode_filter_set(&output, verify_options)?;
+    if decoded != *value {
+        return Err(DecodeError::projection());
+    }
+    Ok(RewriteOutput {
+        bytes: output,
+        report,
+    })
 }
 
 /// Prepare a source-preserving table-info rewrite.
@@ -4141,6 +4283,396 @@ struct DesiredAccounting {
     match_work_bytes: usize,
 }
 
+/// Accounting for the second, strict pass over the bytes emitted by a
+/// prepared rewrite.  The pass uses the same bounded wire walker as source
+/// decoding, so its vector growth is calculated from each candidate message
+/// shape instead of being covered by an output-size multiplier.
+#[derive(Debug, Clone, Copy, Default)]
+struct CandidateVerificationAccounting {
+    fields: usize,
+    work_bytes: usize,
+    max_depth: u32,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
+}
+
+impl CandidateVerificationAccounting {
+    fn message(
+        &mut self,
+        bytes: usize,
+        fields: usize,
+        depth: u32,
+        max_fields: usize,
+    ) -> Result<(), DecodeError> {
+        self.fields = self
+            .fields
+            .checked_add(fields)
+            .ok_or_else(DecodeError::projection)?;
+        self.work_bytes = self
+            .work_bytes
+            .checked_add(bytes.checked_mul(2).ok_or_else(DecodeError::projection)?)
+            .ok_or_else(DecodeError::projection)?;
+        self.max_depth = self.max_depth.max(depth);
+
+        // Keep this in lockstep with `scan_fields`: the initial reserve is
+        // derived from message bytes, and subsequent reserves double the
+        // current capacity until all fields fit.
+        let mut length = 0usize;
+        let mut capacity = (bytes / 2).min(max_fields).min(32);
+        if capacity != 0 {
+            self.allocation(
+                capacity
+                    .checked_mul(size_of::<FieldSpan>())
+                    .ok_or_else(DecodeError::projection)?,
+            )?;
+        }
+        while length < fields {
+            if length == capacity {
+                let remaining = max_fields.saturating_sub(length).max(1);
+                let additional = capacity.max(1).min(remaining);
+                self.allocation(
+                    additional
+                        .checked_mul(size_of::<FieldSpan>())
+                        .ok_or_else(DecodeError::projection)?,
+                )?;
+                capacity = capacity
+                    .checked_add(additional)
+                    .ok_or_else(DecodeError::projection)?;
+            }
+            length = length.checked_add(1).ok_or_else(DecodeError::projection)?;
+        }
+        Ok(())
+    }
+
+    fn allocation(&mut self, bytes: usize) -> Result<(), DecodeError> {
+        self.allocations = self
+            .allocations
+            .checked_add(1)
+            .ok_or_else(DecodeError::projection)?;
+        self.scratch_bytes = self
+            .scratch_bytes
+            .checked_add(bytes)
+            .ok_or_else(DecodeError::projection)?;
+        Ok(())
+    }
+
+    fn retain(&mut self, bytes: usize) -> Result<(), DecodeError> {
+        self.retained_bytes = self
+            .retained_bytes
+            .checked_add(bytes)
+            .ok_or_else(DecodeError::projection)?;
+        Ok(())
+    }
+
+    fn candidate_extent(&mut self, value: &HiddenStateExtentSnapshot) -> Result<(), DecodeError> {
+        let length = value.base_hidden_states.len();
+        if length != 0 {
+            let bytes = length
+                .checked_mul(size_of::<ParsedState<'static>>())
+                .ok_or_else(DecodeError::projection)?;
+            self.allocation(bytes)?;
+        }
+        let uid_index_bytes = length
+            .checked_mul(size_of::<UuidSnapshot>())
+            .ok_or_else(DecodeError::projection)?;
+        // The duplicate checker and final owned snapshot vector both charge
+        // an allocation for an empty collection as well.
+        self.allocation(uid_index_bytes)?;
+        let snapshot_bytes = length
+            .checked_mul(size_of::<RowOrColumnStateSnapshot>())
+            .ok_or_else(DecodeError::projection)?;
+        self.allocation(snapshot_bytes)?;
+        Ok(())
+    }
+
+    fn candidate_hidden_states(&mut self, value: &HiddenStatesSnapshot) -> Result<(), DecodeError> {
+        self.candidate_clone_extent(value.column_hidden_state_extent())?;
+        self.candidate_clone_extent(value.row_hidden_state_extent())
+    }
+
+    fn candidate_owner(
+        &mut self,
+        value: &HiddenStatesOwnerSnapshot,
+        owner_uid_bytes: usize,
+    ) -> Result<(), DecodeError> {
+        self.retain(owner_uid_bytes)?;
+        let length = value.hidden_states.len();
+        if length != 0 {
+            let bytes = length
+                .checked_mul(size_of::<ParsedHiddenStates<'static>>())
+                .ok_or_else(DecodeError::projection)?;
+            self.allocation(bytes)?;
+        }
+        // The duplicate checker and final owned snapshot vector both charge
+        // an allocation for an empty collection as well.
+        let uid_index_bytes = length
+            .checked_mul(size_of::<UuidSnapshot>())
+            .ok_or_else(DecodeError::projection)?;
+        self.allocation(uid_index_bytes)?;
+        let snapshot_bytes = length
+            .checked_mul(size_of::<HiddenStatesSnapshot>())
+            .ok_or_else(DecodeError::projection)?;
+        self.allocation(snapshot_bytes)?;
+        for hidden_states in &value.hidden_states {
+            self.candidate_hidden_states(hidden_states)?;
+        }
+        Ok(())
+    }
+
+    fn candidate_owner_clone(
+        &mut self,
+        value: &HiddenStatesOwnerSnapshot,
+    ) -> Result<(), DecodeError> {
+        for hidden_states in &value.hidden_states {
+            self.candidate_clone_extent(hidden_states.column_hidden_state_extent())?;
+            self.candidate_clone_extent(hidden_states.row_hidden_state_extent())?;
+        }
+        Ok(())
+    }
+
+    fn candidate_clone_extent(
+        &mut self,
+        value: &HiddenStateExtentSnapshot,
+    ) -> Result<(), DecodeError> {
+        let bytes = value
+            .base_hidden_states
+            .len()
+            .checked_mul(size_of::<RowOrColumnStateSnapshot>())
+            .ok_or_else(DecodeError::projection)?;
+        if bytes != 0 {
+            self.allocation(bytes)?;
+            self.retain(bytes)?;
+        }
+        Ok(())
+    }
+}
+
+struct MeasureContext<'accounting> {
+    verification: &'accounting mut CandidateVerificationAccounting,
+    max_fields: usize,
+}
+
+impl MeasureContext<'_> {
+    fn message(&mut self, bytes: usize, fields: usize, depth: u32) -> Result<(), DecodeError> {
+        self.verification
+            .message(bytes, fields, depth, self.max_fields)
+    }
+
+    fn source_message(
+        &mut self,
+        source: &[u8],
+        bytes: usize,
+        omitted_fields: usize,
+        appended_fields: usize,
+        depth: u32,
+    ) -> Result<(), DecodeError> {
+        let fields = count_message_fields(source)?
+            .checked_sub(omitted_fields)
+            .ok_or_else(DecodeError::projection)?
+            .checked_add(appended_fields)
+            .ok_or_else(DecodeError::projection)?;
+        self.message(bytes, fields, depth)
+    }
+
+    fn source_leaf(&mut self, source: &[u8], depth: u32) -> Result<(), DecodeError> {
+        self.source_message(source, source.len(), 0, 0, depth)
+    }
+
+    fn retain(&mut self, bytes: usize) -> Result<(), DecodeError> {
+        self.verification.retain(bytes)
+    }
+
+    fn candidate_extent(&mut self, value: &HiddenStateExtentSnapshot) -> Result<(), DecodeError> {
+        self.verification.candidate_extent(value)
+    }
+
+    fn candidate_hidden_states(&mut self, value: &HiddenStatesSnapshot) -> Result<(), DecodeError> {
+        self.verification.candidate_hidden_states(value)
+    }
+
+    fn candidate_owner(
+        &mut self,
+        value: &HiddenStatesOwnerSnapshot,
+        owner_uid_bytes: usize,
+    ) -> Result<(), DecodeError> {
+        self.verification.candidate_owner(value, owner_uid_bytes)
+    }
+
+    fn candidate_owner_clone(
+        &mut self,
+        value: &HiddenStatesOwnerSnapshot,
+    ) -> Result<(), DecodeError> {
+        self.verification.candidate_owner_clone(value)
+    }
+
+    fn canonical_uuid(&mut self, value: UuidSnapshot, depth: u32) -> Result<(), DecodeError> {
+        self.message(canonical_uuid_len(value), 2, depth)
+    }
+
+    fn canonical_reference(
+        &mut self,
+        value: ReferenceSnapshot,
+        depth: u32,
+    ) -> Result<(), DecodeError> {
+        let fields = 1
+            + usize::from(value.deprecated_type.is_some())
+            + usize::from(value.deprecated_is_external.is_some());
+        self.message(canonical_reference_len(value), fields, depth)
+    }
+}
+
+fn count_message_fields(source: &[u8]) -> Result<usize, DecodeError> {
+    fn count_until(
+        source: &[u8],
+        offset: &mut usize,
+        closing_number: Option<u32>,
+    ) -> Result<usize, DecodeError> {
+        let mut count = 0usize;
+        loop {
+            if *offset == source.len() {
+                if closing_number.is_some() {
+                    return Err(buffa::DecodeError::UnexpectedEof.into());
+                }
+                return Ok(count);
+            }
+            let key = read_varint(source, offset)?;
+            if !key.canonical {
+                return Err(DecodeError::noncanonical("protobuf field key"));
+            }
+            let raw =
+                u32::try_from(key.value).map_err(|_| buffa::DecodeError::InvalidFieldNumber)?;
+            let number = raw >> 3;
+            let wire =
+                u8::try_from(raw & 7).map_err(|_| buffa::DecodeError::InvalidWireType(raw & 7))?;
+            if number == 0 || number > buffa::encoding::MAX_FIELD_NUMBER {
+                return Err(buffa::DecodeError::InvalidFieldNumber.into());
+            }
+            if wire == 4 {
+                if closing_number == Some(number) {
+                    return count.checked_add(1).ok_or_else(DecodeError::projection);
+                }
+                return Err(buffa::DecodeError::InvalidEndGroup(number).into());
+            }
+            count = count.checked_add(1).ok_or_else(DecodeError::projection)?;
+            match wire {
+                0 => {
+                    let _ = read_varint(source, offset)?;
+                },
+                1 => {
+                    let end = offset.checked_add(8).ok_or_else(DecodeError::projection)?;
+                    if end > source.len() {
+                        return Err(buffa::DecodeError::UnexpectedEof.into());
+                    }
+                    *offset = end;
+                },
+                2 => {
+                    let length = read_varint(source, offset)?;
+                    let length = usize::try_from(length.value)
+                        .map_err(|_| buffa::DecodeError::MessageTooLarge)?;
+                    let end = offset
+                        .checked_add(length)
+                        .ok_or_else(DecodeError::projection)?;
+                    if end > source.len() {
+                        return Err(buffa::DecodeError::UnexpectedEof.into());
+                    }
+                    *offset = end;
+                },
+                3 => {
+                    count = count
+                        .checked_add(count_until(source, offset, Some(number))?)
+                        .ok_or_else(DecodeError::projection)?;
+                },
+                5 => {
+                    let end = offset.checked_add(4).ok_or_else(DecodeError::projection)?;
+                    if end > source.len() {
+                        return Err(buffa::DecodeError::UnexpectedEof.into());
+                    }
+                    *offset = end;
+                },
+                _ => return Err(buffa::DecodeError::InvalidWireType(u32::from(wire)).into()),
+            }
+        }
+    }
+
+    let mut offset = 0;
+    count_until(source, &mut offset, None)
+}
+
+fn account_canonical_row_state(
+    value: &RowOrColumnStateSnapshot,
+    context: &mut MeasureContext<'_>,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    let fields = 1
+        + usize::from(value.user_hidden.is_some())
+        + usize::from(value.filtered.is_some())
+        + usize::from(value.pivot_hidden.is_some());
+    context.message(canonical_row_state_len(value)?, fields, depth)?;
+    context.canonical_uuid(value.row_or_column_uid, child_depth(depth)?)
+}
+
+fn account_canonical_extent(
+    value: &HiddenStateExtentSnapshot,
+    context: &mut MeasureContext<'_>,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    let fields = 2
+        + value.base_hidden_states.len()
+        + usize::from(value.needs_to_update_filter_set_for_import.is_some())
+        + usize::from(value.filter_set.is_some());
+    context.message(canonical_extent_len(value)?, fields, depth)?;
+    context.canonical_uuid(value.hidden_state_extent_uid, child_depth(depth)?)?;
+    for state in &value.base_hidden_states {
+        account_canonical_row_state(state, context, child_depth(depth)?)?;
+    }
+    if let Some(reference) = value.filter_set {
+        context.canonical_reference(reference, child_depth(depth)?)?;
+    }
+    // An appended extent is parsed by the candidate verification pass just
+    // like a source extent.  Its repeated-state vectors therefore need the
+    // same bounded allocation accounting as `measure_extent_with_context`,
+    // which is entered for source-matched extents.
+    context.candidate_extent(value)?;
+    Ok(())
+}
+
+fn account_canonical_hidden_states(
+    value: &HiddenStatesSnapshot,
+    context: &mut MeasureContext<'_>,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    context.message(canonical_hidden_states_len(value)?, 3, depth)?;
+    context.canonical_uuid(value.hidden_states_uid, child_depth(depth)?)?;
+    account_canonical_extent(
+        value.column_hidden_state_extent(),
+        context,
+        child_depth(depth)?,
+    )?;
+    account_canonical_extent(
+        value.row_hidden_state_extent(),
+        context,
+        child_depth(depth)?,
+    )?;
+    Ok(())
+}
+
+fn account_canonical_owner(
+    value: &HiddenStatesOwnerSnapshot,
+    context: &mut MeasureContext<'_>,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    let fields = 1usize
+        .checked_add(value.hidden_states.len())
+        .ok_or_else(DecodeError::projection)?;
+    context.message(canonical_owner_len(value)?, fields, depth)?;
+    context.canonical_uuid(value.owner_uid, child_depth(depth)?)?;
+    for state in &value.hidden_states {
+        account_canonical_hidden_states(state, context, child_depth(depth)?)?;
+    }
+    Ok(())
+}
+
 fn account_vec(
     length: usize,
     element_size: usize,
@@ -4456,17 +4988,27 @@ fn prepare_rewrite<'source>(
         },
     }
     let index_plan = build_rewrite_index_plan(&desired)?;
-    let output_bytes = measure_rewrite(source, kind, &desired, &index_plan)?;
+    let (output_bytes, verification) = measure_rewrite(
+        source,
+        kind,
+        &desired,
+        &index_plan,
+        options.max_fields.max(32),
+    )?;
     if output_bytes > options.max_output_bytes {
         return Err(DecodeError::limit(DecodeLimit::OutputBytes {
             observed: output_bytes,
             maximum: options.max_output_bytes,
         }));
     }
+    // Aggregate the strict source admission and every raw source-preserving
+    // visit before adding the strict candidate admission. The five source
+    // passes used by the old estimate were incomplete for matched rows; this
+    // complete callgraph bound also scales with unknown UUID/group fields.
     let fields = budget
         .fields
-        .checked_mul(3)
-        .and_then(|value| value.checked_add(64))
+        .checked_mul(SOURCE_REWRITE_AGGREGATE_FIELD_PASS_BOUND)
+        .and_then(|value| value.checked_add(verification.fields))
         .ok_or_else(DecodeError::projection)?;
     if fields > options.max_fields {
         return Err(DecodeError::limit(DecodeLimit::Fields {
@@ -4474,16 +5016,20 @@ fn prepare_rewrite<'source>(
             maximum: options.max_fields,
         }));
     }
+    let raw_source_work_bytes = source
+        .len()
+        .checked_mul(SOURCE_REWRITE_RAW_PASS_BOUND)
+        .and_then(|value| value.checked_mul(2))
+        .ok_or_else(DecodeError::projection)?;
+    let output_write_work_bytes = output_bytes
+        .checked_mul(2)
+        .ok_or_else(DecodeError::projection)?;
     let work_bytes = budget
         .work_bytes
-        .checked_add(
-            source
-                .len()
-                .checked_add(output_bytes)
-                .and_then(|value| value.checked_mul(4))
-                .ok_or_else(DecodeError::projection)?,
-        )
+        .checked_add(raw_source_work_bytes)
+        .and_then(|value| value.checked_add(output_write_work_bytes))
         .and_then(|value| value.checked_add(desired_accounting.match_work_bytes))
+        .and_then(|value| value.checked_add(verification.work_bytes))
         .ok_or_else(DecodeError::projection)?;
     if work_bytes > options.max_work_bytes {
         return Err(DecodeError::limit(DecodeLimit::WorkBytes {
@@ -4496,6 +5042,7 @@ fn prepare_rewrite<'source>(
         .checked_add(output_bytes)
         .and_then(|value| value.checked_add(budget.retained_bytes))
         .and_then(|value| value.checked_add(desired_accounting.owned_bytes))
+        .and_then(|value| value.checked_add(verification.retained_bytes))
         .ok_or_else(DecodeError::projection)?;
     if retained_bytes > options.max_retained_bytes {
         return Err(DecodeError::limit(DecodeLimit::RetainedBytes {
@@ -4503,11 +5050,19 @@ fn prepare_rewrite<'source>(
             maximum: options.max_retained_bytes,
         }));
     }
-    let scratch_bytes = budget
-        .scratch_bytes
-        .checked_add(output_bytes)
-        .and_then(|value| value.checked_add(desired_accounting.match_bytes))
+    let execution_scratch = output_bytes
+        .checked_add(desired_accounting.match_bytes)
+        .and_then(|value| value.checked_add(verification.scratch_bytes))
         .ok_or_else(DecodeError::projection)?;
+    // Source and candidate scanners charge scratch cumulatively in their
+    // local budgets, while output and match storage are live only during the
+    // execution phase and overlap the candidate scanner. Charge the larger
+    // of that scanner total and the peak execution working set.
+    let scanner_scratch = budget
+        .scratch_bytes
+        .checked_add(verification.scratch_bytes)
+        .ok_or_else(DecodeError::projection)?;
+    let scratch_bytes = scanner_scratch.max(execution_scratch);
     if scratch_bytes > options.max_scratch_bytes {
         return Err(DecodeError::limit(DecodeLimit::ScratchBytes {
             observed: scratch_bytes,
@@ -4518,6 +5073,7 @@ fn prepare_rewrite<'source>(
         .allocations
         .checked_add(desired_accounting.allocations)
         .and_then(|value| value.checked_add(desired_accounting.match_allocations))
+        .and_then(|value| value.checked_add(verification.allocations))
         .and_then(|value| value.checked_add(8))
         .ok_or_else(DecodeError::projection)?;
     if allocations > options.max_allocations {
@@ -4526,16 +5082,30 @@ fn prepare_rewrite<'source>(
             maximum: options.max_allocations,
         }));
     }
+    let states = budget
+        .states
+        .checked_add(desired_accounting.states)
+        .ok_or_else(DecodeError::projection)?;
+    if states > options.max_states.min(MAX_CONSTRUCTED_STATES) {
+        return Err(DecodeError::limit(DecodeLimit::States {
+            observed: states,
+            maximum: options.max_states.min(MAX_CONSTRUCTED_STATES),
+        }));
+    }
+    let max_depth = budget.max_depth.max(2).max(verification.max_depth);
+    if max_depth > options.recursion_limit.min(MAX_RECURSION) {
+        return Err(DecodeError::limit(DecodeLimit::Nesting {
+            observed: max_depth,
+            maximum: options.recursion_limit.min(MAX_RECURSION),
+        }));
+    }
     let report = DecodeReport {
         input_bytes: source.len(),
         output_bytes,
         fields,
         work_bytes,
-        max_depth: budget.max_depth.max(2),
-        states: budget
-            .states
-            .checked_add(desired_accounting.states)
-            .ok_or_else(DecodeError::projection)?,
+        max_depth,
+        states,
         allocations,
         retained_bytes,
         scratch_bytes,
@@ -4544,7 +5114,7 @@ fn prepare_rewrite<'source>(
         output_bytes,
         fields,
         work_bytes,
-        max_depth: report.max_depth,
+        max_depth: report.max_depth.max(verification.max_depth),
         states: report.states,
         allocations,
         retained_bytes,
@@ -4640,26 +5210,33 @@ fn measure_rewrite(
     kind: RewriteKind,
     desired: &RewriteDesired,
     index_plan: &RewriteIndexPlan,
-) -> Result<usize, DecodeError> {
+    max_fields: usize,
+) -> Result<(usize, CandidateVerificationAccounting), DecodeError> {
     let mut matched = new_match_marks(index_plan)?;
-    match (kind, desired) {
+    let mut verification = CandidateVerificationAccounting::default();
+    let mut context = MeasureContext {
+        verification: &mut verification,
+        max_fields,
+    };
+    let output_bytes = match (kind, desired) {
         (RewriteKind::TableInfo, RewriteDesired::TableInfo(value)) => {
-            measure_table_info(source, value)
+            measure_table_info(source, value, &mut context)
         },
         (RewriteKind::TableModel, RewriteDesired::TableModel(value)) => {
-            measure_table_model(source, value, index_plan, &mut matched)
+            measure_table_model(source, value, index_plan, &mut matched, &mut context)
         },
         (RewriteKind::HiddenStatesOwner, RewriteDesired::HiddenStatesOwner(value)) => {
-            measure_owner(source, value, index_plan, &mut matched)
+            measure_owner_with_context(source, value, index_plan, &mut matched, 1, &mut context)
         },
         (RewriteKind::HiddenStateExtent, RewriteDesired::HiddenStateExtent(value)) => {
-            measure_extent(source, value, index_plan, &mut matched)
+            measure_extent_with_context(source, value, index_plan, &mut matched, 1, &mut context)
         },
         (RewriteKind::RowOrColumnState, RewriteDesired::RowOrColumnState(value)) => {
-            measure_row_state(source, value)
+            measure_row_state_with_context(source, value, 1, &mut context)
         },
         _ => Err(DecodeError::projection()),
-    }
+    }?;
+    Ok((output_bytes, verification))
 }
 
 fn add_len(total: &mut usize, value: usize) -> Result<(), DecodeError> {
@@ -4695,6 +5272,414 @@ fn canonical_reference_len(value: ReferenceSnapshot) -> usize {
         total += varint_field_len(REFERENCE_DEPRECATED_EXTERNAL_FIELD, u64::from(external));
     }
     total
+}
+
+fn canonical_cfuuid_len(value: &CfuuidSnapshot) -> Result<usize, DecodeError> {
+    let mut total = 0usize;
+    if let Some(bytes) = value.uuid_bytes.as_deref() {
+        add_len(&mut total, length_delimited_len(1, bytes.len())?)?;
+    }
+    for (index, word) in value.words.into_iter().enumerate() {
+        if let Some(word) = word {
+            let number = u32::try_from(index + 2).map_err(|_| DecodeError::projection())?;
+            add_len(&mut total, varint_field_len(number, u64::from(word)))?;
+        }
+    }
+    Ok(total)
+}
+
+fn canonical_hidden_state_formula_owner_len(
+    value: &HiddenStateFormulaOwnerSnapshot,
+) -> Result<usize, DecodeError> {
+    let mut total = 0usize;
+    if let Some(owner_id) = value.owner_id.as_ref() {
+        add_len(
+            &mut total,
+            length_delimited_len(
+                HIDDEN_FORMULA_OWNER_ID_FIELD,
+                canonical_cfuuid_len(owner_id)?,
+            )?,
+        )?;
+    }
+    if let Some(needs_update) = value.needs_to_update_filter_set_for_import {
+        add_len(
+            &mut total,
+            varint_field_len(
+                HIDDEN_FORMULA_OWNER_NEEDS_UPDATE_FIELD,
+                u64::from(needs_update),
+            ),
+        )?;
+    }
+    Ok(total)
+}
+
+fn canonical_filter_set_len(value: &FilterSetSnapshot) -> Result<usize, DecodeError> {
+    let mut total = 0usize;
+    if let Some(filter_type) = value.filter_type {
+        add_len(
+            &mut total,
+            varint_field_len(FILTER_SET_TYPE_FIELD, filter_type as i64 as u64),
+        )?;
+    }
+    if let Some(is_enabled) = value.is_enabled {
+        add_len(
+            &mut total,
+            varint_field_len(FILTER_SET_ENABLED_FIELD, u64::from(is_enabled)),
+        )?;
+    }
+    if let Some(needs_rewrite) = value.needs_formula_rewrite_for_import {
+        add_len(
+            &mut total,
+            varint_field_len(
+                FILTER_SET_NEEDS_FORMULA_REWRITE_FIELD,
+                u64::from(needs_rewrite),
+            ),
+        )?;
+    }
+    for offset in &value.filter_offsets {
+        add_len(
+            &mut total,
+            varint_field_len(FILTER_SET_OFFSETS_FIELD, u64::from(*offset)),
+        )?;
+    }
+    Ok(total)
+}
+
+fn canonical_cfuuid_fields(value: &CfuuidSnapshot) -> usize {
+    usize::from(value.uuid_bytes.is_some())
+        + value.words.into_iter().filter(Option::is_some).count()
+}
+
+fn canonical_hidden_state_formula_owner_fields(
+    value: &HiddenStateFormulaOwnerSnapshot,
+) -> Result<usize, DecodeError> {
+    usize::from(value.owner_id.is_some())
+        .checked_add(usize::from(
+            value.needs_to_update_filter_set_for_import.is_some(),
+        ))
+        .and_then(|fields| {
+            value.owner_id.as_ref().map_or(Some(fields), |owner_id| {
+                fields.checked_add(canonical_cfuuid_fields(owner_id))
+            })
+        })
+        .ok_or_else(DecodeError::projection)
+}
+
+fn canonical_filter_set_fields(value: &FilterSetSnapshot) -> Result<usize, DecodeError> {
+    usize::from(value.filter_type.is_some())
+        .checked_add(usize::from(value.is_enabled.is_some()))
+        .and_then(|fields| {
+            fields.checked_add(usize::from(
+                value.needs_formula_rewrite_for_import.is_some(),
+            ))
+        })
+        .and_then(|fields| fields.checked_add(value.filter_offsets.len()))
+        .ok_or_else(DecodeError::projection)
+}
+
+fn canonical_hidden_state_formula_owner_depth(value: &HiddenStateFormulaOwnerSnapshot) -> u32 {
+    if value.owner_id.is_some() { 2 } else { 1 }
+}
+
+fn canonical_scan_field_allocations(
+    message_bytes: usize,
+    fields: usize,
+    max_fields: usize,
+) -> Result<(usize, usize), DecodeError> {
+    let mut capacity = (message_bytes / 2).min(max_fields).min(32);
+    let mut allocations = usize::from(capacity != 0);
+    let mut bytes = capacity
+        .checked_mul(size_of::<FieldSpan>())
+        .ok_or_else(DecodeError::projection)?;
+    for index in 0..fields {
+        if index == capacity {
+            let remaining = max_fields
+                .checked_sub(index)
+                .ok_or_else(DecodeError::projection)?;
+            let additional = capacity.max(1).min(remaining.max(1));
+            capacity = capacity
+                .checked_add(additional)
+                .ok_or_else(DecodeError::projection)?;
+            allocations = allocations
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+            bytes = bytes
+                .checked_add(
+                    additional
+                        .checked_mul(size_of::<FieldSpan>())
+                        .ok_or_else(DecodeError::projection)?,
+                )
+                .ok_or_else(DecodeError::projection)?;
+        }
+    }
+    Ok((allocations, bytes))
+}
+
+fn canonical_hidden_state_formula_owner_allocations(
+    value: &HiddenStateFormulaOwnerSnapshot,
+    output_bytes: usize,
+    fields: usize,
+) -> Result<usize, DecodeError> {
+    let (mut allocations, _) = canonical_scan_field_allocations(output_bytes, fields, fields)?;
+    if let Some(owner_id) = value.owner_id.as_ref() {
+        let bytes = canonical_cfuuid_len(owner_id)?;
+        let owner_fields = canonical_cfuuid_fields(owner_id);
+        allocations = allocations
+            .checked_add(canonical_scan_field_allocations(bytes, owner_fields, fields)?.0)
+            .ok_or_else(DecodeError::projection)?;
+        if owner_id.uuid_bytes.is_some() {
+            allocations = allocations
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+        }
+    }
+    allocations
+        .checked_add(usize::from(output_bytes != 0))
+        .ok_or_else(DecodeError::projection)
+}
+
+fn canonical_hidden_state_formula_owner_retained_bytes(
+    value: &HiddenStateFormulaOwnerSnapshot,
+    output_bytes: usize,
+) -> Result<usize, DecodeError> {
+    output_bytes
+        .checked_add(
+            value
+                .owner_id
+                .as_ref()
+                .and_then(|owner_id| owner_id.uuid_bytes.as_ref())
+                .map_or(0, Vec::len),
+        )
+        .ok_or_else(DecodeError::projection)
+}
+
+fn canonical_hidden_state_formula_owner_scratch_bytes(
+    value: &HiddenStateFormulaOwnerSnapshot,
+    output_bytes: usize,
+    fields: usize,
+) -> Result<usize, DecodeError> {
+    let (_, mut scratch) = canonical_scan_field_allocations(output_bytes, fields, fields)?;
+    if let Some(owner_id) = value.owner_id.as_ref() {
+        let bytes = canonical_cfuuid_len(owner_id)?;
+        let owner_fields = canonical_cfuuid_fields(owner_id);
+        scratch = scratch
+            .checked_add(canonical_scan_field_allocations(bytes, owner_fields, fields)?.1)
+            .and_then(|value| value.checked_add(owner_id.uuid_bytes.as_ref().map_or(0, Vec::len)))
+            .ok_or_else(DecodeError::projection)?;
+    }
+    output_bytes
+        .checked_add(scratch)
+        .ok_or_else(DecodeError::projection)
+}
+
+fn canonical_filter_set_allocations(
+    output_bytes: usize,
+    fields: usize,
+    offsets: usize,
+) -> Result<usize, DecodeError> {
+    let (scan_allocations, _) = canonical_scan_field_allocations(output_bytes, fields, fields)?;
+    scan_allocations
+        .checked_add(usize::from(offsets != 0))
+        .and_then(|value| value.checked_add(usize::from(output_bytes != 0)))
+        .ok_or_else(DecodeError::projection)
+}
+
+fn canonical_filter_set_scratch_bytes(
+    output_bytes: usize,
+    fields: usize,
+    offsets: usize,
+) -> Result<usize, DecodeError> {
+    let (_, scan_scratch) = canonical_scan_field_allocations(output_bytes, fields, fields)?;
+    let offsets_scratch = offsets
+        .checked_mul(size_of::<u32>())
+        .ok_or_else(DecodeError::projection)?;
+    output_bytes
+        .checked_add(scan_scratch)
+        .and_then(|value| value.checked_add(offsets_scratch))
+        .ok_or_else(DecodeError::projection)
+}
+
+fn canonical_encode_report(
+    output_bytes: usize,
+    fields: usize,
+    max_depth: u32,
+    states: usize,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
+) -> Result<DecodeReport, DecodeError> {
+    let work_bytes = output_bytes
+        .checked_mul(4)
+        .ok_or_else(DecodeError::projection)?;
+    Ok(DecodeReport {
+        input_bytes: 0,
+        output_bytes,
+        fields,
+        work_bytes,
+        max_depth,
+        states,
+        allocations,
+        retained_bytes,
+        scratch_bytes,
+    })
+}
+
+fn validate_hidden_state_formula_owner_for_encode(
+    value: &HiddenStateFormulaOwnerSnapshot,
+) -> Result<(), DecodeError> {
+    if let Some(owner_id) = value.owner_id.as_ref() {
+        if let Some(bytes) = owner_id.uuid_bytes.as_deref() {
+            if bytes.len() > MAX_CFUUID_BYTES {
+                return Err(DecodeError::limit(DecodeLimit::RetainedBytes {
+                    observed: bytes.len(),
+                    maximum: MAX_CFUUID_BYTES,
+                }));
+            }
+            if owner_id.words.iter().any(Option::is_some) {
+                let [Some(w0), Some(w1), Some(w2), Some(w3)] = owner_id.words else {
+                    return Err(DecodeError::invalid(
+                        "CFUUID bytes and partial word representation conflict",
+                    ));
+                };
+                if bytes.len() != MAX_CFUUID_BYTES {
+                    return Err(DecodeError::invalid(
+                        "CFUUID bytes and word representation conflict",
+                    ));
+                }
+                let encoded =
+                    u128::from_be_bytes(bytes.try_into().map_err(|_| DecodeError::projection())?);
+                let words = (u128::from(w2) << 96)
+                    | (u128::from(w3) << 64)
+                    | (u128::from(w1) << 32)
+                    | u128::from(w0);
+                if encoded != words {
+                    return Err(DecodeError::invalid(
+                        "CFUUID bytes and word representation conflict",
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_filter_set_for_encode(value: &FilterSetSnapshot) -> Result<(), DecodeError> {
+    if let Some(filter_type) = value.filter_type
+        && !matches!(filter_type, 0 | 1)
+    {
+        return Err(DecodeError::invalid("filter-set type is out of range"));
+    }
+    if value.filter_offsets.len() > MAX_CONSTRUCTED_STATES {
+        return Err(DecodeError::limit(DecodeLimit::States {
+            observed: value.filter_offsets.len(),
+            maximum: MAX_CONSTRUCTED_STATES,
+        }));
+    }
+    Ok(())
+}
+
+fn validate_canonical_encode_report(
+    report: DecodeReport,
+    options: DecodeOptions,
+) -> Result<(), DecodeError> {
+    if options.recursion_limit == 0 || options.recursion_limit > MAX_RECURSION {
+        return Err(DecodeError::limit(DecodeLimit::Nesting {
+            observed: options.recursion_limit,
+            maximum: MAX_RECURSION,
+        }));
+    }
+    for (observed, maximum, limit) in [
+        (
+            report.output_bytes,
+            options.max_output_bytes,
+            DecodeLimit::OutputBytes {
+                observed: report.output_bytes,
+                maximum: options.max_output_bytes,
+            },
+        ),
+        (
+            report.fields,
+            options.max_fields,
+            DecodeLimit::Fields {
+                observed: report.fields,
+                maximum: options.max_fields,
+            },
+        ),
+        (
+            report.work_bytes,
+            options.max_work_bytes,
+            DecodeLimit::WorkBytes {
+                observed: report.work_bytes,
+                maximum: options.max_work_bytes,
+            },
+        ),
+        (
+            report.states,
+            options.max_states.min(MAX_CONSTRUCTED_STATES),
+            DecodeLimit::States {
+                observed: report.states,
+                maximum: options.max_states.min(MAX_CONSTRUCTED_STATES),
+            },
+        ),
+        (
+            report.allocations,
+            options.max_allocations,
+            DecodeLimit::Allocations {
+                observed: report.allocations,
+                maximum: options.max_allocations,
+            },
+        ),
+        (
+            report.retained_bytes,
+            options.max_retained_bytes,
+            DecodeLimit::RetainedBytes {
+                observed: report.retained_bytes,
+                maximum: options.max_retained_bytes,
+            },
+        ),
+        (
+            report.scratch_bytes,
+            options.max_scratch_bytes,
+            DecodeLimit::ScratchBytes {
+                observed: report.scratch_bytes,
+                maximum: options.max_scratch_bytes,
+            },
+        ),
+    ] {
+        if observed > maximum {
+            return Err(DecodeError::limit(limit));
+        }
+    }
+    if report.max_depth > options.recursion_limit.min(MAX_RECURSION) {
+        return Err(DecodeError::limit(DecodeLimit::Nesting {
+            observed: report.max_depth,
+            maximum: options.recursion_limit.min(MAX_RECURSION),
+        }));
+    }
+    Ok(())
+}
+
+fn reserve_encode_output(output: &mut Vec<u8>, bytes: usize) -> Result<(), DecodeError> {
+    if bytes != 0 {
+        output
+            .try_reserve_exact(bytes)
+            .map_err(|_| DecodeError::allocation(bytes))?;
+    }
+    Ok(())
+}
+
+fn canonical_encode_verify_options(report: DecodeReport) -> DecodeOptions {
+    DecodeOptions::new(
+        report.output_bytes.max(1),
+        report.output_bytes.max(1),
+        report.fields,
+        report.work_bytes,
+        report.max_depth,
+        report.states,
+    )
+    .with_max_allocations(report.allocations)
+    .with_max_retained_bytes(report.retained_bytes)
+    .with_max_scratch_bytes(report.scratch_bytes)
 }
 
 fn canonical_row_state_len(value: &RowOrColumnStateSnapshot) -> Result<usize, DecodeError> {
@@ -4809,6 +5794,60 @@ fn emit_reference_canonical(value: ReferenceSnapshot, output: &mut Vec<u8>) {
     }
 }
 
+fn emit_cfuuid_canonical(value: &CfuuidSnapshot, output: &mut Vec<u8>) {
+    if let Some(bytes) = value.uuid_bytes.as_deref() {
+        emit_length_delimited(1, bytes, output);
+    }
+    for (index, word) in value.words.into_iter().enumerate() {
+        if let Some(word) = word {
+            let number = match index {
+                0 => 2,
+                1 => 3,
+                2 => 4,
+                3 => 5,
+                _ => unreachable!("CFUUID has four native words"),
+            };
+            emit_varint_field(number, u64::from(word), output);
+        }
+    }
+}
+
+fn emit_hidden_state_formula_owner_canonical(
+    value: &HiddenStateFormulaOwnerSnapshot,
+    output: &mut Vec<u8>,
+) -> Result<(), DecodeError> {
+    if let Some(owner_id) = value.owner_id.as_ref() {
+        let owner_id_len = canonical_cfuuid_len(owner_id)?;
+        emit_length_delimited_header(HIDDEN_FORMULA_OWNER_ID_FIELD, owner_id_len, output);
+        emit_cfuuid_canonical(owner_id, output);
+    }
+    emit_optional_bool(
+        HIDDEN_FORMULA_OWNER_NEEDS_UPDATE_FIELD,
+        value.needs_to_update_filter_set_for_import,
+        output,
+    );
+    Ok(())
+}
+
+fn emit_filter_set_canonical(
+    value: &FilterSetSnapshot,
+    output: &mut Vec<u8>,
+) -> Result<(), DecodeError> {
+    if let Some(filter_type) = value.filter_type {
+        emit_varint_field(FILTER_SET_TYPE_FIELD, filter_type as i64 as u64, output);
+    }
+    emit_optional_bool(FILTER_SET_ENABLED_FIELD, value.is_enabled, output);
+    emit_optional_bool(
+        FILTER_SET_NEEDS_FORMULA_REWRITE_FIELD,
+        value.needs_formula_rewrite_for_import,
+        output,
+    );
+    for offset in &value.filter_offsets {
+        emit_varint_field(FILTER_SET_OFFSETS_FIELD, u64::from(*offset), output);
+    }
+    Ok(())
+}
+
 fn emit_row_state_canonical(
     value: &RowOrColumnStateSnapshot,
     output: &mut Vec<u8>,
@@ -4883,11 +5922,17 @@ fn emit_owner_canonical(
     Ok(())
 }
 
-fn measure_table_info(source: &[u8], desired: &TableInfoSnapshot) -> Result<usize, DecodeError> {
+fn measure_table_info(
+    source: &[u8],
+    desired: &TableInfoSnapshot,
+    context: &mut MeasureContext<'_>,
+) -> Result<usize, DecodeError> {
     let mut total = 0usize;
     let mut model_seen = false;
     let mut view_seen = false;
     let mut hidden_seen = false;
+    let mut omitted_fields = 0usize;
+    let mut appended_fields = 0usize;
     for_each_field_for_emit(source, |field| {
         match field.number {
             TABLE_INFO_MODEL_FIELD => {
@@ -4897,16 +5942,21 @@ fn measure_table_info(source: &[u8], desired: &TableInfoSnapshot) -> Result<usiz
                 model_seen = true;
                 if source_reference_matches(source, field, desired.table_model)? {
                     add_len(&mut total, field.end - field.start)?;
+                    let payload = field_bytes(source, field)?;
+                    context.retain(payload.len())?;
+                    context.source_leaf(payload, 2)?;
                 } else {
+                    let payload = field_bytes(source, field)?;
+                    let payload_len = measure_reference_payload_rewrite_with_context(
+                        payload,
+                        desired.table_model,
+                        context,
+                        2,
+                    )?;
+                    context.retain(payload_len)?;
                     add_len(
                         &mut total,
-                        length_delimited_len(
-                            TABLE_INFO_MODEL_FIELD,
-                            measure_reference_payload_rewrite(
-                                field_bytes(source, field)?,
-                                desired.table_model,
-                            )?,
-                        )?,
+                        length_delimited_len(TABLE_INFO_MODEL_FIELD, payload_len)?,
                     )?;
                 }
             },
@@ -4920,18 +5970,21 @@ fn measure_table_info(source: &[u8], desired: &TableInfoSnapshot) -> Result<usiz
                 if let Some(value) = desired.view_column_row_uids {
                     if source_reference_matches(source, field, value)? {
                         add_len(&mut total, field.end - field.start)?;
+                        context.source_leaf(field_bytes(source, field)?, 2)?;
                     } else {
+                        let payload = field_bytes(source, field)?;
+                        let payload_len = measure_reference_payload_rewrite_with_context(
+                            payload, value, context, 2,
+                        )?;
                         add_len(
                             &mut total,
-                            length_delimited_len(
-                                TABLE_INFO_VIEW_UIDS_FIELD,
-                                measure_reference_payload_rewrite(
-                                    field_bytes(source, field)?,
-                                    value,
-                                )?,
-                            )?,
+                            length_delimited_len(TABLE_INFO_VIEW_UIDS_FIELD, payload_len)?,
                         )?;
                     }
+                } else {
+                    omitted_fields = omitted_fields
+                        .checked_add(1)
+                        .ok_or_else(DecodeError::projection)?;
                 }
             },
             TABLE_INFO_HIDDEN_STATES_UUID_FIELD => {
@@ -4944,15 +5997,20 @@ fn measure_table_info(source: &[u8], desired: &TableInfoSnapshot) -> Result<usiz
                 if let Some(value) = desired.hidden_states_uuid {
                     if source_uuid_matches(source, field, value)? {
                         add_len(&mut total, field.end - field.start)?;
+                        context.source_leaf(field_bytes(source, field)?, 2)?;
                     } else {
+                        let payload = field_bytes(source, field)?;
+                        let payload_len =
+                            measure_uuid_payload_rewrite_with_context(payload, value, context, 2)?;
                         add_len(
                             &mut total,
-                            length_delimited_len(
-                                TABLE_INFO_HIDDEN_STATES_UUID_FIELD,
-                                measure_uuid_payload_rewrite(field_bytes(source, field)?, value)?,
-                            )?,
+                            length_delimited_len(TABLE_INFO_HIDDEN_STATES_UUID_FIELD, payload_len)?,
                         )?;
                     }
+                } else {
+                    omitted_fields = omitted_fields
+                        .checked_add(1)
+                        .ok_or_else(DecodeError::projection)?;
                 }
             },
             _ => add_len(&mut total, field.end - field.start)?,
@@ -4963,6 +6021,10 @@ fn measure_table_info(source: &[u8], desired: &TableInfoSnapshot) -> Result<usiz
         return Err(DecodeError::missing("TST.TableInfoArchive.tableModel"));
     }
     if !hidden_seen && let Some(value) = desired.hidden_states_uuid {
+        appended_fields = appended_fields
+            .checked_add(1)
+            .ok_or_else(DecodeError::projection)?;
+        context.canonical_uuid(value, 2)?;
         add_len(
             &mut total,
             length_delimited_len(
@@ -4972,11 +6034,16 @@ fn measure_table_info(source: &[u8], desired: &TableInfoSnapshot) -> Result<usiz
         )?;
     }
     if !view_seen && let Some(value) = desired.view_column_row_uids {
+        appended_fields = appended_fields
+            .checked_add(1)
+            .ok_or_else(DecodeError::projection)?;
+        context.canonical_reference(value, 2)?;
         add_len(
             &mut total,
             length_delimited_len(TABLE_INFO_VIEW_UIDS_FIELD, canonical_reference_len(value))?,
         )?;
     }
+    context.source_message(source, total, omitted_fields, appended_fields, 1)?;
     Ok(total)
 }
 
@@ -4985,9 +6052,12 @@ fn measure_table_model(
     desired: &TableModelSnapshot,
     index_plan: &RewriteIndexPlan,
     matched: &mut [u8],
+    context: &mut MeasureContext<'_>,
 ) -> Result<usize, DecodeError> {
     let mut total = 0usize;
     let mut replaced = [false; 11];
+    let mut omitted_fields = 0usize;
+    let mut appended_fields = 0usize;
     for_each_field_for_emit(source, |field| {
         let slot = match field.number {
             TABLE_MODEL_ROWS_FIELD => Some(0),
@@ -5068,6 +6138,8 @@ fn measure_table_model(
                 field,
                 TABLE_MODEL_COLUMN_FORMULA_OWNER_FIELD,
                 desired.hidden_state_formula_owner_for_columns,
+                context,
+                2,
             ),
             TABLE_MODEL_ROW_FORMULA_OWNER_FIELD => measure_optional_reference_field(
                 &mut total,
@@ -5075,6 +6147,8 @@ fn measure_table_model(
                 field,
                 TABLE_MODEL_ROW_FORMULA_OWNER_FIELD,
                 desired.hidden_state_formula_owner_for_rows,
+                context,
+                2,
             ),
             TABLE_MODEL_BASE_COLUMN_ROW_UIDS_FIELD => measure_optional_reference_field(
                 &mut total,
@@ -5082,16 +6156,19 @@ fn measure_table_model(
                 field,
                 TABLE_MODEL_BASE_COLUMN_ROW_UIDS_FIELD,
                 desired.base_column_row_uids,
+                context,
+                2,
             ),
             TABLE_MODEL_HIDDEN_STATES_OWNER_FIELD => {
                 if let Some(owner) = desired.hidden_states_owner.as_ref() {
                     let payload = source_field_payload(source, field)?;
+                    let payload_len = measure_owner_with_context(
+                        payload, owner, index_plan, matched, 2, context,
+                    )?;
+                    context.candidate_owner_clone(owner)?;
                     add_len(
                         &mut total,
-                        length_delimited_len(
-                            TABLE_MODEL_HIDDEN_STATES_OWNER_FIELD,
-                            measure_owner(payload, owner, index_plan, matched)?,
-                        )?,
+                        length_delimited_len(TABLE_MODEL_HIDDEN_STATES_OWNER_FIELD, payload_len)?,
                     )?;
                 }
                 Ok(())
@@ -5100,6 +6177,11 @@ fn measure_table_model(
         }
     })?;
     if !replaced[2] {
+        if desired.number_of_hidden_rows.is_some() {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+        }
         measure_optional_u32(
             &mut total,
             TABLE_MODEL_HIDDEN_ROWS_FIELD,
@@ -5107,6 +6189,11 @@ fn measure_table_model(
         )?;
     }
     if !replaced[3] {
+        if desired.number_of_hidden_columns.is_some() {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+        }
         measure_optional_u32(
             &mut total,
             TABLE_MODEL_HIDDEN_COLUMNS_FIELD,
@@ -5114,6 +6201,11 @@ fn measure_table_model(
         )?;
     }
     if !replaced[4] {
+        if desired.number_of_filtered_rows.is_some() {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+        }
         measure_optional_u32(
             &mut total,
             TABLE_MODEL_FILTERED_ROWS_FIELD,
@@ -5121,6 +6213,11 @@ fn measure_table_model(
         )?;
     }
     if !replaced[5] {
+        if desired.number_of_user_hidden_rows.is_some() {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+        }
         measure_optional_u32(
             &mut total,
             TABLE_MODEL_USER_HIDDEN_ROWS_FIELD,
@@ -5128,6 +6225,11 @@ fn measure_table_model(
         )?;
     }
     if !replaced[6] {
+        if desired.number_of_user_hidden_columns.is_some() {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+        }
         measure_optional_u32(
             &mut total,
             TABLE_MODEL_USER_HIDDEN_COLUMNS_FIELD,
@@ -5135,6 +6237,13 @@ fn measure_table_model(
         )?;
     }
     if !replaced[7] {
+        if let Some(reference) = desired.hidden_state_formula_owner_for_columns {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+            context.canonical_reference(reference, 2)?;
+            context.retain(canonical_reference_len(reference))?;
+        }
         measure_optional_reference(
             &mut total,
             TABLE_MODEL_COLUMN_FORMULA_OWNER_FIELD,
@@ -5142,6 +6251,13 @@ fn measure_table_model(
         )?;
     }
     if !replaced[8] {
+        if let Some(reference) = desired.hidden_state_formula_owner_for_rows {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+            context.canonical_reference(reference, 2)?;
+            context.retain(canonical_reference_len(reference))?;
+        }
         measure_optional_reference(
             &mut total,
             TABLE_MODEL_ROW_FORMULA_OWNER_FIELD,
@@ -5149,6 +6265,13 @@ fn measure_table_model(
         )?;
     }
     if !replaced[9] {
+        if let Some(reference) = desired.base_column_row_uids {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+            context.canonical_reference(reference, 2)?;
+            context.retain(canonical_reference_len(reference))?;
+        }
         measure_optional_reference(
             &mut total,
             TABLE_MODEL_BASE_COLUMN_ROW_UIDS_FIELD,
@@ -5158,6 +6281,15 @@ fn measure_table_model(
     if !replaced[10]
         && let Some(owner) = desired.hidden_states_owner.as_ref()
     {
+        appended_fields = appended_fields
+            .checked_add(1)
+            .ok_or_else(DecodeError::projection)?;
+        account_canonical_owner(owner, context, 2)?;
+        // A canonical owner appended to a table model bypasses the
+        // source-owner measurement path. Account both the owner's own parse
+        // vectors and the clone performed by `parse_table_model`.
+        context.candidate_owner(owner, canonical_uuid_len(owner.owner_uid))?;
+        context.candidate_owner_clone(owner)?;
         add_len(
             &mut total,
             length_delimited_len(
@@ -5165,7 +6297,42 @@ fn measure_table_model(
                 canonical_owner_len(owner)?,
             )?,
         )?;
+    } else if replaced[10] && desired.hidden_states_owner.is_none() {
+        omitted_fields = omitted_fields
+            .checked_add(1)
+            .ok_or_else(DecodeError::projection)?;
     }
+    for (slot, desired_present) in [
+        desired.number_of_hidden_rows.is_some(),
+        desired.number_of_hidden_columns.is_some(),
+        desired.number_of_filtered_rows.is_some(),
+        desired.number_of_user_hidden_rows.is_some(),
+        desired.number_of_user_hidden_columns.is_some(),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        if replaced[slot + 2] && !desired_present {
+            omitted_fields = omitted_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+        }
+    }
+    for (slot, desired_present) in [
+        desired.hidden_state_formula_owner_for_columns.is_some(),
+        desired.hidden_state_formula_owner_for_rows.is_some(),
+        desired.base_column_row_uids.is_some(),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        if replaced[slot + 7] && !desired_present {
+            omitted_fields = omitted_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+        }
+    }
+    context.source_message(source, total, omitted_fields, appended_fields, 1)?;
     Ok(total)
 }
 
@@ -5244,18 +6411,20 @@ fn measure_optional_reference_field(
     field: FieldSpan,
     number: u32,
     value: Option<ReferenceSnapshot>,
+    context: &mut MeasureContext<'_>,
+    depth: u32,
 ) -> Result<(), DecodeError> {
     if let Some(value) = value {
         if source_reference_matches(source, field, value)? {
             add_len(total, field.end - field.start)?;
+            context.source_leaf(field_bytes(source, field)?, depth)?;
+            context.retain(field_bytes(source, field)?.len())?;
         } else {
-            add_len(
-                total,
-                length_delimited_len(
-                    number,
-                    measure_reference_payload_rewrite(field_bytes(source, field)?, value)?,
-                )?,
-            )?;
+            let payload = field_bytes(source, field)?;
+            let payload_len =
+                measure_reference_payload_rewrite_with_context(payload, value, context, depth)?;
+            context.retain(payload_len)?;
+            add_len(total, length_delimited_len(number, payload_len)?)?;
         }
     }
     Ok(())
@@ -5267,8 +6436,27 @@ fn measure_owner(
     index_plan: &RewriteIndexPlan,
     matched: &mut [u8],
 ) -> Result<usize, DecodeError> {
+    let mut verification = CandidateVerificationAccounting::default();
+    let mut context = MeasureContext {
+        verification: &mut verification,
+        max_fields: usize::MAX,
+    };
+    measure_owner_with_context(source, desired, index_plan, matched, 1, &mut context)
+}
+
+fn measure_owner_with_context(
+    source: &[u8],
+    desired: &HiddenStatesOwnerSnapshot,
+    index_plan: &RewriteIndexPlan,
+    matched: &mut [u8],
+    depth: u32,
+    context: &mut MeasureContext<'_>,
+) -> Result<usize, DecodeError> {
     let mut total = 0usize;
     let mut owner_seen = false;
+    let mut owner_uid_payload_len = None;
+    let mut omitted_fields = 0usize;
+    let mut appended_fields = 0usize;
     let desired_range = index_plan.owner_range.ok_or_else(DecodeError::projection)?;
     for_each_field_for_emit(source, |field| {
         match field.number {
@@ -5281,13 +6469,20 @@ fn measure_owner(
                 owner_seen = true;
                 if source_uuid_matches(source, field, desired.owner_uid)? {
                     add_len(&mut total, field.end - field.start)?;
+                    let payload = field_bytes(source, field)?;
+                    owner_uid_payload_len = Some(payload.len());
+                    context.source_leaf(payload, child_depth(depth)?)?;
                 } else {
+                    let payload_len = measure_uuid_payload_rewrite_with_context(
+                        field_bytes(source, field)?,
+                        desired.owner_uid,
+                        context,
+                        child_depth(depth)?,
+                    )?;
+                    owner_uid_payload_len = Some(payload_len);
                     add_len(
                         &mut total,
-                        length_delimited_len(
-                            OWNER_UID_FIELD,
-                            canonical_uuid_len(desired.owner_uid),
-                        )?,
+                        length_delimited_len(OWNER_UID_FIELD, payload_len)?,
                     )?;
                 }
             },
@@ -5299,13 +6494,25 @@ fn measure_owner(
                 if let Some(index) = find_uid_index(index_plan, desired_range, uid)? {
                     mark_match(matched, desired_range, index)?;
                     let state = &desired.hidden_states[index];
+                    let state_depth = child_depth(depth)?;
                     add_len(
                         &mut total,
                         length_delimited_len(
                             OWNER_STATES_FIELD,
-                            measure_hidden_states(payload, state, index_plan, matched)?,
+                            measure_hidden_states_with_context(
+                                payload,
+                                state,
+                                index_plan,
+                                matched,
+                                state_depth,
+                                context,
+                            )?,
                         )?,
                     )?;
+                } else {
+                    omitted_fields = omitted_fields
+                        .checked_add(1)
+                        .ok_or_else(DecodeError::projection)?;
                 }
             },
             _ => add_len(&mut total, field.end - field.start)?,
@@ -5319,12 +6526,21 @@ fn measure_owner(
     }
     for (index, state) in desired.hidden_states.iter().enumerate() {
         if !is_matched(matched, desired_range, index)? {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+            account_canonical_hidden_states(state, context, child_depth(depth)?)?;
             add_len(
                 &mut total,
                 length_delimited_len(OWNER_STATES_FIELD, canonical_hidden_states_len(state)?)?,
             )?;
         }
     }
+    context.source_message(source, total, omitted_fields, appended_fields, depth)?;
+    context.candidate_owner(
+        desired,
+        owner_uid_payload_len.ok_or_else(DecodeError::projection)?,
+    )?;
     Ok(total)
 }
 
@@ -5333,6 +6549,22 @@ fn measure_hidden_states(
     desired: &HiddenStatesSnapshot,
     index_plan: &RewriteIndexPlan,
     matched: &mut [u8],
+) -> Result<usize, DecodeError> {
+    let mut verification = CandidateVerificationAccounting::default();
+    let mut context = MeasureContext {
+        verification: &mut verification,
+        max_fields: usize::MAX,
+    };
+    measure_hidden_states_with_context(source, desired, index_plan, matched, 1, &mut context)
+}
+
+fn measure_hidden_states_with_context(
+    source: &[u8],
+    desired: &HiddenStatesSnapshot,
+    index_plan: &RewriteIndexPlan,
+    matched: &mut [u8],
+    depth: u32,
+    context: &mut MeasureContext<'_>,
 ) -> Result<usize, DecodeError> {
     let mut total = 0usize;
     let mut uid_seen = false;
@@ -5349,16 +6581,18 @@ fn measure_hidden_states(
                 uid_seen = true;
                 if source_uuid_matches(source, field, desired.hidden_states_uid)? {
                     add_len(&mut total, field.end - field.start)?;
+                    context.source_leaf(field_bytes(source, field)?, child_depth(depth)?)?;
                 } else {
+                    let payload = field_bytes(source, field)?;
+                    let payload_len = measure_uuid_payload_rewrite_with_context(
+                        payload,
+                        desired.hidden_states_uid,
+                        context,
+                        child_depth(depth)?,
+                    )?;
                     add_len(
                         &mut total,
-                        length_delimited_len(
-                            STATE_UID_FIELD,
-                            measure_uuid_payload_rewrite(
-                                field_bytes(source, field)?,
-                                desired.hidden_states_uid,
-                            )?,
-                        )?,
+                        length_delimited_len(STATE_UID_FIELD, payload_len)?,
                     )?;
                 }
             },
@@ -5374,11 +6608,13 @@ fn measure_hidden_states(
                     &mut total,
                     length_delimited_len(
                         STATE_COLUMN_EXTENT_FIELD,
-                        measure_extent(
+                        measure_extent_with_context(
                             payload,
                             desired.column_hidden_state_extent(),
                             index_plan,
                             matched,
+                            child_depth(depth)?,
+                            context,
                         )?,
                     )?,
                 )?;
@@ -5395,11 +6631,13 @@ fn measure_hidden_states(
                     &mut total,
                     length_delimited_len(
                         STATE_ROW_EXTENT_FIELD,
-                        measure_extent(
+                        measure_extent_with_context(
                             payload,
                             desired.row_hidden_state_extent(),
                             index_plan,
                             matched,
+                            child_depth(depth)?,
+                            context,
                         )?,
                     )?,
                 )?;
@@ -5416,6 +6654,8 @@ fn measure_hidden_states(
     if !column_seen || !row_seen {
         return Err(DecodeError::missing("TST.HiddenStatesArchive.extent"));
     }
+    context.source_message(source, total, 0, 0, depth)?;
+    context.candidate_hidden_states(desired)?;
     Ok(total)
 }
 
@@ -5425,11 +6665,29 @@ fn measure_extent(
     index_plan: &RewriteIndexPlan,
     matched: &mut [u8],
 ) -> Result<usize, DecodeError> {
+    let mut verification = CandidateVerificationAccounting::default();
+    let mut context = MeasureContext {
+        verification: &mut verification,
+        max_fields: usize::MAX,
+    };
+    measure_extent_with_context(source, desired, index_plan, matched, 1, &mut context)
+}
+
+fn measure_extent_with_context(
+    source: &[u8],
+    desired: &HiddenStateExtentSnapshot,
+    index_plan: &RewriteIndexPlan,
+    matched: &mut [u8],
+    depth: u32,
+    context: &mut MeasureContext<'_>,
+) -> Result<usize, DecodeError> {
     let mut total = 0usize;
     let mut uid_seen = false;
     let mut direction_seen = false;
     let mut needs_filter_seen = false;
     let mut filter_set_seen = false;
+    let mut omitted_fields = 0usize;
+    let mut appended_fields = 0usize;
     let desired_range = index_plan
         .extent_range(desired.hidden_state_extent_uid)
         .ok_or_else(DecodeError::projection)?;
@@ -5444,16 +6702,18 @@ fn measure_extent(
                 uid_seen = true;
                 if source_uuid_matches(source, field, desired.hidden_state_extent_uid)? {
                     add_len(&mut total, field.end - field.start)?;
+                    context.source_leaf(field_bytes(source, field)?, child_depth(depth)?)?;
                 } else {
+                    let payload = field_bytes(source, field)?;
+                    let payload_len = measure_uuid_payload_rewrite_with_context(
+                        payload,
+                        desired.hidden_state_extent_uid,
+                        context,
+                        child_depth(depth)?,
+                    )?;
                     add_len(
                         &mut total,
-                        length_delimited_len(
-                            EXTENT_UID_FIELD,
-                            measure_uuid_payload_rewrite(
-                                field_bytes(source, field)?,
-                                desired.hidden_state_extent_uid,
-                            )?,
-                        )?,
+                        length_delimited_len(EXTENT_UID_FIELD, payload_len)?,
                     )?;
                 }
             },
@@ -5488,9 +6748,18 @@ fn measure_extent(
                         &mut total,
                         length_delimited_len(
                             EXTENT_BASE_STATES_FIELD,
-                            measure_row_state(payload, state)?,
+                            measure_row_state_with_context(
+                                payload,
+                                state,
+                                child_depth(depth)?,
+                                context,
+                            )?,
                         )?,
                     )?;
+                } else {
+                    omitted_fields = omitted_fields
+                        .checked_add(1)
+                        .ok_or_else(DecodeError::projection)?;
                 }
             },
             EXTENT_NEEDS_FILTER_UPDATE_FIELD => {
@@ -5503,6 +6772,10 @@ fn measure_extent(
                         EXTENT_NEEDS_FILTER_UPDATE_FIELD,
                         desired.needs_to_update_filter_set_for_import,
                     )?;
+                } else {
+                    omitted_fields = omitted_fields
+                        .checked_add(1)
+                        .ok_or_else(DecodeError::projection)?;
                 }
             },
             EXTENT_FILTER_SET_FIELD => {
@@ -5510,18 +6783,24 @@ fn measure_extent(
                 if let Some(reference) = desired.filter_set {
                     if source_reference_matches(source, field, reference)? {
                         add_len(&mut total, field.end - field.start)?;
+                        context.source_leaf(field_bytes(source, field)?, child_depth(depth)?)?;
                     } else {
+                        let payload = field_bytes(source, field)?;
+                        let payload_len = measure_reference_payload_rewrite_with_context(
+                            payload,
+                            reference,
+                            context,
+                            child_depth(depth)?,
+                        )?;
                         add_len(
                             &mut total,
-                            length_delimited_len(
-                                EXTENT_FILTER_SET_FIELD,
-                                measure_reference_payload_rewrite(
-                                    field_bytes(source, field)?,
-                                    reference,
-                                )?,
-                            )?,
+                            length_delimited_len(EXTENT_FILTER_SET_FIELD, payload_len)?,
                         )?;
                     }
+                } else {
+                    omitted_fields = omitted_fields
+                        .checked_add(1)
+                        .ok_or_else(DecodeError::projection)?;
                 }
             },
             _ => add_len(&mut total, field.end - field.start)?,
@@ -5540,6 +6819,10 @@ fn measure_extent(
     }
     for (index, state) in desired.base_hidden_states.iter().enumerate() {
         if !is_matched(matched, desired_range, index)? {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+            account_canonical_row_state(state, context, child_depth(depth)?)?;
             add_len(
                 &mut total,
                 length_delimited_len(EXTENT_BASE_STATES_FIELD, canonical_row_state_len(state)?)?,
@@ -5547,17 +6830,26 @@ fn measure_extent(
         }
     }
     if !needs_filter_seen && let Some(value) = desired.needs_to_update_filter_set_for_import {
+        appended_fields = appended_fields
+            .checked_add(1)
+            .ok_or_else(DecodeError::projection)?;
         add_len(
             &mut total,
             varint_field_len(EXTENT_NEEDS_FILTER_UPDATE_FIELD, u64::from(value)),
         )?;
     }
     if !filter_set_seen && let Some(reference) = desired.filter_set {
+        appended_fields = appended_fields
+            .checked_add(1)
+            .ok_or_else(DecodeError::projection)?;
+        context.canonical_reference(reference, child_depth(depth)?)?;
         add_len(
             &mut total,
             length_delimited_len(EXTENT_FILTER_SET_FIELD, canonical_reference_len(reference))?,
         )?;
     }
+    context.source_message(source, total, omitted_fields, appended_fields, depth)?;
+    context.candidate_extent(desired)?;
     Ok(total)
 }
 
@@ -5565,9 +6857,25 @@ fn measure_row_state(
     source: &[u8],
     desired: &RowOrColumnStateSnapshot,
 ) -> Result<usize, DecodeError> {
+    let mut verification = CandidateVerificationAccounting::default();
+    let mut context = MeasureContext {
+        verification: &mut verification,
+        max_fields: usize::MAX,
+    };
+    measure_row_state_with_context(source, desired, 1, &mut context)
+}
+
+fn measure_row_state_with_context(
+    source: &[u8],
+    desired: &RowOrColumnStateSnapshot,
+    depth: u32,
+    context: &mut MeasureContext<'_>,
+) -> Result<usize, DecodeError> {
     let mut total = 0usize;
     let mut uid_seen = false;
     let mut replaced = [false; 3];
+    let mut omitted_fields = 0usize;
+    let mut appended_fields = 0usize;
     for_each_field_for_emit(source, |field| {
         match field.number {
             ROW_STATE_UID_FIELD => {
@@ -5579,16 +6887,18 @@ fn measure_row_state(
                 uid_seen = true;
                 if source_uuid_matches(source, field, desired.row_or_column_uid)? {
                     add_len(&mut total, field.end - field.start)?;
+                    context.source_leaf(field_bytes(source, field)?, child_depth(depth)?)?;
                 } else {
+                    let payload = field_bytes(source, field)?;
+                    let payload_len = measure_uuid_payload_rewrite_with_context(
+                        payload,
+                        desired.row_or_column_uid,
+                        context,
+                        child_depth(depth)?,
+                    )?;
                     add_len(
                         &mut total,
-                        length_delimited_len(
-                            ROW_STATE_UID_FIELD,
-                            measure_uuid_payload_rewrite(
-                                field_bytes(source, field)?,
-                                desired.row_or_column_uid,
-                            )?,
-                        )?,
+                        length_delimited_len(ROW_STATE_UID_FIELD, payload_len)?,
                     )?;
                 }
             },
@@ -5632,18 +6942,48 @@ fn measure_row_state(
         ));
     }
     if !replaced[0] {
+        if desired.user_hidden.is_some() {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+        }
         measure_optional_bool(&mut total, ROW_STATE_USER_HIDDEN_FIELD, desired.user_hidden)?;
     }
     if !replaced[1] {
+        if desired.filtered.is_some() {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+        }
         measure_optional_bool(&mut total, ROW_STATE_FILTERED_FIELD, desired.filtered)?;
     }
     if !replaced[2] {
+        if desired.pivot_hidden.is_some() {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+        }
         measure_optional_bool(
             &mut total,
             ROW_STATE_PIVOT_HIDDEN_FIELD,
             desired.pivot_hidden,
         )?;
     }
+    for (slot, desired_present) in [
+        desired.user_hidden.is_some(),
+        desired.filtered.is_some(),
+        desired.pivot_hidden.is_some(),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        if replaced[slot] && !desired_present {
+            omitted_fields = omitted_fields
+                .checked_add(1)
+                .ok_or_else(DecodeError::projection)?;
+        }
+    }
+    context.source_message(source, total, omitted_fields, appended_fields, depth)?;
     Ok(total)
 }
 
@@ -6644,6 +7984,24 @@ fn measure_uuid_payload_rewrite(
     source: &[u8],
     desired: UuidSnapshot,
 ) -> Result<usize, DecodeError> {
+    measure_uuid_payload_rewrite_inner(source, desired, None, 0)
+}
+
+fn measure_uuid_payload_rewrite_with_context(
+    source: &[u8],
+    desired: UuidSnapshot,
+    context: &mut MeasureContext<'_>,
+    depth: u32,
+) -> Result<usize, DecodeError> {
+    measure_uuid_payload_rewrite_inner(source, desired, Some(context), depth)
+}
+
+fn measure_uuid_payload_rewrite_inner(
+    source: &[u8],
+    desired: UuidSnapshot,
+    mut context: Option<&mut MeasureContext<'_>>,
+    depth: u32,
+) -> Result<usize, DecodeError> {
     let mut total = 0usize;
     let mut lower_seen = false;
     let mut upper_seen = false;
@@ -6686,6 +8044,9 @@ fn measure_uuid_payload_rewrite(
     }
     if !upper_seen {
         return Err(DecodeError::missing("TSP.UUID.upper"));
+    }
+    if let Some(context) = context.take() {
+        context.source_message(source, total, 0, 0, depth)?;
     }
     Ok(total)
 }
@@ -6734,6 +8095,24 @@ fn emit_uuid_payload_preserving(
 fn measure_reference_payload_rewrite(
     source: &[u8],
     desired: ReferenceSnapshot,
+) -> Result<usize, DecodeError> {
+    measure_reference_payload_rewrite_inner(source, desired, None, 0)
+}
+
+fn measure_reference_payload_rewrite_with_context(
+    source: &[u8],
+    desired: ReferenceSnapshot,
+    context: &mut MeasureContext<'_>,
+    depth: u32,
+) -> Result<usize, DecodeError> {
+    measure_reference_payload_rewrite_inner(source, desired, Some(context), depth)
+}
+
+fn measure_reference_payload_rewrite_inner(
+    source: &[u8],
+    desired: ReferenceSnapshot,
+    mut context: Option<&mut MeasureContext<'_>>,
+    depth: u32,
 ) -> Result<usize, DecodeError> {
     let mut total = 0usize;
     let mut identifier_seen = false;
@@ -6812,6 +8191,14 @@ fn measure_reference_payload_rewrite(
                 varint_field_len(REFERENCE_DEPRECATED_EXTERNAL_FIELD, u64::from(value)),
             )?;
         }
+    }
+    if let Some(context) = context.take() {
+        let omitted_fields = usize::from(deprecated_type_seen && desired.deprecated_type.is_none())
+            + usize::from(external_seen && desired.deprecated_is_external.is_none());
+        let appended_fields =
+            usize::from(!deprecated_type_seen && desired.deprecated_type.is_some())
+                + usize::from(!external_seen && desired.deprecated_is_external.is_some());
+        context.source_message(source, total, omitted_fields, appended_fields, depth)?;
     }
     Ok(total)
 }
@@ -7357,8 +8744,46 @@ mod tests {
         out
     }
 
+    fn fixed64_field(number: u32, value: u64) -> Vec<u8> {
+        let mut out = Vec::new();
+        encode_varint((u64::from(number) << 3) | 1, &mut out);
+        out.extend_from_slice(&value.to_le_bytes());
+        out
+    }
+
     fn uuid(lower: u64, upper: u64) -> Vec<u8> {
         canonical_uuid(UuidSnapshot::new(lower, upper)).expect("uuid")
+    }
+
+    fn table_model_source() -> Vec<u8> {
+        let mut source = field(TABLE_MODEL_TABLE_ID_FIELD, b"table");
+        source.extend_from_slice(&field(TABLE_MODEL_TABLE_STYLE_FIELD, &[]));
+        source.extend_from_slice(&field(TABLE_MODEL_BASE_DATA_STORE_FIELD, &[]));
+        source.extend_from_slice(&varint_field(TABLE_MODEL_ROWS_FIELD, 4));
+        source.extend_from_slice(&varint_field(TABLE_MODEL_COLUMNS_FIELD, 3));
+        source.extend_from_slice(&field(TABLE_MODEL_TABLE_NAME_FIELD, b"name"));
+        source.extend_from_slice(&fixed64_field(TABLE_MODEL_DEFAULT_ROW_HEIGHT_FIELD, 1));
+        source.extend_from_slice(&fixed64_field(TABLE_MODEL_DEFAULT_COLUMN_WIDTH_FIELD, 2));
+        for number in [
+            TABLE_MODEL_BODY_CELL_STYLE_FIELD,
+            TABLE_MODEL_HEADER_ROW_STYLE_FIELD,
+            TABLE_MODEL_HEADER_COLUMN_STYLE_FIELD,
+            TABLE_MODEL_FOOTER_ROW_STYLE_FIELD,
+            TABLE_MODEL_BODY_TEXT_STYLE_FIELD,
+            TABLE_MODEL_HEADER_ROW_TEXT_STYLE_FIELD,
+            TABLE_MODEL_HEADER_COLUMN_TEXT_STYLE_FIELD,
+            TABLE_MODEL_FOOTER_ROW_TEXT_STYLE_FIELD,
+        ] {
+            source.extend_from_slice(&field(number, &[]));
+        }
+        source
+    }
+
+    fn table_info_source(reference: ReferenceSnapshot) -> Vec<u8> {
+        let mut source = field(TABLE_INFO_SUPER_FIELD, &[]);
+        let payload = canonical_reference(reference).expect("reference");
+        source.extend_from_slice(&field(TABLE_INFO_MODEL_FIELD, &payload));
+        source
     }
 
     #[test]
@@ -7540,6 +8965,141 @@ mod tests {
         );
     }
 
+    fn exact_encode_options(report: DecodeReport) -> DecodeOptions {
+        DecodeOptions::new(
+            report.output_bytes().max(1),
+            report.output_bytes().max(1),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.states(),
+        )
+        .with_max_allocations(report.allocations())
+        .with_max_retained_bytes(report.retained_bytes())
+        .with_max_scratch_bytes(report.scratch_bytes())
+    }
+
+    #[test]
+    fn canonical_formula_owner_constructor_round_trips_at_exact_limits() {
+        let owner_id = CfuuidSnapshot::new(Some(vec![0x11; MAX_CFUUID_BYTES]), [None; 4]);
+        let desired = HiddenStateFormulaOwnerSnapshot::new(Some(owner_id), Some(true));
+        let generous = DecodeOptions::new(256, 256, 256, 4_096, 8, 32)
+            .with_max_allocations(256)
+            .with_max_retained_bytes(4_096)
+            .with_max_scratch_bytes(4_096);
+        let output = encode_hidden_state_formula_owner(&desired, generous).expect("encode");
+        assert_eq!(
+            decode_hidden_state_formula_owner(
+                output.bytes(),
+                exact_encode_options(output.report())
+            )
+            .expect("readback"),
+            desired
+        );
+
+        let report = output.report();
+        assert_eq!(report.input_bytes(), 0);
+        assert_eq!(report.output_bytes(), output.bytes().len());
+        assert_eq!(report.max_depth(), 2);
+        assert_eq!(report.states(), 0);
+        assert_eq!(
+            measure_hidden_state_formula_owner(&desired, generous).expect("measure"),
+            report
+        );
+        assert!(encode_hidden_state_formula_owner(&desired, exact_encode_options(report)).is_ok());
+
+        for limited in [
+            exact_encode_options(report).with_max_output_bytes(report.output_bytes() - 1),
+            exact_encode_options(report).with_max_fields(report.fields() - 1),
+            exact_encode_options(report).with_max_work_bytes(report.work_bytes() - 1),
+            exact_encode_options(report).with_recursion_limit(report.max_depth() - 1),
+            exact_encode_options(report).with_max_allocations(report.allocations() - 1),
+            exact_encode_options(report).with_max_retained_bytes(report.retained_bytes() - 1),
+            exact_encode_options(report).with_max_scratch_bytes(report.scratch_bytes() - 1),
+        ] {
+            assert!(
+                encode_hidden_state_formula_owner(&desired, limited)
+                    .expect_err("one-under limit")
+                    .resource_limit()
+                    .is_some()
+            );
+        }
+    }
+
+    #[test]
+    fn canonical_filter_set_constructor_round_trips_and_bounds_offsets() {
+        let desired = FilterSetSnapshot::new(Some(1), Some(false), Some(true), [7, 300, u32::MAX])
+            .expect("filter-set");
+        let generous = DecodeOptions::new(256, 256, 256, 4_096, 4, 32)
+            .with_max_allocations(256)
+            .with_max_retained_bytes(4_096)
+            .with_max_scratch_bytes(4_096);
+        let output = encode_filter_set(&desired, generous).expect("encode");
+        assert_eq!(
+            decode_filter_set(output.bytes(), exact_encode_options(output.report()))
+                .expect("readback"),
+            desired
+        );
+
+        let report = output.report();
+        assert_eq!(report.input_bytes(), 0);
+        assert_eq!(report.output_bytes(), output.bytes().len());
+        assert_eq!(report.max_depth(), 1);
+        assert_eq!(report.states(), 3);
+        assert_eq!(
+            measure_filter_set(&desired, generous).expect("measure"),
+            report
+        );
+        assert!(encode_filter_set(&desired, exact_encode_options(report)).is_ok());
+
+        for limited in [
+            exact_encode_options(report).with_max_output_bytes(report.output_bytes() - 1),
+            exact_encode_options(report).with_max_fields(report.fields() - 1),
+            exact_encode_options(report).with_max_work_bytes(report.work_bytes() - 1),
+            exact_encode_options(report).with_recursion_limit(report.max_depth() - 1),
+            exact_encode_options(report).with_max_states(report.states() - 1),
+            exact_encode_options(report).with_max_allocations(report.allocations() - 1),
+            exact_encode_options(report).with_max_retained_bytes(report.retained_bytes() - 1),
+            exact_encode_options(report).with_max_scratch_bytes(report.scratch_bytes() - 1),
+        ] {
+            assert!(
+                encode_filter_set(&desired, limited)
+                    .expect_err("one-under limit")
+                    .resource_limit()
+                    .is_some()
+            );
+        }
+        assert!(matches!(
+            encode_filter_set(
+                &FilterSetSnapshot {
+                    filter_type: Some(2),
+                    is_enabled: None,
+                    needs_formula_rewrite_for_import: None,
+                    filter_offsets: Vec::new(),
+                },
+                generous,
+            ),
+            Err(error) if error.resource_limit().is_none()
+        ));
+    }
+
+    #[test]
+    fn canonical_formula_owner_rejects_inconsistent_cfuuid_forms() {
+        let desired = HiddenStateFormulaOwnerSnapshot::new(
+            Some(CfuuidSnapshot::new(
+                Some(vec![0; 15]),
+                [Some(1), None, None, None],
+            )),
+            None,
+        );
+        let error = encode_hidden_state_formula_owner(
+            &desired,
+            DecodeOptions::new(256, 256, 256, 4_096, 8, 32),
+        )
+        .expect_err("partial CFUUID words must be rejected");
+        assert!(error.to_string().contains("CFUUID"));
+    }
+
     #[test]
     fn formula_owner_dependencies_preserve_empty_envelope_presence() {
         let mut base = field(FORMULA_OWNER_UID_FIELD, &uuid(1, 2));
@@ -7584,6 +9144,648 @@ mod tests {
             error.to_string(),
             "invalid Pages hidden-state graph hidden-state extent direction does not match axis"
         );
+    }
+
+    #[test]
+    fn appended_owner_table_model_rewrite_accounts_candidate_verification() {
+        let source = table_model_source();
+        let options = options(&source);
+        let model = decode_table_model(&source, options).expect("model");
+        let owner = HiddenStatesOwnerSnapshot::new(UuidSnapshot::new(99, 100), []).expect("owner");
+        let desired = model.with_hidden_states_owner(Some(owner));
+        let prepared = prepare_table_model_rewrite(&source, &desired, options).expect("prepare");
+        let requirements = prepared.execution_requirements();
+
+        // The old output-size scratch estimate stopped at 1,695 bytes for
+        // this shape and then exposed a depth-three candidate.  Both limits
+        // now include the appended owner verification pass.
+        assert!(requirements.scratch_bytes() >= 1_960);
+        assert!(requirements.max_depth() >= 3);
+        prepared
+            .clone()
+            .execute(RewriteExecutionLimits::exact(requirements))
+            .expect("inclusive exact limits");
+
+        let cases = [
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_output_bytes(requirements.output_bytes() - 1),
+                DecodeLimit::OutputBytes {
+                    observed: requirements.output_bytes(),
+                    maximum: requirements.output_bytes() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements).with_fields(requirements.fields() - 1),
+                DecodeLimit::Fields {
+                    observed: requirements.fields(),
+                    maximum: requirements.fields() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_work_bytes(requirements.work_bytes() - 1),
+                DecodeLimit::WorkBytes {
+                    observed: requirements.work_bytes(),
+                    maximum: requirements.work_bytes() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_max_depth(requirements.max_depth() - 1),
+                DecodeLimit::Nesting {
+                    observed: requirements.max_depth(),
+                    maximum: requirements.max_depth() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_allocations(requirements.allocations() - 1),
+                DecodeLimit::Allocations {
+                    observed: requirements.allocations(),
+                    maximum: requirements.allocations() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_retained_bytes(requirements.retained_bytes() - 1),
+                DecodeLimit::RetainedBytes {
+                    observed: requirements.retained_bytes(),
+                    maximum: requirements.retained_bytes() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_scratch_bytes(requirements.scratch_bytes() - 1),
+                DecodeLimit::ScratchBytes {
+                    observed: requirements.scratch_bytes(),
+                    maximum: requirements.scratch_bytes() - 1,
+                },
+            ),
+        ];
+        for (limits, expected) in cases {
+            let error = prepared
+                .clone()
+                .execute(limits)
+                .expect_err("one below an execution requirement");
+            assert_eq!(error.resource_limit(), Some(expected));
+        }
+    }
+
+    #[test]
+    fn appended_table_info_field_accounts_candidate_verification() {
+        let reference = ReferenceSnapshot::new(NonZeroU64::new(41).expect("reference"));
+        let source = table_info_source(reference);
+        let options = options(&source);
+        let desired = TableInfoSnapshot::new(reference)
+            .with_hidden_states_uuid(Some(UuidSnapshot::new(101, 102)));
+        let prepared = prepare_table_info_rewrite(&source, &desired, options).expect("prepare");
+        let requirements = prepared.execution_requirements();
+        prepared
+            .clone()
+            .execute(RewriteExecutionLimits::exact(requirements))
+            .expect("inclusive exact limits");
+        let cases = [
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_output_bytes(requirements.output_bytes() - 1),
+                DecodeLimit::OutputBytes {
+                    observed: requirements.output_bytes(),
+                    maximum: requirements.output_bytes() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements).with_fields(requirements.fields() - 1),
+                DecodeLimit::Fields {
+                    observed: requirements.fields(),
+                    maximum: requirements.fields() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_work_bytes(requirements.work_bytes() - 1),
+                DecodeLimit::WorkBytes {
+                    observed: requirements.work_bytes(),
+                    maximum: requirements.work_bytes() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_max_depth(requirements.max_depth() - 1),
+                DecodeLimit::Nesting {
+                    observed: requirements.max_depth(),
+                    maximum: requirements.max_depth() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_allocations(requirements.allocations() - 1),
+                DecodeLimit::Allocations {
+                    observed: requirements.allocations(),
+                    maximum: requirements.allocations() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_retained_bytes(requirements.retained_bytes() - 1),
+                DecodeLimit::RetainedBytes {
+                    observed: requirements.retained_bytes(),
+                    maximum: requirements.retained_bytes() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_scratch_bytes(requirements.scratch_bytes() - 1),
+                DecodeLimit::ScratchBytes {
+                    observed: requirements.scratch_bytes(),
+                    maximum: requirements.scratch_bytes() - 1,
+                },
+            ),
+        ];
+        for (limits, expected) in cases {
+            let error = prepared
+                .clone()
+                .execute(limits)
+                .expect_err("one below an execution requirement");
+            assert_eq!(error.resource_limit(), Some(expected));
+        }
+    }
+
+    #[test]
+    fn appended_owner_with_nested_states_replays_exact_requirements() {
+        let source = table_model_source();
+        let options = DecodeOptions::new(
+            source.len(),
+            source.len().saturating_mul(4),
+            source.len().saturating_mul(64).max(128),
+            source.len().saturating_mul(512).max(512),
+            16,
+            128,
+        )
+        .with_max_allocations(16_384)
+        .with_max_retained_bytes(1_000_000)
+        .with_max_scratch_bytes(1_000_000);
+        let model = decode_table_model(&source, options).expect("model");
+        let state =
+            RowOrColumnStateSnapshot::new(UuidSnapshot::new(20, 21)).with_user_hidden(Some(true));
+        let column =
+            HiddenStateExtentSnapshot::new(UuidSnapshot::new(30, 31), AxisDirection::Column, [])
+                .expect("column");
+        let row =
+            HiddenStateExtentSnapshot::new(UuidSnapshot::new(32, 33), AxisDirection::Row, [state])
+                .expect("row");
+        let hidden = HiddenStatesSnapshot::new(UuidSnapshot::new(40, 41), column, row);
+        let owner =
+            HiddenStatesOwnerSnapshot::new(UuidSnapshot::new(50, 51), [hidden]).expect("owner");
+        let desired = model.with_hidden_states_owner(Some(owner));
+        let prepared = prepare_table_model_rewrite(&source, &desired, options).expect("prepare");
+        let requirements = prepared.execution_requirements();
+        assert!(requirements.max_depth() >= 6);
+        assert!(requirements.states() > 0);
+        prepared
+            .clone()
+            .execute(RewriteExecutionLimits::exact(requirements))
+            .expect("inclusive exact limits");
+
+        let cases = [
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_output_bytes(requirements.output_bytes() - 1),
+                DecodeLimit::OutputBytes {
+                    observed: requirements.output_bytes(),
+                    maximum: requirements.output_bytes() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements).with_fields(requirements.fields() - 1),
+                DecodeLimit::Fields {
+                    observed: requirements.fields(),
+                    maximum: requirements.fields() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_work_bytes(requirements.work_bytes() - 1),
+                DecodeLimit::WorkBytes {
+                    observed: requirements.work_bytes(),
+                    maximum: requirements.work_bytes() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_max_depth(requirements.max_depth() - 1),
+                DecodeLimit::Nesting {
+                    observed: requirements.max_depth(),
+                    maximum: requirements.max_depth() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements).with_states(requirements.states() - 1),
+                DecodeLimit::States {
+                    observed: requirements.states(),
+                    maximum: requirements.states() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_allocations(requirements.allocations() - 1),
+                DecodeLimit::Allocations {
+                    observed: requirements.allocations(),
+                    maximum: requirements.allocations() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_retained_bytes(requirements.retained_bytes() - 1),
+                DecodeLimit::RetainedBytes {
+                    observed: requirements.retained_bytes(),
+                    maximum: requirements.retained_bytes() - 1,
+                },
+            ),
+            (
+                RewriteExecutionLimits::exact(requirements)
+                    .with_scratch_bytes(requirements.scratch_bytes() - 1),
+                DecodeLimit::ScratchBytes {
+                    observed: requirements.scratch_bytes(),
+                    maximum: requirements.scratch_bytes() - 1,
+                },
+            ),
+        ];
+        for (limits, expected) in cases {
+            let error = prepared
+                .clone()
+                .execute(limits)
+                .expect_err("one below an execution requirement");
+            assert_eq!(error.resource_limit(), Some(expected));
+        }
+    }
+
+    #[test]
+    fn appended_owner_wide_unknown_source_replays_exact_requirements() {
+        for unknown_count in [1usize, 2, 4, 8, 16, 32, 64, 128] {
+            let mut source = table_model_source();
+            for _ in 0..unknown_count {
+                source.extend_from_slice(&varint_field(100, 0));
+            }
+            let options = options(&source);
+            let model = decode_table_model(&source, options).expect("model");
+            let owner =
+                HiddenStatesOwnerSnapshot::new(UuidSnapshot::new(99, 100), []).expect("owner");
+            let desired = model.with_hidden_states_owner(Some(owner));
+            let prepared =
+                prepare_table_model_rewrite(&source, &desired, options).expect("prepare");
+            let requirements = prepared.execution_requirements();
+            prepared
+                .execute(RewriteExecutionLimits::exact(requirements))
+                .unwrap_or_else(|error| panic!("unknown_count={unknown_count}: {error}"));
+        }
+    }
+
+    #[test]
+    fn matched_table_model_owner_row_uuid_unknowns_replay_exact_requirements() {
+        for unknown_count in [1usize, 6, 32, 128] {
+            let mut row_uuid = uuid(20, 21);
+            for index in 0..unknown_count {
+                row_uuid.extend_from_slice(&varint_field(
+                    100 + u32::try_from(index).expect("unknown field number"),
+                    index as u64,
+                ));
+            }
+            let mut row_state = field(ROW_STATE_UID_FIELD, &row_uuid);
+            row_state.extend_from_slice(&varint_field(ROW_STATE_USER_HIDDEN_FIELD, 1));
+
+            let mut column_extent = field(EXTENT_UID_FIELD, &uuid(30, 31));
+            column_extent.extend_from_slice(&varint_field(
+                EXTENT_DIRECTION_FIELD,
+                AxisDirection::Column.native_value() as u64,
+            ));
+            let mut row_extent = field(EXTENT_UID_FIELD, &uuid(32, 33));
+            row_extent.extend_from_slice(&field(EXTENT_BASE_STATES_FIELD, &row_state));
+            row_extent.extend_from_slice(&varint_field(
+                EXTENT_DIRECTION_FIELD,
+                AxisDirection::Row.native_value() as u64,
+            ));
+
+            let mut hidden_states = field(STATE_UID_FIELD, &uuid(40, 41));
+            hidden_states.extend_from_slice(&field(STATE_COLUMN_EXTENT_FIELD, &column_extent));
+            hidden_states.extend_from_slice(&field(STATE_ROW_EXTENT_FIELD, &row_extent));
+
+            let mut owner = field(OWNER_UID_FIELD, &uuid(50, 51));
+            owner.extend_from_slice(&field(OWNER_STATES_FIELD, &hidden_states));
+
+            let mut source = table_model_source();
+            source.extend_from_slice(&field(TABLE_MODEL_HIDDEN_STATES_OWNER_FIELD, &owner));
+            let options = options(&source);
+            let model = decode_table_model(&source, options)
+                .unwrap_or_else(|error| panic!("unknown_count={unknown_count}: decode: {error}"));
+            let desired_owner = model.hidden_states_owner().cloned();
+            let desired = model.with_hidden_states_owner(desired_owner);
+            let prepared = prepare_table_model_rewrite(&source, &desired, options)
+                .unwrap_or_else(|error| panic!("unknown_count={unknown_count}: prepare: {error}"));
+            let requirements = prepared.execution_requirements();
+            prepared
+                .clone()
+                .execute(RewriteExecutionLimits::exact(requirements))
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "unknown_count={unknown_count}: exact execution: {error}; limit={:?}",
+                        error.resource_limit()
+                    )
+                });
+
+            let error = prepared
+                .clone()
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_fields(requirements.fields() - 1),
+                )
+                .expect_err("one below the aggregate field requirement");
+            assert_eq!(
+                error.resource_limit(),
+                Some(DecodeLimit::Fields {
+                    observed: requirements.fields(),
+                    maximum: requirements.fields() - 1,
+                }),
+                "unknown_count={unknown_count}"
+            );
+
+            let error = prepared
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_work_bytes(requirements.work_bytes() - 1),
+                )
+                .expect_err("one below the aggregate work requirement");
+            assert_eq!(
+                error.resource_limit(),
+                Some(DecodeLimit::WorkBytes {
+                    observed: requirements.work_bytes(),
+                    maximum: requirements.work_bytes() - 1,
+                }),
+                "unknown_count={unknown_count}"
+            );
+        }
+    }
+
+    #[test]
+    fn changed_nested_uuid_and_reference_unknowns_replay_exact_requirements() {
+        let mut previous_requirement = None;
+        for unknown_count in [1usize, 6, 32, 128] {
+            let mut column_uuid = uuid(30, 31);
+            let mut reference_payload = canonical_reference(ReferenceSnapshot::new(
+                NonZeroU64::new(61).expect("source reference"),
+            ))
+            .expect("reference");
+            for index in 0..unknown_count {
+                let number = 100 + u32::try_from(index).expect("unknown field number");
+                column_uuid.extend_from_slice(&varint_field(number, index as u64));
+                reference_payload.extend_from_slice(&varint_field(number, index as u64));
+            }
+
+            let row_uuid = uuid(20, 21);
+            let mut row_state = field(ROW_STATE_UID_FIELD, &row_uuid);
+            row_state.extend_from_slice(&varint_field(ROW_STATE_USER_HIDDEN_FIELD, 1));
+
+            let mut column_extent = field(EXTENT_UID_FIELD, &column_uuid);
+            column_extent.extend_from_slice(&varint_field(
+                EXTENT_DIRECTION_FIELD,
+                AxisDirection::Column.native_value() as u64,
+            ));
+            let mut row_extent = field(EXTENT_UID_FIELD, &uuid(32, 33));
+            row_extent.extend_from_slice(&field(EXTENT_BASE_STATES_FIELD, &row_state));
+            row_extent.extend_from_slice(&varint_field(
+                EXTENT_DIRECTION_FIELD,
+                AxisDirection::Row.native_value() as u64,
+            ));
+            row_extent.extend_from_slice(&field(EXTENT_FILTER_SET_FIELD, &reference_payload));
+
+            let mut hidden_states = field(STATE_UID_FIELD, &uuid(40, 41));
+            hidden_states.extend_from_slice(&field(STATE_COLUMN_EXTENT_FIELD, &column_extent));
+            hidden_states.extend_from_slice(&field(STATE_ROW_EXTENT_FIELD, &row_extent));
+
+            let mut owner = field(OWNER_UID_FIELD, &uuid(50, 51));
+            owner.extend_from_slice(&field(OWNER_STATES_FIELD, &hidden_states));
+
+            let mut source = table_model_source();
+            source.extend_from_slice(&field(TABLE_MODEL_HIDDEN_STATES_OWNER_FIELD, &owner));
+            let options = options(&source);
+            let model = decode_table_model(&source, options)
+                .unwrap_or_else(|error| panic!("unknown_count={unknown_count}: decode: {error}"));
+            let source_owner = model
+                .hidden_states_owner()
+                .expect("source hidden-state owner");
+            let source_hidden = source_owner.hidden_states()[0].clone();
+            let desired_column = HiddenStateExtentSnapshot::new(
+                UuidSnapshot::new(130, 131),
+                AxisDirection::Column,
+                source_hidden
+                    .column_hidden_state_extent()
+                    .base_hidden_states()
+                    .iter()
+                    .copied(),
+            )
+            .expect("desired column extent");
+            let desired_row = HiddenStateExtentSnapshot::new(
+                source_hidden
+                    .row_hidden_state_extent()
+                    .hidden_state_extent_uid(),
+                AxisDirection::Row,
+                source_hidden
+                    .row_hidden_state_extent()
+                    .base_hidden_states()
+                    .iter()
+                    .copied(),
+            )
+            .expect("desired row extent")
+            .with_filter_set(Some(ReferenceSnapshot::new(
+                NonZeroU64::new(62).expect("desired reference"),
+            )));
+            let desired_hidden = HiddenStatesSnapshot::new(
+                source_hidden.hidden_states_uid(),
+                desired_column,
+                desired_row,
+            );
+            let desired_owner =
+                HiddenStatesOwnerSnapshot::new(source_owner.owner_uid(), [desired_hidden])
+                    .expect("desired owner");
+            let desired = model.with_hidden_states_owner(Some(desired_owner));
+            let prepared = prepare_table_model_rewrite(&source, &desired, options)
+                .unwrap_or_else(|error| panic!("unknown_count={unknown_count}: prepare: {error}"));
+            let requirements = prepared.execution_requirements();
+            if let Some((previous_count, previous_fields)) = previous_requirement {
+                let additional_unknowns = unknown_count - previous_count;
+                let minimum_delta = additional_unknowns * 2 * 19;
+                assert!(
+                    requirements.fields() - previous_fields >= minimum_delta,
+                    "unknown_count={unknown_count}: field delta {} is below the analytical minimum {minimum_delta}",
+                    requirements.fields() - previous_fields
+                );
+            }
+            previous_requirement = Some((unknown_count, requirements.fields()));
+            prepared
+                .clone()
+                .execute(RewriteExecutionLimits::exact(requirements))
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "unknown_count={unknown_count}: exact execution: {error}; limit={:?}",
+                        error.resource_limit()
+                    )
+                });
+
+            let error = prepared
+                .clone()
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_fields(requirements.fields() - 1),
+                )
+                .expect_err("one below the aggregate field requirement");
+            assert_eq!(
+                error.resource_limit(),
+                Some(DecodeLimit::Fields {
+                    observed: requirements.fields(),
+                    maximum: requirements.fields() - 1,
+                }),
+                "unknown_count={unknown_count}"
+            );
+
+            let error = prepared
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_work_bytes(requirements.work_bytes() - 1),
+                )
+                .expect_err("one below the aggregate work requirement");
+            assert_eq!(
+                error.resource_limit(),
+                Some(DecodeLimit::WorkBytes {
+                    observed: requirements.work_bytes(),
+                    maximum: requirements.work_bytes() - 1,
+                }),
+                "unknown_count={unknown_count}"
+            );
+        }
+    }
+
+    #[test]
+    fn many_empty_hidden_states_replay_exact_requirements() {
+        let source_owner =
+            HiddenStatesOwnerSnapshot::new(UuidSnapshot::new(90, 91), []).expect("owner");
+        let source = canonical_owner(&source_owner).expect("owner bytes");
+        let options = DecodeOptions::new(256, 1_000_000, 1_000_000, 10_000_000, 16, 1_000_000)
+            .with_max_allocations(1_000_000)
+            .with_max_retained_bytes(10_000_000)
+            .with_max_scratch_bytes(10_000_000);
+
+        for count in [1usize, 4, 16, 64, 256] {
+            let mut hidden_states = Vec::with_capacity(count);
+            for index in 0..count {
+                let index = index as u64;
+                let column = HiddenStateExtentSnapshot::new(
+                    UuidSnapshot::new(1_000 + index, 2_000),
+                    AxisDirection::Column,
+                    [],
+                )
+                .expect("column extent");
+                let row = HiddenStateExtentSnapshot::new(
+                    UuidSnapshot::new(3_000 + index, 4_000),
+                    AxisDirection::Row,
+                    [],
+                )
+                .expect("row extent");
+                hidden_states.push(HiddenStatesSnapshot::new(
+                    UuidSnapshot::new(5_000 + index, 6_000),
+                    column,
+                    row,
+                ));
+            }
+            let desired = HiddenStatesOwnerSnapshot::new(source_owner.owner_uid(), hidden_states)
+                .expect("desired owner");
+            let prepared = prepare_hidden_states_owner_rewrite(&source, &desired, options)
+                .unwrap_or_else(|error| panic!("count={count}: prepare failed: {error}"));
+            let requirements = prepared.execution_requirements();
+            prepared
+                .execute(RewriteExecutionLimits::exact(requirements))
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "count={count}: exact execution failed: {error}; limit={:?}",
+                        error.resource_limit()
+                    )
+                });
+        }
+    }
+
+    #[test]
+    fn many_source_rows_rewrite_to_empty_replays_exact_field_requirements() {
+        for row_count in [1usize, 4, 16, 64, 256] {
+            let mut rows = Vec::with_capacity(row_count);
+            for index in 0..row_count {
+                let index = index as u64;
+                rows.push(
+                    RowOrColumnStateSnapshot::new(UuidSnapshot::new(1_000 + index, 2_000))
+                        .with_user_hidden(Some(true))
+                        .with_filtered(Some(false))
+                        .with_pivot_hidden(Some(true)),
+                );
+            }
+            let column = HiddenStateExtentSnapshot::new(
+                UuidSnapshot::new(11, 20),
+                AxisDirection::Column,
+                [],
+            )
+            .expect("column extent");
+            let row =
+                HiddenStateExtentSnapshot::new(UuidSnapshot::new(12, 20), AxisDirection::Row, rows)
+                    .expect("row extent");
+            let hidden = HiddenStatesSnapshot::new(UuidSnapshot::new(13, 20), column, row);
+            let source_owner = HiddenStatesOwnerSnapshot::new(UuidSnapshot::new(14, 20), [hidden])
+                .expect("source owner");
+            let source = canonical_owner(&source_owner).expect("source owner bytes");
+
+            let desired_column = HiddenStateExtentSnapshot::new(
+                UuidSnapshot::new(11, 20),
+                AxisDirection::Column,
+                [],
+            )
+            .expect("desired column extent");
+            let desired_row =
+                HiddenStateExtentSnapshot::new(UuidSnapshot::new(12, 20), AxisDirection::Row, [])
+                    .expect("desired row extent");
+            let desired_hidden =
+                HiddenStatesSnapshot::new(UuidSnapshot::new(13, 20), desired_column, desired_row);
+            let desired_owner =
+                HiddenStatesOwnerSnapshot::new(UuidSnapshot::new(14, 20), [desired_hidden])
+                    .expect("desired owner");
+            let options = DecodeOptions::new(
+                source.len(),
+                source.len().saturating_mul(4).max(1),
+                source.len().saturating_mul(128).max(256),
+                source.len().saturating_mul(512).max(1_024),
+                16,
+                1_000_000,
+            )
+            .with_max_allocations(1_000_000)
+            .with_max_retained_bytes(source.len().saturating_mul(16).max(1_024))
+            .with_max_scratch_bytes(source.len().saturating_mul(512).max(1_024));
+            let prepared = prepare_hidden_states_owner_rewrite(&source, &desired_owner, options)
+                .unwrap_or_else(|error| panic!("row_count={row_count}: prepare: {error}"));
+            let requirements = prepared.execution_requirements();
+            prepared
+                .clone()
+                .execute(RewriteExecutionLimits::exact(requirements))
+                .unwrap_or_else(|error| panic!("row_count={row_count}: exact: {error}"));
+
+            let limits =
+                RewriteExecutionLimits::exact(requirements).with_fields(requirements.fields() - 1);
+            let error = prepared
+                .execute(limits)
+                .expect_err("one below the field requirement");
+            assert_eq!(
+                error.resource_limit(),
+                Some(DecodeLimit::Fields {
+                    observed: requirements.fields(),
+                    maximum: requirements.fields() - 1,
+                }),
+                "row_count={row_count}"
+            );
+        }
     }
 
     #[test]

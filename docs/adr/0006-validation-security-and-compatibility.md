@@ -59,6 +59,19 @@ the changed identity, the safe facade returns a typed dependency block. Markup-
 compatibility alternatives are edited only when their effective semantics are
 modeled; otherwise the operation is blocked before any bytes are published.
 
+IWA archive object-reference transitions may append explicit canonical
+`FieldInfo` records when their paths are absent and their unique nonzero
+references belong to the authorized target aggregate. Removal requires an
+exact canonical trailing suffix, including its raw wire encoding; unknown or
+noncanonical metadata cannot be discarded by a matching decoded projection.
+Existing selected fields and new attribution are validated and published
+atomically under source and target metadata, header, and object limits. This
+physical primitive does not establish format ownership. A format adapter must
+prove its graph and package registry separately. Canonical suffix removal also
+does not promise a byte-exact whole-header inverse: ordinary aggregate
+transitions preserve empty packed occurrences. Source-bound package patches
+retain the original bytes when exact restoration is required.
+
 Serialization is deterministic unless a `Clock`, actor identity, or
 cryptographic RNG is explicitly supplied. Existing timestamps are preserved;
 new files do not consult ambient time, process identity, filesystem metadata, or

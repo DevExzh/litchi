@@ -32554,13 +32554,25 @@ def audit_iwa_numbers_table_cell_control_bridge_source_topology(
             f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
         )
     else:
+        # Parsed-source extraction may move the staged transaction into the
+        # explicitly delegated ``*_with_location`` helper. Keep the marker
+        # checks on the entry point and inspect that helper only when the
+        # entry point actually delegates to it. This preserves the ratchet
+        # against removing a focused stage or verification call while
+        # allowing the helper to own the extracted transaction body.
+        write_bodies = [write_helper]
+        delegated_helper = "commit_exact_focused_data_format_with_location"
+        if delegated_helper in write_helper:
+            delegated_body = _rust_any_function_body(source, delegated_helper)
+            if delegated_body is not None:
+                write_bodies.append(delegated_body)
         for marker in (
             "focused_cell_location",
             "focused_set_data_format",
             "focused_clear_data_format",
             "verify_focused_data_format",
         ):
-            if marker not in write_helper:
+            if not any(marker in body for body in write_bodies):
                 violations.append(
                     "Numbers cell-control write bridge must retain focused "
                     f"dispatch marker {marker}: "

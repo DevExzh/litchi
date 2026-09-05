@@ -3,9 +3,8 @@
 //! The main hidden-axis fixture covers semantic set/clear behavior.  This
 //! companion binary deliberately checks the native objects that are private
 //! to the package owner: existing-helper identity, metadata/member locality,
-//! copy-on-write behavior, and refusal of an inbound/shared formula-owner
-//! edge.  Pages currently edits existing hidden-state owners only; an absent
-//! owner is read as empty and cannot be synthesized by this API.
+//! copy-on-write behavior, indexed owner creation, and refusal of an
+//! inbound/shared formula-owner edge.
 
 mod fixture {
     include!("body_table_hidden_axes.rs");
@@ -83,7 +82,7 @@ mod fixture {
             .clone())
     }
 
-    fn metadata_package(source: &[u8]) -> TestResult<Vec<u8>> {
+    fn audit_metadata_package(source: &[u8]) -> TestResult<Vec<u8>> {
         let catalog = Catalog::from_bytes(source)?;
         let document = catalog
             .iter()
@@ -240,25 +239,83 @@ mod fixture {
     }
 
     #[test]
-    fn absent_owner_refuses_creation_and_preserves_cow() -> TestResult {
+    fn ownerless_creation_preserves_cow_and_inverse() -> TestResult {
         let source = normal_package()?;
         let package = Package::from_bytes(&source)?;
-        let source_ids = archive_object_ids(&document_archive(&source)?);
+        let source_archive = document_archive(&source)?;
+        let source_ids = archive_object_ids(&source_archive);
         let before = package.exact_bytes();
         let requested = HiddenAxes::new([AxisIndex::row(0), AxisIndex::column(3)])?;
-        let result = package
+        let commit = package
             .edit_body_table_hidden_axes(1usize)?
             .set(requested)
-            .commit();
-        assert!(matches!(
-            result,
-            Err(Error::UnsupportedDependency | Error::UnsupportedSource)
-        ));
+            .commit()?;
         assert_eq!(package.exact_bytes(), before);
         assert_eq!(
             archive_object_ids(&document_archive(&package.exact_bytes())?),
             source_ids,
-            "refusing an absent owner must not allocate helper objects"
+            "owner creation must use copy-on-write"
+        );
+        let target = commit.package().exact_bytes();
+        let target_archive = document_archive(&target)?;
+        let target_ids = archive_object_ids(&target_archive);
+        let mut added_ids = target_ids
+            .difference(&source_ids)
+            .copied()
+            .collect::<Vec<_>>();
+        added_ids.sort_unstable();
+        assert_eq!(added_ids.len(), 4, "owner creation must add four helpers");
+        assert_eq!(target_ids.len(), source_ids.len() + 4);
+        for identifier in &source_ids {
+            let source_object = source_archive
+                .object(*identifier)
+                .ok_or("source object disappeared")?;
+            let target_object = target_archive
+                .object(*identifier)
+                .ok_or("existing object disappeared from candidate")?;
+            if *identifier == table_drawable(1) || *identifier == table_model(1) {
+                continue;
+            }
+            assert!(
+                source_object.same_content_ignoring_offsets(target_object),
+                "existing object {identifier} changed during owner creation"
+            );
+        }
+        let helper_types = added_ids
+            .iter()
+            .map(|identifier| {
+                target_archive
+                    .object(*identifier)
+                    .and_then(|object| object.messages.first())
+                    .map(|message| message.type_)
+                    .ok_or_else(|| "created helper is missing its message".into())
+            })
+            .collect::<TestResult<Vec<_>>>()?;
+        assert_eq!(
+            helper_types
+                .iter()
+                .filter(|message_type| **message_type == HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE)
+                .count(),
+            2
+        );
+        assert_eq!(
+            helper_types
+                .iter()
+                .filter(|message_type| **message_type == FILTER_SET_MESSAGE_TYPE)
+                .count(),
+            2
+        );
+        assert_eq!(
+            commit.package().body_table_hidden_axes(1usize)?,
+            HiddenAxes::new([AxisIndex::row(0), AxisIndex::column(3)])?
+        );
+        let restored = commit
+            .package()
+            .apply_body_table_hidden_axes(&commit.patch().inverse())?;
+        assert_eq!(restored.package().exact_bytes(), source);
+        assert_eq!(
+            archive_object_ids(&document_archive(&restored.package().exact_bytes())?),
+            source_ids
         );
 
         let noop = package
@@ -383,7 +440,7 @@ mod fixture {
 
     #[test]
     fn existing_owner_rewrite_preserves_unrelated_metadata_exactly() -> TestResult {
-        let source = metadata_package(&normal_package()?)?;
+        let source = audit_metadata_package(&normal_package()?)?;
         let entry_snapshots_before = unchanged_entry_snapshots(&source)?;
         let package = Package::from_bytes(&source)?;
         let metadata_before = member_bytes(&source, AUDIT_METADATA_MEMBER)?;
@@ -411,7 +468,7 @@ mod fixture {
     }
 
     #[test]
-    fn absent_owner_refusal_does_not_scan_or_allocate_near_max_ids() -> TestResult {
+    fn ownerless_creation_refuses_exhausted_identifier_space_without_mutation() -> TestResult {
         let source = add_identifier(&normal_package()?, u64::MAX)?;
         let package = Package::from_bytes(&source)?;
         let before = package.exact_bytes();
@@ -421,7 +478,10 @@ mod fixture {
             .commit();
         assert!(matches!(
             result,
-            Err(Error::UnsupportedDependency | Error::UnsupportedSource)
+            Err(Error::LimitExceeded {
+                kind: BodyTableHiddenAxesLimitKind::PayloadObjects,
+                ..
+            })
         ));
         assert_eq!(package.exact_bytes(), before);
         Ok(())

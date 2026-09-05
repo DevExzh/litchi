@@ -11,7 +11,10 @@ use litchi_iwa_common::table::cell::{
     layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment},
 };
 use litchi_iwa_protos::table_dimension_codec as neutral_dimension_codec;
-use litchi_numbers::cell::data_format::number::{DecimalPlaces, NegativeStyle, ThousandsSeparator};
+use litchi_numbers::cell::data_format::number::{
+    CurrencyCode, CurrencyStyle, DecimalPlaces, FixedDecimalPlaces, FractionAccuracy,
+    NegativeStyle, ThousandsSeparator,
+};
 use litchi_numbers::cell::data_format::numeral_system::{
     Base, FixedPlaces, NegativeStyle as NumeralSystemNegativeStyle, Places,
 };
@@ -258,6 +261,20 @@ fn set_test_table_locked(editor: &mut NumbersEditor) {
 
 fn cell_number(value: f64) -> CellValue {
     CellValue::number(value).expect("finite test number")
+}
+
+fn focused_test_cell_value(editor: &NumbersEditor, row: usize, column: usize) -> Option<CellValue> {
+    let focused = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    focused
+        .table_cell(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::try_from_usize(row, column).unwrap(),
+        )
+        .unwrap()
+        .storage()
+        .value()
+        .cloned()
 }
 
 fn cached_number(value: f64) -> FormulaCachedValue {
@@ -3728,6 +3745,527 @@ fn focused_number_format_edit_round_trips_through_legacy_host_writer() {
     assert_eq!(edited_bytes, focused_bytes);
     assert_eq!(
         editor.table_cell_data_format(table_id, 2, 1).unwrap(),
+        DataFormat::Number(number)
+    );
+}
+
+#[test]
+fn exact_control_to_number_preserves_boolean_against_compatibility_writer() {
+    let mut source_editor = NumbersDocumentBuilder::new()
+        .table_name("Focused control scalar transition")
+        .table_dimensions(3, 3)
+        .build()
+        .unwrap();
+    let table_id = source_editor.tables().unwrap().remove(0).id();
+    crate::numbers::editor::set_cell_fixture(
+        &mut source_editor,
+        table_id,
+        1,
+        1,
+        CellValue::Boolean(true),
+    )
+    .unwrap();
+    source_editor
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Checkbox(Checkbox))
+        .unwrap();
+    let source_bytes = source_editor.to_bytes().unwrap();
+    let number = Number::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+    );
+
+    // Recreate the previous host route: release the focused control owner,
+    // then let the compatibility scalar writer publish Number metadata.
+    let expected = NumbersEditor::from_bytes(&source_bytes).unwrap();
+    let mut expected = expected;
+    expected
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
+        .unwrap();
+    super::cell_data_format::set_cell_data_format(
+        &mut expected.package,
+        table_id,
+        1,
+        1,
+        &DataFormat::Number(number),
+    )
+    .unwrap();
+    let expected = NumbersEditor::from_bytes(&expected.to_bytes().unwrap()).unwrap();
+
+    let mut actual = NumbersEditor::from_bytes(&source_bytes).unwrap();
+    actual
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Number(number))
+        .unwrap();
+
+    assert_eq!(
+        actual.table_cell_data_format(table_id, 1, 1).unwrap(),
+        expected.table_cell_data_format(table_id, 1, 1).unwrap()
+    );
+    assert_eq!(
+        focused_test_cell_value(&actual, 1, 1),
+        focused_test_cell_value(&expected, 1, 1)
+    );
+    assert_eq!(
+        focused_test_cell_value(&actual, 1, 1),
+        Some(CellValue::Boolean(true))
+    );
+
+    // Currency is deliberately outside the focused admission set for this
+    // Boolean storage shape; preserve the established compatibility result
+    // instead of coercing the value to a number.
+    let currency = Currency::new(
+        CurrencyCode::USD,
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+        CurrencyStyle::Standard,
+    );
+    let expected_currency = NumbersEditor::from_bytes(&source_bytes).unwrap();
+    let mut expected_currency = expected_currency;
+    expected_currency
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
+        .unwrap();
+    super::cell_data_format::set_cell_data_format(
+        &mut expected_currency.package,
+        table_id,
+        1,
+        1,
+        &DataFormat::Currency(currency),
+    )
+    .unwrap();
+    let expected_currency =
+        NumbersEditor::from_bytes(&expected_currency.to_bytes().unwrap()).unwrap();
+    let mut actual_currency = NumbersEditor::from_bytes(&source_bytes).unwrap();
+    actual_currency
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Currency(currency))
+        .unwrap();
+    assert_eq!(
+        actual_currency
+            .table_cell_data_format(table_id, 1, 1)
+            .unwrap(),
+        expected_currency
+            .table_cell_data_format(table_id, 1, 1)
+            .unwrap()
+    );
+    assert_eq!(
+        focused_test_cell_value(&actual_currency, 1, 1),
+        focused_test_cell_value(&expected_currency, 1, 1)
+    );
+    assert_eq!(
+        focused_test_cell_value(&actual_currency, 1, 1),
+        Some(CellValue::Boolean(true))
+    );
+}
+
+#[test]
+fn nonnumeric_controls_to_scientific_keep_compatibility_writer() {
+    let scientific = Scientific::new(FixedDecimalPlaces::new(3).unwrap());
+
+    let mut checkbox_source = NumbersDocumentBuilder::new()
+        .table_name("Boolean scientific compatibility")
+        .table_dimensions(3, 3)
+        .build()
+        .unwrap();
+    let table_id = checkbox_source.tables().unwrap().remove(0).id();
+    crate::numbers::editor::set_cell_fixture(
+        &mut checkbox_source,
+        table_id,
+        1,
+        1,
+        CellValue::Boolean(true),
+    )
+    .unwrap();
+    checkbox_source
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Checkbox(Checkbox))
+        .unwrap();
+    let checkbox_bytes = checkbox_source.to_bytes().unwrap();
+
+    // A Checkbox cell with Boolean storage remains on the compatibility route
+    // when Scientific is requested. Compare the complete package with the
+    // previous two-owner route: focused clear, then the generic writer.
+    let mut expected = NumbersEditor::from_bytes(&checkbox_bytes).unwrap();
+    expected
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
+        .unwrap();
+    super::cell_data_format::set_cell_data_format(
+        &mut expected.package,
+        table_id,
+        1,
+        1,
+        &DataFormat::Scientific(scientific),
+    )
+    .unwrap();
+    let expected = NumbersEditor::from_bytes(&expected.to_bytes().unwrap()).unwrap();
+
+    let mut actual = NumbersEditor::from_bytes(&checkbox_bytes).unwrap();
+    actual
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Scientific(scientific))
+        .unwrap();
+    assert_eq!(actual.to_bytes().unwrap(), expected.to_bytes().unwrap());
+    assert_eq!(
+        focused_test_cell_value(&actual, 1, 1),
+        Some(CellValue::Boolean(true))
+    );
+    assert_eq!(
+        actual.table_cell_data_format(table_id, 1, 1).unwrap(),
+        DataFormat::Scientific(scientific)
+    );
+
+    // The focused control-to-Number owner can leave Boolean storage under a
+    // Number format. Scientific must still reject that shape before owner
+    // selection, matching a direct generic writer on the Number source.
+    let number = Number::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+    );
+    let mut number_source = NumbersEditor::from_bytes(&checkbox_bytes).unwrap();
+    number_source
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Number(number))
+        .unwrap();
+    let number_bytes = number_source.to_bytes().unwrap();
+    let mut expected = NumbersEditor::from_bytes(&number_bytes).unwrap();
+    super::cell_data_format::set_cell_data_format(
+        &mut expected.package,
+        table_id,
+        1,
+        1,
+        &DataFormat::Scientific(scientific),
+    )
+    .unwrap();
+    let expected = NumbersEditor::from_bytes(&expected.to_bytes().unwrap()).unwrap();
+    let mut actual = NumbersEditor::from_bytes(&number_bytes).unwrap();
+    actual
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Scientific(scientific))
+        .unwrap();
+    assert_eq!(actual.to_bytes().unwrap(), expected.to_bytes().unwrap());
+    assert_eq!(
+        focused_test_cell_value(&actual, 1, 1),
+        Some(CellValue::Boolean(true))
+    );
+
+    let mut text_source = NumbersDocumentBuilder::new()
+        .table_name("Text scientific compatibility")
+        .table_dimensions(3, 3)
+        .build()
+        .unwrap();
+    let text_table_id = text_source.tables().unwrap().remove(0).id();
+    crate::numbers::editor::set_cell_fixture(
+        &mut text_source,
+        text_table_id,
+        1,
+        1,
+        CellValue::Text("Selected".to_owned()),
+    )
+    .unwrap();
+    // This is the exact compatibility state that exposed the regression: a
+    // Number display owner can coexist with text storage, while the prior
+    // host writer still permits the subsequent Scientific transition.
+    text_source
+        .set_table_cell_data_format(text_table_id, 1, 1, DataFormat::Number(number))
+        .unwrap();
+    let text_bytes = text_source.to_bytes().unwrap();
+    let text_exact = NumbersEditor::from_bytes(&text_bytes).unwrap();
+    assert_eq!(
+        focused_test_cell_value(&text_exact, 1, 1),
+        Some(CellValue::Text("Selected".to_owned()))
+    );
+
+    let mut expected = NumbersEditor::from_bytes(&text_bytes).unwrap();
+    super::cell_data_format::set_cell_data_format(
+        &mut expected.package,
+        text_table_id,
+        1,
+        1,
+        &DataFormat::Scientific(scientific),
+    )
+    .unwrap();
+    let expected = NumbersEditor::from_bytes(&expected.to_bytes().unwrap()).unwrap();
+    let mut actual = NumbersEditor::from_bytes(&text_bytes).unwrap();
+    actual
+        .set_table_cell_data_format(text_table_id, 1, 1, DataFormat::Scientific(scientific))
+        .unwrap();
+    assert_eq!(actual.to_bytes().unwrap(), expected.to_bytes().unwrap());
+    assert_eq!(
+        focused_test_cell_value(&actual, 1, 1),
+        focused_test_cell_value(&expected, 1, 1)
+    );
+    assert_eq!(
+        actual.table_cell_data_format(text_table_id, 1, 1).unwrap(),
+        DataFormat::Scientific(scientific)
+    );
+}
+
+#[test]
+fn nonnumeric_formula_caches_keep_compatibility_numeric_routes() {
+    let currency = Currency::new(
+        CurrencyCode::USD,
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+        CurrencyStyle::Standard,
+    );
+    let scientific = Scientific::new(FixedDecimalPlaces::new(3).unwrap());
+    let cached_values = vec![
+        FormulaCachedValue::Boolean(true),
+        FormulaCachedValue::date(123.0).unwrap(),
+        FormulaCachedValue::duration(45.0).unwrap(),
+        FormulaCachedValue::Text("cached text".to_owned()),
+    ];
+
+    for cached_value in cached_values {
+        let mut source = NumbersDocumentBuilder::new()
+            .table_name("Nonnumeric formula cache")
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let table_id = source.tables().unwrap().remove(0).id();
+        source
+            .set_formula_with_cached_value(
+                table_id,
+                1,
+                1,
+                FormulaExpression::function(
+                    "SUM",
+                    [
+                        FormulaExpression::Number(19.0),
+                        FormulaExpression::Number(23.0),
+                    ],
+                ),
+                cached_value,
+            )
+            .unwrap();
+        let source_bytes = source.to_bytes().unwrap();
+        let source_editor = NumbersEditor::from_bytes(&source_bytes).unwrap();
+        let before_value = focused_test_cell_value(&source_editor, 1, 1);
+        let before_cache = cached_formula_scalar(&source_editor, table_id, 1, 1);
+        assert!(matches!(before_value.as_ref(), Some(CellValue::Formula(_))));
+        assert_eq!(
+            source_editor
+                .table_cell_data_format(table_id, 1, 1)
+                .unwrap(),
+            DataFormat::Automatic
+        );
+        assert!(!matches!(
+            before_cache,
+            crate::numbers::bnc::CachedScalar::Number(_)
+        ));
+
+        for target in [
+            DataFormat::Currency(currency),
+            DataFormat::Scientific(scientific),
+        ] {
+            let mut expected = NumbersEditor::from_bytes(&source_bytes).unwrap();
+            super::cell_data_format::set_cell_data_format(
+                &mut expected.package,
+                table_id,
+                1,
+                1,
+                &target,
+            )
+            .unwrap();
+            let expected = NumbersEditor::from_bytes(&expected.to_bytes().unwrap()).unwrap();
+
+            let mut actual = NumbersEditor::from_bytes(&source_bytes).unwrap();
+            actual
+                .set_table_cell_data_format(table_id, 1, 1, target.clone())
+                .unwrap();
+            assert_eq!(actual.to_bytes().unwrap(), expected.to_bytes().unwrap());
+            assert_eq!(focused_test_cell_value(&actual, 1, 1), before_value);
+            assert_eq!(
+                cached_formula_scalar(&actual, table_id, 1, 1),
+                cached_formula_scalar(&expected, table_id, 1, 1)
+            );
+            assert_eq!(
+                actual.table_cell_data_format(table_id, 1, 1).unwrap(),
+                target
+            );
+        }
+    }
+}
+
+#[test]
+fn exact_number_to_currency_matches_focused_stages_and_preserves_value() {
+    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/basic.numbers");
+    let mut editor = NumbersEditor::open(fixture).unwrap();
+    let table_id = editor.tables().unwrap().remove(0).id();
+    let number = Number::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+    );
+    editor
+        .set_table_cell_data_format(table_id, 2, 1, DataFormat::Number(number))
+        .unwrap();
+    let source_bytes = editor.to_bytes().unwrap();
+    let source = FocusedNumbersPackage::from_bytes(&source_bytes).unwrap();
+    let position = CellPosition::new(2, 1);
+    let before_value = source
+        .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
+        .unwrap()
+        .storage()
+        .value()
+        .cloned();
+    let currency = Currency::new(
+        CurrencyCode::USD,
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+        CurrencyStyle::Standard,
+    );
+
+    let cleared = source
+        .edit_table_cell_number_format(SheetSelector::index(0), TableSelector::index(0), position)
+        .unwrap()
+        .clear()
+        .commit()
+        .unwrap();
+    let focused_commit = cleared
+        .package()
+        .edit_table_cell_currency_format(SheetSelector::index(0), TableSelector::index(0), position)
+        .unwrap()
+        .set(currency)
+        .commit()
+        .unwrap();
+    let mut focused_bytes = Vec::new();
+    focused_commit
+        .package()
+        .write_to(&mut focused_bytes)
+        .unwrap();
+
+    editor
+        .set_table_cell_data_format(table_id, 2, 1, DataFormat::Currency(currency))
+        .unwrap();
+    let edited_bytes = editor.to_bytes().unwrap();
+    if let Some(path) = std::env::var_os("LITCHI_NUMBERS_CURRENCY_HOST_PROBE_OUTPUT") {
+        std::fs::write(path, &edited_bytes).unwrap();
+    }
+    assert_eq!(edited_bytes, focused_bytes);
+    assert_eq!(focused_test_cell_value(&editor, 2, 1), before_value);
+    assert_eq!(
+        editor.table_cell_data_format(table_id, 2, 1).unwrap(),
+        DataFormat::Currency(currency)
+    );
+}
+
+#[test]
+fn exact_numeric_cross_family_transitions_preserve_typed_value() {
+    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/basic.numbers");
+    let mut editor = NumbersEditor::open(fixture).unwrap();
+    let table_id = editor.tables().unwrap().remove(0).id();
+    let number = Number::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+    );
+    editor
+        .set_table_cell_data_format(table_id, 2, 1, DataFormat::Number(number))
+        .unwrap();
+    let before_value = focused_test_cell_value(&editor, 2, 1);
+    let percentage = Percentage::new(
+        DecimalPlaces::fixed(1).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Hidden,
+    );
+    let currency = Currency::new(
+        CurrencyCode::EUR,
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+        CurrencyStyle::Accounting,
+    );
+    let scientific = Scientific::new(FixedDecimalPlaces::new(3).unwrap());
+    let fraction = Fraction::new(FractionAccuracy::UpToThreeDigits);
+    let targets = [
+        DataFormat::Percentage(percentage),
+        DataFormat::Currency(currency),
+        DataFormat::Scientific(scientific),
+        DataFormat::Fraction(fraction),
+        DataFormat::Number(number),
+    ];
+
+    for target in targets {
+        editor
+            .set_table_cell_data_format(table_id, 2, 1, target.clone())
+            .unwrap();
+        assert_eq!(
+            editor.table_cell_data_format(table_id, 2, 1).unwrap(),
+            target
+        );
+        assert_eq!(focused_test_cell_value(&editor, 2, 1), before_value);
+    }
+}
+
+#[test]
+fn exact_formula_numeric_transitions_preserve_formula_and_cached_value() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_name("Focused formula scalar transition")
+        .table_dimensions(3, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap().remove(0).id();
+    editor
+        .set_formula_with_cached_value(
+            table_id,
+            1,
+            1,
+            FormulaExpression::function(
+                "SUM",
+                [
+                    FormulaExpression::Number(19.0),
+                    FormulaExpression::Number(23.0),
+                ],
+            ),
+            cached_number(42.0),
+        )
+        .unwrap();
+    let number = Number::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+    );
+    // The generated package starts on the compatibility owner.  Materialize
+    // its initial Number format before reopening the exact source exercised
+    // by the focused transition owner.
+    editor
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Number(number))
+        .unwrap();
+    let source_bytes = editor.to_bytes().unwrap();
+    let mut exact = NumbersEditor::from_bytes(&source_bytes).unwrap();
+    let before_formula = focused_test_cell_value(&exact, 1, 1);
+    let before_cache = cached_formula_scalar(&exact, table_id, 1, 1);
+    assert!(matches!(
+        before_formula.as_ref(),
+        Some(CellValue::Formula(_))
+    ));
+    assert_eq!(before_cache, cached_scalar_number(42.0));
+
+    let currency = Currency::new(
+        CurrencyCode::USD,
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Shown,
+        CurrencyStyle::Standard,
+    );
+    exact
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Currency(currency))
+        .unwrap();
+    assert_eq!(focused_test_cell_value(&exact, 1, 1), before_formula);
+    assert_eq!(cached_formula_scalar(&exact, table_id, 1, 1), before_cache);
+    assert_eq!(
+        exact.table_cell_data_format(table_id, 1, 1).unwrap(),
+        DataFormat::Currency(currency)
+    );
+
+    exact
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Number(number))
+        .unwrap();
+    assert_eq!(focused_test_cell_value(&exact, 1, 1), before_formula);
+    assert_eq!(cached_formula_scalar(&exact, table_id, 1, 1), before_cache);
+    assert_eq!(
+        exact.table_cell_data_format(table_id, 1, 1).unwrap(),
         DataFormat::Number(number)
     );
 }
