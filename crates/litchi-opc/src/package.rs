@@ -331,6 +331,38 @@ impl OpcPackage {
         Self::from_owned_bytes_with_limits(data, limits)
     }
 
+    /// Load an owned OPC package while opportunistically reusing matching
+    /// payload allocations from an already opened package.
+    ///
+    /// The new archive still goes through the complete physical-package and
+    /// package-reader validation and decompression path.  For each part, the
+    /// donor payload is selected only when its content type and bytes match
+    /// the newly decoded payload, agrees with the donor's visible bytes,
+    /// and its vector capacity is no larger. A
+    /// failed comparison simply keeps the newly decoded allocation, so this
+    /// optimization never changes package semantics.  Donor metadata,
+    /// relationship state, save options, and source authorization are not
+    /// carried into the returned package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the new archive violates `limits` or is not a
+    /// valid OPC package.  The donor is used only after those checks and does
+    /// not relax any read or allocation limit.
+    pub fn from_vec_reusing_payloads(
+        data: Vec<u8>,
+        limits: ReadLimits,
+        donor: &Self,
+    ) -> Result<Self> {
+        let mut package = {
+            let phys_reader = PhysPkgReader::new_with_limits(&data, limits)?;
+            let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
+            Self::unmarshal_with_payload_donor(pkg_reader, Some(donor))?
+        };
+        package.authorize_owned_source(data);
+        Ok(package)
+    }
+
     /// Moves an owned ZIP archive into an explicitly scheduled eager open.
     ///
     /// This additive advanced API retains exact owned-source authorization on
@@ -393,7 +425,14 @@ impl OpcPackage {
     /// and relationships into the in-memory object graph.
     ///
     /// Optimized to minimize clones by consuming the package reader and moving data.
-    pub(crate) fn unmarshal(mut pkg_reader: PackageReader) -> Result<Self> {
+    pub(crate) fn unmarshal(pkg_reader: PackageReader) -> Result<Self> {
+        Self::unmarshal_with_payload_donor(pkg_reader, None)
+    }
+
+    fn unmarshal_with_payload_donor(
+        mut pkg_reader: PackageReader,
+        donor: Option<&Self>,
+    ) -> Result<Self> {
         let mut package = Self::new();
 
         // Get ownership of package relationships, parts, and non-part members
@@ -414,10 +453,26 @@ impl OpcPackage {
         // Create all parts - move data instead of cloning
         for spart in sparts {
             let partname = spart.partname.clone(); // Need to clone partname for the HashMap key
+            let blob = donor
+                .and_then(|donor| donor.parts.get(&partname))
+                .filter(|donor_part| donor_part.content_type() == spart.content_type.as_str())
+                .and_then(|donor_part| {
+                    let blob = donor_part.blob_arc();
+                    let visible = donor_part.blob();
+                    // Built-in parts take the pointer fast path. A custom
+                    // part cannot donate storage inconsistent with its blob.
+                    (std::ptr::eq(blob.as_slice(), visible) || blob.as_slice() == visible)
+                        .then_some(blob)
+                })
+                .filter(|donor_blob| {
+                    donor_blob.capacity() <= spart.blob.capacity()
+                        && donor_blob.as_slice() == spart.blob.as_slice()
+                })
+                .unwrap_or(spart.blob);
             let mut part = PartFactory::load_shared(
                 spart.partname,     // Move
                 spart.content_type, // Move
-                spart.blob,         // Move the shared decompressed payload
+                blob,               // Move the selected shared decompressed payload
             )?;
 
             // Reserve the complete incoming relationship collection before
@@ -1174,6 +1229,9 @@ impl OpcPackage {
         self.exact_source_authorized = true;
     }
 }
+
+#[cfg(test)]
+mod payload_reuse_tests;
 
 impl Default for OpcPackage {
     fn default() -> Self {

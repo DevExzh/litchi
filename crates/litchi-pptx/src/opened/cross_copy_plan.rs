@@ -1059,7 +1059,17 @@ fn build_candidate(
         staged.set_blob(xml);
     }
     let serialized = bounded_package_bytes(&candidate, archive_limit)?;
-    let reopened = OpcPackage::from_vec(serialized)?;
+    // Clean owned ingress proves the destination has built-in parts. Keep
+    // the existing path for caller-defined parts and revoked authorization.
+    let reopened = if destination.package.is_unmodified_owned_source() {
+        OpcPackage::from_vec_reusing_payloads(
+            serialized,
+            litchi_opc::ReadLimits::default(),
+            &candidate,
+        )?
+    } else {
+        OpcPackage::from_vec(serialized)?
+    };
     let captured = super::model::capture(
         &reopened,
         destination.limits,
