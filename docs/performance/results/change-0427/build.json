@@ -1,0 +1,24 @@
+{
+  "revision": "392a11a1e7fca51ec930adff024b0f7a7f20d4fd",
+  "production_revision": "d2f98b02e1d620c84359604a34c4ffadd9213cf3",
+  "build_receipt": "checks/release-build.json",
+  "build_receipt_sha256": "604ae41d9495390e246d44e821f09c5b01cc68d48bc6acae021cf444e5930858",
+  "source_manifest": {
+    "path": "sources/8680b682b0369d011a6cfb43d6f8c2fed658a07e3f7fdbe4203a60ae798b331a.json",
+    "sha256": "8680b682b0369d011a6cfb43d6f8c2fed658a07e3f7fdbe4203a60ae798b331a",
+    "files": 6629
+  },
+  "original_binary": "tools/perf-baseline/target/release/litchi-perf-baseline-alloc",
+  "capture_binary": "/tmp/litchi-goal-0427-binaries/litchi-perf-baseline-alloc",
+  "binary_sha256": "e48043229d70195d3394631ccbc796f6155747dc070f4ea29963a6d0991a25a1",
+  "binary_bytes": 455072152,
+  "protocol_sha256": "e1dc7443afccfe27db0bd00316cefb37ba61bc127b358128fecdd9623ff674ed",
+  "machine_sha256": "1384a46761bdd016329a2a453765fa10cf67a4acde6dab94d2d0e901c6bde028",
+  "capture_driver_sha256": "b70f412ecc2050c92e43656f59c56f88565fc4aba62bec2054175bb407fc23e9",
+  "verifier_sha256": "06825daaf2b901311fa889796b4206a3980f312903e73aeeba5e446436740a54",
+  "probe_sha256": "6d36f803795304cc72e5234e191a7221bbd69b61e6f233a88649a2277b2097b5",
+  "summary_driver_sha256": "e427a5e161ee607bd767ee6a5727caede90d13af29670c24151ed4f90033c616",
+  "rust_toolchain": "1.98.1",
+  "profile": "release",
+  "scope": "one frozen diagnostic build; no production optimization or before/after speedup"
+}

@@ -5,12 +5,18 @@
   "crud-index": "pass",
   "debug-binaries": "pass",
   "debug-cli-smoke": "pass",
+  "diff-check": "pass",
   "harness-rustdoc": "pass",
   "harness-strict": "failed",
   "harness-tests": "failed",
+  "release-build": "pass",
+  "release-capture": "pass",
   "retention-unit-tests": "pass",
   "rustfmt-final": "failed",
   "rustfmt-verified": "pass",
   "selector-count-corrected": "pass",
-  "smoke-replay-final": "pass"
+  "smoke-replay-final": "pass",
+  "source-frozen": "pass",
+  "summarize-release": "pass",
+  "temporary-cleanup": "pass"
 }

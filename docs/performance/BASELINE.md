@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0427: explicit PPTX allocator drop checkpoints
+
+[0427](changes/0427-pptx-allocator-drop-checkpoints.md) adds a separate allocator
+journal for opening, planning, publication and explicit caller drops. Eight
+fresh release processes retain 240 samples; every final sink-drop point equals
+its entry callback live-byte value, and phase changes match across repeats.
+The [resource review](results/change-0427/resource-review.md) distinguishes
+owned snapshots, consumed source-backed editors, remaining caller source Arcs
+and the sink. This is descriptive current-API evidence with no optimization,
+RSS-release, cache-eviction, managed-budget or leak claim. Portable replay and
+mutation probes pass; the full cache/near-limit and non-iWork goals remain open.
+
 ## Change 0424: validated staged PPTX payload reuse
 
 [0424](changes/0424-staged-pptx-payload-reuse.md) shares independently staged

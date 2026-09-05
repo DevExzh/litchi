@@ -1,0 +1,50 @@
+{
+  "name": "plain-owned-r2",
+  "corpus": "plain",
+  "api": "owned",
+  "repeat": "R2",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0427/capture/plain-owned-r2-resource.log",
+    "/tmp/litchi-goal-0427-binaries/litchi-perf-baseline-alloc",
+    "retention",
+    "--api",
+    "owned",
+    "--corpus",
+    "plain",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "392a11a1e7fca51ec930adff024b0f7a7f20d4fd",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0427/capture/plain-owned-r2.json"
+  ],
+  "revision": "392a11a1e7fca51ec930adff024b0f7a7f20d4fd",
+  "binary_sha256": "e48043229d70195d3394631ccbc796f6155747dc070f4ea29963a6d0991a25a1",
+  "protocol_sha256": "e1dc7443afccfe27db0bd00316cefb37ba61bc127b358128fecdd9623ff674ed",
+  "started_utc": "2026-09-05T21:09:55.349006+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T21:09:55.975456+00:00",
+  "artifacts": {
+    "capture/plain-owned-r2.json": {
+      "sha256": "a157412fa650a0fedbcacd6b99f4680279b623d28910b89df8d55297c337bf56",
+      "bytes": 127554
+    },
+    "capture/plain-owned-r2.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "capture/plain-owned-r2-resource.log": {
+      "sha256": "b8f13eec18f816c6651f28a88a4a4c70c317b7c839448e022e4e33668f32fe7e",
+      "bytes": 992
+    }
+  }
+}

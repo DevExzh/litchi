@@ -1,0 +1,50 @@
+{
+  "name": "media-rich-owned-r2",
+  "corpus": "media-rich",
+  "api": "owned",
+  "repeat": "R2",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0427/capture/media-rich-owned-r2-resource.log",
+    "/tmp/litchi-goal-0427-binaries/litchi-perf-baseline-alloc",
+    "retention",
+    "--api",
+    "owned",
+    "--corpus",
+    "media-rich",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "392a11a1e7fca51ec930adff024b0f7a7f20d4fd",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0427/capture/media-rich-owned-r2.json"
+  ],
+  "revision": "392a11a1e7fca51ec930adff024b0f7a7f20d4fd",
+  "binary_sha256": "e48043229d70195d3394631ccbc796f6155747dc070f4ea29963a6d0991a25a1",
+  "protocol_sha256": "e1dc7443afccfe27db0bd00316cefb37ba61bc127b358128fecdd9623ff674ed",
+  "started_utc": "2026-09-05T21:10:52.744776+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T21:11:20.041271+00:00",
+  "artifacts": {
+    "capture/media-rich-owned-r2.json": {
+      "sha256": "2f3c5dfd153aba1df9bafaab2ad3845c97507a0455c6760ec4773ea176bbe7b1",
+      "bytes": 130223
+    },
+    "capture/media-rich-owned-r2.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "capture/media-rich-owned-r2-resource.log": {
+      "sha256": "7a9aa8893a41b78a33f7d36d5c66d9a87d2020d34dbf17a6091ec7aee00fdcf3",
+      "bytes": 1008
+    }
+  }
+}

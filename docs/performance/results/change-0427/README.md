@@ -33,6 +33,33 @@ and protocol bindings, and runs the declared matrix serially. Report replay and
 mutation probes are independent Python programs; no original executable is
 needed to validate retained observations after task-temporary cleanup.
 
+## Captured observations
+
+The release capture is bound to harness revision
+`392a11a1e7fca51ec930adff024b0f7a7f20d4fd` and executable SHA-256
+`e48043229d70195d3394631ccbc796f6155747dc070f4ea29963a6d0991a25a1`.
+Eight fresh processes retain 240 samples, plus 24 validated warmups. Exact
+output equality succeeds in all 264 iterations. The [table](result-table.md),
+[raw-derived summary](summary.json), and [resource review](resource-review.md)
+retain every boundary and distinguish point values from the whole-probe peak.
+
+All 240 final sink-drop points equal their own entry live-byte value. Phase
+changes are identical within each process and across its two repeats, so no
+repeat row crosses the 5% review threshold. The media-rich publication delta
+is 160.719714 MiB for owned and 118.309136 MiB for source-backed; these have
+different live owner sets and are descriptive API observations. At document
+drop the source-backed caller still holds the input sources and sink. Dropping
+its caller source Arcs changes callback live bytes by −33,631,741 B, followed
+by the sink drop returning the delta to zero. This does not prove RSS release,
+cache eviction, absence of leaks, or a matched optimization improvement.
+
+`verify.py --portable` replays reports, source/build custody, summaries,
+compression and the complete inventory using only an exported bundle. Each
+full replay rejects 160 report mutations (20 per report), plus explicit
+portable mutations of the pinned validator and a valid-shaped output digest
+in one repeat. The four debug reports separately pass 80 final report probes.
+The original executable is not needed for this replay.
+
 ## Pre-capture validation
 
 The complete harness command retained 287 passes, one failure and one ignored
@@ -54,3 +81,19 @@ Warning-denied documentation passes. Strict Clippy retains exactly the prior
 Formatting initially found the new module declaration out of order; pinned
 rustfmt corrected it and the final format check passes. These failures and
 corrections are retained without warning suppressions or production changes.
+
+## Reproduction
+
+The build receipt and per-process capture receipts retain exact commands.
+`prepare-build.py` copies the release executable into a new task directory;
+`capture.py` refuses existing outputs and runs the declared matrix.
+To replay the committed evidence without rebuilding:
+
+```sh
+python3 -B docs/performance/results/change-0427/verify.py --portable
+```
+
+The final bundle retains 20 command receipts and 114 inventoried files plus
+`SHA256SUMS`. All 36 logs are losslessly compressed with original and stored
+hashes. Post-cleanup portable replay passes after removal of the hash-bound
+copied executable; the root and harness build directories remain intact.

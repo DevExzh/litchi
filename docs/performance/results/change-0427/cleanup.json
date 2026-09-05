@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "removed_directory": "/tmp/litchi-goal-0427-binaries",
+  "removed_binary_sha256": "e48043229d70195d3394631ccbc796f6155747dc070f4ea29963a6d0991a25a1",
+  "temporary_directory_absent": true,
+  "original_build_binary_retained": true,
+  "root_target_retained": true,
+  "harness_target_retained": true
+}

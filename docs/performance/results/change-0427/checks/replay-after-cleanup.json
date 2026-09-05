@@ -1,0 +1,23 @@
+{
+  "status": "pass",
+  "phase": "after copied executable cleanup",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0427/verify.py",
+    "--portable"
+  ],
+  "wrapper_sha256": "5164a5f79925edbc8a93ecdcc5db44cb25a2deb6964021ecf1b8f6799aa7b9a2",
+  "result": {
+    "status": "pass",
+    "command_receipts": 20,
+    "processes": 8,
+    "samples": 240,
+    "inventory_files": 114,
+    "performance_claim": null,
+    "portable_export": "pass; copied executable not needed",
+    "pinned_validator_mutation": "rejected",
+    "valid_digest_repeat_output_mutation": "rejected"
+  },
+  "copied_executable_absent": true
+}
