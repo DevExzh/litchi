@@ -1,5 +1,25 @@
 # Performance program phase report
 
+## Change 0421: allocator high-water correction
+
+[0421](changes/0421-allocator-peak-counter.md) fixes a benchmark counter that
+used pre-allocation live bytes when updating the process peak. Historical
+`peak_live_bytes_*` numbers and derived differences require corrected captures;
+raw reports remain unchanged. Live-byte totals, allocation request counts and
+bytes, normal timing, RSS and independent Heaptrack metrics are unaffected by
+this specific defect. New allocator reports carry `post_update_peak_v2`,
+preventing comparison with markerless historical reports under one policy.
+
+The recent owned PPTX lifecycle work retains distinct findings:
+[0418](changes/0418-pptx-cross-copy-candidate-reuse.md) establishes the scoped
+latency result, [0419](changes/0419-pptx-bounded-archive-growth.md) reduces
+cumulative allocation requests, and [0420](changes/0420-opc-owned-payload-reuse.md)
+reduces media-rich live-after bytes by 17.518% and whole-process RSS by about
+9.1–9.3%. The plain 0420 p99 regression of 5.215% in one diagnostic pair remains
+an accepted, disclosed tradeoff. Its faulty allocator high-water comparison
+is withdrawn pending corrected paired captures. These findings do not complete
+the broader non-iWork program.
+
 ## Change 0413: exact CFB scratch reservation
 
 [0413](changes/0413-cfb-chain-scratch-reservation.md) removes a redundant

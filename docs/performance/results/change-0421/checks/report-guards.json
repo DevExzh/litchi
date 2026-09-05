@@ -1,0 +1,22 @@
+{
+  "change": 421,
+  "checks": {
+    "chronological_peak_decrease": {
+      "diagnostic": "guard_probe violates peak/live or monotonic-peak invariants",
+      "rejected": true
+    },
+    "elapsed_sorted_vectors_restore_chronology": true,
+    "missing_counter_revision": {
+      "diagnostic": "guard_probe.tool is not the post_update_peak_v2 allocator identity",
+      "rejected": true
+    },
+    "peak_below_live": {
+      "diagnostic": "guard_probe violates peak/live or monotonic-peak invariants",
+      "rejected": true
+    },
+    "unmodified_real_report_accepted": true
+  },
+  "classification": "in-memory validator guards; no synthetic measurement",
+  "original_report_sha256": "7a4d41362086fe99d4f3f3d0931e357a9dbab67ef70ceae8f5706bca91809539",
+  "status": "pass"
+}

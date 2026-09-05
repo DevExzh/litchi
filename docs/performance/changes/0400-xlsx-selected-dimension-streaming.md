@@ -1,5 +1,11 @@
 # Change 0400: dimension-bearing XLSX selected-cell streaming and numeric scratch
 
+> Correction (0421): allocator `peak_live_bytes_*` values in this record
+> may under-report peaks and must not support high-water claims.
+> [Counter correction](0421-allocator-peak-counter.md) explains the defect.
+> Live-byte totals, allocation requests, normal timing, RSS and Heaptrack
+> metrics are unaffected by this specific bug. Raw reports are unchanged.
+
 Date: 2026-09-04
 
 Status: accepted scoped production optimization. The retained latency claim is

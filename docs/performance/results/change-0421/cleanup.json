@@ -1,0 +1,52 @@
+{
+  "change": 421,
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "no_batch_temporaries_remain": true,
+  "removed": [
+    "/tmp/litchi-goal-0421-candidate-worktree",
+    "/tmp/litchi-goal-0421-candidate-normal",
+    "/tmp/litchi-goal-0421-candidate-allocator",
+    "/tmp/0421-capture-help.txt",
+    "/tmp/0421-summary-help.txt",
+    "/tmp/fix-0421-verifier.py",
+    "/tmp/make-0421-fixture.py",
+    "/tmp/fixture-0421",
+    "docs/performance/results/change-0421/__pycache__"
+  ],
+  "retained_preflight_inputs": [
+    {
+      "bytes": 1331,
+      "classification": "synthetic script preflight only, not measurement",
+      "path": "/tmp/0421-capture-help.txt",
+      "retained_as": "checks/script-selftest/0421-capture-help.txt.gz",
+      "sha256": "63af9955e33741e0f27b587d515d7c76836133eb15a4a1f47fa8663e9fecf777"
+    },
+    {
+      "bytes": 521,
+      "classification": "synthetic script preflight only, not measurement",
+      "path": "/tmp/0421-summary-help.txt",
+      "retained_as": "checks/script-selftest/0421-summary-help.txt.gz",
+      "sha256": "d6fa45a5a55b0a4ee5fc59654d85f79efbf53a188eb0815d09159ae502913f0c"
+    },
+    {
+      "bytes": 1455,
+      "classification": "synthetic script preflight only, not measurement",
+      "path": "/tmp/fix-0421-verifier.py",
+      "retained_as": "checks/script-selftest/fix-0421-verifier.py.gz",
+      "sha256": "8f3219c0a7843b34c98d4d874f06f897c8c90b8dd4ab35dd94a594a2b535b6ea"
+    },
+    {
+      "bytes": 6174,
+      "classification": "synthetic script preflight only, not measurement",
+      "path": "/tmp/make-0421-fixture.py",
+      "retained_as": "checks/script-selftest/make-0421-fixture.py.gz",
+      "sha256": "a5a6455624997a428c73cc4273a6d3f49324f10ab5703db18062719ff178b0b7"
+    }
+  ],
+  "shared_caches_preserved": [
+    "target",
+    "tools/perf-baseline/target"
+  ],
+  "status": "pass",
+  "synthetic_fixture_inventory": "checks/script-selftest/synthetic-inventory.json"
+}
