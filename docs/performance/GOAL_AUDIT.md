@@ -7,6 +7,22 @@ transport tests and independent large Python OPC corpus narrow the ZIP64 gap;
 semantic streaming, broader append/failure matrices and the performance program
 remain open.
 
+Change [0416](changes/0416-local-zip64-read-preservation.md) adds local-only
+forced-ZIP64 read/preserve compatibility: 13 deterministic Python fixtures, 10
+focused ZIP integration cases, and 7 OPC no-op/edit/failure cases, with strict
+path fuzz coverage. The fixtures cover signed and unsigned descriptors,
+descriptor-signature CRC collision, seekable no-descriptor output, empty and
+many-small members, and central/local or ZIP32-tail combinations. This records
+capability coverage only; the source identity, performance guards, and final
+gate status belong to the 0416 change record. The overall non-iWork goal
+remains open.
+
+The prepared ODF catalog's existing `has_zip64_metadata` observation is based
+on central-directory/tail metadata. It does not classify a seekable local-header
+ZIP64 sentinel when the central and tail metadata remain ordinary. ODF catalog
+parity for that input form, together with semantic, cold/remote, native,
+concurrency/scaling, and broader failure-matrix evidence, remains open.
+
 Change [0414](changes/0414-zip64-output-promotion.md) implements preservation
 output promotion at ZIP32 local-offset and member-count boundaries, including
 OPC provenance for reopened packages above 65,535 members. Generated ZIP64
@@ -22,7 +38,8 @@ of the non-iWork program. Broad scenario, native/cold/remote and scaling gaps
 below remain open.
 
 **Audit date:** 2026-09-05
-**Audit basis:** the 0415 streaming source batch and its retained evidence,
+**Audit basis:** the 0416 local-framing candidate `d18cd04a2` and retained evidence,
+with the 0415 streaming source batch and its retained evidence,
 with the 0414 source batch and its retained verification evidence,
 with the 0413 committed control `6b632726b` and the 0412 captured candidate at
 `63c95bc22d5883c8ecab0872030757e5584254f7`, with the verified 0411 baseline at
@@ -221,9 +238,12 @@ they are synthetic in-memory fixtures. They leave the following gates open:
    corpus and validate all semantic Part bytes, raw member identity, archive
    layout, and reopen behavior. Change 0415 supplies an independently generated
    Python OPC source with a real 4 GiB logical member and a small XML overlay
-   preservation check. Native Office producer coverage and the broader
-   dependency/topology matrix remain open; Python's small forced-ZIP64 local
-   form with ordinary central sizes is a separate reader compatibility gap.
+   preservation check. The 0416 batch adds deterministic Python forced-ZIP64
+   local-framing fixtures and focused ZIP/OPC no-op, edit, and refusal cases;
+   these remain synthetic compatibility evidence, and the final gate status is
+   deferred to its change record. Native Office producer coverage, ODF
+   prepared-catalog classification of local-only sentinels, and the broader
+   dependency/topology matrix remain open.
 5. Expand the scoped gates in
    [`changes/0404-zip64-preservation-integration.md`](changes/0404-zip64-preservation-integration.md)
    to the full non-iWork feature and native-producer matrix. The scoped final
@@ -239,7 +259,7 @@ a normalizing fallback for a different unsupported source.
 
 | Priority | Requirement from `docs/GOAL.md` | Next reviewable evidence |
 | --- | --- | --- |
-| P0 | Close the ZIP64 integration and preservation contract | 0414 adds offset/count promotion and repeated OPC publication beyond the count sentinel. 0415 adds streaming Deflate framing and independent large Python OPC coverage. Semantic bounded-memory creation/append, native producers, small forced-ZIP64 input compatibility and the broader failure-atomicity matrix remain open. |
+| P0 | Close the ZIP64 integration and preservation contract | 0414 adds offset/count promotion and repeated OPC publication beyond the count sentinel. 0415 adds streaming Deflate framing and independent large Python OPC coverage. The 0416 batch adds local-only forced-ZIP64 reader/source-backed compatibility fixtures and focused refusal cases. Semantic bounded-memory creation/append, native producers, ODF local-sentinel catalog classification, and the broader failure-atomicity matrix remain open. |
 | P0 | Establish the Phase-1 baseline before selecting further optimizations | 0411 supplies a clean, descriptive six-selector XLS/CFB warm baseline with normal and allocator observations. Continue the full non-iWork capture with p50/p95/p99, throughput, `perf stat` counters, allocation/peak RSS, source calls/bytes/ranges, decompressed/recompressed/copied bytes, output bytes, lock-wait fields, and cold/warm plus explicit bounded-worker cases. |
 | P0 | Turn cache correctness into accepted observation | 0405 now retains validated direct-lock acquisition observations, cache counters, and explicit timing scope in 24 normal and 24 observed smoke rows. The release harness passes 256 tests with one ignored. Extend this descriptive evidence to representative workloads with operation-local attribution. Keep cache observations separate from latency claims until an accepted ABBA protocol exists. |
 | P0 | Capture current hardware/resource evidence | 0406 binds machine, corpus, revision, binary, raw samples, counters, allocation traces, RSS, syscall evidence, and profiling limitations. 0408 improves caller unwinding and verification efficiency and adds operation-local allocation/ZIP evidence. 0409 records XLSX query/edit/save and usable native L2 events; exact LLC is documented unavailable on this guest. 0410 measures the expanded-name ownership candidate, with residual selected-path attribution but no paired CPU delta. 0411 adds the six-selector XLS/CFB lifecycle and allocation baseline, still without a speedup claim. 0412 isolates diagnostic ReadAt observer cost with plain-source selectors; 0413 retains a scoped CFB reservation optimization with paired CPU/PMU evidence and a reviewed CFB guard cost. Remaining CFB FAT/stream/physical validation costs need attribution before further production changes. The broader semantic CRUD, cold-source, and resource matrix remains open. |

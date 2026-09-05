@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "python3",
+    "tools/check_perf_claims.py",
+    "--registry",
+    "docs/performance/claim-registry-v1.json",
+    "--repo-root",
+    ".",
+    "--evidence-root",
+    ".",
+    "--mode",
+    "strict"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:09:37.013665+00:00",
+  "elapsed_seconds": 70.990587606997,
+  "log": "claims.log",
+  "rustup_toolchain": "1.98.1",
+  "rustflags": null
+}

@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "python3",
+    "docs/performance/results/change-0416/interop.py",
+    "verify"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:08:18.349667+00:00",
+  "elapsed_seconds": 0.17800481300218962,
+  "log": "python-interop.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

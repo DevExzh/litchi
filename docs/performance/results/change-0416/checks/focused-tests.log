@@ -1,0 +1,58 @@
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling rstest_macros v0.26.1
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling rstest v0.26.1
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.47s
+     Running tests/forced_zip64_failures.rs (target/debug/deps/forced_zip64_failures-dddff235912840f8)
+
+running 6 tests
+test forced_zip64_metadata_limit_rejects_source_before_catalog_publication ... ok
+test forced_zip64_overlay_part_limit_rejects_before_sink_output ... ok
+test forced_zip64_managed_cancellation_rejects_before_first_sink_write ... ok
+test forced_zip64_overlay_reports_partial_sequential_sink_failure ... ok
+test forced_zip64_managed_output_limit_rejects_before_first_sink_write ... ok
+test forced_zip64_overlay_reports_source_version_change_before_output_and_midstream ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/python_zip64_source.rs (target/debug/deps/python_zip64_source-ab3dcbe255bb00f4)
+
+running 1 test
+test python_force_zip64_source_overlay_is_exact_on_noop_and_preserves_untouched_members ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/python_zip64_compat.rs (target/debug/deps/python_zip64_compat-8d0d4f3d6c790314)
+
+running 10 tests
+test local_only_zip64_preservation_index_retains_descriptor_and_central_record_spans ... ok
+test seekable_force_zip64_actual_local_sizes_match_ordinary_central_records ... FAILED
+test python_force_zip64_local_placeholders_use_64_bit_signed_descriptors ... ok
+test python_central_zip64_entries_with_zip32_tail_use_borrowed_and_reader_at_paths ... ok
+test python_force_zip64_unsigned_crc_signature_ambiguity_is_verified ... ok
+test empty_local_only_zip64_signed_and_unsigned_descriptors_keep_width_eight ... ok
+test python_zip32_signed_store_and_deflate_are_read_and_verified ... ok
+test python_central_and_local_zip64_signed_descriptor_is_verified ... ok
+test malformed_local_zip64_descriptor_and_size_fields_are_rejected_strictly ... ok
+test many_small_controls_cover_zip32_local_only_and_central_local_zip64 ... ok
+
+failures:
+
+---- seekable_force_zip64_actual_local_sizes_match_ordinary_central_records stdout ----
+
+thread 'seekable_force_zip64_actual_local_sizes_match_ordinary_central_records' (1618587) panicked at crates/soapberry-zip/tests/python_zip64_compat.rs:310:9:
+assertion `left == right` failed
+  left: 326
+ right: 76
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    seekable_force_zip64_actual_local_sizes_match_ordinary_central_records
+
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+error: test failed, to rerun pass `-p soapberry-zip --test python_zip64_compat`

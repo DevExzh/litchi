@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "rustup",
+    "run",
+    "1.98.1",
+    "rustfmt",
+    "--edition",
+    "2024",
+    "--check",
+    "crates/litchi-odf-common/src/core/source_publication.rs",
+    "crates/litchi-odf-common/src/package/edit.rs",
+    "crates/litchi-odf-common/src/repair.rs",
+    "crates/litchi-odt/src/package/resource_gc.rs",
+    "crates/litchi-opc/tests/forced_zip64_failures.rs",
+    "crates/litchi-opc/tests/python_zip64_source.rs",
+    "crates/soapberry-zip/fuzz/fuzz_targets/parse_zip.rs"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:18:27.055284+00:00",
+  "elapsed_seconds": 0.046268810983747244,
+  "log": "changed-fmt.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

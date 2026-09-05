@@ -1,0 +1,21 @@
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+   Compiling litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.44s
+     Running tests/embedded_resource_gc.rs (target/debug/deps/embedded_resource_gc-59c14ff222e515a2)
+
+running 12 tests
+test candidate_limit_and_overlaps_refuse_without_partial_deletion ... ok
+test candidate_paths_enforce_the_utf8_byte_bound_before_planning ... ok
+test inherited_xml_base_refuses_deletion_instead_of_misresolving_a_live_owner ... ok
+test unknown_extension_reference_and_unsafe_paths_are_typed_refusals ... ok
+test nested_xml_references_are_resolved_relative_to_their_package_part ... ok
+test live_selected_subdocument_cannot_hide_a_reference_to_another_candidate ... ok
+test object_ole_and_styles_owners_are_part_of_the_shared_reference_closure ... ok
+test subdocument_gc_removes_complete_directory_and_manifest_closure ... ok
+test plans_first_middle_last_orphans_and_retains_a_shared_owner ... ok
+test signatures_and_document_protection_are_typed_refusals ... ok
+test stale_apply_exact_noop_and_durable_replay_are_source_checked ... ok
+test encrypted_snapshot_planning_returns_a_typed_refusal_without_decryption ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s
+

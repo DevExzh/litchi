@@ -1,0 +1,52 @@
+{
+  "change": 416,
+  "classification": "compatibility capability and performance guards; no speedup claim",
+  "control": "4794d2e5e",
+  "candidate": "d18cd04a2b3f17dc2b5b1a8c50ba09309c65eb16",
+  "hypothesis": "Validated local ZIP64 framing must determine descriptor width even when central sizes and global tail remain ZIP32. Existing width selection rejects Python forced-ZIP64 input before source-backed preservation can publish a targeted edit.",
+  "constraints": [
+    "CRC and sizes must match central metadata",
+    "validated ZIP64 local extras; no ambiguous width guessing",
+    "untouched physical records and metadata remain raw copies",
+    "explicit ZIP32-only preservation policy must still refuse ZIP64 local framing",
+    "no new ambient I/O, unsafe code, dependency edges or parallelism"
+  ],
+  "measurement": {
+    "cpu": 2,
+    "process_order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ],
+    "samples": 300,
+    "warmups": 30,
+    "repeat_on_trigger": {
+      "samples": 1000,
+      "warmups": 100
+    },
+    "trigger_percent": 5,
+    "input_state": "warm immutable bytes; input file read outside timer",
+    "concurrency": "serialize all measurements against task-owned builds, tests and analysis workloads; shared host background not controlled",
+    "scope": "changed-path borrowed/ReaderAt guards; full timed operation boundaries in probe and capture; capability failures excluded from ratios"
+  },
+  "references": [
+    {
+      "url": "https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT",
+      "version": "6.3.10",
+      "sections": [
+        "4.3.9.1-4.3.9.4",
+        "4.5.3"
+      ]
+    },
+    {
+      "url": "https://docs.python.org/3/library/zipfile.html",
+      "section": "ZipFile.open force_zip64"
+    }
+  ],
+  "descriptor_review": {
+    "result": "no blocker",
+    "reason": "Validated local ZIP64 fixes width to eight. Optional signature is selected by full CRC/size matching; multiple matches refuse. Preservation grammar already permits opaque bytes after a valid descriptor, so producer intent cannot be inferred from an extra signature-like word."
+  },
+  "odf_catalog_scope": "Existing prepared catalog fact observes central/tail only; seekable local-only sentinel classification is not changed."
+}

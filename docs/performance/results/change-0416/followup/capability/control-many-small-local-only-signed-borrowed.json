@@ -1,0 +1,13 @@
+{
+  "borrowed_store_crc_scan": true,
+  "elapsed_ns": 156050,
+  "error": "Invalid input: stored local header uses ZIP64 sizes absent from the central entry",
+  "input_bytes": 38934,
+  "input_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/many-small-local-only-signed.zip",
+  "mode": "borrowed",
+  "operation": "capability",
+  "payload_decompression": false,
+  "schema_version": 1,
+  "status": "error",
+  "tool": "litchi-goal-0416-zip-strict-probe"
+}

@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "fmt",
+    "--all",
+    "--",
+    "--check"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 1,
+  "started_utc": "2026-09-05T05:20:34.899637+00:00",
+  "elapsed_seconds": 13.699091403017519,
+  "log": "workspace-fmt-final.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

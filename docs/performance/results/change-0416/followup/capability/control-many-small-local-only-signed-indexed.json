@@ -1,0 +1,13 @@
+{
+  "borrowed_store_crc_scan": false,
+  "elapsed_ns": 195471,
+  "error": "Unsupported ZIP preservation layout: invalid local member framing",
+  "input_bytes": 38934,
+  "input_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/many-small-local-only-signed.zip",
+  "mode": "indexed",
+  "operation": "capability",
+  "payload_decompression": false,
+  "schema_version": 1,
+  "status": "error",
+  "tool": "litchi-goal-0416-zip-strict-probe"
+}

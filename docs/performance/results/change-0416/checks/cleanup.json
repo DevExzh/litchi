@@ -1,0 +1,30 @@
+{
+  "completed_utc": "2026-09-05T05:27:09.459062+00:00",
+  "removed": [
+    "/tmp/litchi-goal-0416-control",
+    "/tmp/litchi-goal-0416-candidate",
+    "crates/soapberry-zip/fuzz/Cargo.lock",
+    "crates/litchi-opc/fuzz/Cargo.lock",
+    "/tmp/litchi-goal-0416-candidate-heaptrack.zst",
+    "/tmp/litchi-goal-0416-candidate-perf.data",
+    "/tmp/litchi-goal-0416-candidate-probe",
+    "/tmp/litchi-goal-0416-control-heaptrack.zst",
+    "/tmp/litchi-goal-0416-control-perf.data",
+    "/tmp/litchi-goal-0416-control-probe",
+    "/tmp/litchi-goal-0416-fuzz",
+    "/tmp/litchi-goal-0416-fuzz-target",
+    "/tmp/litchi-goal-0416-large.zip",
+    "/tmp/litchi-goal-0416-probe",
+    "/tmp/litchi-goal-0416-profile.py",
+    "/tmp/litchi-goal-0416-replay",
+    "/tmp/litchi-goal-0416-run-capture.py",
+    "/tmp/litchi-goal-0416-run-check.py",
+    "/tmp/litchi-goal-0416-run-fuzz.py"
+  ],
+  "preserved": [
+    "shared workspace target",
+    "shared performance harness target",
+    "untracked user docs/GOAL.md"
+  ],
+  "remaining_owned_temporary_paths": []
+}

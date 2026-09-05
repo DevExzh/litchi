@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "crates/litchi-opc/fuzz/Cargo.toml",
+    "--target",
+    "x86_64-unknown-linux-gnu",
+    "--bin",
+    "parse_opc"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:09:57.865961+00:00",
+  "elapsed_seconds": 26.94082734498079,
+  "log": "opc-fuzz-build.log",
+  "rustup_toolchain": null,
+  "rustflags": "-C passes=sancov-module -C llvm-args=-sanitizer-coverage-level=4 -C llvm-args=-sanitizer-coverage-inline-8bit-counters -C llvm-args=-sanitizer-coverage-pc-table -C llvm-args=-sanitizer-coverage-trace-compares -Z sanitizer=address --cfg fuzzing"
+}

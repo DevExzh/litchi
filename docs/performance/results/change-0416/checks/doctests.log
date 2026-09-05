@@ -1,0 +1,66 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+   Doc-tests litchi_odf_common
+
+running 9 tests
+test crates/litchi-odf-common/src/core/writer.rs - core::writer::PackageWriter (line 553) ... ignored
+test crates/litchi-odf-common/src/coordinates/model.rs - coordinates::model::CellRange (line 86) ... ok
+test crates/litchi-odf-common/src/constants.rs - constants::is_odf_mime_type (line 297) ... ok
+test crates/litchi-odf-common/src/constants.rs - constants::is_odf_extension (line 272) ... ok
+test crates/litchi-odf-common/src/constants.rs - constants::get_extension_from_mime_type (line 241) ... ok
+test crates/litchi-odf-common/src/constants.rs - constants::get_mime_type_from_extension (line 217) ... ok
+test crates/litchi-odf-common/src/detect.rs - detect (line 6) ... ok
+test crates/litchi-odf-common/src/coordinates/model.rs - coordinates::model::CellCoord (line 21) ... ok
+test crates/litchi-odf-common/src/coordinates/codec.rs - coordinates::codec::alpha_to_digit (line 100) ... ok
+
+test result: ok. 8 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.22s; merged doctests compilation took 0.22s
+   Doc-tests litchi_opc
+
+running 5 tests
+test crates/litchi-opc/src/package.rs - package::OpcPackage::next_partname (line 944) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::open (line 260) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::save (line 1006) - compile ... ok
+test crates/litchi-opc/src/pkgwriter.rs - pkgwriter::PackageWriter (line 863) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::to_stream (line 1032) - compile ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.29s; merged doctests compilation took 0.28s
+   Doc-tests soapberry_zip
+
+running 31 tests
+test crates/soapberry-zip/src/reader_at.rs - reader_at::RangeReader (line 327) ... ignored
+test crates/soapberry-zip/src/office.rs - office (line 9) - compile ... ok
+test crates/soapberry-zip/src/office.rs - office (line 27) - compile ... ok
+test crates/soapberry-zip/src/office.rs - office::LazyArchiveCacheLimits (line 5930) - compile ... ok
+test crates/soapberry-zip/src/lib.rs - (line 11) - compile ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<R>::eocd_offset (line 1512) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipEntry<'archive,R>::compressed_data_range (line 1773) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<R>::entries (line 1393) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<()>::from_seekable (line 1348) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive (line 1299) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipSliceArchive (line 40) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipEntry<'archive,R>::local_header (line 1819) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipFileHeaderRecord<'a>::file_path (line 3153) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipFileHeaderRecord<'a>::extra_fields (line 3254) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter (line 175) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::locate_in_file (line 530) ... ok
+test crates/soapberry-zip/src/time.rs - time::ZipDateTime<TZ>::from_components (line 278) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::max_search_space (line 344) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::locate_in_slice (line 487) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<R>::comment (line 1479) ... ok
+test crates/soapberry-zip/src/path.rs - path (line 45) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter<W>::new_dir (line 991) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipFileBuilder<'archive,'_,W>::start (line 562) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter<W>::stream_offset (line 280) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter<W>::new_file (line 1079) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipFileBuilder<'archive,'_,W>::start (line 549) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter (line 161) ... ok
+test crates/soapberry-zip/src/time.rs - time (line 17) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriterBuilder::with_offset (line 118) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::locate_in_reader (line 580) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipFileBuilder<'archive,'_,W>::extra_field (line 433) ... ok
+
+test result: ok. 30 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.13s
+

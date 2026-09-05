@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "tools/check_report_claim_classification.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:10:48.022662+00:00",
+  "elapsed_seconds": 0.047359479998704046,
+  "log": "classification.log",
+  "rustup_toolchain": "1.98.1",
+  "rustflags": null
+}

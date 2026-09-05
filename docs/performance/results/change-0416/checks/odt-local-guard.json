@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "test",
+    "--locked",
+    "-p",
+    "litchi-odt",
+    "--all-features",
+    "--lib",
+    "raw_rewrite_rejects_local_zip64"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:19:10.854431+00:00",
+  "elapsed_seconds": 12.556090714002494,
+  "log": "odt-local-guard.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

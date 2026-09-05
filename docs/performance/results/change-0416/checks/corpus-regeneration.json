@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "python3",
+    "-c",
+    "from pathlib import Path; import subprocess,sys,tempfile; root=Path(\"docs/performance/results/change-0416\"); scratch=tempfile.TemporaryDirectory(prefix=\"litchi-goal-0416-corpus-replay-\"); out=Path(scratch.name); subprocess.run([sys.executable,str(root/\"interop.py\"),\"generate\",\"--output-dir\",str(out)],check=True); originals=[root/\"manifest.json\",*sorted((root/\"corpus\").glob(\"*.zip\"))]; [(lambda p: None if p.read_bytes()==(out/p.relative_to(root)).read_bytes() else sys.exit(\"corpus mismatch: \"+str(p)))(p) for p in originals]; print(\"Exact regeneration matches 13 fixtures and manifest\"); scratch.cleanup()"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:13:27.443512+00:00",
+  "elapsed_seconds": 0.20804672199301422,
+  "log": "corpus-regeneration.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

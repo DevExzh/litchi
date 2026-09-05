@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "/tmp/litchi-goal-0416-fuzz-target/x86_64-unknown-linux-gnu/release/parse_opc",
+    "/tmp/litchi-goal-0416-fuzz/opc",
+    "-runs=1000",
+    "-seed=416",
+    "-max_len=1048576",
+    "-timeout=10"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T05:10:24.826037+00:00",
+  "elapsed_seconds": 0.11271650798153132,
+  "log": "opc-fuzz.log",
+  "rustup_toolchain": null,
+  "rustflags": "-C passes=sancov-module -C llvm-args=-sanitizer-coverage-level=4 -C llvm-args=-sanitizer-coverage-inline-8bit-counters -C llvm-args=-sanitizer-coverage-pc-table -C llvm-args=-sanitizer-coverage-trace-compares -Z sanitizer=address --cfg fuzzing"
+}

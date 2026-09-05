@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "check",
+    "--locked",
+    "-p",
+    "soapberry-zip",
+    "-p",
+    "litchi-opc",
+    "-p",
+    "litchi-odf-common",
+    "--all-features",
+    "--all-targets"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T04:58:19.045037+00:00",
+  "elapsed_seconds": 0.47062520499457605,
+  "log": "third-check.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}

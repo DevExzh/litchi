@@ -1,0 +1,63 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/tests/glossary_authoring.rs:1:
+[32m+use litchi_docx::Package;
+[m use litchi_docx::glossary::{
+     self, Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Name, Props, raw,
+ };
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/tests/glossary_authoring.rs:4:
+[31m-use litchi_docx::Package;
+[m use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+ use litchi_opc::{PackURI, part::BlobPart};
+ 
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/tests/glossary_authoring.rs:240:
+         );
+     }
+ 
+[31m-    assert!(
+[m[31m-        package
+[m[31m-            .edit_opc(glossary::remove)
+[m[31m-            .unwrap()
+[m[31m-    );
+[m[31m-    assert!(
+[m[31m-        !package
+[m[31m-            .edit_opc(glossary::remove)
+[m[31m-            .unwrap()
+[m[31m-    );
+[m[32m+    assert!(package.edit_opc(glossary::remove).unwrap());
+[m[32m+    assert!(!package.edit_opc(glossary::remove).unwrap());
+[m }
+ 
+ #[test]
+Diff in /home/zhuhe/code/litchi/crates/litchi-odf-common/src/package/edit.rs:623:
+     #[test]
+     fn raw_preservation_rejects_local_zip64_size_sentinels() {
+         let mut writer = PackageWriter::new();
+[31m-        writer.set_mimetype("application/vnd.oasis.opendocument.text").unwrap();
+[m[32m+        writer
+[m[32m+            .set_mimetype("application/vnd.oasis.opendocument.text")
+[m[32m+            .unwrap();
+[m         writer.add_file("content.xml", b"source").unwrap();
+         writer
+             .add_file_with_media_type("Pictures/blob.bin", b"opaque", "application/octet-stream")
+Diff in /home/zhuhe/code/litchi/crates/litchi-odf-common/src/package/edit.rs:630:
+             .unwrap();
+         let original = writer.finish_to_bytes().unwrap();
+[31m-        let archive = ZipArchive::from_slice(&original).unwrap().into_zip_archive();
+[m[32m+        let archive = ZipArchive::from_slice(&original)
+[m[32m+            .unwrap()
+[m[32m+            .into_zip_archive();
+[m         let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+         let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+         let local = index.entries().last().unwrap().local_span();
+Diff in /home/zhuhe/code/litchi/crates/litchi-odf-common/src/repair.rs:3632:
+     #[test]
+     fn zip32_repair_refuses_local_zip64_descriptor_framing() {
+         let source = zip32_archive_with_local_zip64_descriptor();
+[31m-        assert!(!ZipArchive::from_slice(source.as_slice()).unwrap().is_zip64());
+[m[32m+        assert!(
+[m[32m+            !ZipArchive::from_slice(source.as_slice())
+[m[32m+                .unwrap()
+[m[32m+                .is_zip64()
+[m[32m+        );
+[m         assert!(matches!(
+             inspect_layout(&source, OdfRepairLimits::default()),
+             Err(RepairError::Unsupported {

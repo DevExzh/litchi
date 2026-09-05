@@ -1,0 +1,45 @@
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+error: items after a test module
+   --> crates/litchi-odf-common/src/package/edit.rs:619:1
+    |
+619 |   mod tests {
+    |   ^^^^^^^^^
+...
+651 |   fn le_u64(bytes: &[u8], offset: usize) -> Option<u64> {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+668 | / pub fn rebuild_package(
+669 | |     source: &OwnedPackage,
+670 | |     content: &str,
+671 | |     additions: Vec<Addition>,
+...   |
+674 | |     excluded_prefixes: impl AsRef<[String]>,
+675 | | ) -> Result<Vec<u8>> {
+    | |____________________^
+...
+760 | / pub fn content_splice_publication(
+761 | |     source: &OwnedPackage,
+762 | |     candidate: &str,
+763 | | ) -> Result<XmlSplicePublication> {
+    | |_________________________________^
+...
+778 | / pub fn xml_splice_publication(
+779 | |     source: &OwnedPackage,
+780 | |     path: &str,
+781 | |     candidate: &str,
+782 | | ) -> Result<XmlSplicePublication> {
+    | |_________________________________^
+...
+870 |   pub fn splice(xml: &str, start: usize, end: usize, replacement: &str) -> Result<String> {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+882 |   fn invalid<T>(message: impl Into<String>) -> Result<T> {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#items_after_test_module
+    = note: `-D clippy::items-after-test-module` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::items_after_test_module)]`
+    = help: move the items to before the test module was defined
+
+error: could not compile `litchi-odf-common` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

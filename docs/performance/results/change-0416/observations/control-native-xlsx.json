@@ -1,0 +1,35 @@
+{
+  "borrowed_store_crc_scan": false,
+  "elapsed_ns": 28520,
+  "input_bytes": 7311,
+  "input_path": "/home/zhuhe/code/litchi/test-data/office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx",
+  "latency_samples_include_reader_at_instrumentation": false,
+  "mode": "indexed",
+  "observation": {
+    "borrowed_crc_scan_bytes": 0,
+    "borrowed_none": 0,
+    "borrowed_some": 0,
+    "compressed_bytes": 5577,
+    "crc32_xor": 42221450,
+    "digest": 7167128578969341807,
+    "entries": 13,
+    "name_bytes": 258,
+    "uncompressed_bytes": 18719
+  },
+  "operation": "reader-at-count",
+  "oracle": {
+    "central_entry_count": 13,
+    "compressed_bytes": 5577,
+    "crc32_xor": 42221450,
+    "file_count": 13,
+    "name_bytes": 258,
+    "uncompressed_bytes": 18719
+  },
+  "payload_decompression": false,
+  "reader_at": {
+    "bytes": 4370,
+    "calls": 58
+  },
+  "schema_version": 1,
+  "tool": "litchi-goal-0416-zip-strict-probe"
+}

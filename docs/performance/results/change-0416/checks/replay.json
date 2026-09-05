@@ -1,0 +1,65 @@
+{
+  "runs": [
+    {
+      "case": "fresh-standalone-export",
+      "argv": [
+        "python3",
+        "/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py"
+      ],
+      "exit_code": 0,
+      "stdout": "OK: independently verified 13 ZIP fixtures\nOK: source/corpus/capture bindings, raw-vector summaries and required check outcomes\n",
+      "stderr": ""
+    },
+    {
+      "case": "raw-observation-mismatch",
+      "argv": [
+        "python3",
+        "/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py"
+      ],
+      "exit_code": 1,
+      "stdout": "OK: independently verified 13 ZIP fixtures\n",
+      "stderr": "error: zip32-tiny/indexed: observation oracle differs in B1\nTraceback (most recent call last):\n  File \"/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py\", line 121, in <module>\n    main()\n    ~~~~^^\n  File \"/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py\", line 84, in main\n    subprocess.run(\n    ~~~~~~~~~~~~~~^\n        [sys.executable, str(root / \"summarize.py\"), \"--root\", str(capture_root),\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n         \"--samples\", str(capture[\"samples\"]), \"--warmups\", str(capture[\"warmups\"]),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n         \"--output\", str(output)], check=True,\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"/usr/lib/python3.14/subprocess.py\", line 578, in run\n    raise CalledProcessError(retcode, process.args,\n                             output=stdout, stderr=stderr)\nsubprocess.CalledProcessError: Command '['/usr/bin/python3', '/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/summarize.py', '--root', '/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416', '--samples', '300', '--warmups', '30', '--output', '/tmp/litchi-goal-0416-replay-crm0afmn/summary.json']' returned non-zero exit status 1.\n"
+    },
+    {
+      "case": "capture-argv-mismatch",
+      "argv": [
+        "python3",
+        "/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py"
+      ],
+      "exit_code": 1,
+      "stdout": "OK: independently verified 13 ZIP fixtures\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py\", line 121, in <module>\n    main()\n    ~~~~^^\n  File \"/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py\", line 76, in main\n    assert run[\"argv\"] == [\n           ^^^^^^^^^^^^^^^^\n    ...<2 lines>...\n    ]\n    ^\nAssertionError\n"
+    },
+    {
+      "case": "binary-binding-mismatch",
+      "argv": [
+        "python3",
+        "/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py"
+      ],
+      "exit_code": 1,
+      "stdout": "OK: independently verified 13 ZIP fixtures\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py\", line 121, in <module>\n    main()\n    ~~~~^^\n  File \"/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py\", line 50, in main\n    assert recorded[\"sha256\"] == identities[\"binaries\"][role][\"sha256\"], role\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: candidate\n"
+    },
+    {
+      "case": "source-mismatch",
+      "argv": [
+        "python3",
+        "/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py\", line 121, in <module>\n    main()\n    ~~~~^^\n  File \"/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py\", line 28, in main\n    assert sha(actual) == expected, (\"candidate source\", name)\n           ^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ('candidate source', 'crates/soapberry-zip/src/archive.rs')\n"
+    },
+    {
+      "case": "restored-export",
+      "argv": [
+        "python3",
+        "/tmp/litchi-goal-0416-replay/docs/performance/results/change-0416/verify.py"
+      ],
+      "exit_code": 0,
+      "stdout": "OK: independently verified 13 ZIP fixtures\nOK: source/corpus/capture bindings, raw-vector summaries and required check outcomes\n",
+      "stderr": ""
+    }
+  ],
+  "result": "baseline and restoration pass; four deliberate corruptions refuse"
+}

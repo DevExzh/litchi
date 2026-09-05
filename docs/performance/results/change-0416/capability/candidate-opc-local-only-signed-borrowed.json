@@ -1,0 +1,23 @@
+{
+  "borrowed_store_crc_scan": true,
+  "elapsed_ns": 43150,
+  "input_bytes": 1348,
+  "input_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/opc-local-only-signed.zip",
+  "mode": "borrowed",
+  "observation": {
+    "borrowed_crc_scan_bytes": 677,
+    "borrowed_none": 1,
+    "borrowed_some": 3,
+    "compressed_bytes": 718,
+    "crc32_xor": 1126924430,
+    "digest": 3400702954918429453,
+    "entries": 4,
+    "name_bytes": 64,
+    "uncompressed_bytes": 723
+  },
+  "operation": "capability",
+  "payload_decompression": false,
+  "schema_version": 1,
+  "status": "ok",
+  "tool": "litchi-goal-0416-zip-strict-probe"
+}

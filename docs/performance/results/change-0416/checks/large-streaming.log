@@ -1,0 +1,9 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Finished `release` profile [optimized] target(s) in 7.86s
+     Running tests/streaming_zip64_deflate.rs (target/release/deps/streaming_zip64_deflate-c722ffb76419efd5)
+
+running 1 test
+test one_bounded_zero_reader_crosses_zip64_size_boundary ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 1.54s
+

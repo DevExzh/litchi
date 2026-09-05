@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "/tmp/litchi-goal-0416-probe/Cargo.toml"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "started_utc": "2026-09-05T04:57:00.595975+00:00",
+  "elapsed_seconds": 0.8015370309876744,
+  "log": "control-bound-build.log",
+  "rustup_toolchain": null,
+  "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes"
+}

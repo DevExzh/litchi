@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "cargo",
+    "+1.98.1",
+    "test",
+    "--locked",
+    "-p",
+    "soapberry-zip",
+    "--test",
+    "python_zip64_compat",
+    "-p",
+    "litchi-opc",
+    "--test",
+    "python_zip64_source",
+    "--test",
+    "forced_zip64_failures",
+    "--all-features"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 101,
+  "started_utc": "2026-09-05T05:04:53.257596+00:00",
+  "elapsed_seconds": 4.7128622620075475,
+  "log": "focused-tests.log",
+  "rustup_toolchain": null,
+  "rustflags": null
+}
