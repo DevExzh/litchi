@@ -1,0 +1,130 @@
+{
+  "baseline": {
+    "capture_manifest_used": false,
+    "command": [
+      "<PYTHON>",
+      "<REPO>/docs/performance/results/change-0420/verify.py",
+      "--repo-root",
+      "<REPO>",
+      "--report",
+      "<REPO>/docs/performance/results/change-0420/runs/normal/A1/pptx_cross_copy_media_rich_lifecycle/report.json",
+      "--catalog",
+      "<REPO>/docs/performance/results/change-0420/runs/normal/A1/pptx_cross_copy_media_rich_lifecycle/catalog.json",
+      "--selector",
+      "pptx_cross_copy_media_rich_lifecycle",
+      "--samples",
+      "100",
+      "--warmups",
+      "10"
+    ],
+    "returncode": 0,
+    "status": "pass"
+  },
+  "change": 420,
+  "control_report_shape": {
+    "elapsed_sample_count": 100,
+    "result_keys": [
+      "case",
+      "corpus",
+      "elapsed_ns",
+      "operation_metrics",
+      "output_sha256",
+      "sink",
+      "source"
+    ],
+    "samples": 100,
+    "selector": "pptx_cross_copy_media_rich_lifecycle",
+    "top_level_keys": [
+      "binary_identity",
+      "configuration",
+      "corpus_catalog",
+      "environment",
+      "parallel_metrics",
+      "results",
+      "schema_version",
+      "tool"
+    ],
+    "warmups": 10
+  },
+  "probes": [
+    {
+      "capture_manifest_used": false,
+      "command": [
+        "<PYTHON>",
+        "<REPO>/docs/performance/results/change-0420/verify.py",
+        "--repo-root",
+        "<REPO>",
+        "--report",
+        "<TMP>/report.json",
+        "--catalog",
+        "<REPO>/docs/performance/results/change-0420/runs/normal/A1/pptx_cross_copy_media_rich_lifecycle/catalog.json",
+        "--selector",
+        "pptx_cross_copy_media_rich_lifecycle",
+        "--samples",
+        "100",
+        "--warmups",
+        "10"
+      ],
+      "diagnostic": "FAIL: report[0]: shared PPTX row validator rejected report: report[0].pptx_cross_copy_media_rich_lifecycle.source.pptx_cross_copy.output_sha256[0] differs from expected_output_sha256",
+      "expected_field": "output_sha256",
+      "mutation": "wrong-output-vector",
+      "name": "wrong-output-vector",
+      "returncode": 2,
+      "status": "rejected"
+    },
+    {
+      "capture_manifest_used": false,
+      "command": [
+        "<PYTHON>",
+        "<REPO>/docs/performance/results/change-0420/verify.py",
+        "--repo-root",
+        "<REPO>",
+        "--report",
+        "<TMP>/report.json",
+        "--catalog",
+        "<REPO>/docs/performance/results/change-0420/runs/normal/A1/pptx_cross_copy_media_rich_lifecycle/catalog.json",
+        "--selector",
+        "pptx_cross_copy_media_rich_lifecycle",
+        "--samples",
+        "100",
+        "--warmups",
+        "10"
+      ],
+      "diagnostic": "FAIL: report[0]: shared PPTX row validator rejected report: report[0].pptx_cross_copy_media_rich_lifecycle.source.pptx_cross_copy.gates.semantic_output_verified must be true",
+      "expected_field": "gates",
+      "mutation": "false-correctness-gate",
+      "name": "false-correctness-gate",
+      "returncode": 2,
+      "status": "rejected"
+    },
+    {
+      "capture_manifest_used": false,
+      "command": [
+        "<PYTHON>",
+        "<REPO>/docs/performance/results/change-0420/verify.py",
+        "--repo-root",
+        "<REPO>",
+        "--report",
+        "<TMP>/report.json",
+        "--catalog",
+        "<REPO>/docs/performance/results/change-0420/runs/normal/A1/pptx_cross_copy_media_rich_lifecycle/catalog.json",
+        "--selector",
+        "pptx_cross_copy_media_rich_lifecycle",
+        "--samples",
+        "100",
+        "--warmups",
+        "10"
+      ],
+      "diagnostic": "FAIL: report[0]: parallel metrics rejected: report[0].results[0].elapsed_ns.sample_order must be a complete permutation",
+      "expected_field": "sample_order",
+      "mutation": "invalid-sample-order",
+      "name": "invalid-sample-order",
+      "returncode": 2,
+      "status": "rejected"
+    }
+  ],
+  "source_catalog": "runs/normal/A1/pptx_cross_copy_media_rich_lifecycle/catalog.json",
+  "source_report": "runs/normal/A1/pptx_cross_copy_media_rich_lifecycle/report.json",
+  "status": "pass",
+  "verifier_sha256": "ffaa16792c90a8bb9776d335f36fe1806481cc7d85e77306b46d1bd63e53485b"
+}

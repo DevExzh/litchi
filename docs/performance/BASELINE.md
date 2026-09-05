@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0420: owned OPC payload storage reuse
+
+[0420](changes/0420-opc-owned-payload-reuse.md) reduces the measured media-rich
+PPTX lifecycle live-after snapshot from 287.886 MB to 237.453 MB (−17.518%)
+and whole-process RSS by about 9.1–9.3%. Plain live-after falls 9.889%.
+Allocation requests remain effectively unchanged because target decompression
+still occurs. Normal timing is mixed: plain p50 is 1.22–1.69% slower, and one
+plain p99 pair is 5.215% slower, an explicit reviewed tradeoff. The 100-sample
+normal lane establishes no release latency claim. The [table](results/change-0420/result-table.md)
+and [bundle](results/change-0420/README.md) retain all pairs and replayable
+resource evidence. Process snapshots do not establish an operation-local peak.
+
 ## Change 0419: bounded PPTX archive growth
 
 [0419](changes/0419-pptx-bounded-archive-growth.md) retains a matched resource

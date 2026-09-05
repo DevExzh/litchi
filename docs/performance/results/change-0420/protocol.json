@@ -1,0 +1,32 @@
+{
+  "change": 420,
+  "declared_utc": "2026-09-05T09:45:41.721540+00:00",
+  "control_revision": "68e4b0dfa217c073b33a6801bf9d2a8551b7ce6f",
+  "classification": "matched owned OPC payload storage reuse diagnostic",
+  "cpu": 2,
+  "workers": 1,
+  "common_flags": [
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm"
+  ],
+  "hypothesis": "Selecting an equal existing payload Arc during unmarshal removes duplicate decoded retention without skipping archive validation or decompression. Same URI/content type, actual byte equality and no greater capacity gate reuse.",
+  "source_policy": "identical427-selectorharness; onlyOPCpayloadreuseconstructor,focusedtestsandPPTXcandidateingress differ",
+  "limits": "existing finite ReadLimits plus PPTX archive bound unchanged; no aggregate or operation-local peak claim",
+  "profile_basis": "change-0419 candidate heaptrace and source retention audit; control production identical at68e4b0dfa; no new whole-command heaptrace needed to repeat unchanged decoding path"
+}

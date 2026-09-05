@@ -1,0 +1,20 @@
+{
+  "binaries": [
+    "/tmp/litchi-goal-0420-control-normal",
+    "/tmp/litchi-goal-0420-control-allocator",
+    "/tmp/litchi-goal-0420-candidate-normal",
+    "/tmp/litchi-goal-0420-candidate-allocator"
+  ],
+  "bytecode_removed": [],
+  "change": 420,
+  "remaining_batch_temporaries": [],
+  "shared_caches_retained": [
+    "target",
+    "tools/perf-baseline/target"
+  ],
+  "status": "pass",
+  "worktrees": [
+    "/tmp/litchi-goal-0420-control-worktree",
+    "/tmp/litchi-goal-0420-candidate-worktree"
+  ]
+}

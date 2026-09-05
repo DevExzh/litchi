@@ -1,0 +1,12 @@
+{
+  "change": 420,
+  "checks": {
+    "changed_protocol_rejected": true,
+    "empty_report_rejected": true,
+    "empty_stdout_or_stderr_allowed": true,
+    "matching_protocol_accepted": true,
+    "nonempty_report_accepted": true
+  },
+  "schema_version": 1,
+  "status": "pass"
+}

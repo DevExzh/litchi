@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## Change 0420: decoded payload retention
+
+[0420](changes/0420-opc-owned-payload-reuse.md) selects equal existing payload
+storage inside OPC after full target validation and decoding. Clean owned PPTX
+cross-copy keeps the target archive's independent authority while sharing
+payloads with the staged graph. Media-rich live-after falls 50.433 MB and RSS
+about 9.1–9.3%; plain live-after falls 87,463 bytes. Requested allocation volume
+remains effectively unchanged. The plain median is 1.22–1.69% slower and one
+p99 pair is 5.215% slower, explicitly reviewed and accepted for this scoped
+memory benefit. No latency speedup is claimed.
+
+Full decompression, raw archive retention, and transient candidate work remain.
+The [ownership review](results/change-0420/source-review.md) separates shared
+holders from payload copies. Near-limit memory evidence and source-backed
+lifecycle comparisons remain priorities in the [goal audit](results/change-0420/goal-audit.md).
+
 ## Change 0419: PPTX archive allocation requests
 
 [0419](changes/0419-pptx-bounded-archive-growth.md) traced the large cumulative

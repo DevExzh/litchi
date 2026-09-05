@@ -1,0 +1,1626 @@
+{
+  "change": 420,
+  "classification": "resource diagnostic; no latency claim",
+  "comparisons": {
+    "allocator/pptx_cross_copy_media_rich_lifecycle": {
+      "pairs": {
+        "A1_to_B1": {
+          "allocated_bytes": {
+            "candidate": 369980305.93333334,
+            "candidate_minus_control_percent": 0.00011359176077734434,
+            "control": 369979885.6666667
+          },
+          "allocation_calls": {
+            "candidate": 59714.96666666667,
+            "candidate_minus_control_percent": 0.0002232834387849916,
+            "control": 59714.833333333336
+          },
+          "live_bytes_after": {
+            "candidate": 237452746,
+            "candidate_minus_control_percent": -17.518446259046975,
+            "control": 287885879
+          },
+          "live_bytes_before": {
+            "candidate": 169821478,
+            "candidate_minus_control_percent": 0.0,
+            "control": 169821478
+          },
+          "peak_live_bytes_after": {
+            "candidate": 812687527,
+            "candidate_minus_control_percent": -9.359291944206467,
+            "control": 896603242
+          },
+          "peak_live_bytes_before": {
+            "candidate": 812687527,
+            "candidate_minus_control_percent": -9.359291944206467,
+            "control": 896603242
+          },
+          "reallocation_calls": {
+            "candidate": 7305,
+            "candidate_minus_control_percent": 0.0,
+            "control": 7305
+          },
+          "rss_kib": {
+            "candidate": 803760,
+            "candidate_minus_control_percent": -9.146399359765608,
+            "control": 884676
+          }
+        },
+        "A2_to_B2": {
+          "allocated_bytes": {
+            "candidate": 369979885.6666667,
+            "candidate_minus_control_percent": 0.0,
+            "control": 369979885.6666667
+          },
+          "allocation_calls": {
+            "candidate": 59714.833333333336,
+            "candidate_minus_control_percent": 0.0,
+            "control": 59714.833333333336
+          },
+          "live_bytes_after": {
+            "candidate": 237452746,
+            "candidate_minus_control_percent": -17.518446259046975,
+            "control": 287885879
+          },
+          "live_bytes_before": {
+            "candidate": 169821478,
+            "candidate_minus_control_percent": 0.0,
+            "control": 169821478
+          },
+          "peak_live_bytes_after": {
+            "candidate": 812687527,
+            "candidate_minus_control_percent": -9.359291944206467,
+            "control": 896603242
+          },
+          "peak_live_bytes_before": {
+            "candidate": 812687527,
+            "candidate_minus_control_percent": -9.359291944206467,
+            "control": 896603242
+          },
+          "reallocation_calls": {
+            "candidate": 7305,
+            "candidate_minus_control_percent": 0.0,
+            "control": 7305
+          },
+          "rss_kib": {
+            "candidate": 803508,
+            "candidate_minus_control_percent": -9.201979795240355,
+            "control": 884940
+          }
+        }
+      },
+      "same_revision_drift_percent": {
+        "A1_to_A2": {
+          "allocated_bytes": 0.0,
+          "allocation_calls": 0.0,
+          "live_bytes_after": 0.0,
+          "live_bytes_before": 0.0,
+          "peak_live_bytes_after": 0.0,
+          "peak_live_bytes_before": 0.0,
+          "reallocation_calls": 0.0,
+          "rss_kib": 0.029841433473949783
+        },
+        "B1_to_B2": {
+          "allocated_bytes": -0.00011359163174660974,
+          "allocation_calls": -0.0002232829402311644,
+          "live_bytes_after": 0.0,
+          "live_bytes_before": 0.0,
+          "peak_live_bytes_after": 0.0,
+          "peak_live_bytes_before": 0.0,
+          "reallocation_calls": 0.0,
+          "rss_kib": -0.031352642579874586
+        }
+      },
+      "validation": {
+        "capture": null,
+        "change": 420,
+        "claim_authorized": false,
+        "claim_withheld_reason": "allocator instrumentation is excluded from latency claims",
+        "classification": "matched allocation/resource diagnostic",
+        "lane": "allocator",
+        "performance_claim": null,
+        "report_count": 4,
+        "reports": [
+          {
+            "allocation": {
+              "allocated_bytes": {
+                "count": 30,
+                "max": 369986715,
+                "min": 369977259,
+                "sum": 11099396570
+              },
+              "allocation_calls": {
+                "count": 30,
+                "max": 59717,
+                "min": 59714,
+                "sum": 1791445
+              },
+              "deallocated_bytes": {
+                "count": 30,
+                "max": 251922314,
+                "min": 251912858,
+                "sum": 7557464540
+              },
+              "deallocation_calls": {
+                "count": 30,
+                "max": 48854,
+                "min": 48851,
+                "sum": 1465555
+              },
+              "failed_allocation_calls": {
+                "count": 30,
+                "max": 0,
+                "min": 0,
+                "sum": 0
+              },
+              "reallocation_calls": {
+                "count": 30,
+                "max": 7305,
+                "min": 7305,
+                "sum": 219150
+              },
+              "status": "measured"
+            },
+            "binary_sha256": "fcf601d203a11929fbeb36e60530dda8a14029581e09be8deb6cc8b1f16299d0",
+            "corpus_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 721624428.8044648,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 722086778.8622019
+              },
+              "max": 722970796,
+              "mean": 721855603.8333334,
+              "min": 720340817,
+              "p50": 721922582,
+              "p95": 722792885,
+              "p99": 722970796,
+              "sample_count": 30,
+              "standard_deviation": 619167.6187932286
+            },
+            "leg": "A1",
+            "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+            "output_vector_sha256": "d075976dccef89faf6df28685b5051982bde0e45c70bd3d3fc1a81d4c8df4076",
+            "report_sha256": "221c24ff7aa7f49774ddb49c39d151077a1a70cb4bac60a011d5dba685dee060",
+            "revision": "68e4b0dfa217c073b33a6801bf9d2a8551b7ce6f",
+            "sample_order_sha256": "095465d674626d226648d8a43d4f4f4664fdb2bb0cfe716fd6a381e03967e083"
+          },
+          {
+            "allocation": {
+              "allocated_bytes": {
+                "count": 30,
+                "max": 369986715,
+                "min": 369977259,
+                "sum": 11099409178
+              },
+              "allocation_calls": {
+                "count": 30,
+                "max": 59717,
+                "min": 59714,
+                "sum": 1791449
+              },
+              "deallocated_bytes": {
+                "count": 30,
+                "max": 302355447,
+                "min": 302345991,
+                "sum": 9070471138
+              },
+              "deallocation_calls": {
+                "count": 30,
+                "max": 48950,
+                "min": 48947,
+                "sum": 1468439
+              },
+              "failed_allocation_calls": {
+                "count": 30,
+                "max": 0,
+                "min": 0,
+                "sum": 0
+              },
+              "reallocation_calls": {
+                "count": 30,
+                "max": 7305,
+                "min": 7305,
+                "sum": 219150
+              },
+              "status": "measured"
+            },
+            "binary_sha256": "0f57ceb1a6d09c6bbd329f58913411a5ad893fea1ef8b4567276eaee0491fccd",
+            "corpus_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 712277925.5760646,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 713330083.157269
+              },
+              "max": 715264235,
+              "mean": 712804004.3666668,
+              "min": 709888276,
+              "p50": 712734891,
+              "p95": 714955744,
+              "p99": 715264235,
+              "sample_count": 30,
+              "standard_deviation": 1409023.0838036088
+            },
+            "leg": "B1",
+            "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+            "output_vector_sha256": "d075976dccef89faf6df28685b5051982bde0e45c70bd3d3fc1a81d4c8df4076",
+            "report_sha256": "a62069dd66ae6daa1aadae2b4557df145528d7415e7ef1d0d255e8f83cb8259d",
+            "revision": "81c70058a33dd671bcf022f72bbf1d90fa35821f",
+            "sample_order_sha256": "1b53943e23ecebfc07d9326752a41c97d40f67dbdde5e33a2787341cb73604ea"
+          },
+          {
+            "allocation": {
+              "allocated_bytes": {
+                "count": 30,
+                "max": 369986715,
+                "min": 369977259,
+                "sum": 11099396570
+              },
+              "allocation_calls": {
+                "count": 30,
+                "max": 59717,
+                "min": 59714,
+                "sum": 1791445
+              },
+              "deallocated_bytes": {
+                "count": 30,
+                "max": 302355447,
+                "min": 302345991,
+                "sum": 9070458530
+              },
+              "deallocation_calls": {
+                "count": 30,
+                "max": 48950,
+                "min": 48947,
+                "sum": 1468435
+              },
+              "failed_allocation_calls": {
+                "count": 30,
+                "max": 0,
+                "min": 0,
+                "sum": 0
+              },
+              "reallocation_calls": {
+                "count": 30,
+                "max": 7305,
+                "min": 7305,
+                "sum": 219150
+              },
+              "status": "measured"
+            },
+            "binary_sha256": "0f57ceb1a6d09c6bbd329f58913411a5ad893fea1ef8b4567276eaee0491fccd",
+            "corpus_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 708615362.7972347,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 709714899.0694321
+              },
+              "max": 711787591,
+              "mean": 709165130.9333334,
+              "min": 706535173,
+              "p50": 709262765,
+              "p95": 711297620,
+              "p99": 711787591,
+              "sample_count": 30,
+              "standard_deviation": 1472471.4402879132
+            },
+            "leg": "B2",
+            "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+            "output_vector_sha256": "d075976dccef89faf6df28685b5051982bde0e45c70bd3d3fc1a81d4c8df4076",
+            "report_sha256": "f468394b278b59ac1f045648ab7449624fd401192b37fc2f7f540255aeed8571",
+            "revision": "81c70058a33dd671bcf022f72bbf1d90fa35821f",
+            "sample_order_sha256": "d2be4280f672f92ff72d90023add1ef42fd50e864a3f6f587a1327ce2c28e7f2"
+          },
+          {
+            "allocation": {
+              "allocated_bytes": {
+                "count": 30,
+                "max": 369986715,
+                "min": 369977259,
+                "sum": 11099396570
+              },
+              "allocation_calls": {
+                "count": 30,
+                "max": 59717,
+                "min": 59714,
+                "sum": 1791445
+              },
+              "deallocated_bytes": {
+                "count": 30,
+                "max": 251922314,
+                "min": 251912858,
+                "sum": 7557464540
+              },
+              "deallocation_calls": {
+                "count": 30,
+                "max": 48854,
+                "min": 48851,
+                "sum": 1465555
+              },
+              "failed_allocation_calls": {
+                "count": 30,
+                "max": 0,
+                "min": 0,
+                "sum": 0
+              },
+              "reallocation_calls": {
+                "count": 30,
+                "max": 7305,
+                "min": 7305,
+                "sum": 219150
+              },
+              "status": "measured"
+            },
+            "binary_sha256": "fcf601d203a11929fbeb36e60530dda8a14029581e09be8deb6cc8b1f16299d0",
+            "corpus_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 726722593.8207669,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 727244592.9792333
+              },
+              "max": 728183244,
+              "mean": 726983593.4000001,
+              "min": 725567944,
+              "p50": 726971395,
+              "p95": 728171093,
+              "p99": 728183244,
+              "sample_count": 30,
+              "standard_deviation": 699048.20071069
+            },
+            "leg": "A2",
+            "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+            "output_vector_sha256": "d075976dccef89faf6df28685b5051982bde0e45c70bd3d3fc1a81d4c8df4076",
+            "report_sha256": "cca9f685201fefa4d0c81fce009630782f9c47224ae6d80ff7dfc36f45003168",
+            "revision": "68e4b0dfa217c073b33a6801bf9d2a8551b7ce6f",
+            "sample_order_sha256": "eab9be4c9dd18ee4e889b34176e64681fe459b29697a824306616ca47dd30f1c"
+          }
+        ],
+        "samples": 30,
+        "selector": "pptx_cross_copy_media_rich_lifecycle",
+        "warmups": 3
+      }
+    },
+    "allocator/pptx_cross_copy_plain_lifecycle": {
+      "pairs": {
+        "A1_to_B1": {
+          "allocated_bytes": {
+            "candidate": 15664317,
+            "candidate_minus_control_percent": 0.0,
+            "control": 15664317
+          },
+          "allocation_calls": {
+            "candidate": 49335,
+            "candidate_minus_control_percent": 0.0,
+            "control": 49335
+          },
+          "live_bytes_after": {
+            "candidate": 796963,
+            "candidate_minus_control_percent": -9.889238896188036,
+            "control": 884426
+          },
+          "live_bytes_before": {
+            "candidate": 368711,
+            "candidate_minus_control_percent": 0.0,
+            "control": 368711
+          },
+          "peak_live_bytes_after": {
+            "candidate": 3559495,
+            "candidate_minus_control_percent": -0.1756988692452661,
+            "control": 3565760
+          },
+          "peak_live_bytes_before": {
+            "candidate": 3559495,
+            "candidate_minus_control_percent": -0.1756988692452661,
+            "control": 3565760
+          },
+          "reallocation_calls": {
+            "candidate": 6085,
+            "candidate_minus_control_percent": 0.0,
+            "control": 6085
+          },
+          "rss_kib": {
+            "candidate": 82672,
+            "candidate_minus_control_percent": -0.0821851583272903,
+            "control": 82740
+          }
+        },
+        "A2_to_B2": {
+          "allocated_bytes": {
+            "candidate": 15664317,
+            "candidate_minus_control_percent": 0.0,
+            "control": 15664317
+          },
+          "allocation_calls": {
+            "candidate": 49335,
+            "candidate_minus_control_percent": 0.0,
+            "control": 49335
+          },
+          "live_bytes_after": {
+            "candidate": 796963,
+            "candidate_minus_control_percent": -9.889238896188036,
+            "control": 884426
+          },
+          "live_bytes_before": {
+            "candidate": 368711,
+            "candidate_minus_control_percent": 0.0,
+            "control": 368711
+          },
+          "peak_live_bytes_after": {
+            "candidate": 3559495,
+            "candidate_minus_control_percent": -0.1756988692452661,
+            "control": 3565760
+          },
+          "peak_live_bytes_before": {
+            "candidate": 3559495,
+            "candidate_minus_control_percent": -0.1756988692452661,
+            "control": 3565760
+          },
+          "reallocation_calls": {
+            "candidate": 6085,
+            "candidate_minus_control_percent": 0.0,
+            "control": 6085
+          },
+          "rss_kib": {
+            "candidate": 82736,
+            "candidate_minus_control_percent": 0.15494867325198527,
+            "control": 82608
+          }
+        }
+      },
+      "same_revision_drift_percent": {
+        "A1_to_A2": {
+          "allocated_bytes": 0.0,
+          "allocation_calls": 0.0,
+          "live_bytes_after": 0.0,
+          "live_bytes_before": 0.0,
+          "peak_live_bytes_after": 0.0,
+          "peak_live_bytes_before": 0.0,
+          "reallocation_calls": 0.0,
+          "rss_kib": -0.15953589557650472
+        },
+        "B1_to_B2": {
+          "allocated_bytes": 0.0,
+          "allocation_calls": 0.0,
+          "live_bytes_after": 0.0,
+          "live_bytes_before": 0.0,
+          "peak_live_bytes_after": 0.0,
+          "peak_live_bytes_before": 0.0,
+          "reallocation_calls": 0.0,
+          "rss_kib": 0.0774143603638475
+        }
+      },
+      "validation": {
+        "capture": null,
+        "change": 420,
+        "claim_authorized": false,
+        "claim_withheld_reason": "allocator instrumentation is excluded from latency claims",
+        "classification": "matched allocation/resource diagnostic",
+        "lane": "allocator",
+        "performance_claim": null,
+        "report_count": 4,
+        "reports": [
+          {
+            "allocation": {
+              "allocated_bytes": {
+                "count": 30,
+                "max": 15664317,
+                "min": 15664317,
+                "sum": 469929510
+              },
+              "allocation_calls": {
+                "count": 30,
+                "max": 49335,
+                "min": 49335,
+                "sum": 1480050
+              },
+              "deallocated_bytes": {
+                "count": 30,
+                "max": 15148602,
+                "min": 15148602,
+                "sum": 454458060
+              },
+              "deallocation_calls": {
+                "count": 30,
+                "max": 40604,
+                "min": 40604,
+                "sum": 1218120
+              },
+              "failed_allocation_calls": {
+                "count": 30,
+                "max": 0,
+                "min": 0,
+                "sum": 0
+              },
+              "reallocation_calls": {
+                "count": 30,
+                "max": 6085,
+                "min": 6085,
+                "sum": 182550
+              },
+              "status": "measured"
+            },
+            "binary_sha256": "fcf601d203a11929fbeb36e60530dda8a14029581e09be8deb6cc8b1f16299d0",
+            "corpus_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 10304422.456360383,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 10368247.143639619
+              },
+              "max": 10535078,
+              "mean": 10336334.8,
+              "min": 10161786,
+              "p50": 10362477,
+              "p95": 10444947,
+              "p99": 10535078,
+              "sample_count": 30,
+              "standard_deviation": 85472.42285709358
+            },
+            "leg": "A1",
+            "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+            "output_vector_sha256": "57b461542561c83967ab2f8155439a4f906e03fe1a36f50a0c1b89f5e1750a41",
+            "report_sha256": "ab2cfb88cd02f69adc07e3027aa07e76ecc908bbad097e282e2ffdd85df06452",
+            "revision": "68e4b0dfa217c073b33a6801bf9d2a8551b7ce6f",
+            "sample_order_sha256": "913c425301281a8b1d19f9958b2273fe08a44d95bcf1d2109e29003d8b204a49"
+          },
+          {
+            "allocation": {
+              "allocated_bytes": {
+                "count": 30,
+                "max": 15664317,
+                "min": 15664317,
+                "sum": 469929510
+              },
+              "allocation_calls": {
+                "count": 30,
+                "max": 49335,
+                "min": 49335,
+                "sum": 1480050
+              },
+              "deallocated_bytes": {
+                "count": 30,
+                "max": 15236065,
+                "min": 15236065,
+                "sum": 457081950
+              },
+              "deallocation_calls": {
+                "count": 30,
+                "max": 40652,
+                "min": 40652,
+                "sum": 1219560
+              },
+              "failed_allocation_calls": {
+                "count": 30,
+                "max": 0,
+                "min": 0,
+                "sum": 0
+              },
+              "reallocation_calls": {
+                "count": 30,
+                "max": 6085,
+                "min": 6085,
+                "sum": 182550
+              },
+              "status": "measured"
+            },
+            "binary_sha256": "0f57ceb1a6d09c6bbd329f58913411a5ad893fea1ef8b4567276eaee0491fccd",
+            "corpus_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 10250712.392246671,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 10343371.074419994
+              },
+              "max": 10556618,
+              "mean": 10297041.733333332,
+              "min": 10078906,
+              "p50": 10269257,
+              "p95": 10541938,
+              "p99": 10556618,
+              "sample_count": 30,
+              "standard_deviation": 124086.18673601479
+            },
+            "leg": "B1",
+            "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+            "output_vector_sha256": "57b461542561c83967ab2f8155439a4f906e03fe1a36f50a0c1b89f5e1750a41",
+            "report_sha256": "389978858334fceb7107dc21bba67e9430f5a3ee4d766c057bf875a3f2e1bfba",
+            "revision": "81c70058a33dd671bcf022f72bbf1d90fa35821f",
+            "sample_order_sha256": "666ad3288202830c4e5fa4b3d806b7c8f07ebba0ddb8a3d67ff663c78fbf16aa"
+          },
+          {
+            "allocation": {
+              "allocated_bytes": {
+                "count": 30,
+                "max": 15664317,
+                "min": 15664317,
+                "sum": 469929510
+              },
+              "allocation_calls": {
+                "count": 30,
+                "max": 49335,
+                "min": 49335,
+                "sum": 1480050
+              },
+              "deallocated_bytes": {
+                "count": 30,
+                "max": 15236065,
+                "min": 15236065,
+                "sum": 457081950
+              },
+              "deallocation_calls": {
+                "count": 30,
+                "max": 40652,
+                "min": 40652,
+                "sum": 1219560
+              },
+              "failed_allocation_calls": {
+                "count": 30,
+                "max": 0,
+                "min": 0,
+                "sum": 0
+              },
+              "reallocation_calls": {
+                "count": 30,
+                "max": 6085,
+                "min": 6085,
+                "sum": 182550
+              },
+              "status": "measured"
+            },
+            "binary_sha256": "0f57ceb1a6d09c6bbd329f58913411a5ad893fea1ef8b4567276eaee0491fccd",
+            "corpus_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 10365522.321199114,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 10470088.278800884
+              },
+              "max": 10838829,
+              "mean": 10417805.299999999,
+              "min": 10124746,
+              "p50": 10432413,
+              "p95": 10642078,
+              "p99": 10838829,
+              "sample_count": 30,
+              "standard_deviation": 140032.1117985766
+            },
+            "leg": "B2",
+            "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+            "output_vector_sha256": "57b461542561c83967ab2f8155439a4f906e03fe1a36f50a0c1b89f5e1750a41",
+            "report_sha256": "9cc9d80000dd83f31ba979e4f86a5c15d769d5100e50825681eb483ff1609aa4",
+            "revision": "81c70058a33dd671bcf022f72bbf1d90fa35821f",
+            "sample_order_sha256": "cd36bd6efe58a292a06dc563e7f8778fc950d70e4329565de95a679026df8fb8"
+          },
+          {
+            "allocation": {
+              "allocated_bytes": {
+                "count": 30,
+                "max": 15664317,
+                "min": 15664317,
+                "sum": 469929510
+              },
+              "allocation_calls": {
+                "count": 30,
+                "max": 49335,
+                "min": 49335,
+                "sum": 1480050
+              },
+              "deallocated_bytes": {
+                "count": 30,
+                "max": 15148602,
+                "min": 15148602,
+                "sum": 454458060
+              },
+              "deallocation_calls": {
+                "count": 30,
+                "max": 40604,
+                "min": 40604,
+                "sum": 1218120
+              },
+              "failed_allocation_calls": {
+                "count": 30,
+                "max": 0,
+                "min": 0,
+                "sum": 0
+              },
+              "reallocation_calls": {
+                "count": 30,
+                "max": 6085,
+                "min": 6085,
+                "sum": 182550
+              },
+              "status": "measured"
+            },
+            "binary_sha256": "fcf601d203a11929fbeb36e60530dda8a14029581e09be8deb6cc8b1f16299d0",
+            "corpus_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 10211821.024956731,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 10282204.308376601
+              },
+              "max": 10468878,
+              "mean": 10247012.666666666,
+              "min": 10048986,
+              "p50": 10247422,
+              "p95": 10413968,
+              "p99": 10468878,
+              "sample_count": 30,
+              "standard_deviation": 94255.53056318333
+            },
+            "leg": "A2",
+            "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+            "output_vector_sha256": "57b461542561c83967ab2f8155439a4f906e03fe1a36f50a0c1b89f5e1750a41",
+            "report_sha256": "f6e37eeb92a1fb8ccab8e3043a41619c68466f4c0a77e062d8b3cc2bd05e23d5",
+            "revision": "68e4b0dfa217c073b33a6801bf9d2a8551b7ce6f",
+            "sample_order_sha256": "a072dd57bb14347e97a2b8ebd0fa0936fc4b6ff8a32beb756e5bc1f29be88ff2"
+          }
+        ],
+        "samples": 30,
+        "selector": "pptx_cross_copy_plain_lifecycle",
+        "warmups": 3
+      }
+    },
+    "normal/pptx_cross_copy_media_rich_lifecycle": {
+      "pairs": {
+        "A1_to_B1": {
+          "mean": {
+            "candidate": 714981906.3799998,
+            "candidate_minus_control_percent": 0.6606777531311687,
+            "control": 710289183.7600005
+          },
+          "p50": {
+            "candidate": 714916674,
+            "candidate_minus_control_percent": 0.6562633901193141,
+            "control": 710255527
+          },
+          "p95": {
+            "candidate": 716077350,
+            "candidate_minus_control_percent": 0.6982513293289224,
+            "control": 711112001
+          },
+          "p99": {
+            "candidate": 717612002,
+            "candidate_minus_control_percent": 0.8868931475804632,
+            "control": 711303500
+          },
+          "rss_kib": {
+            "candidate": 803256,
+            "candidate_minus_control_percent": -9.226763581134225,
+            "control": 884904
+          }
+        },
+        "A2_to_B2": {
+          "mean": {
+            "candidate": 716742978.8,
+            "candidate_minus_control_percent": -1.5075025274018985,
+            "control": 727713274.8099998
+          },
+          "p50": {
+            "candidate": 716609186,
+            "candidate_minus_control_percent": -1.5539148542948613,
+            "control": 727920450
+          },
+          "p95": {
+            "candidate": 718294874,
+            "candidate_minus_control_percent": -1.4637266609347768,
+            "control": 728964928
+          },
+          "p99": {
+            "candidate": 718853489,
+            "candidate_minus_control_percent": -1.4132381096305557,
+            "control": 729158231
+          },
+          "rss_kib": {
+            "candidate": 803744,
+            "candidate_minus_control_percent": -9.273732926966927,
+            "control": 885900
+          }
+        }
+      },
+      "same_revision_drift_percent": {
+        "A1_to_A2": {
+          "mean": 2.4530981814706587,
+          "p50": 2.4871222156642228,
+          "p95": 2.5105647176386214,
+          "p99": 2.510142435683221,
+          "rss_kib": 0.1125545821919666
+        },
+        "B1_to_B2": {
+          "mean": 0.2463100680290807,
+          "p50": 0.23674255497921148,
+          "p95": 0.30967660127778096,
+          "p99": 0.1730025412813539,
+          "rss_kib": 0.06075273636300258
+        }
+      },
+      "validation": {
+        "capture": null,
+        "change": 420,
+        "claim_authorized": false,
+        "claim_withheld_reason": "normal ABBA retains 100 samples; at least 500 are required",
+        "classification": "matched allocation/resource diagnostic",
+        "lane": "normal",
+        "performance_claim": null,
+        "report_count": 4,
+        "reports": [
+          {
+            "allocation": {
+              "status": "unavailable"
+            },
+            "binary_sha256": "d0536ad9d1acafd320c49e8a1526569159e7ef80c230a877a5ccbcb60daf235a",
+            "corpus_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 710190694.6304852,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 710387672.8895158
+              },
+              "max": 711776644,
+              "mean": 710289183.7600005,
+              "min": 708940446,
+              "p50": 710255527,
+              "p95": 711112001,
+              "p99": 711303500,
+              "sample_count": 100,
+              "standard_deviation": 496362.7100438723
+            },
+            "leg": "A1",
+            "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+            "output_vector_sha256": "556c179874cf9b2bcce9f48ad03503920db58f8547df2c73c5cf57b60ce4c9c9",
+            "report_sha256": "644fd7aa3052f503f0a6efbf35998991e84a87b6938019deb96c1d2cc1e3cf25",
+            "revision": "68e4b0dfa217c073b33a6801bf9d2a8551b7ce6f",
+            "sample_order_sha256": "030fe3b261bad87ce86d32c947f295177c7675a8c864065d148bcccd6203d002"
+          },
+          {
+            "allocation": {
+              "status": "unavailable"
+            },
+            "binary_sha256": "0aff183cd68d91a10a08dc8e6cedda7c6da94bde3e1466d773f20c3c4b8b57e4",
+            "corpus_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 714833879.716417,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 715129933.0435826
+              },
+              "max": 718024167,
+              "mean": 714981906.3799998,
+              "min": 713783667,
+              "p50": 714916674,
+              "p95": 716077350,
+              "p99": 717612002,
+              "sample_count": 100,
+              "standard_deviation": 746020.5634505794
+            },
+            "leg": "B1",
+            "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+            "output_vector_sha256": "556c179874cf9b2bcce9f48ad03503920db58f8547df2c73c5cf57b60ce4c9c9",
+            "report_sha256": "d6109ab11cb6d3623250d0fa8b204e69e462552084499e34f25bf29df57c7326",
+            "revision": "81c70058a33dd671bcf022f72bbf1d90fa35821f",
+            "sample_order_sha256": "793baae253663d7af68fd72359f23360721263e103924a08c758fd9af94648c4"
+          },
+          {
+            "allocation": {
+              "status": "unavailable"
+            },
+            "binary_sha256": "0aff183cd68d91a10a08dc8e6cedda7c6da94bde3e1466d773f20c3c4b8b57e4",
+            "corpus_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 716593910.739702,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 716892046.8602979
+              },
+              "max": 719354429,
+              "mean": 716742978.8,
+              "min": 715467225,
+              "p50": 716609186,
+              "p95": 718294874,
+              "p99": 718853489,
+              "sample_count": 100,
+              "standard_deviation": 751268.9649572809
+            },
+            "leg": "B2",
+            "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+            "output_vector_sha256": "556c179874cf9b2bcce9f48ad03503920db58f8547df2c73c5cf57b60ce4c9c9",
+            "report_sha256": "e3daa36dc5d769fd3868cbda8b920545318f3fa98956d9ac3c6b905c1e072512",
+            "revision": "81c70058a33dd671bcf022f72bbf1d90fa35821f",
+            "sample_order_sha256": "c637f67fb2f205c3c4ed15f47119713ba95fd9f08091eea639c4024f40252732"
+          },
+          {
+            "allocation": {
+              "status": "unavailable"
+            },
+            "binary_sha256": "d0536ad9d1acafd320c49e8a1526569159e7ef80c230a877a5ccbcb60daf235a",
+            "corpus_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 727478007.2600293,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 727948542.3599703
+              },
+              "max": 729433121,
+              "mean": 727713274.8099998,
+              "min": 723928051,
+              "p50": 727920450,
+              "p95": 728964928,
+              "p99": 729158231,
+              "sample_count": 100,
+              "standard_deviation": 1185694.6981209856
+            },
+            "leg": "A2",
+            "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+            "output_vector_sha256": "556c179874cf9b2bcce9f48ad03503920db58f8547df2c73c5cf57b60ce4c9c9",
+            "report_sha256": "5a7f4bc997af499ee0de3a030933541b9869157151335267b88694f6adde8de7",
+            "revision": "68e4b0dfa217c073b33a6801bf9d2a8551b7ce6f",
+            "sample_order_sha256": "8139f984805241d696dcc4d9987be7cdfdd602deadd9b5fffa2ea9d4aea53dd0"
+          }
+        ],
+        "samples": 100,
+        "selector": "pptx_cross_copy_media_rich_lifecycle",
+        "warmups": 10
+      }
+    },
+    "normal/pptx_cross_copy_plain_lifecycle": {
+      "pairs": {
+        "A1_to_B1": {
+          "mean": {
+            "candidate": 9457624.390000004,
+            "candidate_minus_control_percent": 1.590081762349829,
+            "control": 9309594.230000002
+          },
+          "p50": {
+            "candidate": 9455718,
+            "candidate_minus_control_percent": 1.688175138585995,
+            "control": 9298739
+          },
+          "p95": {
+            "candidate": 9624733,
+            "candidate_minus_control_percent": 2.4094608750426274,
+            "control": 9398285
+          },
+          "p99": {
+            "candidate": 9681314,
+            "candidate_minus_control_percent": 2.3844405232953796,
+            "control": 9455845
+          },
+          "rss_kib": {
+            "candidate": 82660,
+            "candidate_minus_control_percent": 0.01936014713711824,
+            "control": 82644
+          }
+        },
+        "A2_to_B2": {
+          "mean": {
+            "candidate": 9501663.26999999,
+            "candidate_minus_control_percent": 1.5711916241071069,
+            "control": 9354683.270000001
+          },
+          "p50": {
+            "candidate": 9478239,
+            "candidate_minus_control_percent": 1.2236777549970321,
+            "control": 9363658
+          },
+          "p95": {
+            "candidate": 9774015,
+            "candidate_minus_control_percent": 3.92709632774477,
+            "control": 9404684
+          },
+          "p99": {
+            "candidate": 9924835,
+            "candidate_minus_control_percent": 5.214718983510327,
+            "control": 9432934
+          },
+          "rss_kib": {
+            "candidate": 82736,
+            "candidate_minus_control_percent": 0.0,
+            "control": 82736
+          }
+        }
+      },
+      "same_revision_drift_percent": {
+        "A1_to_A2": {
+          "mean": 0.484328735345956,
+          "p50": 0.698148426361897,
+          "p95": 0.06808689032094685,
+          "p99": -0.24229458075930815,
+          "rss_kib": 0.11132084603842989
+        },
+        "B1_to_B2": {
+          "mean": 0.4656442060286336,
+          "p50": 0.23817334654015698,
+          "p95": 1.5510248440138548,
+          "p99": 2.5153713638458584,
+          "rss_kib": 0.09194289862085653
+        }
+      },
+      "validation": {
+        "capture": null,
+        "change": 420,
+        "claim_authorized": false,
+        "claim_withheld_reason": "normal ABBA retains 100 samples; at least 500 are required",
+        "classification": "matched allocation/resource diagnostic",
+        "lane": "normal",
+        "performance_claim": null,
+        "report_count": 4,
+        "reports": [
+          {
+            "allocation": {
+              "status": "unavailable"
+            },
+            "binary_sha256": "d0536ad9d1acafd320c49e8a1526569159e7ef80c230a877a5ccbcb60daf235a",
+            "corpus_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 9300102.032101687,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 9319086.427898318
+              },
+              "max": 9458036,
+              "mean": 9309594.230000002,
+              "min": 9248454,
+              "p50": 9298739,
+              "p95": 9398285,
+              "p99": 9455845,
+              "sample_count": 100,
+              "standard_deviation": 47838.50863816984
+            },
+            "leg": "A1",
+            "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+            "output_vector_sha256": "1d761a1dc337c342a129c2ac12445c83559b9474b4b41e006979e12727554a84",
+            "report_sha256": "9cfca9c3c28fba4bb9813a44e3d8fb660a3bf329b1c30bc12157a1b301b2bc4c",
+            "revision": "68e4b0dfa217c073b33a6801bf9d2a8551b7ce6f",
+            "sample_order_sha256": "be9526ff9f9f1e2af0bfd77441af452e9133dbfb5ada930d9696fed2bdf71209"
+          },
+          {
+            "allocation": {
+              "status": "unavailable"
+            },
+            "binary_sha256": "0aff183cd68d91a10a08dc8e6cedda7c6da94bde3e1466d773f20c3c4b8b57e4",
+            "corpus_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 9438048.251382068,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 9477200.52861794
+              },
+              "max": 9695764,
+              "mean": 9457624.390000004,
+              "min": 9264842,
+              "p50": 9455718,
+              "p95": 9624733,
+              "p99": 9681314,
+              "sample_count": 100,
+              "standard_deviation": 98659.26589482948
+            },
+            "leg": "B1",
+            "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+            "output_vector_sha256": "1d761a1dc337c342a129c2ac12445c83559b9474b4b41e006979e12727554a84",
+            "report_sha256": "42f3ee790712dd520447b95be78235eb060acc7f516be644e685cefe980f51b1",
+            "revision": "81c70058a33dd671bcf022f72bbf1d90fa35821f",
+            "sample_order_sha256": "021206437551506e16f9ede82a1063cc71fae64ea8394c916f5e2adf3eae339a"
+          },
+          {
+            "allocation": {
+              "status": "unavailable"
+            },
+            "binary_sha256": "0aff183cd68d91a10a08dc8e6cedda7c6da94bde3e1466d773f20c3c4b8b57e4",
+            "corpus_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 9471955.74206419,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 9531370.797935791
+              },
+              "max": 9946356,
+              "mean": 9501663.26999999,
+              "min": 9272793,
+              "p50": 9478239,
+              "p95": 9774015,
+              "p99": 9924835,
+              "sample_count": 100,
+              "standard_deviation": 149719.15324561647
+            },
+            "leg": "B2",
+            "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+            "output_vector_sha256": "1d761a1dc337c342a129c2ac12445c83559b9474b4b41e006979e12727554a84",
+            "report_sha256": "5bc3886d50008d21edb3797415742ca02f6c2c07b894044c9d8e8709cad58dc6",
+            "revision": "81c70058a33dd671bcf022f72bbf1d90fa35821f",
+            "sample_order_sha256": "bcc0f99d9dbe0722e25410f96a2929119cf438b0c23e72b5c3267d1009cbbb2f"
+          },
+          {
+            "allocation": {
+              "status": "unavailable"
+            },
+            "binary_sha256": "d0536ad9d1acafd320c49e8a1526569159e7ef80c230a877a5ccbcb60daf235a",
+            "corpus_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+            "elapsed": {
+              "confidence_interval_95": {
+                "lower": 9343110.837540558,
+                "method": "two-sided Student's t interval for the mean",
+                "upper": 9366255.702459445
+              },
+              "max": 9735135,
+              "mean": 9354683.270000001,
+              "min": 9251543,
+              "p50": 9363658,
+              "p95": 9404684,
+              "p99": 9432934,
+              "sample_count": 100,
+              "standard_deviation": 58322.41553602429
+            },
+            "leg": "A2",
+            "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+            "output_vector_sha256": "1d761a1dc337c342a129c2ac12445c83559b9474b4b41e006979e12727554a84",
+            "report_sha256": "28e7c780e75e501749d9a05ff67c974a528a16fceca36546c53c9190df04666d",
+            "revision": "68e4b0dfa217c073b33a6801bf9d2a8551b7ce6f",
+            "sample_order_sha256": "419c74375145525c0204474899b48fd69fe3f0ec78bd228d13ae776d8fe8cac2"
+          }
+        ],
+        "samples": 100,
+        "selector": "pptx_cross_copy_plain_lifecycle",
+        "warmups": 10
+      }
+    }
+  },
+  "limitations": [
+    "100 normal samples are below the release latency claim threshold; allocator elapsed times excluded",
+    "Allocation bytes count full successful realloc requests, not physical copying",
+    "Live/peak values are process snapshots; no operation-local peak claim",
+    "RSS is whole process; shared KVM background uncontrolled; no cold, scaling or native-producer generalization"
+  ],
+  "runs": {
+    "allocator/A1/pptx_cross_copy_media_rich_lifecycle": {
+      "allocation": {
+        "allocated_bytes": {
+          "max": 369986715,
+          "mean": 369979885.6666667,
+          "min": 369977259
+        },
+        "allocation_calls": {
+          "max": 59717,
+          "mean": 59714.833333333336,
+          "min": 59714
+        },
+        "live_bytes_after": {
+          "max": 287886807,
+          "mean": 287885879,
+          "min": 287884951
+        },
+        "live_bytes_before": {
+          "max": 169822406,
+          "mean": 169821478,
+          "min": 169820550
+        },
+        "peak_live_bytes_after": {
+          "max": 896603242,
+          "mean": 896603242,
+          "min": 896603242
+        },
+        "peak_live_bytes_before": {
+          "max": 896603242,
+          "mean": 896603242,
+          "min": 896603242
+        },
+        "reallocation_calls": {
+          "max": 7305,
+          "mean": 7305,
+          "min": 7305
+        }
+      },
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "report_sha256": "221c24ff7aa7f49774ddb49c39d151077a1a70cb4bac60a011d5dba685dee060",
+      "rss_kib": 884676
+    },
+    "allocator/A1/pptx_cross_copy_plain_lifecycle": {
+      "allocation": {
+        "allocated_bytes": {
+          "max": 15664317,
+          "mean": 15664317,
+          "min": 15664317
+        },
+        "allocation_calls": {
+          "max": 49335,
+          "mean": 49335,
+          "min": 49335
+        },
+        "live_bytes_after": {
+          "max": 885354,
+          "mean": 884426,
+          "min": 883498
+        },
+        "live_bytes_before": {
+          "max": 369639,
+          "mean": 368711,
+          "min": 367783
+        },
+        "peak_live_bytes_after": {
+          "max": 3565760,
+          "mean": 3565760,
+          "min": 3565760
+        },
+        "peak_live_bytes_before": {
+          "max": 3565760,
+          "mean": 3565760,
+          "min": 3565760
+        },
+        "reallocation_calls": {
+          "max": 6085,
+          "mean": 6085,
+          "min": 6085
+        }
+      },
+      "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "report_sha256": "ab2cfb88cd02f69adc07e3027aa07e76ecc908bbad097e282e2ffdd85df06452",
+      "rss_kib": 82740
+    },
+    "allocator/A2/pptx_cross_copy_media_rich_lifecycle": {
+      "allocation": {
+        "allocated_bytes": {
+          "max": 369986715,
+          "mean": 369979885.6666667,
+          "min": 369977259
+        },
+        "allocation_calls": {
+          "max": 59717,
+          "mean": 59714.833333333336,
+          "min": 59714
+        },
+        "live_bytes_after": {
+          "max": 287886807,
+          "mean": 287885879,
+          "min": 287884951
+        },
+        "live_bytes_before": {
+          "max": 169822406,
+          "mean": 169821478,
+          "min": 169820550
+        },
+        "peak_live_bytes_after": {
+          "max": 896603242,
+          "mean": 896603242,
+          "min": 896603242
+        },
+        "peak_live_bytes_before": {
+          "max": 896603242,
+          "mean": 896603242,
+          "min": 896603242
+        },
+        "reallocation_calls": {
+          "max": 7305,
+          "mean": 7305,
+          "min": 7305
+        }
+      },
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "report_sha256": "cca9f685201fefa4d0c81fce009630782f9c47224ae6d80ff7dfc36f45003168",
+      "rss_kib": 884940
+    },
+    "allocator/A2/pptx_cross_copy_plain_lifecycle": {
+      "allocation": {
+        "allocated_bytes": {
+          "max": 15664317,
+          "mean": 15664317,
+          "min": 15664317
+        },
+        "allocation_calls": {
+          "max": 49335,
+          "mean": 49335,
+          "min": 49335
+        },
+        "live_bytes_after": {
+          "max": 885354,
+          "mean": 884426,
+          "min": 883498
+        },
+        "live_bytes_before": {
+          "max": 369639,
+          "mean": 368711,
+          "min": 367783
+        },
+        "peak_live_bytes_after": {
+          "max": 3565760,
+          "mean": 3565760,
+          "min": 3565760
+        },
+        "peak_live_bytes_before": {
+          "max": 3565760,
+          "mean": 3565760,
+          "min": 3565760
+        },
+        "reallocation_calls": {
+          "max": 6085,
+          "mean": 6085,
+          "min": 6085
+        }
+      },
+      "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "report_sha256": "f6e37eeb92a1fb8ccab8e3043a41619c68466f4c0a77e062d8b3cc2bd05e23d5",
+      "rss_kib": 82608
+    },
+    "allocator/B1/pptx_cross_copy_media_rich_lifecycle": {
+      "allocation": {
+        "allocated_bytes": {
+          "max": 369986715,
+          "mean": 369980305.93333334,
+          "min": 369977259
+        },
+        "allocation_calls": {
+          "max": 59717,
+          "mean": 59714.96666666667,
+          "min": 59714
+        },
+        "live_bytes_after": {
+          "max": 237453674,
+          "mean": 237452746,
+          "min": 237451818
+        },
+        "live_bytes_before": {
+          "max": 169822406,
+          "mean": 169821478,
+          "min": 169820550
+        },
+        "peak_live_bytes_after": {
+          "max": 812687527,
+          "mean": 812687527,
+          "min": 812687527
+        },
+        "peak_live_bytes_before": {
+          "max": 812687527,
+          "mean": 812687527,
+          "min": 812687527
+        },
+        "reallocation_calls": {
+          "max": 7305,
+          "mean": 7305,
+          "min": 7305
+        }
+      },
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "report_sha256": "a62069dd66ae6daa1aadae2b4557df145528d7415e7ef1d0d255e8f83cb8259d",
+      "rss_kib": 803760
+    },
+    "allocator/B1/pptx_cross_copy_plain_lifecycle": {
+      "allocation": {
+        "allocated_bytes": {
+          "max": 15664317,
+          "mean": 15664317,
+          "min": 15664317
+        },
+        "allocation_calls": {
+          "max": 49335,
+          "mean": 49335,
+          "min": 49335
+        },
+        "live_bytes_after": {
+          "max": 797891,
+          "mean": 796963,
+          "min": 796035
+        },
+        "live_bytes_before": {
+          "max": 369639,
+          "mean": 368711,
+          "min": 367783
+        },
+        "peak_live_bytes_after": {
+          "max": 3559495,
+          "mean": 3559495,
+          "min": 3559495
+        },
+        "peak_live_bytes_before": {
+          "max": 3559495,
+          "mean": 3559495,
+          "min": 3559495
+        },
+        "reallocation_calls": {
+          "max": 6085,
+          "mean": 6085,
+          "min": 6085
+        }
+      },
+      "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "report_sha256": "389978858334fceb7107dc21bba67e9430f5a3ee4d766c057bf875a3f2e1bfba",
+      "rss_kib": 82672
+    },
+    "allocator/B2/pptx_cross_copy_media_rich_lifecycle": {
+      "allocation": {
+        "allocated_bytes": {
+          "max": 369986715,
+          "mean": 369979885.6666667,
+          "min": 369977259
+        },
+        "allocation_calls": {
+          "max": 59717,
+          "mean": 59714.833333333336,
+          "min": 59714
+        },
+        "live_bytes_after": {
+          "max": 237453674,
+          "mean": 237452746,
+          "min": 237451818
+        },
+        "live_bytes_before": {
+          "max": 169822406,
+          "mean": 169821478,
+          "min": 169820550
+        },
+        "peak_live_bytes_after": {
+          "max": 812687527,
+          "mean": 812687527,
+          "min": 812687527
+        },
+        "peak_live_bytes_before": {
+          "max": 812687527,
+          "mean": 812687527,
+          "min": 812687527
+        },
+        "reallocation_calls": {
+          "max": 7305,
+          "mean": 7305,
+          "min": 7305
+        }
+      },
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "report_sha256": "f468394b278b59ac1f045648ab7449624fd401192b37fc2f7f540255aeed8571",
+      "rss_kib": 803508
+    },
+    "allocator/B2/pptx_cross_copy_plain_lifecycle": {
+      "allocation": {
+        "allocated_bytes": {
+          "max": 15664317,
+          "mean": 15664317,
+          "min": 15664317
+        },
+        "allocation_calls": {
+          "max": 49335,
+          "mean": 49335,
+          "min": 49335
+        },
+        "live_bytes_after": {
+          "max": 797891,
+          "mean": 796963,
+          "min": 796035
+        },
+        "live_bytes_before": {
+          "max": 369639,
+          "mean": 368711,
+          "min": 367783
+        },
+        "peak_live_bytes_after": {
+          "max": 3559495,
+          "mean": 3559495,
+          "min": 3559495
+        },
+        "peak_live_bytes_before": {
+          "max": 3559495,
+          "mean": 3559495,
+          "min": 3559495
+        },
+        "reallocation_calls": {
+          "max": 6085,
+          "mean": 6085,
+          "min": 6085
+        }
+      },
+      "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "report_sha256": "9cc9d80000dd83f31ba979e4f86a5c15d769d5100e50825681eb483ff1609aa4",
+      "rss_kib": 82736
+    },
+    "normal/A1/pptx_cross_copy_media_rich_lifecycle": {
+      "elapsed_ns": {
+        "max": 711776644,
+        "mean": 710289183.7600005,
+        "min": 708940446,
+        "p50": 710255527,
+        "p95": 711112001,
+        "p99": 711303500,
+        "sample_standard_deviation": 496362.71004404133
+      },
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "report_sha256": "644fd7aa3052f503f0a6efbf35998991e84a87b6938019deb96c1d2cc1e3cf25",
+      "rss_kib": 884904
+    },
+    "normal/A1/pptx_cross_copy_plain_lifecycle": {
+      "elapsed_ns": {
+        "max": 9458036,
+        "mean": 9309594.230000002,
+        "min": 9248454,
+        "p50": 9298739,
+        "p95": 9398285,
+        "p99": 9455845,
+        "sample_standard_deviation": 47838.50863817081
+      },
+      "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "report_sha256": "9cfca9c3c28fba4bb9813a44e3d8fb660a3bf329b1c30bc12157a1b301b2bc4c",
+      "rss_kib": 82644
+    },
+    "normal/A2/pptx_cross_copy_media_rich_lifecycle": {
+      "elapsed_ns": {
+        "max": 729433121,
+        "mean": 727713274.8099998,
+        "min": 723928051,
+        "p50": 727920450,
+        "p95": 728964928,
+        "p99": 729158231,
+        "sample_standard_deviation": 1185694.698120901
+      },
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "report_sha256": "5a7f4bc997af499ee0de3a030933541b9869157151335267b88694f6adde8de7",
+      "rss_kib": 885900
+    },
+    "normal/A2/pptx_cross_copy_plain_lifecycle": {
+      "elapsed_ns": {
+        "max": 9735135,
+        "mean": 9354683.270000001,
+        "min": 9251543,
+        "p50": 9363658,
+        "p95": 9404684,
+        "p99": 9432934,
+        "sample_standard_deviation": 58322.41553602411
+      },
+      "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "report_sha256": "28e7c780e75e501749d9a05ff67c974a528a16fceca36546c53c9190df04666d",
+      "rss_kib": 82736
+    },
+    "normal/B1/pptx_cross_copy_media_rich_lifecycle": {
+      "elapsed_ns": {
+        "max": 718024167,
+        "mean": 714981906.3799998,
+        "min": 713783667,
+        "p50": 714916674,
+        "p95": 716077350,
+        "p99": 717612002,
+        "sample_standard_deviation": 746020.5634504757
+      },
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "report_sha256": "d6109ab11cb6d3623250d0fa8b204e69e462552084499e34f25bf29df57c7326",
+      "rss_kib": 803256
+    },
+    "normal/B1/pptx_cross_copy_plain_lifecycle": {
+      "elapsed_ns": {
+        "max": 9695764,
+        "mean": 9457624.390000004,
+        "min": 9264842,
+        "p50": 9455718,
+        "p95": 9624733,
+        "p99": 9681314,
+        "sample_standard_deviation": 98659.26589483103
+      },
+      "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "report_sha256": "42f3ee790712dd520447b95be78235eb060acc7f516be644e685cefe980f51b1",
+      "rss_kib": 82660
+    },
+    "normal/B2/pptx_cross_copy_media_rich_lifecycle": {
+      "elapsed_ns": {
+        "max": 719354429,
+        "mean": 716742978.8,
+        "min": 715467225,
+        "p50": 716609186,
+        "p95": 718294874,
+        "p99": 718853489,
+        "sample_standard_deviation": 751268.9649572915
+      },
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "report_sha256": "e3daa36dc5d769fd3868cbda8b920545318f3fa98956d9ac3c6b905c1e072512",
+      "rss_kib": 803744
+    },
+    "normal/B2/pptx_cross_copy_plain_lifecycle": {
+      "elapsed_ns": {
+        "max": 9946356,
+        "mean": 9501663.26999999,
+        "min": 9272793,
+        "p50": 9478239,
+        "p95": 9774015,
+        "p99": 9924835,
+        "sample_standard_deviation": 149719.15324561158
+      },
+      "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "report_sha256": "5bc3886d50008d21edb3797415742ca02f6c2c07b894044c9d8e8709cad58dc6",
+      "rss_kib": 82736
+    }
+  }
+}
