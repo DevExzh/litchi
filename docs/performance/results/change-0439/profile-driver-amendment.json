@@ -1,0 +1,21 @@
+{
+  "change": 439,
+  "reason": "original profile custody compared full git status, including artifacts it created; refined driver uses the same outside-bundle status filter as capture and enforces frozen oracle hashes",
+  "original_driver": {
+    "path": "profile.py",
+    "sha256": "13f9aa255727c8904858727f2aaf0403944ba76928736241fc9fe48642352ccc"
+  },
+  "refined_driver": {
+    "path": "profile-refined.py",
+    "sha256": "e3d60fb364ed159b5fa85dc73f7d154fd42b3cb10179443c14f3fe9cb3a4929a"
+  },
+  "unchanged_capture_driver_sha256": "79bdccdb197f1286e955b74a25921f9567821cdf4aea04ef4fe4b9f091b9a516",
+  "unchanged_protocol_sha256": "d5adeef91f70d65cfb0fc6940e5423d9bedec040a36667dd643f364a921bfca1",
+  "unchanged_source_manifest": {
+    "files": 6657,
+    "path": "sources/8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6.json",
+    "sha256": "8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6"
+  },
+  "failed_profile_receipt": "profiles/after/stat/formal/receipt.json",
+  "scope": "profile orchestration correction; workload binary, argv flags, timed operation and formal 12-report matrix unchanged"
+}

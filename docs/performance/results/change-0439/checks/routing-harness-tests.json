@@ -1,0 +1,47 @@
+{
+  "change": 439,
+  "argv": [
+    "cargo",
+    "test",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--all-features",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "a31fc506ee8af6b4fe41e1707030cf20b9f9a850",
+  "driver_sha256": "25aab515959a791e087c3cc9261440827785d905df9b10fec6a554a0379803e7",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T13:03:24.876162+00:00",
+  "source_before": {
+    "path": "sources/8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6.json",
+    "sha256": "8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6",
+    "files": 6657
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T13:07:49.721181+00:00",
+  "source_after": {
+    "path": "sources/8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6.json",
+    "sha256": "8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6",
+    "files": 6657
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/routing-harness-tests.log",
+    "bytes": 33835,
+    "sha256": "8896f652fe3aad155dfafc4f937b854190dfdb3a0985e4d89c6c487372ca75de"
+  },
+  "passed_tests": 368,
+  "failed_tests": 0,
+  "ignored_tests": 1
+}

@@ -1,5 +1,23 @@
 # Performance hotspot inventory
 
+## Change 0439: owned append exposes XML and allocation costs
+
+[0439](changes/0439-odp-existing-append-lifecycle.md) measures existing ODP
+opening through one appended slide, commit and output. The 8,192-slide case
+takes 170.742/175.416 ms normal p50 and requests 236,704,188 bytes through
+1,462,779 allocation calls. Its region peak is 39,890,548 bytes above entry.
+Whole-process self samples include namespace-event processing (6.91%),
+attribute iteration (5.21%), `ElementAttrs::get` (4.71%), memcmp (8.38%), and
+memmove (4.19%). Setup and oracle work are included, so these are candidates
+for operation-specific attribution, not proven causal shares of append.
+
+Next isolate open versus commit validation and the owned namespace snapshots
+in `ElementAttrs`; preserve namespace resolution, malformed-attribute ordering,
+and exact publication checks before testing an optimization. The earlier
+shared generated-XML double-parse hypothesis remains separate future work.
+Part addition/repackaging, native breadth, cold/range input and scaling remain
+open. No production optimization is included in this batch.
+
 ## Change 0438: fixed-markup Work batching is insufficient
 
 [0438](changes/0438-odp-markup-batching-negative.md) rejects the preceding

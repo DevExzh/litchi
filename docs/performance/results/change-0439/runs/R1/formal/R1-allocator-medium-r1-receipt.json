@@ -1,0 +1,129 @@
+{
+  "ambient_source_manifest": {
+    "files": 6657,
+    "path": "sources/8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6.json",
+    "sha256": "8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0439/runs/R1/formal/R1-allocator-medium-r1-resource.log",
+    "/tmp/litchi-goal-0439-binaries/after-routing/allocator",
+    "--case",
+    "odp_existing_append_lifecycle",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0439/runs/R1/formal/R1-allocator-medium-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0439/runs/R1/formal/R1-allocator-medium-r1-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4948,
+      "path": "runs/R1/formal/R1-allocator-medium-r1-catalog.json",
+      "sha256": "a8be32285da61930a724a7ee0342cfd01223ec39a77001495c60a055bd79f199"
+    },
+    "oracle_log": {
+      "bytes": 303,
+      "path": "runs/R1/formal/R1-allocator-medium-r1-oracle.log",
+      "sha256": "d83a3f913e43122e8942a1a0beb283573e937731c5983b506d85501bab421ea0"
+    },
+    "report": {
+      "bytes": 54802,
+      "path": "runs/R1/formal/R1-allocator-medium-r1.json",
+      "sha256": "4c720a8bc10b6a31e2d36cbdcda9cb8c51954f8135d12169f36a6e1e6cd5215b"
+    },
+    "resource_log": {
+      "bytes": 1112,
+      "path": "runs/R1/formal/R1-allocator-medium-r1-resource.log",
+      "sha256": "77f83edf3c4b864a5f1b259cab2ec3ccc8b56168043ecb73a61374ba5b799004"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/R1/formal/R1-allocator-medium-r1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 457237080,
+    "path": "/tmp/litchi-goal-0439-binaries/after-routing/allocator",
+    "sha256": "a93357033e07b52f77bdf4c24b6845971917c5c09d23b25e19b1d0d4dcc7455e"
+  },
+  "build_directory": "after",
+  "change": 439,
+  "custody_driver": "/home/zhuhe/code/litchi/docs/performance/results/change-0439/check.py",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "79bdccdb197f1286e955b74a25921f9567821cdf4aea04ef4fe4b9f091b9a516",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T13:19:36.132505+00:00",
+  "lane": {
+    "mode": "allocator",
+    "phase": "R1",
+    "repeat": "R1",
+    "shape": "medium"
+  },
+  "name": "R1-allocator-medium-r1",
+  "oracle_exit_code": 0,
+  "oracle_role": "after",
+  "oracle_stdout_sha256": "d83a3f913e43122e8942a1a0beb283573e937731c5983b506d85501bab421ea0",
+  "outside_bundle_status_unchanged": true,
+  "phase": "R1",
+  "protocol_sha256": "d5adeef91f70d65cfb0fc6940e5423d9bedec040a36667dd643f364a921bfca1",
+  "revision": "a31fc506ee8af6b4fe41e1707030cf20b9f9a850",
+  "role": "after",
+  "schema": "litchi-0439-capture-receipt-v1",
+  "selector": "odp_existing_append_lifecycle",
+  "source_after": {
+    "files": 6657,
+    "path": "sources/8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6.json",
+    "sha256": "8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6"
+  },
+  "source_before": {
+    "files": 6657,
+    "path": "sources/8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6.json",
+    "sha256": "8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6"
+  },
+  "source_field": "odp_append",
+  "source_manifest": {
+    "files": 6657,
+    "path": "sources/8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6.json",
+    "sha256": "8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T13:19:32.074096+00:00",
+  "status": "pass",
+  "status_after": [
+    " M docs/performance/GOAL_AUDIT.md",
+    " M docs/performance/crud-coverage-index-v1.json",
+    " M tools/perf-baseline/README.md",
+    " M tools/perf-baseline/src/lib.rs",
+    " M tools/test_crud_coverage_index.py",
+    " M tools/validate_crud_coverage_index.py",
+    "?? docs/GOAL.md",
+    "?? docs/performance/changes/0439-odp-existing-append-lifecycle.md",
+    "?? tools/perf-baseline/src/odp_existing_append.rs"
+  ],
+  "status_before": [
+    " M docs/performance/GOAL_AUDIT.md",
+    " M docs/performance/crud-coverage-index-v1.json",
+    " M tools/perf-baseline/README.md",
+    " M tools/perf-baseline/src/lib.rs",
+    " M tools/test_crud_coverage_index.py",
+    " M tools/validate_crud_coverage_index.py",
+    "?? docs/GOAL.md",
+    "?? docs/performance/changes/0439-odp-existing-append-lifecycle.md",
+    "?? tools/perf-baseline/src/odp_existing_append.rs"
+  ]
+}

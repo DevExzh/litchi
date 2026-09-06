@@ -1,0 +1,105 @@
+{
+  "change": 439,
+  "status": "pass",
+  "oracle_sha256": "e4bca2715391cfb31637b86507c98f121df24b96405cb64df29902c09ef0aa4b",
+  "driver_sha256": "30e7a5c345ef59d5e713e0b8c47fef727ddb7ce60ef0f2aa4deb802bb6b3e7ea",
+  "controls": [
+    {
+      "path": "pilots/after/aligned/normal-tiny.json",
+      "sha256": "e962e8da0bd5e0f9961c9a2248a3899c0fa864737f66f8b60438d82ebda74f5a"
+    },
+    {
+      "path": "pilots/after/aligned/normal-medium.json",
+      "sha256": "685d02d01a0205273019c244f4e6052beeeed65065c4952dbb2033e7e4401197"
+    },
+    {
+      "path": "pilots/after/aligned/normal-large.json",
+      "sha256": "1d417d5e820ecdad602bff3f1c2f7ec73eeda6763557175a2517f7f20b636822"
+    },
+    {
+      "path": "pilots/after/aligned/allocator-tiny.json",
+      "sha256": "d7faaebd503378ccc6e38a567a2b05e9a6e2d7a5972fb5913fa939b3d6bd80c7"
+    },
+    {
+      "path": "pilots/after/aligned/allocator-medium.json",
+      "sha256": "013689cbd2a331d4b33eb70f910db82eeeb539c47701435f59d1feab0cb70f43"
+    },
+    {
+      "path": "pilots/after/aligned/allocator-large.json",
+      "sha256": "f942486f0ea73ccf50523e32fadaeb38ee93d8ac559d56a78018924b75e2ab57"
+    }
+  ],
+  "probes": [
+    {
+      "name": "source_semantic",
+      "status": "rejected",
+      "reason": "source/output semantic digest does not match the independent fixture"
+    },
+    {
+      "name": "output_order",
+      "status": "rejected",
+      "reason": "source/output order digest does not match the independent fixture"
+    },
+    {
+      "name": "opaque_formula",
+      "status": "rejected",
+      "reason": "opaque member decoded SHA differs from the independent formula"
+    },
+    {
+      "name": "text_projection",
+      "status": "rejected",
+      "reason": "source text projection SHA differs from fixture"
+    },
+    {
+      "name": "manifest_gate",
+      "status": "rejected",
+      "reason": "odp_append.output_manifest_bindings_verified: expected true"
+    },
+    {
+      "name": "untouched_gate",
+      "status": "rejected",
+      "reason": "odp_append.untouched_members_verified: expected true"
+    },
+    {
+      "name": "timing_open_excluded",
+      "status": "rejected",
+      "reason": "odp_append.timing_scope incorrectly excludes Snapshot::from_bytes"
+    },
+    {
+      "name": "chronological_order",
+      "status": "rejected",
+      "reason": "lifecycle_ns does not bind to original sample indices"
+    },
+    {
+      "name": "allocation_balance",
+      "status": "rejected",
+      "reason": "allocator live-byte balance differs"
+    },
+    {
+      "name": "allocation_peak",
+      "status": "rejected",
+      "reason": "allocator region peak is below an endpoint"
+    },
+    {
+      "name": "allocation_failure",
+      "status": "rejected",
+      "reason": "allocator failure calls must be zero"
+    },
+    {
+      "name": "allocator_revision",
+      "status": "rejected",
+      "reason": "allocator counter revision differs"
+    },
+    {
+      "name": "binary_profile",
+      "status": "rejected",
+      "reason": "binary identity must describe a release executable"
+    },
+    {
+      "name": "sink_count",
+      "status": "rejected",
+      "reason": "operation_metrics sink accepted bytes do not equal committed output bytes"
+    }
+  ],
+  "source_unchanged": true
+}

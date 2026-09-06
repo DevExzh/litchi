@@ -1,0 +1,64 @@
+{
+  "change": 439,
+  "cleanup_paths": [
+    "/tmp/litchi-goal-0439-append",
+    "/tmp/litchi-goal-0439-oracle",
+    "/tmp/litchi-goal-0439-evidence",
+    "/tmp/litchi-goal-0439-lifecycle",
+    "/tmp/litchi-goal-0439-review",
+    "/tmp/litchi-goal-0439-binaries",
+    "/tmp/litchi-goal-0439-lifecycle-refined"
+  ],
+  "goal_path": "/home/zhuhe/code/litchi/docs/GOAL.md",
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "precleanup_receipt": "checks/precleanup-lifecycle.json",
+  "preserved_target_directory_identity": {
+    "/home/zhuhe/code/litchi/target": [
+      66305,
+      25854451
+    ],
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target": [
+      66305,
+      25593433
+    ]
+  },
+  "removed": [
+    {
+      "path": "/tmp/litchi-goal-0439-append",
+      "regular_file_bytes": 2867042,
+      "regular_files": 4
+    },
+    {
+      "path": "/tmp/litchi-goal-0439-oracle",
+      "regular_file_bytes": 75506,
+      "regular_files": 4
+    },
+    {
+      "path": "/tmp/litchi-goal-0439-evidence",
+      "regular_file_bytes": 70709,
+      "regular_files": 5
+    },
+    {
+      "path": "/tmp/litchi-goal-0439-lifecycle",
+      "regular_file_bytes": 66719,
+      "regular_files": 7
+    },
+    {
+      "path": "/tmp/litchi-goal-0439-review",
+      "regular_file_bytes": 6611,
+      "regular_files": 1
+    },
+    {
+      "path": "/tmp/litchi-goal-0439-binaries",
+      "regular_file_bytes": 1830251416,
+      "regular_files": 4
+    },
+    {
+      "path": "/tmp/litchi-goal-0439-lifecycle-refined",
+      "regular_file_bytes": 63102,
+      "regular_files": 4
+    }
+  ],
+  "schema": "litchi-0439-cleanup-inventory-v1",
+  "status": "pass"
+}

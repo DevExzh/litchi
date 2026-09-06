@@ -109,6 +109,7 @@ GENERATED_SELECTOR_SHAPES = {
     "odp_semantic_text_to_sink": ("large", "medium", "tiny"),
     "xlsx_streaming_create": ("large", "medium", "tiny"),
     "rtf_streaming_create": ("large", "medium", "tiny"),
+    "odp_existing_append_lifecycle": ("large", "medium", "tiny"),
     "xlsx_eager_defined_names_edit_save": ("media-rich",),
     "xlsx_eager_row_visibility_edit_save": ("large", "medium"),
     "xlsx_eager_cell_remove_edit_save": ("dense-sparse", "medium"),

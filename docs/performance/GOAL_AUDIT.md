@@ -1,6 +1,38 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0437
+## Current evidence through 0439
+
+[0439](changes/0439-odp-existing-append-lifecycle.md) establishes the full
+owned existing-ODP append interval that the older one-edit timer omitted.
+Twelve reports/360 samples and two accepted profiles cover 64/4,096/8,192
+source slides plus an opaque package member. The 368-test harness suite,
+independent fixture/resource gates, and no-new-Clippy-debt comparison pass.
+Large normal p50 is 170.742/175.416 ms, with 236,704,188 requested bytes and
+a 39,890,548-byte region peak above entry. This is a baseline addition, with
+no production optimization or bounded-commit-memory claim.
+
+The next evidence question is operation-specific attribution of owned open
+and commit validation, including repeated attribute/namespace work. Part
+addition, arbitrary repackaging, native/producer breadth, cold/range input,
+scaling and the remaining non-iWork goal stay open. The user-owned goal is
+unchanged; this batch does not narrow or complete it.
+
+## Earlier evidence through 0438
+
+[0438](changes/0438-odp-markup-batching-negative.md) tested the proposed ODP
+fixed-markup accounting change and rejected it under the predeclared 5%
+practical-gain gate. The 24-report/720-sample comparison found only
+0.703–1.982% normal p50 improvements. Production was restored; candidate
+source, measurements, four profiles, and validation remain reproducible.
+
+The next coverage target is logical append to an existing ODP through the full
+owned open/transaction/commit/sequential-output lifecycle. The existing
+`odp_semantic_one_edit_save` timer excludes opening. This is distinct from
+fresh streaming creation, adding a package Part, and arbitrary repackaging.
+The broader non-iWork goal remains open, including rich/native producer
+coverage, cold/range I/O, and scaling. `docs/GOAL.md` remains user-owned.
+
+## Earlier evidence through 0437
 
 [0437](changes/0437-odp-bounded-plain-slides.md) implements and measures fresh
 plain titled-slide ODP streaming with explicit source/sink/resource ownership.
@@ -12,7 +44,7 @@ sizes, 98.247% below large Builder, with the 1.574/1.588 large p50 ratios and
 all other regression flags disclosed. Native visual compatibility is unproven.
 
 This closes the current plain fresh ODP creation slice, not the program goal.
-Fixed-markup execution-accounting cost is the next measured-hypothesis target;
+Fixed-markup execution-accounting cost was the next measured-hypothesis target;
 existing append, richer creation, Part addition/repackaging, real-producer
 breadth, cold/range/scaling, and other taxonomy gaps remain. The user-owned
 `docs/GOAL.md` stays unchanged and excluded from commits. The batch retains
