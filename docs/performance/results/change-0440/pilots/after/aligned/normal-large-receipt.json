@@ -1,0 +1,30 @@
+{
+  "status": "pass",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0440-binaries/after/normal",
+    "--case",
+    "odp_existing_append_lifecycle",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "3",
+    "--warmup",
+    "1",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0440/pilots/after/aligned/normal-large.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0440/pilots/after/aligned/normal-large-catalog.json"
+  ],
+  "binary": {
+    "path": "/tmp/litchi-goal-0440-binaries/after/normal",
+    "bytes": 457884856,
+    "sha256": "81bd81b4fc34033be3aa7b47954c1319dacba3c1c2333b445103af4187cbc26d"
+  },
+  "revision": "dd0681cf884163fc16953ac2a95e4da81ace5d46",
+  "oracle_sha256": "e4bca2715391cfb31637b86507c98f121df24b96405cb64df29902c09ef0aa4b"
+}

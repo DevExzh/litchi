@@ -1,0 +1,247 @@
+#!/usr/bin/env python3
+"""Verify 0440 retained evidence without original binaries or checkout state."""
+import argparse
+import gzip
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+import datetime as dt
+
+ROOT = Path(__file__).resolve().parent
+
+
+def sha(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def load(path):
+    return json.loads(path.read_text())
+
+
+def require(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+
+def member(name):
+    path = Path(name)
+    require(not path.is_absolute() and '..' not in path.parts, 'unsafe bundle path')
+    path = (ROOT / path).resolve()
+    require(path.is_relative_to(ROOT.resolve()), 'path escapes bundle')
+    return path
+
+
+def artifact(row):
+    path = member(row['path'])
+    compressed = False
+    if not path.is_file():
+        path = Path(str(path) + '.gz')
+        compressed = True
+    require(path.stat().st_size <= 64 * 1024 * 1024, 'oversized stored artifact')
+    if compressed:
+        with gzip.open(path, 'rb') as stream:
+            raw = stream.read(64 * 1024 * 1024 + 1)
+    else:
+        raw = path.read_bytes()
+    require(len(raw) <= 64 * 1024 * 1024, 'oversized logical artifact')
+    require(len(raw) == row['bytes'] and sha(raw) == row['sha256'], 'artifact identity: ' + row['path'])
+    return raw
+
+
+def source(binding):
+    raw = member(binding['path']).read_bytes()
+    require(sha(raw) == binding['sha256'], 'source manifest hash')
+    rows = json.loads(raw)
+    require(len(rows) == binding['files'], 'source manifest count')
+    return rows
+
+
+def oracle(report, mode, shape, build, protocol):
+    binary = build['binaries'][mode]
+    identity = report['binary_identity']
+    require(identity['path'] == binary['path'] and identity['binary_bytes'] == binary['bytes'] and identity['binary_sha256'] == binary['sha256'], 'report binary identity')
+    require(report['environment']['git_revision'] == build['revision'], 'report revision')
+
+
+def receipt(name, build, protocol, driver, mode, shape, required):
+    row = load(member(name))
+    require(row.get('status') == 'pass' and row.get('exit_code') == 0 and row.get('oracle_exit_code') == 0, 'receipt status: ' + name)
+    require(row['protocol_sha256'] == sha((ROOT / 'protocol.json').read_bytes()), 'receipt protocol')
+    require(row['driver_sha256'] == sha((ROOT / driver).read_bytes()), 'receipt driver')
+    require(row['binary'] == build['binaries'][mode] and row['revision'] == build['revision'], 'receipt build')
+    require(row['source_before'] == row['source_after'] == row['source_manifest'] == build['source_manifest'] and row['source_unchanged'] is True, 'receipt source')
+    require(row['status_before'] == row['status_after'] and row['outside_bundle_status_unchanged'] is True, 'receipt worktree')
+    require(row['selector'] == 'odp_existing_append_lifecycle' and row['source_field'] == 'odp_append', 'receipt selector')
+    artifacts = row['artifacts']
+    require(set(required) <= set(artifacts), 'required artifacts')
+    decoded = {key: artifact(value) for key, value in artifacts.items()}
+    for key in required:
+        if key not in ('workload', 'workload_log'):
+            require(bool(decoded[key]), 'empty required artifact: ' + key)
+    report = json.loads(decoded['report'])
+    oracle(report, mode, shape, build, protocol)
+    command = [sys.executable, '-B', str(ROOT / 'oracle/verify-report.py'), '--report', str(member(artifacts['report']['path'])), '--mode', mode, '--shape', shape]
+    result = subprocess.run(command, capture_output=True, text=True)
+    require(result.returncode == 0 and result.stdout.strip() == 'VALID', 'independent oracle: ' + result.stderr)
+    start, end = (dt.datetime.fromisoformat(row[key]) for key in ('started_utc', 'finished_utc'))
+    require(start.tzinfo is not None and end.tzinfo is not None and start <= end, 'receipt timestamps')
+    return row, decoded, start, end
+
+
+def normalized_argv(values):
+    marker = '/docs/performance/results/change-0440/'
+    return [value.split(marker, 1)[1] if marker in value else value for value in values]
+
+
+def base_argv(build, mode, shape, artifacts):
+    return [build['binaries'][mode]['path'], '--case', 'odp_existing_append_lifecycle', '--semantic-shape', shape, '--workers', '1', '--samples', '30', '--warmup', '3', '--json', artifacts['report']['path'], '--corpus-manifest', artifacts['catalog']['path']]
+
+
+def validate(sealed=False, cleanup=False):
+    protocol = load(ROOT / 'protocol.json')
+    protocol_sha = sha((ROOT / 'protocol.json').read_bytes())
+    require(protocol['change'] == 440 and protocol['status'] == 'frozen', 'protocol identity')
+    require((protocol['cpu'], protocol['workers'], protocol['samples'], protocol['warmups']) == (2, 1, 30, 3), 'protocol dimensions')
+    for key, name in (('verifier_sha256', 'verify-report.py'), ('protocol_sha256', 'protocol.json')):
+        require(sha((ROOT / 'oracle' / name).read_bytes()) == protocol['oracle'][key], 'frozen oracle hash')
+    builds = {role: load(ROOT / role / 'build.json') for role in ('before', 'after')}
+    sources = {}
+    for role, build in builds.items():
+        require(build['role'] == role and build['change'] == 440 and build['protocol_sha256'] == protocol_sha, 'build protocol')
+        require(build['capture_driver_sha256'] == sha((ROOT / 'capture.py').read_bytes()) and build['profile_driver_sha256'] == sha((ROOT / 'profile.py').read_bytes()), 'build driver')
+        require(build['binaries'] == load(ROOT / role / 'binary-copies.json'), 'binary copies')
+        sources[role] = source(build['source_manifest'])
+        candidate = ROOT / 'candidate' / f'{role}-validation.rs.txt'
+        require(sha(candidate.read_bytes()) == sources[role]['crates/litchi-odp/src/codec/parser/codec/xml/validation.rs'], 'retained candidate source')
+        check = load(member(build['build_receipt']))
+        require(check['status'] == 'pass' and check['exit_code'] == 0 and check['source_before'] == check['source_after'] == build['source_manifest'], 'build receipt')
+    policy = load(ROOT / 'checks-policy.json')
+    for path in (ROOT / 'checks').glob('*.json'):
+        row = load(path)
+        if 'source_before' not in row:
+            continue
+        expected = policy['expected_status'].get(path.name, 'pass')
+        require(row['status'] == expected and row['status'] != 'running', 'check status: ' + path.name)
+        require((row['exit_code'] == 0) == (expected == 'pass'), 'check exit: ' + path.name)
+        require(row['source_before'] == row['source_after'] and row['source_unchanged'] is True, 'check custody')
+        source(row['source_before'])
+        artifact(row['log'])
+    for name, expected in policy['required'].items():
+        row = load(ROOT / 'checks' / name)
+        require(row['status'] == 'pass', 'required check: ' + name)
+        if 'tests' in expected:
+            require(row['passed_tests'] == expected['tests'] and row['failed_tests'] == 0, 'test count: ' + name)
+        if 'role' in expected:
+            require(row['source_after'] == builds[expected['role']]['source_manifest'], 'required check source: ' + name)
+    changed = {key for key in sources['before'].keys() | sources['after'].keys() if sources['before'].get(key) != sources['after'].get(key)}
+    require(changed == {'crates/litchi-odp/src/codec/parser/codec/xml/validation.rs'}, 'candidate source scope')
+    previous = None
+    intervals = []
+    phase_indices = {}
+    order = protocol['order']
+    require(len(order) == 24 and len({tuple(sorted(row.items())) for row in order}) == 24, 'capture lane set')
+    for lane in order:
+        phase, role, mode, shape, repeat = (lane[key] for key in ('phase', 'role', 'mode', 'shape', 'repeat'))
+        name = f'runs/{phase}/formal/{phase}-{role}-{mode}-{shape}-{repeat.lower()}-receipt.json'
+        row, decoded, start, end = receipt(name, builds[role], protocol, 'capture.py', mode, shape, ('report', 'catalog', 'resource_log', 'workload_log', 'oracle_log'))
+        require(row['lane'] == lane and row['phase'] == phase and row['role'] == role and row['attempt'] == 'formal', 'capture lane')
+        require(previous is None or previous <= start, 'capture chronology')
+        previous = end
+        intervals.append((start, end, name))
+        phase_indices.setdefault(phase, []).append(name)
+        expected = ['taskset', '-c', '2', '/usr/bin/time', '-v', '-o', row['artifacts']['resource_log']['path']] + base_argv(builds[role], mode, shape, row['artifacts'])
+        require(normalized_argv(row['argv']) == expected, 'capture argv')
+    for phase, paths in phase_indices.items():
+        directory = ROOT / 'runs' / phase / 'formal'
+        require(load(directory / 'capture-index.json') == paths, 'ordered phase index')
+        state = load(directory / 'capture-state.json')
+        require(state['status'] == 'pass' and state['completed_lanes'] == 6 and state['index'] == paths and state['protocol_sha256'] == protocol_sha, 'capture state')
+    main_finished = previous
+    profile_count = 0
+    for role in ('before', 'after'):
+        for kind in ('stat', 'record'):
+            required = ['report', 'catalog', 'resource', 'workload', 'oracle'] + (['perf_stat'] if kind == 'stat' else ['perf_data', 'perf_script', 'perf_report'])
+            recaptured = role == 'before' and kind == 'record'
+            attempt = 'recapture' if recaptured else 'formal'
+            driver = 'profile-recapture.py' if recaptured else 'profile.py'
+            name = f'profiles/{role}/{kind}/{attempt}/receipt.json'
+            row, decoded, start, end = receipt(name, builds[role], protocol, driver, 'normal', 'large', required)
+            require(previous <= start, 'profile chronology')
+            previous = end
+            intervals.append((start, end, name))
+            require(row['role'] == role and row['kind'] == kind and row['shape'] == 'large', 'profile lane')
+            require(row['capture_driver_sha256'] == sha((ROOT / 'capture.py').read_bytes()), 'profile helper')
+            a = row['artifacts']
+            base = base_argv(builds[role], 'normal', 'large', a)
+            if kind == 'stat':
+                require(row['stat_events'] == protocol['profiles']['events'], 'stat events')
+                perf = ['perf', 'stat', '--no-big-num', '-x,', '-e', ','.join(row['stat_events']), '-o', a['perf_stat']['path'], '--'] + base
+            else:
+                require((row['record_event'], row['record_frequency_hz'], row['call_graph']) == ('cycles:u', 999, 'fp,127'), 'record flags')
+                perf = ['perf', 'record', '--no-buildid-cache', '-o', a['perf_data']['path'], '-F', '999', '-e', 'cycles:u', '--call-graph', 'fp,127', '--'] + base
+            expected = ['taskset', '-c', '2', '/usr/bin/time', '-v', '-o', a['resource']['path']] + perf
+            require(normalized_argv(row['argv']) == expected, 'profile argv')
+            profile_count += 1
+    exclusion = load(ROOT / 'overlap-exclusion.json')
+    require(exclusion['protocol_sha256'] == protocol_sha and exclusion['original_profile_driver_sha256'] == sha((ROOT/'profile.py').read_bytes()) and exclusion['recapture_profile_driver_sha256'] == sha((ROOT/'profile-recapture.py').read_bytes()), 'recapture amendment')
+    require(exclusion['excluded'] == ['profiles/before/record/formal/receipt.json', 'confirmation/C1/receipt.json'], 'excluded attempt set')
+    excluded_rows = [load(member(name)) for name in exclusion['excluded']]
+    excluded_intervals = []
+    for row, key in zip(excluded_rows, ('profile_interval', 'confirmation_interval')):
+        require(exclusion[key] == [row['started_utc'], row['finished_utc']], 'excluded interval identity')
+        excluded_intervals.append(tuple(dt.datetime.fromisoformat(value) for value in exclusion[key]))
+        for value in row['artifacts'].values():
+            artifact(value)
+    require(max(item[0] for item in excluded_intervals) < min(item[1] for item in excluded_intervals), 'excluded overlap')
+    for key, expected in (('replacement_profile', 'profiles/before/record/recapture/receipt.json'), ('replacement_confirmation', 'confirmation/C1-recapture/receipt.json')):
+        require(exclusion[key] == expected, 'replacement path')
+        replacement = load(member(expected))
+        require(dt.datetime.fromisoformat(replacement['started_utc']) >= max(item[1] for item in excluded_intervals), 'replacement starts before excluded attempts end')
+    plan = load(ROOT / 'confirmation-plan.json')
+    require(exclusion['confirmation_plan_sha256'] == sha((ROOT / 'confirmation-plan.json').read_bytes()), 'confirmation plan binding')
+    require(plan['order'] == [{'phase':phase,'role':role} for phase,role in (('C1','before'),('C2','after'),('C3','after'),('C4','before'))], 'confirmation order')
+    confirmation_previous = main_finished
+    for item in plan['order']:
+        phase, role = item['phase'], item['role']
+        directory = phase + ('-recapture' if phase == 'C1' else '')
+        name = f'confirmation/{directory}/receipt.json'
+        row, decoded, start, end = receipt(name, builds[role], protocol, 'confirm.py', 'normal', 'large', ('report','catalog','resource_log','workload_log','oracle_log'))
+        require(confirmation_previous <= start, 'confirmation chronology')
+        confirmation_previous = end
+        require(row['lane'] == item and row['plan_sha256'] == exclusion['confirmation_plan_sha256'], 'confirmation lane')
+        expected = ['taskset','-c','2','/usr/bin/time','-v','-o',row['artifacts']['resource_log']['path']] + base_argv(builds[role], 'normal', 'large', row['artifacts'])
+        require(normalized_argv(row['argv']) == expected, 'confirmation argv')
+        intervals.append((start, end, name))
+    intervals.sort()
+    for left, right in zip(intervals, intervals[1:]):
+        require(left[1] <= right[0], 'selected measurements overlap: ' + left[2] + ' / ' + right[2])
+    if cleanup:
+        proof = load(ROOT / 'checks/cleanup-inventory.json')
+        require(proof['status'] == 'pass' and proof['change'] == 440, 'cleanup proof')
+        require(load(ROOT / 'checks/precleanup.json')['status'] == 'pass', 'precleanup proof')
+        require(proof['cleanup_paths'] == policy['cleanup_paths'], 'cleanup path set')
+        require(proof['goal_sha256'] == 'bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1', 'GOAL preservation')
+        require(len(proof['preserved_target_directory_identity']) == 2, 'preserved build caches')
+    if sealed:
+        inventory = {}
+        for line in (ROOT / 'SHA256SUMS').read_text().splitlines():
+            digest, name = line.split('  ', 1)
+            require(name not in inventory and sha(member(name).read_bytes()) == digest, 'sealed inventory member: ' + name)
+            inventory[name] = digest
+        actual = {str(path.relative_to(ROOT)) for path in ROOT.rglob('*') if path.is_file() and path.name != 'SHA256SUMS'}
+        require(actual == set(inventory), 'sealed inventory coverage')
+    return {'status': 'pass', 'reports': 24, 'samples': 720, 'profiles': profile_count, 'confirmation_reports':4, 'confirmation_samples':120, 'sealed': sealed, 'cleanup': cleanup}
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--sealed', action='store_true')
+    parser.add_argument('--cleanup', action='store_true')
+    args = parser.parse_args()
+    try:
+        print(json.dumps(validate(args.sealed, args.cleanup)))
+    except (OSError, KeyError, TypeError, ValueError) as error:
+        print('INVALID: ' + str(error), file=sys.stderr)
+        raise SystemExit(1)

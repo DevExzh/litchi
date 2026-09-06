@@ -1,0 +1,92 @@
+{
+  "status": "pass",
+  "copied_control": {
+    "exit_code": 0,
+    "output": "{\"status\": \"pass\", \"reports\": 24, \"samples\": 720, \"profiles\": 4, \"confirmation_reports\": 4, \"confirmation_samples\": 120, \"sealed\": true, \"cleanup\": true}\n"
+  },
+  "probes": [
+    {
+      "name": "oracle_verifier",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: frozen oracle hash\n"
+    },
+    {
+      "name": "protocol_cpu",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: protocol dimensions\n"
+    },
+    {
+      "name": "build_binary",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: binary copies\n"
+    },
+    {
+      "name": "phase_order",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: ordered phase index\n"
+    },
+    {
+      "name": "capture_source",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: receipt source\n"
+    },
+    {
+      "name": "report_semantics",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: independent oracle: INVALID: odp_append.append_exactly_one_verified: expected true\n\n"
+    },
+    {
+      "name": "allocator_balance",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: independent oracle: INVALID: allocator live-byte balance differs\n\n"
+    },
+    {
+      "name": "profile_argv",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: profile argv\n"
+    },
+    {
+      "name": "confirmation_plan",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: confirmation plan binding\n"
+    },
+    {
+      "name": "confirmation_chronology",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: confirmation chronology\n"
+    },
+    {
+      "name": "required_check",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: [Errno 2] No such file or directory: '/tmp/litchi-0440-probes-oh_bm17i/required_check/checks/candidate-odp-tests.json'\n"
+    },
+    {
+      "name": "exclusion_scope",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: excluded attempt set\n"
+    },
+    {
+      "name": "cleanup_goal",
+      "status": "rejected",
+      "exit_code": 1,
+      "output": "INVALID: GOAL preservation\n"
+    }
+  ],
+  "count": 13,
+  "inventory_unchanged": true,
+  "inventory_sha256": "632fe1f1f8fc8c965ef17f9361beb5f9abe3b38dc39209c8ee3252781ce00f47",
+  "verifier_sha256": "0acc3aa1bd23539c43040fae5b196da24d42d48c517810df1bdbf045f018d52a",
+  "scope": "independent copied bundles; mutated report artifact hashes and whole inventories refreshed before verification; source bundle untouched until this completed proof is written"
+}

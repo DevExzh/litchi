@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## Change 0440: borrowed namespace cache reduces allocation work
+
+[0440](changes/0440-odp-borrowed-attribute-namespaces.md) removes per-attribute
+namespace URI vectors while preserving reader-scoped resolution. The large
+owned append interval drops from 1,462,779 to 1,167,845 allocation calls and
+236,704,188 to 221,171,020 requested bytes. Peak above entry remains 39,890,548
+bytes. No normal latency improvement is established; the main tail flags and
+fixed confirmation remain visible in the [measurements](results/change-0440/measurements.md).
+
+Next isolate one-shot attribute-cache costs and repeated transaction staging
+or commit validation. The historical stack attribution includes setup and
+oracle work and is not an operation-only causal share. Keep these hypotheses
+separate from the measured namespace-ownership result. Bounded existing
+append, Part addition, repackaging, native breadth, cold/range and scaling
+remain open.
+
 ## Change 0439: owned append exposes XML and allocation costs
 
 [0439](changes/0439-odp-existing-append-lifecycle.md) measures existing ODP

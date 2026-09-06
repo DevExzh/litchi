@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""One declared large normal confirmation lane, using the frozen workload."""
+import argparse
+import importlib.util
+import json
+import os
+from pathlib import Path
+import subprocess
+
+ROOT = Path(__file__).resolve().parent
+REPO = ROOT.parents[3]
+
+
+def imported(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    value = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(value)
+    return value
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--phase', choices=('C1', 'C2', 'C3', 'C4'), required=True)
+    parser.add_argument('--attempt', choices=('recapture',))
+    args = parser.parse_args()
+    cap = imported('capture440', ROOT / 'capture.py')
+    custody = imported('custody440', ROOT / 'check.py')
+    plan = cap.load(ROOT / 'confirmation-plan.json')
+    lane = next(row for row in plan['order'] if row['phase'] == args.phase)
+    role = lane['role']
+    protocol = cap.load(ROOT / 'protocol.json')
+    _, build = cap.build_for(role, protocol, REPO, ROOT / 'protocol.json')
+    cap.oracle_files(protocol)
+    before = custody.sources()
+    assert before == build['source_manifest']
+    status = cap.status_outside_bundle(REPO)
+    directory = ROOT / 'confirmation' / (args.phase + ('-' + args.attempt if args.attempt else ''))
+    directory.mkdir(parents=True, exist_ok=False)
+    paths = {key:directory / name for key,name in [('report','report.json'),('catalog','catalog.json'),('resource_log','resource.log'),('workload_log','workload.log'),('oracle_log','oracle.log')]}
+    binary = build['binaries']['normal']
+    argv = ['taskset','-c','2','/usr/bin/time','-v','-o',str(paths['resource_log'])] + cap.workload_argv(protocol, Path(binary['path']), 'odp_existing_append_lifecycle', 'large', paths['report'], paths['catalog'])
+    row = {'schema':'litchi-0440-confirmation-v1','change':440,'phase':args.phase,'role':role,'lane':lane,'selector':'odp_existing_append_lifecycle','source_field':'odp_append','binary':binary,'revision':build['revision'],'source_manifest':before,'source_before':before,'status_before':status,'protocol_sha256':cap.sha(ROOT/'protocol.json'),'plan_sha256':cap.sha(ROOT/'confirmation-plan.json'),'driver_sha256':cap.sha(Path(__file__)),'argv':argv,'started_utc':cap.now(),'status':'running'}
+    receipt = directory / 'receipt.json'
+    cap.write(receipt,row)
+    try:
+        env = os.environ | {'RUSTUP_TOOLCHAIN':'1.98.1','DEBUGINFOD_URLS':'','PYTHONDONTWRITEBYTECODE':'1'}
+        with paths['workload_log'].open('wb') as stream:
+            run = subprocess.run(argv,cwd=REPO,env=env,stdout=stream,stderr=subprocess.STDOUT)
+        row['exit_code'] = run.returncode
+        assert run.returncode == 0
+        cap.verify_report_identity(paths['report'],binary,build['revision'])
+        oracle = cap.oracle_command(protocol,paths['report'],'normal','large',role)
+        run = subprocess.run(oracle,cwd=REPO,env=env,capture_output=True,text=True)
+        paths['oracle_log'].write_text(run.stdout+run.stderr)
+        row['oracle_exit_code'] = run.returncode
+        assert run.returncode == 0 and run.stdout.strip() == 'VALID'
+        row['status'] = 'pass'
+    except Exception as error:
+        row['status'] = 'failed'; row['error'] = repr(error)
+    finally:
+        row['finished_utc'] = cap.now(); row['source_after'] = custody.sources(); row['status_after'] = cap.status_outside_bundle(REPO)
+        row['source_unchanged'] = row['source_before'] == row['source_after']
+        row['outside_bundle_status_unchanged'] = row['status_before'] == row['status_after']
+        if not row['source_unchanged'] or not row['outside_bundle_status_unchanged']:row['status']='failed'
+        row['artifacts'] = {key:cap.record(path) for key,path in paths.items() if path.is_file()}
+        cap.write(receipt,row)
+    return 0 if row['status']=='pass' else 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

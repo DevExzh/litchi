@@ -1,0 +1,22 @@
+{
+  "change": 440,
+  "decision": "keep",
+  "basis": "The predeclared allocator gate is met in both main repeats: medium/large allocation calls fall about 20%, and cumulative requested bytes fall 6.322%/6.562%, with unchanged semantic, archive, preservation, patch and sink identities.",
+  "latency_review": "Main p50 changes range from -1.501% to +1.743%, so no normal latency improvement is claimed. Main large R2 p95/p99 increases of 8.353%/8.138% remain retained. They did not recur in either pair of the single fixed additional large-normal ABBA confirmation: p95 changes -1.410%/-1.525%, p99 -2.613%/-1.868%. This is a scoped review result, not proof of universal absence of tail regressions.",
+  "memory_review": "Operation peak above entry and retained live delta are unchanged. Cumulative requested bytes and allocation call counts describe temporary allocation work, not retained memory or physical copying. No RSS improvement is claimed.",
+  "profile_review": "Whole-process instructions fall 0.661%, cycles rise 0.594%. These include fixture setup and oracle work and do not support a causal timed-operation speedup claim. Zero L1 counter values have no cache-miss interpretation.",
+  "excluded_attempts": "The initial baseline record profile and first C1 confirmation overlapped during profile conversion. Both are retained and explicitly excluded; their replacements ran serially. Main formal evidence is unaffected.",
+  "claims": [
+    "20.101%/20.163% fewer operation allocation calls for the medium/large owned ODP append fixtures, identical in both repeats",
+    "6.322%/6.562% fewer cumulative requested bytes for those medium/large fixtures, identical in both repeats"
+  ],
+  "withheld": [
+    "normal latency speedup",
+    "peak-live-memory or RSS improvement",
+    "bounded-memory existing-document append",
+    "source-backed or compressed passthrough",
+    "scaling, native rendering, or universal Office performance"
+  ],
+  "followup": "Profile the separate one-shot get_attr cache cost and repeated staging/validation work. Do not combine either with this namespace-ownership result. The full non-iWork goal remains active.",
+  "repeat_review": "All eight repeat flags remain in summary.json: baseline large normal RSS +9.665%, baseline large allocator RSS -5.162%, four baseline tiny instrumented timing statistics about -17.4% to -17.6%, and candidate large normal p95/p99 +9.050%/+8.940%. Allocation counters are identical across repeats; no instrumented latency or RSS benefit is claimed."
+}

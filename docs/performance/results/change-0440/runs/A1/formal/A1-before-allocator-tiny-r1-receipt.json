@@ -1,0 +1,117 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0440/runs/A1/formal/A1-before-allocator-tiny-r1-resource.log",
+    "/tmp/litchi-goal-0440-binaries/before/allocator",
+    "--case",
+    "odp_existing_append_lifecycle",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0440/runs/A1/formal/A1-before-allocator-tiny-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0440/runs/A1/formal/A1-before-allocator-tiny-r1-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4921,
+      "path": "runs/A1/formal/A1-before-allocator-tiny-r1-catalog.json",
+      "sha256": "c7c44a0ef1878908abd415d8db1be785e865ecce85295a2e198937d3a4182b6b"
+    },
+    "oracle_log": {
+      "bytes": 306,
+      "path": "runs/A1/formal/A1-before-allocator-tiny-r1-oracle.log",
+      "sha256": "6f222102393c92bffb6858a9265fe41411cc3e64ad423096ff761f3075004ef3"
+    },
+    "report": {
+      "bytes": 54284,
+      "path": "runs/A1/formal/A1-before-allocator-tiny-r1.json",
+      "sha256": "706835c0aeee8c08e34d12ecf02768f9cb6931a9af0850919d81451f0ac329da"
+    },
+    "resource_log": {
+      "bytes": 1112,
+      "path": "runs/A1/formal/A1-before-allocator-tiny-r1-resource.log",
+      "sha256": "075f55503346ec1f88b11e060f0efbe0b9a39fce5955d38566806cbdfdbc2011"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/A1/formal/A1-before-allocator-tiny-r1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 457237080,
+    "path": "/tmp/litchi-goal-0440-binaries/before/allocator",
+    "sha256": "a93357033e07b52f77bdf4c24b6845971917c5c09d23b25e19b1d0d4dcc7455e"
+  },
+  "build_directory": "before",
+  "change": 440,
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "a16aa2176bfb882b338086c01f8baecd068583b212c2f3075155ef87789de908",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T15:14:34.494173+00:00",
+  "lane": {
+    "mode": "allocator",
+    "phase": "A1",
+    "repeat": "R1",
+    "role": "before",
+    "shape": "tiny"
+  },
+  "name": "A1-before-allocator-tiny-r1",
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0440/oracle/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0440/runs/A1/formal/A1-before-allocator-tiny-r1.json",
+    "--mode",
+    "allocator",
+    "--shape",
+    "tiny"
+  ],
+  "oracle_exit_code": 0,
+  "outside_bundle_status_unchanged": true,
+  "phase": "A1",
+  "protocol_sha256": "4cf3f297d440d48fe56ee0f5072d96f882e8866bb07ab826227da9d0df1d0d3e",
+  "revision": "dd0681cf884163fc16953ac2a95e4da81ace5d46",
+  "role": "before",
+  "schema": "litchi-0440-capture-receipt-v1",
+  "selector": "odp_existing_append_lifecycle",
+  "source_after": {
+    "files": 6657,
+    "path": "sources/8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6.json",
+    "sha256": "8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6"
+  },
+  "source_before": {
+    "files": 6657,
+    "path": "sources/8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6.json",
+    "sha256": "8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6"
+  },
+  "source_field": "odp_append",
+  "source_manifest": {
+    "files": 6657,
+    "path": "sources/8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6.json",
+    "sha256": "8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T15:14:34.044220+00:00",
+  "status": "pass",
+  "status_after": [
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md"
+  ]
+}

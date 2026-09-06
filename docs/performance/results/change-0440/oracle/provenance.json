@@ -1,0 +1,8 @@
+{
+  "source_bundle": "change-0439",
+  "unchanged": {
+    "verify-report.py": "e4bca2715391cfb31637b86507c98f121df24b96405cb64df29902c09ef0aa4b",
+    "protocol.json": "8d98a7c4e1efd74cf20d4cab414c202e5e64b4295cfc664ad976a4ee9d752a8f"
+  },
+  "scope": "same append selector, fixture, timer and report contract; oracle role remains after for both binary roles"
+}

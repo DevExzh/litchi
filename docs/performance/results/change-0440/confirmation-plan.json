@@ -1,0 +1,28 @@
+{
+  "change": 440,
+  "status": "frozen",
+  "frozen_utc": "2026-09-06T15:28:20.906617+00:00",
+  "trigger": "Main B2 versus A2 large normal p95 +8.353% and p99 +8.138%; no consistent main p50 gain, allocator practical gate met.",
+  "scope": "One additional fixed ABBA confirmation, large normal only, 30 samples and three warmups per fresh CPU2 one-worker process; no further reruns to seek a pass.",
+  "order": [
+    {
+      "phase": "C1",
+      "role": "before"
+    },
+    {
+      "phase": "C2",
+      "role": "after"
+    },
+    {
+      "phase": "C3",
+      "role": "after"
+    },
+    {
+      "phase": "C4",
+      "role": "before"
+    }
+  ],
+  "reports": 4,
+  "samples": 120,
+  "review": "Keep all original observations. Review p50/p95/p99 and RSS in both confirmation pairs. Withhold latency claims regardless; if adverse tails reproduce consistently, reject or explicitly justify a documented tradeoff rather than claiming noise."
+}

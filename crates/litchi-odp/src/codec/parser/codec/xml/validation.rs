@@ -284,14 +284,15 @@ impl Parser {
 /// every yielded attribute is appended to `parsed`, and each lookup replays
 /// the cached prefix in document order before advancing the shared iterator.
 /// Each attribute's key is namespace-resolved exactly once, when the scan
-/// first reaches it, and the owned outcome is cached next to the raw
+/// first reaches it, and the borrowed outcome is cached next to the raw
 /// attribute; replays compare the cached resolution and local-name bytes
 /// instead of calling the resolver again. This is exact because no event may
 /// be read between [`Self::new`] and the last lookup — every call site reads
 /// one element's attributes consecutively — so the resolver state at append
-/// time equals the state at lookup time, and resolution itself cannot fail
-/// (unknown prefixes simply never match). Value decoding still happens per
-/// match at lookup time, so results are identical to repeated
+/// time equals the state at lookup time, and the cached bound URI borrows the
+/// resolver for exactly this interval. Resolution itself cannot fail (unknown
+/// prefixes simply never match). Value decoding still happens per match at
+/// lookup time, so results are identical to repeated
 /// [`Parser::get_attr`] calls: first match in document order wins, duplicate
 /// detection stays with the underlying iterator, and a malformed attribute
 /// surfaces at exactly the lookup whose scan first reaches it. The formatted
@@ -302,42 +303,43 @@ impl Parser {
 /// non-modeled drawing attributes from the cached prefix plus the rest of the
 /// shared iterator, replacing the historical second fresh scan of
 /// `element.attributes()`.
-pub(super) struct ElementAttrs<'a> {
-    attributes: Attributes<'a>,
-    parsed: Vec<ResolvedAttribute<'a>>,
+pub(super) struct ElementAttrs<'event, 'resolver> {
+    attributes: Attributes<'event>,
+    parsed: Vec<ResolvedAttribute<'event, 'resolver>>,
     malformed: Option<String>,
 }
 
 /// One scanned attribute together with its namespace resolution snapshot.
-struct ResolvedAttribute<'a> {
-    attribute: RawAttribute<'a>,
-    namespace: ResolvedAttributeNamespace,
-    local_name: LocalName<'a>,
+struct ResolvedAttribute<'event, 'resolver> {
+    attribute: RawAttribute<'event>,
+    namespace: ResolvedAttributeNamespace<'resolver>,
+    local_name: LocalName<'event>,
 }
 
-/// Owned snapshot of one attribute key's [`ResolveResult`].
+/// Borrowed snapshot of one attribute key's [`ResolveResult`].
 ///
 /// [`ResolveResult`] borrows the reader's namespace stack, so it cannot be
-/// stored next to the attribute; this owned copy preserves exactly the
-/// information [`Parser::is_namespace`] inspects.
-enum ResolvedAttributeNamespace {
-    /// Bound namespace URI bytes.
-    Bound(Vec<u8>),
+/// stored without carrying the reader lifetime.  The URI is borrowed instead
+/// of copied; `ElementAttrs`'s resolver lifetime prevents the resolver from
+/// reading another event until the cache is dropped.
+enum ResolvedAttributeNamespace<'resolver> {
+    /// Bound namespace URI bytes in the reader's resolver buffer.
+    Bound(XmlNamespace<'resolver>),
     /// No prefix: attributes never take the default namespace.
     Unbound,
     /// Prefix not declared in scope.
     Unknown,
 }
 
-impl ResolvedAttributeNamespace {
+impl ResolvedAttributeNamespace<'_> {
     /// Matches exactly like [`Parser::is_namespace`] on the live outcome.
     fn matches(&self, namespace_uri: &[u8]) -> bool {
-        matches!(self, Self::Bound(uri) if uri.as_slice() == namespace_uri)
+        matches!(self, Self::Bound(XmlNamespace(uri)) if *uri == namespace_uri)
     }
 }
 
-impl<'a> ElementAttrs<'a> {
-    pub(super) fn new(element: &'a BytesStart<'_>) -> Self {
+impl<'event, 'resolver> ElementAttrs<'event, 'resolver> {
+    pub(super) fn new(element: &'event BytesStart<'_>) -> Self {
         Self {
             attributes: element.attributes(),
             parsed: Vec::new(),
@@ -348,7 +350,7 @@ impl<'a> ElementAttrs<'a> {
     /// Looks up `namespace_uri:local_name`, continuing the shared scan.
     pub(super) fn get(
         &mut self,
-        reader: &NsReader<&[u8]>,
+        reader: &'resolver NsReader<&[u8]>,
         namespace_uri: &[u8],
         local_name: &[u8],
     ) -> Result<Option<String>> {
@@ -382,7 +384,7 @@ impl<'a> ElementAttrs<'a> {
     /// Looks up a required attribute, failing with `qualified_name` when absent.
     pub(super) fn required(
         &mut self,
-        reader: &NsReader<&[u8]>,
+        reader: &'resolver NsReader<&[u8]>,
         namespace: &[u8],
         local_name: &[u8],
         qualified_name: &str,
@@ -395,7 +397,7 @@ impl<'a> ElementAttrs<'a> {
     /// Requires `xlink:type="simple"` on the element.
     pub(super) fn require_simple_xlink(
         &mut self,
-        reader: &NsReader<&[u8]>,
+        reader: &'resolver NsReader<&[u8]>,
         description: &str,
     ) -> Result<()> {
         let link_type = self.required(reader, XLINK_NAMESPACE, b"type", "xlink:type")?;
@@ -410,14 +412,12 @@ impl<'a> ElementAttrs<'a> {
     /// Resolves one freshly scanned attribute key exactly once with the
     /// current resolver, snapshotting the outcome next to the raw attribute.
     fn resolve_at_scan(
-        reader: &NsReader<&[u8]>,
-        attribute: RawAttribute<'a>,
-    ) -> ResolvedAttribute<'a> {
+        reader: &'resolver NsReader<&[u8]>,
+        attribute: RawAttribute<'event>,
+    ) -> ResolvedAttribute<'event, 'resolver> {
         let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = match namespace {
-            ResolveResult::Bound(XmlNamespace(uri)) => {
-                ResolvedAttributeNamespace::Bound(uri.to_vec())
-            },
+            ResolveResult::Bound(uri) => ResolvedAttributeNamespace::Bound(uri),
             ResolveResult::Unbound => ResolvedAttributeNamespace::Unbound,
             ResolveResult::Unknown(_) => ResolvedAttributeNamespace::Unknown,
         };
@@ -433,7 +433,7 @@ impl<'a> ElementAttrs<'a> {
     /// fresh resolver call, and only the matching attribute is decoded.
     fn lookup(
         reader: &NsReader<&[u8]>,
-        cached: &ResolvedAttribute<'_>,
+        cached: &ResolvedAttribute<'event, 'resolver>,
         namespace_uri: &[u8],
         local_name: &[u8],
     ) -> Result<Option<String>> {
@@ -477,7 +477,7 @@ impl<'a> ElementAttrs<'a> {
     ///   messages are unchanged.
     pub(super) fn drawing_attributes(
         &mut self,
-        reader: &NsReader<&[u8]>,
+        reader: &'resolver NsReader<&[u8]>,
     ) -> Result<Vec<DrawingAttribute>> {
         let mut attributes = Vec::new();
         for cached in &self.parsed {
@@ -504,7 +504,7 @@ impl<'a> ElementAttrs<'a> {
     /// harvested attribute is decoded with the same decoder settings.
     fn harvest_drawing_attribute(
         reader: &NsReader<&[u8]>,
-        cached: &ResolvedAttribute<'_>,
+        cached: &ResolvedAttribute<'event, 'resolver>,
     ) -> Result<Option<DrawingAttribute>> {
         let namespace = if cached.namespace.matches(DRAW_NAMESPACE) {
             DrawingAttributeNamespace::Drawing
@@ -562,6 +562,32 @@ mod tests {
             Ok(_) => panic!("test document must start with an element"),
             Err(error) => panic!("test document must parse: {error}"),
         }
+    }
+
+    /// Independent one-shot namespace/attribute oracle for focused cache tests.
+    /// This intentionally does not call `ElementAttrs` or `Parser::get_attr`.
+    fn direct_lookup(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+        namespace_uri: &[u8],
+        local_name: &[u8],
+    ) -> Result<Option<String>> {
+        for attribute_result in element.attributes() {
+            let attribute = attribute_result
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+            if matches!(namespace, ResolveResult::Bound(XmlNamespace(uri)) if uri == namespace_uri)
+                && local.as_ref() == local_name
+            {
+                return attribute
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                    .map(|value| Some(value.into_owned()))
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid XML attribute value: {error}"))
+                    });
+            }
+        }
+        Ok(None)
     }
 
     fn invalid_format_message(result: Result<Option<String>>) -> String {
@@ -869,6 +895,126 @@ mod tests {
         );
     }
 
+    #[test]
+    fn bound_namespace_cache_borrows_long_resolver_uri() {
+        let uri = format!("urn:odp:0440:{}", "namespace-segment-".repeat(32));
+        let xml = format!("<e xmlns:d=\"{uri}\" d:name=\"value\" plain=\"unqualified\"/>");
+        let mut reader = NsReader::from_str(&xml);
+        let mut buf = Vec::new();
+        let element = first_element(&mut reader, &mut buf);
+        let mut attributes = ElementAttrs::new(&element);
+        assert_eq!(
+            attributes.get(&reader, uri.as_bytes(), b"name").unwrap(),
+            Some("value".to_string())
+        );
+        assert_eq!(
+            direct_lookup(&reader, &element, uri.as_bytes(), b"name").unwrap(),
+            Some("value".to_string())
+        );
+
+        let qualified_key = element
+            .attributes()
+            .find_map(|attribute_result| {
+                let attribute = attribute_result.ok()?;
+                (attribute.key.local_name().as_ref() == b"name").then_some(attribute.key)
+            })
+            .expect("qualified test attribute");
+        let live_uri = match reader.resolver().resolve_attribute(qualified_key).0 {
+            ResolveResult::Bound(XmlNamespace(uri)) => uri,
+            other => panic!("expected bound namespace, got {other:?}"),
+        };
+        let cached_uri = attributes
+            .parsed
+            .iter()
+            .find(|cached| cached.local_name.as_ref() == b"name")
+            .map(|cached| match &cached.namespace {
+                ResolvedAttributeNamespace::Bound(XmlNamespace(uri)) => *uri,
+                _ => panic!("expected cached bound namespace"),
+            })
+            .expect("cached qualified attribute");
+        assert_eq!(cached_uri, live_uri);
+        assert_eq!(cached_uri.len(), uri.len());
+        assert!(std::ptr::eq(cached_uri.as_ptr(), live_uri.as_ptr()));
+    }
+
+    #[test]
+    fn unqualified_attribute_does_not_take_default_namespace() {
+        const DEFAULT_URI: &[u8] = b"urn:odp:0440:default";
+        const QUALIFIED_URI: &[u8] = b"urn:odp:0440:qualified";
+        let xml = format!(
+            "<e xmlns=\"{}\" xmlns:d=\"{}\" plain=\"unqualified\" d:name=\"qualified\"/>",
+            std::str::from_utf8(DEFAULT_URI).unwrap(),
+            std::str::from_utf8(QUALIFIED_URI).unwrap(),
+        );
+        let mut reader = NsReader::from_str(&xml);
+        let mut buf = Vec::new();
+        let element = first_element(&mut reader, &mut buf);
+        let mut attributes = ElementAttrs::new(&element);
+        assert_eq!(
+            attributes.get(&reader, DEFAULT_URI, b"plain").unwrap(),
+            None
+        );
+        assert_eq!(
+            direct_lookup(&reader, &element, DEFAULT_URI, b"plain").unwrap(),
+            None
+        );
+        assert_eq!(
+            attributes.get(&reader, QUALIFIED_URI, b"name").unwrap(),
+            Some("qualified".to_string())
+        );
+        assert_eq!(
+            direct_lookup(&reader, &element, QUALIFIED_URI, b"name").unwrap(),
+            Some("qualified".to_string())
+        );
+    }
+
+    #[test]
+    fn scoped_namespace_rebind_is_safe_after_cache_drop() {
+        const OUTER_URI: &[u8] = b"urn:odp:0440:outer";
+        const INNER_URI: &[u8] = b"urn:odp:0440:inner";
+        let xml = format!(
+            "<root xmlns:d=\"{}\"><child xmlns:d=\"{}\" d:name=\"inner\"/><sibling d:name=\"outer\"/></root>",
+            std::str::from_utf8(OUTER_URI).unwrap(),
+            std::str::from_utf8(INNER_URI).unwrap(),
+        );
+        let mut reader = NsReader::from_str(&xml);
+        let mut buf = Vec::new();
+        match reader.read_resolved_event_into(&mut buf) {
+            Ok((_, Event::Start(_))) => {},
+            other => panic!("expected root start, got {other:?}"),
+        }
+        buf.clear();
+        let child = match reader.read_resolved_event_into(&mut buf) {
+            Ok((_, Event::Empty(element))) => element,
+            other => panic!("expected empty child, got {other:?}"),
+        };
+        {
+            let mut attributes = ElementAttrs::new(&child);
+            assert_eq!(
+                attributes.get(&reader, INNER_URI, b"name").unwrap(),
+                Some("inner".to_string())
+            );
+            assert_eq!(
+                direct_lookup(&reader, &child, INNER_URI, b"name").unwrap(),
+                Some("inner".to_string())
+            );
+        }
+        buf.clear();
+        let sibling = match reader.read_resolved_event_into(&mut buf) {
+            Ok((_, Event::Empty(element))) => element,
+            other => panic!("expected empty sibling, got {other:?}"),
+        };
+        let mut attributes = ElementAttrs::new(&sibling);
+        assert_eq!(
+            attributes.get(&reader, OUTER_URI, b"name").unwrap(),
+            Some("outer".to_string())
+        );
+        assert_eq!(
+            direct_lookup(&reader, &sibling, OUTER_URI, b"name").unwrap(),
+            Some("outer".to_string())
+        );
+    }
+
     fn presentation_uri() -> &'static str {
         std::str::from_utf8(PRESENTATION_NAMESPACE).expect("presentation namespace is UTF-8")
     }
@@ -901,7 +1047,10 @@ mod tests {
 
     /// Runs the exact lookup sequence `Parser::shape_builder` performs for a
     /// non-line shape, leaving the shared scan mid-element.
-    fn shape_builder_lookups(attributes: &mut ElementAttrs<'_>, reader: &NsReader<&[u8]>) {
+    fn shape_builder_lookups<'resolver>(
+        attributes: &mut ElementAttrs<'_, 'resolver>,
+        reader: &'resolver NsReader<&[u8]>,
+    ) {
         attributes
             .get(reader, PRESENTATION_NAMESPACE, b"class")
             .unwrap();

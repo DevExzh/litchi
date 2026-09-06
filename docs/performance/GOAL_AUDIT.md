@@ -1,6 +1,22 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0439
+## Current evidence through 0440
+
+[0440](changes/0440-odp-borrowed-attribute-namespaces.md) reduces temporary
+namespace allocation work in owned ODP append: about 20% fewer medium/large
+calls and 6.3–6.6% fewer requested bytes across both repeats. Exact archive,
+semantic, preservation and patch gates pass. The main 720 samples, additional
+120-sample confirmation, four selected profiles, 352 ODP tests and 368 harness
+tests are retained. Peak and retained live bytes are unchanged; no normal
+latency or RSS benefit is claimed. Original adverse tails and two excluded
+overlapping attempts remain documented.
+
+This closes one private ownership experiment. One-shot cache cost and repeated
+staging/validation are separate next hypotheses. Bounded existing append,
+Part addition, repackaging, native/producer breadth, cold/range input, scaling
+and the remaining non-iWork goal stay open. The user-owned goal is unchanged.
+
+## Earlier evidence through 0439
 
 [0439](changes/0439-odp-existing-append-lifecycle.md) establishes the full
 owned existing-ODP append interval that the older one-edit timer omitted.
