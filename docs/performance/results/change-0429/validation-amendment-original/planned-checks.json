@@ -1,0 +1,30 @@
+{
+  "required_pass": [
+    "zip-short-reads-expanded",
+    "zip-tests",
+    "zip-strict-verified",
+    "zip-doc",
+    "consumer-tests",
+    "harness-range-tests-verified",
+    "harness-provider-tests",
+    "harness-native-tests-verified",
+    "harness-cache-tests",
+    "harness-doc",
+    "fmt",
+    "zip-fmt",
+    "boundaries",
+    "claims",
+    "crud-index",
+    "cli-smoke-final",
+    "python-syntax-final",
+    "release-build",
+    "release-capture",
+    "release-summary",
+    "release-profiles",
+    "probe-controls"
+  ],
+  "required_review": [
+    "harness-strict-final"
+  ],
+  "review_policy": "Strict harness diagnostics must match retained 0428 baseline exactly by message/source file multiset, with zero findings in new or visibility-modified modules. All failed attempts are retained."
+}

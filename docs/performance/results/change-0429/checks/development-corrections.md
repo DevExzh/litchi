@@ -51,3 +51,14 @@ The next CLI preflight reached mutation controls, where the histogram probe
 selected the unavailable baseline's null histogram. That probe now selects an
 available histogram before corrupting its count. This is a mutation-driver
 correction; the report's unavailable baseline remains null as required.
+
+After formal capture, supplementary CPU recording completed for media-rich
+bytes, but the frozen verifier rejected the protocol's 100-sample profile
+because its count policy admitted only controls and formal baseline rows.
+The explicit validation amendment retains the original build/verifier/policy,
+pins unchanged capture artifacts, and permits (100,3) only for the two declared
+media-rich bytes/file profile roles. All 32 baseline reports are revalidated;
+none is recaptured. `resume-profiles.py` processes the existing completed bytes
+recording, retaining the failed wrapper receipt and marking reconstructed
+command provenance, then records the file profile. The original recording's
+start timestamp was not retained by the failed wrapper and remains unavailable.

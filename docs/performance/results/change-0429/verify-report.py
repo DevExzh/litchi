@@ -588,12 +588,22 @@ def check_native_provider_config(value: Any, report: dict[str, Any]) -> tuple[in
 def check_common_identity(report: dict[str, Any], *, native: bool) -> tuple[int, int, dict[str, int]]:
     samples = uint(report["samples"], "report.samples")
     warmup = uint(report["warmup"], "report.warmup")
-    if samples not in {1, 30}:
+    # The protocol has one explicitly scoped supplementary profile lane.  It
+    # retains 100 media-rich synthetic samples after three warmups for the
+    # direct bytes/file providers only; it is not a native, range, plain, or
+    # formal baseline report.
+    profile_allowed = (
+        not native
+        and report.get("corpus") == "media-rich"
+        and report.get("provider") in {"bytes", "file"}
+    )
+    allowed_pairs = {(1, 0), (30, 3)}
+    if profile_allowed:
+        allowed_pairs.add((100, 3))
+    if (samples, warmup) not in allowed_pairs:
+        if samples == 100:
+            fail("report.samples", "100-sample profile reports require the media-rich bytes or file provider lane")
         fail("report.samples", "only one-sample controls and thirty-sample formal reports are valid")
-    if warmup not in {0, 3}:
-        fail("report.warmup", "only zero-warmup controls and three-warmup formal reports are valid")
-    if (samples, warmup) not in {(1, 0), (30, 3)}:
-        fail("report.warmup", "control reports require (samples=1,warmup=0) and formal reports require (samples=30,warmup=3)")
     checked = uint(report["checked_iteration_count"], "report.checked_iteration_count")
     if checked != samples + warmup:
         fail("report.checked_iteration_count", "does not equal samples plus warmups")

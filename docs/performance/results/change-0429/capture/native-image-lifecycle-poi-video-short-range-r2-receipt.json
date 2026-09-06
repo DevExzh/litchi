@@ -1,0 +1,59 @@
+{
+  "name": "native-image-lifecycle-poi-video-short-range-r2",
+  "command": "native-image-lifecycle",
+  "selector_key": "fixture",
+  "selector": "poi-video",
+  "provider_label": "short-range",
+  "provider": "range",
+  "max_range": 4096,
+  "delay_us": 0,
+  "repeat": "R2",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/capture/native-image-lifecycle-poi-video-short-range-r2-resource.log",
+    "/tmp/litchi-goal-0429-binaries/litchi-perf-baseline",
+    "native-image-lifecycle",
+    "--fixture",
+    "poi-video",
+    "--provider",
+    "range",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/capture/native-image-lifecycle-poi-video-short-range-r2.json",
+    "--max-range",
+    "4096",
+    "--delay-us",
+    "0"
+  ],
+  "revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+  "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969",
+  "protocol_sha256": "f4da6b83b5d90ab521a11cae1be14e22b6d1599cf0c8d1e9cd1b42ea8c8f4971",
+  "started_utc": "2026-09-05T23:37:36.542960+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T23:37:36.808548+00:00",
+  "artifacts": {
+    "capture/native-image-lifecycle-poi-video-short-range-r2.json": {
+      "sha256": "5ebf27b8e2746067a5d748f795084f9342313c2aff8589cf4dd8a298cbf551d2",
+      "bytes": 816743
+    },
+    "capture/native-image-lifecycle-poi-video-short-range-r2.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "capture/native-image-lifecycle-poi-video-short-range-r2-resource.log": {
+      "sha256": "be4aeb74278e5ef5faf22668c5610d9389e73af26ed3d1fd7f0c15a4f03d5003",
+      "bytes": 1073
+    }
+  }
+}

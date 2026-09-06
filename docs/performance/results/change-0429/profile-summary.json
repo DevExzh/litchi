@@ -1,0 +1,367 @@
+{
+  "status": "pass",
+  "profiles": [
+    {
+      "name": "media-rich-bytes",
+      "samples": 17217,
+      "exclusive_ancestry_counts": {
+        "other_or_unresolved": 16387,
+        "corpus_setup": 830
+      },
+      "exclusive_ancestry_percent": {
+        "other_or_unresolved": 95.1791833652785,
+        "corpus_setup": 4.8208166347214965
+      },
+      "iteration_api_ancestry_counts_nonexclusive": {},
+      "top_leaf_symbols_by_ancestry": {
+        "iteration": [],
+        "corpus_setup": [
+          [
+            "deflate_medium+0x63d",
+            57
+          ],
+          [
+            "quick_insert_value+0x586",
+            50
+          ],
+          [
+            "[unknown]",
+            44
+          ],
+          [
+            "deflate_medium+0x5d6",
+            32
+          ],
+          [
+            "_mm_shuffle_epi32<14>+0xd3",
+            21
+          ],
+          [
+            "longest_match_help<false>+0x158",
+            18
+          ],
+          [
+            "_mm_add_epi32+0x9e",
+            17
+          ],
+          [
+            "_mm_sha256rnds2_epu32+0xf9",
+            17
+          ],
+          [
+            "len<u8>+0x18",
+            15
+          ],
+          [
+            "hash_calc+0x57d",
+            14
+          ],
+          [
+            "len<u8>+0xb38",
+            14
+          ],
+          [
+            "_mm_alignr_epi8<4>+0x2f3",
+            13
+          ],
+          [
+            "index<u8>+0x567",
+            13
+          ],
+          [
+            "copied<[u8; 8], core::array::TryFromSliceError>+0x154",
+            13
+          ],
+          [
+            "_mm_add_epi32+0x110",
+            13
+          ],
+          [
+            "_mm_shuffle_epi32<14>+0xb4",
+            12
+          ],
+          [
+            "deflate_medium+0x649",
+            11
+          ],
+          [
+            "tally_lit_help+0xb98",
+            11
+          ],
+          [
+            "_mm_sha256msg1_epu32+0x12a",
+            11
+          ],
+          [
+            "_mm_add_epi32+0xbd",
+            11
+          ]
+        ],
+        "other_or_unresolved": [
+          [
+            "deflate_medium+0x63d",
+            1528
+          ],
+          [
+            "quick_insert_value+0x586",
+            1513
+          ],
+          [
+            "deflate_medium+0x5d6",
+            769
+          ],
+          [
+            "longest_match_help<false>+0x158",
+            490
+          ],
+          [
+            "deflate_medium+0x649",
+            390
+          ],
+          [
+            "len<u8>+0xb38",
+            369
+          ],
+          [
+            "tally_lit_help+0xb98",
+            366
+          ],
+          [
+            "index<u8>+0x567",
+            344
+          ],
+          [
+            "copied<[u8; 8], core::array::TryFromSliceError>+0x154",
+            332
+          ],
+          [
+            "len<u8>+0x18",
+            303
+          ],
+          [
+            "[unknown]",
+            260
+          ],
+          [
+            "deflate_medium+0x5d9",
+            260
+          ],
+          [
+            "deflate_medium+0x645",
+            257
+          ],
+          [
+            "push_lit+0xb87",
+            252
+          ],
+          [
+            "hash_calc+0x57d",
+            244
+          ],
+          [
+            "len<u8>+0x553",
+            232
+          ],
+          [
+            "longest_match_help<false>+0xe8",
+            204
+          ],
+          [
+            "quick_insert_value+0x5bb",
+            192
+          ],
+          [
+            "pqdownheap+0x61",
+            178
+          ],
+          [
+            "longest_match_help<false>+0x169",
+            176
+          ]
+        ]
+      }
+    },
+    {
+      "name": "media-rich-file",
+      "samples": 16635,
+      "exclusive_ancestry_counts": {
+        "other_or_unresolved": 15850,
+        "corpus_setup": 785
+      },
+      "exclusive_ancestry_percent": {
+        "other_or_unresolved": 95.28103396453261,
+        "corpus_setup": 4.718966035467388
+      },
+      "iteration_api_ancestry_counts_nonexclusive": {},
+      "top_leaf_symbols_by_ancestry": {
+        "iteration": [],
+        "corpus_setup": [
+          [
+            "deflate_medium+0x63d",
+            63
+          ],
+          [
+            "quick_insert_value+0x586",
+            49
+          ],
+          [
+            "deflate_medium+0x5d6",
+            25
+          ],
+          [
+            "_mm_shuffle_epi32<14>+0xd3",
+            24
+          ],
+          [
+            "[unknown]",
+            23
+          ],
+          [
+            "longest_match_help<false>+0x158",
+            20
+          ],
+          [
+            "_mm_sha256rnds2_epu32+0xf9",
+            19
+          ],
+          [
+            "len<u8>+0xb38",
+            18
+          ],
+          [
+            "index<u8>+0x567",
+            18
+          ],
+          [
+            "_mm_add_epi32+0x110",
+            15
+          ],
+          [
+            "_mm_add_epi32+0xbd",
+            14
+          ],
+          [
+            "tally_lit_help+0xb98",
+            13
+          ],
+          [
+            "as_slice<u16, 65536>+0x579",
+            13
+          ],
+          [
+            "_mm_add_epi32+0x369",
+            12
+          ],
+          [
+            "copied<[u8; 8], core::array::TryFromSliceError>+0x154",
+            12
+          ],
+          [
+            "len<u8>+0x553",
+            12
+          ],
+          [
+            "len<u8>+0x18",
+            11
+          ],
+          [
+            "deflate_medium+0x649",
+            11
+          ],
+          [
+            "push_lit+0xb87",
+            11
+          ],
+          [
+            "_mm_shuffle_epi32<14>+0xb4",
+            10
+          ]
+        ],
+        "other_or_unresolved": [
+          [
+            "quick_insert_value+0x586",
+            1484
+          ],
+          [
+            "deflate_medium+0x63d",
+            1446
+          ],
+          [
+            "deflate_medium+0x5d6",
+            795
+          ],
+          [
+            "longest_match_help<false>+0x158",
+            497
+          ],
+          [
+            "len<u8>+0xb38",
+            424
+          ],
+          [
+            "copied<[u8; 8], core::array::TryFromSliceError>+0x154",
+            386
+          ],
+          [
+            "tally_lit_help+0xb98",
+            376
+          ],
+          [
+            "index<u8>+0x567",
+            345
+          ],
+          [
+            "deflate_medium+0x649",
+            308
+          ],
+          [
+            "len<u8>+0x18",
+            281
+          ],
+          [
+            "push_lit+0xb87",
+            262
+          ],
+          [
+            "hash_calc+0x57d",
+            252
+          ],
+          [
+            "deflate_medium+0x5d9",
+            237
+          ],
+          [
+            "len<u8>+0x553",
+            231
+          ],
+          [
+            "deflate_medium+0x645",
+            226
+          ],
+          [
+            "longest_match_help<false>+0x169",
+            218
+          ],
+          [
+            "as_slice<u16, 65536>+0x579",
+            214
+          ],
+          [
+            "quick_insert_value+0x5bb",
+            174
+          ],
+          [
+            "pqdownheap+0x61",
+            157
+          ],
+          [
+            "longest_match_help<false>+0x136",
+            157
+          ]
+        ]
+      }
+    }
+  ],
+  "scope": "Unweighted cycles:u sample counts from full-process perf script. Explicit non-inlined iteration ancestry separates iterations from corpus setup when frames resolve. Iterations include source construction, observers, checks and drops; API ancestry is nonexclusive. Missing/truncated/unresolved stacks remain other_or_unresolved. Percentages are sampled CPU scope, not API wall-clock fractions or speedup.",
+  "performance_claim": null
+}

@@ -1,0 +1,42 @@
+{
+  "change": 429,
+  "argv": [
+    "/tmp/litchi-goal-0429-zip-fuzz/crate/fuzz/target/x86_64-unknown-linux-gnu/release/parse_zip",
+    "/tmp/litchi-goal-0429-zip-fuzz/corpus",
+    "-runs=1000",
+    "-seed=429",
+    "-max_len=1048576",
+    "-timeout=10",
+    "-artifact_prefix=/tmp/litchi-goal-0429-zip-fuzz/"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+  "driver_sha256": "fe045dd9f3e4128911a377dc44313bcd7ff33c8baf8ed0fb7b45cfcd43c9be9d",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-05T23:47:53.569992+00:00",
+  "source_before": {
+    "path": "sources/1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122.json",
+    "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+    "files": 6634
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T23:47:53.981837+00:00",
+  "source_after": {
+    "path": "sources/1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122.json",
+    "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+    "files": 6634
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/zip-fuzz-smoke.log",
+    "bytes": 18501,
+    "sha256": "8581cb8c79394e8252169ae71a7beb86d4cb9ff9224cfca870a302eabc7681d1"
+  }
+}

@@ -1,5 +1,18 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0429: ZIP short reads and provider evidence
+
+[0429](changes/0429-pptx-provider-native-baselines.md) keeps fixed-header refill logic inside the ZIP grammar owner
+and explicit file/range adapters, clocks and observers inside the standalone
+harness (0001/0002/0010/0011/0024). Existing snapshot/publication ownership,
+caller budgets, metadata limits and typed refusals remain active (0003/0005/
+0006). Pinned red/green regressions, ZIP32/ZIP64 capped-read cases, OPC/PPTX
+consumer suites, isolated ASAN fuzz smoke, exact native descriptor/payload
+oracles and capture/replay custody provide 0008 evidence. The explicit
+validator amendment retains the original validator and unchanged captures.
+See the [batch matrix](results/change-0429/adr-review.md). No dependency,
+unsafe production code, hidden executor, network client or guessed edit is added.
+
 ## Change 0411: XLS observation scope and XLSX lint gates
 
 [0411](changes/0411-xls-read-allocation-baseline.md) adds observation regions

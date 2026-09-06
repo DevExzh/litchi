@@ -51,3 +51,39 @@ requested a full fixed header even when bytes were already buffered, and could
 silently discard a truncated trailing header. Four generated regressions failed
 before the production refill fix and passed after it. This correction enables
 valid short-read providers; it is not a measured speedup.
+
+The completed formal capture contains 32 processes, 960 retained samples and
+8,160 phase points. [Resource review](resource-review.md) retains all 27 RSS
+repeat flags and the exact non-RSS phase observations. The two supplementary
+profiles contain 200 benchmark rows outside that count;
+[profile review](profile-review.md) explains partial stack attribution and the
+separate analysis of unqualified DWARF names.
+
+`validation-amendment.json` pins the original validator/build/policy and 131
+unchanged capture artifacts. It records the correction needed to admit the
+already-declared 100-sample profile roles. No baseline is recaptured. The
+original failed profile wrapper and first recording remain retained.
+
+Replay the sealed bundle without the capture executable:
+
+```sh
+python3 -B verify.py --portable
+python3 -B profile-symbol-audit.py --portable-check
+```
+
+The first command checks the full baseline/profile custody, original/amended
+validation chain, all formal report mutations and an exported bundle. The
+second independently rederives the supplementary symbol interpretation in an
+exported bundle. Logs and perf data are losslessly gzip-compressed with original
+and stored hashes; decompress a `.data.gz` file before opening it in perf.
+
+The hash-bound copied capture executable and the isolated fuzz workspace have
+been removed. The original harness executable, root target and harness target
+remain. Cleanup and portable replay receipts are retained under `checks/`;
+the user-supplied `docs/GOAL.md` remains untouched.
+
+Final portable replay passes before and after executable cleanup: 32 formal
+reports, 832 formal mutations, both profiles and the validation-amendment chain.
+The supplementary symbol analysis also passes its exported replay after cleanup.
+`checks/finalization.json` records unchanged production-source and goal-file
+identity and preservation of the original executable and existing target trees.

@@ -1,0 +1,66 @@
+{
+  "name": "media-rich-bytes",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "perf",
+    "record",
+    "-e",
+    "cycles:u",
+    "-F",
+    "499",
+    "--call-graph",
+    "dwarf,16384",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/profiles/media-rich-bytes.data",
+    "--",
+    "/tmp/litchi-goal-0429-binaries/litchi-perf-baseline",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "bytes",
+    "--samples",
+    "100",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/profiles/media-rich-bytes.json"
+  ],
+  "revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+  "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969",
+  "scope": "Full-process samples retained; any operation attribution must select stacks under the measured iteration and identify setup/observer/check frames separately. Profile rows are not additional formal baseline samples.",
+  "recovered_completed_recording": true,
+  "recording_started_utc": null,
+  "postprocessing_started_utc": "2026-09-05T23:50:36.886825+00:00",
+  "recovery_source": "checks/release-profiles.json",
+  "argv_provenance": "Reconstructed from the frozen profiles.py and protocol; original wrapper stopped after successful perf record at the sample-count validator.",
+  "exit_code": 0,
+  "status": "pass",
+  "artifacts": {
+    "profiles/media-rich-bytes.data": {
+      "sha256": "6fdb5c4ecc985e64898f5ed6e2d8a5098e1cb0c005718fa20cd0a6b66ac01a33",
+      "bytes": 286377664
+    },
+    "profiles/media-rich-bytes.json": {
+      "sha256": "97ac0d70d702f166ef47cbbb7da31a8e767404ee9fde3c7585f8c492a92e163c",
+      "bytes": 5831785
+    },
+    "profiles/media-rich-bytes.log": {
+      "sha256": "60ae76a43cf8a17c5ce79594d08ec6c9981dd8ca4a9d103f1b8cd8978e34d370",
+      "bytes": 206
+    },
+    "profiles/media-rich-bytes-script.log": {
+      "sha256": "d5798504b162bec60ab70cc6a04f8554b46cada71cc528ca61ced0119c317eae",
+      "bytes": 35846919
+    },
+    "profiles/media-rich-bytes-report.log": {
+      "sha256": "65435ab0d12c522f7fbf0cd61b571cb02a95b4323d443367bfa49725be0316a4",
+      "bytes": 82872
+    }
+  },
+  "finished_utc": "2026-09-05T23:51:39.569657+00:00"
+}

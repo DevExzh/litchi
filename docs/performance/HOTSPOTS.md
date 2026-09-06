@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## Change 0429: provider boundary and ZIP refill correctness
+
+[0429](changes/0429-pptx-provider-native-baselines.md) extends the matched PPTX lifecycle with bytes, warm files and
+explicit capped/delayed sources, plus separate native image ownership probes.
+Runtime preflight exposed and corrected a shared ZIP central-directory refill
+bug; four red regressions and six expanded capped-read tests bind that
+correctness result. Across 960 samples, non-RSS numeric phase observations are
+exactly repeatable. All 27 review flags are RSS points with different baseline
+values, so API cost cannot explain them without further setup/allocator
+attribution. API clocks exclude setup, source copies, observers, checks and
+drops. Cold I/O, representative native cross-copy, full CRUD coverage,
+semantic streaming and explicit scaling remain open.
+
 ## Change 0428: managed PPTX cache and budget lifetimes
 
 [0428](changes/0428-managed-pptx-cache-lifetimes.md) adds fallible diagnostics on

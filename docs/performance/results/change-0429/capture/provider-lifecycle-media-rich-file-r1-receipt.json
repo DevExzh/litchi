@@ -1,0 +1,55 @@
+{
+  "name": "provider-lifecycle-media-rich-file-r1",
+  "command": "provider-lifecycle",
+  "selector_key": "corpus",
+  "selector": "media-rich",
+  "provider_label": "file",
+  "provider": "file",
+  "max_range": null,
+  "delay_us": null,
+  "repeat": "R1",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/capture/provider-lifecycle-media-rich-file-r1-resource.log",
+    "/tmp/litchi-goal-0429-binaries/litchi-perf-baseline",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "file",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/capture/provider-lifecycle-media-rich-file-r1.json"
+  ],
+  "revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+  "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969",
+  "protocol_sha256": "f4da6b83b5d90ab521a11cae1be14e22b6d1599cf0c8d1e9cd1b42ea8c8f4971",
+  "started_utc": "2026-09-05T23:36:32.148634+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T23:36:46.227825+00:00",
+  "artifacts": {
+    "capture/provider-lifecycle-media-rich-file-r1.json": {
+      "sha256": "6b8cafd4f7129a79141cfcd76fb9850c65b39ebe566d48ebb6493f9eb8d0a631",
+      "bytes": 1753651
+    },
+    "capture/provider-lifecycle-media-rich-file-r1.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "capture/provider-lifecycle-media-rich-file-r1-resource.log": {
+      "sha256": "116eb6ca8cb7b775cfdea493e3d29df468b02fa7c0cfe0f96c2b5715cefd9a9b",
+      "bytes": 1034
+    }
+  }
+}

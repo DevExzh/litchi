@@ -1,0 +1,64 @@
+{
+  "name": "media-rich-file",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "perf",
+    "record",
+    "-e",
+    "cycles:u",
+    "-F",
+    "499",
+    "--call-graph",
+    "dwarf,16384",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/profiles/media-rich-file.data",
+    "--",
+    "/tmp/litchi-goal-0429-binaries/litchi-perf-baseline",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "file",
+    "--samples",
+    "100",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/profiles/media-rich-file.json"
+  ],
+  "revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+  "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969",
+  "scope": "Full-process samples retained; any operation attribution must select stacks under the measured iteration and identify setup/observer/check frames separately. Profile rows are not additional formal baseline samples.",
+  "recovered_completed_recording": false,
+  "recording_started_utc": "2026-09-05T23:51:39.569911+00:00",
+  "postprocessing_started_utc": "2026-09-05T23:51:39.569914+00:00",
+  "exit_code": 0,
+  "status": "pass",
+  "artifacts": {
+    "profiles/media-rich-file.data": {
+      "sha256": "488dd2c97e51973deb9a79fc119059f7df1cbdd4b27fbfbdf95bbc27b969a247",
+      "bytes": 276502488
+    },
+    "profiles/media-rich-file.json": {
+      "sha256": "627f7960c026818ecbc29c6239f7622e6b1a4d67c79efe808fe718f3a731e4b2",
+      "bytes": 5831783
+    },
+    "profiles/media-rich-file.log": {
+      "sha256": "2a06ad6d08b0ad26ef06718ea13ca0665c9d20a0bf766dedb9f4474150ca3fcd",
+      "bytes": 205
+    },
+    "profiles/media-rich-file-script.log": {
+      "sha256": "6496e912cb45bd14e9bda13315f8c6f3b190dfcc6b0f94c84fb46b8ab55e9a15",
+      "bytes": 34866583
+    },
+    "profiles/media-rich-file-report.log": {
+      "sha256": "78fbe12f7808e6b67babfb756f1b883d07c0b8f5ef7991c00783cdfdb0a99e24",
+      "bytes": 79248
+    }
+  },
+  "finished_utc": "2026-09-05T23:53:23.712838+00:00"
+}

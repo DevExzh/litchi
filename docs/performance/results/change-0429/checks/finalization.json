@@ -1,0 +1,14 @@
+{
+  "status": "pass",
+  "source_manifest": {
+    "path": "sources/1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122.json",
+    "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+    "files": 6634
+  },
+  "goal_sha256_unchanged": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "production_sources_unchanged_since_implementation_commit": true,
+  "adr_tree_unchanged": true,
+  "task_binary_and_fuzz_directories_absent": true,
+  "original_binary_and_both_targets_retained": true,
+  "global_goal": "active"
+}

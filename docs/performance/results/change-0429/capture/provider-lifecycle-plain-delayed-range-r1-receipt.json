@@ -1,0 +1,59 @@
+{
+  "name": "provider-lifecycle-plain-delayed-range-r1",
+  "command": "provider-lifecycle",
+  "selector_key": "corpus",
+  "selector": "plain",
+  "provider_label": "delayed-range",
+  "provider": "range",
+  "max_range": 65536,
+  "delay_us": 200,
+  "repeat": "R1",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/capture/provider-lifecycle-plain-delayed-range-r1-resource.log",
+    "/tmp/litchi-goal-0429-binaries/litchi-perf-baseline",
+    "provider-lifecycle",
+    "--corpus",
+    "plain",
+    "--provider",
+    "range",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/capture/provider-lifecycle-plain-delayed-range-r1.json",
+    "--max-range",
+    "65536",
+    "--delay-us",
+    "200"
+  ],
+  "revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+  "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969",
+  "protocol_sha256": "f4da6b83b5d90ab521a11cae1be14e22b6d1599cf0c8d1e9cd1b42ea8c8f4971",
+  "started_utc": "2026-09-05T23:36:12.568389+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T23:36:16.926792+00:00",
+  "artifacts": {
+    "capture/provider-lifecycle-plain-delayed-range-r1.json": {
+      "sha256": "71c9831aebdd02c8e11e42d50e78c75425b1b930e89740330804225f813b40c3",
+      "bytes": 1744418
+    },
+    "capture/provider-lifecycle-plain-delayed-range-r1.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "capture/provider-lifecycle-plain-delayed-range-r1-resource.log": {
+      "sha256": "acc19fcf832ed76e79491a7a36a24442e523a14696cef6441f8f5362597c8ad7",
+      "bytes": 1065
+    }
+  }
+}

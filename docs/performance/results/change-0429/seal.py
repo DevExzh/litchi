@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Losslessly compress logs and refresh the complete bundle inventory."""
+"""Losslessly compress logs and CPU data and refresh the complete bundle inventory."""
 import gzip
 import hashlib
 import json
@@ -15,7 +15,7 @@ def sha(raw):
 def main():
     compression = ROOT / 'compression.json'
     records = json.loads(compression.read_text()) if compression.exists() else {}
-    for path in sorted(ROOT.rglob('*.log')):
+    for path in sorted([*ROOT.rglob('*.log'), *(ROOT / 'profiles').glob('*.data')]):
         stored_path = path.with_suffix(path.suffix + '.gz')
         assert not stored_path.exists()
         raw = path.read_bytes()

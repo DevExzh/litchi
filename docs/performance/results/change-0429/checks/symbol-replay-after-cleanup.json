@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "argv": [
+    "python3",
+    "-B",
+    "profile-symbol-audit.py",
+    "--portable-check"
+  ],
+  "exit_code": 0,
+  "completed_utc": "2026-09-06T00:08:59.614961+00:00",
+  "input_inventory_sha256": "272caad0b4b29d5ea72a18fc4dae4e7fa41826e27ab089b99741a5f2b88ad619",
+  "result": {
+    "status": "pass",
+    "profiles": 2,
+    "portable": true
+  }
+}
