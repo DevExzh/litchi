@@ -1,0 +1,15 @@
+{
+  "change": 448,
+  "revision": "2d5855f03201bfa4e04392bdbb16e683371e5bc1",
+  "source_manifest": {
+    "path": "sources/75e2dd637de219ec4c937306e7e99c5b6c54cea08d36c220095f4b99765d029c.json",
+    "sha256": "75e2dd637de219ec4c937306e7e99c5b6c54cea08d36c220095f4b99765d029c",
+    "files": 6661
+  },
+  "build_receipt": "checks/candidate-build.json",
+  "binary": {
+    "path": "/tmp/litchi-goal-0448-binaries/normal",
+    "bytes": 459741448,
+    "sha256": "23020708cd9849593649d582a78e916dc00f1275236302222e817745640bcd39"
+  }
+}

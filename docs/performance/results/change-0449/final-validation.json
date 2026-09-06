@@ -1,0 +1,15 @@
+{
+  "change": 449,
+  "status": "pass",
+  "finished_utc": "2026-09-06T21:21:28.593860+00:00",
+  "sealed_export": {
+    "exit_code": 0,
+    "stdout": "{\"change\": 449, \"status\": \"pass\", \"reports_reanalysed\": 8, \"samples_reanalysed\": 240, \"profiles_reanalysed\": 2, \"sealed\": true, \"new_workload_executions\": 0}\n",
+    "stderr": ""
+  },
+  "scratch_removed": true,
+  "copied_binaries_created": 0,
+  "worktrees_created": 0,
+  "cargo_targets_preserved": true,
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+}

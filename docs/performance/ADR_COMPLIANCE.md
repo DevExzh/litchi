@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0449: ownership-specific diagnostic attribution
+
+[0449](changes/0449-pptx-caller-source-attribution.md) changes only evidence tooling and documentation. All seven retained source
+copies match the 0448 build. Source freshness, OPC compressed authorization,
+cache/budget accounting and ZIP preservation remain unchanged (0003/0005/0006).
+No production API, dependency, unsafe policy or execution change. The source
+review keeps memory and immutable-source contracts explicit for the proposed
+first-decode capture investigation. Accepted ADRs are unchanged.
+
 ## Change 0448: explicit minimum-service policy in standalone tooling
 
 [0448](changes/0448-pptx-minimum-service-pacing.md) uses a local monotonic timer only in the caller-configured range simulator.

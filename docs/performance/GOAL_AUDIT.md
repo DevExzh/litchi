@@ -1,6 +1,19 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0448
+## Current evidence through 0449
+
+[0449](changes/0449-pptx-caller-source-attribution.md) corrects the attribution used to rank the next PPTX optimization: untimed
+harness hashing is about half of lifecycle SHA period, and publication read totals
+combine source compressed capture with destination passthrough. Replaying all
+240 existing samples confirms source-cache hits rather than cold rereads during
+publication. This is diagnostic evidence; no new workload or native test ran.
+
+Registry/default counts remain 438/36 and representative coverage remains
+15 categories/33 mappings/10 measured/23 correctness-only. Native breadth, cold
+I/O, bounded existing append, repackaging and scaling remain incomplete. The full
+user-owned non-iWork goal remains active and uncompleted.
+
+## Earlier evidence through 0448
 
 [0448](changes/0448-pptx-minimum-service-pacing.md) completes the scoped minimum-service timer calibration identified in 0447.
 Eight reports/240 samples and four profiles support retention of the opt-in

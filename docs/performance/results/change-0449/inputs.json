@@ -1,0 +1,218 @@
+{
+  "change": 449,
+  "parent_commit": "2e897dc115af3ed32e4c7d6d4d90f105c94893a3",
+  "imported_utc": "2026-09-06T21:15:11.984173+00:00",
+  "origin_seal_sha256": "2b4118d6fdf5a90b7b7beb042f86c2d93e74d51a31f77b52357ae710c6004230",
+  "records": [
+    {
+      "origin": "docs/performance/results/change-0448/build.json",
+      "path": "inputs/build.json",
+      "sha256": "e074815e93bc743774f96e9543b20a1ef8f83afb98c5f8aa2264285d92716356",
+      "bytes": 526
+    },
+    {
+      "origin": "docs/performance/results/change-0448/protocol.json",
+      "path": "inputs/protocol.json",
+      "sha256": "61bdb65c6a55af082095a81d723ca654665cb3f54bac4784cc0eaa2580b7f37f",
+      "bytes": 3216
+    },
+    {
+      "origin": "docs/performance/results/change-0448/source-files.json",
+      "path": "inputs/source-files.json",
+      "sha256": "37aad8dbbc5e9bb91bad86a3dde440f7f6a5c76ccffdb9ebefa5b6bd94d69a37",
+      "bytes": 109
+    },
+    {
+      "origin": "docs/performance/results/change-0448/summary.json",
+      "path": "inputs/summary.json",
+      "sha256": "cf2205754453c45ee349e4545ea55cd6d6b7ff934a9644e65647bb549252866f",
+      "bytes": 221102
+    },
+    {
+      "origin": "docs/performance/results/change-0448/profile-summary.json",
+      "path": "inputs/profile-summary.json",
+      "sha256": "f8d09a84f5c097f3fa1770c959e250efdc44c0a2b517d7533b1895e783ed12fc",
+      "bytes": 34297
+    },
+    {
+      "origin": "docs/performance/results/change-0448/verify-report.py",
+      "path": "inputs/verify-report.py",
+      "sha256": "59b33e888d5233b5462c1c705bedcf4f6b6c118e9e209a0fa1e0ea4af5d2fc95",
+      "bytes": 3679
+    },
+    {
+      "origin": "docs/performance/results/change-0448/base-verify-report.py",
+      "path": "inputs/base-verify-report.py",
+      "sha256": "d8ec5862592192dbb3b3f08205f6faec19eba10c5f4b9d0a64d536a373474b00",
+      "bytes": 62497
+    },
+    {
+      "origin": "docs/performance/results/change-0448/sources/75e2dd637de219ec4c937306e7e99c5b6c54cea08d36c220095f4b99765d029c.json",
+      "path": "inputs/sources/75e2dd637de219ec4c937306e7e99c5b6c54cea08d36c220095f4b99765d029c.json",
+      "sha256": "75e2dd637de219ec4c937306e7e99c5b6c54cea08d36c220095f4b99765d029c",
+      "bytes": 806515
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/0/report.json",
+      "path": "inputs/runs/0/report.json",
+      "sha256": "c307d7dbdc909420ae3330811c96e8a331446caabfe2e7dc5918581b21c86ec5",
+      "bytes": 1817905
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/0/receipt.json",
+      "path": "inputs/runs/0/receipt.json",
+      "sha256": "d167dcee62895ad3644796dc3f4fee95b95b788392776c5d3a4c266e5e6d46d6",
+      "bytes": 2689
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/1/report.json",
+      "path": "inputs/runs/1/report.json",
+      "sha256": "c2820071fa68b0428464b158493daed4bd428400af98ceff6ad56ea9eb71ee6a",
+      "bytes": 1831310
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/1/receipt.json",
+      "path": "inputs/runs/1/receipt.json",
+      "sha256": "54e3ae124bfcac3f2788100c18e6b98b1c4df1ae3cf8e6f4d49fd0bdaf2e6666",
+      "bytes": 2699
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/2/report.json",
+      "path": "inputs/runs/2/report.json",
+      "sha256": "ef11017d3be5a1682b0a415d42996be0adc8595c50e8071050197abda791ae87",
+      "bytes": 1817905
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/2/receipt.json",
+      "path": "inputs/runs/2/receipt.json",
+      "sha256": "d4cc46159a6481ec2984ae8cc1d9440947964f301c512c5366a6318ad0747759",
+      "bytes": 2688
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/3/report.json",
+      "path": "inputs/runs/3/report.json",
+      "sha256": "f8e1d1630ad0ad381f2ddee6e09447e993d120f576d9c37268f91446b65e4d8e",
+      "bytes": 1831310
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/3/receipt.json",
+      "path": "inputs/runs/3/receipt.json",
+      "sha256": "a50797a9bf20041d84330b9de11c5d8936168c3cdb801bcc01877c3f8d7d2dd5",
+      "bytes": 2698
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/4/report.json",
+      "path": "inputs/runs/4/report.json",
+      "sha256": "bd5032c56b322c110971f9acfc1875a2684c87c58c0710ec76ffd46af7dfc336",
+      "bytes": 1831310
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/4/receipt.json",
+      "path": "inputs/runs/4/receipt.json",
+      "sha256": "149840c2d1e7327386fb1e5eec594fa4c75fe151bf2da412d8fc67d1dae21113",
+      "bytes": 2698
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/5/report.json",
+      "path": "inputs/runs/5/report.json",
+      "sha256": "74e5965ecb3fbc212c72e232d34953565e54c91d2b8caf9178052ac4bb5c8109",
+      "bytes": 1817905
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/5/receipt.json",
+      "path": "inputs/runs/5/receipt.json",
+      "sha256": "9223ed3bb14418c82f4007774361e0f9d11df10328e03ae71486a4cc50cbc6c6",
+      "bytes": 2688
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/6/report.json",
+      "path": "inputs/runs/6/report.json",
+      "sha256": "e74b47d2e66b55db2f34d8fccbea2941233dedbf6b2220e8aaf91743ffcb2379",
+      "bytes": 1831310
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/6/receipt.json",
+      "path": "inputs/runs/6/receipt.json",
+      "sha256": "c6293120911f66789ce9d3e57d4573e4e9e376bb4f3a44181b0a37af9b5dadfd",
+      "bytes": 2699
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/7/report.json",
+      "path": "inputs/runs/7/report.json",
+      "sha256": "91a5581a8c48d04c7a90fd77e68a39a658e97f26e61711ff5d8e61bffa1db8bb",
+      "bytes": 1817905
+    },
+    {
+      "origin": "docs/performance/results/change-0448/runs/7/receipt.json",
+      "path": "inputs/runs/7/receipt.json",
+      "sha256": "b7e2da03fd890253f986c141d0cc4d83fe1b1e5d346fed94bb6d5cdde76aa1d7",
+      "bytes": 2689
+    },
+    {
+      "origin": "docs/performance/results/change-0448/profiles/1/record/perf-script.txt.gz",
+      "path": "inputs/profiles/1/record/perf-script.txt.gz",
+      "sha256": "febca6cf7e8bdf91ef4a74656ecf7017a5f1de741e43e076a58b3b0b88b1f759",
+      "bytes": 369907
+    },
+    {
+      "origin": "docs/performance/results/change-0448/profiles/1/record/receipt.json",
+      "path": "inputs/profiles/1/record/receipt.json",
+      "sha256": "44ae2ad7602f1f2ade33336ed8e1154151c9348aa2f3244dee242059fe8d555d",
+      "bytes": 3569
+    },
+    {
+      "origin": "docs/performance/results/change-0448/profiles/3/record/perf-script.txt.gz",
+      "path": "inputs/profiles/3/record/perf-script.txt.gz",
+      "sha256": "c2f01714b56c9ebbba947d5437ddab20538a9a1b2ffa87331968da209a91ddc2",
+      "bytes": 367605
+    },
+    {
+      "origin": "docs/performance/results/change-0448/profiles/3/record/receipt.json",
+      "path": "inputs/profiles/3/record/receipt.json",
+      "sha256": "afc686ec779424fa83948651d4cbaa793f21f77fc5d49d5e774f226083e88c62",
+      "bytes": 3568
+    },
+    {
+      "origin": "tools/perf-baseline/src/pptx_provider_lifecycle.rs",
+      "path": "source/tools/perf-baseline/src/pptx_provider_lifecycle.rs",
+      "sha256": "5b9784297f209317ec4870bd0edade0b8d86279054c49b047b9fe3868d3c0a08",
+      "bytes": 49159
+    },
+    {
+      "origin": "tools/perf-baseline/src/pptx_cache_retention.rs",
+      "path": "source/tools/perf-baseline/src/pptx_cache_retention.rs",
+      "sha256": "1322518d42377d6f1859763ee6b319745afedc303148fd749c3fae2e2cc30872",
+      "bytes": 95286
+    },
+    {
+      "origin": "tools/perf-baseline/src/lib.rs",
+      "path": "source/tools/perf-baseline/src/lib.rs",
+      "sha256": "4121a9d0eda820a4a1944b11607c46b990e84901eb3d2e942361b47f851a9eeb",
+      "bytes": 2824106
+    },
+    {
+      "origin": "crates/litchi-pptx/src/presentation/source_cross_copy.rs",
+      "path": "source/crates/litchi-pptx/src/presentation/source_cross_copy.rs",
+      "sha256": "366dcd4170148eee0ddd532b850866ab8d8197cf68ed8419e94a0a44fcfd62cf",
+      "bytes": 223750
+    },
+    {
+      "origin": "crates/litchi-opc/src/source_backed.rs",
+      "path": "source/crates/litchi-opc/src/source_backed.rs",
+      "sha256": "d5707f7e051e12c96b3aa71b1c9416f3f5294a5af1d07a7ab3c49915d11f1d99",
+      "bytes": 649412
+    },
+    {
+      "origin": "crates/litchi-core/src/source.rs",
+      "path": "source/crates/litchi-core/src/source.rs",
+      "sha256": "adb5695a0b3cc5effa7e1fc95b62531540e9436d0a39dfc57244de827dfe6192",
+      "bytes": 8322
+    },
+    {
+      "origin": "crates/soapberry-zip/src/preserve.rs",
+      "path": "source/crates/soapberry-zip/src/preserve.rs",
+      "sha256": "d6d8bedfd9452f8b452df4bf8cd6a407da9ccad401b879b65c2cf2bcea3bb94e",
+      "bytes": 189898
+    }
+  ]
+}

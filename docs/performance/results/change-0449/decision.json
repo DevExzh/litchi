@@ -1,0 +1,10 @@
+{
+  "change": 449,
+  "decision": "retain diagnostic attribution",
+  "production_optimization": false,
+  "goal_complete": false,
+  "new_workload_executions": 0,
+  "finding": "About half of lifecycle SHA samples come from an untimed harness hash. Publication totals combine source compressed capture and destination reads while logical source rereads hit cache.",
+  "next_action": "Inspect OPC/ZIP first-cold-decode compressed authorization with explicit memory and freshness ownership before attempting to remove a physical pass. Separately measure preservation copy granularity.",
+  "withheld": ["production speedup", "removable read count", "exact timer CPU attribution", "per-member offset attribution", "operation allocation", "native or cold coverage", "scaling"]
+}

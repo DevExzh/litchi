@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## Change 0449: separate harness hashing and publication source owners
+
+[0449](changes/0449-pptx-caller-source-attribution.md) shows that roughly half the lifecycle SHA period belongs to the untimed
+output hash. Planning/publication touched-digest stacks each account for roughly
+one quarter of lifecycle SHA period. Keep those contracts; the prior aggregate
+SHA percentage does not justify a production SIMD rewrite.
+
+Publication's 33,617,184 returned bytes comprise 16,786,581 from the source and
+16,830,603 from the destination. Source cache hits are 23, with no cold loads.
+Logical candidate rereads therefore do not imply fresh payload materialization.
+Investigate OPC/ZIP authorization during first cold decode under explicit capture
+memory/source fences, then bounded destination copy granularity. Current counters
+cannot prove exactly removable reads. See [source review](results/change-0449/source-review.md).
+Native breadth, cold I/O, bounded append, repackaging and scaling remain open.
+
 ## Change 0448: reduce excess waiting in the explicit pacing model
 
 [0448](changes/0448-pptx-minimum-service-pacing.md) credits elapsed source work and fixed-wait overshoot against a combined

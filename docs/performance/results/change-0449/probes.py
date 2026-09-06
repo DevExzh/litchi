@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""Exercise caller attribution and reject altered exported evidence."""
+import importlib.util,json,shutil,subprocess,sys,tempfile
+from pathlib import Path
+ROOT=Path(__file__).resolve().parent
+s=importlib.util.spec_from_file_location('d',ROOT/'derive.py');d=importlib.util.module_from_spec(s);s.loader.exec_module(d)
+def run(p):return subprocess.run([sys.executable,'-B',str(p/'verify.py')],cwd=p,capture_output=True,text=True)
+# Non-tautological parser edge cases, preserving both missing stacks and EOF blocks.
+blocks=d.parse(b'app 4 1.0: 7 cycles:u:\n  abc sha2::sha256::x86_sha::compress+0x1 (binary)\n\napp 4 2.0: 11 cycles:u:\n\napp 4 3.0: 13 cycles:u:\n  def other (binary)')
+assert blocks==[(7,('sha2::sha256::x86_sha::compress',)),(11,()),(13,('other',))]
+try:d.parse(b'not a profile line')
+except ValueError:pass
+else:raise AssertionError('malformed profile accepted')
+assert d.category(('sha2::sha256::x86_sha::compress','litchi_perf_baseline::sha256_hex'))=='outside-lifecycle-frame'
+assert d.category((d.RUN,'unrecognised caller'))=='unclassified-lifecycle-sha'
+assert d.category((d.RUN,'litchi_perf_baseline::sha256_hex'))=='untimed-harness-output-hash'
+assert d.category((d.RUN,'owner::digest_touched','owner::publish_cross_slide_copy_to_stream'))=='publication-touched-digest'
+assert d.category((d.RUN,'owner::digest_touched','owner::plan_cross_slide_copy'))=='planning-touched-digest'
+rows=[]
+with tempfile.TemporaryDirectory(prefix='litchi-goal-0449-probes-') as scratch:
+    out=Path(scratch)/'export';shutil.copytree(ROOT,out)
+    valid=run(out);assert valid.returncode==0,valid.stdout
+    cases=[('attribution.json',lambda v:v['profiles'][0].__setitem__('run_period',0)),
+           ('inputs/runs/3/report.json',lambda v:v['samples_raw'][0]['phases'][3]['source_reads']['delta'].__setitem__('returned_bytes',0)),
+           ('inputs/profiles/3/record/receipt.json',lambda v:v['artifacts']['perf_script'].__setitem__('sha256','0'*64)),
+           ('inputs.json',lambda v:v['records'][0].__setitem__('sha256','0'*64)),
+           ('inputs.json',lambda v:v['records'][0].__setitem__('origin','unknown'))]
+    for name,mutate in cases:
+        p=out/name;raw=p.read_bytes();v=json.loads(raw);mutate(v);p.write_text(json.dumps(v))
+        r=run(out);assert r.returncode!=0,(name,r.stdout);rows.append({'path':name,'exit_code':r.returncode,'stdout':r.stdout,'stderr':r.stderr});p.write_bytes(raw)
+    p=out/'source/crates/soapberry-zip/src/preserve.rs';raw=p.read_bytes();p.write_bytes(raw+b'\n// changed source\n');r=run(out);assert r.returncode!=0;rows.append({'path':str(p.relative_to(out)),'exit_code':r.returncode,'stdout':r.stdout,'stderr':r.stderr})
+receipt={'status':'pass','parser_and_classification_checks':7,'exported_valid':{'exit_code':valid.returncode,'stdout':valid.stdout},'rejected':rows,'temporary_directory_removed':not Path(scratch).exists(),'scope':'export replay invokes no Rust workload or profiler'}
+with (ROOT/'probes.json').open('x') as f:f.write(json.dumps(receipt,indent=2)+'\n')
+print(json.dumps({'status':'pass','rejected':len(rows),'parser_and_classification_checks':7,'scratch_removed':True}))
