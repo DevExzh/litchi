@@ -11,6 +11,7 @@ const MAX_FILES: usize = 256;
 const MAX_MEMBER_NAME_BYTES: u64 = 4 << 10;
 const MAX_METADATA_BYTES: u64 = 64 << 10;
 const MAX_ENTRY_BYTES: u64 = 1 << 20;
+const MAX_PRECOMPRESSED_PROGRESS_EVENTS: usize = 8;
 
 fn fuzz_limits() -> ArchiveLimits {
     ArchiveLimits {
@@ -105,6 +106,54 @@ fn exercise_preservation_index<R: ReaderAt>(archive: &IndexedArchive<R>, limits:
     }
 }
 
+fn exercise_precompressed<R: ReaderAt>(archive: &IndexedArchive<R>, borrowed: &ArchiveReader<'_>) {
+    for name in archive.file_names() {
+        let Some(entry_id) = archive.entry_id(name) else {
+            continue;
+        };
+        let Ok(metadata) = archive.metadata_for(entry_id) else {
+            continue;
+        };
+        if metadata.uncompressed_size() > MAX_ENTRY_BYTES {
+            continue;
+        }
+
+        // The borrowed reader supplies the already-decoded logical bytes.
+        // Its admission limits keep this allocation within MAX_ENTRY_BYTES;
+        // the precompressed API then captures and verifies only the matching
+        // bounded source member.
+        let Ok(decoded) = borrowed.read(name) else {
+            continue;
+        };
+        let Ok(decoded_size) = u64::try_from(decoded.len()) else {
+            continue;
+        };
+        assert_eq!(decoded_size, metadata.uncompressed_size());
+
+        let mut progress_events = 0usize;
+        let result =
+            archive.read_entry_precompressed_with_progress(entry_id, &decoded, |progress| {
+                progress_events = progress_events.saturating_add(1);
+                let _ = black_box(progress);
+                if progress_events > MAX_PRECOMPRESSED_PROGRESS_EVENTS {
+                    Err(())
+                } else {
+                    Ok(())
+                }
+            });
+        if let Ok(token) = result {
+            assert_eq!(token.compressed_size(), metadata.compressed_size());
+            assert_eq!(token.uncompressed_size(), decoded_size);
+            assert_eq!(token.crc32(), soapberry_zip::crc32(&decoded));
+            let _ = black_box(token.compression_method());
+        }
+
+        // One bounded member is enough to cover both successful small-member
+        // tokens and callback cancellation for larger admitted members.
+        break;
+    }
+}
+
 fn exercise_bounded_paths(data: &[u8]) {
     let limits = fuzz_limits();
     let borrowed = ArchiveReader::new_with_limits(data, limits);
@@ -122,6 +171,7 @@ fn exercise_bounded_paths(data: &[u8]) {
     // successful results keeps this target sensitive to drift between the
     // contiguous borrowed source and the positional ReaderAt source.
     if let (Ok(reader), Ok(archive)) = (&borrowed, &reader_at) {
+        exercise_precompressed(archive, reader);
         for name in reader.file_names() {
             assert!(archive.contains(name));
             if let (Ok(borrowed_metadata), Ok(reader_at_metadata)) =

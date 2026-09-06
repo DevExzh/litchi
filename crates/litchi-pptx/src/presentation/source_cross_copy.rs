@@ -376,7 +376,8 @@ impl SourceBackedPresentationEditor {
         }
         verify_candidate(&self, &plan.source, &current)?;
         let _memory_reservation = current.memory_reservation.clone();
-        let topology = current.into_topology(execution_context.as_ref())?;
+        let topology =
+            current.into_topology(&plan.source.inner.package, execution_context.as_ref())?;
         let source_check_state = Arc::new(Mutex::new(SourceCheckState::default()));
         let writer = SourceCheckedWriter {
             inner: writer,
@@ -470,6 +471,7 @@ impl Prepared {
 
     fn into_topology(
         self,
+        source_package: &SourceBackedPackage,
         execution_context: Option<&ExecutionContext>,
     ) -> Result<SourceTopologyPlan> {
         let mut topology = SourceTopologyPlan::new();
@@ -496,11 +498,61 @@ impl Prepared {
         )?;
         for image in self.images {
             check_execution(execution_context)?;
-            topology.try_add_part_shared(image.target_uri, image.content_type, image.bytes)?;
+            let source_part = source_package.part(&image.source_uri)?;
+            match source_part.authorize_precompressed(Arc::clone(&image.bytes)) {
+                Ok(payload) => match topology.try_add_precompressed_part(
+                    image.target_uri.clone(),
+                    image.content_type.clone(),
+                    payload,
+                ) {
+                    Ok(()) => {},
+                    Err(error) if precompressed_fallback_allowed(&error) => {
+                        topology.try_add_part_shared(
+                            image.target_uri,
+                            image.content_type,
+                            image.bytes,
+                        )?;
+                    },
+                    Err(error) => return Err(Error::Opc(error)),
+                },
+                Err(error) if precompressed_fallback_allowed(&error) => {
+                    topology.try_add_part_shared(
+                        image.target_uri,
+                        image.content_type,
+                        image.bytes,
+                    )?;
+                },
+                Err(error) => return Err(Error::Opc(error)),
+            }
         }
         for chart in self.charts {
             check_execution(execution_context)?;
-            topology.try_add_part_shared(chart.target_uri, chart.content_type, chart.bytes)?;
+            let source_part = source_package.part(&chart.source_uri)?;
+            match source_part.authorize_precompressed(Arc::clone(&chart.bytes)) {
+                Ok(payload) => match topology.try_add_precompressed_part(
+                    chart.target_uri.clone(),
+                    chart.content_type.clone(),
+                    payload,
+                ) {
+                    Ok(()) => {},
+                    Err(error) if precompressed_fallback_allowed(&error) => {
+                        topology.try_add_part_shared(
+                            chart.target_uri,
+                            chart.content_type,
+                            chart.bytes,
+                        )?;
+                    },
+                    Err(error) => return Err(Error::Opc(error)),
+                },
+                Err(error) if precompressed_fallback_allowed(&error) => {
+                    topology.try_add_part_shared(
+                        chart.target_uri,
+                        chart.content_type,
+                        chart.bytes,
+                    )?;
+                },
+                Err(error) => return Err(Error::Opc(error)),
+            }
         }
         for relationship in self.slide_relationship_order {
             check_execution(execution_context)?;
@@ -5515,6 +5567,14 @@ fn check_execution(context: Option<&ExecutionContext>) -> Result<()> {
     Ok(())
 }
 
+fn precompressed_fallback_allowed(error: &litchi_opc::OpcError) -> bool {
+    matches!(
+        error,
+        litchi_opc::OpcError::Execution(ExecutionError::ResourceLimit(limit))
+            if limit.resource == Resource::Memory
+    )
+}
+
 fn map_execution_error(error: ExecutionError) -> Error {
     Error::Opc(match error {
         ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
@@ -5736,6 +5796,38 @@ mod tests {
                 Some(&context),
             ),
             Err(Error::Opc(litchi_opc::OpcError::Cancelled))
+        ));
+    }
+
+    #[test]
+    fn precompressed_fallback_is_limited_to_memory_admission_refusal() {
+        let memory = litchi_opc::OpcError::Execution(ExecutionError::ResourceLimit(
+            litchi_core::ResourceLimit {
+                resource: Resource::Memory,
+                observed: 10,
+                limit: 1,
+                scope: Arc::from("test"),
+            },
+        ));
+        assert!(precompressed_fallback_allowed(&memory));
+
+        let work = litchi_opc::OpcError::Execution(ExecutionError::ResourceLimit(
+            litchi_core::ResourceLimit {
+                resource: Resource::Work,
+                observed: 10,
+                limit: 1,
+                scope: Arc::from("test"),
+            },
+        ));
+        assert!(!precompressed_fallback_allowed(&work));
+        assert!(!precompressed_fallback_allowed(
+            &litchi_opc::OpcError::ZipError("corrupt compressed payload".into())
+        ));
+        assert!(!precompressed_fallback_allowed(
+            &litchi_opc::OpcError::SourceChanged {
+                expected: SourceVersion::new(1, 0),
+                actual: SourceVersion::new(1, 1),
+            }
         ));
     }
 }

@@ -7,6 +7,7 @@
 //! a partial preserved archive.
 
 use crate::office::ArchiveLimits;
+use crate::office::VerifiedPrecompressedEntry;
 use crate::{
     CompressionMethod, EndOfCentralDirectoryRecordFixed, Error, ErrorKind, LimitResource, ReaderAt,
     ZipArchive, ZipArchiveWriter, ZipFileHeaderFixed, ZipLocalFileHeaderFixed,
@@ -142,6 +143,7 @@ pub struct RegeneratedEntry {
 enum RegeneratedPayload {
     Owned(Vec<u8>),
     Shared(Arc<Vec<u8>>),
+    Precompressed(VerifiedPrecompressedEntry),
 }
 
 impl RegeneratedPayload {
@@ -149,6 +151,9 @@ impl RegeneratedPayload {
         match self {
             Self::Owned(data) => data,
             Self::Shared(data) => data,
+            Self::Precompressed(_) => {
+                unreachable!("precompressed payload has no logical byte slice")
+            },
         }
     }
 }
@@ -174,9 +179,30 @@ impl RegeneratedEntry {
         }
     }
 
+    /// Create a regenerated member from a ZIP-reader-issued verified
+    /// compressed payload.  The token carries its own method, actual CRC, and
+    /// decoded size; callers cannot provide unchecked metadata or bytes.
+    pub fn new_precompressed_shared(
+        name: impl Into<String>,
+        data: VerifiedPrecompressedEntry,
+    ) -> Self {
+        let compression = data.compression_method();
+        Self {
+            name: name.into(),
+            data: RegeneratedPayload::Precompressed(data),
+            compression,
+        }
+    }
+
+    /// Select the compression method for an ordinary logical payload.
+    ///
+    /// A verified precompressed payload keeps the method issued by its ZIP
+    /// reader; this builder call therefore leaves that token's method fixed.
     #[must_use]
     pub fn compression_method(mut self, compression: CompressionMethod) -> Self {
-        self.compression = compression;
+        if !matches!(&self.data, RegeneratedPayload::Precompressed(_)) {
+            self.compression = compression;
+        }
         self
     }
 }
@@ -1897,44 +1923,71 @@ fn generated_deflate_needs_zip64(payload_len: usize, name_len: usize) -> Result<
 }
 
 fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
-    let payload_len = entry.data.as_slice().len();
+    let payload_len = match &entry.data {
+        RegeneratedPayload::Owned(data) => data.len(),
+        RegeneratedPayload::Shared(data) => data.len(),
+        RegeneratedPayload::Precompressed(data) => data.compressed_payload().len(),
+    };
     let name_bytes = entry
         .name
         .len()
         .checked_mul(2)
         .ok_or_else(|| unsupported("generated member allocation size"))?;
-    let capacity = payload_len
-        .checked_add(payload_len / 8)
-        .and_then(|size| size.checked_add(name_bytes))
-        .and_then(|size| size.checked_add(4 * 1024))
-        .ok_or_else(|| unsupported("generated member allocation size"))?;
+    let capacity = match &entry.data {
+        // A verified payload is copied verbatim by the sized writer. It has no
+        // Deflate expansion bound, so retaining the ordinary C + C/8 reserve
+        // would overcharge the managed publication memory budget for large
+        // transfers.
+        RegeneratedPayload::Precompressed(_) => payload_len
+            .checked_add(name_bytes)
+            .and_then(|size| size.checked_add(4 * 1024))
+            .ok_or_else(|| unsupported("generated member allocation size"))?,
+        RegeneratedPayload::Owned(_) | RegeneratedPayload::Shared(_) => payload_len
+            .checked_add(payload_len / 8)
+            .and_then(|size| size.checked_add(name_bytes))
+            .and_then(|size| size.checked_add(4 * 1024))
+            .ok_or_else(|| unsupported("generated member allocation size"))?,
+    };
     let mut generated = Vec::new();
     generated
         .try_reserve_exact(capacity)
         .map_err(|source| allocation("generated member", source))?;
     let mut writer = ZipArchiveWriter::new(generated);
-    match entry.compression {
-        CompressionMethod::Store => writer.write_stored_file(&entry.name, entry.data.as_slice())?,
-        CompressionMethod::Deflate => {
-            use flate2::Compression;
-            use flate2::write::DeflateEncoder;
-
-            // This helper remains fully buffered; the selector only establishes
-            // valid ZIP framing before the one-pass compressor starts.
-            let zip64 = generated_deflate_needs_zip64(payload_len, entry.name.len())?;
-            let (mut file, config) = writer
-                .new_file(&entry.name)
-                .compression_method(CompressionMethod::Deflate)
-                .zip64(zip64)
-                .start()?;
-            let encoder = DeflateEncoder::new(&mut file, Compression::default());
-            let mut data_writer = config.wrap(encoder);
-            data_writer.write_all(entry.data.as_slice())?;
-            let (encoder, descriptor) = data_writer.finish()?;
-            encoder.finish()?;
-            file.finish(descriptor)?;
+    match &entry.data {
+        RegeneratedPayload::Precompressed(data) => {
+            writer.write_precompressed_file(
+                &entry.name,
+                data.compression_method(),
+                data.crc32(),
+                data.uncompressed_size(),
+                data.compressed_payload(),
+            )?;
         },
-        _ => return Err(unsupported("generated compression method")),
+        RegeneratedPayload::Owned(_) | RegeneratedPayload::Shared(_) => match entry.compression {
+            CompressionMethod::Store => {
+                writer.write_stored_file(&entry.name, entry.data.as_slice())?
+            },
+            CompressionMethod::Deflate => {
+                use flate2::Compression;
+                use flate2::write::DeflateEncoder;
+
+                // This helper remains fully buffered; the selector only establishes
+                // valid ZIP framing before the one-pass compressor starts.
+                let zip64 = generated_deflate_needs_zip64(payload_len, entry.name.len())?;
+                let (mut file, config) = writer
+                    .new_file(&entry.name)
+                    .compression_method(CompressionMethod::Deflate)
+                    .zip64(zip64)
+                    .start()?;
+                let encoder = DeflateEncoder::new(&mut file, Compression::default());
+                let mut data_writer = config.wrap(encoder);
+                data_writer.write_all(entry.data.as_slice())?;
+                let (encoder, descriptor) = data_writer.finish()?;
+                encoder.finish()?;
+                file.finish(descriptor)?;
+            },
+            _ => return Err(unsupported("generated compression method")),
+        },
     }
     let bytes = writer.finish()?;
     let (directory_offset, central_end, payload_start, payload_end) = {
@@ -2002,9 +2055,19 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         },
         generated_payload: Some(GeneratedPayload {
             range: payload_start..payload_end,
-            kind: match entry.compression {
-                CompressionMethod::Store => AccountingWriteKind::Stored,
-                CompressionMethod::Deflate => AccountingWriteKind::GeneratedDeflate,
+            kind: match (&entry.data, entry.compression) {
+                (RegeneratedPayload::Precompressed(_), CompressionMethod::Store)
+                | (RegeneratedPayload::Owned(_), CompressionMethod::Store)
+                | (RegeneratedPayload::Shared(_), CompressionMethod::Store) => {
+                    AccountingWriteKind::Stored
+                },
+                (RegeneratedPayload::Precompressed(_), CompressionMethod::Deflate) => {
+                    AccountingWriteKind::Precompressed
+                },
+                (RegeneratedPayload::Owned(_), CompressionMethod::Deflate)
+                | (RegeneratedPayload::Shared(_), CompressionMethod::Deflate) => {
+                    AccountingWriteKind::GeneratedDeflate
+                },
                 _ => return Err(unsupported("generated compression method")),
             },
         }),
@@ -3381,6 +3444,44 @@ mod tests {
             deflate_accounting.generated_deflate_payload_bytes_emitted(),
             3
         );
+
+        let mut source_writer = crate::office::StreamingArchiveWriter::new();
+        source_writer.write_deflated("source.bin", deflate).unwrap();
+        let source_bytes = source_writer.finish_to_bytes().unwrap();
+        let source_len = source_bytes.len() as u64;
+        let source =
+            crate::office::IndexedArchive::from_reader(Cursor::new(source_bytes), source_len)
+                .unwrap();
+        let source_id = source.entry_id("source.bin").unwrap();
+        let token = source
+            .read_entry_precompressed_with_progress(source_id, deflate, |_| Ok::<(), io::Error>(()))
+            .unwrap();
+        let mut precompressed_plan = PreservationPlan::copy_all(&index);
+        precompressed_plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new_precompressed_shared("partial-precompressed", token),
+        };
+        let precompressed_payload_start =
+            ZipLocalFileHeaderFixed::SIZE + b"partial-precompressed".len();
+        let mut precompressed_sink =
+            PartialFailingSink::new(precompressed_payload_start + 3, usize::MAX);
+        let mut precompressed_accounting = ZipOperationAccounting::default();
+        let error = index
+            .write_to_with_accounting(
+                &precompressed_plan,
+                &mut precompressed_sink,
+                &mut precompressed_accounting,
+            )
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert_eq!(
+            precompressed_accounting.precompressed_payload_bytes_emitted(),
+            3
+        );
+        assert_eq!(
+            precompressed_accounting.generated_deflate_payload_bytes_emitted(),
+            0
+        );
     }
 
     #[test]
@@ -4587,5 +4688,44 @@ mod tests {
         truncated.pop();
         assert!(ZipArchive::from_slice(&truncated).is_err());
         assert_eq!(source, zip64_archive());
+    }
+
+    #[test]
+    fn regenerated_precompressed_entry_reopens_and_charges_precompressed_bytes() {
+        let payload = b"precompressed preservation payload repeated repeated";
+        let mut source_writer = crate::office::StreamingArchiveWriter::new();
+        source_writer.write_deflated("source.bin", payload).unwrap();
+        let source_bytes = source_writer.finish_to_bytes().unwrap();
+        let source_len = source_bytes.len() as u64;
+        let source =
+            crate::office::IndexedArchive::from_reader(Cursor::new(source_bytes), source_len)
+                .unwrap();
+        let source_id = source.entry_id("source.bin").unwrap();
+        let token = source
+            .read_entry_precompressed_with_progress(source_id, payload, |_| Ok::<(), io::Error>(()))
+            .unwrap();
+        let compressed_size = token.compressed_size();
+
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.try_append(RegeneratedEntry::new_precompressed_shared(
+            "copied.bin",
+            token,
+        ))
+        .unwrap();
+
+        let mut accounting = ZipOperationAccounting::default();
+        let output = index
+            .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
+            .unwrap();
+        let reader = crate::office::ArchiveReader::new(&output).unwrap();
+        assert_eq!(reader.read("copied.bin").unwrap(), payload);
+        assert_eq!(
+            accounting.precompressed_payload_bytes_emitted(),
+            compressed_size
+        );
+        assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
     }
 }
