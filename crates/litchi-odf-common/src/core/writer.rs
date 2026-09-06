@@ -426,6 +426,7 @@ impl std::error::Error for PackageWriterError {
 pub type PackageWriterResult<T> = std::result::Result<T, PackageWriterError>;
 
 use super::encryption::{Profile, encrypt_entry};
+use super::generated_xml::{GeneratedXmlEnvelope, GeneratedXmlLimits, GeneratedXmlReport};
 use super::manifest::{
     ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm,
     ManifestKeyDerivation, ManifestStartKeyGeneration,
@@ -1184,6 +1185,98 @@ impl<W: Write> PackageWriter<W> {
         let inserted = self.member_paths.insert(path.to_string());
         debug_assert!(inserted);
         self.archive_entry_count += 1;
+    }
+
+    /// Publish an XML member from independently audited bounded fragments.
+    ///
+    /// Envelope and publication metadata are validated before the ZIP entry
+    /// is admitted. The first producer callback runs from the reader after
+    /// the content local header is admitted; a producer failure therefore
+    /// poisons the package and must cause the caller to discard it. The direct
+    /// envelope is valid with zero fragments.
+    pub fn add_generated_xml<F>(
+        &mut self,
+        path: &str,
+        media_type: &str,
+        envelope: GeneratedXmlEnvelope,
+        xml_limits: GeneratedXmlLimits,
+        max_fragment_bytes: usize,
+        produce: F,
+    ) -> PackageWriterResult<GeneratedXmlReport>
+    where
+        F: FnMut(&mut dyn Write) -> Result<bool>,
+    {
+        self.validate_generated_xml_publication(path, media_type)?;
+        let entry = ManifestEntry {
+            full_path: path.to_string(),
+            media_type: media_type.to_string(),
+            size: None,
+            encryption: None,
+        };
+        let entry_bytes = self.validate_manifest_candidate(&entry)?;
+        let mut reader = envelope
+            .prepare(xml_limits, max_fragment_bytes, produce)
+            .map_err(|error| {
+                Self::map_stream_error(
+                    error,
+                    self.zip_writer.output_bytes(),
+                    self.zip_writer.last_limit().map(Self::map_streaming_limit),
+                )
+            })?;
+        if let Err(error) = self.zip_writer.write_deflated_reader(path, &mut reader) {
+            return Err(self.map_archive_error(error));
+        }
+
+        let report = reader.report();
+        self.record_manifest_entry(entry, entry_bytes);
+        self.wrote_any_entry = true;
+        self.record_member_path(path);
+        if !path.starts_with("META-INF/") {
+            self.wrote_payload_entry = true;
+        }
+        Ok(report)
+    }
+
+    fn validate_generated_xml_publication(
+        &self,
+        path: &str,
+        media_type: &str,
+    ) -> PackageWriterResult<()> {
+        if !self.wrote_mimetype {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(
+                "MIME type not set".to_string(),
+            )));
+        }
+        self.validate_member_path(path, false)
+            .map_err(PackageWriterError::Core)?;
+        if Self::is_reserved_admin_path(path) {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(format!(
+                "ODF generated XML path '{path}' is reserved for package metadata"
+            ))));
+        }
+        Self::validate_media_type(media_type, false, "manifest media type")
+            .map_err(PackageWriterError::Core)?;
+        if !xml_minifier::audit::package::is_xml_part(path, media_type) {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(format!(
+                "ODF generated XML member '{path}' must be XML-classified"
+            ))));
+        }
+        if self.encryption.is_some() {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(
+                "ODF generated XML publication does not support encryption".to_string(),
+            )));
+        }
+        if self.document_signer.is_some() {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(
+                "ODF generated XML publication does not support document signing".to_string(),
+            )));
+        }
+        if self.member_paths.contains(path) || self.manifest_paths.contains(path) {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(format!(
+                "ODF manifest/member path collision: '{path}'"
+            ))));
+        }
+        Ok(())
     }
 
     /// Add a file to the package

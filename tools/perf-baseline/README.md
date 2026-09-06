@@ -2563,8 +2563,31 @@ facade reopen. Each measured iteration constructs the scalar row model, calls
 discard sink. The output is dropped before the clock stops; sink finalization,
 semantic checks, and digest diagnostics are outside the clock. The source
 record carries the semantic digest and row/column contract, while the sink
-reports `retained_authoring_window_bytes: null`: this buffered role is a
-baseline and makes no fixed-window or throughput claim.
+ reports `retained_authoring_window_bytes: null`: this buffered role is a
+ baseline and makes no fixed-window or throughput claim.
+
+## Opt-in ODS streaming scalar creation
+
+`ods_streaming_create` uses the public `litchi_ods::streaming` forward-only
+writer with the same `Sheet1` four-cell Number/Text/Boolean/Empty rows and
+`tiny`/`medium`/`large` counts as `ods_buffered_create`. The row iterator is
+lazy, so fresh scalar row generation, XML/package publication, and hashing
+sink writes are inside the measured provider call. Each iteration constructs
+and destroys a fresh unlimited execution context inside the clock and passes
+`StreamingLimits::default()` to the provider; the API report contributes
+checked row, cell, and authored `content.xml` counts. The normalized semantic
+projection byte count is computed independently by the harness because it is
+not a provider report field.
+
+Each role builds its own corpus once before warmups and retains that role's
+archive plus extracted `content.xml` through its run. Exact three-member
+package, mimetype, manifest, typed-cell, XML-audit, reopen, and semantic gates
+run before warmups. The streaming role reports a fixed 4 KiB authoring window
+and zero retained output. Its lexical archive and target hashes may differ
+from the buffered role; generic sink/output checks bind each result to its own
+corpus, while cross-role equality uses the normalized semantic digest and the
+matched row/column contract. Source metrics classify the generated rows as
+`not_applicable_in_process_sink` and make no physical-I/O claim.
 
 ## Opt-in DOCX/PPTX semantic corpus matrix
 

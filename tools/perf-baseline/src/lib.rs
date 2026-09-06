@@ -187,6 +187,7 @@ const ODT_MEDIA_APPEND_HYPERLINK_TEXT: &str = " performance link";
 const ODT_MEDIA_INSERT_PARAGRAPH_TEXT: &str = "Inserted performance paragraph";
 const SEMANTIC_ODS_CORPUS_GENERATOR: &str = "litchi-ods-semantic-v1";
 const ODS_BUFFERED_CORPUS_GENERATOR: &str = "litchi-ods-buffered-scalar-rows-v1";
+const ODS_STREAMING_CORPUS_GENERATOR: &str = "litchi-ods-streaming-scalar-rows-v1";
 const ODS_BUFFERED_SHEET_NAME: &str = "Sheet1";
 const ODS_BUFFERED_COLUMN_COUNT: usize = 4;
 const ODS_MEDIA_CORPUS_GENERATOR: &str = "litchi-ods-media-publication-v1";
@@ -1442,6 +1443,7 @@ enum Case {
     OdsSemanticTextToSink,
     OdsSemanticCreateSmall,
     OdsBufferedCreate,
+    OdsStreamingCreate,
     OdsSemanticNoopEditSave,
     OdsSemanticOneEditSave,
     OdsSemanticOnePercentEditSave,
@@ -2022,6 +2024,7 @@ impl Case {
             Self::OdsSemanticTextToSink => "ods_semantic_text_to_sink",
             Self::OdsSemanticCreateSmall => "ods_semantic_create_small",
             Self::OdsBufferedCreate => "ods_buffered_create",
+            Self::OdsStreamingCreate => "ods_streaming_create",
             Self::OdsSemanticNoopEditSave => "ods_semantic_noop_edit_save",
             Self::OdsSemanticOneEditSave => "ods_semantic_one_edit_save",
             Self::OdsSemanticOnePercentEditSave => "ods_semantic_one_percent_edit_save",
@@ -2604,6 +2607,10 @@ impl Case {
 
     const fn uses_ods_buffered_creation(self) -> bool {
         matches!(self, Self::OdsBufferedCreate)
+    }
+
+    const fn uses_ods_streaming_creation(self) -> bool {
+        matches!(self, Self::OdsStreamingCreate)
     }
 
     const fn is_ods_source_cell_edit_save(self) -> bool {
@@ -8906,6 +8913,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_row_visibility_edit_save()
                     && !case.uses_streaming_creation()
                     && !case.uses_ods_buffered_creation()
+                    && !case.uses_ods_streaming_creation()
                     && !case.uses_semantic_rtf()
                     && !case.is_rtf_picture_crud()
                     && !case.uses_semantic_docx()
@@ -10196,6 +10204,29 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 .filter(|case| case.uses_ods_buffered_creation())
             {
                 results.push(run_ods_buffered_creation(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_ods_streaming_creation())
+    {
+        for shape in &options.semantic_shapes {
+            let corpus = build_ods_streaming_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_ods_streaming_creation())
+            {
+                results.push(run_ods_streaming_creation(
                     case,
                     &corpus,
                     options.warmup_iterations,
@@ -11560,6 +11591,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_semantic_text_to_sink" => Some(Case::OdsSemanticTextToSink),
         "ods_semantic_create_small" => Some(Case::OdsSemanticCreateSmall),
         "ods_buffered_create" => Some(Case::OdsBufferedCreate),
+        "ods_streaming_create" => Some(Case::OdsStreamingCreate),
         "ods_semantic_noop_edit_save" => Some(Case::OdsSemanticNoopEditSave),
         "ods_semantic_one_edit_save" => Some(Case::OdsSemanticOneEditSave),
         "ods_semantic_one_percent_edit_save" => Some(Case::OdsSemanticOnePercentEditSave),
@@ -11996,6 +12028,7 @@ fn usage_text() -> String {
                                        ods_semantic_full_cell_text,ods_semantic_text_to_sink,\n\
                                        ods_semantic_create_small,\n\
                                        ods_buffered_create,\n\
+                                       ods_streaming_create,\n\
                                        ods_semantic_noop_edit_save,ods_semantic_one_edit_save,\n\
                                        ods_semantic_one_percent_edit_save,\n\
                                        ods_source_eager_one_edit_save,\n\
@@ -18113,7 +18146,7 @@ fn ods_scalar_row(ordinal: usize) -> Result<litchi_ods::Row, Box<dyn Error>> {
     let ordinal_u32 = u32::try_from(ordinal)
         .map_err(|_error| "buffered ODS scalar ordinal exceeds f64-safe fixture range")?;
     let text = ods_scalar_row_text(ordinal);
-    let boolean = ordinal % 2 == 0;
+    let boolean = ordinal.is_multiple_of(2);
     let cells = vec![
         litchi_ods::Cell::new(litchi_ods::CellValue::Number(f64::from(ordinal_u32)), ""),
         litchi_ods::Cell::new(litchi_ods::CellValue::Text(text.clone()), text),
@@ -18314,6 +18347,82 @@ fn build_ods_buffered_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
             archive_sha256: sha256_hex(&archive),
             target_entry: "content.xml".to_owned(),
             target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "content.xml".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+/// The public streaming writer accepts arbitrary bounded scalar rows.  The
+/// benchmark fixes every row to the same four-cell Number/Text/Boolean/Empty
+/// contract as the buffered Builder role.  Rows stay lazy so row-model
+/// construction is part of the measured provider call rather than a retained
+/// second authoring model.
+fn ods_streaming_rows(
+    row_count: usize,
+) -> impl Iterator<Item = Vec<litchi_ods::streaming::StreamingCell<'static>>> {
+    (1..=row_count).map(|ordinal| {
+        let ordinal_u32 = u32::try_from(ordinal).expect("ODS scalar ordinal fits u32");
+        let text = ods_scalar_row_text(ordinal);
+        vec![
+            litchi_ods::streaming::StreamingCell::Number(f64::from(ordinal_u32)),
+            litchi_ods::streaming::StreamingCell::Text(std::borrow::Cow::Owned(text)),
+            litchi_ods::streaming::StreamingCell::Boolean(ordinal % 2 == 0),
+            litchi_ods::streaming::StreamingCell::Empty,
+        ]
+    })
+}
+
+/// Build the streaming role's own corpus once before warmups.  It retains the
+/// actual stream archive and extracted `content.xml`, matching the buffered
+/// role's archive-plus-target storage strategy.  Role-local ZIP/XML hashes may
+/// differ; the normalized semantic digest and shape remain identical.
+fn build_ods_streaming_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let rows = ods_scalar_row_count(shape);
+    let cells = rows
+        .checked_mul(ODS_BUFFERED_COLUMN_COUNT)
+        .ok_or("streaming ODS scalar cell count overflows usize")?;
+    let expected_semantic_sha256 = ods_scalar_expected_semantic_sha256(shape);
+    let semantic_projection_bytes = ods_scalar_expected_projection(shape).len();
+    let context = streaming_context(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)?;
+    let mut archive = Vec::new();
+    let report = litchi_ods::streaming::stream_scalar_rows_to(
+        &mut archive,
+        ods_streaming_rows(rows),
+        &context,
+        litchi_ods::streaming::StreamingLimits::default(),
+    )?;
+    if report.rows() != rows || report.cells() != cells {
+        return Err("streaming ODS provider report differs from scalar fixture".into());
+    }
+    verify_ods_buffered_archive(&archive, shape, &expected_semantic_sha256)?;
+    let target_payload = ArchiveReader::new(&archive)?.read("content.xml")?;
+    if target_payload.len() != report.authored_content_xml_bytes() {
+        return Err("streaming ODS authored content byte count differs from archive".into());
+    }
+    let target_payload_bytes = target_payload.len();
+    let entry_count = cells;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("ods-streaming-scalar-rows-{}", shape.name()),
+            generator: ODS_STREAMING_CORPUS_GENERATOR,
+            package_format: "ODS/ODF/ZIP",
+            shape: shape.name(),
+            payload_kind: "deterministic-scalar-rows-number-text-boolean-empty",
+            compression: "deflate",
+            entry_count,
+            archive_member_count: 3,
+            entry_bytes: ods_scalar_row_text(1).len(),
+            uncompressed_payload_bytes: semantic_projection_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "content.xml".to_owned(),
+            target_payload_bytes,
             target_payload_sha256: sha256_hex(&target_payload),
             rtf_variant: None,
             xlsx: None,
@@ -22864,6 +22973,9 @@ fn run_case_with_config(
         },
         Case::OdsBufferedCreate => {
             run_ods_buffered_creation(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdsStreamingCreate => {
+            run_ods_streaming_creation(case, corpus, warmup_iterations, samples)
         },
         Case::OdsSourceEagerOneEditSave
         | Case::OdsSourceBackedOneEditSave
@@ -56461,6 +56573,139 @@ fn run_ods_buffered_creation(
     })
 }
 
+fn run_ods_streaming_creation(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if case != Case::OdsStreamingCreate
+        || corpus.manifest.generator != ODS_STREAMING_CORPUS_GENERATOR
+    {
+        return Err("non-streaming ODS case passed to streaming creation runner".into());
+    }
+    let shape = semantic_shape(corpus)?;
+    let rows = ods_scalar_row_count(shape);
+    let cells = rows
+        .checked_mul(ODS_BUFFERED_COLUMN_COUNT)
+        .ok_or("streaming ODS scalar cell count overflows usize")?;
+    let expected_semantic_sha256 = ods_scalar_expected_semantic_sha256(shape);
+    let expected_input_bytes = ods_scalar_expected_projection(shape).len();
+    let maximum = u64::try_from(corpus.manifest.archive_bytes)?
+        .checked_add(64 * 1024)
+        .ok_or("streaming ODS sink ceiling overflows")?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summaries = Vec::with_capacity(samples);
+    let mut digests = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Sink reservation and process/allocator setup are outside the clock.
+        // Context construction/destruction, lazy four-cell row construction,
+        // provider publication, and sink writes are measured.
+        let mut sink = HashingDiscardSink::new(maximum, 4_096);
+        let process_before = process_metrics::Snapshot::read().ok();
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        let context = streaming_context(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)?;
+        let report = litchi_ods::streaming::stream_scalar_rows_to(
+            &mut sink,
+            ods_streaming_rows(rows),
+            &context,
+            litchi_ods::streaming::StreamingLimits::default(),
+        )?;
+        if report.rows() != rows
+            || report.cells() != cells
+            || report.authored_content_xml_bytes() != corpus.manifest.target_payload_bytes
+        {
+            return Err("streaming ODS provider report changed during sample".into());
+        }
+        std::hint::black_box(report);
+        drop(context);
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        let process_after = process_metrics::Snapshot::read().ok();
+        let process_metrics = process_before
+            .zip(process_after)
+            .map(|(before, after)| after.delta(before));
+
+        // Sink finalization, digest extraction, and corpus comparison are
+        // untimed checks performed for warmups and measured samples alike.
+        let (mut summary, digest) = sink.finish();
+        if summary.accepted_bytes != u64::try_from(corpus.manifest.archive_bytes)?
+            || digest != corpus.manifest.archive_sha256
+        {
+            return Err("streaming ODS sink bytes or digest differ from its corpus".into());
+        }
+        summary.rows = Some(u64::try_from(rows)?);
+        summary.cells = Some(u64::try_from(cells)?);
+        summary.input_bytes = Some(u64::try_from(expected_input_bytes)?);
+        summary.authored_part_bytes = Some(u64::try_from(corpus.manifest.target_payload_bytes)?);
+        if iteration >= warmup_iterations {
+            summaries.push(summary);
+            digests.push(digest);
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns: elapsed_ns(duration)?,
+                process_metrics,
+                allocation_metrics,
+            });
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let sink = deterministic_sink_summary(&summaries, "streaming ODS creation")?;
+    if sink.retained_output_bytes != Some(0) || sink.retained_authoring_window_bytes != Some(4_096)
+    {
+        return Err("streaming ODS creation did not prove its fixed retained window".into());
+    }
+    if digests
+        .iter()
+        .any(|digest| digest != &corpus.manifest.archive_sha256)
+    {
+        return Err("streaming ODS output digest changed across samples".into());
+    }
+    let sink_observation = operation_metrics::SinkObservation {
+        accepted_bytes: sink.accepted_bytes,
+        write_calls: sink.write_calls,
+        largest_write: sink.largest_write,
+        bytes_0: sink.write_size_buckets.bytes_0,
+        bytes_1_to_512: sink.write_size_buckets.bytes_1_to_512,
+        bytes_513_to_4096: sink.write_size_buckets.bytes_513_to_4096,
+        bytes_4097_to_16384: sink.write_size_buckets.bytes_4097_to_16384,
+        bytes_16385_to_65536: sink.write_size_buckets.bytes_16385_to_65536,
+        bytes_over_65536: sink.write_size_buckets.bytes_over_65536,
+    };
+    let operation_metrics = Some(operation_metrics::from_in_process_observations(
+        &observations,
+        sink_observation,
+    )?);
+    let source = SourceSummary {
+        ods_scalar_rows: Some(OdsScalarRowsSummary {
+            role: "streaming",
+            implementation: "litchi_ods::streaming::stream_scalar_rows_to",
+            timing_scope: "execution context construction/destruction, lazy four-cell scalar row generation, litchi_ods streaming XML/package publication, and HashingDiscardSink write; provider result consumption and context destruction occur before the clock stops and allocator/process endpoint snapshots; corpus setup, reopen, digest, sink finalization, and semantic/package gates are outside",
+            performance_claim: "timing and process/RSS/allocator evidence only; fixed 4096-byte authoring window; source is generated in-process with no physical-I/O claim; no throughput or cross-role lexical-byte claim",
+            semantic_sha256: expected_semantic_sha256,
+            archive_member_set_verified: true,
+            semantic_reopen_verified: true,
+            sheet_count: 1,
+            rows_per_sheet: rows,
+            columns_per_sheet: ODS_BUFFERED_COLUMN_COUNT,
+            scalar_columns: ["number", "text", "boolean", "blank"],
+        }),
+        ..SourceSummary::default()
+    };
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(Box::new(source)),
+        execution: None,
+        output_sha256: Some(corpus.manifest.archive_sha256.clone()),
+        operation_metrics,
+    })
+}
+
 fn run_fresh_writer(
     case: Case,
     corpus: &Corpus,
@@ -58214,7 +58459,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 429);
+        assert_eq!(selectable_count, 431);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -59985,6 +60230,79 @@ mod tests {
             );
             assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
         }
+    }
+
+    #[test]
+    fn ods_streaming_selector_uses_role_local_corpus_and_matches_buffered_semantics() {
+        let case = parse_case("ods_streaming_create").expect("streaming ODS selector parses");
+        assert_eq!(case, Case::OdsStreamingCreate);
+        assert!(!Case::DEFAULT.contains(&case));
+
+        let buffered = super::build_ods_buffered_corpus(SemanticShape::Tiny).unwrap();
+        let streaming = super::build_ods_streaming_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(
+            buffered.manifest.shape, streaming.manifest.shape,
+            "both roles use the same semantic shape"
+        );
+        assert_eq!(
+            buffered.manifest.entry_count, streaming.manifest.entry_count,
+            "both roles use the same four-cell row count"
+        );
+        assert_eq!(
+            buffered.manifest.uncompressed_payload_bytes,
+            streaming.manifest.uncompressed_payload_bytes,
+            "both roles use the same semantic projection byte count"
+        );
+        assert_eq!(
+            buffered.manifest.archive_member_count,
+            streaming.manifest.archive_member_count
+        );
+        let buffered_result =
+            super::run_ods_buffered_creation(Case::OdsBufferedCreate, &buffered, 0, 1).unwrap();
+        let streaming_result = super::run_ods_streaming_creation(case, &streaming, 0, 1).unwrap();
+        assert_eq!(
+            buffered_result
+                .source
+                .as_ref()
+                .unwrap()
+                .ods_scalar_rows
+                .as_ref()
+                .unwrap()
+                .semantic_sha256,
+            streaming_result
+                .source
+                .as_ref()
+                .unwrap()
+                .ods_scalar_rows
+                .as_ref()
+                .unwrap()
+                .semantic_sha256,
+            "buffered and streaming roles reopen to the same semantic digest"
+        );
+        assert_eq!(
+            streaming_result.output_sha256.as_deref(),
+            Some(streaming.manifest.archive_sha256.as_str())
+        );
+        assert_eq!(
+            streaming_result.sink.as_ref().unwrap().accepted_bytes,
+            streaming.manifest.archive_bytes as u64
+        );
+        assert_eq!(
+            streaming_result
+                .sink
+                .as_ref()
+                .unwrap()
+                .retained_authoring_window_bytes,
+            Some(4_096)
+        );
+        assert_eq!(
+            streaming_result
+                .operation_metrics
+                .as_ref()
+                .unwrap()
+                .sample_count,
+            1
+        );
     }
 
     #[test]

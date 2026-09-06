@@ -67,6 +67,8 @@ mod content_validation;
 mod encryption;
 /// Shared ownership for simple packaged ODF families.
 pub mod family;
+/// Bounded publication of provider-authored generated XML members.
+mod generated_xml;
 /// ODF manifest parsing
 mod manifest;
 /// ODF metadata parsing
@@ -94,6 +96,7 @@ pub mod private {
 
 pub use encryption::{Cipher, Kdf, Profile, StartKey};
 pub use family::{Package, PreparedPackage, validate_content_document_part, validate_content_part};
+pub use generated_xml::{GeneratedXmlEnvelope, GeneratedXmlLimits, GeneratedXmlReport};
 #[allow(
     unused_imports,
     reason = "The manifest descriptors are intentionally re-exported as the core public API."
@@ -124,3 +127,8 @@ pub use xml_splice::{
     AuthoredXmlFragment, XmlSourcePart, XmlSourceRange, XmlSplicePublication,
     rebuild_package_with_xml_splices,
 };
+
+#[cfg(test)]
+mod generated_xml_tests;
+#[cfg(test)]
+mod writer_generated_xml_tests;
