@@ -1,0 +1,69 @@
+{
+  "change": 432,
+  "name": "normal-tiny-r1",
+  "lane": {
+    "repeat": "R1",
+    "mode": "normal",
+    "shape": "tiny"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0432/captures/normal-tiny-r1-resource.log",
+    "/tmp/litchi-goal-0432-binaries/normal",
+    "--case",
+    "xlsx_streaming_create",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0432/captures/normal-tiny-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0432/captures/normal-tiny-r1-catalog.json"
+  ],
+  "revision": "4c9cfd1fc9dd9df1a0f53a086bce274a8cf687ae",
+  "source_manifest": {
+    "path": "sources/9001116ab186cafcd7a0dbb415d0fcfe094af7ed1df8f3a09a12598513db1015.json",
+    "sha256": "9001116ab186cafcd7a0dbb415d0fcfe094af7ed1df8f3a09a12598513db1015",
+    "files": 6635
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0432-binaries/normal",
+    "sha256": "21f9860398991329ed798e7c1341281cff335da7f74dea5cb2946bf70aef1479",
+    "bytes": 452877688
+  },
+  "protocol_sha256": "b15ca7b87d3abb4ad9ffdbb37b13a89ea90aeb9a61451724988e52f2a43251f8",
+  "driver_sha256": "bc75cf229fe6bd37302ee79c5ac3d0775049db9056f2b4a7ebb1a321133925dc",
+  "verifier_sha256": "346105527a749dc6af8fa228bd38b10aa7b24e77d29b004aac0c82d1be3278b0",
+  "started_utc": "2026-09-06T03:02:07.072759+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T03:02:07.396755+00:00",
+  "artifacts": {
+    "captures/normal-tiny-r1.json": {
+      "sha256": "c30696b3c2328f61438cf0172fb797ff23eebf2fd286ce98c458ccc7317cf3db",
+      "bytes": 31757
+    },
+    "captures/normal-tiny-r1-catalog.json": {
+      "sha256": "acfff679a92bd2100c877a3862cb4024f3f7f7f364181b87249162cad763d5a1",
+      "bytes": 5229
+    },
+    "captures/normal-tiny-r1.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "captures/normal-tiny-r1-resource.log": {
+      "sha256": "6f7f8c9e78195724b5c6f9b27c7fe3559ae1b9f8cf7e8d4ea3cf451e04a919c8",
+      "bytes": 1055
+    }
+  }
+}

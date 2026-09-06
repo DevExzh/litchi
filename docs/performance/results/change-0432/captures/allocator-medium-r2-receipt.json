@@ -1,0 +1,69 @@
+{
+  "change": 432,
+  "name": "allocator-medium-r2",
+  "lane": {
+    "repeat": "R2",
+    "mode": "allocator",
+    "shape": "medium"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0432/captures/allocator-medium-r2-resource.log",
+    "/tmp/litchi-goal-0432-binaries/allocator",
+    "--case",
+    "xlsx_streaming_create",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0432/captures/allocator-medium-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0432/captures/allocator-medium-r2-catalog.json"
+  ],
+  "revision": "4c9cfd1fc9dd9df1a0f53a086bce274a8cf687ae",
+  "source_manifest": {
+    "path": "sources/9001116ab186cafcd7a0dbb415d0fcfe094af7ed1df8f3a09a12598513db1015.json",
+    "sha256": "9001116ab186cafcd7a0dbb415d0fcfe094af7ed1df8f3a09a12598513db1015",
+    "files": 6635
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0432-binaries/allocator",
+    "sha256": "f501761877e48e4f455d5f8eab5a36b813730f7a0c496da270afbaf33c676897",
+    "bytes": 452213528
+  },
+  "protocol_sha256": "b15ca7b87d3abb4ad9ffdbb37b13a89ea90aeb9a61451724988e52f2a43251f8",
+  "driver_sha256": "bc75cf229fe6bd37302ee79c5ac3d0775049db9056f2b4a7ebb1a321133925dc",
+  "verifier_sha256": "346105527a749dc6af8fa228bd38b10aa7b24e77d29b004aac0c82d1be3278b0",
+  "started_utc": "2026-09-06T03:02:34.732435+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T03:02:35.534780+00:00",
+  "artifacts": {
+    "captures/allocator-medium-r2.json": {
+      "sha256": "9687e9e49cd38933a7d8ccf8db79e0551b334c451f1473e2105b2c562c4e9cf9",
+      "bytes": 41088
+    },
+    "captures/allocator-medium-r2-catalog.json": {
+      "sha256": "17ba1fc005bc9b191c25bf2e3f477893e0aaf3b622e7b06d8b24a253434dbac9",
+      "bytes": 5263
+    },
+    "captures/allocator-medium-r2.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "captures/allocator-medium-r2-resource.log": {
+      "sha256": "719a02ecdd712bfb3020d2706723c8a553bb11959a7d6b26e594048928b4f6a6",
+      "bytes": 1071
+    }
+  }
+}

@@ -1,6 +1,18 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0431
+## Current evidence through 0432
+
+[0432](changes/0432-xlsx-streaming-operation-memory.md) closes the missing
+operation-allocation observation for the existing XLSX scalar streaming writer.
+Across 64/8,192/131,072 rows, all 180 allocator samples retain the same
+420,110-byte incremental peak and zero exit live-byte change. This supports
+the tested creation path; it does not close richer authoring, logical append,
+all-feature memory bounds, cold/remote I/O or explicit scaling. Medium normal
+latency repeat drift remains flagged. The [next-work audit](results/change-0432/next-work.md)
+identifies ODS bounded scalar-row creation; the [native audit](results/change-0432/native-gap.md)
+records the PPTX identity/fixture gap. The non-iWork goal remains active.
+
+## Prior evidence through 0431
 
 [0431](changes/0431-verified-compressed-source-transfer.md) implements and
 measures verified compressed source-part transfer in the source-backed PPTX/OPC

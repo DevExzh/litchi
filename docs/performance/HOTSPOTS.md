@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## Change 0432: streaming heap evidence and next coverage
+
+[0432](changes/0432-xlsx-streaming-operation-memory.md) separates XLSX's
+configured row buffer from actual allocator observations. The incremental
+requested-live peak remains 420,110 bytes across a 2,048-fold row-count range,
+while cumulative requests grow. No allocation-stack cause or general memory
+bound is inferred. The [source audit](results/change-0432/next-work.md)
+recommends bounded ODS scalar-row creation as the next missing semantic
+workstream. Its present builder/append paths retain complete XML/package
+candidates; performance ranking requires a measured baseline. The separate
+[native PPTX audit](results/change-0432/native-gap.md) records the name-gate and
+provenance blocker without fabricating a positive fixture.
+
 ## Change 0431: compressed media transfer measured
 
 [0431](changes/0431-verified-compressed-source-transfer.md) addresses the

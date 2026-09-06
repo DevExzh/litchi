@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0432: streaming resource observation and oracle checks
+
+[0432](changes/0432-xlsx-streaming-operation-memory.md) changes only the
+standalone harness and its correctness oracle. Semantic XLSX/OPC/ZIP ownership,
+finite writer context and sequential sink remain unchanged (0001/0002/0005/
+0010/0011/0024). Exact package membership, all stored-cell validation and
+specific mutation refusals strengthen evidence under 0006/0008. The
+[batch review](results/change-0432/adr-review.md) separates modeled row scratch,
+callback-order requested heap and setup-inclusive RSS. Full strict-lint and
+formatting debt remains explicit; no broad completion claim follows.
+
 ## Change 0431: verified compressed source-part transfer
 
 [0431](changes/0431-verified-compressed-source-transfer.md) keeps ZIP framing

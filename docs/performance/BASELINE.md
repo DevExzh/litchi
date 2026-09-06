@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0432: XLSX streaming operation memory
+
+[0432](changes/0432-xlsx-streaming-operation-memory.md) records 360 formal
+samples across 64/8,192/131,072 rows, normal/allocator executables and two
+fresh-process repeats. All 180 allocator samples show 420,110 bytes above
+entry at the region peak and zero exit live-byte change. The 4 KiB row scratch
+is a separate model; process peak RSS includes the materializing oracle.
+Normal medium p50 repeat drift is 6.88% and remains flagged. This is a
+current descriptive resource baseline, with no production speedup claim.
+
 ## Change 0431: verified compressed media transfer
 
 [0431](changes/0431-verified-compressed-source-transfer.md) compares 16 fresh

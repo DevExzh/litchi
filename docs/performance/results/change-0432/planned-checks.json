@@ -1,0 +1,25 @@
+{
+  "required_pass": [
+    "streaming-debug-tests-final",
+    "scoped-fmt",
+    "harness-release-tests",
+    "writer-tests",
+    "strict-debt-check",
+    "harness-doc",
+    "release-build",
+    "pilot-normal",
+    "pilot-normal-verify",
+    "pilot-allocator",
+    "pilot-allocator-verify",
+    "capture",
+    "derive-v2",
+    "boundaries",
+    "python-syntax",
+    "precleanup-portable",
+    "task-cleanup",
+    "aftercleanup-portable",
+    "final-diff",
+    "final-staged-diff"
+  ],
+  "scope": "Required terminal gates; interrupted/failed development commands and preexisting strict/formatting debt remain retained and explicitly reviewed."
+}

@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## Change 0432: streaming requested-heap observations
+
+[0432](changes/0432-xlsx-streaming-operation-memory.md) records a fixed
+420,110-byte incremental allocator peak and zero exit live-byte change in all
+180 instrumented scalar-XLSX creation samples across 64–131,072 rows. This is
+observed requested heap, distinct from the 4 KiB modeled row buffer and
+setup-inclusive RSS. Medium normal latency repeat drift is 6.88% and remains
+flagged. There is no production speedup claim. This extends resource evidence
+after the [0431 publication optimization](changes/0431-verified-compressed-source-transfer.md);
+the wider CRUD, ODS streaming, native identity, cold-I/O and scaling work remains
+open.
+
 ## Change 0428: managed PPTX cache and budget lifetimes
 
 [0428](changes/0428-managed-pptx-cache-lifetimes.md) adds fallible diagnostics on

@@ -1,0 +1,21 @@
+{
+  "status": "pass",
+  "removed": [
+    {
+      "path": "/tmp/litchi-goal-0432-binaries/normal",
+      "sha256": "21f9860398991329ed798e7c1341281cff335da7f74dea5cb2946bf70aef1479",
+      "bytes": 452877688
+    },
+    {
+      "path": "/tmp/litchi-goal-0432-binaries/allocator",
+      "sha256": "f501761877e48e4f455d5f8eab5a36b813730f7a0c496da270afbaf33c676897",
+      "bytes": 452213528
+    }
+  ],
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "preserved": [
+    "target",
+    "tools/perf-baseline/target"
+  ],
+  "scope": "Only copied task binaries removed; portable replay does not require them."
+}

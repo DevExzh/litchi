@@ -1,0 +1,34 @@
+{
+  "change": 432,
+  "revision": "4c9cfd1fc9dd9df1a0f53a086bce274a8cf687ae",
+  "source_manifest": {
+    "path": "sources/9001116ab186cafcd7a0dbb415d0fcfe094af7ed1df8f3a09a12598513db1015.json",
+    "sha256": "9001116ab186cafcd7a0dbb415d0fcfe094af7ed1df8f3a09a12598513db1015",
+    "files": 6635
+  },
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0432-binaries/normal",
+      "sha256": "21f9860398991329ed798e7c1341281cff335da7f74dea5cb2946bf70aef1479",
+      "bytes": 452877688
+    },
+    "allocator": {
+      "path": "/tmp/litchi-goal-0432-binaries/allocator",
+      "sha256": "f501761877e48e4f455d5f8eab5a36b813730f7a0c496da270afbaf33c676897",
+      "bytes": 452213528
+    }
+  },
+  "build_receipts": {
+    "checks/release-build.json": {
+      "sha256": "dfcbc26e468ee6ea90235ba430ebcff53449603962bfae56b58dda409e79732f"
+    }
+  },
+  "protocol_sha256": "b15ca7b87d3abb4ad9ffdbb37b13a89ea90aeb9a61451724988e52f2a43251f8",
+  "verifier_sha256": "346105527a749dc6af8fa228bd38b10aa7b24e77d29b004aac0c82d1be3278b0",
+  "rustflags": "-Cforce-frame-pointers=yes",
+  "release_debug": 1,
+  "features": [
+    "allocator-metrics"
+  ],
+  "scope": "Both targets built together; normal binary has no allocator wrapper. Source manifests exclude some compile-time fixtures; recapture needs repo/assets."
+}

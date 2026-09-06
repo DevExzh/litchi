@@ -1,0 +1,84 @@
+{
+  "change": 432,
+  "declared_utc": "2026-09-06T02:27:41.814206+00:00",
+  "baseline_revision": "cf212b9a8f62110ed9c5985764307781a51f5bc0",
+  "classification": "descriptive XLSX streaming creation operation-resource baseline; tool-only instrumentation enabler; no before/after optimization claim",
+  "selector": "xlsx_streaming_create",
+  "shapes": {
+    "tiny": 64,
+    "medium": 8192,
+    "large": 131072
+  },
+  "cells_per_row": 4,
+  "cpu": 2,
+  "workers": 1,
+  "warmups": 3,
+  "samples": 30,
+  "repeats": 2,
+  "order": [
+    {
+      "repeat": "R1",
+      "mode": "normal",
+      "shape": "tiny"
+    },
+    {
+      "repeat": "R1",
+      "mode": "normal",
+      "shape": "medium"
+    },
+    {
+      "repeat": "R1",
+      "mode": "normal",
+      "shape": "large"
+    },
+    {
+      "repeat": "R1",
+      "mode": "allocator",
+      "shape": "tiny"
+    },
+    {
+      "repeat": "R1",
+      "mode": "allocator",
+      "shape": "medium"
+    },
+    {
+      "repeat": "R1",
+      "mode": "allocator",
+      "shape": "large"
+    },
+    {
+      "repeat": "R2",
+      "mode": "allocator",
+      "shape": "large"
+    },
+    {
+      "repeat": "R2",
+      "mode": "allocator",
+      "shape": "medium"
+    },
+    {
+      "repeat": "R2",
+      "mode": "allocator",
+      "shape": "tiny"
+    },
+    {
+      "repeat": "R2",
+      "mode": "normal",
+      "shape": "large"
+    },
+    {
+      "repeat": "R2",
+      "mode": "normal",
+      "shape": "medium"
+    },
+    {
+      "repeat": "R2",
+      "mode": "normal",
+      "shape": "tiny"
+    }
+  ],
+  "timing_scope": "Writer/context construction, deterministic row text generation, XML encoding, Deflate, ZIP finalization and hashing discard publication. Sink construction, procfs/allocation observer boundaries, expected artifact generation, exhaustive owned Workbook reopen/readback and digest extraction excluded.",
+  "memory_scope": "Allocator target only: serialized callback-order operation peak minus entry and exit minus entry; includes pre-existing/background process live bytes, excludes allocator-internal realloc overlap, RSS and physical copies. Row-authoring window4096bytes is separately modeled, not total heap. No instrumentation latency comparisons.",
+  "acceptance": "All rows exhaustively reopened in untimed deterministic artifact; every timed output matches archive hash/bytes and sink/resource counters. Normal allocation unavailable, allocator v3 measured finite aligned vectors, no failed allocations; region peak bounds and cumulative arithmetic hold. Source/corpus/output/harness identity bound. All size/repeat results and >5% repeat flags retained.",
+  "limits": "Fresh one-sheet inline-scalar creation, not logical append, Part addition, repackaging, all workbook features, or general bounded-total-memory proof. Process RSS includes untimed materializing oracle. No production change or speedup claim."
+}
