@@ -1,0 +1,27 @@
+{
+  "source": "change-0442/profiles/after/record/formal/perf-script.txt.gz",
+  "stored_sha256": "29cb479d0a7ee41030ff0361544450add053837e0334018a1cace0ae95cc4153",
+  "raw_sha256": "b9613c98c8ce88215872a3ad08f3cbb1e1f501183459a3d03b531359bea7c02a",
+  "samples": 6358,
+  "total_sampled_periods": 27476647460,
+  "markers": {
+    "source_fragments": "core::option::Option<litchi_odp::codec::content_source::ContentSource>",
+    "staging": "litchi_odp::model::staging::Metadata"
+  },
+  "sample_counts": {
+    "unclassified_transaction": 63,
+    "staging": 922,
+    "source_fragments": 497
+  },
+  "sampled_period_sums": {
+    "unclassified_transaction": 275606359,
+    "staging": 4029375088,
+    "source_fragments": 2172778542
+  },
+  "sampled_period_percent": {
+    "unclassified_transaction": 1.003056720807088,
+    "staging": 14.664726087365246,
+    "source_fragments": 7.90772799033467
+  },
+  "scope": "Exclusive observed transaction call-chain groups including warmups. Unmatched/ambiguous frames remain unclassified; incomplete symbolization limits attribution. These are not phase wall times or allocation fractions."
+}

@@ -1,6 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0442
+## Current evidence through 0443
+
+[0443](changes/0443-odp-compact-fragment-frames.md) replaces copied namespace/local-name frame data
+in ODP source-fragment scanning with exact element kinds. The 720-sample matrix
+passes the frozen allocation-call gate at 14.886%/14.943% medium/large reductions.
+The normal latency gate fails; timing costs, two instrumented tail flags and
+eight repeat flags remain disclosed. Peak and retained bytes are unchanged.
+The original scanner remains a byte-identical differential reference.
+
+This removes one source of temporary allocation work. Repeated validation,
+one-shot attribute lookups, Part addition, repackaging, bounded existing append,
+native breadth, cold/range and scaling remain open. The full user-owned
+non-iWork goal is unchanged and uncompleted.
+
+## Earlier evidence through 0442
 
 [0442](changes/0442-odp-shared-staging-traversal.md) combines three ODP staging XML traversals while
 preserving complete-pass error priority. The 720-sample matrix passes the frozen

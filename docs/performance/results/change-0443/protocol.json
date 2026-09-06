@@ -1,0 +1,301 @@
+{
+  "schema": "litchi-0443-odp-existing-append-abba-v1",
+  "change": 443,
+  "status": "frozen",
+  "purpose": "Matched owned ODP append evidence for compact source-fragment scanner frames",
+  "hypothesis": {
+    "description": "Replace copied namespace/local-name frame data with exact element classification while retaining all spans, namespace semantics, limits and refusal behavior.",
+    "candidate_scope": "Private ODP content-source scanner and test-only original scanner/differential tests."
+  },
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "repeats": 2,
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "shapes": {
+    "tiny": 64,
+    "medium": 4096,
+    "large": 8192
+  },
+  "roles": {
+    "before": {
+      "build_directory": "before",
+      "selector": "odp_existing_append_lifecycle",
+      "source_field": "odp_append",
+      "oracle_role": "after"
+    },
+    "after": {
+      "build_directory": "after",
+      "selector": "odp_existing_append_lifecycle",
+      "source_field": "odp_append",
+      "oracle_role": "after"
+    }
+  },
+  "order": [
+    {
+      "phase": "A1",
+      "role": "before",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "A1",
+      "role": "before",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "A1",
+      "role": "before",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "A1",
+      "role": "before",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "A1",
+      "role": "before",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "A1",
+      "role": "before",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B1",
+      "role": "after",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B1",
+      "role": "after",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B1",
+      "role": "after",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B1",
+      "role": "after",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B1",
+      "role": "after",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B1",
+      "role": "after",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B2",
+      "role": "after",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "B2",
+      "role": "after",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "B2",
+      "role": "after",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "phase": "B2",
+      "role": "after",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "B2",
+      "role": "after",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "B2",
+      "role": "after",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "phase": "A2",
+      "role": "before",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "A2",
+      "role": "before",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "A2",
+      "role": "before",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "phase": "A2",
+      "role": "before",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "A2",
+      "role": "before",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "A2",
+      "role": "before",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R2"
+    }
+  ],
+  "matrix": {
+    "reports": 24,
+    "retained_samples": 720,
+    "reports_per_role": 12,
+    "samples_per_report": 30
+  },
+  "workload_cli": {
+    "case_flag": "--case",
+    "shape_flag": "--semantic-shape",
+    "workers_flag": "--workers",
+    "samples_flag": "--samples",
+    "warmup_flag": "--warmup",
+    "report_flag": "--json",
+    "catalog_flag": "--corpus-manifest"
+  },
+  "timing_scope": {
+    "inside": [
+      "Snapshot::from_bytes of the precloned owned input",
+      "Snapshot::transaction, one add, commit including internal validation",
+      "write_all of the materialized committed snapshot bytes to the hashing discard sink"
+    ],
+    "outside": [
+      "source fixture and expected output construction",
+      "owned input clone, appended title/body construction, and sink setup",
+      "endpoint process observations, independent semantic/member/patch oracles, digest finalization, destruction, and report serialization"
+    ]
+  },
+  "profiles": {
+    "stage": "required-after-formal-matrix",
+    "roles": [
+      "before",
+      "after"
+    ],
+    "shape": "large",
+    "mode": "normal",
+    "kinds": [
+      "stat",
+      "record"
+    ],
+    "events": [
+      "cycles:u",
+      "instructions:u",
+      "branches:u",
+      "branch-misses:u",
+      "L1-dcache-load-misses:u"
+    ],
+    "record_frequency_hz": 999,
+    "call_graph": "fp,127",
+    "scope": "whole fresh executable including setup, corpus generation, warmups, samples, hashing, and workload checks; Python oracle afterward"
+  },
+  "acceptance": {
+    "normal": "medium and large p50 lower by at least 5 percent in both repeats, with bootstrap evidence retained",
+    "allocator": "medium and large requested allocated bytes, allocation calls, or peak above operation entry lower by at least 5 percent in both repeats",
+    "guards": "flag every unexplained normal elapsed, process RSS, or allocator metric change above 5 percent; preserve all flags",
+    "claims": "no claim is accepted unless output, semantic, source-preservation, patch, sink, corpus, and report identity gates pass"
+  },
+  "oracle": {
+    "protocol_path": "oracle/protocol.json",
+    "verifier_path": "oracle/verify-report.py",
+    "argv": [
+      "{python}",
+      "-B",
+      "{verifier}",
+      "--report",
+      "{report}",
+      "--mode",
+      "{mode}",
+      "--shape",
+      "{shape}"
+    ],
+    "role_map": {
+      "before": "after",
+      "after": "after"
+    },
+    "contract": "unchanged 0439 append oracle; print exactly VALID on success and reject report/source/output/semantic/sample mutations",
+    "verifier_sha256": "e4bca2715391cfb31637b86507c98f121df24b96405cb64df29902c09ef0aa4b",
+    "protocol_sha256": "8d98a7c4e1efd74cf20d4cab414c202e5e64b4295cfc664ad976a4ee9d752a8f"
+  },
+  "claims": {
+    "allowed": [
+      "descriptive matched before/after evidence for the named selector and frozen scope after all identity gates pass"
+    ],
+    "withheld": [
+      "causal hotspot proof from whole-process profiles",
+      "fixed-memory, cache-miss, scaling, or universal Office claim"
+    ]
+  },
+  "frozen_utc": "2026-09-06T16:40:46.920686+00:00",
+  "analysis": {
+    "bootstrap_resamples": 2000,
+    "quantiles": "arithmetic midpoint p50, nearest-rank p95/p99",
+    "acceptance": "normal OR allocation-calls/requested-bytes/normalized-peak practical gate, subject to all guards; no post-hoc criterion needed"
+  }
+}

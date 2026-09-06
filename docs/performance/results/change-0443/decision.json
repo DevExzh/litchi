@@ -1,0 +1,25 @@
+{
+  "change": 443,
+  "decision": "keep",
+  "basis": "predeclared allocation-call gate in both medium/large repeats, with disclosed timing costs and tail variation",
+  "practical_gate_met": true,
+  "normal_p50_gate": false,
+  "allocator_requested_call_or_peak_gate": true,
+  "allocation_review": "All 60 observations per role/shape agree for calls, requested bytes, peak and retained delta. Medium calls fall 577,973 to 491,936 (-14.886%); large 1,151,422 to 979,369 (-14.943%). Requested bytes fall only 2.557%/2.663%; peak and retained bytes are unchanged. Tiny calls fall 10.156%.",
+  "latency_review": "Normal p50 changes medium R1/R2 -0.606%/+2.460%, large +0.267%/+1.402%. The normal practical gate fails; no normal speedup is claimed. No matched normal or RSS regression exceeds 5%. Baseline tiny repeat p50 rises 29.546%; its large apparent R2 paired gain is not a useful speedup claim.",
+  "matched_flag_review": "Two flags: medium allocator R1 p95 +13.310% and p99 +12.987%. R1 p50 falls 1.379% and mean rises 0.967%; R2 p95/p99 fall 2.478%/2.414%. The tail effect does not recur in R2, but remains an unresolved instrumented timing observation. An unrelated host build was observed during correctness validation; it is not proof of the cause. The change is retained for deterministic allocation-call reduction, accepting the observed sub-5% normal p50 costs.",
+  "repeat_flag_review": "All eight flags retained: baseline tiny normal p50/p95/p99/mean +29.546%/+35.210%/+37.112%/+23.544%; baseline medium normal p95/p99 +7.691%/+9.292%; candidate medium allocator p95/p99 -13.439%/-13.543%. ABBA grouping and 30-sample tail resolution limit timing inference. No measurements are excluded or replaced.",
+  "withheld": [
+    "normal latency or tail speedup",
+    "peak or RSS improvement",
+    "bounded existing append",
+    "physical-copy counts",
+    "cache-miss benefit",
+    "fresh native visual compatibility",
+    "cold/range or scaling benefit",
+    "universal Office performance"
+  ],
+  "followup": "Reprofile remaining repeated validation and one-shot attribute lookup costs, while continuing unresolved CRUD/native/cold/range/scaling work under the full goal.",
+  "profile_review": "Whole-process cycles rise 1.516%, instructions fall 0.739%, branches fall 0.803% and branch misses fall 9.036%. Setup, warmups and Rust oracle work are included, so these are not operation-only causal effects. Both roles retain 13 addr2line warnings per conversion. Zero L1 values support no cache-miss claim.",
+  "geometric_mean_review": "The six explicitly paired normal p50 ratios have geometric mean 1.0375x, but the baseline tiny repeat shift dominates it. This does not establish a normal speedup."
+}

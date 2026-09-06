@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0443: retain exact source semantics with compact frame state
+
+[0443](changes/0443-odp-compact-fragment-frames.md) keeps preservation scanning in the ODP owner
+(0002/0023/0024). Frame kinds encode exactly the namespace/name distinctions
+used by existing state transitions, retain no reader borrow across events,
+and leave raw source authority and detached editing intact (0003). Existing
+bounds, failure ordering, opaque spans, namespace bindings and publication
+readback remain (0005/0006/0008). The complete original scanner remains a
+test-only differential reference. No public API, dependency, unsafe code,
+executor or ambient I/O is added. See [review](results/change-0443/validation-notes.md)
+and the explicit timing-cost/flag discussion in the keep decision.
+
 ## Change 0442: preserve parser contracts while sharing traversal
 
 [0442](changes/0442-odp-shared-staging-traversal.md) keeps XML grammar and state in the ODP owner

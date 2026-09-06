@@ -1,0 +1,26 @@
+{
+  "change": 443,
+  "role": "before",
+  "revision": "f283c2cd987bfd03c41adbda8a5d83eb9e8e7a24",
+  "source_manifest": {
+    "path": "sources/442951d71495608359f82baa5b6f7eabd225b5a5fabf7e5122df668b2dc91c36.json",
+    "sha256": "442951d71495608359f82baa5b6f7eabd225b5a5fabf7e5122df668b2dc91c36",
+    "files": 6658
+  },
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0443-binaries/before/normal",
+      "bytes": 457937816,
+      "sha256": "f84ef03ce0bf2bd30bfd6f09c286af8a04d10a21deb4865478f1a68be60a0f2c"
+    },
+    "allocator": {
+      "path": "/tmp/litchi-goal-0443-binaries/before/allocator",
+      "bytes": 457285640,
+      "sha256": "dc71f0ce5c9b0c409f597336c572611f0a2ae00f50b9de061ee069fd9b1ef96e"
+    }
+  },
+  "protocol_sha256": "d00167305459619f1c56d353c400b824f90584941aa5845be16d53e39a176614",
+  "capture_driver_sha256": "3ebf6653fe3cf9f504568f0cfeb19beb2a446a7753d132825201964454057804",
+  "profile_driver_sha256": "3f56b9ef72115667eb8f72261ef427635c31266fa6ab8fc4490b290cfabc10d3",
+  "build_receipt": "checks/before-build.json"
+}

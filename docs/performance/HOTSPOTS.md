@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## Change 0443: compact preservation-scanner frames
+
+[0443](changes/0443-odp-compact-fragment-frames.md) eliminates temporary namespace/local-name copies
+from the source-fragment scanner. The prior profile attributed 7.908% of sampled
+periods to this path under transaction, including warmups and incomplete symbols.
+Medium/large operation allocation calls now fall 14.886%/14.943%, passing the
+frozen gate. Requested bytes fall only 2.557%/2.663%, while peak is unchanged.
+
+Normal latency does not pass its practical gate. Whole-process cycles rise
+1.516% and instructions fall 0.739%; no operation-only causal improvement is
+claimed. Continue measuring repeated validation and one-shot attribute lookups
+before further changes; bounded existing append and wider I/O/scaling remain open.
+
 ## Change 0442: consolidate three auxiliary staging XML traversals
 
 [0442](changes/0442-odp-shared-staging-traversal.md) shares borrowed events among settings, declarations
