@@ -1,5 +1,23 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0437 measures fresh plain ODP slide streams
+
+[0437](changes/0437-odp-bounded-plain-slides.md) adds `odp_buffered_create` and
+`odp_streaming_create` for taxonomy category 4 (creation from scratch), with
+an ordered-source bounded publication facility relevant to category 6.
+This does not measure append to an existing document. The corpus has
+64/4,096/8,192 plain titled slides with ASCII, Unicode, and escaped XML text;
+32,768 slides retain the Builder's explicit default attribute-limit refusal.
+The selector count is 435; the default 36 remain unchanged.
+
+The matrix supplies 36 reports/1,080 samples and six profiles with exact role
+identities and cross-API text, page geometry, package topology, and auxiliary
+part parity. Streaming's sampled operation peak is 420,352 bytes; large
+Builder peak is 23,973,505 bytes, with streaming p50 1.574/1.588 times Builder
+in the large R1/R2 comparisons. All 37 regression flags remain visible.
+Rich slides, real-producer/native rendering, existing append, Part addition,
+repackaging, and cold/range/scaling measurements remain open.
+
 ## 2026-09-06: change 0436 reduces fresh ODT text accounting
 
 [0436](changes/0436-odt-bounded-text-spans.md) reuses `odt_streaming_create`

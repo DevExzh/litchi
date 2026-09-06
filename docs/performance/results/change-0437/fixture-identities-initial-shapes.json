@@ -1,0 +1,47 @@
+{
+  "derivation": "Independent direct byte concatenation and hashlib SHA-256, checked against draft oracle; no generated archive or performance result.",
+  "shapes": {
+    "tiny": {
+      "slides": 64,
+      "semantic_sha256": "167428219fc1603b63046c349a06ef8d0033ac9f720567c5383bb79e379d10d1",
+      "presentation_text_bytes": 7358,
+      "title_bytes": 3616,
+      "body_bytes": 3552,
+      "variant_counts": [
+        16,
+        16,
+        16,
+        16
+      ],
+      "first_slide_text_bytes": 96
+    },
+    "medium": {
+      "slides": 8192,
+      "semantic_sha256": "9fb3e3c5f97292e4e19980f5aa1ed00c8eba71e2aacd1bdfb27a354fe059d08a",
+      "presentation_text_bytes": 942078,
+      "title_bytes": 462848,
+      "body_bytes": 454656,
+      "variant_counts": [
+        2048,
+        2048,
+        2048,
+        2048
+      ],
+      "first_slide_text_bytes": 96
+    },
+    "large": {
+      "slides": 32768,
+      "semantic_sha256": "b41fd74f1565df3ef6756d369df4912f8fc34ce4e7c96741f54e8442582d8648",
+      "presentation_text_bytes": 3768318,
+      "title_bytes": 1851392,
+      "body_bytes": 1818624,
+      "variant_counts": [
+        8192,
+        8192,
+        8192,
+        8192
+      ],
+      "first_slide_text_bytes": 96
+    }
+  }
+}

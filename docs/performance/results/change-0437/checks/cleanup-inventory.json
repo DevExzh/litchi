@@ -1,0 +1,108 @@
+{
+  "change": 437,
+  "cleanup_expected_paths": [
+    "/tmp/litchi-goal-0437-binaries",
+    "/tmp/litchi-goal-0437-odp-audit",
+    "/tmp/litchi-goal-0437-odp-common",
+    "/tmp/litchi-goal-0437-odp-common-review",
+    "/tmp/litchi-goal-0437-odp-common-tests",
+    "/tmp/litchi-goal-0437-odp-evidence",
+    "/tmp/litchi-goal-0437-odp-harness",
+    "/tmp/litchi-goal-0437-odp-lifecycle",
+    "/tmp/litchi-goal-0437-odp-oracle",
+    "/tmp/litchi-goal-0437-odp-provider",
+    "/tmp/litchi-goal-0437-odp-provider-tests",
+    "/tmp/litchi-goal-0437-odp-review"
+  ],
+  "cleanup_paths": [
+    "/tmp/litchi-goal-0437-binaries",
+    "/tmp/litchi-goal-0437-odp-audit",
+    "/tmp/litchi-goal-0437-odp-common",
+    "/tmp/litchi-goal-0437-odp-common-review",
+    "/tmp/litchi-goal-0437-odp-common-tests",
+    "/tmp/litchi-goal-0437-odp-evidence",
+    "/tmp/litchi-goal-0437-odp-harness",
+    "/tmp/litchi-goal-0437-odp-lifecycle",
+    "/tmp/litchi-goal-0437-odp-oracle",
+    "/tmp/litchi-goal-0437-odp-provider",
+    "/tmp/litchi-goal-0437-odp-provider-tests",
+    "/tmp/litchi-goal-0437-odp-review"
+  ],
+  "precleanup_receipt": "checks/precleanup-portable.json",
+  "preserved_target_directory_identity": {
+    "/home/zhuhe/code/litchi/target": [
+      66305,
+      25854451
+    ],
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target": [
+      66305,
+      25593433
+    ]
+  },
+  "protocol": "protocol.json",
+  "removed": [
+    {
+      "path": "/tmp/litchi-goal-0437-binaries",
+      "regular_file_bytes": 1825636448,
+      "regular_files": 4
+    },
+    {
+      "path": "/tmp/litchi-goal-0437-odp-audit",
+      "regular_file_bytes": 26183,
+      "regular_files": 2
+    },
+    {
+      "path": "/tmp/litchi-goal-0437-odp-common",
+      "regular_file_bytes": 49720,
+      "regular_files": 4
+    },
+    {
+      "path": "/tmp/litchi-goal-0437-odp-common-review",
+      "regular_file_bytes": 25806,
+      "regular_files": 3
+    },
+    {
+      "path": "/tmp/litchi-goal-0437-odp-common-tests",
+      "regular_file_bytes": 18087,
+      "regular_files": 1
+    },
+    {
+      "path": "/tmp/litchi-goal-0437-odp-evidence",
+      "regular_file_bytes": 158499,
+      "regular_files": 8
+    },
+    {
+      "path": "/tmp/litchi-goal-0437-odp-harness",
+      "regular_file_bytes": 5812270,
+      "regular_files": 8
+    },
+    {
+      "path": "/tmp/litchi-goal-0437-odp-lifecycle",
+      "regular_file_bytes": 166668,
+      "regular_files": 11
+    },
+    {
+      "path": "/tmp/litchi-goal-0437-odp-oracle",
+      "regular_file_bytes": 138508,
+      "regular_files": 6
+    },
+    {
+      "path": "/tmp/litchi-goal-0437-odp-provider",
+      "regular_file_bytes": 66202,
+      "regular_files": 5
+    },
+    {
+      "path": "/tmp/litchi-goal-0437-odp-provider-tests",
+      "regular_file_bytes": 39978,
+      "regular_files": 2
+    },
+    {
+      "path": "/tmp/litchi-goal-0437-odp-review",
+      "regular_file_bytes": 57242,
+      "regular_files": 4
+    }
+  ],
+  "status": "pass",
+  "user_goal_path": "/home/zhuhe/code/litchi/docs/GOAL.md",
+  "user_goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+}

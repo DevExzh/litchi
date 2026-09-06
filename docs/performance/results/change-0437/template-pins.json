@@ -1,0 +1,20 @@
+{
+  "change": 437,
+  "basis": "Exact fixed source literals before any ODP production change; measured output gates must confirm these pins.",
+  "source_files": {
+    "crates/litchi-odf-common/src/core/writer.rs": "2ebfede21049f325e17a13fb90ad92d00cc250f2723e4c0248efdb5bef673929",
+    "crates/litchi-odp/src/authoring/builder.rs": "12e362439b72c1503227aa4b7544412e80a7b9803950d04110843e5d1f3317db"
+  },
+  "parts": {
+    "styles.xml": {
+      "path": "templates/styles.xml",
+      "bytes": 1960,
+      "sha256": "d9881e91085516246a19c30d9e5cde39a8b10d7e42120b135f48f5ca8afef8d2"
+    },
+    "meta.xml": {
+      "path": "templates/meta.xml",
+      "bytes": 387,
+      "sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719"
+    }
+  }
+}

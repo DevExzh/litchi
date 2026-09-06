@@ -1,0 +1,23 @@
+{
+  "scope": "Source-only preliminary audit; no measured optimization claim; later reviews may supersede findings.",
+  "artifacts": [
+    {
+      "source": "/tmp/litchi-goal-0437-odp-audit/audit.md",
+      "path": "source-review/odp-data-path.md",
+      "bytes": 14151,
+      "sha256": "fcc0d43a3692ddd638a5876779e0b6b30261607a2c7d8e18c7b7f34614d2e10c"
+    },
+    {
+      "source": "/tmp/litchi-goal-0437-odp-audit/design.md",
+      "path": "source-review/odp-design-before-measurement.md",
+      "bytes": 12032,
+      "sha256": "f0b3ed110c3c20ac86f03c20635c981c302bf64576054b559351da027cafb0e7"
+    },
+    {
+      "source": "/tmp/litchi-goal-0437-odp-review/review.md",
+      "path": "source-review/baseline-contract-review.md",
+      "bytes": 13533,
+      "sha256": "4bed8e7ee5a966d78f3cf34ba8d77aedd50e2dd38213aa9c8c32637e8671d860"
+    }
+  ]
+}

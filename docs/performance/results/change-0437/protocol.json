@@ -1,0 +1,528 @@
+{
+  "candidate_build_descriptor": "after/build.json",
+  "change": 437,
+  "classification": "Matched ODP buffered control and candidate bounded streaming role; this evidence authorizes descriptive baseline comparison only.",
+  "cleanup_expected_paths": [
+    "/tmp/litchi-goal-0437-binaries",
+    "/tmp/litchi-goal-0437-odp-audit",
+    "/tmp/litchi-goal-0437-odp-common",
+    "/tmp/litchi-goal-0437-odp-common-review",
+    "/tmp/litchi-goal-0437-odp-common-tests",
+    "/tmp/litchi-goal-0437-odp-evidence",
+    "/tmp/litchi-goal-0437-odp-harness",
+    "/tmp/litchi-goal-0437-odp-lifecycle",
+    "/tmp/litchi-goal-0437-odp-oracle",
+    "/tmp/litchi-goal-0437-odp-provider",
+    "/tmp/litchi-goal-0437-odp-provider-tests",
+    "/tmp/litchi-goal-0437-odp-review"
+  ],
+  "cleanup_inventory": "checks/cleanup-inventory.json",
+  "cleanup_paths": [
+    "/tmp/litchi-goal-0437-binaries",
+    "/tmp/litchi-goal-0437-odp-audit",
+    "/tmp/litchi-goal-0437-odp-common",
+    "/tmp/litchi-goal-0437-odp-common-review",
+    "/tmp/litchi-goal-0437-odp-common-tests",
+    "/tmp/litchi-goal-0437-odp-evidence",
+    "/tmp/litchi-goal-0437-odp-harness",
+    "/tmp/litchi-goal-0437-odp-lifecycle",
+    "/tmp/litchi-goal-0437-odp-oracle",
+    "/tmp/litchi-goal-0437-odp-provider",
+    "/tmp/litchi-goal-0437-odp-provider-tests",
+    "/tmp/litchi-goal-0437-odp-review"
+  ],
+  "cleanup_receipt": "checks/task-cleanup.json",
+  "corpus": {
+    "compression": "mimetype=stored;xml=deflate",
+    "declaration_policy": "XML declaration may be absent; when present it must declare UTF-8 XML 1.0 without standalone.",
+    "default_meta_xml_sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719",
+    "default_styles_xml_sha256": "d9881e91085516246a19c30d9e5cde39a8b10d7e42120b135f48f5ca8afef8d2",
+    "manifest_entry_count": 4,
+    "member_names": [
+      "mimetype",
+      "content.xml",
+      "styles.xml",
+      "meta.xml",
+      "META-INF/manifest.xml"
+    ],
+    "mimetype": "application/vnd.oasis.opendocument.presentation",
+    "mimetype_layout": "Stored offset-zero first local and central entry; no extra field or data descriptor; header name, sizes, payload and central CRC match.",
+    "package_format": "ODP/ODF/ZIP",
+    "payload_kind": "deterministic-mixed-unicode-entities-plain-titled-slides",
+    "semantic_hash": {
+      "count_encoding": "u64le",
+      "domain": "litchi-odp-buffered-semantic-v1\\0",
+      "field_order": [
+        "title",
+        "body"
+      ],
+      "input_projection": "UTF-8 title, LF, body, with LF LF between slides and no trailing separator",
+      "length_encoding": "u64le",
+      "payload_encoding": "UTF-8",
+      "separator_is_hashed": false
+    },
+    "slide_fixture": {
+      "body_prefix": "litchi-perf-odp-buffered-body-",
+      "cycle": 4,
+      "index_format": "{index:05}",
+      "slide_separator": "LF LF",
+      "text_contract": "four-cycle plain/Unicode/XML-significant UTF-8 title and body text with single interior spaces; one title and one body text object per slide",
+      "title_body_separator": "LF",
+      "title_prefix": "litchi-perf-odp-buffered-title-",
+      "variants": [
+        "plain slide",
+        "Unicode caf\u00e9 \u0394 \u4e2d",
+        "entities <&> \"quoted\"",
+        "mixed fa\u00e7ade \u03a9 <&> value"
+      ]
+    },
+    "target_entry": "content.xml"
+  },
+  "cpu": 2,
+  "formal_profiles": {
+    "kinds": [
+      "stat",
+      "record"
+    ],
+    "required_receipts": [
+      "profiles/before-buffered/stat/receipt.json",
+      "profiles/before-buffered/record/receipt.json",
+      "profiles/after-buffered/stat/receipt.json",
+      "profiles/after-buffered/record/receipt.json",
+      "profiles/after-streaming/stat/receipt.json",
+      "profiles/after-streaming/record/receipt.json"
+    ],
+    "roles": [
+      "before-buffered",
+      "after-buffered",
+      "after-streaming"
+    ],
+    "shape": "large"
+  },
+  "frozen_inputs": {
+    "candidate_oracle": {
+      "path": "verify-report-candidate.py",
+      "sha256": "eddfef3fe680d383f7bc067bc4a6732679c3a1e35ce8a10c90f6ffb7d9589b16"
+    },
+    "oracle_protocol": {
+      "path": "oracle-protocol.json",
+      "sha256": "2d07b5936e9036e9ee7fadac68148ef60196c9830f2f4b70154c6aa327095a9f"
+    }
+  },
+  "goal_path": "/home/zhuhe/code/litchi/docs/GOAL.md",
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "identity_scope": {
+    "cross_role_archive_rule": "ZIP archive bytes, archive SHA, compression framing, and sink write segmentation may differ across roles; each role/repeat must remain deterministic and internally gated.",
+    "cross_role_content_xml_rule": "Retain content.xml hashes and byte counts for each role/repeat, but never require lexical content.xml equality across roles; semantic title/body/style/meta/member-topology equality is the cross-role gate.",
+    "cross_role_required": [
+      "slide_count",
+      "title_count",
+      "body_count",
+      "title_text_bytes",
+      "body_text_bytes",
+      "title_variant_counts",
+      "body_variant_counts",
+      "semantic_sha256",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "member_names",
+      "mimetype",
+      "manifest_entry_count"
+    ],
+    "same_role_required": [
+      "slide_count",
+      "title_count",
+      "body_count",
+      "title_text_bytes",
+      "body_text_bytes",
+      "title_variant_counts",
+      "body_variant_counts",
+      "semantic_sha256",
+      "content_xml_sha256",
+      "content_xml_bytes",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "member_names",
+      "mimetype",
+      "manifest_entry_count",
+      "target_payload_bytes",
+      "target_payload_sha256"
+    ]
+  },
+  "limit_boundary": "The legacy 32,768-title request remains an intentional aggregate audit-limit refusal; this baseline measures only 64, 4,096, and 8,192 slides and does not relax production limits.",
+  "matrix": {
+    "formal_reports": 36,
+    "phases": [
+      "A1",
+      "B1",
+      "C1",
+      "C2",
+      "B2",
+      "A2"
+    ],
+    "retained_samples": 1080,
+    "roles": [
+      "before-buffered",
+      "after-buffered",
+      "after-streaming"
+    ]
+  },
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "operation_metrics": {
+    "allocation_scope": "operation_global_system_allocator",
+    "normal_allocator_elapsed": "allocator elapsed values are retained for process context only; no allocator latency claim",
+    "required_region_peak": true,
+    "sample_alignment": "elapsed_ns.samples_by_elapsed_then_sample_index"
+  },
+  "oracle": {
+    "path": "oracle-protocol.json",
+    "roles": {
+      "after-buffered": "after-buffered",
+      "after-streaming": "after-streaming",
+      "before-buffered": "before-buffered"
+    },
+    "sha256": "2d07b5936e9036e9ee7fadac68148ef60196c9830f2f4b70154c6aa327095a9f",
+    "verifier_path": "verify-report-candidate.py",
+    "verifier_sha256": "eddfef3fe680d383f7bc067bc4a6732679c3a1e35ce8a10c90f6ffb7d9589b16"
+  },
+  "oracle_roles": {
+    "after-buffered": "after-buffered",
+    "after-streaming": "after-streaming",
+    "before-buffered": "before-buffered"
+  },
+  "order": [
+    {
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "tiny"
+    },
+    {
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "tiny"
+    }
+  ],
+  "pilot_contract": {
+    "attempt": "initial",
+    "receipts": [
+      "pilots/before-buffered/initial/normal-tiny-receipt.json",
+      "pilots/before-buffered/initial/normal-medium-receipt.json",
+      "pilots/before-buffered/initial/normal-large-receipt.json",
+      "pilots/before-buffered/initial/allocator-tiny-receipt.json",
+      "pilots/before-buffered/initial/allocator-medium-receipt.json",
+      "pilots/before-buffered/initial/allocator-large-receipt.json",
+      "pilots/after-buffered/initial/normal-tiny-receipt.json",
+      "pilots/after-buffered/initial/normal-medium-receipt.json",
+      "pilots/after-buffered/initial/normal-large-receipt.json",
+      "pilots/after-buffered/initial/allocator-tiny-receipt.json",
+      "pilots/after-buffered/initial/allocator-medium-receipt.json",
+      "pilots/after-buffered/initial/allocator-large-receipt.json",
+      "pilots/after-streaming/initial/normal-tiny-receipt.json",
+      "pilots/after-streaming/initial/normal-medium-receipt.json",
+      "pilots/after-streaming/initial/normal-large-receipt.json",
+      "pilots/after-streaming/initial/allocator-tiny-receipt.json",
+      "pilots/after-streaming/initial/allocator-medium-receipt.json",
+      "pilots/after-streaming/initial/allocator-large-receipt.json"
+    ],
+    "roles": [
+      "before-buffered",
+      "after-buffered",
+      "after-streaming"
+    ],
+    "samples": 3,
+    "warmups": 1
+  },
+  "pilots": {
+    "groups": {
+      "by_role": {
+        "after-buffered": 6,
+        "after-streaming": 6,
+        "before-buffered": 6
+      },
+      "candidate_two_roles": 12,
+      "preparatory_before_buffered": 6
+    },
+    "required_receipts": [
+      "pilots/before-buffered/initial/normal-tiny-receipt.json",
+      "pilots/before-buffered/initial/normal-medium-receipt.json",
+      "pilots/before-buffered/initial/normal-large-receipt.json",
+      "pilots/before-buffered/initial/allocator-tiny-receipt.json",
+      "pilots/before-buffered/initial/allocator-medium-receipt.json",
+      "pilots/before-buffered/initial/allocator-large-receipt.json",
+      "pilots/after-buffered/initial/normal-tiny-receipt.json",
+      "pilots/after-buffered/initial/normal-medium-receipt.json",
+      "pilots/after-buffered/initial/normal-large-receipt.json",
+      "pilots/after-buffered/initial/allocator-tiny-receipt.json",
+      "pilots/after-buffered/initial/allocator-medium-receipt.json",
+      "pilots/after-buffered/initial/allocator-large-receipt.json",
+      "pilots/after-streaming/initial/normal-tiny-receipt.json",
+      "pilots/after-streaming/initial/normal-medium-receipt.json",
+      "pilots/after-streaming/initial/normal-large-receipt.json",
+      "pilots/after-streaming/initial/allocator-tiny-receipt.json",
+      "pilots/after-streaming/initial/allocator-medium-receipt.json",
+      "pilots/after-streaming/initial/allocator-large-receipt.json"
+    ]
+  },
+  "precleanup_receipt": "checks/precleanup-portable.json",
+  "preparation": {
+    "candidate_pilot_driver": "pilot-candidate.py",
+    "oracle": "verify-report.py",
+    "pilot_driver": "pilot.py",
+    "profile_driver": "profile.py",
+    "summary_module": "before-hypothesis",
+    "summary_path": "before-hypothesis.json"
+  },
+  "preparatory_oracle_path": "verify-report.py",
+  "preparatory_profiles": {
+    "attempt": "initial",
+    "module": "profile.py --preparatory",
+    "required_receipts": [
+      "profiles/preparatory-before-buffered/initial/stat/receipt.json",
+      "profiles/preparatory-before-buffered/initial/record/receipt.json"
+    ],
+    "role": "before-buffered"
+  },
+  "preparatory_summary_module": "before-hypothesis",
+  "preparatory_summary_path": "before-hypothesis.json",
+  "preserved_paths": [
+    "/home/zhuhe/code/litchi/target",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target"
+  ],
+  "probe_needles": {
+    "build_protocol": "protocol binding is stale",
+    "compression": "original artifact binding differs",
+    "cpu_affinity": "CPU affinity",
+    "missing_required": "file is missing",
+    "phase_timestamp": "formal lanes overlap or are out of capture order",
+    "record_event": "perf-record sampling/call-graph binding is stale",
+    "semantic_digest": "semantic_sha256",
+    "summary": "summary.json: retained summary differs from independent derivation"
+  },
+  "protocol_schema": "litchi-0437-odp-protocol-v1",
+  "repeats": 2,
+  "replay_drivers": [
+    "replay.py",
+    "check.py",
+    "pilot.py",
+    "save-binaries.py",
+    "capture.py",
+    "profile.py",
+    "summary.py",
+    "decision.py",
+    "evidence-preflight.py",
+    "final-evidence-preflight.py",
+    "formal-suite.py",
+    "before-hypothesis.py",
+    "verify.py",
+    "before-hypothesis-capture.py",
+    "compare-strict.py",
+    "compare-strict-candidate.py",
+    "build-descriptors.py",
+    "cleanup.py",
+    "lifecycle.py",
+    "portable-probes.py",
+    "seal.py",
+    "protocol.json",
+    "protocol-draft.json",
+    "planned-checks.json",
+    "verify-report.py",
+    "oracle-protocol.json",
+    "verify-report-candidate.py",
+    "pilot-candidate.py",
+    "freeze.py"
+  ],
+  "report_contract": {
+    "cross_role_comparison": "outer capture verifier; this per-report oracle validates one role/shape/mode",
+    "currently_supported_source_role": "buffered_and_streaming_candidate",
+    "future_role_contracts_are_draft": false,
+    "reports_per_role": 12,
+    "required_reports": 36,
+    "retained_samples": 1080,
+    "schema_version": 1
+  },
+  "retention_decision": {
+    "driver": "decision.py",
+    "driver_sha256": "849effdb4dceb597bc91faca2e346ed8a4da3a8e3ac6fdce47d5c9f5d0d42a84",
+    "large_peak_reduction_threshold_percent": 20.0,
+    "path": "retention-decision.json",
+    "scope": "Measured bounded publication enabler; disclose all latency and RSS flags independently."
+  },
+  "roles": {
+    "after-buffered": {
+      "build_directory": "after",
+      "implementation": "litchi_odp::Builder::add_slide_with_title/build",
+      "retention": "unbounded",
+      "selector": "odp_buffered_create",
+      "source_field": "odp_slides",
+      "source_role": "buffered"
+    },
+    "after-streaming": {
+      "build_directory": "after",
+      "implementation": "litchi_odp::streaming::stream_plain_slides_to",
+      "input_accounting": "raw_title_body_utf8_sum",
+      "provider_report_input_bytes_field": "provider_input_text_bytes",
+      "retained_authoring_window_bytes": 4096,
+      "retention": "fixed_explicit_window",
+      "selector": "odp_streaming_create",
+      "source_field": "odp_slides",
+      "source_role": "streaming"
+    },
+    "before-buffered": {
+      "build_directory": "before",
+      "implementation": "litchi_odp::Builder::add_slide_with_title/build",
+      "retention": "unbounded",
+      "selector": "odp_buffered_create",
+      "source_field": "odp_slides",
+      "source_role": "buffered"
+    }
+  },
+  "same_identity_policy": {
+    "cross_role_archive_rule": "ZIP archive bytes, archive SHA, compression framing, and sink write segmentation may differ across roles; each role/repeat must remain deterministic and internally gated.",
+    "cross_role_content_xml_rule": "Retain content.xml hashes and byte counts for each role/repeat, but never require lexical content.xml equality across roles; semantic title/body/style/meta/member-topology equality is the cross-role gate.",
+    "cross_role_required": [
+      "slide_count",
+      "title_count",
+      "body_count",
+      "title_text_bytes",
+      "body_text_bytes",
+      "title_variant_counts",
+      "body_variant_counts",
+      "semantic_sha256",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "member_names",
+      "mimetype",
+      "manifest_entry_count"
+    ],
+    "same_role_required": [
+      "slide_count",
+      "title_count",
+      "body_count",
+      "title_text_bytes",
+      "body_text_bytes",
+      "title_variant_counts",
+      "body_variant_counts",
+      "semantic_sha256",
+      "content_xml_sha256",
+      "content_xml_bytes",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "member_names",
+      "mimetype",
+      "manifest_entry_count",
+      "target_payload_bytes",
+      "target_payload_sha256"
+    ]
+  },
+  "samples": 30,
+  "selector_family": "odp_fresh_slide_creation",
+  "shapes": {
+    "large": 8192,
+    "medium": 4096,
+    "tiny": 64
+  },
+  "source_contract": {
+    "all_boolean_gates_required_true": true,
+    "required_fields": [
+      "role",
+      "implementation",
+      "timing_scope",
+      "performance_claim",
+      "semantic_sha256",
+      "content_xml_sha256",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "archive_member_set_verified",
+      "manifest_bindings_verified",
+      "semantic_reopen_verified",
+      "immutable_styles_meta_verified",
+      "runtime_output_digest_verified",
+      "runtime_sink_length_verified",
+      "page_structure_verified",
+      "page_geometry_verified",
+      "slide_count",
+      "title_count",
+      "body_count",
+      "title_text_bytes",
+      "body_text_bytes",
+      "title_variant_counts",
+      "body_variant_counts",
+      "text_contract"
+    ],
+    "same_role_content_identity_required": true,
+    "streaming_optional_fields": [
+      "provider_input_text_bytes"
+    ]
+  },
+  "status": "frozen",
+  "streaming_contract": {
+    "corpus_projection_definition": "title UTF-8 bytes, LF, body UTF-8 bytes, LF LF between slides, no trailing separator",
+    "provider_report_input_bytes_field": "provider_input_text_bytes",
+    "provider_report_input_bytes_optional": true,
+    "raw_input_definition": "sum of UTF-8 title and body bytes with no presentation separators",
+    "retained_authoring_window_bytes": 4096,
+    "retained_output_bytes": 0,
+    "selector": "odp_streaming_create",
+    "sink_input_bytes": "raw_title_body_utf8_sum",
+    "source_field": "odp_slides",
+    "unknown_limit_policy": "reject unknown or mismatched provider limit/window declarations"
+  },
+  "summary_module": "summary",
+  "summary_path": "summary.json",
+  "timing_scope": "Fresh slide title/body input and public ODP authoring/publication plus HashingDiscardSink write are inside the operation timer. Corpus construction, archive reopen, XML/semantic/package gates, sink construction/finalization, and digest extraction are outside it.",
+  "warmups": 3,
+  "workers": 1
+}

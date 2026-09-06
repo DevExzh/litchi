@@ -1,5 +1,23 @@
 # Performance hotspot inventory
 
+## Change 0437: ODP memory retention removed; accounting remains visible
+
+[0437](changes/0437-odp-bounded-plain-slides.md) keeps a bounded fresh plain
+ODP publication API. Its operation allocator peak is 420,352 bytes across all
+three measured sizes, compared with 23,973,505 bytes for large Builder.
+Streaming large p50 is 1.574 / 1.588 times candidate Builder; the memory benefit
+has a disclosed CPU cost. The same-API tiny R1 p99 flag (+5.874%) also remains.
+RSS stays around 84.5–84.7 MB, and no repeat comparison crosses 5%.
+
+Whole-executable streaming self samples include execution consume 11.00%,
+Deflate longest-match 10.78%, Deflate medium 6.88%, XML audit 5.39%, and fragment
+validation 3.17%; SHA setup hashing is 12.85%. These scopes exclude the later
+Python oracle and do not establish an operation-only Amdahl fraction. The
+next hypothesis is bounded batching of repeated fixed-markup Work charges,
+with exact fallback at limits. No benefit is yet measured. Preserve XML and
+publication checks; broader append, native, cold/range, and scaling coverage
+remain separate open work.
+
 ## Change 0436: ODT Work batching measured
 
 [0436](changes/0436-odt-bounded-text-spans.md) closes the immediate ODT

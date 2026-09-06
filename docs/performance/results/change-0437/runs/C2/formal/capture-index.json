@@ -1,0 +1,8 @@
+[
+  "runs/C2/formal/C2-allocator-large-r2-receipt.json",
+  "runs/C2/formal/C2-allocator-medium-r2-receipt.json",
+  "runs/C2/formal/C2-allocator-tiny-r2-receipt.json",
+  "runs/C2/formal/C2-normal-large-r2-receipt.json",
+  "runs/C2/formal/C2-normal-medium-r2-receipt.json",
+  "runs/C2/formal/C2-normal-tiny-r2-receipt.json"
+]
