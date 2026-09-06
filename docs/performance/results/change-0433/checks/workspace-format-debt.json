@@ -1,0 +1,11 @@
+{
+  "status": "review",
+  "scope": "Workspace format check failed only in these files, unchanged from the frozen before source. Owned-file formatting passes.",
+  "files": [
+    {
+      "file": "crates/litchi-docx/tests/glossary_authoring.rs",
+      "unchanged_from_before": true,
+      "sha256": "9cdb25c9b4721274198a9563b2c5190231b366bca94276c38e33ac78168cb564"
+    }
+  ]
+}

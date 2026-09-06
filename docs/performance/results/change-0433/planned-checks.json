@@ -1,0 +1,42 @@
+{
+  "required_pass": [
+    "ods-reference-crate-v2",
+    "before-harness-focused-v2",
+    "ods-reference-strict-scoped",
+    "ods-reference-doc",
+    "before-owned-format-v2",
+    "before-build",
+    "before-pilot-normal-tiny",
+    "before-pilot-allocator-tiny",
+    "before-pilot-normal-large",
+    "before-pilots-verify",
+    "before-capture",
+    "before-profiles",
+    "common-tests-final",
+    "ods-tests-final",
+    "harness-tests-final",
+    "owned-format-final",
+    "production-strict-scoped-final",
+    "production-doc-final",
+    "harness-doc-final",
+    "boundaries-final",
+    "strict-debt-check",
+    "after-build",
+    "after-buffered-capture",
+    "after-streaming-capture",
+    "after-profiles",
+    "derive-final",
+    "python-syntax-final",
+    "precleanup-portable",
+    "task-cleanup",
+    "aftercleanup-portable",
+    "final-diff",
+    "final-staged-diff"
+  ],
+  "required_review": [
+    "ods-reference-strict",
+    "harness-strict-final",
+    "production-strict-final"
+  ],
+  "scope": "Required final correctness, source custody, repeated measurement and portable evidence gates. Development failures remain retained. Full strict lint failures require explicit comparison against unchanged preexisting findings; scoped lint passes are diagnostic only."
+}

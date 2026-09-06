@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0433: bounded ODS fresh scalar creation
+
+[0433](changes/0433-ods-bounded-fresh-scalar-creation.md) adds a measured
+fresh ODS scalar-creation role beside the existing buffered control. The
+protocol retains 36 reports and 1,080 samples: three roles, two modes, three
+row shapes (64, 8,192, 32,768), four cells per row, two reversed repeats,
+three warmups, and thirty samples per report. Normal streaming p50 is
+59.017–62.137% below before-buffered across the retained shapes/repeats; the
+after-buffered control has a retained +7.037% tiny R1 p99 flag. Large-shape
+operation-region requested-allocation peak is 71,050,076 bytes before and
+419,347 bytes after streaming. These values are descriptive requested-heap
+and timer observations; process RSS, physical copies, allocator internals,
+and total-memory bounds are outside the claim scope. The [bundle](results/change-0433/README.md)
+contains semantic-oracle, build, profile, and check receipts; portable replay
+finalization remains pending for root.
+
 ## Change 0432: XLSX streaming operation memory
 
 [0432](changes/0432-xlsx-streaming-operation-memory.md) records 360 formal

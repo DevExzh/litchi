@@ -1,0 +1,14 @@
+[
+  "captures/after-buffered-normal-tiny-r1-receipt.json",
+  "captures/after-buffered-normal-medium-r1-receipt.json",
+  "captures/after-buffered-normal-large-r1-receipt.json",
+  "captures/after-buffered-allocator-tiny-r1-receipt.json",
+  "captures/after-buffered-allocator-medium-r1-receipt.json",
+  "captures/after-buffered-allocator-large-r1-receipt.json",
+  "captures/after-buffered-allocator-large-r2-receipt.json",
+  "captures/after-buffered-allocator-medium-r2-receipt.json",
+  "captures/after-buffered-allocator-tiny-r2-receipt.json",
+  "captures/after-buffered-normal-large-r2-receipt.json",
+  "captures/after-buffered-normal-medium-r2-receipt.json",
+  "captures/after-buffered-normal-tiny-r2-receipt.json"
+]

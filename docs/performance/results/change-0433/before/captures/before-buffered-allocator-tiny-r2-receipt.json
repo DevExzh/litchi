@@ -1,0 +1,71 @@
+{
+  "change": 433,
+  "role": "before-buffered",
+  "selector": "ods_buffered_create",
+  "name": "before-buffered-allocator-tiny-r2",
+  "lane": {
+    "mode": "allocator",
+    "shape": "tiny",
+    "repeat": "R2"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/before/captures/before-buffered-allocator-tiny-r2-resource.log",
+    "/tmp/litchi-goal-0433-binaries/before/allocator",
+    "--case",
+    "ods_buffered_create",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/before/captures/before-buffered-allocator-tiny-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/before/captures/before-buffered-allocator-tiny-r2-catalog.json"
+  ],
+  "revision": "be82ef53dc191a64bc3c3365502bf44599528577",
+  "source_manifest": {
+    "path": "sources/5ebf43666112953e459f60c56488de5950b49a2313f31e2e2ca70b3309878fea.json",
+    "sha256": "5ebf43666112953e459f60c56488de5950b49a2313f31e2e2ca70b3309878fea",
+    "files": 6637
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0433-binaries/before/allocator",
+    "sha256": "f1917863cef737eb4afa3c04a8f66bf3bf46de671809b392491be66df2408a3e",
+    "bytes": 452349928
+  },
+  "protocol_sha256": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+  "driver_sha256": "c64493fc7d6682e228dee70d4de4ff51522a5371c31302e4c51256efb7af72c3",
+  "verifier_sha256": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+  "started_utc": "2026-09-06T04:22:14.122060+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T04:22:14.474434+00:00",
+  "artifacts": {
+    "before/captures/before-buffered-allocator-tiny-r2.json": {
+      "sha256": "c56b2ed4000f23fdb7393fd568a3aaa92331fd4e1859b38652bcff1bc55b085e",
+      "bytes": 41535
+    },
+    "before/captures/before-buffered-allocator-tiny-r2-catalog.json": {
+      "sha256": "426676495dfe86a074d6d0d66feb671426e3dd586d27581762d922af249dcf65",
+      "bytes": 4823
+    },
+    "before/captures/before-buffered-allocator-tiny-r2.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "before/captures/before-buffered-allocator-tiny-r2-resource.log": {
+      "sha256": "f657a3ab97076129771791768672c0502be4fbf6f41d14aa7bf9e4f87e167209",
+      "bytes": 1116
+    }
+  }
+}

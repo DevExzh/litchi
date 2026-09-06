@@ -1,0 +1,10 @@
+{
+  "harness-tests-final": {
+    "attempts": [
+      "harness-tests-final",
+      "harness-tests-final-v2"
+    ],
+    "selected": "harness-tests-final-v2",
+    "reason": "Corrected the stale selectable-case-count assertion from 430 to 431 and restored three task-owned recursive rustfmt spills to their exact HEAD bytes; retained the failed initial full-suite run and reran the identical command."
+  }
+}

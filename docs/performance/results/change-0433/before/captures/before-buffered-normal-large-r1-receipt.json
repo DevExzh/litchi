@@ -1,0 +1,71 @@
+{
+  "change": 433,
+  "role": "before-buffered",
+  "selector": "ods_buffered_create",
+  "name": "before-buffered-normal-large-r1",
+  "lane": {
+    "mode": "normal",
+    "shape": "large",
+    "repeat": "R1"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/before/captures/before-buffered-normal-large-r1-resource.log",
+    "/tmp/litchi-goal-0433-binaries/before/normal",
+    "--case",
+    "ods_buffered_create",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/before/captures/before-buffered-normal-large-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/before/captures/before-buffered-normal-large-r1-catalog.json"
+  ],
+  "revision": "be82ef53dc191a64bc3c3365502bf44599528577",
+  "source_manifest": {
+    "path": "sources/5ebf43666112953e459f60c56488de5950b49a2313f31e2e2ca70b3309878fea.json",
+    "sha256": "5ebf43666112953e459f60c56488de5950b49a2313f31e2e2ca70b3309878fea",
+    "files": 6637
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0433-binaries/before/normal",
+    "sha256": "37b8cef07ca3bef7ed2fc385ceb5a154d50e3035fed78616957e19a7666f7be3",
+    "bytes": 453014336
+  },
+  "protocol_sha256": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+  "driver_sha256": "c64493fc7d6682e228dee70d4de4ff51522a5371c31302e4c51256efb7af72c3",
+  "verifier_sha256": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+  "started_utc": "2026-09-06T04:21:40.221721+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T04:21:48.512848+00:00",
+  "artifacts": {
+    "before/captures/before-buffered-normal-large-r1.json": {
+      "sha256": "b17cdfdbb19fb4a50c4b7fc477363a47f0f95bb335dc3f42f2788ba1fe3a92fd",
+      "bytes": 32750
+    },
+    "before/captures/before-buffered-normal-large-r1-catalog.json": {
+      "sha256": "197800cb2d433fe7f735798ab4120ed617af4745cdfd9db51a13ed7b3889df1e",
+      "bytes": 4853
+    },
+    "before/captures/before-buffered-normal-large-r1.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "before/captures/before-buffered-normal-large-r1-resource.log": {
+      "sha256": "5a9187925033e6340ee5af06ff8499b83fab9d66bc1a69da78f82c4c37cf30f4",
+      "bytes": 1111
+    }
+  }
+}

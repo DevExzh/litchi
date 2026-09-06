@@ -2589,6 +2589,16 @@ corpus, while cross-role equality uses the normalized semantic digest and the
 matched row/column contract. Source metrics classify the generated rows as
 `not_applicable_in_process_sink` and make no physical-I/O claim.
 
+The [0433 evidence record](../../docs/performance/changes/0433-ods-bounded-fresh-scalar-creation.md)
+retains 36 reports and 1,080 samples for this fresh-creation matrix. The
+after-streaming normal p50 is 59.017–62.137% below the before-buffered role;
+the after-buffered control retains a +7.037% tiny R1 normal p99 flag. The
+large operation-region requested peak is 71,050,076 bytes before and 419,347
+bytes after streaming. These are descriptive operation/timer observations,
+not a production speedup, total-memory, RSS, allocator-internal, or scaling
+claim. Logical append, package-Part addition, and arbitrary repackaging remain
+outside this selector.
+
 ## Opt-in DOCX/PPTX semantic corpus matrix
 
 `--semantic-shape` creates complete public-API packages in memory. Text names,

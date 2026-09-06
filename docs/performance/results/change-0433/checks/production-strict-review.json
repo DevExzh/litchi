@@ -1,0 +1,74 @@
+{
+  "baseline": {
+    "log_bytes": 1488,
+    "log_path": "checks/ods-reference-strict.log",
+    "log_sha256": "fe41d25b38b22a81bd41277bf80c098afe2b574f660e8eecef986f0dca67bfe8",
+    "record_bytes": 1348,
+    "record_path": "checks/ods-reference-strict.json",
+    "record_sha256": "d42c78ffe2d05462e7e5e1b704a37b45ebc82b3e912a33083e0aba295a95cb00",
+    "revision": "d1b18749dfc73407abcd116f172d0954529cc7d0",
+    "source_after": {
+      "bytes": 803581,
+      "files": 6637,
+      "path": "sources/7df8b7cd91076a154411768c1ce173a36aae83c346d006826edfa6e9a8f19765.json",
+      "sha256": "7df8b7cd91076a154411768c1ce173a36aae83c346d006826edfa6e9a8f19765",
+      "source_file": "crates/litchi-odf-common/src/package/model.rs",
+      "source_sha256": "d71f1c9fb2297f394fc1d0db7e680bc4c5c97af34964404e72b478e050d98bab"
+    },
+    "source_before": {
+      "bytes": 803581,
+      "files": 6637,
+      "path": "sources/7df8b7cd91076a154411768c1ce173a36aae83c346d006826edfa6e9a8f19765.json",
+      "sha256": "7df8b7cd91076a154411768c1ce173a36aae83c346d006826edfa6e9a8f19765",
+      "source_file": "crates/litchi-odf-common/src/package/model.rs",
+      "source_sha256": "d71f1c9fb2297f394fc1d0db7e680bc4c5c97af34964404e72b478e050d98bab"
+    },
+    "source_sha256": "d71f1c9fb2297f394fc1d0db7e680bc4c5c97af34964404e72b478e050d98bab",
+    "status": "failed"
+  },
+  "change": 433,
+  "current": {
+    "log_bytes": 1627,
+    "log_path": "checks/production-strict-final.log",
+    "log_sha256": "30d37d656c882bcc60ba837781e5b55a9e5a88c8e3db1ef705a8a73368338d2d",
+    "record_bytes": 1386,
+    "record_path": "checks/production-strict-final.json",
+    "record_sha256": "db04d3b0c6c385c0a9b94d2a86766991d6824a9824b2dc2c8bd0d76ce31aa182",
+    "revision": "be82ef53dc191a64bc3c3365502bf44599528577",
+    "source_after": {
+      "bytes": 804199,
+      "files": 6642,
+      "path": "sources/6f90c88d4200c9fd9c374f55c320b2eeefb1f58d8ab48cb02ced396502d877b3.json",
+      "sha256": "6f90c88d4200c9fd9c374f55c320b2eeefb1f58d8ab48cb02ced396502d877b3",
+      "source_file": "crates/litchi-odf-common/src/package/model.rs",
+      "source_sha256": "d71f1c9fb2297f394fc1d0db7e680bc4c5c97af34964404e72b478e050d98bab"
+    },
+    "source_before": {
+      "bytes": 804199,
+      "files": 6642,
+      "path": "sources/6f90c88d4200c9fd9c374f55c320b2eeefb1f58d8ab48cb02ced396502d877b3.json",
+      "sha256": "6f90c88d4200c9fd9c374f55c320b2eeefb1f58d8ab48cb02ced396502d877b3",
+      "source_file": "crates/litchi-odf-common/src/package/model.rs",
+      "source_sha256": "d71f1c9fb2297f394fc1d0db7e680bc4c5c97af34964404e72b478e050d98bab"
+    },
+    "source_sha256": "d71f1c9fb2297f394fc1d0db7e680bc4c5c97af34964404e72b478e050d98bab",
+    "status": "failed"
+  },
+  "findings": [
+    {
+      "count": 1,
+      "file": "crates/litchi-odf-common/src/package/model.rs",
+      "message": "large size difference between variants"
+    }
+  ],
+  "known_preexisting_diagnostic": {
+    "count": 1,
+    "file": "crates/litchi-odf-common/src/package/model.rs",
+    "message": "large size difference between variants"
+  },
+  "same_message_and_source_file_multiset": true,
+  "scope": "diagnostic-only; does not claim a passing production strict gate",
+  "source_file": "crates/litchi-odf-common/src/package/model.rs",
+  "source_sha256_unchanged": true,
+  "status": "pass"
+}

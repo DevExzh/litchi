@@ -1,0 +1,38 @@
+{
+  "change": 433,
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0433/production-strict-review.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "f5bf1696192f0007db56554aa5b16719cdf1950b",
+  "driver_sha256": "e04a06a4e561d0ce860f3992d22edbaf8377cca8d25931b9cb0eb6290c5f5378",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T05:25:47.331975+00:00",
+  "source_before": {
+    "path": "sources/7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e.json",
+    "sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e",
+    "files": 6642
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T05:25:47.502768+00:00",
+  "source_after": {
+    "path": "sources/7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e.json",
+    "sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e",
+    "files": 6642
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/production-strict-review-driver-v2.log",
+    "bytes": 44,
+    "sha256": "f6730cd0696a4fcf89f570e47d736682d130a218d7018f9870547c384514e198"
+  }
+}

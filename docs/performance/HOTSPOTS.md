@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## Change 0433: bounded ODS fresh creation
+
+[0433](changes/0433-ods-bounded-fresh-scalar-creation.md) supplies the missing
+fresh ODS scalar-row creation evidence with a sequential writer and a fixed
+4,096-byte authoring window. Its retained normal p50 is 59.017–62.137% below
+the before-buffered role, while the large operation-region requested peak is
+71,050,076 → 419,347 bytes. The after-buffered tiny R1 p99 control flag is
++7.037%. These observations do not identify a universal hotspot or authorize
+a production speedup: allocator vectors, RSS, profiles, compression, XML
+audit, and setup have distinct scopes. The bundle's [profile index](results/change-0433/profile-index.json)
+and [summary](results/change-0433/summary.json) retain the evidence.
+
+The path covers fresh one-sheet scalar creation only. Logical append, package
+Part addition, arbitrary repackaging, native/cold I/O, total-RSS attribution,
+and broader scaling remain open work.
+
 ## Change 0432: streaming heap evidence and next coverage
 
 [0432](changes/0432-xlsx-streaming-operation-memory.md) separates XLSX's

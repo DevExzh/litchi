@@ -1,5 +1,18 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0433 adds bounded ODS fresh scalar creation
+
+[0433](changes/0433-ods-bounded-fresh-scalar-creation.md) adds measured
+`ods_streaming_create` fresh one-sheet scalar creation alongside the
+`ods_buffered_create` before/after controls. The matrix covers 64, 8,192, and
+32,768 rows with four scalar cells per row, normal and allocator modes, and
+semantic archive/readback oracles. This is creation from scratch only. It does
+not cover logical append to an existing worksheet, adding an opaque or semantic
+package Part, arbitrary modification/repackaging, native-application behavior,
+or broad memory/scaling claims. The [bundle](results/change-0433/README.md)
+retains the protocol and checks; no default-matrix or JSON registry change is
+made by this evidence batch.
+
 ## 2026-09-06: change 0432 observes XLSX streaming allocations
 
 [0432](changes/0432-xlsx-streaming-operation-memory.md) keeps the existing

@@ -1,0 +1,29 @@
+{
+  "change": 433,
+  "declared_utc": "2026-09-06T03:26:11.905912+00:00",
+  "baseline_revision": "1518a0901",
+  "hypothesis": "Fresh ODS scalar row creation can avoid retaining the full worksheet model, content XML, and output package by consuming rows into one bounded audited XML fragment window and a sequential non-seek sink.",
+  "classification": "Necessary bounded-memory capability enabler with matched existing-builder measurements; no logical existing-document append claim.",
+  "shapes": {
+    "tiny": 64,
+    "medium": 8192,
+    "large": 32768
+  },
+  "cells_per_row": 4,
+  "cpu": 2,
+  "workers": 1,
+  "warmups": 3,
+  "samples": 30,
+  "repeats": 2,
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "timing_scope": "Create deterministic scalar row inputs, author content, validate publication, compress/finalize package, and write to hashing discard sink. Exclude artifact creation/reopen oracle, procfs probes, sink construction and digest extraction.",
+  "preservation_scope": "Fresh one-sheet scalar documents only; no existing source or unknown content is modified.",
+  "comparison_scope": "Matched semantic rows and cells, not necessarily identical XML/package lexical representation. Full-byte hashes must be stable within each implementation.",
+  "regression_trigger_percent": 5,
+  "allocator_policy": "serialized_region_peak_v3; derive peak minus entry; normal binaries own latency claims; process maximum RSS includes setup and oracle.",
+  "shape_revision_utc": "2026-09-06T03:29:44.198290+00:00",
+  "shape_revision_reason": "Existing PackageWriter authored XML default permits 250000 aggregate attributes. The 131072-row proposal would require more than this. The matched large shape is 32768 rows; no production limit is relaxed."
+}

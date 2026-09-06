@@ -1,0 +1,41 @@
+{
+  "status": "pass",
+  "removed": [
+    {
+      "path": "/tmp/litchi-goal-0433-binaries",
+      "regular_files": 4,
+      "regular_file_bytes": 1813653984
+    },
+    {
+      "path": "/tmp/litchi-goal-0433-common",
+      "regular_files": 7,
+      "regular_file_bytes": 73033
+    },
+    {
+      "path": "/tmp/litchi-goal-0433-ods",
+      "regular_files": 4,
+      "regular_file_bytes": 81472
+    },
+    {
+      "path": "/tmp/litchi-goal-0433-ods-tests",
+      "regular_files": 2,
+      "regular_file_bytes": 5856
+    },
+    {
+      "path": "/tmp/litchi-goal-0433-harness",
+      "regular_files": 3,
+      "regular_file_bytes": 22854
+    }
+  ],
+  "preserved_target_directory_identity": {
+    "/home/zhuhe/code/litchi/target": [
+      66305,
+      25854451
+    ],
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target": [
+      66305,
+      25593433
+    ]
+  },
+  "user_goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+}

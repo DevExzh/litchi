@@ -1,0 +1,8 @@
+{
+  "status": "review",
+  "original_receipt": "checks/final-staged-diff-original-receipt.txt",
+  "original_receipt_sha256": "55dacedc938717dcc78bc4b59bf009c74517796fffb5a1e01d89ea0af65cd878",
+  "retained_failed_receipt": "checks/final-staged-diff-first.json",
+  "retained_failed_log": "checks/final-staged-diff-first.log.gz",
+  "reason": "The initial staged diff found whitespace in the retained historical patch. Lossless gzip packaging preserves every patch byte. Original receipt bytes remain retained; the relocated failed receipt adjusts only its log path. The canonical final check is rerun after packaging."
+}

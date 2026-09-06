@@ -1,6 +1,23 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0432
+## Current evidence through 0433
+
+[0433](changes/0433-ods-bounded-fresh-scalar-creation.md) records 36 formal
+reports and 1,080 samples for fresh one-sheet ODS scalar creation. The new
+sequential writer's normal p50 is 59.017–62.137% below the before-buffered
+role across the retained shapes and repeats; the after-buffered control retains
+a +7.037% tiny R1 p99 regression flag. In allocator mode, the large
+operation-region peak is observed at 71,050,076 bytes for the buffered role and
+419,347 bytes for streaming. These are descriptive harness observations, not
+an accepted speedup, total-memory, RSS, or allocator-internal claim. The
+[result bundle](results/change-0433/README.md) retains the protocol, summary,
+source/build custody, profiles, and checks. Copied-bundle replay and mutation
+checks pass before and after removal of the task temporaries. Fresh creation
+is the only covered semantic;
+logical append, package-Part addition, arbitrary repackaging, and broader
+native/I/O/scaling coverage remain open.
+
+## Prior evidence through 0432
 
 [0432](changes/0432-xlsx-streaming-operation-memory.md) closes the missing
 operation-allocation observation for the existing XLSX scalar streaming writer.
