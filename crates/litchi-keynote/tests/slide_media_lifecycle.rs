@@ -44,6 +44,7 @@ const NATIVE_REMOVE_AUDIO: &[u8] =
     include_bytes!("../../../test-data/iwork/keynote/media-lifecycle-audio-remove-native.key");
 
 const NATIVE_SLIDE_COMPONENT: u64 = 2_652_150;
+const NATIVE_SLIDE_NODE: u64 = 2_652_149;
 const NATIVE_MOVIE_A: u64 = 2_653_286;
 const NATIVE_MOVIE_B: u64 = 2_653_610;
 const NATIVE_AUDIO_A: u64 = 2_652_595;
@@ -2051,5 +2052,206 @@ fn native_saved_candidates_are_read_back_without_rewriting_them() -> TestResult 
         &[NATIVE_MOVIE_MEMBER, NATIVE_POSTER_MEMBER],
     )?;
     assert_native_removed_graph(&source, &final_audio, &[NATIVE_AUDIO_A, NATIVE_AUDIO_B])?;
+    Ok(())
+}
+
+#[test]
+fn lifecycle_preserves_selector_order_with_unsupported_media_siblings() -> TestResult {
+    for live_video in [false, true] {
+        let original = lifecycle_source()?;
+        let mut movie = tsd::MovieArchive::decode(
+            fixture::movie_payload_from_package(&original, fixture::MOVIES[0])?.as_slice(),
+        )?;
+        movie.is_live_video = live_video.then_some(true);
+        movie.flags = (!live_video).then_some(1);
+        let opaque_sibling = movie.encode_to_vec();
+        let source =
+            fixture::with_movie_payload(&original, fixture::MOVIES[0], opaque_sibling.clone())?;
+        let package = Package::from_bytes(&source)?;
+        let duplicate =
+            package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(1))?;
+        assert_eq!(duplicate.diagnostics().source_media_count(), 3);
+        assert_eq!(duplicate.diagnostics().target_media_count(), 4);
+        assert_eq!(movie_count(duplicate.package())?, 4);
+        assert_eq!(
+            fixture::movie_payload_from_package(
+                &exact_bytes(duplicate.package())?,
+                fixture::MOVIES[0]
+            )?,
+            opaque_sibling,
+        );
+        let restored = duplicate
+            .package()
+            .apply_slide_media_lifecycle(&duplicate.patch().inverse())?;
+        assert_eq!(exact_bytes(restored.package())?, source);
+        let removed =
+            package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(1))?;
+        assert_eq!(removed.diagnostics().source_media_count(), 3);
+        assert_eq!(removed.diagnostics().target_media_count(), 2);
+        assert_eq!(movie_count(removed.package())?, 2);
+        assert_eq!(
+            fixture::movie_payload_from_package(
+                &exact_bytes(removed.package())?,
+                fixture::MOVIES[0]
+            )?,
+            opaque_sibling,
+        );
+        assert_eq!(exact_bytes(&package)?, source);
+    }
+    Ok(())
+}
+
+#[test]
+fn typed_lifecycle_kind_mismatch_precedes_metadata_rewrite() -> TestResult {
+    let source = lifecycle_source()?;
+    let mut metadata = tsp::PackageMetadata::decode(fixture::metadata_stream(&source)?.as_slice())?;
+    metadata.last_object_identifier = 0;
+    let source = fixture::replace_metadata_payload(&source, metadata.encode_to_vec())?;
+    let package = Package::from_bytes(&source)?;
+    for error in [
+        package
+            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .unwrap_err(),
+        package
+            .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .unwrap_err(),
+        package
+            .duplicate_slide_audio(SlideSelector::index(0), MovieSelector::index(0))
+            .unwrap_err(),
+        package
+            .remove_slide_audio(SlideSelector::index(0), MovieSelector::index(0))
+            .unwrap_err(),
+    ] {
+        assert!(
+            matches!(error, SlideMediaLifecycleError::KindMismatch { expected, actual } if expected != actual)
+        );
+    }
+    assert!(
+        package
+            .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(2))
+            .is_err()
+    );
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+#[test]
+#[allow(deprecated)]
+fn lifecycle_invalidates_materialized_node_cache_and_restores_exact_source() -> TestResult {
+    let (_, archive) = native_component_containing_object(NATIVE_SOURCE, NATIVE_SLIDE_NODE)?;
+    let mut node =
+        kn::SlideNodeArchive::decode(native_object_message(&archive, NATIVE_SLIDE_NODE, 4)?)?;
+    node.build_event_count = Some(99);
+    node.build_event_count_cache_version = Some(2);
+    node.build_event_count_is_up_to_date = Some(true);
+    node.has_explicit_builds = Some(true);
+    node.has_explicit_builds_cache_version = Some(2);
+    node.has_explicit_builds_is_up_to_date = Some(true);
+    let mut payload = node.encode_to_vec();
+    append_length_delimited_field(&mut payload, 199, b"opaque node witness")?;
+    let source =
+        replace_native_component_object_payload(NATIVE_SOURCE, NATIVE_SLIDE_NODE, 4, payload)?;
+    let package = Package::from_bytes(&source)?;
+    for duplicate in [true, false] {
+        let commit = if duplicate {
+            package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?
+        } else {
+            package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?
+        };
+        let candidate = exact_bytes(commit.package())?;
+        let (_, archive) = native_component_containing_object(&candidate, NATIVE_SLIDE_NODE)?;
+        let payload = native_object_message(&archive, NATIVE_SLIDE_NODE, 4)?;
+        let cache = kn::SlideNodeArchive::decode(payload)?;
+        assert_eq!(cache.build_event_count, None);
+        assert_eq!(cache.has_explicit_builds, None);
+        assert_eq!(cache.build_event_count_cache_version, Some(u32::MAX));
+        assert_eq!(cache.has_explicit_builds_cache_version, Some(u32::MAX));
+        assert_ne!(cache.build_event_count_is_up_to_date, Some(true));
+        assert_ne!(cache.has_explicit_builds_is_up_to_date, Some(true));
+        assert!(
+            payload
+                .windows(b"opaque node witness".len())
+                .any(|span| span == b"opaque node witness")
+        );
+        let mut expected = node.clone();
+        expected.build_event_count = cache.build_event_count;
+        expected.has_explicit_builds = cache.has_explicit_builds;
+        expected.build_event_count_cache_version = cache.build_event_count_cache_version;
+        expected.has_explicit_builds_cache_version = cache.has_explicit_builds_cache_version;
+        expected.build_event_count_is_up_to_date = cache.build_event_count_is_up_to_date;
+        expected.has_explicit_builds_is_up_to_date = cache.has_explicit_builds_is_up_to_date;
+        assert_eq!(cache, expected);
+        let restored = commit
+            .package()
+            .apply_slide_media_lifecycle(&commit.patch().inverse())?;
+        assert_eq!(exact_bytes(restored.package())?, source);
+        assert_eq!(exact_bytes(&package)?, source);
+        if duplicate {
+            export_if_requested(commit.package(), "focused-materialized-cache-duplicate.key")?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn lifecycle_keeps_already_invalidated_native_node_component_exact() -> TestResult {
+    let (node_member, _) = native_component_containing_object(NATIVE_SOURCE, NATIVE_SLIDE_NODE)?;
+    let package = Package::from_bytes(NATIVE_SOURCE)?;
+    let commit = package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    assert_member_unchanged(NATIVE_SOURCE, &exact_bytes(commit.package())?, &node_member)?;
+    Ok(())
+}
+
+#[test]
+fn native_saved_materialized_cache_candidate_has_strict_readback() -> TestResult {
+    let Some(path) = env::var_os("LITCHI_KEYNOTE_CACHE_NATIVE_SAVED_PATH") else {
+        return Ok(());
+    };
+    let saved = fs::read(path)?;
+    let package = Package::from_bytes(&saved)?;
+    package.validate()?;
+    assert_native_inventory(&package, 5, 2, 3)?;
+    assert_native_media_zip_unchanged(NATIVE_SOURCE, &saved)?;
+    let clone = native_candidate_media_id(&saved, &native_media_ids(NATIVE_SOURCE)?)?;
+    assert_native_movie_clone_graph(
+        NATIVE_SOURCE,
+        &saved,
+        NATIVE_MOVIE_A,
+        clone,
+        &[NATIVE_MOVIE_DATA, NATIVE_POSTER_DATA],
+    )?;
+    let (_, archive) = native_component_containing_object(&saved, NATIVE_SLIDE_NODE)?;
+    let node =
+        kn::SlideNodeArchive::decode(native_object_message(&archive, NATIVE_SLIDE_NODE, 4)?)?;
+    assert_eq!(node.build_event_count, None);
+    // Keynote recomputes the explicit-builds cache while saving this changed
+    // candidate. The focused transaction's invalidated state is checked
+    // separately before native save.
+    assert_eq!(node.has_explicit_builds, Some(true));
+    assert_eq!(node.build_event_count_cache_version, Some(u32::MAX));
+    assert_eq!(node.has_explicit_builds_cache_version, Some(2));
+    assert_eq!(exact_bytes(&package)?, saved);
+    Ok(())
+}
+
+#[test]
+fn duplicate_refuses_unproven_transitive_movie_header_reference() -> TestResult {
+    let source = lifecycle_source()?;
+    let mut archive = Archive::parse(fixture::document_stream(&source)?.as_slice())?;
+    archive
+        .object_mut(fixture::MOVIES[0])
+        .ok_or_else(|| io::Error::other("missing selected movie"))?
+        .archive_info
+        .message_infos[0]
+        .object_references
+        .push(fixture::CAPTIONS[1]);
+    let source = fixture::replace_document_archive(&source, archive)?;
+    let package = Package::from_bytes(&source)?;
+    assert!(
+        package
+            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .is_err()
+    );
+    assert_eq!(exact_bytes(&package)?, source);
     Ok(())
 }

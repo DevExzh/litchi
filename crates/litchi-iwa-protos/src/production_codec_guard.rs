@@ -766,6 +766,10 @@ mod tests {
             include_str!("keynote_media_lifecycle_codec.rs"),
         ),
         (
+            "keynote_media_lifecycle_node_cache",
+            include_str!("keynote_media_lifecycle_codec/node_cache.rs"),
+        ),
+        (
             "keynote_slide_transition",
             include_str!("keynote_slide_transition_codec.rs"),
         ),
@@ -1220,10 +1224,16 @@ mod oracle {
     fn build_script_tracks_every_codec_source() {
         let build_script = include_str!("../build.rs");
         for (name, _) in FOCUSED_CODECS {
-            let rerun_marker = format!("cargo:rerun-if-changed=src/{name}_codec.rs");
+            let source_path = match *name {
+                "keynote_media_lifecycle_node_cache" => {
+                    "keynote_media_lifecycle_codec/node_cache.rs".to_owned()
+                },
+                _ => format!("{name}_codec.rs"),
+            };
+            let rerun_marker = format!("cargo:rerun-if-changed=src/{source_path}");
             assert!(
                 build_script.contains(&rerun_marker),
-                "build.rs is missing rerun-if-changed for {name}_codec.rs"
+                "build.rs is missing rerun-if-changed for {source_path}"
             );
         }
     }

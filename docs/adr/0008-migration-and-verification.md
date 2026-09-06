@@ -17339,3 +17339,62 @@ The six temporary focused candidates and native-saved copies were removed
 after verification. The isolated sanitizer target was cleaned with
 `cargo clean` (2.1 GiB reclaimed); permanent audio oracle fixtures remain
 checked in.
+
+## 2026-09-07 follow-up: Keynote cache hardening and host interoperability scope
+
+This extends the verified lifecycle baseline `ca9b9f5cd`; no host route is
+retired. Typed movie/audio calls resolve complete source-order media positions,
+including live-video and placeholder siblings, and report `KindMismatch`
+before metadata rewriting. Selected direct comments return
+`UnsupportedComment` until reply/author ownership has a dedicated transaction.
+Comments on unselected media remain preserved.
+
+A changed build topology invalidates only the selected `SlideNode` caches:
+fields 15, 20, 22, and 23 are removed; fields 26 and 27 become `u32::MAX`.
+Already-invalidated nodes keep their exact component bytes. Other node fields
+and ZIP members remain preserved, and inverse patches restore the original
+cache bytes. Five Keynote-authored source/duplicate/removal fixtures establish
+the invalidated baseline state. Keynote may recompute a cache during save;
+that native saved state is checked separately from the transaction output.
+The sixth scalar-only Buffa projection keeps five generated files totaling
+191,918 bytes under a 192 KiB bound, with no generated repeated views.
+
+Source-built interoperability covers mixed movie/audio order, multiple builds,
+titles/captions, duplicate/shared/final-owner removal, host reopen, data
+retention/culling, exact inverse, and unselected-comment preservation. A narrow
+Movie → CaptionInfo → ShapeStyle witness admits the producer's transitive
+style references without ignoring unexplained header edges. Playback UUIDs
+and registry UUIDs are separate identity domains. Clone identities use a
+deterministic hash with collision checks instead of XOR, which collided for
+source-built label graphs. Chunk UUID occurrences must agree within a build.
+
+The focused allocation watermark remains monotonic: removals retain
+`last_object_identifier`, and duplicates allocate above it. The host's
+trailing-suffix release remains separate legacy behavior. Source-built
+interoperability is E1 evidence; comment ownership and the remaining host
+compatibility decisions still gate ADR 0028 deletion.
+
+Targeted verification passed: 27 focused lifecycle integration tests, three
+source-built interoperability tests, 16 neutral lifecycle codec tests, strict
+Keynote/protos Clippy, 942 boundary unit tests, and the full scanner (64
+packages, 238 internal edges, 11 explicit debts). The final cache candidate
+also passed the environment-enabled native-saved strict readback test. Normal
+workspace commit hooks remain the final gate for this slice.
+
+The final `focused-materialized-cache-duplicate.key` candidate opened in
+Keynote, saved, closed to the theme chooser, and reopened at its exact path
+through CUA without a repair alert. It retained three movies, two audio clips,
+all captions, body text, and footer. Strict readback checked media bytes,
+clone graph, metadata ownership, inventory, and exact package reread.
+
+- Before native save: 692,362 bytes; SHA-256
+  `28bc60c56b535f4b058ccaa7db67031b568503d64d136e62b61a24f046ae4163`.
+- After native save: 752,753 bytes; SHA-256
+  `8cb1d11df43af2184b2d24d12c781f81f810a2669df9aeba69dabadfa70e4f9f`.
+
+Keynote recomputed `has_explicit_builds = true` with cache version 2 while
+leaving the build-event count absent and its version `u32::MAX`. The focused
+transaction invalidation and native recomputation are separate verified
+states. Temporary candidates are disposable verification artifacts, not new
+permanent fixture copies. No fresh ASAN result is claimed for this follow-up;
+the earlier lifecycle fuzz receipt remains historical evidence.

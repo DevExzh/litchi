@@ -33,3 +33,15 @@ message BuildChunkArchive {
   optional BuildChunkIdentifierArchive build_chunk_identifier = 7;
   optional UUID build_id = 8;
 }
+
+// Scalar cache state on one native KN.SlideNodeArchive.  Repeated build
+// envelopes stay in the handwritten streaming codec so a lazy view never
+// allocates a generated collection for an otherwise opaque SlideNode.
+message SlideNodeBuildCacheArchive {
+  optional uint32 build_event_count = 15;
+  optional uint32 build_event_count_cache_version = 26;
+  optional bool build_event_count_is_up_to_date = 22;
+  optional bool has_explicit_builds = 20;
+  optional uint32 has_explicit_builds_cache_version = 27;
+  optional bool has_explicit_builds_is_up_to_date = 23;
+}

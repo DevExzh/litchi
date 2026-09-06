@@ -37,7 +37,9 @@ use crate::{MovieKind, MovieSelector, SlideSelector};
 mod budget;
 mod clone_payload;
 mod graph;
+mod graph_caption_witness;
 mod metadata;
+mod node_cache;
 
 use budget::LifecycleBudget;
 use graph::MediaGraphSelection;
@@ -112,6 +114,15 @@ pub enum SlideMediaLifecycleError {
     SlidePositionNotFound { position: Position },
     #[error("Keynote media position was not found: {position:?}")]
     MoviePositionNotFound { position: Position },
+    #[error(
+        "selected Keynote media kind does not match the requested operation (expected {expected:?}, actual {actual:?})"
+    )]
+    KindMismatch {
+        expected: MovieKind,
+        actual: MovieKind,
+    },
+    #[error("Keynote media lifecycle edits do not yet support a selected drawable comment")]
+    UnsupportedComment,
     #[error("an audio drawable has no poster image")]
     AudioPoster,
     #[error("the Keynote package source is malformed or inconsistent")]
@@ -384,6 +395,7 @@ impl Package {
             slide_selector.into(),
             movie_selector.into(),
             LifecycleAction::Duplicate,
+            None,
         )
     }
 
@@ -398,6 +410,7 @@ impl Package {
             slide_selector.into(),
             movie_selector.into(),
             LifecycleAction::Remove,
+            None,
         )
     }
 
@@ -408,11 +421,13 @@ impl Package {
         slide_selector: impl Into<SlideSelector<'slide>>,
         movie_selector: impl Into<MovieSelector>,
     ) -> Result<SlideMediaLifecycleCommit, SlideMediaLifecycleError> {
-        let commit = self.duplicate_slide_media(slide_selector, movie_selector)?;
-        if commit.patch.kind() != MovieKind::File {
-            return Err(SlideMediaLifecycleError::InvalidSource);
-        }
-        Ok(commit)
+        run_lifecycle(
+            self,
+            slide_selector.into(),
+            movie_selector.into(),
+            LifecycleAction::Duplicate,
+            Some(MovieKind::File),
+        )
     }
 
     /// Duplicate an audio drawable.
@@ -421,11 +436,13 @@ impl Package {
         slide_selector: impl Into<SlideSelector<'slide>>,
         movie_selector: impl Into<MovieSelector>,
     ) -> Result<SlideMediaLifecycleCommit, SlideMediaLifecycleError> {
-        let commit = self.duplicate_slide_media(slide_selector, movie_selector)?;
-        if commit.patch.kind() != MovieKind::Audio {
-            return Err(SlideMediaLifecycleError::InvalidSource);
-        }
-        Ok(commit)
+        run_lifecycle(
+            self,
+            slide_selector.into(),
+            movie_selector.into(),
+            LifecycleAction::Duplicate,
+            Some(MovieKind::Audio),
+        )
     }
 
     /// Remove a file-backed movie.
@@ -434,11 +451,13 @@ impl Package {
         slide_selector: impl Into<SlideSelector<'slide>>,
         movie_selector: impl Into<MovieSelector>,
     ) -> Result<SlideMediaLifecycleCommit, SlideMediaLifecycleError> {
-        let commit = self.remove_slide_media(slide_selector, movie_selector)?;
-        if commit.patch.kind() != MovieKind::File {
-            return Err(SlideMediaLifecycleError::InvalidSource);
-        }
-        Ok(commit)
+        run_lifecycle(
+            self,
+            slide_selector.into(),
+            movie_selector.into(),
+            LifecycleAction::Remove,
+            Some(MovieKind::File),
+        )
     }
 
     /// Remove an audio drawable.
@@ -447,11 +466,13 @@ impl Package {
         slide_selector: impl Into<SlideSelector<'slide>>,
         movie_selector: impl Into<MovieSelector>,
     ) -> Result<SlideMediaLifecycleCommit, SlideMediaLifecycleError> {
-        let commit = self.remove_slide_media(slide_selector, movie_selector)?;
-        if commit.patch.kind() != MovieKind::Audio {
-            return Err(SlideMediaLifecycleError::InvalidSource);
-        }
-        Ok(commit)
+        run_lifecycle(
+            self,
+            slide_selector.into(),
+            movie_selector.into(),
+            LifecycleAction::Remove,
+            Some(MovieKind::Audio),
+        )
     }
 
     /// Apply a patch only when this package is the exact retained source.
@@ -498,6 +519,7 @@ fn run_lifecycle(
     slide_selector: SlideSelector<'_>,
     movie_selector: MovieSelector,
     action: LifecycleAction,
+    expected_kind: Option<MovieKind>,
 ) -> Result<SlideMediaLifecycleCommit, SlideMediaLifecycleError> {
     let catalog = physical_catalog(source)?;
     let mut budget = LifecycleBudget::for_package(source)?;
@@ -512,6 +534,14 @@ fn run_lifecycle(
         wire_limits,
         &mut budget,
     )?;
+    if let Some(expected) = expected_kind
+        && selection.kind != expected
+    {
+        return Err(SlideMediaLifecycleError::KindMismatch {
+            expected,
+            actual: selection.kind,
+        });
+    }
     budget.charge_entries(1)?;
     budget.charge_references(
         selection
@@ -607,7 +637,7 @@ fn count_slide_media(
         else {
             continue;
         };
-        let (info, _) = decode_movie_info(
+        let (_info, _) = decode_movie_info(
             &message.data,
             limits,
             SemanticPath::SlideDrawable {
@@ -617,11 +647,14 @@ fn count_slide_media(
         )
         .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
         budget.charge_wire_work(message.data.len().max(1))?;
-        if matches!(info.kind(), MovieKind::File | MovieKind::Audio) {
-            count = count
-                .checked_add(1)
-                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
-        }
+        // `MovieSelector` addresses the complete source-ordered MovieArchive
+        // projection, including native placeholders and live-video drawables.
+        // The lifecycle graph still rejects those kinds as edit targets, but
+        // omitting them here would shift every later selector and would make
+        // candidate verification disagree with the original selection.
+        count = count
+            .checked_add(1)
+            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
     }
     Ok(count)
 }
@@ -1152,7 +1185,9 @@ fn allocate_clone_identities(
             size_of::<(u64, u64)>()
                 .checked_add(size_of::<u64>())
                 .and_then(|bytes| bytes.checked_add(size_of::<SuperUuid>()))
-                .and_then(|bytes| bytes.checked_add(size_of::<(u64, SuperUuid)>()))
+                .and_then(|bytes| {
+                    bytes.checked_add(size_of::<(u64, SuperUuid, Option<SuperUuid>)>())
+                })
                 .ok_or(SlideMediaLifecycleError::InvalidSource)?,
         )
         .ok_or(SlideMediaLifecycleError::InvalidSource)?;
@@ -1175,13 +1210,13 @@ fn allocate_clone_identities(
             amount: source_ids.len().saturating_mul(size_of::<SuperUuid>()),
         }
     })?;
-    let mut generated_build_uuids: Vec<(u64, SuperUuid)> = Vec::new();
+    let mut generated_build_uuids: Vec<(u64, SuperUuid, Option<SuperUuid>)> = Vec::new();
     generated_build_uuids
         .try_reserve_exact(source_ids.len())
         .map_err(|_| SlideMediaLifecycleError::Allocation {
             amount: source_ids
                 .len()
-                .saturating_mul(size_of::<(u64, SuperUuid)>()),
+                .saturating_mul(size_of::<(u64, SuperUuid, Option<SuperUuid>)>()),
         })?;
     for &source_id in source_ids {
         global_max = global_max
@@ -1198,30 +1233,31 @@ fn allocate_clone_identities(
             Err(error) => return Err(map_metadata_error(error)),
         };
         let new_uuid = derive_clone_uuid(uuid, global_max);
+        budget.charge_wire_work(new_uuids.len())?;
         if snapshot.has_uuid(identity_codec::UuidBits::new(
             new_uuid.lower,
             new_uuid.upper,
-        )) {
+        )) || new_uuids.contains(&new_uuid)
+        {
             return Err(SlideMediaLifecycleError::InvalidSource);
         }
         if selection_contains_build_id(source_id, source_ids, component_archive) {
             if generated_build_uuids
                 .iter()
-                .any(|(_, existing)| *existing == new_uuid)
+                .any(|(_, existing, _)| *existing == new_uuid)
             {
                 return Err(SlideMediaLifecycleError::InvalidSource);
             }
-            generated_build_uuids.push((global_max, new_uuid));
+            generated_build_uuids.push((global_max, new_uuid, None));
         }
         new_uuids.push(new_uuid);
     }
 
-    // BuildChunk UUIDs are identities of their referenced Build, not of the
-    // chunk object.  Native Keynote writes that UUID in both the nested
-    // chunkIdentifier and direct buildId fields, while the chunk itself is
-    // commonly absent from ObjectUuidMap.  Decode the selected chunks to
-    // prove that invariant and point every clone at the UUID generated for
-    // its remapped Build.
+    // BuildChunk UUIDs identify a build within the playback graph. Both
+    // payload locations, and all chunks for that build, must agree. The
+    // migration builder uses a separate ObjectUuidMap identity; native files
+    // commonly use the same UUID for both domains. Derive clone identities
+    // independently for both domains, preserving their source relationship.
     for &chunk_id in source_ids {
         let Some(chunk_index) = source_ids.iter().position(|id| *id == chunk_id) else {
             return Err(SlideMediaLifecycleError::InvalidSource);
@@ -1241,10 +1277,14 @@ fn allocate_clone_identities(
             lifecycle_codec::decode_build_chunk_with_report(&message.data, options)
                 .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
         charge_lifecycle_decode_report(report, budget)?;
+        match snapshot.object_uuid(component, chunk_id) {
+            Err(metadata::MetadataError::Missing) => {},
+            Ok(_) => return Err(SlideMediaLifecycleError::InvalidSource),
+            Err(error) => return Err(map_metadata_error(error)),
+        }
         let old_build = chunk.build().identifier();
-        let source_build_uuid = snapshot
+        let _registry_witness = snapshot
             .object_uuid(component, old_build)
-            .map(SuperUuid::from)
             .map_err(map_metadata_error)?;
         let nested_uuid = chunk.chunk_identifier().map(|uuid| {
             let uuid = uuid.uuid();
@@ -1260,31 +1300,33 @@ fn allocate_clone_identities(
                 upper: uuid.upper(),
             }
         });
-        if nested_uuid != Some(source_build_uuid) || direct_uuid != Some(source_build_uuid) {
+        if nested_uuid.is_none() || direct_uuid != nested_uuid {
             return Err(SlideMediaLifecycleError::InvalidSource);
         }
         let new_build = remap_lookup(&remap, old_build)?;
-        let new_uuid = derive_clone_uuid(source_build_uuid, new_build);
+        let new_uuid = derive_clone_uuid(
+            nested_uuid.ok_or(SlideMediaLifecycleError::InvalidSource)?,
+            new_build,
+        );
         if snapshot.has_uuid(identity_codec::UuidBits::new(
             new_uuid.lower,
             new_uuid.upper,
         )) {
             return Err(SlideMediaLifecycleError::InvalidSource);
         }
-        if generated_build_uuids
-            .iter()
-            .any(|(identifier, uuid)| *identifier == new_build && *uuid != new_uuid)
-            || generated_build_uuids
-                .iter()
-                .any(|(identifier, uuid)| *identifier != new_build && *uuid == new_uuid)
-        {
-            return Err(SlideMediaLifecycleError::InvalidSource);
-        }
-        if !generated_build_uuids
-            .iter()
-            .any(|(identifier, uuid)| *identifier == new_build && *uuid == new_uuid)
-        {
-            generated_build_uuids.push((new_build, new_uuid));
+        budget.charge_wire_work(generated_build_uuids.len())?;
+        for (identifier, uuid, source_chunk_uuid) in &mut generated_build_uuids {
+            if *identifier == new_build {
+                if source_chunk_uuid.is_some_and(|source| Some(source) != nested_uuid) {
+                    return Err(SlideMediaLifecycleError::InvalidSource);
+                }
+                *source_chunk_uuid = nested_uuid;
+            } else if *uuid == new_uuid
+                || source_chunk_uuid
+                    .is_some_and(|source| derive_clone_uuid(source, *identifier) == new_uuid)
+            {
+                return Err(SlideMediaLifecycleError::InvalidSource);
+            }
         }
         new_uuids[chunk_index] = new_uuid;
     }
@@ -1292,9 +1334,19 @@ fn allocate_clone_identities(
 }
 
 fn derive_clone_uuid(source: SuperUuid, target_identifier: u64) -> SuperUuid {
+    let mut digest = Sha1::new();
+    digest.update(b"litchi.keynote.media.clone.v1");
+    digest.update(source.lower.to_le_bytes());
+    digest.update(source.upper.to_le_bytes());
+    digest.update(target_identifier.to_le_bytes());
+    let digest = digest.finalize();
+    let mut lower = [0; 8];
+    let mut upper = [0; 8];
+    lower.copy_from_slice(&digest[..8]);
+    upper.copy_from_slice(&digest[8..16]);
     let mut uuid = SuperUuid {
-        lower: source.lower ^ target_identifier,
-        upper: source.upper ^ target_identifier.rotate_left(17),
+        lower: u64::from_le_bytes(lower),
+        upper: u64::from_le_bytes(upper),
     };
     if uuid.lower == 0 && uuid.upper == 0 {
         uuid.upper = 1;
@@ -1328,6 +1380,7 @@ fn charge_lifecycle_decode_report(
 }
 
 fn append_clones(
+    package: &Package,
     edited: &mut Archive,
     source_archive: &Archive,
     selection: &MediaGraphSelection,
@@ -1338,7 +1391,31 @@ fn append_clones(
     archive_limits: ArchiveLimits,
     budget: &mut LifecycleBudget,
 ) -> Result<(), SlideMediaLifecycleError> {
+    let movie = source_archive
+        .object(selection.movie_identifier)
+        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+    let style_witnesses = graph_caption_witness::prove_movie_caption_style_witness(
+        package,
+        selection.component_name.as_ref(),
+        movie,
+        package
+            .semantic_wire_limits()
+            .map_err(|_| SlideMediaLifecycleError::InvalidSource)?,
+        budget,
+    )?;
+
+    let mut transitive_styles = [0; 2];
+    let mut style_count = 0;
+    for identifier in style_witnesses.into_iter().flatten() {
+        transitive_styles[style_count] = identifier;
+        style_count += 1;
+    }
     let mut clones = Vec::new();
+    budget.charge_allocations(
+        source_ids
+            .len()
+            .saturating_mul(size_of::<litchi_iwa_core::ArchiveObject>()),
+    )?;
     clones.try_reserve_exact(source_ids.len()).map_err(|_| {
         SlideMediaLifecycleError::Allocation {
             amount: source_ids
@@ -1346,11 +1423,6 @@ fn append_clones(
                 .saturating_mul(size_of::<litchi_iwa_core::ArchiveObject>()),
         }
     })?;
-    budget.charge_allocations(
-        source_ids
-            .len()
-            .saturating_mul(size_of::<litchi_iwa_core::ArchiveObject>()),
-    )?;
     for (index, &source_id) in source_ids.iter().enumerate() {
         let source_object = source_archive
             .object(source_id)
@@ -1369,6 +1441,7 @@ fn append_clones(
             archive_limits,
             source_id == selection.movie_identifier,
             uuid,
+            &transitive_styles[..style_count],
             budget,
         )?;
         clones.push(clone);
@@ -1962,6 +2035,7 @@ fn verify_zip_locality(
     source: &SourceCatalog,
     candidate: &SourceCatalog,
     changed_members: &str,
+    changed_node_member: Option<&str>,
     deleted_data_paths: &[String],
     deleted_preview_names: &[&str],
 ) -> Result<(), SlideMediaLifecycleError> {
@@ -1978,7 +2052,10 @@ fn verify_zip_locality(
         if entry.name() != candidate_entry.name() {
             return Err(SlideMediaLifecycleError::Verification);
         }
-        if entry.name() == changed_members || entry.name() == METADATA_COMPONENT {
+        if entry.name() == changed_members
+            || entry.name() == METADATA_COMPONENT
+            || Some(entry.name()) == changed_node_member
+        {
             if !super::rendering_invalidation::selected_package_member_preserved(
                 entry,
                 candidate_entry,
@@ -2133,6 +2210,7 @@ fn rewrite_lifecycle(
     match action {
         LifecycleAction::Duplicate => {
             append_clones(
+                source,
                 &mut edited_component,
                 component_archive,
                 &selection,
@@ -2143,6 +2221,7 @@ fn rewrite_lifecycle(
                 archive_limits,
                 budget,
             )?;
+
             for ((old, new), uuid) in remap.iter().zip(new_uuids.iter()) {
                 match snapshot.object_uuid(component, *old) {
                     Ok(_) => identity_additions.push(identity_codec::ObjectUuidAddition::new(
@@ -2249,6 +2328,16 @@ fn rewrite_lifecycle(
         }
     }
 
+    let node_edit = node_cache::prepare_slide_node_build_cache(
+        source,
+        &selection,
+        selection.component_name.as_ref(),
+        &mut edited_component,
+        archive_limits,
+        wire_limits,
+        budget,
+    )?;
+
     let identity_batch = match action {
         LifecycleAction::Duplicate => {
             let new_last = *new_ids
@@ -2316,6 +2405,10 @@ fn rewrite_lifecycle(
         serialize_component(&edited_component, archive_limits, snappy_limits, budget)?;
     let metadata_bytes =
         serialize_component(&metadata_archive, archive_limits, snappy_limits, budget)?;
+    let node_bytes = node_edit
+        .as_ref()
+        .map(|edit| serialize_component(&edit.archive, archive_limits, snappy_limits, budget))
+        .transpose()?;
     let component_edit = EntryEdit::new(selection.component_name.as_ref(), &component_bytes);
     let metadata_edit = EntryEdit::new(METADATA_COMPONENT, &metadata_bytes);
     let preview_plan = super::rendering_invalidation::root_preview_deletions(catalog.package())
@@ -2368,10 +2461,25 @@ fn rewrite_lifecycle(
         })?;
     deleted_names.extend(removed_data_paths.iter().map(String::as_str));
     deleted_names.extend(preview_plan.names());
-    let edits = [component_edit, metadata_edit];
+    let node_entry_edit = node_edit
+        .as_ref()
+        .zip(node_bytes.as_ref())
+        .map(|(edit, bytes)| EntryEdit::new(edit.name.as_ref(), bytes));
+    let mut entry_edits = [component_edit, metadata_edit, metadata_edit];
+    let edit_count = if let Some(edit) = node_entry_edit {
+        entry_edits[2] = edit;
+        3
+    } else {
+        2
+    };
     let prepared = catalog
         .package()
-        .prepare_reassembly_with_changes(&[], &edits, &deleted_names, catalog.limits())
+        .prepare_reassembly_with_changes(
+            &[],
+            &entry_edits[..edit_count],
+            &deleted_names,
+            catalog.limits(),
+        )
         .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
     let requirements = prepared.execution_requirements();
     budget.charge_output(requirements.output_bytes())?;
@@ -2384,7 +2492,9 @@ fn rewrite_lifecycle(
     candidate
         .validate()
         .map_err(|_| SlideMediaLifecycleError::Verification)?;
+
     let candidate_catalog = physical_catalog(&candidate)?;
+    node_cache::validate_candidate_package_node_cache(&candidate, &selection, wire_limits, budget)?;
     verify_candidate_delta(
         source,
         &candidate,
@@ -2401,6 +2511,7 @@ fn rewrite_lifecycle(
         catalog,
         candidate_catalog,
         &selection.component_name,
+        node_edit.as_ref().map(|edit| edit.name.as_ref()),
         &removed_data_paths,
         preview_plan.names(),
     )?;
@@ -2422,7 +2533,7 @@ fn rewrite_lifecycle(
             0
         },
         removed_data: removed_data_ids.len(),
-        touched_members: 2usize
+        touched_members: edit_count
             .checked_add(removed_data_paths.len())
             .and_then(|value| value.checked_add(preview_plan.len()))
             .ok_or(SlideMediaLifecycleError::InvalidSource)?,
