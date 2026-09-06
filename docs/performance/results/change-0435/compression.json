@@ -482,6 +482,13 @@
     "stored_bytes": 56,
     "stored_sha256": "786fa69d13181c343f7f8516e09f415bd8484036a0604b0ef518a9248122e237"
   },
+  "checks/tracked-whitespace-final.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/tracked-whitespace-final.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
   "checks/typed-xml-focused-v2.log.gz": {
     "original_bytes": 23403,
     "original_path": "checks/typed-xml-focused-v2.log",

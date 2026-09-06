@@ -43,4 +43,3 @@ capture, allocator/RSS evidence, scaling evidence, or native producer proof.
 The native runtime probe is unavailable for this batch; separate fixture tests
 must remain labeled as fixture coverage and cannot be promoted to native
 compatibility evidence. The overall non-iWork goal therefore remains open.
-

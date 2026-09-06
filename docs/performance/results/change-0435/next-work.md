@@ -62,4 +62,3 @@ even when fixture correctness is green. The native runtime probe is unavailable
 in this batch; fixture tests should be retained as a separate evidence class,
 with later LibreOffice/Office runtime checks required before claiming native
 compatibility.
-
