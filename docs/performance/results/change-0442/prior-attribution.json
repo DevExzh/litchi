@@ -1,0 +1,35 @@
+{
+  "source": "change-0441/profiles/after/record/formal/perf-script.txt.gz",
+  "stored_sha256": "8fa4ede753d3f44bf5a7c7554dacada426ace0b6bf4c05f3b5da20e642483370",
+  "raw_sha256": "3fe649cbe35a3eb0ce9a23e8ae408df103f51dc874bf26aa912bf5bc2eb78225",
+  "samples": 6803,
+  "total_sampled_periods": 29612424221,
+  "markers": {
+    "source_fragments": "core::option::Option<litchi_odp::codec::content_source::ContentSource>",
+    "settings": "litchi_odp::model::settings::Settings",
+    "declarations": "litchi_odp::model::declaration::Collection",
+    "page_metadata": "litchi_odp::model::page_metadata::Collection"
+  },
+  "sample_counts": {
+    "unclassified_transaction": 62,
+    "settings": 395,
+    "declarations": 618,
+    "page_metadata": 476,
+    "source_fragments": 496
+  },
+  "sampled_period_sums": {
+    "unclassified_transaction": 272962331,
+    "settings": 1735433039,
+    "declarations": 2717351771,
+    "page_metadata": 2090546863,
+    "source_fragments": 2179570209
+  },
+  "sampled_period_percent": {
+    "unclassified_transaction": 0.9217831304956976,
+    "settings": 5.860489590613446,
+    "declarations": 9.176390797052536,
+    "page_metadata": 7.059695104318626,
+    "source_fragments": 7.360323466710072
+  },
+  "scope": "Exclusive observed transaction call-chain groups including warmups. Unmatched/ambiguous frames remain unclassified; incomplete symbolization limits attribution. These are not phase wall times or allocation fractions."
+}

@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "measured_source_matches_checkout": true,
+  "candidate_files": 7,
+  "retained_executables_verified": 4,
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "accepted_adr_tree_unchanged": true,
+  "prior_bundle_unchanged": true,
+  "temporary_paths": [
+    "/tmp/litchi-goal-0442-binaries"
+  ]
+}

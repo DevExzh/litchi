@@ -1,0 +1,74 @@
+{
+  "change": 442,
+  "expected_status": {},
+  "required": {
+    "before-build.json": {
+      "role": "before"
+    },
+    "after-build.json": {
+      "role": "after"
+    },
+    "candidate-odp-clippy.json": {
+      "role": "after"
+    },
+    "candidate-harness-tests.json": {
+      "role": "after",
+      "tests": 368
+    },
+    "candidate-odp-doc.json": {
+      "role": "after"
+    },
+    "final-format.json": {
+      "role": "after"
+    },
+    "final-boundaries.json": {
+      "role": "after"
+    },
+    "formal-b1.json": {
+      "role": "after"
+    },
+    "formal-b2.json": {
+      "role": "after"
+    },
+    "formal-a2.json": {
+      "role": "before"
+    },
+    "before-stat.json": {
+      "role": "before"
+    },
+    "before-record.json": {
+      "role": "before"
+    },
+    "after-stat.json": {
+      "role": "after"
+    },
+    "after-record.json": {
+      "role": "after"
+    },
+    "formal-summary.json": {
+      "role": "before"
+    },
+    "profile-summary.json": {
+      "role": "after"
+    },
+    "measurements.json": {
+      "role": "after"
+    },
+    "candidate-odp-tests.json": {
+      "role": "after",
+      "tests": 355
+    },
+    "formal-a1.json": {
+      "role": "before"
+    },
+    "candidate-workspace-check.json": {
+      "role": "after"
+    },
+    "candidate-odf-features.json": {
+      "role": "after"
+    }
+  },
+  "cleanup_paths": [
+    "/tmp/litchi-goal-0442-binaries"
+  ]
+}

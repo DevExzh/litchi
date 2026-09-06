@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "exit_code": 0,
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0442/verify.py"
+  ],
+  "started_utc": "2026-09-06T17:23:17.328740+00:00",
+  "finished_utc": "2026-09-06T17:23:21.294768+00:00",
+  "verifier_sha256": "5d0d9668f0c607e0f8e8ca0d28eb659df674e8aa0b16f30b5e8d22e41984f700",
+  "log": {
+    "path": "checks/precleanup.log",
+    "bytes": 100,
+    "sha256": "6562ddba1c49841d39134ccb460ce82cdafa7c2c54f85fcfbba3e9bf633e9c09"
+  },
+  "changed_markdown_links_valid": true,
+  "source_review": "checks/final-source-review.json"
+}

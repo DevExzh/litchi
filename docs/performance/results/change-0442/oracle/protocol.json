@@ -1,0 +1,236 @@
+{
+  "protocol": "0439-odp-existing-append-lifecycle",
+  "version": 1,
+  "status": "validated-0439-baseline-contract",
+  "selector": "odp_existing_append_lifecycle",
+  "default_case_count": 36,
+  "claim_boundary": {
+    "allowed": [
+      "owned ODP edit lifecycle timing",
+      "process RSS and allocator observations for the measured region",
+      "output identity and deterministic semantic checks",
+      "an operation-scoped committed-bytes-per-second value derived from elapsed time"
+    ],
+    "forbidden": [
+      "bounded-memory claim",
+      "source-backed or zero-copy claim",
+      "physical-I/O or cold-file claim",
+      "end-to-end or physical-I/O throughput claim",
+      "cancellation claim"
+    ]
+  },
+  "matrix": {
+    "shapes": {
+      "tiny": 64,
+      "medium": 4096,
+      "large": 8192
+    },
+    "modes": ["normal", "allocator"],
+    "repeats_per_shape_and_mode": 2,
+    "samples_per_report": 30,
+    "warmups_per_report": 3,
+    "reports": 12,
+    "retained_samples": 360,
+    "cpu_repetitions": 2,
+    "large_profiles": 2
+  },
+  "fixture": {
+    "generator": "litchi-odp-existing-append-lifecycle-v1",
+    "source_name": "odp-existing-append-lifecycle-{shape}",
+    "package_format": "ODP/ODF/ZIP",
+    "slide_text_source": "the existing 0437 buffered ODP title/body fixture",
+    "title_function": "odp_buffered_title(index)",
+    "body_function": "odp_buffered_body(index)",
+    "shape_contract": "exactly one title and one body text per slide; index order is 0..source_slide_count-1",
+    "text_contract": "UTF-8 mixed Unicode/entities/plain text; one interior ASCII space; no CR, LF, tab, edge space, or repeated interior spaces",
+    "append_contract": "the new slide is exactly odp_buffered_title(source_slide_count) and odp_buffered_body(source_slide_count)",
+    "opaque_member": {
+      "path": "Opaque/litchi-perf-odp-existing-append-opaque.bin",
+      "media_type": "application/octet-stream",
+      "length": 65536,
+      "byte_formula": "for i in 0..65536, byte[i] = (i as u8).wrapping_mul(37).wrapping_add((i / 256) as u8).wrapping_add(0x5b)",
+      "acceptance": "the oracle regenerates the bytes from byte_formula and compares every byte and its SHA-256"
+    }
+  },
+  "archive_identity": {
+    "source_member_count": 6,
+    "output_member_count": 6,
+    "member_names": [
+      "mimetype",
+      "content.xml",
+      "styles.xml",
+      "meta.xml",
+      "Opaque/litchi-perf-odp-existing-append-opaque.bin",
+      "META-INF/manifest.xml"
+    ],
+    "mimetype": {
+      "must_be_first": true,
+      "compression": "stored",
+      "bytes": "application/vnd.oasis.opendocument.presentation"
+    },
+    "manifest": {
+      "entry_count": 5,
+      "full_paths": ["/", "content.xml", "styles.xml", "meta.xml", "Opaque/litchi-perf-odp-existing-append-opaque.bin"],
+      "media_types": {
+        "/": "application/vnd.oasis.opendocument.presentation",
+        "content.xml": "text/xml",
+        "styles.xml": "text/xml",
+        "meta.xml": "text/xml",
+        "Opaque/litchi-perf-odp-existing-append-opaque.bin": "application/octet-stream"
+      },
+      "checks": [
+        "manifest XML is well formed and namespace-aware",
+        "there is one manifest:file-entry for every full_path",
+        "there are no duplicate full paths",
+        "there are no extra file entries",
+        "every media type equals the value above"
+      ]
+    },
+    "styles_xml_sha256": "d9881e91085516246a19c30d9e5cde39a8b10d7e42120b135f48f5ca8afef8d2",
+    "meta_xml_sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719",
+    "untouched_members": ["mimetype", "styles.xml", "meta.xml", "Opaque/litchi-perf-odp-existing-append-opaque.bin", "META-INF/manifest.xml"],
+    "untouched_rule": "output bytes for every untouched member equal the source bytes byte-for-byte; the oracle also compares each against the independent fixture expectation",
+    "content_rule": "content.xml is validated by independent semantic readback, not by trusting a producer-reported digest",
+    "manifest_rule": "manifest identity is validated independently and the output manifest bytes must also equal the source manifest bytes"
+  },
+  "semantic_oracle": {
+    "slide_readback": [
+      "open source and output with an independent ODP reader or namespace-aware XML reader",
+      "read every slide in archive order",
+      "require source slide index i to expose the exact expected title/body for i",
+      "require output slide index i to expose the exact source title/body for i < source_count",
+      "require output slide index source_count to expose the exact append title/body",
+      "require output slide count = source_count + 1",
+      "require no title/body text outside those expected fields"
+    ],
+    "semantic_digest": {
+      "domain": "litchi-odp-buffered-semantic-v1\\0",
+      "encoding": "SHA-256 over domain, u64 little-endian slide count, and for each slide in order: u64 little-endian title byte length, title UTF-8 bytes, u64 little-endian body byte length, body UTF-8 bytes",
+      "source_expected_count": "source_slide_count",
+      "output_expected_count": "source_slide_count + 1"
+    },
+    "text_projection": {
+      "encoding": "title UTF-8 bytes, LF, body UTF-8 bytes; join slides with LF LF; no trailing separator",
+      "source_expected": "the projection of the source fixture",
+      "output_expected": "the source projection followed by LF LF and the append title/body projection"
+    },
+    "order_digest": {
+      "domain": "litchi-odp-existing-append-order-v1\\0",
+      "encoding": "SHA-256 over domain, u64 little-endian slide count, and for each slide: u64 little-endian index, title length/title bytes, body length/body bytes",
+      "purpose": "a separate order-sensitive check in addition to the semantic digest"
+    }
+  },
+  "edit_contract": {
+    "api": "litchi_odp::authoring::edit::Snapshot -> transaction() -> add(title, body) -> commit()",
+    "exactly_one_add": true,
+    "append_at_tail": true,
+    "commit_changed_gate": "if the public Commit API exposes a changed/non-noop predicate, it must be true; otherwise the independent output member, semantic, and archive identity gates must prove that one slide was appended",
+    "source_immutability": "the source archive bytes and source snapshot identity remain unchanged after every iteration",
+    "expected_output": "the independently prepared expected output archive has the same semantic identity and archive identity as every measured output"
+  },
+  "timing_contract": {
+    "outside_region": [
+      "source fixture generation and archive build",
+      "source archive hash/member/manifest/semantic oracle",
+      "per-iteration source archive Vec clone",
+      "per-iteration append title/body string construction",
+      "sink construction and reservation",
+      "expected-output construction and all diagnostics",
+      "output hash/oracle/reopen checks",
+      "commit, snapshot, transaction, and sink drops"
+    ],
+    "inside_region": [
+      "Snapshot::from_bytes",
+      "Snapshot::transaction",
+      "the one transaction.add call",
+      "transaction.commit",
+      "writing all committed snapshot bytes to the sink"
+    ],
+    "clock_rule": "start Instant immediately before Snapshot::from_bytes and stop immediately after the sink accepts the final committed byte; process and allocator end observations happen before any operation-owned value is dropped",
+    "sink_rule": "the sink receives the committed archive bytes, not a precomputed expected buffer",
+    "latency_claim": "owned open-through-commit-and-output interval; corpus setup, argument construction, endpoint observations, independent oracles, hash finalization, and destruction are excluded"
+  },
+  "report_schema": {
+    "source_role": "odp_append",
+    "implementation": "litchi_odp::authoring::edit::Snapshot::from_bytes/transaction/add/commit",
+    "required_source_fields": [
+      "role",
+      "implementation",
+      "timing_scope",
+      "performance_claim",
+      "shape",
+      "source_slide_count",
+      "output_slide_count",
+      "append_count",
+      "corpus_generator",
+      "source_archive_sha256",
+      "output_archive_sha256",
+      "source_archive_bytes",
+      "output_archive_bytes",
+      "source_content_xml_sha256",
+      "source_content_xml_bytes",
+      "output_content_xml_sha256",
+      "output_content_xml_bytes",
+      "source_semantic_sha256",
+      "output_semantic_sha256",
+      "source_order_sha256",
+      "output_order_sha256",
+      "source_text_projection_sha256",
+      "output_text_projection_sha256",
+      "source_text_projection_bytes",
+      "output_text_projection_bytes",
+      "opaque_member_path",
+      "opaque_bytes",
+      "opaque_sha256",
+      "opaque_member_compressed_bytes",
+      "opaque_member_compressed_sha256",
+      "source_members",
+      "output_members",
+      "source_member_count",
+      "output_member_count",
+      "source_manifest_bindings_verified",
+      "output_manifest_bindings_verified",
+      "untouched_members_verified",
+      "opaque_member_compressed_identity_verified",
+      "source_semantic_reopen_verified",
+      "output_semantic_reopen_verified",
+      "append_exactly_one_verified",
+      "source_unchanged_verified",
+      "patch_replay_verified",
+      "inverse_patch_verified",
+      "stale_source_refusal_verified",
+      "exact_noop_verified",
+      "runtime_output_digest_verified",
+      "runtime_sink_length_verified",
+      "lifecycle_ns",
+      "output_sha256",
+      "text_contract"
+    ],
+    "corpus_manifest_rule": "CorpusManifest identifies the source archive and source content.xml; uncompressed_payload_bytes is the canonical source title/LF/body projection length (opaque bytes are separately identified); output identity is carried by this source summary and CaseResult.output_sha256",
+    "sink_rule": "accepted_bytes and sink digest equal output archive bytes and output_archive_sha256; input_bytes equals the canonical output text projection length; authored_part_bytes equals output content.xml length",
+    "source_reads": "not applicable for this owned archive edit; do not report source-backed read counters"
+  },
+  "operation_metrics": {
+    "sample_count": 30,
+    "sample_alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+    "required_vectors": ["elapsed_ns", "sample_indices"],
+    "normal_mode": "allocator metrics may be absent or explicitly unavailable; never synthesize zero allocations",
+    "allocator_mode": "allocation_calls, deallocation_calls, reallocation_calls, failed_allocation_calls, allocated_bytes, deallocated_bytes, live_bytes_before, live_bytes_after, peak_live_bytes_before, peak_live_bytes_after, and region_peak_live_bytes are measured vectors of length 30 with the same sample indices",
+    "rss_scope": "full-process RSS observation for the documented process phase; no comparative claim",
+    "warmups": "warmups are excluded from retained vectors and reports"
+  },
+  "rejection_rules": [
+    "unknown selector or unregistered opt-in selector",
+    "missing or duplicate source slide",
+    "wrong source title/body, reordered source slide, or unexpected text",
+    "missing, extra, renamed, or altered archive member",
+    "opaque member with wrong length, bytes, or manifest media type",
+    "styles.xml, meta.xml, or mimetype changed by the edit",
+    "manifest with missing, extra, duplicate, or wrong-media-type entry",
+    "output count other than source_count + 1",
+    "append slide not exactly the prescribed tail slide",
+    "runtime sink length or digest different from the output archive",
+    "operation vectors with wrong count or misaligned sample indices",
+    "claim or field implying bounded memory, source-backed behavior, physical I/O, end-to-end throughput, or cancellation; an operation-scoped committed-bytes-per-second value is allowed when derived only from the measured elapsed interval"
+  ]
+}

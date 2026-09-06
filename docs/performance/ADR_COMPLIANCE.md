@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0442: preserve parser contracts while sharing traversal
+
+[0442](changes/0442-odp-shared-staging-traversal.md) keeps XML grammar and state in the ODP owner
+(0002/0023/0024), detached editing and exact source authority (0003), measured
+benefit and existing ownership bounds (0005), and fail-closed diagnostics,
+preservation and publication readback (0006/0008). The accepted ADR tree is
+unchanged; no public API, dependency, unsafe code, executor or ambient I/O is
+added. Test-only original parser bodies provide independent differential
+references. Lower-priority outputs can accumulate before a later higher-priority
+failure within existing finite input/model limits; invalid-input performance
+is not claimed. See [review](results/change-0442/validation-notes.md).
+
 ## Change 0441: immutable sharing with detached ODP staging
 
 [0441](changes/0441-odp-shared-preservation-projection.md) shares only the

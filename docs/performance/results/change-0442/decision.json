@@ -1,0 +1,23 @@
+{
+  "change": 442,
+  "decision": "keep",
+  "basis": "predeclared medium/large normal p50 gate in both repeats",
+  "practical_gate_met": true,
+  "normal_p50_gate": true,
+  "allocator_requested_call_or_peak_gate": false,
+  "latency_review": "Medium/large normal p50 improves 9.830\u201313.307%; tiny improves 6.923\u20137.020%. No matched adverse comparison exceeds 5%. All five repeat flags remain: four before allocator medium timing decreases and a +7.091% after normal large p99 repeat increase. Large R2 paired p99 is 172.099 to 168.196 ms (-2.268%). No general tail-speedup or instrumented-timing claim.",
+  "allocation_review": "All 60 observations per role/shape agree. Each size saves 38 calls and 11,902 requested bytes; operation peak and retained live bytes are unchanged. The practical allocation/peak gate fails.",
+  "profile_review": "Whole-process cycles/instructions decrease 10.092%/8.824%, including setup, warmups and Rust oracle work. Not operation-only causal fractions. Zero L1 values support no cache-miss claim; 13 before and 14 after addr2line warnings per conversion remain.",
+  "withheld": [
+    "material allocation benefit",
+    "peak or RSS improvement",
+    "general tail-latency improvement",
+    "bounded existing append",
+    "physical-copy counts",
+    "native visual compatibility",
+    "cold/range or scaling benefit",
+    "universal Office performance"
+  ],
+  "followup": "Inspect remaining source-fragment scanning and one-shot attribute-cache costs; preserve full non-iWork goal scope.",
+  "statistical_review": "The descriptive 2,000-resample p50 bootstrap intervals do not overlap for each matched normal pair. ABBA temporal grouping still limits causal/generalized inference; all samples and repeat flags are retained."
+}

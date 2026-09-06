@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## Change 0442: consolidate three auxiliary staging XML traversals
+
+[0442](changes/0442-odp-shared-staging-traversal.md) shares borrowed events among settings, declarations
+and page metadata. These accounted for 22.097% of the prior profile's weighted
+sampled periods under transaction, including warmups and incomplete symbols.
+Normal medium/large owned-append p50 now improves 9.830–13.307% in both repeats.
+Whole-process cycles/instructions fall 10.092%/8.824%; these include setup and
+oracle work and are not operation-only causal attribution. Peak is unchanged.
+
+Source-fragment scanning, ordinary semantic parsing and commit/publication
+readback remain separate traversals. Inspect their current measured contribution
+and one-shot attribute-cache cost before another change. General tail speedup,
+RSS, bounded existing append, cold/range and scaling remain unproven.
+
 ## Change 0441: avoid a temporary preservation-model copy
 
 [0441](changes/0441-odp-shared-preservation-projection.md) removes one deep
