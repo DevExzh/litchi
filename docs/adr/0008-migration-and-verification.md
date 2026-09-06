@@ -17304,7 +17304,9 @@ Regenerating all six focused candidate inputs produces bytes exactly equal to
 the native-verified originals. Fresh-export equality and strict native-saved
 readback both pass. The bounded lifecycle AddressSanitizer campaign passed 256 runs with no
 findings (244 MiB peak RSS); boundary verification passes 942 unit tests.
-Normal repository hooks remain pending. No host lifecycle route was retired and the ADR 0028 deletion gate is
+Implementation commit `182f31566` passed all normal repository hooks:
+formatting, manifest sorting, workspace library Clippy, all-feature
+library/integration tests, and doctests. No host lifecycle route was retired and the ADR 0028 deletion gate is
 unchanged.
 
 ## 2026-09-06 follow-up: Keynote audio lifecycle oracle pass
@@ -17332,3 +17334,8 @@ Litchi-mutated candidate and does not establish lifecycle E3/E4. At this Sep 6
 oracle snapshot the focused lifecycle owner, lazy wire codec, clone-payload
 path, and metadata adapter were still being implemented; the Sep 7 owner and
 E4 section below supersedes that pending status.
+
+The six temporary focused candidates and native-saved copies were removed
+after verification. The isolated sanitizer target was cleaned with
+`cargo clean` (2.1 GiB reclaimed); permanent audio oracle fixtures remain
+checked in.
