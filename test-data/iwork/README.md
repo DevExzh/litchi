@@ -577,8 +577,9 @@ dependency declarations, and 11 explicit debt items.
 Keynote removes two selector-first host wrappers for chart arrangement. These
 were semantic wrappers rather than raw-ID methods; the internal read-batch,
 listing, and lifecycle helpers remain. The dead handoff writer is removed.
-Pages and Numbers chart-arrangement ownership remains host-owned. The focused
-CLI retains its enhanced no-clobber and forward-conflict behavior.
+The broader Pages and Numbers chart-arrangement graph and lifecycle remain
+host-owned; focused flag ownership is recorded in the follow-up below. The
+focused CLI retains its enhanced no-clobber and forward-conflict behavior.
 
 Selected-graph discovery, codec work, rewrite, and locality validation charge
 against one shared resource ledger. Graph allocations have a separate finite
@@ -609,3 +610,79 @@ targeted tests. The host arrangement/CRUD suite passes 6/6, including the
 private actual-candidate verification passed exact-work and one-under replays.
 Boundary verification passes 922 tests; the scanner passes with 64 packages,
 238 internal dependency declarations, and 11 explicit debt items.
+
+## Focused Numbers and Pages chart-arrangement owners (2026-09-06)
+
+The focused Numbers and Pages packages now share the archive-free
+`ChartArrangement` value for the two existing Arrange-panel controls: chart
+lock and aspect-ratio constraint. Numbers resolves a `SheetSelector` plus
+`ChartSelector`; Pages resolves a semantic `BodyChartSelector`. Both owners
+keep native identifiers and graph payloads private, use the strict preflight
+and neutral lazy Buffa [`chart_arrangement_codec`](../../crates/litchi-iwa-protos/src/chart_arrangement_codec.rs),
+and bound source-preserving no-op, inverse, candidate-reopen, and locality
+checks with their format-specific budgets. The neutral codec's nine focused
+tests pass. Broader chart data, geometry, lifecycle, and host graph behavior
+remain outside these bounded owners; package ingress remains separately
+bounded, and these owner budgets do not cover every semantic constructor
+allocation. No exit-gate or host-debt claim follows.
+
+Computer Use verified the native Numbers baseline
+[`numbers/chart-arrangement-native.numbers`](numbers/chart-arrangement-native.numbers)
+in Numbers 14.4 after authoring, saving, closing, and exact-path reopening
+without repair. It is 128,644 bytes with SHA-256
+`54b74c114e05884aa68fc028fb033d0b8562d7646faa0fdc6d280ba97f2055a9` and has
+title `Numbers Arrange native chart`; `Sheet 1`/`Table 1` is a 3-by-5 chart
+with rows `North`/`South`, columns April through July, and values
+`[[17, 26, 53, 96], [55, 43, 70, 58]]`. Both flags are false and the package
+has no data assets. This is native baseline evidence only; it does not promote
+changed Numbers mutation acceptance.
+
+The focused Numbers candidate set both flags true. Numbers 14.4 opened it
+without repair showing `Locked`, `Constrain proportions=1`, and an enabled
+Unlock control. Root clicked native Unlock, verified `Constrain proportions=1`
+in Arrange, clicked Lock, saved with Cmd-S, closed the actual window, and
+reopened the exact disk path. All 15 table cells and all eight chart values,
+the unchanged title, `Locked=true`, `Constrain proportions=true`, and the
+enabled Unlock control were preserved before the document was closed. The
+checked-in resaved fixture is
+[`numbers/chart-arrangement-retirement-resaved.numbers`](numbers/chart-arrangement-retirement-resaved.numbers)
+with 128,604 bytes and SHA-256
+`0c7a58e7c81d5f7994eac004c572cb2a6665381b4ecde8abb3b5869194a1575a`.
+Native auto-parsed month headers carried Apple-second values
+`[796694400, 799286400, 801964800, 804556800]` and displayed April through
+July. The standalone native test oracle verifies those exact dates after editing,
+reopening, reset, and exact inverse restoration.
+
+Computer Use also verified the Pages baseline
+[`pages/chart-arrangement-native.pages`](pages/chart-arrangement-native.pages)
+in Pages 14.4 from a Blank word-processing document after saving, closing, and
+reopening the exact path without repair. It is 118,207 bytes with SHA-256
+`dccfa28a337babf786bed9433805311843184b0c8d7f3161d8795fe0047faf42` and has
+body marker `Pages Arrange native body marker` followed by the native U+FFFC
+chart anchor. The chart title is `Pages Arrange native chart`, with the
+default 2D Column layout, rows `Region 1`/`Region 2`, columns April through
+July, and values `[[17, 26, 53, 96], [55, 43, 70, 58]]`; `Move with Text` is
+`1` and `Constrain proportions` is `0`. Both Lock and Unlock controls were
+disabled for this text-anchored chart, and the package has no data assets.
+This is native baseline evidence only: the both-true changed-candidate gate
+has now been exercised for the focused Pages operation, while interactive Lock
+button parity remains unclaimed.
+
+The focused Pages candidate set both flags true while retaining `Move with
+Text=1`. Pages opened it without repair with all eight values unchanged. Root
+inserted `Native saved: ` into the body to force a dirty document; Cmd-S, the
+actual close button, and exact-path disk reopen preserved that prefix, the body
+U+FFFC anchor, title, grid, `Locked=true`, and `Constrain proportions=true`.
+The checked-in resaved fixture is
+[`pages/chart-arrangement-retirement-resaved.pages`](pages/chart-arrangement-retirement-resaved.pages)
+with 119,482 bytes and SHA-256
+`5b8d18a8b02bb6471da1fc20d02139f8d18ebe44e421f8fd8b17e841efb76986`.
+Both Lock and Unlock buttons remained unavailable for the body anchor, while
+the persisted Locked state was respected because all chart edit controls were
+disabled; this is persisted-state evidence, not interactive button parity.
+Focused integration coverage passes 25 tests: Numbers has 7 synthetic and 4
+native tests, while Pages has 10 synthetic and 4 native tests. Both native
+resaved fixtures, strict Date headers, body/U+FFFC/grid preservation, and
+metadata-ownership regressions are included. The Pages private ZIP-mask unit
+passes 1 test. The Keynote shared-rename regression set passes 22 tests;
+boundary verification passes 927 tests.

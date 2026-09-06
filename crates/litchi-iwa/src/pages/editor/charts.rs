@@ -75,9 +75,7 @@ use crate::charts::source::{
     single_message_index, source_chart_objects, unregister_chart_styles,
     validate_chart_styles_registered,
 };
-use crate::charts::{
-    ChartArrangement, ChartData, Direction, DirectionKind, IWorkChartArchive, Kind,
-};
+use crate::charts::{ChartData, Direction, DirectionKind, IWorkChartArchive, Kind};
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,
 };
@@ -86,6 +84,7 @@ use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry,
     remove_orphaned_image_asset,
 };
+use litchi_iwa_common::chart::arrangement::ChartArrangement;
 
 const PAGES_THEME_MESSAGE_TYPE: u32 = 10_001;
 
@@ -243,7 +242,12 @@ impl PagesEditor {
             &archive_name,
             &ids.style_ids(),
         )?;
-        let created = body_chart_graph(&verified, ids.drawable)?;
+        let mut created = body_chart_graph(&verified, ids.drawable)?;
+        created.info.arrangement = arrangement::focused_chart_arrangement_at(
+            &verified,
+            created.chart_count,
+            created.chart_position,
+        )?;
         let mut expected_object_ids = chart_object_ids;
         expected_object_ids.push(attachment_id);
         let expected_anchor = u32::try_from(anchor_character_index)
@@ -545,7 +549,12 @@ impl PagesEditor {
                 )?;
             }
         }
-        let created = body_chart_graph(&verified, new_drawable_id)?;
+        let mut created = body_chart_graph(&verified, new_drawable_id)?;
+        created.info.arrangement = arrangement::focused_chart_arrangement_at(
+            &verified,
+            created.chart_count,
+            created.chart_position,
+        )?;
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".into()))?;
         let expected_object_ids = source
@@ -577,7 +586,12 @@ impl PagesEditor {
     /// Remove a body chart, its attachment, and any crate-owned private styles.
     #[allow(deprecated)]
     pub fn remove_body_chart(&mut self, drawable_object_id: u64) -> Result<RemovedPagesBodyChart> {
-        let source = body_chart_graph(self, drawable_object_id)?;
+        let mut source = body_chart_graph(self, drawable_object_id)?;
+        source.info.arrangement = arrangement::focused_chart_arrangement_at(
+            self,
+            source.chart_count,
+            source.chart_position,
+        )?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,

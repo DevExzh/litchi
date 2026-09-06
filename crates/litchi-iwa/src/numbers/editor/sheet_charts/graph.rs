@@ -305,10 +305,10 @@ pub(super) fn chart_graph(
             ),
             data: chart_data("Numbers", drawable_object_id, payload)?,
             geometry: drawable_geometry("Numbers", drawable_object_id, drawable)?,
-            arrangement: ChartArrangement::new(
-                drawable.locked.unwrap_or(false),
-                drawable.aspect_ratio_locked.unwrap_or(false),
-            ),
+            // Chart Arrange values are owned by the focused Numbers package.
+            // Callers that publish a listing or return a lifecycle result
+            // fill this field through the private semantic-position helpers.
+            arrangement: ChartArrangement::default(),
         },
         object_ids,
         uuid_object_ids,

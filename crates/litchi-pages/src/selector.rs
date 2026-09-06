@@ -233,6 +233,63 @@ pub enum ImageSelector {
     Index(Position),
 }
 
+/// Selects one chart anchored in the rooted Pages body by its zero-based
+/// source order.
+///
+/// Native attachment, drawable, and archive identities are deliberately not
+/// representable here. The package owner proves those private graph edges
+/// after resolving this semantic selector.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "The selector name identifies the Pages body-chart domain."
+)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BodyChartSelector {
+    /// Select the chart at this zero-based body source position.
+    Index(Position),
+}
+
+impl BodyChartSelector {
+    /// Create a selector from a zero-based body-chart index.
+    #[must_use]
+    pub const fn index(index: usize) -> Self {
+        Self::Index(Position::new(index))
+    }
+
+    /// Create a selector from a typed zero-based body-chart position.
+    #[must_use]
+    pub const fn position(position: Position) -> Self {
+        Self::Index(position)
+    }
+
+    /// Return the selected typed body-chart position.
+    #[must_use]
+    pub const fn as_position(self) -> Position {
+        match self {
+            Self::Index(position) => position,
+        }
+    }
+
+    /// Return the selected zero-based body-chart index.
+    #[must_use]
+    pub const fn as_index(self) -> usize {
+        self.as_position().get()
+    }
+}
+
+impl From<usize> for BodyChartSelector {
+    fn from(index: usize) -> Self {
+        Self::index(index)
+    }
+}
+
+impl From<Position> for BodyChartSelector {
+    fn from(position: Position) -> Self {
+        Self::position(position)
+    }
+}
+
 impl ImageSelector {
     /// Create a selector from a zero-based body-image index.
     #[must_use]
@@ -334,5 +391,15 @@ mod tests {
         assert_eq!(from_index, from_position);
         assert_eq!(from_index.as_index(), 3);
         assert_eq!(from_index.as_position(), Position::new(3));
+    }
+
+    #[test]
+    fn body_chart_selector_is_typed_and_source_ordered() {
+        let from_index = BodyChartSelector::index(4);
+        let from_position = BodyChartSelector::from(Position::new(4));
+
+        assert_eq!(from_index, from_position);
+        assert_eq!(from_index.as_index(), 4);
+        assert_eq!(from_index.as_position(), Position::new(4));
     }
 }

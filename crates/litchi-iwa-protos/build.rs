@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_chart_caption_graph_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_title_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_legend_codec.rs");
-    println!("cargo:rerun-if-changed=src/keynote_chart_arrangement_codec.rs");
+    println!("cargo:rerun-if-changed=src/chart_arrangement_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_title_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_value_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
@@ -163,10 +163,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         proto_directory,
         buffa_projection_directory,
     )?;
-    enforce_keynote_chart_arrangement_projection_provenance(
-        proto_directory,
-        buffa_projection_directory,
-    )?;
+    enforce_chart_arrangement_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_chart_axis_title_projection_provenance(
         proto_directory,
         buffa_projection_directory,
@@ -532,17 +529,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile()?;
     enforce_keynote_chart_legend_projection_budget(&buffa_keynote_chart_legend_out_directory)?;
 
-    // Keynote chart-arrangement reads need only the chart drawable `super`
+    // Chart-arrangement reads need only the chart drawable `super`
     // envelope and the two lock controls inherited from DrawableArchive.
     // Keep every unrelated drawable field caller-owned for strict validation
     // and source-preserving rewrites.
-    let buffa_keynote_chart_arrangement_out_directory =
-        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-chart-arrangement");
+    let buffa_chart_arrangement_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-chart-arrangement");
     buffa_build::Config::new()
         .files(&[buffa_projection_directory.join("TSCHChartArrangementArchive.proto")])
         .includes(&[buffa_projection_directory])
-        .out_dir(&buffa_keynote_chart_arrangement_out_directory)
-        .include_file("iwa_keynote_chart_arrangement_buffa_protos.rs")
+        .out_dir(&buffa_chart_arrangement_out_directory)
+        .include_file("iwa_chart_arrangement_buffa_protos.rs")
         .generate_views(true)
         .lazy_views(true)
         .preserve_unknown_fields(false)
@@ -551,9 +548,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .reflect_mode(buffa_build::ReflectMode::Off)
         .idiomatic_field_names(true)
         .compile()?;
-    enforce_keynote_chart_arrangement_projection_budget(
-        &buffa_keynote_chart_arrangement_out_directory,
-    )?;
+    enforce_chart_arrangement_projection_budget(&buffa_chart_arrangement_out_directory)?;
 
     // Keynote chart-axis-title reads need only the four scalar fields from
     // the generated ChartAxisNonStyleArchive extension. Keep the outer
@@ -1506,8 +1501,8 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
         ),
         (
             "TSCHChartArrangementArchive.proto",
-            521,
-            "e20460a5645f68e5f37fd857768e328799c9e5136bb1f16b0c9585def4fad1d3",
+            526,
+            "bd6f3bb383ae48ab1884fc3559f003915ade36063b07bba71cb1125519da76b4",
         ),
         (
             "TSCHChartAxisTitleArchive.proto",
@@ -1779,9 +1774,9 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_keynote_chart_legend_generated {",
         ),
         (
-            "src/keynote_chart_arrangement_codec.rs",
-            "crate::buffa_keynote_chart_arrangement_generated::",
-            "mod buffa_keynote_chart_arrangement_generated {",
+            "src/chart_arrangement_codec.rs",
+            "crate::buffa_chart_arrangement_generated::",
+            "mod buffa_chart_arrangement_generated {",
         ),
         (
             "src/keynote_chart_axis_title_codec.rs",
@@ -3590,7 +3585,7 @@ optional bool tschchartinfodefaultshowlegend = 20;\n\
     Ok(())
 }
 
-fn enforce_keynote_chart_arrangement_projection_provenance(
+fn enforce_chart_arrangement_projection_provenance(
     proto_directory: &Path,
     projection_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
@@ -3627,15 +3622,15 @@ optional .LitchiIwaProjection.DrawableArchive super = 1;\n\
         "decode_lazy_view(source)",
     ];
     const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
-        "#[doc(hidden)]\nmod buffa_keynote_chart_arrangement_generated {",
-        "/buffa-keynote-chart-arrangement/iwa_keynote_chart_arrangement_buffa_protos.rs",
+        "#[doc(hidden)]\nmod buffa_chart_arrangement_generated {",
+        "/buffa-chart-arrangement/iwa_chart_arrangement_buffa_protos.rs",
     ];
 
     let tsch = fs::read_to_string(proto_directory.join("TSCHArchives.proto"))?;
     let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
     let projection =
         fs::read_to_string(projection_directory.join("TSCHChartArrangementArchive.proto"))?;
-    let codec = fs::read_to_string("src/keynote_chart_arrangement_codec.rs")?;
+    let codec = fs::read_to_string("src/chart_arrangement_codec.rs")?;
     let production_codec = production_codec_source(&codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     let normalize = |source: &str| {
@@ -3669,7 +3664,7 @@ optional .LitchiIwaProjection.DrawableArchive super = 1;\n\
         || production_codec.contains("IWorkPackage")
     {
         return Err(
-            "derived Keynote chart-arrangement projection/router drifted from TSCH.ChartDrawableArchive.super and TSD.DrawableArchive fields 5/7, exposed generated ownership, or introduced production encoding".into(),
+            "derived chart-arrangement projection/router drifted from TSCH.ChartDrawableArchive.super and TSD.DrawableArchive fields 5/7, exposed generated ownership, or introduced production encoding".into(),
         );
     }
     Ok(())
@@ -9292,9 +9287,7 @@ fn enforce_keynote_chart_legend_projection_budget(directory: &Path) -> Result<()
     Ok(())
 }
 
-fn enforce_keynote_chart_arrangement_projection_budget(
-    directory: &Path,
-) -> Result<(), Box<dyn Error>> {
+fn enforce_chart_arrangement_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
     // The arrangement projection contains one nested message and two scalar
     // controls. Keep the generated shape small and free of repeated storage;
     // all unrelated drawable bytes stay in the strict source router.
@@ -9326,7 +9319,7 @@ fn enforce_keynote_chart_arrangement_projection_budget(
     if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
     {
         return Err(format!(
-            "Keynote chart-arrangement projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+            "chart-arrangement projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

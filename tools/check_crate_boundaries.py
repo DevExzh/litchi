@@ -477,10 +477,12 @@ IWA_KEYNOTE_CHART_LEGEND_LEGACY_CALL = re.compile(
 )
 
 # Wave121 moves the Keynote chart Arrange-panel state behind the focused
-# package owner.  Keep this seam separate from the shared chart arrangement
-# implementation used by Pages and Numbers: those formats still legitimately
-# use the legacy host adapter while Keynote's migration is staged.
+# package owner.  Pages and Numbers have their own focused owners as well, so
+# the former shared litchi-iwa host shell is retired across all three formats.
 KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
+KEYNOTE_CHART_ARRANGEMENT_COMMON_SOURCE = Path(
+    "crates/litchi-iwa-common/src/chart/arrangement.rs"
+)
 KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE = (
     KEYNOTE_SOURCE_ROOT / "package" / "slide_chart_arrangement.rs"
 )
@@ -523,6 +525,9 @@ KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES = frozenset(
     }
 )
 KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_TYPES = frozenset({"ChartArrangement"})
+KEYNOTE_CHART_ARRANGEMENT_COMMON_METHODS = frozenset(
+    {"new", "locked", "constrain_proportions", "with_locked", "with_constrain_proportions"}
+)
 KEYNOTE_CHART_ARRANGEMENT_SELECTOR_TYPES = frozenset(
     {"ChartSelector", "SlideSelector"}
 )
@@ -662,20 +667,49 @@ KEYNOTE_CHART_ARRANGEMENT_HOST_WIRE_PATH = re.compile(
 KEYNOTE_CHART_ARRANGEMENT_MONOLITH_PATH = re.compile(
     r"\b(?:crate|super|litchi_iwa)\s*::\s*charts\b"
 )
+RETIRED_IWA_SHARED_CHART_ARRANGEMENT_SOURCE = Path(
+    "crates/litchi-iwa/src/charts/arrangement.rs"
+)
+RETIRED_IWA_SHARED_CHART_ARRANGEMENT_MODULE_SOURCE = Path(
+    "crates/litchi-iwa/src/charts/mod.rs"
+)
+RETIRED_IWA_SHARED_CHART_ARRANGEMENT_MODULE = "arrangement"
+RETIRED_IWA_SHARED_CHART_ARRANGEMENT_HELPERS = (
+    "chart_arrangement",
+    "set_chart_arrangement",
+)
+RETIRED_IWA_NUMBERS_CHART_ARRANGEMENT_HOST_ROOT = Path(
+    "crates/litchi-iwa/src/numbers/editor"
+)
+RETIRED_IWA_NUMBERS_CHART_ARRANGEMENT_HOST_METHODS = (
+    "sheet_chart_arrangement",
+    "set_sheet_chart_arrangement",
+)
+RETIRED_IWA_PAGES_CHART_ARRANGEMENT_HOST_ROOT = Path(
+    "crates/litchi-iwa/src/pages/editor"
+)
+RETIRED_IWA_PAGES_CHART_ARRANGEMENT_HOST_METHODS = (
+    "body_chart_arrangement",
+    "set_body_chart_arrangement",
+)
 IWA_KEYNOTE_CHART_ARRANGEMENT_SOURCE = (
     IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_charts" / "arrangement.rs"
 )
-KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE = Path(
+CHART_ARRANGEMENT_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/chart_arrangement_codec.rs"
+)
+RETIRED_KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/keynote_chart_arrangement_codec.rs"
 )
-KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE = Path(
+RETIRED_KEYNOTE_CHART_ARRANGEMENT_CODEC_MODULE = "keynote_chart_arrangement_codec"
+CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/lib.rs"
 )
-KEYNOTE_CHART_ARRANGEMENT_CODEC_MODULE = "keynote_chart_arrangement_codec"
-KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE = (
-    "buffa_keynote_chart_arrangement_generated"
+CHART_ARRANGEMENT_CODEC_MODULE = "chart_arrangement_codec"
+CHART_ARRANGEMENT_CODEC_GENERATED_MODULE = (
+    "buffa_chart_arrangement_generated"
 )
-KEYNOTE_CHART_ARRANGEMENT_CODEC_REQUIRED_APIS = (
+CHART_ARRANGEMENT_CODEC_REQUIRED_APIS = (
     "DecodeError",
     "DecodeOptions",
     "ChartArrangementSnapshot",
@@ -690,9 +724,9 @@ KEYNOTE_CHART_ARRANGEMENT_CODEC_REQUIRED_APIS = (
     "RewriteExecutionRequirements",
     "RewriteExecutionLimits",
 )
-KEYNOTE_CHART_ARRANGEMENT_CODEC_REQUIRED_MARKER_GROUPS = {
+CHART_ARRANGEMENT_CODEC_REQUIRED_MARKER_GROUPS = {
     "lazy Buffa projection": (
-        KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE,
+        CHART_ARRANGEMENT_CODEC_GENERATED_MODULE,
         ("decode_lazy_view", "decode_view"),
         "buffa",
     ),
@@ -709,12 +743,12 @@ KEYNOTE_CHART_ARRANGEMENT_CODEC_REQUIRED_MARKER_GROUPS = {
     ),
     "arrangement fields": ("locked", "aspect_ratio", "constrain_proportions"),
 }
-KEYNOTE_CHART_ARRANGEMENT_CODEC_HIDDEN_MODULE = re.compile(
+CHART_ARRANGEMENT_CODEC_HIDDEN_MODULE = re.compile(
     rf"(?m)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
-    rf"pub\s+mod\s+{re.escape(KEYNOTE_CHART_ARRANGEMENT_CODEC_MODULE)}\b"
+    rf"pub\s+mod\s+{re.escape(CHART_ARRANGEMENT_CODEC_MODULE)}\b"
 )
-KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_GENERATED_MODULE = re.compile(
-    rf"(?m)^\s*pub\s+mod\s+{re.escape(KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE)}\b"
+CHART_ARRANGEMENT_CODEC_PUBLIC_GENERATED_MODULE = re.compile(
+    rf"(?m)^\s*pub\s+mod\s+{re.escape(CHART_ARRANGEMENT_CODEC_GENERATED_MODULE)}\b"
 )
 
 KEYNOTE_CHART_CAPTION_LEGACY_CALL = re.compile(
@@ -10738,6 +10772,29 @@ IWA_NUMBERS_BORROWED_ARCHIVE_PARSE = re.compile(
 )
 NUMBERS_SOURCE_ROOT = Path("crates/litchi-numbers/src")
 NUMBERS_PACKAGE_SOURCE = NUMBERS_SOURCE_ROOT / "package.rs"
+NUMBERS_CHART_ARRANGEMENT_OWNER_SOURCE = (
+    NUMBERS_SOURCE_ROOT / "package" / "chart_arrangement.rs"
+)
+NUMBERS_CHART_ARRANGEMENT_PACKAGE_MODULE = "chart_arrangement"
+NUMBERS_CHART_ARRANGEMENT_PACKAGE_METHODS = (
+    "sheet_chart_arrangement",
+    "sheet_chart_arrangements",
+    "edit_sheet_chart_arrangement",
+    "apply_sheet_chart_arrangement",
+)
+NUMBERS_CHART_ARRANGEMENT_SELECTOR_TYPES = ("SheetSelector", "ChartSelector")
+NUMBERS_CHART_ARRANGEMENT_OWNER_MARKERS = (
+    "select_chart_with_budget",
+    "resolve_sheet_position",
+    "verify_locality",
+)
+NUMBERS_CHART_ARRANGEMENT_LAZY_CODEC_MARKERS = (
+    "chart_arrangement_codec",
+    "decode_chart_arrangement_with_report",
+    "prepare_chart_arrangement_rewrite",
+    "execution_requirements",
+    "execute",
+)
 NUMBERS_INDEX_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "index.rs"
 NUMBERS_CORE_ARCHIVE_SOURCE = Path("crates/litchi-iwa-core/src/archive.rs")
 NUMBERS_PACKAGE_MANIFEST = Path("crates/litchi-numbers/Cargo.toml")
@@ -12920,6 +12977,29 @@ PAGES_DOCUMENT_PUBLIC_MARKERS = frozenset(
     }
 )
 PAGES_PACKAGE_SOURCE = PAGES_SOURCE_ROOT / "package.rs"
+PAGES_BODY_CHART_ARRANGEMENT_OWNER_SOURCE = (
+    PAGES_SOURCE_ROOT / "package" / "body_chart_arrangement.rs"
+)
+PAGES_BODY_CHART_ARRANGEMENT_PACKAGE_MODULE = "body_chart_arrangement"
+PAGES_BODY_CHART_ARRANGEMENT_PACKAGE_METHODS = (
+    "body_chart_arrangement",
+    "body_chart_arrangements",
+    "edit_body_chart_arrangement",
+    "apply_body_chart_arrangement",
+)
+PAGES_BODY_CHART_ARRANGEMENT_SELECTOR_TYPES = ("BodyChartSelector",)
+PAGES_BODY_CHART_ARRANGEMENT_OWNER_MARKERS = (
+    "resolve_target",
+    "resolve_targets",
+    "verify_locality",
+)
+PAGES_BODY_CHART_ARRANGEMENT_LAZY_CODEC_MARKERS = (
+    "chart_arrangement_codec",
+    "decode_chart_arrangement_with_report",
+    "prepare_chart_arrangement_rewrite",
+    "execution_requirements",
+    "execute",
+)
 PAGES_PACKAGE_MANIFEST = Path("crates/litchi-pages/Cargo.toml")
 # Pages body discovery is a hot path in the retained compatibility host.  Its
 # source payload is now projected by the focused package, so keep this
@@ -46973,30 +47053,65 @@ def _keynote_chart_arrangement_owner_present(root: Path) -> bool:
     ) is not None
 
 
-def _keynote_chart_arrangement_check_codec(root: Path) -> list[str]:
-    """Require a private, Buffa-backed chart-arrangement codec boundary."""
+def _chart_arrangement_all_owners_present(root: Path) -> bool:
+    """Return whether Keynote, Numbers, and Pages owners are all wired."""
 
-    codec_path = root / KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE
-    public_path = root / KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE
+    if not _keynote_chart_arrangement_owner_present(root):
+        return False
+    for owner_path, package_path, module_name in (
+        (
+            NUMBERS_CHART_ARRANGEMENT_OWNER_SOURCE,
+            NUMBERS_PACKAGE_SOURCE,
+            NUMBERS_CHART_ARRANGEMENT_PACKAGE_MODULE,
+        ),
+        (
+            PAGES_BODY_CHART_ARRANGEMENT_OWNER_SOURCE,
+            PAGES_PACKAGE_SOURCE,
+            PAGES_BODY_CHART_ARRANGEMENT_PACKAGE_MODULE,
+        ),
+    ):
+        package = root / package_path
+        if not (root / owner_path).is_file() or not package.is_file():
+            return False
+        source = _mask_rust_cfg_test_items(package.read_text(encoding="utf-8"))
+        if not _rust_root_level_module_declarations(
+            source,
+            frozenset({module_name}),
+        ):
+            return False
+    return True
+
+
+def _chart_arrangement_check_codec(root: Path) -> list[str]:
+    """Require the neutral private, Buffa-backed chart-arrangement boundary."""
+
+    codec_path = root / CHART_ARRANGEMENT_CODEC_SOURCE
+    retired_codec_path = root / RETIRED_KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE
+    public_path = root / CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE
     violations: list[str] = []
+    if retired_codec_path.is_file():
+        violations.append(
+            "retired Keynote-specific chart-arrangement codec source must remain "
+            f"deleted: {RETIRED_KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+        )
     if not codec_path.is_file():
         return [
-            "focused litchi-keynote chart-arrangement codec source is missing: "
-            f"{KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+            "neutral chart-arrangement codec source is missing: "
+            f"{CHART_ARRANGEMENT_CODEC_SOURCE}"
         ]
 
     raw_codec = codec_path.read_text(encoding="utf-8")
     codec = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_codec))
     codec_attributes = _mask_rust_non_code(raw_codec)
 
-    for api in KEYNOTE_CHART_ARRANGEMENT_CODEC_REQUIRED_APIS:
+    for api in CHART_ARRANGEMENT_CODEC_REQUIRED_APIS:
         if re.search(
             rf"\b(?:pub\s+)?(?:fn|struct|enum|type)\s+{re.escape(api)}\b",
             codec,
         ) is None:
             violations.append(
-                "focused litchi-keynote chart-arrangement codec is missing strict API "
-                f"{api}: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+                "neutral chart-arrangement codec is missing strict API "
+                f"{api}: {CHART_ARRANGEMENT_CODEC_SOURCE}"
             )
 
     def has_marker(marker: str | tuple[str, ...]) -> bool:
@@ -47004,105 +47119,447 @@ def _keynote_chart_arrangement_check_codec(root: Path) -> list[str]:
             return any(has_marker(item) for item in marker)
         return marker in codec
 
-    for label, markers in KEYNOTE_CHART_ARRANGEMENT_CODEC_REQUIRED_MARKER_GROUPS.items():
+    for label, markers in CHART_ARRANGEMENT_CODEC_REQUIRED_MARKER_GROUPS.items():
         if not all(has_marker(marker) for marker in markers):
             violations.append(
-                "focused litchi-keynote chart-arrangement codec is missing "
-                f"{label} marker: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+                "neutral chart-arrangement codec is missing "
+                f"{label} marker: {CHART_ARRANGEMENT_CODEC_SOURCE}"
             )
 
     if re.search(r"\b(?:prost|prost_types)\b", codec) is not None:
         violations.append(
-            "focused litchi-keynote chart-arrangement codec must use Buffa rather "
-            f"than Prost: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+            "neutral chart-arrangement codec must use Buffa rather "
+            f"than Prost: {CHART_ARRANGEMENT_CODEC_SOURCE}"
         )
     for declaration, line_number in _rust_public_declarations(codec):
         if re.search(
-            rf"\b{re.escape(KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE)}\b"
+            rf"\b{re.escape(CHART_ARRANGEMENT_CODEC_GENERATED_MODULE)}\b"
             r"|\bprojection\s*::",
             declaration,
         ):
             violations.append(
-                "focused litchi-keynote chart-arrangement codec must not expose Buffa "
-                f"generated types: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}:{line_number}"
+                "neutral chart-arrangement codec must not expose Buffa "
+                f"generated types: {CHART_ARRANGEMENT_CODEC_SOURCE}:{line_number}"
             )
     if _rust_root_generated_public_leaks(
         codec,
-        frozenset({KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}),
+        frozenset({CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}),
     ):
         violations.append(
-            "focused litchi-keynote chart-arrangement codec must not expose Buffa "
-            f"generated aliases: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+            "neutral chart-arrangement codec must not expose Buffa "
+            f"generated aliases: {CHART_ARRANGEMENT_CODEC_SOURCE}"
         )
 
     if not public_path.is_file():
         violations.append(
-            "focused litchi-keynote chart-arrangement codec public module source is "
-            f"missing: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
+            "neutral chart-arrangement codec public module source is "
+            f"missing: {CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
         )
         return sorted(set(violations))
 
     raw_public = public_path.read_text(encoding="utf-8")
     public = _mask_rust_cfg_test_items(raw_public)
     public_code = _mask_rust_non_code(public)
-    if not _rust_root_level_matches(public, KEYNOTE_CHART_ARRANGEMENT_CODEC_HIDDEN_MODULE):
+    if not _rust_root_level_matches(public, CHART_ARRANGEMENT_CODEC_HIDDEN_MODULE):
         violations.append(
-            "focused litchi-keynote chart-arrangement codec module must be hidden: "
-            f"{KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
+            "neutral chart-arrangement codec module must be hidden: "
+            f"{CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
+        )
+    retired_module_declarations = _rust_root_level_module_declarations(
+        public,
+        frozenset({RETIRED_KEYNOTE_CHART_ARRANGEMENT_CODEC_MODULE}),
+    )
+    for _, _, _, _, line_number in retired_module_declarations:
+        violations.append(
+            "retired Keynote-specific chart-arrangement codec module must remain "
+            f"deleted: {CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}:{line_number}"
         )
     generated_declarations = _rust_root_level_module_declarations(
         public,
-        frozenset({KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}),
+        frozenset({CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}),
     )
     if not generated_declarations:
         violations.append(
-            "focused litchi-keynote chart-arrangement codec is missing its private "
-            f"Buffa generated module: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
+            "neutral chart-arrangement codec is missing its private "
+            f"Buffa generated module: {CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
         )
     for module, visibility, shape, body, line_number in generated_declarations:
         if visibility is not None:
             violations.append(
-                "focused litchi-keynote chart-arrangement codec generated module must "
-                f"remain private: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}:{line_number}"
+                "neutral chart-arrangement codec generated module must "
+                f"remain private: {CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}:{line_number}"
             )
         if shape == "invalid" or (
             shape == "inline" and not _rust_generated_module_include_is_valid(body)
         ):
             violations.append(
-                "focused litchi-keynote chart-arrangement codec generated module has "
-                f"invalid include shape: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}:{line_number}"
+                "neutral chart-arrangement codec generated module has "
+                f"invalid include shape: {CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}:{line_number}"
             )
     if _rust_root_generated_public_leaks(
         public,
-        frozenset({KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}),
+        frozenset({CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}),
     ):
         violations.append(
-            "focused litchi-keynote chart-arrangement codec must not re-export Buffa "
-            f"generated types: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
+            "neutral chart-arrangement codec must not re-export Buffa "
+            f"generated types: {CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
         )
     if re.search(
         r"(?m)#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]", codec_attributes
     ) is None:
         violations.append(
-            "focused litchi-keynote chart-arrangement codec is missing cfg(test) "
-            f"coverage: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+            "neutral chart-arrangement codec is missing cfg(test) "
+            f"coverage: {CHART_ARRANGEMENT_CODEC_SOURCE}"
         )
     elif re.search(r"(?m)#\s*\[\s*test\s*\]", codec_attributes) is None:
         violations.append(
-            "focused litchi-keynote chart-arrangement codec is missing #[test] "
-            f"coverage: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+            "neutral chart-arrangement codec is missing #[test] "
+            f"coverage: {CHART_ARRANGEMENT_CODEC_SOURCE}"
         )
     return sorted(set(violations))
 
 
-def audit_keynote_chart_arrangement_codec_source_topology(
+def audit_chart_arrangement_codec_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Require the focused chart-arrangement codec and private Buffa view."""
+    """Require the neutral chart-arrangement codec and private Buffa view."""
 
-    if not _keynote_chart_arrangement_owner_present(root):
+    if not _chart_arrangement_all_owners_present(root):
         return []
-    return _keynote_chart_arrangement_check_codec(root)
+    return _chart_arrangement_check_codec(root)
+
+
+def _audit_focused_chart_arrangement_owner_source_topology(
+    root: Path,
+    *,
+    label: str,
+    owner_source: Path,
+    package_source: Path,
+    public_source: Path,
+    module_name: str,
+    methods: tuple[str, ...],
+    selector_types: dict[str, tuple[str, ...]],
+    method_markers: dict[str, tuple[str, ...]],
+    owner_markers: tuple[str, ...],
+    lazy_codec_markers: tuple[str, ...],
+    canonical_types: tuple[str, ...],
+) -> list[str]:
+    """Audit one focused chart-arrangement package owner.
+
+    The ratchet is deliberately limited to the public package seam and a few
+    stable ownership markers.  Native graph identifiers and wire helpers may
+    occur in the private implementation, but the selector-first methods must
+    admit semantic selectors, route through bounded discovery, and verify the
+    selected candidate locally before publication.
+    """
+
+    owner_path = root / owner_source
+    package_path = root / package_source
+    public_path = root / public_source
+    violations: list[str] = []
+    if not owner_path.is_file():
+        return [
+            f"focused {label} owner source is missing: {owner_source}"
+        ]
+    if not package_path.is_file():
+        violations.append(
+            f"focused {label} package source is missing: {package_source}"
+        )
+    if not public_path.is_file():
+        violations.append(
+            f"focused {label} crate export source is missing: {public_source}"
+        )
+
+    owner_source_text = _mask_rust_cfg_test_items(
+        owner_path.read_text(encoding="utf-8")
+    )
+    owner_code = _mask_rust_non_code(owner_source_text)
+    package_source_text = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    package_code = _mask_rust_non_code(package_source_text)
+    public_source_text = (
+        _mask_rust_cfg_test_items(public_path.read_text(encoding="utf-8"))
+        if public_path.is_file()
+        else ""
+    )
+    public_code = _mask_rust_non_code(public_source_text)
+
+    module_declarations = _rust_root_level_module_declarations(
+        package_source_text,
+        frozenset({module_name}),
+    )
+    if not module_declarations:
+        violations.append(
+            f"focused {label} package owner module is missing: {package_source}"
+        )
+    for _, visibility, _, _, line_number in module_declarations:
+        if visibility is not None:
+            violations.append(
+                f"focused {label} package owner module must remain private: "
+                f"{package_source}:{line_number}"
+            )
+
+    public_declarations = _rust_public_declarations(owner_source_text)
+    method_declarations: dict[str, tuple[str, int]] = {}
+    for name in methods:
+        for declaration, line_number in public_declarations:
+            if re.search(
+                rf"\bfn[ \t\r\n]+(?:r#)?{re.escape(name)}\b",
+                declaration,
+            ):
+                method_declarations[name] = (declaration, line_number)
+                break
+        declaration_record = method_declarations.get(name)
+        if declaration_record is None:
+            violations.append(
+                f"focused {label} package API is missing public method {name}: "
+                f"{owner_source}"
+            )
+            continue
+        declaration, line_number = declaration_record
+        expected_selectors = selector_types.get(name, ())
+        for selector in expected_selectors:
+            if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
+                violations.append(
+                    f"focused {label} selector API {name} must accept {selector}: "
+                    f"{owner_source}:{line_number}"
+                )
+        if re.search(
+            r"&\s*\[\s*u8\s*\]|\b(?:u64|u32|i64|i32)\b",
+            declaration,
+        ):
+            violations.append(
+                f"focused {label} public method {name} exposes a raw native/wire "
+                f"parameter: {owner_source}:{line_number}"
+            )
+        body = _rust_any_function_body(owner_source_text, name)
+        if body is None:
+            violations.append(
+                f"focused {label} package API method {name} has no inspectable body: "
+                f"{owner_source}:{line_number}"
+            )
+            continue
+        for marker in method_markers.get(name, ()):
+            if re.search(rf"\b{re.escape(marker)}\b", body) is None:
+                violations.append(
+                    f"focused {label} package API method {name} is missing "
+                    f"ownership marker {marker}: {owner_source}:{line_number}"
+                )
+
+    for marker in owner_markers:
+        if re.search(rf"\b{re.escape(marker)}\b", owner_code) is None:
+            violations.append(
+                f"focused {label} owner is missing admission/locality marker "
+                f"{marker}: {owner_source}"
+            )
+    for marker in lazy_codec_markers:
+        if re.search(rf"\b{re.escape(marker)}\b", owner_code) is None:
+            violations.append(
+                f"focused {label} owner is missing lazy Buffa codec marker "
+                f"{marker}: {owner_source}"
+            )
+    if re.search(r"\bPackage\s*::\s*from_bytes\s*\(", owner_code):
+        violations.append(
+            f"focused {label} owner must not reparse through Package::from_bytes: "
+            f"{owner_source}"
+        )
+    if re.search(r"\b(?:prost|prost_types)\b", owner_code):
+        violations.append(
+            f"focused {label} owner must use the neutral Buffa codec rather than Prost: "
+            f"{owner_source}"
+        )
+
+    if public_path.is_file():
+        for name in canonical_types:
+            if re.search(rf"\b{re.escape(name)}\b", public_code) is None:
+                violations.append(
+                    f"focused {label} crate export is missing {name}: {public_source}"
+                )
+        if re.search(r"\bChartArrangement\b", public_code) is None:
+            violations.append(
+                f"focused {label} crate export is missing semantic ChartArrangement: "
+                f"{public_source}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_numbers_chart_arrangement_owner_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the selector-first Numbers chart-arrangement package owner."""
+
+    return _audit_focused_chart_arrangement_owner_source_topology(
+        root,
+        label="litchi-numbers chart-arrangement",
+        owner_source=NUMBERS_CHART_ARRANGEMENT_OWNER_SOURCE,
+        package_source=NUMBERS_PACKAGE_SOURCE,
+        public_source=NUMBERS_SOURCE_ROOT / "lib.rs",
+        module_name=NUMBERS_CHART_ARRANGEMENT_PACKAGE_MODULE,
+        methods=NUMBERS_CHART_ARRANGEMENT_PACKAGE_METHODS,
+        selector_types={
+            "sheet_chart_arrangement": NUMBERS_CHART_ARRANGEMENT_SELECTOR_TYPES,
+            "sheet_chart_arrangements": ("SheetSelector",),
+            "edit_sheet_chart_arrangement": NUMBERS_CHART_ARRANGEMENT_SELECTOR_TYPES,
+            "apply_sheet_chart_arrangement": (),
+        },
+        method_markers={
+            "sheet_chart_arrangement": ("select_chart_with_budget",),
+            "sheet_chart_arrangements": ("discover_sheet_charts",),
+            "edit_sheet_chart_arrangement": ("ChartArrangementEdit::new",),
+            "apply_sheet_chart_arrangement": (
+                "select_chart_with_budget",
+                "verify_locality",
+            ),
+        },
+        owner_markers=NUMBERS_CHART_ARRANGEMENT_OWNER_MARKERS,
+        lazy_codec_markers=NUMBERS_CHART_ARRANGEMENT_LAZY_CODEC_MARKERS,
+        canonical_types=(
+            "SheetChartArrangementCommit",
+            "SheetChartArrangementDiagnostics",
+            "SheetChartArrangementEdit",
+            "SheetChartArrangementError",
+            "SheetChartArrangementLimitKind",
+            "SheetChartArrangementPatch",
+        ),
+    )
+
+
+def audit_pages_body_chart_arrangement_owner_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the selector-first Pages body-chart arrangement owner."""
+
+    return _audit_focused_chart_arrangement_owner_source_topology(
+        root,
+        label="litchi-pages body-chart arrangement",
+        owner_source=PAGES_BODY_CHART_ARRANGEMENT_OWNER_SOURCE,
+        package_source=PAGES_PACKAGE_SOURCE,
+        public_source=PAGES_SOURCE_ROOT / "lib.rs",
+        module_name=PAGES_BODY_CHART_ARRANGEMENT_PACKAGE_MODULE,
+        methods=PAGES_BODY_CHART_ARRANGEMENT_PACKAGE_METHODS,
+        selector_types={
+            "body_chart_arrangement": PAGES_BODY_CHART_ARRANGEMENT_SELECTOR_TYPES,
+            "body_chart_arrangements": (),
+            "edit_body_chart_arrangement": PAGES_BODY_CHART_ARRANGEMENT_SELECTOR_TYPES,
+            "apply_body_chart_arrangement": (),
+        },
+        method_markers={
+            "body_chart_arrangement": ("resolve_target",),
+            "body_chart_arrangements": ("resolve_targets",),
+            "edit_body_chart_arrangement": ("resolve_target",),
+            "apply_body_chart_arrangement": ("resolve_target", "verify_locality"),
+        },
+        owner_markers=PAGES_BODY_CHART_ARRANGEMENT_OWNER_MARKERS,
+        lazy_codec_markers=PAGES_BODY_CHART_ARRANGEMENT_LAZY_CODEC_MARKERS,
+        canonical_types=(
+            "BodyChartArrangementCommit",
+            "BodyChartArrangementDiagnostics",
+            "BodyChartArrangementEdit",
+            "BodyChartArrangementError",
+            "BodyChartArrangementLimitKind",
+            "BodyChartArrangementPatch",
+        ),
+    )
+
+
+def audit_iwa_shared_chart_arrangement_retirement_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the deleted generic host chart-arrangement shell from returning."""
+
+    violations: list[str] = []
+    retired_source = root / RETIRED_IWA_SHARED_CHART_ARRANGEMENT_SOURCE
+    if retired_source.is_file():
+        violations.append(
+            "retired litchi-iwa shared chart-arrangement source was restored: "
+            f"{RETIRED_IWA_SHARED_CHART_ARRANGEMENT_SOURCE}"
+        )
+
+    module_source = root / RETIRED_IWA_SHARED_CHART_ARRANGEMENT_MODULE_SOURCE
+    if module_source.is_file():
+        module = _mask_rust_cfg_test_items(
+            module_source.read_text(encoding="utf-8")
+        )
+        declarations = _rust_root_level_module_declarations(
+            module,
+            frozenset({RETIRED_IWA_SHARED_CHART_ARRANGEMENT_MODULE}),
+        )
+        for _, _, _, _, line_number in declarations:
+            violations.append(
+                "retired litchi-iwa shared chart-arrangement module declaration "
+                f"was restored: {RETIRED_IWA_SHARED_CHART_ARRANGEMENT_MODULE_SOURCE}:"
+                f"{line_number}"
+            )
+
+    source_root = root / Path("crates/litchi-iwa/src")
+    if source_root.is_dir():
+        helper_pattern = re.compile(
+            r"(?<![A-Za-z0-9_])(?:r#)?(?:"
+            + "|".join(
+                re.escape(helper) for helper in RETIRED_IWA_SHARED_CHART_ARRANGEMENT_HELPERS
+            )
+            + r")(?![A-Za-z0-9_])[ \t\r\n]*\("
+        )
+        for path in sorted(source_root.rglob("*.rs")):
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            )
+            for match in helper_pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa shared chart-arrangement helper/call "
+                    f"{match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_chart_arrangement_host_public_method_retirement_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Reject the retired Numbers/Pages host Arrange read/write wrappers."""
+
+    inventories = (
+        (
+            "Numbers chart-arrangement",
+            RETIRED_IWA_NUMBERS_CHART_ARRANGEMENT_HOST_ROOT,
+            RETIRED_IWA_NUMBERS_CHART_ARRANGEMENT_HOST_METHODS,
+        ),
+        (
+            "Pages body-chart arrangement",
+            RETIRED_IWA_PAGES_CHART_ARRANGEMENT_HOST_ROOT,
+            RETIRED_IWA_PAGES_CHART_ARRANGEMENT_HOST_METHODS,
+        ),
+    )
+    violations: list[str] = []
+    declaration = re.compile(
+        r"(?m)^[ \t]*pub(?:[ \t]*\([^()\r\n]*\))?[ \t\r\n]+"
+        r"(?:async[ \t\r\n]+|const[ \t\r\n]+)*fn[ \t\r\n]+"
+        r"(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    for label, relative_root, methods in inventories:
+        source_root = root / relative_root
+        if not source_root.is_dir():
+            continue
+        retired = frozenset(methods)
+        for path in sorted(source_root.rglob("*.rs")):
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            )
+            for match in declaration.finditer(source):
+                name = match.group("name")
+                if name not in retired:
+                    continue
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    f"retired litchi-iwa {label} host method {name}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+    return sorted(set(violations))
 
 
 def audit_keynote_chart_arrangement_facade_source_topology(
@@ -47115,6 +47572,7 @@ def audit_keynote_chart_arrangement_facade_source_topology(
 
     owner_path = root / KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE
     semantic_path = root / KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_SOURCE
+    common_path = root / KEYNOTE_CHART_ARRANGEMENT_COMMON_SOURCE
     selector_path = root / KEYNOTE_SOURCE_ROOT / "selector.rs"
     package_path, lib_path = (
         root / path for path in KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES
@@ -47128,6 +47586,36 @@ def audit_keynote_chart_arrangement_facade_source_topology(
     }
     code = {path: _mask_rust_non_code(source) for path, source in sources.items()}
     violations: list[str] = []
+
+    common_source = (
+        _mask_rust_cfg_test_items(common_path.read_text(encoding="utf-8"))
+        if common_path.is_file()
+        else ""
+    )
+    common_code = _mask_rust_non_code(common_source)
+    if not common_path.is_file():
+        violations.append(
+            "focused litchi-keynote chart-arrangement semantic API is missing its "
+            f"common value source: {KEYNOTE_CHART_ARRANGEMENT_COMMON_SOURCE}"
+        )
+    elif re.search(
+        r"(?m)^\s*pub\s+struct\s+ChartArrangement\b", common_code
+    ) is None:
+        violations.append(
+            "focused litchi-keynote chart-arrangement common value is missing "
+            f"ChartArrangement: {KEYNOTE_CHART_ARRANGEMENT_COMMON_SOURCE}"
+        )
+    common_methods = {
+        name
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            common_source, "ChartArrangement"
+        )
+    }
+    for name in sorted(KEYNOTE_CHART_ARRANGEMENT_COMMON_METHODS - common_methods):
+        violations.append(
+            "focused litchi-keynote chart-arrangement common value is missing "
+            f"API method {name}: {KEYNOTE_CHART_ARRANGEMENT_COMMON_SOURCE}"
+        )
 
     for path, label in (
         (owner_path, "private package owner source"),
@@ -47163,10 +47651,37 @@ def audit_keynote_chart_arrangement_facade_source_topology(
         )
 
     semantic_code = code[semantic_path]
-    if re.search(r"\bpub\s+struct\s+ChartArrangement\b", semantic_code) is None:
+    common_reexport = re.compile(
+        r"\s*pub\s+use\s+litchi_iwa_common\s*::\s*chart\s*::\s*"
+        r"arrangement\s*::\s*ChartArrangement\s*;\s*",
+        re.DOTALL,
+    )
+    common_arrangement_use = re.compile(
+        r"(?m)^\s*pub\s+use\s+litchi_iwa_common\s*::\s*chart\s*::\s*"
+        r"arrangement\b[^;]*;"
+    )
+    exact_common_reexports = [
+        declaration
+        for declaration, _line_number in _rust_public_declarations(
+            sources[semantic_path]
+        )
+        if common_reexport.fullmatch(declaration)
+    ]
+    if not exact_common_reexports:
         violations.append(
-            "focused litchi-keynote chart-arrangement semantic API is missing "
-            f"ChartArrangement: {KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_SOURCE}"
+            "focused litchi-keynote chart-arrangement semantic API is missing the "
+            "exact common ChartArrangement re-export: "
+            f"{KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_SOURCE}"
+        )
+    for match in common_arrangement_use.finditer(semantic_code):
+        declaration = match.group(0)
+        if common_reexport.fullmatch(declaration):
+            continue
+        line_number = semantic_code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-keynote chart-arrangement semantic API must use only "
+            "the exact common ChartArrangement re-export: "
+            f"{KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_SOURCE}:{line_number}"
         )
     semantic_exports = _rust_canonical_exports(
         sources[lib_path], KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_TYPES
@@ -47297,7 +47812,12 @@ def audit_keynote_chart_arrangement_facade_source_topology(
                 continue
             if not dedicated and not identifiers.intersection(facade_names):
                 continue
+            canonical_common_reexport = (
+                path == semantic_path and common_reexport.fullmatch(declaration)
+            )
             for identifier in sorted(identifiers):
+                if canonical_common_reexport and identifier == "litchi_iwa_common":
+                    continue
                 if identifier in KEYNOTE_CHART_ARRANGEMENT_PROTO_ORIGINS:
                     reason = "protobuf type"
                 elif identifier in KEYNOTE_CHART_ARRANGEMENT_PHYSICAL_TYPES:
@@ -59103,7 +59623,11 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_chart_legend_visibility_facade_source_topology()
         + audit_iwa_keynote_chart_legend_source_topology()
         + audit_keynote_chart_arrangement_facade_source_topology()
-        + audit_keynote_chart_arrangement_codec_source_topology()
+        + audit_chart_arrangement_codec_source_topology()
+        + audit_numbers_chart_arrangement_owner_source_topology()
+        + audit_pages_body_chart_arrangement_owner_source_topology()
+        + audit_iwa_shared_chart_arrangement_retirement_source_topology()
+        + audit_iwa_chart_arrangement_host_public_method_retirement_source_topology()
         + audit_iwa_keynote_chart_arrangement_source_topology()
         + audit_keynote_chart_axis_title_legacy_calls()
         + audit_iwa_keynote_chart_axis_title_source_topology()

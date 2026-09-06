@@ -114,6 +114,7 @@ impl NumbersEditor {
         let (_, _, sheet) = numbers_sheet(self.package(), sheet_id)?;
         let locations = object_locations(self.package())?;
         let mut charts = Vec::new();
+        let mut chart_positions = Vec::new();
         for reference in sheet.drawable_infos {
             let Some(archive_name) = locations.get(&reference.identifier) else {
                 return Err(Error::InvalidFormat(format!(
@@ -133,9 +134,16 @@ impl NumbersEditor {
                 .iter()
                 .any(|message| message.type_ == CHART_MESSAGE_TYPE)
             {
+                chart_positions.push(charts.len());
                 charts.push(chart_graph(self, sheet_id, reference.identifier)?.info);
             }
         }
+        arrangement::fill_focused_chart_arrangements(
+            self,
+            sheet_id,
+            &mut charts,
+            &chart_positions,
+        )?;
         Ok(charts)
     }
 
@@ -247,7 +255,9 @@ impl NumbersEditor {
             &archive_name,
             &ids.style_ids(),
         )?;
-        let created = chart_graph(&verified, sheet_id, ids.drawable)?;
+        let mut created = chart_graph(&verified, sheet_id, ids.drawable)?;
+        created.info.arrangement =
+            arrangement::focused_chart_arrangement_for_drawable(&verified, sheet_id, ids.drawable)?;
         if created.info.kind != kind
             || created.info.direction != Direction::Rows
             || created.info.data != data
@@ -391,7 +401,13 @@ impl NumbersEditor {
         sheet_id: u64,
         source_drawable_object_id: u64,
     ) -> Result<NumbersSheetChartInfo> {
-        let source = chart_graph(self, sheet_id, source_drawable_object_id)?;
+        let source_arrangement = arrangement::focused_chart_arrangement_for_drawable(
+            self,
+            sheet_id,
+            source_drawable_object_id,
+        )?;
+        let mut source = chart_graph(self, sheet_id, source_drawable_object_id)?;
+        source.info.arrangement = source_arrangement;
         let source_style_ids =
             local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
         let mut staged = self.package.clone();
@@ -508,7 +524,12 @@ impl NumbersEditor {
             &source.archive_name,
             &new_style_ids,
         )?;
-        let created = chart_graph(&verified, sheet_id, new_drawable_id)?;
+        let mut created = chart_graph(&verified, sheet_id, new_drawable_id)?;
+        created.info.arrangement = arrangement::focused_chart_arrangement_for_drawable(
+            &verified,
+            sheet_id,
+            new_drawable_id,
+        )?;
         let expected_object_ids = source
             .object_ids
             .iter()
@@ -524,6 +545,7 @@ impl NumbersEditor {
             || created.info.direction != source.info.direction
             || created.info.data != source.info.data
             || created.info.geometry != geometry
+            || created.info.arrangement != source.info.arrangement
             || created.object_ids != expected_object_ids
         {
             return Err(Error::InvalidFormat(
@@ -541,7 +563,13 @@ impl NumbersEditor {
         sheet_id: u64,
         drawable_object_id: u64,
     ) -> Result<RemovedNumbersSheetChart> {
-        let source = chart_graph(self, sheet_id, drawable_object_id)?;
+        let source_arrangement = arrangement::focused_chart_arrangement_for_drawable(
+            self,
+            sheet_id,
+            drawable_object_id,
+        )?;
+        let mut source = chart_graph(self, sheet_id, drawable_object_id)?;
+        source.info.arrangement = source_arrangement;
         let style_ids =
             local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;

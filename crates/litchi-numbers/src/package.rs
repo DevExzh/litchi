@@ -5,6 +5,7 @@
 //! remains the public semantic owner; this module retains no dependency on the
 //! historical umbrella facade.
 
+mod chart_arrangement;
 pub mod comments;
 #[allow(
     dead_code,
@@ -113,6 +114,12 @@ use extractor::TableDataExtractor;
 use index::{Index, Resolved};
 use sheet::DecodedSheet;
 
+pub use chart_arrangement::{
+    ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
+    ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch,
+    SheetChartArrangementCommit, SheetChartArrangementDiagnostics, SheetChartArrangementEdit,
+    SheetChartArrangementError, SheetChartArrangementLimitKind, SheetChartArrangementPatch,
+};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustmentsError};

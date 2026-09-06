@@ -13,7 +13,6 @@ use crate::{Error, IWorkPackage, Result};
 
 mod archive;
 
-pub(crate) mod arrangement;
 pub(crate) mod axis;
 pub(crate) mod axis_bounds;
 pub(crate) mod axis_gridline_stroke;
@@ -85,7 +84,6 @@ pub(crate) mod style;
 pub use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 
 pub(crate) use archive::IWorkChartArchive;
-pub use arrangement::ChartArrangement;
 pub use axis_gridline_stroke::{ChartAxisGridline, ChartAxisGridlineStroke};
 pub use data::ChartData;
 pub use depth_3d::Chart3dDepth;
@@ -99,6 +97,7 @@ pub use legend_frame::{
 pub use legend_shadow::ChartLegendShadow;
 pub use legend_stroke::ChartLegendStroke;
 pub use lighting_3d::Chart3dLightingStyle;
+pub use litchi_iwa_common::chart::arrangement::ChartArrangement;
 pub use litchi_iwa_common::chart::axis::{
     Axis, Bound, Bounds, LabelAngle, LabelPosition3d, MajorStepCount, MinorStepCount, Scale, Steps,
     TickMarkLocation,

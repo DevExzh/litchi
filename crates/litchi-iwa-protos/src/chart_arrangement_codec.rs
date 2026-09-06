@@ -1,4 +1,4 @@
-//! Strict borrowed projection for the Keynote chart Arrange state.
+//! Strict borrowed projection for the shared iWork chart Arrange state.
 //!
 //! The selected path is `TSCH.ChartDrawableArchive.super` (field 1) to the
 //! two optional `TSD.DrawableArchive` controls `locked` (field 5) and
@@ -16,7 +16,7 @@ use std::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
 
-use crate::buffa_keynote_chart_arrangement_generated::LitchiIwaProjection as projection;
+use crate::buffa_chart_arrangement_generated::LitchiIwaProjection as projection;
 
 const CHART_DRAWABLE_SUPER_FIELD: u32 = 1;
 const DRAWABLE_LOCKED_FIELD: u32 = 5;
@@ -750,35 +750,35 @@ impl fmt::Display for DecodeError {
             DecodeErrorKind::Wire(error) => error.fmt(formatter),
             DecodeErrorKind::Resource(DecodeLimit::Bytes { observed, maximum }) => write!(
                 formatter,
-                "Keynote chart-arrangement projection byte limit exceeded: observed {observed}, maximum {maximum}"
+                "chart-arrangement projection byte limit exceeded: observed {observed}, maximum {maximum}"
             ),
             DecodeErrorKind::Resource(DecodeLimit::Fields { observed, maximum }) => write!(
                 formatter,
-                "Keynote chart-arrangement projection visited {observed} fields; maximum is {maximum}"
+                "chart-arrangement projection visited {observed} fields; maximum is {maximum}"
             ),
             DecodeErrorKind::Resource(DecodeLimit::Work { observed, maximum }) => write!(
                 formatter,
-                "Keynote chart-arrangement projection requires {observed} work bytes; maximum is {maximum}"
+                "chart-arrangement projection requires {observed} work bytes; maximum is {maximum}"
             ),
             DecodeErrorKind::Resource(DecodeLimit::Output { observed, maximum }) => write!(
                 formatter,
-                "Keynote chart-arrangement projection output has {observed} bytes; maximum is {maximum}"
+                "chart-arrangement projection output has {observed} bytes; maximum is {maximum}"
             ),
             DecodeErrorKind::Resource(DecodeLimit::Nesting { observed, maximum }) => write!(
                 formatter,
-                "Keynote chart-arrangement projection nesting {observed} exceeds maximum {maximum}"
+                "chart-arrangement projection nesting {observed} exceeds maximum {maximum}"
             ),
             DecodeErrorKind::Resource(DecodeLimit::Allocations { observed, maximum }) => write!(
                 formatter,
-                "Keynote chart-arrangement rewrite requires {observed} allocations; maximum is {maximum}"
+                "chart-arrangement rewrite requires {observed} allocations; maximum is {maximum}"
             ),
             DecodeErrorKind::Resource(DecodeLimit::Retained { observed, maximum }) => write!(
                 formatter,
-                "Keynote chart-arrangement rewrite retains {observed} bytes; maximum is {maximum}"
+                "chart-arrangement rewrite retains {observed} bytes; maximum is {maximum}"
             ),
             DecodeErrorKind::Resource(DecodeLimit::Scratch { observed, maximum }) => write!(
                 formatter,
-                "Keynote chart-arrangement rewrite requires {observed} scratch bytes; maximum is {maximum}"
+                "chart-arrangement rewrite requires {observed} scratch bytes; maximum is {maximum}"
             ),
             DecodeErrorKind::DuplicateSingular(field) => {
                 write!(formatter, "duplicate singular field {field}")
@@ -788,10 +788,10 @@ impl fmt::Display for DecodeError {
             },
             DecodeErrorKind::Allocation { amount } => write!(
                 formatter,
-                "cannot allocate Keynote chart-arrangement output for {amount} bytes"
+                "cannot allocate chart-arrangement output for {amount} bytes"
             ),
             DecodeErrorKind::Projection => formatter.write_str(
-                "Keynote chart-arrangement strict preflight disagrees with the Buffa projection",
+                "chart-arrangement strict preflight disagrees with the Buffa projection",
             ),
         }
     }
