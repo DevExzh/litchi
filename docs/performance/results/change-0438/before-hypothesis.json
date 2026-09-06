@@ -1,0 +1,215 @@
+{
+  "change": 438,
+  "before_revision": "3841cc99752baad0816a44fb561e6c610e8e1482",
+  "source_manifest": {
+    "path": "sources/191d59feb360a2cc190a5a80adbd3649cb3da44dd550b9a6f5572abca0c7465b.json",
+    "sha256": "191d59feb360a2cc190a5a80adbd3649cb3da44dd550b9a6f5572abca0c7465b",
+    "files": 6656
+  },
+  "baseline_pilots": [
+    {
+      "shape": "tiny",
+      "slides": 64,
+      "normal_p50_ns": 381611,
+      "allocation_calls": [
+        1323,
+        1323,
+        1323
+      ],
+      "allocated_bytes": [
+        1739284,
+        1739284,
+        1739284
+      ],
+      "peak_above_entry_bytes": [
+        420352,
+        420352,
+        420352
+      ],
+      "input_bindings": [
+        {
+          "path": "pilots/before-streaming/initial/normal-tiny.json",
+          "bytes": 20162,
+          "sha256": "51f5f5f31716552511dfcaa14c87023c5ab451d0a833f1b0daede2dd3bbf6fd9"
+        },
+        {
+          "path": "pilots/before-streaming/initial/allocator-tiny.json",
+          "bytes": 23035,
+          "sha256": "966934b921c8751bd5679133cb360ce5851a56c1b74166587e1e0cbce729b2e8"
+        }
+      ]
+    },
+    {
+      "shape": "medium",
+      "slides": 4096,
+      "normal_p50_ns": 19764993,
+      "allocation_calls": [
+        73899,
+        73899,
+        73899
+      ],
+      "allocated_bytes": [
+        5392276,
+        5392276,
+        5392276
+      ],
+      "peak_above_entry_bytes": [
+        420352,
+        420352,
+        420352
+      ],
+      "input_bindings": [
+        {
+          "path": "pilots/before-streaming/initial/normal-medium.json",
+          "bytes": 20228,
+          "sha256": "8f97f0dce798655677d43e5d709b09f99f0d696f3244035b9c6a6ac345b8470c"
+        },
+        {
+          "path": "pilots/before-streaming/initial/allocator-medium.json",
+          "bytes": 23152,
+          "sha256": "cb0bd36184c65bcafb815717e1fcc9ca691c7f795299978527a8469068c80e96"
+        }
+      ]
+    },
+    {
+      "shape": "large",
+      "slides": 8192,
+      "normal_p50_ns": 39329055,
+      "allocation_calls": [
+        147627,
+        147627,
+        147627
+      ],
+      "allocated_bytes": [
+        9103252,
+        9103252,
+        9103252
+      ],
+      "peak_above_entry_bytes": [
+        420352,
+        420352,
+        420352
+      ],
+      "input_bindings": [
+        {
+          "path": "pilots/before-streaming/initial/normal-large.json",
+          "bytes": 20227,
+          "sha256": "53e2b16e78a0297f45bca04b24c399e7c13ea46c2713920fc97d6444198398f7"
+        },
+        {
+          "path": "pilots/before-streaming/initial/allocator-large.json",
+          "bytes": 23157,
+          "sha256": "626172af174853b813c4583fb0d1d497ba9714a568280546faaea8835fc544bc"
+        }
+      ]
+    }
+  ],
+  "historical_profile_bindings": {
+    "stat": {
+      "path": "prior-profile/perf-stat.txt",
+      "bytes": 264,
+      "sha256": "791c8506a576b405ee9b2e5aec40fa3029a6682edc0e734ff84f3026da292af8"
+    },
+    "record": {
+      "path": "prior-profile/perf-report.txt",
+      "bytes": 3060467,
+      "sha256": "d6e3bf4624d0bc741297495449a661be574b20017e701fed1f2040a29a6d8a48"
+    }
+  },
+  "historical_profile_symbols_at_least_one_percent": [
+    {
+      "self_percent": 12.85,
+      "symbol": "sha2::sha256::x86_sha::compress"
+    },
+    {
+      "self_percent": 11.0,
+      "symbol": "<litchi_core::execution::ExecutionContext>::consume"
+    },
+    {
+      "self_percent": 10.78,
+      "symbol": "zlib_rs::deflate::longest_match::longest_match"
+    },
+    {
+      "self_percent": 6.88,
+      "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium"
+    },
+    {
+      "self_percent": 5.39,
+      "symbol": "xml_minifier::audit::verify_with_policy"
+    },
+    {
+      "self_percent": 3.84,
+      "symbol": "<quick_xml::events::attributes::IterState>::next"
+    },
+    {
+      "self_percent": 3.17,
+      "symbol": "litchi_odf_common::core::generated_xml::validate_fragment_shape"
+    },
+    {
+      "self_percent": 2.79,
+      "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+    },
+    {
+      "self_percent": 2.54,
+      "symbol": "<litchi_core::execution::ExecutionContext>::check"
+    },
+    {
+      "self_percent": 2.49,
+      "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+    },
+    {
+      "self_percent": 2.06,
+      "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+    },
+    {
+      "self_percent": 2.06,
+      "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+    },
+    {
+      "self_percent": 1.8,
+      "symbol": "__memset_avx512_unaligned_erms"
+    },
+    {
+      "self_percent": 1.64,
+      "symbol": "litchi_odp::streaming::validate_plain_text"
+    },
+    {
+      "self_percent": 1.46,
+      "symbol": "__memcmp_evex_movbe"
+    },
+    {
+      "self_percent": 1.43,
+      "symbol": "<quick_xml::reader::state::ReaderState>::emit_start"
+    },
+    {
+      "self_percent": 1.43,
+      "symbol": "xml_minifier::audit::check_attribute_layout"
+    },
+    {
+      "self_percent": 1.16,
+      "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates"
+    },
+    {
+      "self_percent": 1.11,
+      "symbol": "_int_malloc"
+    },
+    {
+      "self_percent": 1.1,
+      "symbol": "__memmove_avx512_unaligned_erms"
+    },
+    {
+      "self_percent": 1.06,
+      "symbol": "<litchi_odp::streaming::SlideWriter>::check"
+    },
+    {
+      "self_percent": 1.06,
+      "symbol": "core::str::converts::from_utf8"
+    }
+  ],
+  "profile_scope": "Historical 0437 whole executable; its binary and source exactly match this fresh baseline. Setup, corpus, hashing, warmups and samples are included; later Python oracle and symbolization are excluded. No operation-only causal fraction.",
+  "hypothesis": "Batch adjacent controlled fixed-markup pieces to remove repeated Work atomics and bounds/cancellation dispatch. Use bounded 256-byte stack scratch with no heap allocation; retain the original piece sequence on Work or XML bound refusal.",
+  "preservation": "Require exact same-API archive/content/semantic/sink identities and allocator vectors. Preserve original first failing piece, typed local/ancestor budget errors and rollback; cancellation remains bounded and failed current fragments remain unpublished.",
+  "retention_rule": "Keep only if both medium and large normal p50 improve at least five percent in both repeats, with nonoverlapping mean 95% intervals in the favorable direction, no allocation/peak increase, and every approximately five-percent latency/throughput/RSS or repeat flag reviewed explicitly. Otherwise revert speculative production complexity and retain the negative evidence.",
+  "scope": "Same ODP plain fresh creation workload, no new grammar, public API, limit profile, parallelism, existing-document append or iWork work.",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49"
+}

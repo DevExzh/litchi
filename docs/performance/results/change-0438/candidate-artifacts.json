@@ -1,0 +1,22 @@
+[
+  {
+    "path": "candidate/after-streaming.rs.txt",
+    "bytes": 61071,
+    "sha256": "6b8a696b99b4f8ee84a0c1f48d8a1ade023f72ef0528846480f4585a7bbc0262"
+  },
+  {
+    "path": "candidate/before-streaming.rs.txt",
+    "bytes": 58780,
+    "sha256": "c720b8f9121f26b9a5c574a24c4e1fda14f2f71fe4930e35c27794fa09ff3d2a"
+  },
+  {
+    "path": "candidate/candidate.patch",
+    "bytes": 20940,
+    "sha256": "b39c47da3ceb412af0dcf3819b4598a14680ca9b59b350e5a264e7bb458c8c07"
+  },
+  {
+    "path": "candidate/markup_tests.rs.txt",
+    "bytes": 13484,
+    "sha256": "68e9e1f2f626c49224375ea0e089eb169dc859ea82545906a9bb82e943876dc4"
+  }
+]

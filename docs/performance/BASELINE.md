@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0438: ODP markup candidate rejected
+
+[0438](changes/0438-odp-markup-batching-negative.md) retains a negative result:
+fixed-markup Work batching lowered normal p50 by only 0.703–1.982% across the
+same-API 24-report / 720-sample ABBA matrix. Medium and large failed the
+predeclared 5% gain gate in both repeats despite favorable nonoverlapping mean
+intervals. Production was restored. Exact output/sink and normalized operation
+allocation identities held; peak above entry stayed 420,352 bytes. No matched
+or repeat flag crossed 5%, and RSS stayed around 84.5–84.7 MB. Four fresh
+profiles, the tested patch and correctness checks remain reproducible in the
+[bundle](results/change-0438/README.md). The broader goal remains open.
+
 ## Change 0437: bounded ODP creation with a measured CPU tradeoff
 
 [0437](changes/0437-odp-bounded-plain-slides.md) adds plain titled-slide source

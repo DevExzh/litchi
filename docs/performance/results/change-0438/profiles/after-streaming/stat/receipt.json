@@ -1,0 +1,133 @@
+{
+  "ambient_build_directory": "after",
+  "ambient_source_manifest": {
+    "files": 6657,
+    "path": "sources/47de9545d8749e6017b2d8c8bc213da04f4bc4ce458f18482eddccdc41f426af.json",
+    "sha256": "47de9545d8749e6017b2d8c8bc213da04f4bc4ce458f18482eddccdc41f426af"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0438/profiles/after-streaming/stat/resource.log",
+    "perf",
+    "stat",
+    "--no-big-num",
+    "-x,",
+    "-e",
+    "cycles:u,instructions:u,branches:u,branch-misses:u,L1-dcache-load-misses:u",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0438/profiles/after-streaming/stat/perf-stat.txt",
+    "--",
+    "/tmp/litchi-goal-0438-binaries/after/normal",
+    "--case",
+    "odp_streaming_create",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0438/profiles/after-streaming/stat/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0438/profiles/after-streaming/stat/report-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4857,
+      "path": "profiles/after-streaming/stat/report-catalog.json",
+      "sha256": "18e1ff99388690f4329bd8d9f18f130e7fd391be89396775eed985f17343f665"
+    },
+    "oracle_log": {
+      "bytes": 330,
+      "path": "profiles/after-streaming/stat/oracle.log",
+      "sha256": "90ac545c797c02fa9daf7e9930b547e9012891b709db6921c700d2eb1202f49c"
+    },
+    "perf_stat": {
+      "bytes": 264,
+      "path": "profiles/after-streaming/stat/perf-stat.txt",
+      "sha256": "505608027b3e2a711d89579cafad9dd6804e7eb5f8eec87e1bf13affb83643ef"
+    },
+    "report": {
+      "bytes": 33960,
+      "path": "profiles/after-streaming/stat/report.json",
+      "sha256": "59260988193d20e38e5f14e0de5e6110e66c7772406357719a6522285ed1106f"
+    },
+    "resource": {
+      "bytes": 1304,
+      "path": "profiles/after-streaming/stat/resource.log",
+      "sha256": "eeb5c4c8f54d923e14b5d9c8116dfa64b66746c7b38cc790465d1d5a86c69b29"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "profiles/after-streaming/stat/workload.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 456997936,
+    "path": "/tmp/litchi-goal-0438-binaries/after/normal",
+    "sha256": "e3c564d11865148f72bbad0d589317d5e6c6e0f523b4d42bb05b44c27a228047"
+  },
+  "binary_copies_receipt": "after/binary-copies.json",
+  "binary_copies_receipt_sha256": "5a288ef75ff093d9e8ccf8589611db646e448b67f1b92366bfa2bf46005f8413",
+  "build_receipt": "checks/after-build.json",
+  "build_receipt_sha256": "38b63fc694c15ab50ba42b9e1d7e0f29c60c3bb7b76343f1497cbe6c5728408a",
+  "call_graph": null,
+  "capture_helper_sha256": "667b8bb7c992aaa57006cf779586e9e1476ca2285747774ff4ea0780624bcc01",
+  "change": 438,
+  "custody_driver": "/home/zhuhe/code/litchi/docs/performance/results/change-0438/check.py",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "d220b3afcf0db36572120d68400dac58cc12e98542b063a136e0a284d1655a86",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T12:10:21.582629+00:00",
+  "kind": "stat",
+  "oracle_exit_code": 0,
+  "oracle_stdout_sha256": "90ac545c797c02fa9daf7e9930b547e9012891b709db6921c700d2eb1202f49c",
+  "oracle_verifier": "verify-report-candidate.py",
+  "oracle_verifier_sha256": "eddfef3fe680d383f7bc067bc4a6732679c3a1e35ce8a10c90f6ffb7d9589b16",
+  "preparatory": false,
+  "protocol_path": "protocol.json",
+  "protocol_sha256": "d65ff2526c8a502a6d5ad925f79dec1505c23ba80e55bf597f20c45905498795",
+  "record_event": null,
+  "record_frequency_hz": null,
+  "revision": "3841cc99752baad0816a44fb561e6c610e8e1482",
+  "role": "after-streaming",
+  "schema": "litchi-0438-profile-receipt-v1",
+  "scope": "whole fresh process including setup, corpus generation, warmups, samples, and output hashing; copied Python oracle validation runs afterward outside the profiled workload and GNU-time scope",
+  "selector": "odp_streaming_create",
+  "shape": "large",
+  "source_after": {
+    "files": 6657,
+    "path": "sources/47de9545d8749e6017b2d8c8bc213da04f4bc4ce458f18482eddccdc41f426af.json",
+    "sha256": "47de9545d8749e6017b2d8c8bc213da04f4bc4ce458f18482eddccdc41f426af"
+  },
+  "source_before": {
+    "files": 6657,
+    "path": "sources/47de9545d8749e6017b2d8c8bc213da04f4bc4ce458f18482eddccdc41f426af.json",
+    "sha256": "47de9545d8749e6017b2d8c8bc213da04f4bc4ce458f18482eddccdc41f426af"
+  },
+  "source_field": "odp_slides",
+  "source_manifest": {
+    "files": 6657,
+    "path": "sources/47de9545d8749e6017b2d8c8bc213da04f4bc4ce458f18482eddccdc41f426af.json",
+    "sha256": "47de9545d8749e6017b2d8c8bc213da04f4bc4ce458f18482eddccdc41f426af"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T12:10:19.417821+00:00",
+  "stat_events": [
+    "cycles:u",
+    "instructions:u",
+    "branches:u",
+    "branch-misses:u",
+    "L1-dcache-load-misses:u"
+  ],
+  "status": "pass"
+}

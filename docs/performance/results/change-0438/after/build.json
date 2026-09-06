@@ -1,0 +1,65 @@
+{
+  "binaries": {
+    "allocator": {
+      "bytes": 456344752,
+      "path": "/tmp/litchi-goal-0438-binaries/after/allocator",
+      "sha256": "7f49d8c0cc1c5ceb905079fd2b30de87c56e3077bba38b502e7c7675c76cbce0"
+    },
+    "normal": {
+      "bytes": 456997936,
+      "path": "/tmp/litchi-goal-0438-binaries/after/normal",
+      "sha256": "e3c564d11865148f72bbad0d589317d5e6c6e0f523b4d42bb05b44c27a228047"
+    }
+  },
+  "binary_copies_receipt": "after/binary-copies.json",
+  "binary_copies_receipt_sha256": "5a288ef75ff093d9e8ccf8589611db646e448b67f1b92366bfa2bf46005f8413",
+  "build_argv": [
+    "env",
+    "RUSTFLAGS=-Cforce-frame-pointers=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG=1",
+    "cargo",
+    "build",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline",
+    "--bin",
+    "litchi-perf-baseline-alloc"
+  ],
+  "build_environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "build_receipt": "checks/after-build.json",
+  "build_receipt_sha256": "38b63fc694c15ab50ba42b9e1d7e0f29c60c3bb7b76343f1497cbe6c5728408a",
+  "change": 438,
+  "check_driver_sha256": "b5e978cc00e8e1267b5a48cea112a26d400b01d56ebb08295f0f502c424888b4",
+  "created_utc": "2026-09-06T12:01:34.737039+00:00",
+  "driver_hashes": {
+    "capture.py": "667b8bb7c992aaa57006cf779586e9e1476ca2285747774ff4ea0780624bcc01",
+    "check.py": "b5e978cc00e8e1267b5a48cea112a26d400b01d56ebb08295f0f502c424888b4",
+    "profile.py": "d220b3afcf0db36572120d68400dac58cc12e98542b063a136e0a284d1655a86"
+  },
+  "oracle": {
+    "path": "oracle-protocol.json",
+    "sha256": "2d07b5936e9036e9ee7fadac68148ef60196c9830f2f4b70154c6aa327095a9f",
+    "verifier_path": "verify-report-candidate.py",
+    "verifier_sha256": "eddfef3fe680d383f7bc067bc4a6732679c3a1e35ce8a10c90f6ffb7d9589b16"
+  },
+  "protocol_sha256": "d65ff2526c8a502a6d5ad925f79dec1505c23ba80e55bf597f20c45905498795",
+  "revision": "3841cc99752baad0816a44fb561e6c610e8e1482",
+  "role": "after",
+  "schema": "litchi-0438-build-descriptor-v1",
+  "source_manifest": {
+    "files": 6657,
+    "path": "sources/47de9545d8749e6017b2d8c8bc213da04f4bc4ce458f18482eddccdc41f426af.json",
+    "sha256": "47de9545d8749e6017b2d8c8bc213da04f4bc4ce458f18482eddccdc41f426af"
+  },
+  "source_scope": "workspace and standalone tools"
+}

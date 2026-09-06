@@ -1,0 +1,79 @@
+{
+  "schema": "litchi-0438-lifecycle-contract-v1",
+  "change": 438,
+  "protocol_path": "protocol.json",
+  "protocol_sha256": "d65ff2526c8a502a6d5ad925f79dec1505c23ba80e55bf597f20c45905498795",
+  "summary_path": "summary.json",
+  "summary_module": "summary.py",
+  "hypothesis_path": "before-hypothesis.json",
+  "hypothesis_module": "before-hypothesis.py",
+  "precleanup_receipt": "checks/precleanup-portable-verified.json",
+  "cleanup_receipt": "checks/task-cleanup.json",
+  "cleanup_inventory": "checks/cleanup-inventory.json",
+  "cleanup_paths": [
+    "/tmp/litchi-goal-0438-binaries",
+    "/tmp/litchi-goal-0438-markup",
+    "/tmp/litchi-goal-0438-tests",
+    "/tmp/litchi-goal-0438-evidence",
+    "/tmp/litchi-goal-0438-lifecycle"
+  ],
+  "cleanup_expected_paths": [
+    "/tmp/litchi-goal-0438-binaries",
+    "/tmp/litchi-goal-0438-markup",
+    "/tmp/litchi-goal-0438-tests",
+    "/tmp/litchi-goal-0438-evidence",
+    "/tmp/litchi-goal-0438-lifecycle"
+  ],
+  "preserved_paths": [
+    "/home/zhuhe/code/litchi/target",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target"
+  ],
+  "goal_path": "/home/zhuhe/code/litchi/docs/GOAL.md",
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "replay_drivers": [
+    "build-descriptors.py",
+    "capture.py",
+    "profile.py",
+    "verify.py",
+    "summary.py",
+    "check.py",
+    "pilot.py",
+    "save-binaries.py",
+    "before-hypothesis.py",
+    "decision.py",
+    "oracle-protocol.json",
+    "verify-report-candidate.py",
+    "lifecycle.py",
+    "lifecycle-contract.json",
+    "portable-probes.py",
+    "replay.py",
+    "seal.py",
+    "cleanup.py"
+  ],
+  "retention_gate": {
+    "minimum_p50_improvement_percent": 5.0,
+    "required_shapes": [
+      "medium",
+      "large"
+    ],
+    "required_repeats": [
+      "R1",
+      "R2"
+    ],
+    "require_mean_ci_nonoverlap": true,
+    "require_allocation_nonincrease": true,
+    "rejection_policy": "restore baseline production and retain candidate source, patch, tests, and negative evidence",
+    "candidate_artifacts": [
+      "candidate/before-streaming.rs.txt",
+      "candidate/after-streaming.rs.txt",
+      "candidate/markup_tests.rs.txt",
+      "candidate/candidate.patch",
+      "candidate-artifacts.json"
+    ],
+    "decision": {
+      "driver": "decision.py",
+      "driver_sha256": "2b20383e5eeac9dc3ae86caf407bdfca6a4d226cb58e4669fb137234969f460f",
+      "path": "decision.json"
+    }
+  }
+}

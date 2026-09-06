@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## Change 0438: fixed-markup Work batching is insufficient
+
+[0438](changes/0438-odp-markup-batching-negative.md) rejects the preceding
+fixed-markup batching hypothesis for this ODP workload. Medium/large p50 gains
+were only 0.972–1.982%, below the predeclared 5% gate; production was restored.
+Fresh whole-executable consume self samples changed 9.03% → 8.55%, with no
+operation-only causal claim. Output and operation allocation identities held,
+and no 5% regression/repeat flag appeared. Next investigate a different measured
+cost in required XML/publication validation or compression before optimizing;
+retain all validation and budget contracts. The 0437 bounded-memory API remains
+the baseline, with append, native breadth, cold/range and scaling work open.
+
 ## Change 0437: ODP memory retention removed; accounting remains visible
 
 [0437](changes/0437-odp-bounded-plain-slides.md) keeps a bounded fresh plain

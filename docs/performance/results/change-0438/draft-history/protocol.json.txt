@@ -1,0 +1,350 @@
+{
+  "schema": "litchi-0438-odp-streaming-protocol-v1",
+  "change": 438,
+  "status": "frozen-before-formal-capture",
+  "classification": "Matched same-API ODP streaming creation across before and after binaries; latency, allocation, and process observations remain descriptive.",
+  "selector_family": "odp_streaming_create",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "repeats": 2,
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "shapes": {
+    "tiny": 64,
+    "medium": 4096,
+    "large": 8192
+  },
+  "roles": {
+    "before-streaming": {
+      "build_directory": "before",
+      "selector": "odp_streaming_create",
+      "source_field": "odp_slides",
+      "source_role": "streaming",
+      "implementation": "litchi_odp::streaming::stream_plain_slides_to",
+      "retention": "fixed_explicit_window",
+      "retained_authoring_window_bytes": 4096,
+      "oracle_role": "after-streaming"
+    },
+    "after-streaming": {
+      "build_directory": "after",
+      "selector": "odp_streaming_create",
+      "source_field": "odp_slides",
+      "source_role": "streaming",
+      "implementation": "litchi_odp::streaming::stream_plain_slides_to",
+      "retention": "fixed_explicit_window",
+      "retained_authoring_window_bytes": 4096,
+      "oracle_role": "after-streaming"
+    }
+  },
+  "order": [
+    {
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R2"
+    }
+  ],
+  "corpus": {
+    "package_format": "ODP/ODF/ZIP",
+    "compression": "mimetype=stored;xml=deflate",
+    "payload_kind": "deterministic-mixed-unicode-entities-plain-titled-slides",
+    "mimetype": "application/vnd.oasis.opendocument.presentation",
+    "member_names": [
+      "mimetype",
+      "content.xml",
+      "styles.xml",
+      "meta.xml",
+      "META-INF/manifest.xml"
+    ],
+    "manifest_entry_count": 4,
+    "target_entry": "content.xml",
+    "default_styles_xml_sha256": "d9881e91085516246a19c30d9e5cde39a8b10d7e42120b135f48f5ca8afef8d2",
+    "default_meta_xml_sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719",
+    "declaration_policy": "XML declaration may be absent; when present it must declare UTF-8 XML 1.0 without standalone.",
+    "mimetype_layout": "Stored offset-zero first local and central entry; no extra field or data descriptor; header name, sizes, payload and central CRC match.",
+    "slide_fixture": {
+      "title_prefix": "litchi-perf-odp-buffered-title-",
+      "body_prefix": "litchi-perf-odp-buffered-body-",
+      "index_format": "{index:05}",
+      "variants": [
+        "plain slide",
+        "Unicode caf\u00e9 \u0394 \u4e2d",
+        "entities <&> \"quoted\"",
+        "mixed fa\u00e7ade \u03a9 <&> value"
+      ],
+      "cycle": 4,
+      "title_body_separator": "LF",
+      "slide_separator": "LF LF",
+      "text_contract": "four-cycle plain/Unicode/XML-significant UTF-8 title and body text with single interior spaces; one title and one body text object per slide"
+    },
+    "semantic_hash": {
+      "domain": "litchi-odp-buffered-semantic-v1\\0",
+      "count_encoding": "u64le",
+      "length_encoding": "u64le",
+      "payload_encoding": "UTF-8",
+      "field_order": [
+        "title",
+        "body"
+      ],
+      "separator_is_hashed": false,
+      "input_projection": "UTF-8 title, LF, body, with LF LF between slides and no trailing separator"
+    }
+  },
+  "timing_scope": "Fresh slide title/body input and public ODP streaming authoring/publication plus HashingDiscardSink writes are inside the operation timer. Corpus construction, archive reopen, XML/semantic/package gates, sink construction/finalization, and digest extraction are outside it.",
+  "identity_scope": {
+    "same_api_cross_role_required": [
+      "archive_bytes",
+      "archive_sha256",
+      "target_payload_bytes",
+      "target_payload_sha256",
+      "output_sha256",
+      "content_xml_sha256",
+      "content_xml_bytes",
+      "semantic_sha256",
+      "canonical_text_bytes",
+      "slide_count",
+      "title_count",
+      "body_count",
+      "title_text_bytes",
+      "body_text_bytes",
+      "title_variant_counts",
+      "body_variant_counts",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "member_names",
+      "mimetype",
+      "manifest_entry_count",
+      "page_structure_verified",
+      "page_geometry_verified",
+      "sink_accepted_bytes",
+      "sink_write_calls",
+      "sink_largest_write",
+      "sink_write_size_buckets",
+      "sink_retained_output_bytes",
+      "sink_paragraphs",
+      "sink_runs",
+      "sink_input_bytes",
+      "sink_authored_part_bytes",
+      "sink_retained_authoring_window_bytes",
+      "allocator_vectors"
+    ],
+    "cross_role_scope": "same shape, mode, and repeat across before-streaming and after-streaming",
+    "on_mismatch": "correctness failure; withhold performance comparison",
+    "repeat_scope": "each role, mode, and shape must have R1/R2 identical output and semantic identity"
+  },
+  "operation_metrics": {
+    "sample_alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+    "allocation_scope": "operation_global_system_allocator",
+    "required_region_peak": true,
+    "normal_allocator_elapsed": "allocator elapsed values are retained for process context only; no allocator latency claim"
+  },
+  "profile_scope": {
+    "roles": [
+      "before-streaming",
+      "after-streaming"
+    ],
+    "mode": "normal",
+    "shape": "large",
+    "captures": [
+      "perf-stat",
+      "perf-record"
+    ],
+    "events": [
+      "cycles:u",
+      "instructions:u",
+      "branches:u",
+      "branch-misses:u",
+      "L1-dcache-load-misses:u"
+    ],
+    "record_event": "cycles:u",
+    "record_frequency_hz": 999,
+    "call_graph": "fp,127",
+    "scope": "whole fresh executable process including setup, corpus generation, warmups, samples, and output hashing; copied Python oracle validation runs afterward outside workload, perf, and GNU-time scope"
+  },
+  "report_contract": {
+    "schema_version": 1,
+    "reports_per_role": 12,
+    "required_reports": 24,
+    "retained_samples": 720,
+    "cross_role_comparison": "outer 0438 verifier; copied 0437 ODP oracle validates each report as after-streaming"
+  },
+  "matrix": {
+    "formal_reports": 24,
+    "retained_samples": 720,
+    "roles": [
+      "before-streaming",
+      "after-streaming"
+    ],
+    "phases": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ]
+  },
+  "oracle": {
+    "path": "oracle-protocol.json",
+    "verifier_path": "verify-report-candidate.py",
+    "sha256": "2d07b5936e9036e9ee7fadac68148ef60196c9830f2f4b70154c6aa327095a9f",
+    "verifier_sha256": "eddfef3fe680d383f7bc067bc4a6732679c3a1e35ce8a10c90f6ffb7d9589b16",
+    "roles": {
+      "before-streaming": "after-streaming",
+      "after-streaming": "after-streaming"
+    }
+  },
+  "formal_profiles": {
+    "roles": [
+      "before-streaming",
+      "after-streaming"
+    ],
+    "kinds": [
+      "stat",
+      "record"
+    ],
+    "shape": "large",
+    "required_receipts": [
+      "profiles/before-streaming/stat/receipt.json",
+      "profiles/before-streaming/record/receipt.json",
+      "profiles/after-streaming/stat/receipt.json",
+      "profiles/after-streaming/record/receipt.json"
+    ]
+  },
+  "pilot_contract": {
+    "roles": [
+      "before-streaming",
+      "after-streaming"
+    ],
+    "samples": 3,
+    "warmups": 1,
+    "required_receipts": [
+      "pilots/before-streaming/initial/normal-tiny-receipt.json",
+      "pilots/before-streaming/initial/normal-medium-receipt.json",
+      "pilots/before-streaming/initial/normal-large-receipt.json",
+      "pilots/before-streaming/initial/allocator-tiny-receipt.json",
+      "pilots/before-streaming/initial/allocator-medium-receipt.json",
+      "pilots/before-streaming/initial/allocator-large-receipt.json",
+      "pilots/after-streaming/initial/normal-tiny-receipt.json",
+      "pilots/after-streaming/initial/normal-medium-receipt.json",
+      "pilots/after-streaming/initial/normal-large-receipt.json",
+      "pilots/after-streaming/initial/allocator-tiny-receipt.json",
+      "pilots/after-streaming/initial/allocator-medium-receipt.json",
+      "pilots/after-streaming/initial/allocator-large-receipt.json"
+    ]
+  },
+  "replay_drivers": [
+    "build-descriptors.py",
+    "capture.py",
+    "profile.py",
+    "verify.py",
+    "summary.py",
+    "check.py",
+    "pilot.py",
+    "save-binaries.py",
+    "protocol.json",
+    "oracle-protocol.json",
+    "verify-report-candidate.py"
+  ],
+  "cleanup_paths": [
+    "/tmp/litchi-goal-0438-binaries",
+    "/tmp/litchi-goal-0438-markup",
+    "/tmp/litchi-goal-0438-tests",
+    "/tmp/litchi-goal-0438-evidence",
+    "/tmp/litchi-goal-0438-lifecycle"
+  ],
+  "cleanup_expected_paths": [
+    "/tmp/litchi-goal-0438-binaries",
+    "/tmp/litchi-goal-0438-markup",
+    "/tmp/litchi-goal-0438-tests",
+    "/tmp/litchi-goal-0438-evidence",
+    "/tmp/litchi-goal-0438-lifecycle"
+  ],
+  "status_bindings": {
+    "source_revision": "before and after build descriptors are retained separately",
+    "runtime_revision": "each report environment.git_revision is retained and must be internally consistent",
+    "binary_identity": "normal and allocator SHA-256/byte identities are required per role"
+  },
+  "claims": [
+    "descriptive same-API current-revision comparison only",
+    "no speedup, fixed-memory, fixed-RSS, cache-miss, scaling, or causal hotspot claim",
+    "Python report oracle and symbolization are outside profiled workload and GNU-time scope"
+  ],
+  "review_policy": {
+    "matched_cost_increase_threshold_percent": 5.0,
+    "normal_metrics": [
+      "p50",
+      "p95",
+      "p99",
+      "mean",
+      "throughput.slides_per_second",
+      "throughput.canonical_text_bytes_per_second",
+      "gnu_time_peak_rss_bytes"
+    ],
+    "allocator_metrics": [
+      "allocation.allocation_calls",
+      "allocation.allocated_bytes",
+      "allocation.region_peak_above_entry",
+      "allocation.live_bytes_after",
+      "gnu_time_peak_rss_bytes"
+    ],
+    "repeat_drift": "absolute p50/p95/p99/throughput/RSS drift for normal and allocator vectors; every flag remains visible"
+  },
+  "retention_gate": "See before-hypothesis.json and its pre-implementation check receipt."
+}
