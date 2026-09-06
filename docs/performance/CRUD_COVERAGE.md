@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0450 adds a ZIP transfer prerequisite
+
+[0450](changes/0450-zip-combined-capture-decode.md) enables combined decoded materialization and verified compressed capture
+for the category 9/15 substrate. It is tested through the preservation writer,
+but no semantic caller or native/default timing contract is promoted. Registry
+and representative counts remain 438/36 selectors/defaults and 15 categories,
+33 mappings, 10 measured, 23 correctness-only. OPC/PPTX adoption, native breadth,
+cold I/O, bounded append, repackaging and scaling remain required.
+
 ## 2026-09-06: change 0449 refines category 9 attribution
 
 [0449](changes/0449-pptx-caller-source-attribution.md) separates caller CPU samples and source/destination read counters in the

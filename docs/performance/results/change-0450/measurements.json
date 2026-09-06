@@ -1,0 +1,123 @@
+{
+  "change": 450,
+  "decision": "retain measured ZIP enabler",
+  "rows": [
+    {
+      "deflated": false,
+      "decoded_bytes": 0,
+      "compressed_bytes": 0,
+      "control_calls": 4,
+      "control_bytes": 71,
+      "fused_calls": 2,
+      "fused_bytes": 41,
+      "returned_bytes_saved": 30,
+      "returned_bytes_relative_percent": -42.25352112676056
+    },
+    {
+      "deflated": false,
+      "decoded_bytes": 1,
+      "compressed_bytes": 1,
+      "control_calls": 6,
+      "control_bytes": 73,
+      "fused_calls": 3,
+      "fused_bytes": 42,
+      "returned_bytes_saved": 31,
+      "returned_bytes_relative_percent": -42.465753424657535
+    },
+    {
+      "deflated": false,
+      "decoded_bytes": 65536,
+      "compressed_bytes": 65536,
+      "control_calls": 9,
+      "control_bytes": 131143,
+      "fused_calls": 3,
+      "fused_bytes": 65577,
+      "returned_bytes_saved": 65566,
+      "returned_bytes_relative_percent": -49.995806104786375
+    },
+    {
+      "deflated": false,
+      "decoded_bytes": 262181,
+      "compressed_bytes": 262181,
+      "control_calls": 16,
+      "control_bytes": 524433,
+      "fused_calls": 7,
+      "fused_bytes": 262222,
+      "returned_bytes_saved": 262211,
+      "returned_bytes_relative_percent": -49.99895124830055
+    },
+    {
+      "deflated": false,
+      "decoded_bytes": 1048613,
+      "compressed_bytes": 1048613,
+      "control_calls": 40,
+      "control_bytes": 2097297,
+      "fused_calls": 19,
+      "fused_bytes": 1048654,
+      "returned_bytes_saved": 1048643,
+      "returned_bytes_relative_percent": -49.99973775769478
+    },
+    {
+      "deflated": true,
+      "decoded_bytes": 0,
+      "compressed_bytes": 7,
+      "control_calls": 8,
+      "control_bytes": 133,
+      "fused_calls": 5,
+      "fused_bytes": 80,
+      "returned_bytes_saved": 53,
+      "returned_bytes_relative_percent": -39.849624060150376
+    },
+    {
+      "deflated": true,
+      "decoded_bytes": 1,
+      "compressed_bytes": 9,
+      "control_calls": 10,
+      "control_bytes": 153,
+      "fused_calls": 5,
+      "fused_bytes": 82,
+      "returned_bytes_saved": 71,
+      "returned_bytes_relative_percent": -46.40522875816993
+    },
+    {
+      "deflated": true,
+      "decoded_bytes": 65536,
+      "compressed_bytes": 65558,
+      "control_calls": 13,
+      "control_bytes": 131251,
+      "fused_calls": 6,
+      "fused_bytes": 65631,
+      "returned_bytes_saved": 65620,
+      "returned_bytes_relative_percent": -49.99580955573671
+    },
+    {
+      "deflated": true,
+      "decoded_bytes": 262181,
+      "compressed_bytes": 262266,
+      "control_calls": 22,
+      "control_bytes": 524667,
+      "fused_calls": 9,
+      "fused_bytes": 262339,
+      "returned_bytes_saved": 262328,
+      "returned_bytes_relative_percent": -49.99895171604084
+    },
+    {
+      "deflated": true,
+      "decoded_bytes": 1048613,
+      "compressed_bytes": 1048938,
+      "control_calls": 58,
+      "control_bytes": 2098011,
+      "fused_calls": 21,
+      "fused_bytes": 1049011,
+      "returned_bytes_saved": 1049000,
+      "returned_bytes_relative_percent": -49.99973784694169
+    }
+  ],
+  "cases": 10,
+  "new_tests": 5,
+  "zip_tests": 455,
+  "independent_fresh_indexes": true,
+  "source_max_chunk": 65536,
+  "generator": "xorshift32 seed 0x5a17932d; Store/Deflate single-member StreamingArchiveWriter; exact tested source retained",
+  "scope": "deterministic I/O assertions from one unit-test execution, not 10 timing samples; input index construction excluded, strict layout proof included independently; no latency, allocation, PPTX integration or native/scaling claim"
+}

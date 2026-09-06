@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## Change 0450: ZIP primitive for first-read compressed transfer
+
+[0450](changes/0450-zip-combined-capture-decode.md) implements the prerequisite identified in 0449: a checked compressed
+capture produces both decoded bytes and a verified token in one read/decode pass.
+Large deterministic Store/Deflate cases return roughly half as many source bytes
+as cold decoded read followed by expected-byte capture. CRC, exact size, complete
+Deflate consumption, cancellation and private token construction remain shared.
+
+The next task is OPC/PPTX adoption under explicit combined reservations, source
+lineage/version checks, cache/single-flight ownership and plan/publication lifetime.
+Measure complete old/new workflows, including the existing expected-byte path;
+no latency regression clearance or end-to-end gain is established here. Native,
+cold I/O, bounded append, repackaging and scaling work remains incomplete.
+
 ## Change 0449: separate harness hashing and publication source owners
 
 [0449](changes/0449-pptx-caller-source-attribution.md) shows that roughly half the lifecycle SHA period belongs to the untimed

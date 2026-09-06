@@ -1,6 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0449
+## Current evidence through 0450
+
+[0450](changes/0450-zip-combined-capture-decode.md) adds the low-level combined ZIP capture/decode primitive needed for OPC
+first-read transfer authorization. Deterministic I/O evidence removes a compressed
+source pass while preserving decoded bytes and writer token output. All 455 ZIP,
+436 OPC and 59 PPTX targeted tests pass, as do strict lint and the instrumented
+1,000-run fuzz smoke. This is a measured enabler; OPC/PPTX has not adopted it yet.
+
+No timed or native coverage is promoted. Registry/default counts remain 438/36;
+representative coverage remains 15 categories/33 mappings/10 measured/23
+correctness-only. Combined OPC reservations, token/cache lifetime, matched timing,
+native breadth, cold I/O, bounded existing append, repackaging and scaling remain
+required. The full user-owned non-iWork goal remains active and uncompleted.
+
+## Earlier evidence through 0449
 
 [0449](changes/0449-pptx-caller-source-attribution.md) corrects the attribution used to rank the next PPTX optimization: untimed
 harness hashing is about half of lifecycle SHA period, and publication read totals

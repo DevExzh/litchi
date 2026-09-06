@@ -1,0 +1,16 @@
+{
+  "change": 450,
+  "decision": "retain measured ZIP enabler",
+  "goal_complete": false,
+  "pptx_adopted": false,
+  "latency_claim": false,
+  "memory_peak_claim": false,
+  "acceptance": "Ten independently indexed Store/Deflate cases preserve decoded bytes and transfer-token payload while removing at least the compressed payload size from positional returned bytes. Larger cases return about half as many source bytes.",
+  "next_step": "Integrate combined capture with explicit OPC reservations and source-authorized transfer lifetime; then measure complete PPTX planning/publication with old/new expected-byte controls and equivalent cold/warm/provider configurations.",
+  "limits": [
+    "No latency or peak-allocation measurements in this batch",
+    "No per-format production caller adopts the new primitive yet",
+    "Caller must reserve both compressed and decoded sizes plus operation overhead",
+    "Fuzz is a 1000-run smoke, not exhaustive coverage"
+  ]
+}

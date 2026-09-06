@@ -1,0 +1,20 @@
+{
+  "change": 450,
+  "status": "pass",
+  "finished_utc": "2026-09-06T21:47:35.282851+00:00",
+  "exit_code": 0,
+  "stdout": "{\"status\": \"pass\", \"change\": 450, \"zip_tests\": 455, \"opc_tests\": 436, \"pptx_tests\": 59, \"io_cases\": 10, \"fuzz_runs\": 1000, \"sealed\": true, \"cleanup\": false}\n",
+  "stderr": "",
+  "owned_cpu_jobs": "all terminal",
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "preserved_targets": {
+    "target": [
+      66305,
+      25854451
+    ],
+    "tools/perf-baseline/target": [
+      66305,
+      25593433
+    ]
+  }
+}

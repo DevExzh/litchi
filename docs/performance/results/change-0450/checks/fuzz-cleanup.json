@@ -1,0 +1,4072 @@
+{
+  "artifact_hashes": [
+    {
+      "bytes": 775,
+      "kind": "source-copy",
+      "path": "crate/Cargo.toml",
+      "sha256": "c78ca970c3bfd6e55ae48be3d5407b34360a7ac359bd2ed2b4c07d4206a4731e"
+    },
+    {
+      "bytes": 443,
+      "kind": "source-copy",
+      "path": "crate/fuzz/Cargo.toml",
+      "sha256": "b1696f274e03de35a81b0b6172b35ff03d0ea2b89931fe237b3f3554a6cab2e6"
+    },
+    {
+      "bytes": 10115,
+      "kind": "source-copy",
+      "path": "crate/fuzz/fuzz_targets/parse_zip.rs",
+      "sha256": "536974ff7221d509343e94d154c839e604a6baf7daa4af53ef3f0d3fca023ff8"
+    },
+    {
+      "bytes": 14085,
+      "kind": "source-copy",
+      "path": "crate/src/accounting.rs",
+      "sha256": "f96b578e599d4ee7596bd3eac29a82e77e53169b32f0544a8ef5219bbc84540e"
+    },
+    {
+      "bytes": 168448,
+      "kind": "source-copy",
+      "path": "crate/src/archive.rs",
+      "sha256": "7e4243ab183ce7c92b94916835a15cd86adfdcd8149ccdcacc48f5693786a968"
+    },
+    {
+      "bytes": 1057,
+      "kind": "source-copy",
+      "path": "crate/src/crc.rs",
+      "sha256": "5cfce6562f76a536c0eb4c6f38c684cd1e3aa339d4edd71052d6c5789da021ae"
+    },
+    {
+      "bytes": 10403,
+      "kind": "source-copy",
+      "path": "crate/src/errors.rs",
+      "sha256": "0eff278595bdf85aa4998489f96acbccb8585944c389b61257ee359527fa4e30"
+    },
+    {
+      "bytes": 15294,
+      "kind": "source-copy",
+      "path": "crate/src/extra_fields.rs",
+      "sha256": "bb4a4fd8d8666140a37236a4fa4e81f442fb3b7edd8b7303a94f537f82dc4c8f"
+    },
+    {
+      "bytes": 3056,
+      "kind": "source-copy",
+      "path": "crate/src/headers.rs",
+      "sha256": "385e2ebb6edbc73a22678639dbc2d8dd0c5da029a35bc1fc797ff728e4e87756"
+    },
+    {
+      "bytes": 1381,
+      "kind": "source-copy",
+      "path": "crate/src/lib.rs",
+      "sha256": "99df448608c2f551e796c8785414cc784b2fe94de21b12a6f02d7f2c7e296b97"
+    },
+    {
+      "bytes": 91771,
+      "kind": "source-copy",
+      "path": "crate/src/locator.rs",
+      "sha256": "ab67a85a8cae9ce91861aad78263afa57648435e2eaa114826c7bfaef1a3bbac"
+    },
+    {
+      "bytes": 2692,
+      "kind": "source-copy",
+      "path": "crate/src/mode.rs",
+      "sha256": "4c4faebb37bd8366c26dfadac3844214b40b0d290c3a4afc2e787430616497c9"
+    },
+    {
+      "bytes": 547545,
+      "kind": "source-copy",
+      "path": "crate/src/office.rs",
+      "sha256": "ad626f0f093f5fa655eea1d03972f1923e2663142a423881bf5ed1ad876fa55c"
+    },
+    {
+      "bytes": 15044,
+      "kind": "source-copy",
+      "path": "crate/src/path.rs",
+      "sha256": "642203cc1db7d83a850cf0ea066546decf14814d475401a3ba2be238f5a860a8"
+    },
+    {
+      "bytes": 189898,
+      "kind": "source-copy",
+      "path": "crate/src/preserve.rs",
+      "sha256": "d6d8bedfd9452f8b452df4bf8cd6a407da9ccad401b879b65c2cf2bcea3bb94e"
+    },
+    {
+      "bytes": 21120,
+      "kind": "source-copy",
+      "path": "crate/src/reader_at.rs",
+      "sha256": "7d58b13c16007d830b8eac6ecc7e756918ec17e3e841d92c5b6b592157b9b482"
+    },
+    {
+      "bytes": 43194,
+      "kind": "source-copy",
+      "path": "crate/src/time.rs",
+      "sha256": "6d4a93287ac6df9e88abf115b560c9155d39314786d49088203c46045769daf2"
+    },
+    {
+      "bytes": 341,
+      "kind": "source-copy",
+      "path": "crate/src/utils.rs",
+      "sha256": "1df835893444e8e330060674456e7cdb05db904ba08fb9e27e17e7a532e09971"
+    },
+    {
+      "bytes": 111031,
+      "kind": "source-copy",
+      "path": "crate/src/writer.rs",
+      "sha256": "cb58b87ccba87871b10978fae0cd0b166e5771180c0207889eb9f5a16938b1d3"
+    },
+    {
+      "bytes": 44130,
+      "kind": "seed-copy",
+      "path": "corpus/many-small-central-local-signed.zip",
+      "sha256": "8352e19b15374d816f3845e8dae1f772cf083369e721dacaed7ec8ea852d803c"
+    },
+    {
+      "bytes": 44054,
+      "kind": "seed-copy",
+      "path": "corpus/many-small-central-local-zip32-tail-signed.zip",
+      "sha256": "8ee78ee40493d5f468b4f8520cb9de153ec3f365993ff0305864a2c6468929be"
+    },
+    {
+      "bytes": 38934,
+      "kind": "seed-copy",
+      "path": "corpus/many-small-local-only-signed.zip",
+      "sha256": "e77578623954dc19cf2c0966511596ce196178438a225e798afa5532b12e934c"
+    },
+    {
+      "bytes": 31766,
+      "kind": "seed-copy",
+      "path": "corpus/many-small-zip32-signed.zip",
+      "sha256": "7b8ba022a2ab76def4ae1758091859de3b5c1551664c84d27c85b800e407300a"
+    },
+    {
+      "bytes": 1348,
+      "kind": "seed-copy",
+      "path": "corpus/opc-local-only-signed.zip",
+      "sha256": "6c534b529d6546bac4f9c7d1e9a0a18991751101d0e6b1b1488547b1f8d2d51a"
+    },
+    {
+      "bytes": 373,
+      "kind": "seed-copy",
+      "path": "corpus/zip32-signed-store-deflate.zip",
+      "sha256": "e81bdc5cd5cbf6a1ae911abe8bca73c7a88947e99ceb01b0aa295d675f2ec4be"
+    },
+    {
+      "bytes": 545,
+      "kind": "seed-copy",
+      "path": "corpus/zip64-central-local-signed.zip",
+      "sha256": "d1e6f408641468355c2d0750c99094dec4f9c37135348b9e66452f642d9cf119"
+    },
+    {
+      "bytes": 469,
+      "kind": "seed-copy",
+      "path": "corpus/zip64-central-local-zip32-tail-signed.zip",
+      "sha256": "6b181748e6d19f30ee1a135c5be3895621314961ae9435bc05d98da47a75a953"
+    },
+    {
+      "bytes": 160,
+      "kind": "seed-copy",
+      "path": "corpus/zip64-local-only-empty-signed.zip",
+      "sha256": "ac285a6dfdb9b614f4fabd7fc1de04dc43141f792c66710eb7d5250cc60341ec"
+    },
+    {
+      "bytes": 156,
+      "kind": "seed-copy",
+      "path": "corpus/zip64-local-only-empty-unsigned.zip",
+      "sha256": "6c04fea48bd3f3daafd5931ac697365a0a3aa551258b14b3e4f3c96aa528b038"
+    },
+    {
+      "bytes": 417,
+      "kind": "seed-copy",
+      "path": "corpus/zip64-local-only-seekable-no-descriptor.zip",
+      "sha256": "d1366df6e357f7d5edea8127fd8c21f9ab4312c8413f3a171b48955b3c17561e"
+    },
+    {
+      "bytes": 429,
+      "kind": "seed-copy",
+      "path": "corpus/zip64-local-only-signed.zip",
+      "sha256": "f2312a2a777c66b381ee07ceadc27c34cc1135e9849d59b159fa1babeb56db69"
+    },
+    {
+      "bytes": 424,
+      "kind": "seed-copy",
+      "path": "corpus/zip64-local-only-unsigned-crc-marker.zip",
+      "sha256": "1cf1b52754f238ef3c864e2bf3340027aadc7e793ca308b18482a036ee12d670"
+    },
+    {
+      "bytes": 4463,
+      "kind": "generated-cargo-lock",
+      "path": "crate/fuzz/Cargo.lock",
+      "sha256": "469113ba59e79b9b66c7acb0ad3f6f967319d2ae38d78ff132f7ed145e28779f"
+    },
+    {
+      "bytes": 38934,
+      "kind": "generated",
+      "path": "corpus/01cde3d54e11eaf5c7b1f5626b20da8a88c3f760",
+      "sha256": "4488c6f20c0a9a8d1ded1565c05e3abf869b24f2aa3eebce91d0bdc6bfa0f683"
+    },
+    {
+      "bytes": 38934,
+      "kind": "generated",
+      "path": "corpus/022ba51955585339d06a5afdc502249029576f87",
+      "sha256": "0c541b6c0d5556cc2ad293ec1d6c8d9e61146399daa3a2bf8b8e46ea9203a0e3"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/03f44cadc858a5a85ae25ee76b2c2171a088c235",
+      "sha256": "085d9205e7941a2f0d9f766533cc945bec36701ef83844397e80203f2b2dd44b"
+    },
+    {
+      "bytes": 387,
+      "kind": "generated",
+      "path": "corpus/045e8c5f95d1f034e6a49ab6858632c214db8ad2",
+      "sha256": "550b0b1d0428b6cbf5021c48aa96382a6b719d6aa84c67aa11f5c073a024715a"
+    },
+    {
+      "bytes": 39050,
+      "kind": "generated",
+      "path": "corpus/04668543bd27e5851852761dbb5470bf6eb4895b",
+      "sha256": "077731c40620cc5d31bf64a94ec9bc831310925dc67037fcc1b9ec86eba6b8d5"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/04be55d8e68a0f7d74f9c38609ed0170507c7312",
+      "sha256": "4674ccb72755a694af2200be73eba43fb61a3f054d0a45815f905e0835a4a0d5"
+    },
+    {
+      "bytes": 1348,
+      "kind": "generated",
+      "path": "corpus/093f1247abbfcc45f8dd270877e879a8a11cfa6c",
+      "sha256": "a85d6af1489dfe0b202aeb13803e7cec77323ff2bfd545188cc09c56078f4196"
+    },
+    {
+      "bytes": 359,
+      "kind": "generated",
+      "path": "corpus/09da4cba69d4ecd1551a7cff4098a4525309d5a1",
+      "sha256": "ef7b493d3e01a9f9fad6d4052584e167bb352e7d303cd276ac83781ddda90ee6"
+    },
+    {
+      "bytes": 44054,
+      "kind": "generated",
+      "path": "corpus/0a4584799a796fc8d6e4c7ba6b42ccf07ef3a9e9",
+      "sha256": "870341d0ca0a0db9d9902218202212eb70281b0d8fe397dcb8761fcd5340e334"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/0bb856ba9ca0cad81057c361f088e41347c11007",
+      "sha256": "5289e66712e973b476358acedf4d2288b44670fc5afb07e3892c0a49bca2054d"
+    },
+    {
+      "bytes": 31766,
+      "kind": "generated",
+      "path": "corpus/0eb22e1118aa7ea4eaa064ab5a6015da3d9ff598",
+      "sha256": "f83230ee3e87b9a99eb6c51a911019c7c568d38e853f687f278189b9b0766767"
+    },
+    {
+      "bytes": 469,
+      "kind": "generated",
+      "path": "corpus/0f42ff1a2f0665d1cde2394810bc53fbff17b413",
+      "sha256": "358f4a842770629f4833d83fa7cb1c2a989010415242f6a9be9dea5babb80bc6"
+    },
+    {
+      "bytes": 161,
+      "kind": "generated",
+      "path": "corpus/0f7fc9f71eda8a25f03159813dd75f5a8068a540",
+      "sha256": "6eda73133daed296c0e66366a7cd36bdf9a8b1323c912a8783b2bcca7dc5106b"
+    },
+    {
+      "bytes": 44113,
+      "kind": "generated",
+      "path": "corpus/1b7d9776c361e78d9559c3a97843890e489ebf1b",
+      "sha256": "7d2f3b4e25a2c05e35fd782745a31a32b69494f82e2c1bd8a2963b52ebf07776"
+    },
+    {
+      "bytes": 1352,
+      "kind": "generated",
+      "path": "corpus/1d537069d15573590636b6ee9e88ccf7ffdc5cca",
+      "sha256": "7006f94ee61b5ac84d321a7f3d64edc8574dc78a2b404796d9561079caeb0b8a"
+    },
+    {
+      "bytes": 39097,
+      "kind": "generated",
+      "path": "corpus/1fc3bc66fe55a0a298e18a6ae5da88ba2d9af264",
+      "sha256": "e487308f0705cc3844bb671b21a66ebb51008c5ad1657b7fef286d8480f5f4f4"
+    },
+    {
+      "bytes": 38934,
+      "kind": "generated",
+      "path": "corpus/23509c7c1bf78efef00c4e9aeaab1fece620cfed",
+      "sha256": "cf8b419e0bf057a5d8e58b5f49a6e6cd65721fd398b63c3aeacf3aefc225b8c5"
+    },
+    {
+      "bytes": 31766,
+      "kind": "generated",
+      "path": "corpus/23549961a9fb928bf3dae208ea46d0c5af0e2db4",
+      "sha256": "e171516b7cb5424eee704f40a055274adb126223e24dc43840b1445d0150e13f"
+    },
+    {
+      "bytes": 373,
+      "kind": "generated",
+      "path": "corpus/23a8c1e2200478244a4feae6e49954ed069f4038",
+      "sha256": "e8005bb3f4928fd3da4332b94ce74beaa6ba1780cac25260622801ca007a959e"
+    },
+    {
+      "bytes": 1414,
+      "kind": "generated",
+      "path": "corpus/25f3e9ffc2c5080118bb7ce5b17eef5b39b69115",
+      "sha256": "6d3a28c6f2d6c3ee17521c62fe500a64daf94106254cbb0994809f00f362503a"
+    },
+    {
+      "bytes": 1356,
+      "kind": "generated",
+      "path": "corpus/26e017bb519db4dfe22b3904f40c60afd71efcd4",
+      "sha256": "9538c811012e9b833ef4c150e458b712fb196ba99585f8e2dd66ce01209a4cb4"
+    },
+    {
+      "bytes": 31766,
+      "kind": "generated",
+      "path": "corpus/2ae91ee4a8feb76512c22b192d8f192d5ff6dc36",
+      "sha256": "3ec630405630c0c68a7bd2aeef8464f355fb9feeb4f1f81e74bf57e167f9c2f3"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/2b226233f97f4605e109ecc0996b71e1d09bbc29",
+      "sha256": "ed4b671749dd9c47296f4bef380efddded1f578d1dd9b0d1d693dd941dcf4c6d"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/2c293ba4f8f969eb81910696475a7e0f35593dce",
+      "sha256": "31137a726b77d1bfb3e89d900028953c1bbaedccc5b29181b6cc5d9b3a21e2bc"
+    },
+    {
+      "bytes": 417,
+      "kind": "generated",
+      "path": "corpus/2f4665f8c797a0efffa2922a170773ae7fe6be14",
+      "sha256": "5407f76de10e01250872ae9a0b73a211f46631bd59a86a9279f0dc7312ac6a89"
+    },
+    {
+      "bytes": 38934,
+      "kind": "generated",
+      "path": "corpus/36996329a4a0fc08284a96ddf4fa75b61b780d6a",
+      "sha256": "7034507086af1cd2929fc85dcf918bb70c1b5e45730f49dc3e6eb04e2ffa81b9"
+    },
+    {
+      "bytes": 1348,
+      "kind": "generated",
+      "path": "corpus/386f211a4c8f969fdeba0ea723906af265152821",
+      "sha256": "d492473fde0f65a85adbf398f643a10ca15f24607772725f185a9c629c8e4a9f"
+    },
+    {
+      "bytes": 44055,
+      "kind": "generated",
+      "path": "corpus/396d3b017a8facd050f100a70560aea5f6a278f5",
+      "sha256": "5a01b21429754041dc939fb9cba6f2e9c95a1e591d3e2cc4c3d73a4becc12f88"
+    },
+    {
+      "bytes": 417,
+      "kind": "generated",
+      "path": "corpus/3a409a38879784b5cc23166d67cb235114643299",
+      "sha256": "eb0e1747a2e9f8bbb6549a546585013330a75ba89968a8dd9ad4a985c38a4997"
+    },
+    {
+      "bytes": 44128,
+      "kind": "generated",
+      "path": "corpus/3c41ad16dbc84bf53dd7f75f54f98081c7cb81c0",
+      "sha256": "622d5e38be57f3a69826e79fdb85503c21028c2d38f364dff38c3726269528ee"
+    },
+    {
+      "bytes": 417,
+      "kind": "generated",
+      "path": "corpus/3e247ca5192736377cd713c3e7745f2aaf8f3b16",
+      "sha256": "f1256a28bfc1ba08a8503a6e7eb12712ae143844611127b48dfa16526e53e2d3"
+    },
+    {
+      "bytes": 747,
+      "kind": "generated",
+      "path": "corpus/3f4b7c55d6f21fff5d0832a249153cb61c8fbae1",
+      "sha256": "30c1311e938d88e9da583a1101b6191d369b6f1832747aa93d33c4fa849bc48d"
+    },
+    {
+      "bytes": 156,
+      "kind": "generated",
+      "path": "corpus/3fa2d460b4c1b3bf9855743881050104fdf393c5",
+      "sha256": "8e54691bef813bc63152bc4e63d4cae43b5329f083a30fdb2ddaa17f08b1090f"
+    },
+    {
+      "bytes": 31766,
+      "kind": "generated",
+      "path": "corpus/4107c3fc366902717ff92ef5f686d5cb88f546d2",
+      "sha256": "7e19e654b118a5728f27514e75b3496743e22c469ccf6b9d650c35d77b6de439"
+    },
+    {
+      "bytes": 1348,
+      "kind": "generated",
+      "path": "corpus/444a8e1ec3ef0964668fe3ec9da15d69696f6dcc",
+      "sha256": "c3365ad7b047f422d4913e6986e5eeb02c2350afc14af06008cb13fbefbc0fed"
+    },
+    {
+      "bytes": 469,
+      "kind": "generated",
+      "path": "corpus/453f5523891695f57a11daa5b083c8a291d3c7be",
+      "sha256": "6b181748e6d19f30ee1a135c5be3895621314961ae9435bc05d98da47a75a953"
+    },
+    {
+      "bytes": 164,
+      "kind": "generated",
+      "path": "corpus/47ddf73d06bc57669794ce1aa9cff0a381b0ffed",
+      "sha256": "9df35f6632ca2a78ef049fdebf59645a7c66924992954cc5f8831fba899c981e"
+    },
+    {
+      "bytes": 22021,
+      "kind": "generated",
+      "path": "corpus/489d44befa9fd7e0d2b898c7c31f5edfcedc6be5",
+      "sha256": "85924bbe7f54af9f11ceb1642a1cfe0db40c94ae3d149cfd3a23fd49a0284644"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/4bb5fe5b13ab98b335c45daec9cd59b31f781e35",
+      "sha256": "0662700908e9c836f00a60c354a42b987fcc2ed50b40679bc34f4594af525684"
+    },
+    {
+      "bytes": 31766,
+      "kind": "generated",
+      "path": "corpus/4c62ad3350e0a8dec8d510ea1217f11c2d5b8b00",
+      "sha256": "870a3a06f7891295f5ed1c3e4a5b50373eef4775574c72622a644a9ffeec1f2f"
+    },
+    {
+      "bytes": 1348,
+      "kind": "generated",
+      "path": "corpus/4d15f20857f1741a0ae18e84ff22b7ea88aaf82c",
+      "sha256": "ec7c543b42f285b8e70bac88c09c40a28fe7cd38ea0d5d27baaa12f3d6bc8041"
+    },
+    {
+      "bytes": 601,
+      "kind": "generated",
+      "path": "corpus/4fa9734c5a3cad8c25dcf16d17c55fe170275713",
+      "sha256": "1e474ba9f172b191f8fe7abbb90f9ea2e4bae81b962aeed061b3515d76beb043"
+    },
+    {
+      "bytes": 1467,
+      "kind": "generated",
+      "path": "corpus/5029f891312b972047d120e236bdb710f5a91e00",
+      "sha256": "3ba720ea69f5f847ab8e8dd01a4d2c0339c047b4aa08c50da59e6cd3629e3278"
+    },
+    {
+      "bytes": 721,
+      "kind": "generated",
+      "path": "corpus/51fd41121e83deb574f3357aef3419de8dcf0c77",
+      "sha256": "2bc2eb0a5898c649cb1751bb5464da3a04dae8634334ebd0a3f78a0a5d898b44"
+    },
+    {
+      "bytes": 1394,
+      "kind": "generated",
+      "path": "corpus/522859415dbd8509da3aee27a0fc07bd65f2c814",
+      "sha256": "318e0688cc32b1cfeb426167b9fd440563b0caf88e385383fcf8065066aca17a"
+    },
+    {
+      "bytes": 1348,
+      "kind": "generated",
+      "path": "corpus/5432f7a683c1d91e28216297208e7ecd4dc1d906",
+      "sha256": "8878c576382eed59ffa6acae9e1cd8510b82692772fadae08aa0bc648be9b231"
+    },
+    {
+      "bytes": 417,
+      "kind": "generated",
+      "path": "corpus/5b38c221f4a19f028eb08090f52746ea69c39d0c",
+      "sha256": "a9100b3f4977e1c1d44035fa949ba6275809dde059ea4cb188d521c8c3f1c6a1"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/5c28f0146d5452ccfa1156daaee3984502668d35",
+      "sha256": "e66c96be9a3bce5cad999d54256ac9cccafea8aa97ea9d98b62d1d0ee1a438bc"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/5d9bee95932d2e6a68087700fa3b0b008b2c3bb0",
+      "sha256": "141163ce752047e929f05514b673314653af42b429bebeeefdbb0cdce74d3def"
+    },
+    {
+      "bytes": 31766,
+      "kind": "generated",
+      "path": "corpus/5dbea517305eda206e8ad98596bdbd7fab2287f4",
+      "sha256": "b28510671b2c6c3011a00ddd797ec00ded681d753ba4924e46e7a4f2e72a236e"
+    },
+    {
+      "bytes": 373,
+      "kind": "generated",
+      "path": "corpus/5ebda71c8a227726b45ef48925900ed0a37a0eb3",
+      "sha256": "5a0a366dd0d1aeeece4a9153d54f1695b20d9f2da591cd6fc049daf43bd8df4d"
+    },
+    {
+      "bytes": 44054,
+      "kind": "generated",
+      "path": "corpus/5facf5c15ffad40239484c1d1bf972f0ca4e5fa4",
+      "sha256": "591ba603d1a6158b4b9d009c6dd768ffa59aa6c53b295509ae1778ac820a6803"
+    },
+    {
+      "bytes": 12805,
+      "kind": "generated",
+      "path": "corpus/61d169723de90489c89acefc578971d4c8a0df78",
+      "sha256": "50c0b4d4e9b09d9a871a7b30527ad467224eb452e5e0130f8b543fb366a76e3b"
+    },
+    {
+      "bytes": 44054,
+      "kind": "generated",
+      "path": "corpus/63df1db795f258b8312761e1e86f38bcf5c52591",
+      "sha256": "7f0a49b209700f9a22e9f025f079cf265798ffeeb255595a08bb15be6a2bc4f4"
+    },
+    {
+      "bytes": 44058,
+      "kind": "generated",
+      "path": "corpus/653559c1f130a9675b8f02ed77e10dd28aa7be54",
+      "sha256": "3495bc4c36842d3807af81a5d82c7a7077b7eed3d127c30ad3e815143c0304a7"
+    },
+    {
+      "bytes": 44054,
+      "kind": "generated",
+      "path": "corpus/65d688d50a83e0d7a5c0a9574e6b7fa785156ddf",
+      "sha256": "80646526706207ee913cce1802a18fd5733636609d045e1152f8cfe4b3202d2e"
+    },
+    {
+      "bytes": 473,
+      "kind": "generated",
+      "path": "corpus/68419e48dc3f71a19e37d0480fc059176adfdb31",
+      "sha256": "9bed7ddaf8c2a22a47489493b11171de9607846f1973a2fd59c8df134dcfe7a6"
+    },
+    {
+      "bytes": 44089,
+      "kind": "generated",
+      "path": "corpus/6a9df6e40ea6d5f044a4d5ce3be6603718c66051",
+      "sha256": "a75ab44133c33807ce42f5b29c91547b527289632f8ecfd2edd7febe36814298"
+    },
+    {
+      "bytes": 510,
+      "kind": "generated",
+      "path": "corpus/6d166578784dfb09ae48712afc66cc8548742278",
+      "sha256": "112efc56b6d59f00ebb878c4a552c9b0f66497844cfb8e784695d77646cecdd8"
+    },
+    {
+      "bytes": 160,
+      "kind": "generated",
+      "path": "corpus/6dc3efa582af7bc10ce868467cb4524d08d863a9",
+      "sha256": "ac740efafb27b156357b1f09290b55c46b97f0dbc55e2fec4014bc7137c0be1d"
+    },
+    {
+      "bytes": 588,
+      "kind": "generated",
+      "path": "corpus/6e1c053c656f035fbcfde132b9cf77f92ddedf1e",
+      "sha256": "71c3f8c55418dd043d02eacbb79804a3b111385d9440e36612f537572b276abe"
+    },
+    {
+      "bytes": 31766,
+      "kind": "generated",
+      "path": "corpus/6fa620e286b0e5a9aa41a46e3954555357bf1b92",
+      "sha256": "256ab73cb04ef66602cf5750ab782125938ff253dda7955d3279d4d3a60fdd9b"
+    },
+    {
+      "bytes": 6534,
+      "kind": "generated",
+      "path": "corpus/70b1ac5c2058a5034ac9c95fadb27f5204de016f",
+      "sha256": "2294a966d1980a797e56e493e6c7a58b814b53fde5b2fb90b27db4db1c602c19"
+    },
+    {
+      "bytes": 38938,
+      "kind": "generated",
+      "path": "corpus/71c7c0b5abf85938983fc65ba12a46546660de51",
+      "sha256": "61160bedc51defb8081d7958f1869980f881f3066c56a5db8bbb033ed0557322"
+    },
+    {
+      "bytes": 44062,
+      "kind": "generated",
+      "path": "corpus/75f865d49026875f035c1032b412a72ec24c4b78",
+      "sha256": "0cf3ec8a59eea902cae4dc7bededee9af8516b361fad726665c8a84070b46193"
+    },
+    {
+      "bytes": 21159,
+      "kind": "generated",
+      "path": "corpus/78510bf7c37fa80bd7e7a6cef97cda4bbf365e0c",
+      "sha256": "b3e3d1efff770177a0e0490dc9a9529e16806f2a4831d3421ace77c539d5a9f0"
+    },
+    {
+      "bytes": 1356,
+      "kind": "generated",
+      "path": "corpus/789d191d3498b0cf2c14ab4f529f6bc148138b4a",
+      "sha256": "6cd36c4ab50f3e611518888d727b5fdb3d95743e5daffef1d91bb5367f616940"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/7a275e93a591d84a499ea44988e9cec73dede3c6",
+      "sha256": "cde2433ecfa9f67bee966d0160bea5947602eb511834e0fbaee52cd204611af4"
+    },
+    {
+      "bytes": 373,
+      "kind": "generated",
+      "path": "corpus/7b6af5fde9aafd544b7ee890b35b267bc4fe559d",
+      "sha256": "1955b648e7c353d641d11b468e157572fd0def9ad4b24928c29193b8cf2f6e49"
+    },
+    {
+      "bytes": 546,
+      "kind": "generated",
+      "path": "corpus/7ccf9a50737ce4cdd7494a1efb7134c26fe92da1",
+      "sha256": "649d57d7a840454e9c14e82427debee2aae424c34d8559223c59f8b1bf708ff3"
+    },
+    {
+      "bytes": 424,
+      "kind": "generated",
+      "path": "corpus/7ea6ec9faab7e4694571840acb4b803ce9f602b5",
+      "sha256": "394c8271389fdee96ad484a4ad25981e523a6c7504afe5f74e3cfc9b20d33897"
+    },
+    {
+      "bytes": 663,
+      "kind": "generated",
+      "path": "corpus/808e64bab2ce96bfc87e3c767a5d2fc43d0353dc",
+      "sha256": "48b59d233fb313a80fe776c8251ce1875893452d73d00795036907acde214896"
+    },
+    {
+      "bytes": 417,
+      "kind": "generated",
+      "path": "corpus/8264cea05577dab45f8fddb54ea86523a37794ec",
+      "sha256": "762dd6963c7601b19e54c5173fe38808f14798aa69d03ef379fa532961db2620"
+    },
+    {
+      "bytes": 19331,
+      "kind": "generated",
+      "path": "corpus/82ba74d1d3744a40e8d2bbbe6e99092c9f2e5c70",
+      "sha256": "cac99cced9f1e19fbc3e959cf617ec082c797b8a20a49f40612d2a5314bd57c3"
+    },
+    {
+      "bytes": 403,
+      "kind": "generated",
+      "path": "corpus/849f257394dae9acfa1674ae571d5624ead921d0",
+      "sha256": "d898939e52a83415edc11a2f891fd798db55a51743ac00936ee86f264861bc7e"
+    },
+    {
+      "bytes": 38964,
+      "kind": "generated",
+      "path": "corpus/84c39b0e9dcca48b0adba6b6d6bc897bfd553fe7",
+      "sha256": "debad93f7b82deb43454f9348a0376062ed0973d2d48644727c22902c5522217"
+    },
+    {
+      "bytes": 607,
+      "kind": "generated",
+      "path": "corpus/851d4550c8f2605c0797d9173d57199c9154e627",
+      "sha256": "57636666525f827806b881b734726859c9622a69cdd2db6d9aedccc499893158"
+    },
+    {
+      "bytes": 39050,
+      "kind": "generated",
+      "path": "corpus/86839ef3236acea06d6773a93f6ddca18b20f491",
+      "sha256": "875bc8251d5d261aef66cbe5e2e7c12fccc4d6bb46c706ec767c3f07c2052aed"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/89fb590c7ab58c5d51b94c2d8c7e817e5c270239",
+      "sha256": "b522b3d245b308a7f61d89b16f731f0d7904b515d799690a09b3b145134fd230"
+    },
+    {
+      "bytes": 11857,
+      "kind": "generated",
+      "path": "corpus/8a7ec85f02dce834a3d5e7b0674ec559e3491801",
+      "sha256": "f118b60c2803ebfdcb9ceaeed3509145f23009dc99b310e5a68f08796be2c6bd"
+    },
+    {
+      "bytes": 1352,
+      "kind": "generated",
+      "path": "corpus/8b68a3cc1ae74675947cc796c02ddcee0c4ff966",
+      "sha256": "92721c1bf1186e1c8e1dacc112c581dea0c4812b334049e2640bbe82fce0246a"
+    },
+    {
+      "bytes": 312,
+      "kind": "generated",
+      "path": "corpus/8bd9d0776c8bd6c176d741bfa63f3133d4151acc",
+      "sha256": "09b71a8bd3c5507113467a4f27d7c4e9890932c28bc973fdafe354591f43498a"
+    },
+    {
+      "bytes": 373,
+      "kind": "generated",
+      "path": "corpus/8d0a6f964168fc683fb40c5172cbc4ca2ab9b552",
+      "sha256": "a633c3808d1b128632226800854a2009479df49d4eadc920a9ec8728ce0adcc7"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/8d8406a2dbbeef682f5133c577a7d2d8696db215",
+      "sha256": "fa1895978f8cd2fe75844bc333961becacab1f0fce6d2b1c5c122b168eea67a9"
+    },
+    {
+      "bytes": 244,
+      "kind": "generated",
+      "path": "corpus/8e5865b55e61bbf3f2e9c741261d01eab42b8e49",
+      "sha256": "80eeb73a8748c2b591bc4211da4beeb58938cc605b0a1e4dfcdc673b868e7435"
+    },
+    {
+      "bytes": 11912,
+      "kind": "generated",
+      "path": "corpus/8f08e76c66d80fc601209d9127f5d94e9e32ef18",
+      "sha256": "9e0e06b2d7e06c5cedc4ad759b19936a684cd262563367bcf9900bdd06e87e54"
+    },
+    {
+      "bytes": 1356,
+      "kind": "generated",
+      "path": "corpus/90af2e2ea059c659316a7f0261126e3d3d8978bf",
+      "sha256": "ee75086711def81c49ddf81d2330abe6c1d46ed056723c05388a1c74702695f2"
+    },
+    {
+      "bytes": 44089,
+      "kind": "generated",
+      "path": "corpus/93a8a8cc494306b984a517ac34332d7d4555a298",
+      "sha256": "c212ea89924090dcc4d3ae31099359e4f6c344edf228b545e9dbd0923016db63"
+    },
+    {
+      "bytes": 414,
+      "kind": "generated",
+      "path": "corpus/93fbfb238fcf269c9298b074642b0c761dd05e5b",
+      "sha256": "db5dba26f4d9ebb11c5e5949e4ac4d813664324de6d8b5800cef5bce069cf706"
+    },
+    {
+      "bytes": 156,
+      "kind": "generated",
+      "path": "corpus/9634226ce5f463a4ced531cb3e80be7301d09318",
+      "sha256": "1d70e2a9a33ce996f5e3949892875aae6ed1733a5c9cf95b1035795ee44d6c8e"
+    },
+    {
+      "bytes": 11857,
+      "kind": "generated",
+      "path": "corpus/96d3a65bb783b13aace20e120fc67a7bd3b6bca0",
+      "sha256": "8b96835216b221caff587fb4968f8b90352fdc4ee0bfb66dffea4d0710d88b8d"
+    },
+    {
+      "bytes": 373,
+      "kind": "generated",
+      "path": "corpus/9ab6b25a94ceb13eaeaedaf71c30a2460602d25a",
+      "sha256": "96ca76da2e4dbe1ed045ed5781d967be2a4d2e39914f7b2e7d1fec199b074eb2"
+    },
+    {
+      "bytes": 417,
+      "kind": "generated",
+      "path": "corpus/9b5f409537cc734e8e52f79e6470694e30b5bda1",
+      "sha256": "d043f3762dd89d4126ace67a589099f161a333d486574ce9d14e0bc835dc9c22"
+    },
+    {
+      "bytes": 18353,
+      "kind": "generated",
+      "path": "corpus/9bf08f242d5fb87a4e7b9ecd1c436a095f089878",
+      "sha256": "583a4c02892c932bf223325c084451da238d73b69659fdc8f7c41fa477e393cf"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/9c013459903f30b9c2bbc59ffb375529a42206f1",
+      "sha256": "74113140aaebe9a486e2d12426b9b7ee25fb29889e610e72b7f7d93308d0ae05"
+    },
+    {
+      "bytes": 160,
+      "kind": "generated",
+      "path": "corpus/9def2f1847a16a97e5953ed1f8ab28aef6882f7c",
+      "sha256": "4c071f5d5dcce39d476832344d342e0973d56c67b581b5b05ba03335795c2ce4"
+    },
+    {
+      "bytes": 38934,
+      "kind": "generated",
+      "path": "corpus/9e2c564d13f25979ffafe4a24a09ac49466ab897",
+      "sha256": "0bf1ed2d8a6fe81b76099d4ef8a2a52f977078a2cb00cf3ffa87e614359c522e"
+    },
+    {
+      "bytes": 469,
+      "kind": "generated",
+      "path": "corpus/a1447e5eb332591a127058f2f0e3a39cd139788f",
+      "sha256": "bd2f16ed8bf41e6426804f01e3d66e68068af2d86988545c986a6fd86bca27f2"
+    },
+    {
+      "bytes": 44054,
+      "kind": "generated",
+      "path": "corpus/a4e53cfd560b3e2af053a47e4b06acd43071dd0b",
+      "sha256": "18090bd2966854e926223bc46f83652e10f70537e7d6daa177eafd7d9fe6eea6"
+    },
+    {
+      "bytes": 44089,
+      "kind": "generated",
+      "path": "corpus/ab49d22523d396501422b82ef93124539ef4a42b",
+      "sha256": "c258f829d171a1fa0fe800fe13c0879e69c99ac9d7d8f3b2a56bb14df2ce344c"
+    },
+    {
+      "bytes": 39097,
+      "kind": "generated",
+      "path": "corpus/ab934ca74a0a36119b709e420975eb3c546c3a4a",
+      "sha256": "0c6d56dde94106ab5cca688c959ae6c0b69a3e2b0d95983575a874749152a0cf"
+    },
+    {
+      "bytes": 480,
+      "kind": "generated",
+      "path": "corpus/b18bb518b4fddb3aa363c38e0744a012a5ade1b9",
+      "sha256": "988c0febed46548f1eae98ad364de7500f88b9ccda2e103ac246d08ab7df1814"
+    },
+    {
+      "bytes": 44113,
+      "kind": "generated",
+      "path": "corpus/b3eae1fa6cbdba0fe5519dbe292bddd4a18efbc8",
+      "sha256": "80e6e2d84addaff0d8288a13784d2830a7ef0748cdbdd01e770009a44839525a"
+    },
+    {
+      "bytes": 321,
+      "kind": "generated",
+      "path": "corpus/b4a4a14bfe945d5d53f583c17be77c678a788d21",
+      "sha256": "230be99fc7e2a8bc1bf42f1b032f3a5f1559a6ea5939aa5cc5cabddcdc2dc66c"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/b75320feaadf440d2ad205713bd20906cd79743d",
+      "sha256": "5a6a1f1385cf1a617343d9975c0fd450abd10b7b32475f6ca108f16a3afb126f"
+    },
+    {
+      "bytes": 403,
+      "kind": "generated",
+      "path": "corpus/b9aa143a67eab3a3a9c0bfc30a9b3bb15572c7ba",
+      "sha256": "aaed29dbd6a9dbc97e778deb52c4ec64e392c543213f33fae5f5e1570bc37d7a"
+    },
+    {
+      "bytes": 44054,
+      "kind": "generated",
+      "path": "corpus/ba80fe5b46b4306815b44ccc8f71c0b5327b0ff0",
+      "sha256": "e009d3277ac2996cd6685a244a13f96af42e103819be4e576ea21a3e18ec24c0"
+    },
+    {
+      "bytes": 44054,
+      "kind": "generated",
+      "path": "corpus/bc0097d1d1613498c06a383ece6fb436c0237b4b",
+      "sha256": "adb2a98c26dfc0c4b42e3a658a44b6b53943af091721644f616e8585b95084ff"
+    },
+    {
+      "bytes": 417,
+      "kind": "generated",
+      "path": "corpus/bdf0f8a559b62ab8b60c3aa85effe515f606487b",
+      "sha256": "43cd61ea1bcbfd770fc017ec94367f6827230bfacb5d5c7748c9f88b7b8ad5ed"
+    },
+    {
+      "bytes": 287,
+      "kind": "generated",
+      "path": "corpus/c39328baed9a8e9390ef22efead9f576a02b534a",
+      "sha256": "859992353df8eccf52fafdd836feab271afba82e3bf69f4ce35f2fd924f97394"
+    },
+    {
+      "bytes": 373,
+      "kind": "generated",
+      "path": "corpus/c4d799e4a68197a84e46b5f26d884eeefe36dffd",
+      "sha256": "e9f262dadd1476f602e9862c92c2e94a5c2490c93131354d58bc31f35d7269b9"
+    },
+    {
+      "bytes": 44062,
+      "kind": "generated",
+      "path": "corpus/c744847c5c536642eba45f0b37554e9ee3ed7e50",
+      "sha256": "967942ac452d62fc14f6afa94ecb2b16053900159a74ce442c707e885468a164"
+    },
+    {
+      "bytes": 31766,
+      "kind": "generated",
+      "path": "corpus/cabbe53d81ed846751704bfdbf7e9d385a8ec0b1",
+      "sha256": "8f599288b4be46d09c9df16d8c6f474791965510e7dc2aa74314e14d13570603"
+    },
+    {
+      "bytes": 1348,
+      "kind": "generated",
+      "path": "corpus/cc63bfdd9952e9d281aed4a3cb7562cdae613223",
+      "sha256": "e9725d4787296fcc3813bfee82a2beb55ab2b0b6c95f32d05ce9151aeaff613c"
+    },
+    {
+      "bytes": 160,
+      "kind": "generated",
+      "path": "corpus/d01f6a95228dd8700429435bc896ecbe41f9c5ad",
+      "sha256": "296b4f3b564dcf93e60c49bca5cb1958b7c29abf383feaeeaff01226192b00ea"
+    },
+    {
+      "bytes": 643,
+      "kind": "generated",
+      "path": "corpus/d11ee41b8cfb8a981365c5e12c2b1389b35950ce",
+      "sha256": "9c8029050fba315548d91a7cca815521b0b1966a314ccd4402e9150aadb5e5e9"
+    },
+    {
+      "bytes": 373,
+      "kind": "generated",
+      "path": "corpus/d39ad52033096f3dbfadbc2fb669bc40a688a90b",
+      "sha256": "a885ff13b1863ce6d2a4bcb338de5c218e29241017236fa35d6eea5d1229d8f8"
+    },
+    {
+      "bytes": 425,
+      "kind": "generated",
+      "path": "corpus/d3bcb5237d58fe08105a51cac42513ba02b839bc",
+      "sha256": "40129cca9f88a7a235ae1d30cf799d3ed357f071996140b2ceae88de67bbf08c"
+    },
+    {
+      "bytes": 44130,
+      "kind": "generated",
+      "path": "corpus/d6d4fec585bc32287100cf8eed2af732bb17c1ac",
+      "sha256": "3ca2dd7deae8d49db90187f007a3e04e7fd164c93fcd1ae0ed4f876a2f9509d7"
+    },
+    {
+      "bytes": 546,
+      "kind": "generated",
+      "path": "corpus/d8dcde4c58c7ac4a347c07d8e20b6e565bf015bc",
+      "sha256": "b41be2417c3ec8c4fb32ed1d4305ebd0e65c6ebadd5294cc2c80628d8bf0215a"
+    },
+    {
+      "bytes": 1348,
+      "kind": "generated",
+      "path": "corpus/dc9747384f505386037e83ba77bb7d2b448ebcb4",
+      "sha256": "f8165b101cc0165935661d22b318d219363e4599de72039f9654ea489e383f4d"
+    },
+    {
+      "bytes": 31766,
+      "kind": "generated",
+      "path": "corpus/dfad04f3e5c482b09408f52536d05426167a52af",
+      "sha256": "3003ff0d0c3c98bab776c5df998edac735ca94d107f89eede6f41d954d265181"
+    },
+    {
+      "bytes": 659,
+      "kind": "generated",
+      "path": "corpus/e40a9dfa30795f3cdfef992c973695e806b0b08c",
+      "sha256": "1696d078fae06011832002f0e727bbb19a487176f5b11e430e55ff5506b9656a"
+    },
+    {
+      "bytes": 1348,
+      "kind": "generated",
+      "path": "corpus/e6f1bd95f66ae51c35c4c108a3faa96e7e83a046",
+      "sha256": "abbfa45246abb641a56614175c15e623b46111ff2acc4b04a804894c766f3c5c"
+    },
+    {
+      "bytes": 1394,
+      "kind": "generated",
+      "path": "corpus/e8e0494bad00efff3df442b41e1b07cdd1cb18bd",
+      "sha256": "cfbc2bb4bb316215f86c9d15db126a25a5d6f6f375263a731d7f64d1740fb751"
+    },
+    {
+      "bytes": 44128,
+      "kind": "generated",
+      "path": "corpus/ea0930ee83014e30f633011ce2140ecb0af1b265",
+      "sha256": "567f673523d103fe831dee2b126c4961bf607cb858338b905a4d016c09579e55"
+    },
+    {
+      "bytes": 44054,
+      "kind": "generated",
+      "path": "corpus/eae51741bf0cb1cfd5e9de26273771f8c8f549d0",
+      "sha256": "a4bdae53476330614d3e9f052f96670f62c0f0fff8e83a718b63a5f5a8909e2a"
+    },
+    {
+      "bytes": 7796,
+      "kind": "generated",
+      "path": "corpus/ed217e3513e521c42c9d9f570d4571900709ad14",
+      "sha256": "44beb42cd9c30f3182fe86ef3f6c8b48efcf44d5ba954845fae87e578563bf5a"
+    },
+    {
+      "bytes": 44054,
+      "kind": "generated",
+      "path": "corpus/f02178315df84a82b221295dad64e4536acb9bcc",
+      "sha256": "30df2dbf715fb51eedeefcc627bbff2af3a996bfc85d89c32ccb7798dc740878"
+    },
+    {
+      "bytes": 44129,
+      "kind": "generated",
+      "path": "corpus/f1c7ab099af4502ecb0412cc3af7c60aacdacc74",
+      "sha256": "995a2d9515efd61ff5a475b051fc8e8fcfcaa4890f2818d4f84129a55e7fbf5b"
+    },
+    {
+      "bytes": 403,
+      "kind": "generated",
+      "path": "corpus/f410312dd0025be0fd8383700d7282ae5bc44e87",
+      "sha256": "57b76f5865ee027ae54a4195c3b5c23a322a364847985aa764ad08a86f480871"
+    },
+    {
+      "bytes": 44062,
+      "kind": "generated",
+      "path": "corpus/f42142755123b0271c2ea4079ea254739589f0c6",
+      "sha256": "58b8192464346788d78624c26bdd6fdc443a7d4e5bc3ab0e60d581e28fffc208"
+    },
+    {
+      "bytes": 1352,
+      "kind": "generated",
+      "path": "corpus/f58cc6378f5d0d9bd6464fabd89a445a771e0163",
+      "sha256": "c2c4f8cbd83a98ef37ca8b67d9b7add86d1864b941002ef8800aac697dddde03"
+    },
+    {
+      "bytes": 44062,
+      "kind": "generated",
+      "path": "corpus/fa7152c5471b3721df97c18162178cf61c07d2e7",
+      "sha256": "5950151c89b46e7e1da2fbd86293c69e9f1bb73ef38d4c040ca8c6beb5ce8fbb"
+    },
+    {
+      "bytes": 37791,
+      "kind": "generated",
+      "path": "corpus/fc1523a85b0eb88854004b44491a8ce4aa03e7c6",
+      "sha256": "e2dae7fec6e8199d7584acdfa2e461331ce99eb15adc6294f45b3bdcaa5d9bd8"
+    },
+    {
+      "bytes": 38934,
+      "kind": "generated",
+      "path": "corpus/fe9f8a93101034adc80f3d22aec6c4ad32980003",
+      "sha256": "ee8354050b6117a4aa6afb79d93ba873297a08d626dc0ed47a8429c8963e622d"
+    },
+    {
+      "bytes": 44054,
+      "kind": "generated",
+      "path": "corpus/ff24466172b9d28f9874465476cf1872e2a25a04",
+      "sha256": "78d4ec38b22548595bf2418c0e40596456a2c3d266d7eccf082b4d999403fb12"
+    },
+    {
+      "bytes": 438,
+      "kind": "generated",
+      "path": "corpus/ff6fb8a9b562db620ec7b110d1c27b381ffc3c7b",
+      "sha256": "c6ead5e85f6fc176d97a41b11d5daf42e6a9e6d0c0b62b5cdea0a52319eea383"
+    },
+    {
+      "bytes": 1268,
+      "kind": "generated",
+      "path": "crate/fuzz/target/.rustc_info.json",
+      "sha256": "660c95eec7f6c38f1cedc9f2f8e0a029b73b66af760f019f2d285220c5e1036e"
+    },
+    {
+      "bytes": 177,
+      "kind": "generated",
+      "path": "crate/fuzz/target/CACHEDIR.TAG",
+      "sha256": "6d9d1d216e0f83abc5e5662ca62c92b4f23009466b54fa27321a69acdb778bb2"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.cargo-artifact-lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.cargo-build-lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.cargo-lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/arbitrary-dc2b75f2db0da000/dep-lib-arbitrary",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/arbitrary-dc2b75f2db0da000/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/arbitrary-dc2b75f2db0da000/lib-arbitrary",
+      "sha256": "ff10ebc973dfca64d6a2c8a5ed3cad5b08acc3e76d3d4df0c4c14e17c6fbf4d0"
+    },
+    {
+      "bytes": 386,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/arbitrary-dc2b75f2db0da000/lib-arbitrary.json",
+      "sha256": "10dd8f9400190c675c0528b974003cc2ec4ce93b9f7a3ce6b31b1fd15f745f75"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/cc-afbaa9de4cb91d76/dep-lib-cc",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/cc-afbaa9de4cb91d76/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/cc-afbaa9de4cb91d76/lib-cc",
+      "sha256": "87ea4c512904f13edfc1f870c686a1687dc80490a286c5f1984ce2a9f598d12e"
+    },
+    {
+      "bytes": 621,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/cc-afbaa9de4cb91d76/lib-cc.json",
+      "sha256": "10dc6eeaa7b2c52d37e29e576a872c9c809910f08daa0b71b4adb890cd5da423"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/cc-f04bc944da4f8be1/dep-lib-cc",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/cc-f04bc944da4f8be1/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/cc-f04bc944da4f8be1/lib-cc",
+      "sha256": "26d7e91dc5268411ec5f965d7119407934ad80be6461bf711c1c01ac04ae6897"
+    },
+    {
+      "bytes": 621,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/cc-f04bc944da4f8be1/lib-cc.json",
+      "sha256": "3253ce0e06bdbc205011b24a0315c006467e8e7f90c3466f9636d9ce49e5462a"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/cfg-if-988fe60ae1f1a0ee/dep-lib-cfg_if",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/cfg-if-988fe60ae1f1a0ee/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/cfg-if-988fe60ae1f1a0ee/lib-cfg_if",
+      "sha256": "984e3dc8e970c0aa08aaf17ac6c1949f5571cb165a78a32cb4e1fabc924f8427"
+    },
+    {
+      "bytes": 377,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/cfg-if-988fe60ae1f1a0ee/lib-cfg_if.json",
+      "sha256": "c7e6edd11b28bdb5a0262f973e1586dd4bf56324b48d30dc165a74b337b8ee4c"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-0a1de0d152296677/build-script-build-script-build",
+      "sha256": "c43b1f0a791d804613f08e4ba50299b7210f43c1f4b1b937a07ef990edf6c312"
+    },
+    {
+      "bytes": 423,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-0a1de0d152296677/build-script-build-script-build.json",
+      "sha256": "a068d5d49623b50337aabc8957f660f36a259c562b4b5fd5e729fe56322c44f0"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-0a1de0d152296677/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-0a1de0d152296677/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-2fc9062b6700b4c3/dep-lib-crc32fast",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-2fc9062b6700b4c3/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-2fc9062b6700b4c3/lib-crc32fast",
+      "sha256": "8c761824e8b99a06c4f18060f4a38c5951eb6c7d679a94259d494d5f3a7b6aae"
+    },
+    {
+      "bytes": 532,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-2fc9062b6700b4c3/lib-crc32fast.json",
+      "sha256": "e632e7b422e2b421604d9245307a196c30585034d1a66c59d50e62e7ab19834b"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-45410dd6d45fca1c/build-script-build-script-build",
+      "sha256": "81794af0e3b90db782d06d75873bce16d4e80e555d2f924aaf1c3f1e41a1d740"
+    },
+    {
+      "bytes": 424,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-45410dd6d45fca1c/build-script-build-script-build.json",
+      "sha256": "1f04dad96b6721fabf5ff3e2c94e6107b2050a933111bf3e831015413ffee6dd"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-45410dd6d45fca1c/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-45410dd6d45fca1c/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-5915a2ad2a8bc6bf/run-build-script-build-script-build",
+      "sha256": "b661c7a1aa756c233a78cbfc6d27c7472a9653f00b4feff527bb7c899776f461"
+    },
+    {
+      "bytes": 255,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crc32fast-5915a2ad2a8bc6bf/run-build-script-build-script-build.json",
+      "sha256": "9925b4f2442aaa473c0cd0752030a4c07c225b14e7b070133a482ebd99049b65"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-17d7bdedaa1a977f/build-script-build-script-build",
+      "sha256": "60b8a2c7e19c2620b7310f34d0ea0188f3f049df2f71911ed6bfef436f9de4cc"
+    },
+    {
+      "bytes": 416,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-17d7bdedaa1a977f/build-script-build-script-build.json",
+      "sha256": "692ac4888df3d38ad7ad91726c518a2abe3703bcb807382db2c35270178267ae"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-17d7bdedaa1a977f/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-17d7bdedaa1a977f/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-950d4711c34c60c4/run-build-script-build-script-build",
+      "sha256": "b711de7642f794801c15772a094755a1866884e245cb4237c428ce46da893fbc"
+    },
+    {
+      "bytes": 338,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-950d4711c34c60c4/run-build-script-build-script-build.json",
+      "sha256": "a6f3d05f38dc5ad854d50306153137dd6e2ecc52fa0629ce2fa04acac92c9c51"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-c8c9877fea0f6487/build-script-build-script-build",
+      "sha256": "0c4d7d3cc406216030194cc3b8e145631252d200fa71f6be8559f464b666c788"
+    },
+    {
+      "bytes": 416,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-c8c9877fea0f6487/build-script-build-script-build.json",
+      "sha256": "a8d3e9da702de61ab8a86fd4d9d6183c7c39164712b6e7de2624265b396a47d1"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-c8c9877fea0f6487/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-c8c9877fea0f6487/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-fdb08be070c0e584/dep-lib-crossbeam_deque",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-fdb08be070c0e584/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-fdb08be070c0e584/lib-crossbeam_deque",
+      "sha256": "cba402686bfcedf557f18427d4bd3131c630d194341d726c96c8bd3d74c22f48"
+    },
+    {
+      "bytes": 610,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-deque-fdb08be070c0e584/lib-crossbeam_deque.json",
+      "sha256": "55ce23b3f3068899c90b099fb08516b1469034efdd96480b1f5fa8ca3c5ce805"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-29ee4009c854d909/build-script-build-script-build",
+      "sha256": "9fcb4a978c0a1bdc0ab079f82ebc697638dd53d96bc3c60363113c736147ada5"
+    },
+    {
+      "bytes": 464,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-29ee4009c854d909/build-script-build-script-build.json",
+      "sha256": "bd336313b522ecfaa91e4dc55101bf9210bf0903990606589109e3c1d2376279"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-29ee4009c854d909/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-29ee4009c854d909/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-8a383137a1b459f1/dep-lib-crossbeam_epoch",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-8a383137a1b459f1/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-8a383137a1b459f1/lib-crossbeam_epoch",
+      "sha256": "253da50aea7b2a23433815b87cedab46fd36d14152fa9bed263cc3ed34f0518a"
+    },
+    {
+      "bytes": 592,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-8a383137a1b459f1/lib-crossbeam_epoch.json",
+      "sha256": "5aa859cd557809bd307b32efd7082a8bfe0f21c9cda5581bdfcd191db9ed0369"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-a2490a872ab70a7f/build-script-build-script-build",
+      "sha256": "dc9efabd3e699b96bae71077c1dee6f0e5a333b0b77890cb7c921b244e5f6c17"
+    },
+    {
+      "bytes": 464,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-a2490a872ab70a7f/build-script-build-script-build.json",
+      "sha256": "d0c1d4ff8cf4ffdb2089b551e3e02357f1f6338c5b9443d7212c4f0a783d382b"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-a2490a872ab70a7f/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-a2490a872ab70a7f/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-a607acd426f833b6/run-build-script-build-script-build",
+      "sha256": "e279369522c31aa9ac8c7d8abab05e68925c7c3f6fcdb96b4575a029da52e990"
+    },
+    {
+      "bytes": 338,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-epoch-a607acd426f833b6/run-build-script-build-script-build.json",
+      "sha256": "1e94ed85bbec5febcf64fd51c533747850009655ab4f7d3fbd0291220988f156"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-21e85b111a7932e5/build-script-build-script-build",
+      "sha256": "ba094e73957ede9ed47e5f445b8d5701c2b7be820b3505a114bb2623a5629a82"
+    },
+    {
+      "bytes": 440,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-21e85b111a7932e5/build-script-build-script-build.json",
+      "sha256": "cce88913f6594509483261e50710c963caac99dc6c785bbf9f90ad5d646c0fa5"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-21e85b111a7932e5/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-21e85b111a7932e5/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-39bdfeb1373d71f0/dep-lib-crossbeam_utils",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-39bdfeb1373d71f0/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-39bdfeb1373d71f0/lib-crossbeam_utils",
+      "sha256": "4dd633978bb194f4045924279dd2b55dbc8c79d79ce309939e2a1477e824c45f"
+    },
+    {
+      "bytes": 497,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-39bdfeb1373d71f0/lib-crossbeam_utils.json",
+      "sha256": "7a0afeaec0fd922481c7d23914158f43d6d16d27dfc33384aaa7b792c401c4f7"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-f1720d232c8e399f/run-build-script-build-script-build",
+      "sha256": "42c12b554b1e788d3d1d796b2dafb97603268b68246bbfd04e9eaea5b7bc48b7"
+    },
+    {
+      "bytes": 341,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-f1720d232c8e399f/run-build-script-build-script-build.json",
+      "sha256": "3cf29952a6fec9e526745e1d9ec152ff3860c05df1559eb00b2c520fad306162"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-fd4ccc04acd307ad/build-script-build-script-build",
+      "sha256": "8346eb5091dab97f54a4e2eda41bb76f04b2b2aea4309979025371c4245193ea"
+    },
+    {
+      "bytes": 440,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-fd4ccc04acd307ad/build-script-build-script-build.json",
+      "sha256": "4fc73c601751cac84a1419afc22bd8c52b57d0a570530dbead5d3cc394658eea"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-fd4ccc04acd307ad/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/crossbeam-utils-fd4ccc04acd307ad/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/either-2e32328c19f7dd09/dep-lib-either",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/either-2e32328c19f7dd09/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/either-2e32328c19f7dd09/lib-either",
+      "sha256": "683462b114baca995d29f2ccbdca2d264b1cc0158a0767c66535f78caef88cb0"
+    },
+    {
+      "bytes": 392,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/either-2e32328c19f7dd09/lib-either.json",
+      "sha256": "da0627ded6087f823dbbed5e48748de4bae628333dda5f0eea0e74520d11ff4e"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/find-msvc-tools-70c0bed5ea1bcc49/dep-lib-find_msvc_tools",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/find-msvc-tools-70c0bed5ea1bcc49/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/find-msvc-tools-70c0bed5ea1bcc49/lib-find_msvc_tools",
+      "sha256": "87cb6e8f8563d19b05ce658ccff2c792e077c7c11bd22d06d771b95fd302618a"
+    },
+    {
+      "bytes": 364,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/find-msvc-tools-70c0bed5ea1bcc49/lib-find_msvc_tools.json",
+      "sha256": "0b0c010434c940d2f04d939d1f1900a636ff6887d13f33fcb2a402aea34a3cfd"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/find-msvc-tools-f030cef60749e165/dep-lib-find_msvc_tools",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/find-msvc-tools-f030cef60749e165/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/find-msvc-tools-f030cef60749e165/lib-find_msvc_tools",
+      "sha256": "f28e8ac13b4b8ef6d5fa5a54d26b2c1b7b47328cab1672a16a9279bcb425324b"
+    },
+    {
+      "bytes": 365,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/find-msvc-tools-f030cef60749e165/lib-find_msvc_tools.json",
+      "sha256": "fc29b5d872e6ed2545378e3985f87eed08cbb704fddfbfe33d5b39ae3d955d13"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/flate2-e440d88124d6fcfc/dep-lib-flate2",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/flate2-e440d88124d6fcfc/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/flate2-e440d88124d6fcfc/lib-flate2",
+      "sha256": "07e679385bcc6cd37eed60bd3a96f758ba57bb3954ecb9984c30633f186e6b88"
+    },
+    {
+      "bytes": 722,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/flate2-e440d88124d6fcfc/lib-flate2.json",
+      "sha256": "51dee8b8d60858fada91c035a2ce4b535b0d293afcb559c422ec52a848657cd8"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/jobserver-36be696da8cb94d8/dep-lib-jobserver",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/jobserver-36be696da8cb94d8/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/jobserver-36be696da8cb94d8/lib-jobserver",
+      "sha256": "157cbc13a79fb78ecce3f73900e88b09c90f1c393a97fda5220227c43b94a284"
+    },
+    {
+      "bytes": 409,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/jobserver-36be696da8cb94d8/lib-jobserver.json",
+      "sha256": "e17ce3c666feabefa186db6ca99f66e3edfcfc7969674a8401c7a00cc276f28f"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/jobserver-583546498c486c2b/dep-lib-jobserver",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/jobserver-583546498c486c2b/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/jobserver-583546498c486c2b/lib-jobserver",
+      "sha256": "6ce18a4fee51c35ce3686e931591ae0d756322efb7577eabe267e9f7d061d11e"
+    },
+    {
+      "bytes": 409,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/jobserver-583546498c486c2b/lib-jobserver.json",
+      "sha256": "b31f7aa5fc69d6159fdfe4d580f61b70fb669ee425909c0ba496a0473fedecc0"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-057607ed57d16375/dep-lib-libc",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-057607ed57d16375/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-057607ed57d16375/lib-libc",
+      "sha256": "f6050aecbae30b93edf54e6353346293e81e50ed53dd86b5274e77d6e0873488"
+    },
+    {
+      "bytes": 569,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-057607ed57d16375/lib-libc.json",
+      "sha256": "e8036cb00cede84ed721a1228ea466cc7ddae6ebb7adc216e865ced8cd2ca874"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-24882ca15ac3b954/dep-lib-libc",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-24882ca15ac3b954/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-24882ca15ac3b954/lib-libc",
+      "sha256": "f61167ee416453048d765a33398466bb07c4bbae6324e7b36867ff76c1e9b4db"
+    },
+    {
+      "bytes": 569,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-24882ca15ac3b954/lib-libc.json",
+      "sha256": "a623d27745be3ae7f43db4633734e36cf6b6cd3387ce535ce2302a62824e6525"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-439298a5e8bb8097/build-script-build-script-build",
+      "sha256": "dfaf7f3dd9d8fff42b8c4125f1387ccc1634ae2a336e5c9173b48599bcc9155e"
+    },
+    {
+      "bytes": 521,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-439298a5e8bb8097/build-script-build-script-build.json",
+      "sha256": "11b375d11357eb3ea80ffa8d6fbc27a5cd1b4be1fd2d7ebeaec4bdcef0a1cb63"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-439298a5e8bb8097/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-439298a5e8bb8097/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-4a72b05ba2115f8b/run-build-script-build-script-build",
+      "sha256": "48f29a65e4af135cb4440ec94a96cfa64c9dc3fafccf197d73c39dde468c671d"
+    },
+    {
+      "bytes": 467,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-4a72b05ba2115f8b/run-build-script-build-script-build.json",
+      "sha256": "b22a3bb2d72386fd0a5e11a07854a117f1b6d5f035773faedd9089709d209aaa"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-5f14715bfd208467/build-script-build-script-build",
+      "sha256": "5d80d6bbd70a43a4fe96363053f7d2a7ad3cb9ec0d8db4ec8efe1b8902e54ad1"
+    },
+    {
+      "bytes": 521,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-5f14715bfd208467/build-script-build-script-build.json",
+      "sha256": "82260827359419f6e8bce01d1510166d6cff2a0168565692508b5e26d19d2608"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-5f14715bfd208467/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-5f14715bfd208467/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-9ea07eccc5515dcd/run-build-script-build-script-build",
+      "sha256": "9c79304bc413285ffec6b86db8bf9c6f2e62106d5c92c48225ca9c724e37dfbe"
+    },
+    {
+      "bytes": 467,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libc-9ea07eccc5515dcd/run-build-script-build-script-build.json",
+      "sha256": "06775a6433e2777abf9eadb75f9a529dd6b3b7ebed51c975563ed1da3481ef31"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-507547b6399baf62/run-build-script-build-script-build",
+      "sha256": "849dc398e4aa596d2dc078c4bc2e8da2c31f09cc435910c65128a2660a29fc44"
+    },
+    {
+      "bytes": 17774,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-507547b6399baf62/run-build-script-build-script-build.json",
+      "sha256": "941102e5ff68d1bd9707f46d78c2374cb73678cf3f5dfd242e9c1d42bc367ba0"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-6e093d15e1eebc79/build-script-build-script-build",
+      "sha256": "5ff3c82364186eba06c09f3d876145d988af8e6d2b4bac42eb53a334119bde11"
+    },
+    {
+      "bytes": 513,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-6e093d15e1eebc79/build-script-build-script-build.json",
+      "sha256": "939e897420e05794ae40b6b61620eff63c06107637ada3050cffb95018fd1b42"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-6e093d15e1eebc79/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-6e093d15e1eebc79/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-7b1cd51a8c7d64ff/build-script-build-script-build",
+      "sha256": "f4169af06512fe18f97b18300be5862a986ebe1028a09a3be8fd325a3059b348"
+    },
+    {
+      "bytes": 513,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-7b1cd51a8c7d64ff/build-script-build-script-build.json",
+      "sha256": "93f13cbaec60df58a48a15d705b8df3a6916cc3e6fa4545fed054423d7da2629"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-7b1cd51a8c7d64ff/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-7b1cd51a8c7d64ff/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-f18c1b13852c7668/dep-lib-libfuzzer_sys",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-f18c1b13852c7668/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-f18c1b13852c7668/lib-libfuzzer_sys",
+      "sha256": "47196ed787e8fc5c7a6339e9625380c81bf1927d59c84dc8d07f0612768a5677"
+    },
+    {
+      "bytes": 573,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/libfuzzer-sys-f18c1b13852c7668/lib-libfuzzer_sys.json",
+      "sha256": "4b663236fbdc9c2b006d66026e53019ed2774500730b5f48f6b8a8f47ef95fd2"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-3903051bc656220e/dep-lib-rayon",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-3903051bc656220e/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-3903051bc656220e/lib-rayon",
+      "sha256": "cb510713473a82ad320ce5f5de98ced741cb54d3593a2f6f2d105751e6f530e3"
+    },
+    {
+      "bytes": 482,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-3903051bc656220e/lib-rayon.json",
+      "sha256": "2f33c6c5d18d2c31634c1fdbe352a59999be436263c69c3b400aa1b12b24aaad"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-421038ceeb9210d7/dep-lib-rayon_core",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-421038ceeb9210d7/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-421038ceeb9210d7/lib-rayon_core",
+      "sha256": "9dc2715bbdff41d84dea7c903e30a5946465c81e3397cd82128235d9558081d3"
+    },
+    {
+      "bytes": 575,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-421038ceeb9210d7/lib-rayon_core.json",
+      "sha256": "fffec2c1da29980791106c25c3439f64bd84227cd2852a779173353dde95c46c"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-4c7d499ccbb51c15/build-script-build-script-build",
+      "sha256": "ba443bf6cbff2ffe79d057b01c4d16b13d12d2fa2c512de65e5557762215b71a"
+    },
+    {
+      "bytes": 389,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-4c7d499ccbb51c15/build-script-build-script-build.json",
+      "sha256": "a77b173ec87087ab32e4ffc93df807c8dccfd2e006e9b1bb9667598ffa8fad02"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-4c7d499ccbb51c15/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-4c7d499ccbb51c15/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-d27fc1734cf1e54a/run-build-script-build-script-build",
+      "sha256": "bfbba2441e9ce7e5425d5be5b4d14e4c73d88f655f694c53607442a7a4e185f6"
+    },
+    {
+      "bytes": 331,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-d27fc1734cf1e54a/run-build-script-build-script-build.json",
+      "sha256": "2a3df0f851fe096936bda7dde1e85c086a183889734bc2d27bc2314063419715"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-ee45676f6b4ebdd7/build-script-build-script-build",
+      "sha256": "12aa153de534476dcf0fd0cdc89de83074a24149d7865b779aba2c1b897fee8b"
+    },
+    {
+      "bytes": 390,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-ee45676f6b4ebdd7/build-script-build-script-build.json",
+      "sha256": "f1aa44e277d08d4a8c279f7ad96525bd59fa1077aadce29f02bb9c4ab60cf4c4"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-ee45676f6b4ebdd7/dep-build-script-build-script-build",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/rayon-core-ee45676f6b4ebdd7/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/shlex-2f9d84d68197382e/dep-lib-shlex",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/shlex-2f9d84d68197382e/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/shlex-2f9d84d68197382e/lib-shlex",
+      "sha256": "25ad7fb8485e483d46aca6da8db0eedc4ef20e9029e34b9017c6ab30e80923e6"
+    },
+    {
+      "bytes": 385,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/shlex-2f9d84d68197382e/lib-shlex.json",
+      "sha256": "5aa4a080e33c5551370765d16ed8c67f87c3e46afc3667386f6afe872f6edfba"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/shlex-a0e6b6f3f311c935/dep-lib-shlex",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/shlex-a0e6b6f3f311c935/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/shlex-a0e6b6f3f311c935/lib-shlex",
+      "sha256": "7a3103d7c167e8036c6a5e8502d470103bb6853063d863240ba7c8401f22a482"
+    },
+    {
+      "bytes": 385,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/shlex-a0e6b6f3f311c935/lib-shlex.json",
+      "sha256": "79bc68b52de67f97251b8d423c88e8586a3695206152df8db9fb43aaf0508267"
+    },
+    {
+      "bytes": 323,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/soapberry-zip-c17def0d9364ee3f/dep-lib-soapberry_zip",
+      "sha256": "e0dc07b210b42de0b25aa8b1ebc8d5649428f718a9ab85697bcfb1f092a703a1"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/soapberry-zip-c17def0d9364ee3f/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/soapberry-zip-c17def0d9364ee3f/lib-soapberry_zip",
+      "sha256": "31745cba8c8067177908432f49de2e295883b62d402aca9602c82f4310dfb3ac"
+    },
+    {
+      "bytes": 533,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/soapberry-zip-c17def0d9364ee3f/lib-soapberry_zip.json",
+      "sha256": "2e13c50a1d03d7c0732cd17c998d7a6b4167255cd053823943512d6bb585a53f"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/soapberry-zip-fuzz-edc287199769444b/bin-parse_zip",
+      "sha256": "04899e775445b64ce49ce49ed8c382403a2361a9f27eaabb94b3f01999115f24"
+    },
+    {
+      "bytes": 493,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/soapberry-zip-fuzz-edc287199769444b/bin-parse_zip.json",
+      "sha256": "33907e39d128645c17660365301fed9b5d25c6d377eb16a55b84116f7370404e"
+    },
+    {
+      "bytes": 147,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/soapberry-zip-fuzz-edc287199769444b/dep-bin-parse_zip",
+      "sha256": "31595036fca6b2388feb291c6402ac8ea9b857bd73ea6bb00b0440e0fe14f875"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/soapberry-zip-fuzz-edc287199769444b/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/zlib-rs-f772aa0f6b5a4c12/dep-lib-zlib_rs",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/zlib-rs-f772aa0f6b5a4c12/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/zlib-rs-f772aa0f6b5a4c12/lib-zlib_rs",
+      "sha256": "3f38d98be482464c81f0559f50f91d74b3a2e5a41708ac142da7df72f9166150"
+    },
+    {
+      "bytes": 609,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/.fingerprint/zlib-rs-f772aa0f6b5a4c12/lib-zlib_rs.json",
+      "sha256": "4b5ad5934096e7dd15fec2606c7a8ab41c78d28172e1a010919b360749f905fa"
+    },
+    {
+      "bytes": 4694136,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crc32fast-0a1de0d152296677/build-script-build",
+      "sha256": "6586334f0b27a1380d10f614dec02f870359272b4dd3461e89930e2cea4feeb2"
+    },
+    {
+      "bytes": 4694136,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crc32fast-0a1de0d152296677/build_script_build-0a1de0d152296677",
+      "sha256": "6586334f0b27a1380d10f614dec02f870359272b4dd3461e89930e2cea4feeb2"
+    },
+    {
+      "bytes": 529,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crc32fast-0a1de0d152296677/build_script_build-0a1de0d152296677.d",
+      "sha256": "67ebf104bb7b38c35124fe3a0ddce962a4e6976507009c347caf869b5d6dd6d8"
+    },
+    {
+      "bytes": 4606776,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crc32fast-45410dd6d45fca1c/build-script-build",
+      "sha256": "395bbc3c91fa31b8b40ab00adfa283c58b58c4145a6eb3c1378f3419af7ffafe"
+    },
+    {
+      "bytes": 4606776,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crc32fast-45410dd6d45fca1c/build_script_build-45410dd6d45fca1c",
+      "sha256": "395bbc3c91fa31b8b40ab00adfa283c58b58c4145a6eb3c1378f3419af7ffafe"
+    },
+    {
+      "bytes": 529,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crc32fast-45410dd6d45fca1c/build_script_build-45410dd6d45fca1c.d",
+      "sha256": "994ce025606bfe7f794d620818967328719e242ae8a4128d1accabdff0da45a6"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crc32fast-5915a2ad2a8bc6bf/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 178,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crc32fast-5915a2ad2a8bc6bf/output",
+      "sha256": "bb516d28b8feef7a2a8a75f6be81a78c3c41644271069b8d42f54b4183f1dfc7"
+    },
+    {
+      "bytes": 93,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crc32fast-5915a2ad2a8bc6bf/root-output",
+      "sha256": "a7cf801ae6cc246aa4b58198ccd2c093c2be98cef6567b307c9fcd22c2592da1"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crc32fast-5915a2ad2a8bc6bf/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 4533072,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-deque-17d7bdedaa1a977f/build-script-build",
+      "sha256": "c601400768b9d7668cf08f8f6d9a7cabc59b06f7b692aa92af493b34f325ca4a"
+    },
+    {
+      "bytes": 4533072,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-deque-17d7bdedaa1a977f/build_script_build-17d7bdedaa1a977f",
+      "sha256": "c601400768b9d7668cf08f8f6d9a7cabc59b06f7b692aa92af493b34f325ca4a"
+    },
+    {
+      "bytes": 559,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-deque-17d7bdedaa1a977f/build_script_build-17d7bdedaa1a977f.d",
+      "sha256": "ccc8315f1b40e08ceba84bbbc1b41f24a42f6e60829355abdc97da6fd3387c12"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-deque-950d4711c34c60c4/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 85,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-deque-950d4711c34c60c4/output",
+      "sha256": "8ba2fe9791014b8b7befc812fb9a284415cf2a2c09a1791591abbba5382f46fc"
+    },
+    {
+      "bytes": 99,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-deque-950d4711c34c60c4/root-output",
+      "sha256": "2c5af149ae7077c5f6426a02626748507e7dba0f6999983db128dd65c00f3daa"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-deque-950d4711c34c60c4/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 4578608,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-deque-c8c9877fea0f6487/build-script-build",
+      "sha256": "e584a4da852dd7a5a81218797c6658a9d51190005b05b84ed5b85ffb4afc68ce"
+    },
+    {
+      "bytes": 4578608,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-deque-c8c9877fea0f6487/build_script_build-c8c9877fea0f6487",
+      "sha256": "e584a4da852dd7a5a81218797c6658a9d51190005b05b84ed5b85ffb4afc68ce"
+    },
+    {
+      "bytes": 559,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-deque-c8c9877fea0f6487/build_script_build-c8c9877fea0f6487.d",
+      "sha256": "0655dd7effc15eab01029c6458b760ae47c0171467d68d3ee4797a61a98de5c6"
+    },
+    {
+      "bytes": 4578608,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-epoch-29ee4009c854d909/build-script-build",
+      "sha256": "c03657015e93536ad280f63cea54a20ec2f886d51e75879ed73c72dd905aac87"
+    },
+    {
+      "bytes": 4578608,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-epoch-29ee4009c854d909/build_script_build-29ee4009c854d909",
+      "sha256": "c03657015e93536ad280f63cea54a20ec2f886d51e75879ed73c72dd905aac87"
+    },
+    {
+      "bytes": 562,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-epoch-29ee4009c854d909/build_script_build-29ee4009c854d909.d",
+      "sha256": "ad98d622dc908a1de7acc0a85490dd080f309269a24687e22043ab281c36dc54"
+    },
+    {
+      "bytes": 4533080,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-epoch-a2490a872ab70a7f/build-script-build",
+      "sha256": "9ccff4b443832a3a3ec38ad172ca7bc9ac0cb6f1c915c5c5e8b7dd38e60011fb"
+    },
+    {
+      "bytes": 4533080,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-epoch-a2490a872ab70a7f/build_script_build-a2490a872ab70a7f",
+      "sha256": "9ccff4b443832a3a3ec38ad172ca7bc9ac0cb6f1c915c5c5e8b7dd38e60011fb"
+    },
+    {
+      "bytes": 562,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-epoch-a2490a872ab70a7f/build_script_build-a2490a872ab70a7f.d",
+      "sha256": "19489ed6778f8c9e994227cb90701bac4d0ba4dd855ff992896b6217b014dfd7"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-epoch-a607acd426f833b6/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 85,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-epoch-a607acd426f833b6/output",
+      "sha256": "8ba2fe9791014b8b7befc812fb9a284415cf2a2c09a1791591abbba5382f46fc"
+    },
+    {
+      "bytes": 99,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-epoch-a607acd426f833b6/root-output",
+      "sha256": "a162bc553f7435cc54bd6adce2650a00baf9e28d1b3911df7ed5344375e9f7b8"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-epoch-a607acd426f833b6/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 4559344,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-utils-21e85b111a7932e5/build-script-build",
+      "sha256": "e2efe84d8470f607c41eb98c5ae39d6b9e1acb40a3f345396411ce25aedc7032"
+    },
+    {
+      "bytes": 4559344,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-utils-21e85b111a7932e5/build_script_build-21e85b111a7932e5",
+      "sha256": "e2efe84d8470f607c41eb98c5ae39d6b9e1acb40a3f345396411ce25aedc7032"
+    },
+    {
+      "bytes": 1221,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-utils-21e85b111a7932e5/build_script_build-21e85b111a7932e5.d",
+      "sha256": "4b0be34399f25ae2947a179688e63c7c31717f5618781f0f884b94f174e624a7"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-utils-f1720d232c8e399f/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 109,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-utils-f1720d232c8e399f/output",
+      "sha256": "cb6814e09e64fb079e8defed607f9407cb5ef09b64fd8a31d4c581164f39bac5"
+    },
+    {
+      "bytes": 99,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-utils-f1720d232c8e399f/root-output",
+      "sha256": "b59399d54ef835c91763176b8be6d85b828553e881969948dece6125bae3d2a8"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-utils-f1720d232c8e399f/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 4645264,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-utils-fd4ccc04acd307ad/build-script-build",
+      "sha256": "b0c17506644eaec52975ced69bc2cc12cd35d4ea354ec66cf22297cc38cce308"
+    },
+    {
+      "bytes": 4645264,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-utils-fd4ccc04acd307ad/build_script_build-fd4ccc04acd307ad",
+      "sha256": "b0c17506644eaec52975ced69bc2cc12cd35d4ea354ec66cf22297cc38cce308"
+    },
+    {
+      "bytes": 1221,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/crossbeam-utils-fd4ccc04acd307ad/build_script_build-fd4ccc04acd307ad.d",
+      "sha256": "f25dfefd3cdc7b98c737c57f6b7cfecfe6a5f2e7e9a13509fb4f342fb2dbf7c8"
+    },
+    {
+      "bytes": 4852800,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-439298a5e8bb8097/build-script-build",
+      "sha256": "ef70940679028e4578856f521d3db1669d7ddbd75d57b36224cd3efdf09e034f"
+    },
+    {
+      "bytes": 4852800,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-439298a5e8bb8097/build_script_build-439298a5e8bb8097",
+      "sha256": "ef70940679028e4578856f521d3db1669d7ddbd75d57b36224cd3efdf09e034f"
+    },
+    {
+      "bytes": 510,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-439298a5e8bb8097/build_script_build-439298a5e8bb8097.d",
+      "sha256": "fbf6831ec48d553a6b51996e103eaae6317040480feb3d6b42b21b2a152355bb"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-4a72b05ba2115f8b/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 1222,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-4a72b05ba2115f8b/output",
+      "sha256": "a8c8f65c7e5ff321c04794c844638e113fcb0823bef06c2baf483eaf13c1a73e"
+    },
+    {
+      "bytes": 88,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-4a72b05ba2115f8b/root-output",
+      "sha256": "49560eac227445ffd112ce82efaebcde617285fe1e0371db85eb2587d7e932d8"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-4a72b05ba2115f8b/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 4680968,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-5f14715bfd208467/build-script-build",
+      "sha256": "dddb1bdbb9bdfae79d1cf5d62a897d8884515982fae7c07e271a1f6299a0a3b7"
+    },
+    {
+      "bytes": 4680968,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-5f14715bfd208467/build_script_build-5f14715bfd208467",
+      "sha256": "dddb1bdbb9bdfae79d1cf5d62a897d8884515982fae7c07e271a1f6299a0a3b7"
+    },
+    {
+      "bytes": 510,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-5f14715bfd208467/build_script_build-5f14715bfd208467.d",
+      "sha256": "3b513a2c8311707bcb4204655538a19560c4fdcb0a2cf8f52c49bc9e1cb5416c"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-9ea07eccc5515dcd/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 1222,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-9ea07eccc5515dcd/output",
+      "sha256": "a8c8f65c7e5ff321c04794c844638e113fcb0823bef06c2baf483eaf13c1a73e"
+    },
+    {
+      "bytes": 88,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-9ea07eccc5515dcd/root-output",
+      "sha256": "71e4002fb384e6d4c88afe44583b68eb6df1b79d925a9549f34c6f5d2940ab6b"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libc-9ea07eccc5515dcd/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 185376,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerCrossOver.o",
+      "sha256": "fe11363167bda6c747cb9859d74be983056f41ca3e61acbdd0bc6e65959225a0"
+    },
+    {
+      "bytes": 2518128,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerDataFlowTrace.o",
+      "sha256": "c5654d6faecc8cb4a18f3ccf5f4a1963eb99f53b08e4d35441e8928e087f8b52"
+    },
+    {
+      "bytes": 6008008,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerDriver.o",
+      "sha256": "e746b5715e2e3bc9da56ecf53313da60cc10b63261642d0ad15b31f4461246da"
+    },
+    {
+      "bytes": 1544,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerExtFunctionsDlsym.o",
+      "sha256": "c788e62322cb3e0e48696f49807cdf2730b008d2ffb25e352c8ec0982077e26f"
+    },
+    {
+      "bytes": 47224,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerExtFunctionsWeak.o",
+      "sha256": "7aec9275f7ba3dbd207d95e98f3ab3e549fef6fbe7d765a0abeb050f9b9294dc"
+    },
+    {
+      "bytes": 1544,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerExtFunctionsWindows.o",
+      "sha256": "2a1ad9b99e5b10c261db7037a54222a2781fc0b73250da570adb04e843c3835a"
+    },
+    {
+      "bytes": 9240,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerExtraCounters.o",
+      "sha256": "aaf7a50db27e16aa2162e3c390d0be2e626976e44ea794ca7c67c7c2a763b64a"
+    },
+    {
+      "bytes": 5584,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerExtraCountersDarwin.o",
+      "sha256": "d8444d2cbf2fba7a52fd3b05c732bde0b82a51f63f18cd773fb4ed06f791d076"
+    },
+    {
+      "bytes": 5584,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerExtraCountersWindows.o",
+      "sha256": "cf589087b8162d31744be5f4996b5dbdc571ce81840397b38f40f1f0920c3dcd"
+    },
+    {
+      "bytes": 5556968,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerFork.o",
+      "sha256": "6c502f38bb9a23e8bbfe164c7b9c6159541f0ed8e657fee5a9270ac4f03f89e6"
+    },
+    {
+      "bytes": 920248,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerIO.o",
+      "sha256": "1f59431c10bb2290ffead4eb241bb89266c5fdaa88fa61b3a6d0f63ddb6ca3b9"
+    },
+    {
+      "bytes": 375400,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerIOPosix.o",
+      "sha256": "0adc069b1765db88b5d77da85c0ccce0982b573459613b378f2823e53939f6ee"
+    },
+    {
+      "bytes": 1528,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerIOWindows.o",
+      "sha256": "48fbac54cb8b07ed471fca82330da5971c98ef002c426baac4b5cfec2c28c1af"
+    },
+    {
+      "bytes": 87376,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerInterceptors.o",
+      "sha256": "e7965a15d684d3a538009bdc94ea6743086857e1337fbf25ff80922b021a4746"
+    },
+    {
+      "bytes": 4514152,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerLoop.o",
+      "sha256": "ebfeb5a495112a592df5803e863571e2fde5be768536d3e7f64e83a6e30641dd"
+    },
+    {
+      "bytes": 29496,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerMain.o",
+      "sha256": "d55381eb8dabbdb64f7a0f7f8c2dfd444176d342617b4d2b918cecf124bf0ca4"
+    },
+    {
+      "bytes": 5251616,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerMerge.o",
+      "sha256": "613dc5c988da756c7596ac14a59690b67c576e4ed60176bccce1407a85a988dc"
+    },
+    {
+      "bytes": 1396040,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerMutate.o",
+      "sha256": "2b1ca80ebf2064ee97f1222d9a8aa43f6a237d1dde586e72c0f55b86b4a04c7b"
+    },
+    {
+      "bytes": 225496,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerSHA1.o",
+      "sha256": "249e11355a0f3cd5d23d0da8b083318df6c7031278624e03bb56effeccdb0af0"
+    },
+    {
+      "bytes": 940808,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerTracePC.o",
+      "sha256": "b91b86ed511678b3a7041b383873f5cdec9b5315c4fd7cc8d6e4d06be1c86790"
+    },
+    {
+      "bytes": 508376,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerUtil.o",
+      "sha256": "c8da79750e3a2d7b29b4dc88e6b4e4b1155689ba09aa134cca5a3e43f8ac7fdb"
+    },
+    {
+      "bytes": 1528,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerUtilDarwin.o",
+      "sha256": "d011c86db23ae89a2c9d7b18d15e10da623368a0698d53bce5b216a14ab2a526"
+    },
+    {
+      "bytes": 1528,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerUtilFuchsia.o",
+      "sha256": "eba0425ad476a49acce1019ae38397ca4a40ebed82ce56224be3116c80f18913"
+    },
+    {
+      "bytes": 645520,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerUtilLinux.o",
+      "sha256": "52fbb027e89dbce6fa056d0d69895ca1d51548316f8f5704e4b8684db36d31ea"
+    },
+    {
+      "bytes": 758056,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerUtilPosix.o",
+      "sha256": "7564c1bfcfb750129d9ccc19980caea7c66f77896c8438b4a527e48b68a90915"
+    },
+    {
+      "bytes": 1528,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/e5f0d71fb86e9d6b-FuzzerUtilWindows.o",
+      "sha256": "827446758cc56b3a5abadd0a3a63c0d5a70060beb6e901084e336238a0108d71"
+    },
+    {
+      "bytes": 1304,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/flag_check",
+      "sha256": "c521a840ec1f176c3b19d7477148e89f6e893f20735fdb436487058990c6eba2"
+    },
+    {
+      "bytes": 28,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/flag_check.cpp",
+      "sha256": "65d2fad425e300ae19bd229a513aa7564086a7f0feb9405f806c70b2366ad59a"
+    },
+    {
+      "bytes": 30028030,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/out/libfuzzer.a",
+      "sha256": "236c12f237a94cb376f933a743bc7c53a36a7b68c56476db650cf0dc8f068d73"
+    },
+    {
+      "bytes": 21495,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/output",
+      "sha256": "8bb423e04b37aafd451b54c6b4aa8c58e932a16b730b7b7a7d4fcaf8f74e02d0"
+    },
+    {
+      "bytes": 97,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/root-output",
+      "sha256": "050f96a12d6a661196ccb94af3d83b503ba7f8b8da52fc0f7b49a32f4173cd87"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-507547b6399baf62/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 6174208,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-6e093d15e1eebc79/build-script-build",
+      "sha256": "25c70fcb1ec48b0ce78ea7ca0e20bb18d8af8cd2f5afe1123e2f2848f5520bd9"
+    },
+    {
+      "bytes": 6174208,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-6e093d15e1eebc79/build_script_build-6e093d15e1eebc79",
+      "sha256": "25c70fcb1ec48b0ce78ea7ca0e20bb18d8af8cd2f5afe1123e2f2848f5520bd9"
+    },
+    {
+      "bytes": 552,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-6e093d15e1eebc79/build_script_build-6e093d15e1eebc79.d",
+      "sha256": "58ab51567a2d026f84663c03bc1ba7c8b0499770554de7c1ff9329f2d02ec52f"
+    },
+    {
+      "bytes": 8184968,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-7b1cd51a8c7d64ff/build-script-build",
+      "sha256": "640b105106e7332cdcd42bce220f2423db1f35903bd100fffc5c79bf8f31f91a"
+    },
+    {
+      "bytes": 8184968,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-7b1cd51a8c7d64ff/build_script_build-7b1cd51a8c7d64ff",
+      "sha256": "640b105106e7332cdcd42bce220f2423db1f35903bd100fffc5c79bf8f31f91a"
+    },
+    {
+      "bytes": 552,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/libfuzzer-sys-7b1cd51a8c7d64ff/build_script_build-7b1cd51a8c7d64ff.d",
+      "sha256": "cc44323f370c2da6779c9e49902574760833857913be738d7871010c47cbea6f"
+    },
+    {
+      "bytes": 4509816,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/rayon-core-4c7d499ccbb51c15/build-script-build",
+      "sha256": "b5cdabc85a5f1c3732ea132fed2d31514218b82702d55231d9a62b7b122e94e9"
+    },
+    {
+      "bytes": 4509816,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/rayon-core-4c7d499ccbb51c15/build_script_build-4c7d499ccbb51c15",
+      "sha256": "b5cdabc85a5f1c3732ea132fed2d31514218b82702d55231d9a62b7b122e94e9"
+    },
+    {
+      "bytes": 537,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/rayon-core-4c7d499ccbb51c15/build_script_build-4c7d499ccbb51c15.d",
+      "sha256": "d0d1eecff2ed1c5beba16df91f1bd8fe2b57f2b3fc311c4847d8c99615bf8dcb"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/rayon-core-d27fc1734cf1e54a/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 32,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/rayon-core-d27fc1734cf1e54a/output",
+      "sha256": "dd454a92dee8a02b053b2cf6f15c04b2ff982baaa108229e76ba230456bca222"
+    },
+    {
+      "bytes": 94,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/rayon-core-d27fc1734cf1e54a/root-output",
+      "sha256": "3b76da1b0df5acfd0ec6d607a179e12a5d7ff0c1f8ecd5c09291af8cba954b57"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/rayon-core-d27fc1734cf1e54a/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 4506392,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/rayon-core-ee45676f6b4ebdd7/build-script-build",
+      "sha256": "3afa8922777ac8f507a4b4907c423c9ea9212a4488f63cd63df93476841c02ed"
+    },
+    {
+      "bytes": 4506392,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/rayon-core-ee45676f6b4ebdd7/build_script_build-ee45676f6b4ebdd7",
+      "sha256": "3afa8922777ac8f507a4b4907c423c9ea9212a4488f63cd63df93476841c02ed"
+    },
+    {
+      "bytes": 537,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/build/rayon-core-ee45676f6b4ebdd7/build_script_build-ee45676f6b4ebdd7.d",
+      "sha256": "559c6b21b3fd35c9e95af51ebe938a07f40a6a68e2838e5901950afd67b3dbfe"
+    },
+    {
+      "bytes": 16241,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/arbitrary-dc2b75f2db0da000.d",
+      "sha256": "271479b378dcc8fc050720def5f56fbdadcbc88794b763d2920f33c09c622a12"
+    },
+    {
+      "bytes": 6720,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/cc-afbaa9de4cb91d76.d",
+      "sha256": "394a5b343d28bb2b753d4765c817e2e1c2589ee07c47a79c537c016504cc91e3"
+    },
+    {
+      "bytes": 6720,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/cc-f04bc944da4f8be1.d",
+      "sha256": "b4b6602263e52fb9454ae8c3a3ec332c587263d217b3070bc441080a25e2d25c"
+    },
+    {
+      "bytes": 455,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/cfg_if-988fe60ae1f1a0ee.d",
+      "sha256": "b9c10dc1bb2761ad73f3fa4e9e04c5e876a66e3272ca61a2a965def6231a5378"
+    },
+    {
+      "bytes": 1978,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/crc32fast-2fc9062b6700b4c3.d",
+      "sha256": "fd1aabb63d623a57b8a7e08fe028ad402d07154a4debe8e33ca7977eb85891b0"
+    },
+    {
+      "bytes": 801,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/crossbeam_deque-fdb08be070c0e584.d",
+      "sha256": "2d755a743b3bc6687e7920f225968a73d8f02a0bf7a411c039da54a0b44aed1e"
+    },
+    {
+      "bytes": 3949,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/crossbeam_epoch-8a383137a1b459f1.d",
+      "sha256": "5c79385d9e6842712064de6fe95ad0f43fd5a3051b4e560af25716f9cec9e84e"
+    },
+    {
+      "bytes": 4412,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/crossbeam_utils-39bdfeb1373d71f0.d",
+      "sha256": "c05e1810dac1ea694315a2c17d3562261f6bafbe2880fb5127846b12f1585e01"
+    },
+    {
+      "bytes": 1039,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/either-2e32328c19f7dd09.d",
+      "sha256": "6004674484d013f82749f496d2134f285363c74a23040f9e6024d4090819502a"
+    },
+    {
+      "bytes": 1533,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/find_msvc_tools-70c0bed5ea1bcc49.d",
+      "sha256": "a8e45e81b2f3aa01e778a4dff9060585379de09c08c93dfa6910b3f3bb85c576"
+    },
+    {
+      "bytes": 1533,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/find_msvc_tools-f030cef60749e165.d",
+      "sha256": "6c788621de43c7d15dd96a0c859de46b77025e5c6cd001dd541f590ecd0e0e29"
+    },
+    {
+      "bytes": 5934,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/flate2-e440d88124d6fcfc.d",
+      "sha256": "72074cb5ba7d6174919a9431d819ff4579101e9ae0a83519058ca86f3e3a53cd"
+    },
+    {
+      "bytes": 1423,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/jobserver-36be696da8cb94d8.d",
+      "sha256": "14facfe5b6987d020a52c6e125f21edea61892277c9e218ec7105c8392a48082"
+    },
+    {
+      "bytes": 1423,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/jobserver-583546498c486c2b.d",
+      "sha256": "55c45420216296cfef87ab203b73707bc51cefe2cfa0a5ff9e90f44045f3d7c3"
+    },
+    {
+      "bytes": 420920,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libarbitrary-dc2b75f2db0da000.rmeta",
+      "sha256": "8d6810b993620a73bddfb31c5ddcda55070f94140aa0c2897f92e3d84a695967"
+    },
+    {
+      "bytes": 22186,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libc-057607ed57d16375.d",
+      "sha256": "0de219511a8220cc6eb69883463728684f568201c529e47d1c7b42bbd2b00906"
+    },
+    {
+      "bytes": 22186,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libc-24882ca15ac3b954.d",
+      "sha256": "21214281cec117d7011a4db13046a46c27cbfe613dcf1ec7f9f5dcea1e2694b0"
+    },
+    {
+      "bytes": 6334118,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libcc-afbaa9de4cb91d76.rlib",
+      "sha256": "a353c898292e358bc9f044328d39502388fa9616962a14517cbc3d3d8d52b85e"
+    },
+    {
+      "bytes": 547321,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libcc-afbaa9de4cb91d76.rmeta",
+      "sha256": "e80ca4618b1d68f5dd96ff7a6529c431263d50b4f7599200c671fc5a211cb6a4"
+    },
+    {
+      "bytes": 3804178,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libcc-f04bc944da4f8be1.rlib",
+      "sha256": "f10c41367dd74fdbac0e67a06470d0219a6ac2508fb4d5007de53fecd2aee105"
+    },
+    {
+      "bytes": 547321,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libcc-f04bc944da4f8be1.rmeta",
+      "sha256": "5043d58864b4d1e2fa55c4532dc25d2f8cfdb1bceaa7130a327dcef883543417"
+    },
+    {
+      "bytes": 5487,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libcfg_if-988fe60ae1f1a0ee.rmeta",
+      "sha256": "d8e9f99a814d4ffbbe77e267fa89fb3753c4915145670e6624dc236b949510fe"
+    },
+    {
+      "bytes": 51622,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libcrc32fast-2fc9062b6700b4c3.rmeta",
+      "sha256": "f23611032473100d6ac4c027f9bed911cbd7d30bd2b7c6f5747f6b73cfb6ae84"
+    },
+    {
+      "bytes": 67880,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libcrossbeam_deque-fdb08be070c0e584.rmeta",
+      "sha256": "8eb27cfb5c877e5f559af0f8baafbe3cf69a9db1062ccca20538348df87e6a45"
+    },
+    {
+      "bytes": 254206,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libcrossbeam_epoch-8a383137a1b459f1.rmeta",
+      "sha256": "ad1db64c45371894e8ac0cc019ae37665de7dc8ce9b11d35408e860c336e0219"
+    },
+    {
+      "bytes": 296895,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libcrossbeam_utils-39bdfeb1373d71f0.rmeta",
+      "sha256": "0eded53665cbf26fe11701eaa9dd8827f6c1df23a9b05ba477a8ae086fe6a847"
+    },
+    {
+      "bytes": 147732,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libeither-2e32328c19f7dd09.rmeta",
+      "sha256": "d16cebf920556932089998e3cbd427d2e322c561e7b846a35aa3e68cf3477400"
+    },
+    {
+      "bytes": 261724,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libfind_msvc_tools-70c0bed5ea1bcc49.rlib",
+      "sha256": "80b7dae623715b1971836fbab32b26340da7e29b3fdf3667d7043fe61ee84e33"
+    },
+    {
+      "bytes": 51072,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libfind_msvc_tools-70c0bed5ea1bcc49.rmeta",
+      "sha256": "9ac772ebfbceb54b3543fe1b96a802c75070b936ecad35cea974cd3109152abd"
+    },
+    {
+      "bytes": 511700,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libfind_msvc_tools-f030cef60749e165.rlib",
+      "sha256": "3f97f5b050237ab0f3507ef0f1527fef1efdbae1fc4ee1f5b8e0948e47f267a3"
+    },
+    {
+      "bytes": 51072,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libfind_msvc_tools-f030cef60749e165.rmeta",
+      "sha256": "8cee0545ef394c948ba7ce47ae68f27db8cab50e8696d4b76f8b9ccbdc2a7b4d"
+    },
+    {
+      "bytes": 433928,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libflate2-e440d88124d6fcfc.rmeta",
+      "sha256": "992c32c77d0111370410baf118e402ee317e7ce963415fdd9fb6aa00499dc4fe"
+    },
+    {
+      "bytes": 493,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libfuzzer_sys-f18c1b13852c7668.d",
+      "sha256": "64816b8888c20b8375c3c93785d094c7ac4e3a1e552fcbbb35bc129cb7f342d2"
+    },
+    {
+      "bytes": 860108,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libjobserver-36be696da8cb94d8.rlib",
+      "sha256": "0e21012d0766913eae690d53c46f0b1f6b163b3117611e8bc422c867bfdb112f"
+    },
+    {
+      "bytes": 94745,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libjobserver-36be696da8cb94d8.rmeta",
+      "sha256": "43f06a7b35dc714111e9c7b3badc2c6b98ea90b394c15e1c15170c61c5fe87de"
+    },
+    {
+      "bytes": 497138,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libjobserver-583546498c486c2b.rlib",
+      "sha256": "7b207ff8300d530e229d05103b134c9fd2f45a0e888cdd75bc07c4aff9692f69"
+    },
+    {
+      "bytes": 94745,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libjobserver-583546498c486c2b.rmeta",
+      "sha256": "39ce34cd602fb03ac4339a55f52dcf9a186d343d1c1f49bf400cfb561c1cb40b"
+    },
+    {
+      "bytes": 4138340,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/liblibc-057607ed57d16375.rlib",
+      "sha256": "4e6587b422b9542e60a57b8209215705528389bf1112854818d174baf0dd24ee"
+    },
+    {
+      "bytes": 4109899,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/liblibc-057607ed57d16375.rmeta",
+      "sha256": "4bcc214336257a0b8cb4df88c606b953498821d4c105e29c42362b63bdcbb34d"
+    },
+    {
+      "bytes": 4126684,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/liblibc-24882ca15ac3b954.rlib",
+      "sha256": "d0de52cecd0840c8a2633e0fb9e09647a10153a6fc13d324e1b94c53ef51dacb"
+    },
+    {
+      "bytes": 4109899,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/liblibc-24882ca15ac3b954.rmeta",
+      "sha256": "e2e000ee6658d339e4ecd95c583ca81f55874f80a55f2ac9afbe6b4af91c16c5"
+    },
+    {
+      "bytes": 42251,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/liblibfuzzer_sys-f18c1b13852c7668.rmeta",
+      "sha256": "3144605add57153fb10c052a2f24382c6eb6714e2e819bcb7492875537c16a2e"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libparse_zip-edc287199769444b.rmeta",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 3059219,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/librayon-3903051bc656220e.rmeta",
+      "sha256": "3bb44652a6dedebe5b918b49cf8d8731178fe5794dc1f1b9d289ce30fa85532b"
+    },
+    {
+      "bytes": 343843,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/librayon_core-421038ceeb9210d7.rmeta",
+      "sha256": "1cf114915b11491c15b8cda951dc050e748d1655c6e32b76916cd1afc1bbca6a"
+    },
+    {
+      "bytes": 120968,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libshlex-2f9d84d68197382e.rlib",
+      "sha256": "ea5398aef2d07c28f4f351740a86ac6722cf84f01c0e5a6315bdbd44a0f0e5b3"
+    },
+    {
+      "bytes": 48772,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libshlex-2f9d84d68197382e.rmeta",
+      "sha256": "fb5eb9fd7db44bf69b9d4295126322ec174bad5e04302f26ebe849da6b180063"
+    },
+    {
+      "bytes": 190252,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libshlex-a0e6b6f3f311c935.rlib",
+      "sha256": "0bdee3399f56e43848b717e2fea67cdb2647e49fe9ae6b741ada106e34ee9c03"
+    },
+    {
+      "bytes": 48772,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libshlex-a0e6b6f3f311c935.rmeta",
+      "sha256": "29012353c074b2ed9d58a64ec81c2d7fdab17b73195f6e560faf623b1d2f0da8"
+    },
+    {
+      "bytes": 1369447,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libsoapberry_zip-c17def0d9364ee3f.rmeta",
+      "sha256": "4031a2cbbab8885d54165758eee4694246c42063d73108b9026331a42823c7d4"
+    },
+    {
+      "bytes": 757301,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/libzlib_rs-f772aa0f6b5a4c12.rmeta",
+      "sha256": "510549a2266e2795a39a199556ba288b6f0c85beb20d61802d5104c13e53bfa7"
+    },
+    {
+      "bytes": 402,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/parse_zip-edc287199769444b.d",
+      "sha256": "500b4c67512a834c711d264dafca06615b1501789123366588e30fdd00a7d7de"
+    },
+    {
+      "bytes": 29620,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/rayon-3903051bc656220e.d",
+      "sha256": "41045f6d8d13f37348e1573dc6e85bcaf7b1e885614dfd7a522a1f9eafb75f02"
+    },
+    {
+      "bytes": 7436,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/rayon_core-421038ceeb9210d7.d",
+      "sha256": "8ae4ca2f31f7a1a5762d7cbf7d84309d28c8b30ffec7da30a4d090a4b01db2ce"
+    },
+    {
+      "bytes": 994,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/shlex-2f9d84d68197382e.d",
+      "sha256": "5d65a8bec96fcb80fe91ffe73c4ae7f81e6215e4d36ecfe9e49e8735836518b1"
+    },
+    {
+      "bytes": 994,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/shlex-a0e6b6f3f311c935.d",
+      "sha256": "de55ec48fa4feb9c91fc62f59b56a3e67d157e0538399bbcdbf6f1ebb7b44e31"
+    },
+    {
+      "bytes": 2680,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/soapberry_zip-c17def0d9364ee3f.d",
+      "sha256": "1ca9ee49767d5289a17ba3b0d28646937be4d523e6b991ad34c14c0f4ea05406"
+    },
+    {
+      "bytes": 11810,
+      "kind": "generated",
+      "path": "crate/fuzz/target/release/deps/zlib_rs-f772aa0f6b5a4c12.d",
+      "sha256": "5af753787afd39d1ed2970ee3f75aa4a6bd44ec9b1e520abf9ec50d70e69bc5b"
+    },
+    {
+      "bytes": 177,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/CACHEDIR.TAG",
+      "sha256": "6d9d1d216e0f83abc5e5662ca62c92b4f23009466b54fa27321a69acdb778bb2"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.cargo-artifact-lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.cargo-build-lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.cargo-lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/arbitrary-9ce35286202d29f9/dep-lib-arbitrary",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/arbitrary-9ce35286202d29f9/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/arbitrary-9ce35286202d29f9/lib-arbitrary",
+      "sha256": "2b3c45913ec5e36ee8c43540fe2bda72df01e7aa6bac2808c52a51a1b02487a6"
+    },
+    {
+      "bytes": 702,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/arbitrary-9ce35286202d29f9/lib-arbitrary.json",
+      "sha256": "14c74d92fba766fa9f249f43e30180ec8c3445caa8682c65c4a733fab3ce1f6f"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/cfg-if-d5dad1fa038038d1/dep-lib-cfg_if",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/cfg-if-d5dad1fa038038d1/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/cfg-if-d5dad1fa038038d1/lib-cfg_if",
+      "sha256": "826e60485e56b8ee05c56c663986355206a8ec019dd00418603afcdcdc4abcaa"
+    },
+    {
+      "bytes": 693,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/cfg-if-d5dad1fa038038d1/lib-cfg_if.json",
+      "sha256": "62e6e34a3095fffb2d9fcde28ba26a8aecc4f999150f72f4cfb315e1bcd16746"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crc32fast-583be9e0f87fd34b/run-build-script-build-script-build",
+      "sha256": "7e8d98b827be4e5e7a4db2fea878e84ef0329279823dabca4f8e10fc1179fc7a"
+    },
+    {
+      "bytes": 527,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crc32fast-583be9e0f87fd34b/run-build-script-build-script-build.json",
+      "sha256": "f034e67b5733afea248e33565431fc1d08589a5f3f19170f5d63fd537f68263c"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crc32fast-c96b7480f77ca399/dep-lib-crc32fast",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crc32fast-c96b7480f77ca399/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crc32fast-c96b7480f77ca399/lib-crc32fast",
+      "sha256": "367a0621a7d5aeb85f7ea1fc2ae74af54376b56c8c4c4d65ffe74db755bce21c"
+    },
+    {
+      "bytes": 848,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crc32fast-c96b7480f77ca399/lib-crc32fast.json",
+      "sha256": "7afeb132e5464b49111a4767304900e77e7488762562914090fa50c135e9bfc3"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-deque-1c078648cd1b751e/dep-lib-crossbeam_deque",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-deque-1c078648cd1b751e/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-deque-1c078648cd1b751e/lib-crossbeam_deque",
+      "sha256": "ff953e8e8b5ab3d8678044f5f697b7886d74a04128133c7b3818faf21fcd39d3"
+    },
+    {
+      "bytes": 925,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-deque-1c078648cd1b751e/lib-crossbeam_deque.json",
+      "sha256": "61e7d38ec26288d8578f191aab3786d9c190fc82dbe58c05b129edc006866b22"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-deque-bbef9a5f3a68e591/run-build-script-build-script-build",
+      "sha256": "afad837d21dbe7bb2012eb20fce77f0651fda530ed4fd0f333866b1c7850083c"
+    },
+    {
+      "bytes": 633,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-deque-bbef9a5f3a68e591/run-build-script-build-script-build.json",
+      "sha256": "af19a7ef0e529e6263a7058cd563785c35f1f26dabc7af897a3935bf9addf215"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-epoch-ac2e6219d10ce8d3/dep-lib-crossbeam_epoch",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-epoch-ac2e6219d10ce8d3/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-epoch-ac2e6219d10ce8d3/lib-crossbeam_epoch",
+      "sha256": "79f8a85b5e5fa0dbb3a1779819ba1148e644fde455d7b2984d8713130633b692"
+    },
+    {
+      "bytes": 907,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-epoch-ac2e6219d10ce8d3/lib-crossbeam_epoch.json",
+      "sha256": "8bc0e4171c8eaf2f3774b86e6899da75d5eed2fd1eee5bfec6dfedc1ed506571"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-epoch-d251b35584a70e04/run-build-script-build-script-build",
+      "sha256": "49104e6a58d8c51b297bd30016d41a15f671e56b51bfe526abd80426b7ea7681"
+    },
+    {
+      "bytes": 631,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-epoch-d251b35584a70e04/run-build-script-build-script-build.json",
+      "sha256": "8b72d53a48daf2bbc9348f9c0d0ccbeba74dc60bdb1e7b56d35ad77a3845eb7b"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-utils-19df571209c01135/dep-lib-crossbeam_utils",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-utils-19df571209c01135/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-utils-19df571209c01135/lib-crossbeam_utils",
+      "sha256": "b488c7075cc21e686d08a945c9323d4f48779802c15451b4dc7f4123c8f2557f"
+    },
+    {
+      "bytes": 813,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-utils-19df571209c01135/lib-crossbeam_utils.json",
+      "sha256": "5d22a899e0bc9b7f6f0282db8b84ca1dcf662b112a2d6a7eb18cc08707d31e47"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-utils-9e6d8092334fcc9d/run-build-script-build-script-build",
+      "sha256": "a7b7c86ce420a06c58d4264956a3fb3fefbe4be553709d6dd20bcef1e01f15b4"
+    },
+    {
+      "bytes": 638,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-utils-9e6d8092334fcc9d/run-build-script-build-script-build.json",
+      "sha256": "cfe84d7f18a592b9037de0b6664d5a932447a2768dbeab28b72aff47a3d5349c"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/either-2b08f73413e70746/dep-lib-either",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/either-2b08f73413e70746/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/either-2b08f73413e70746/lib-either",
+      "sha256": "f847aedb991db289849f38340ad074cc2878cecc528a63da2079ea4388cf5add"
+    },
+    {
+      "bytes": 708,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/either-2b08f73413e70746/lib-either.json",
+      "sha256": "48ad949b87d158a92fdc91e29d8f4e4cf9279a0519e8f862737accbe7c2123cb"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/flate2-ebfee09be1985cfe/dep-lib-flate2",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/flate2-ebfee09be1985cfe/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/flate2-ebfee09be1985cfe/lib-flate2",
+      "sha256": "f794ba3389febf337440722607d73a41b800571de123d95f58ddfae1fc4fe25d"
+    },
+    {
+      "bytes": 1038,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/flate2-ebfee09be1985cfe/lib-flate2.json",
+      "sha256": "9e715a10772f27ae8770af11b2f917e9a55cd31252220e2b9e8940f106f3a0ea"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/libfuzzer-sys-0d73bbe39909b0a1/dep-lib-libfuzzer_sys",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/libfuzzer-sys-0d73bbe39909b0a1/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/libfuzzer-sys-0d73bbe39909b0a1/lib-libfuzzer_sys",
+      "sha256": "a2fef9a22ed8a6126915744c46473066da7fa475701e96542e2c2bc04d6ef41a"
+    },
+    {
+      "bytes": 891,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/libfuzzer-sys-0d73bbe39909b0a1/lib-libfuzzer_sys.json",
+      "sha256": "211d8dd8d3e2e5b0e49a4b4be56d923da3459cd628066293e6aabf4f8e89faba"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/libfuzzer-sys-50f058bf153f01fb/run-build-script-build-script-build",
+      "sha256": "bb4c62465c5007650506fc1a526d52ed754313443b5455f1c82b0d1e069b68cb"
+    },
+    {
+      "bytes": 18566,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/libfuzzer-sys-50f058bf153f01fb/run-build-script-build-script-build.json",
+      "sha256": "efbbe969b9a04916de76102da9007621dd31834863e6bd633e57296bc08f253e"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-66ac96ff347d5241/dep-lib-rayon",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-66ac96ff347d5241/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-66ac96ff347d5241/lib-rayon",
+      "sha256": "e4923957ce1b9292e86c83a87101c96249cad41be161160089ce7e740ecccece"
+    },
+    {
+      "bytes": 798,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-66ac96ff347d5241/lib-rayon.json",
+      "sha256": "1b350868694763c7df0bae2cbd5a1ac4c1b5e73dc062f0cf088dea78fd8f9adb"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-core-2f93655bdbd98f4b/run-build-script-build-script-build",
+      "sha256": "86b790e836858e1f41badb725824d54e241e8a3456008a5a17aea0193a8e7b8b"
+    },
+    {
+      "bytes": 628,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-core-2f93655bdbd98f4b/run-build-script-build-script-build.json",
+      "sha256": "c98929e6e5f5bf936f4faeba2c99191a8420557bb436ad15de85ccfefcef1a64"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-core-e829cb1fd4f482a9/dep-lib-rayon_core",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-core-e829cb1fd4f482a9/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-core-e829cb1fd4f482a9/lib-rayon_core",
+      "sha256": "25bf11224b3ed00282c2cb8352f6729e5f2a0fb9e583f361ad8f9014b17ed96b"
+    },
+    {
+      "bytes": 892,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-core-e829cb1fd4f482a9/lib-rayon_core.json",
+      "sha256": "7ca307500e06ffd7bc2ead027c6c209818cc35ae82ffe28b06351574ca5fe552"
+    },
+    {
+      "bytes": 323,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-20c24da7558441ac/dep-lib-soapberry_zip",
+      "sha256": "1d7ca9ec88deeb9f6be3f6b516c0bc97ee71941f80a1591762c0dad66006eebf"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-20c24da7558441ac/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-20c24da7558441ac/lib-soapberry_zip",
+      "sha256": "2904596ce212188d3df4cd22b4862d4c37da611ffa615492ed8dba453fba7e0d"
+    },
+    {
+      "bytes": 848,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-20c24da7558441ac/lib-soapberry_zip.json",
+      "sha256": "9713a03a266af6aee24f7c827b70bedc7a7b22a1031fb2facf3df220e50478dc"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-fuzz-3219d2f5e2aefc46/bin-parse_zip",
+      "sha256": "b8781d08d75ba1d045e80e2c4f5f24ceda49e1f5772f58f55982ab05bff64a01"
+    },
+    {
+      "bytes": 808,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-fuzz-3219d2f5e2aefc46/bin-parse_zip.json",
+      "sha256": "4a1821f291349d8c3f64ed908e5509692975f960f6c33084d822d64c77ff9136"
+    },
+    {
+      "bytes": 45,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-fuzz-3219d2f5e2aefc46/dep-bin-parse_zip",
+      "sha256": "1343350be27645edb4a48139e147f94740e87d25c7cb1a276e677c5222208314"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-fuzz-3219d2f5e2aefc46/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 14,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/zlib-rs-9f54bf36daf196c6/dep-lib-zlib_rs",
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/zlib-rs-9f54bf36daf196c6/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 16,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/zlib-rs-9f54bf36daf196c6/lib-zlib_rs",
+      "sha256": "fa5303d08b1bb0e654c83df282126625a64477a0fb713f0c526c302feb595bba"
+    },
+    {
+      "bytes": 924,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/zlib-rs-9f54bf36daf196c6/lib-zlib_rs.json",
+      "sha256": "c2753bddf63c35592370330a09544b3030814410b0dda5633dd092300183ea13"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crc32fast-583be9e0f87fd34b/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 178,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crc32fast-583be9e0f87fd34b/output",
+      "sha256": "bb516d28b8feef7a2a8a75f6be81a78c3c41644271069b8d42f54b4183f1dfc7"
+    },
+    {
+      "bytes": 118,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crc32fast-583be9e0f87fd34b/root-output",
+      "sha256": "c693bed3d9c7086c809cc5a0d117723ed4c423042d9d1e02bc5590ae629d8bd8"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crc32fast-583be9e0f87fd34b/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-deque-bbef9a5f3a68e591/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 85,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-deque-bbef9a5f3a68e591/output",
+      "sha256": "8ba2fe9791014b8b7befc812fb9a284415cf2a2c09a1791591abbba5382f46fc"
+    },
+    {
+      "bytes": 124,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-deque-bbef9a5f3a68e591/root-output",
+      "sha256": "47aaf089259629bfbf0900a83da78443c2f376d400b34d060f44f1542530aa5b"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-deque-bbef9a5f3a68e591/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-epoch-d251b35584a70e04/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 85,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-epoch-d251b35584a70e04/output",
+      "sha256": "8ba2fe9791014b8b7befc812fb9a284415cf2a2c09a1791591abbba5382f46fc"
+    },
+    {
+      "bytes": 124,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-epoch-d251b35584a70e04/root-output",
+      "sha256": "787347a506729c44cf2ca09bcab0754719bc4c3537068ec0c919b080952cdd5a"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-epoch-d251b35584a70e04/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-utils-9e6d8092334fcc9d/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 109,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-utils-9e6d8092334fcc9d/output",
+      "sha256": "cb6814e09e64fb079e8defed607f9407cb5ef09b64fd8a31d4c581164f39bac5"
+    },
+    {
+      "bytes": 124,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-utils-9e6d8092334fcc9d/root-output",
+      "sha256": "5fd6f603b42ce5901de78776b410de5dad0e580cd54267aa0bcf5947fa135516"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-utils-9e6d8092334fcc9d/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 185376,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerCrossOver.o",
+      "sha256": "fe11363167bda6c747cb9859d74be983056f41ca3e61acbdd0bc6e65959225a0"
+    },
+    {
+      "bytes": 2518128,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerDataFlowTrace.o",
+      "sha256": "c5654d6faecc8cb4a18f3ccf5f4a1963eb99f53b08e4d35441e8928e087f8b52"
+    },
+    {
+      "bytes": 6008008,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerDriver.o",
+      "sha256": "e746b5715e2e3bc9da56ecf53313da60cc10b63261642d0ad15b31f4461246da"
+    },
+    {
+      "bytes": 1544,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerExtFunctionsDlsym.o",
+      "sha256": "c788e62322cb3e0e48696f49807cdf2730b008d2ffb25e352c8ec0982077e26f"
+    },
+    {
+      "bytes": 47224,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerExtFunctionsWeak.o",
+      "sha256": "7aec9275f7ba3dbd207d95e98f3ab3e549fef6fbe7d765a0abeb050f9b9294dc"
+    },
+    {
+      "bytes": 1544,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerExtFunctionsWindows.o",
+      "sha256": "2a1ad9b99e5b10c261db7037a54222a2781fc0b73250da570adb04e843c3835a"
+    },
+    {
+      "bytes": 9240,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerExtraCounters.o",
+      "sha256": "aaf7a50db27e16aa2162e3c390d0be2e626976e44ea794ca7c67c7c2a763b64a"
+    },
+    {
+      "bytes": 5584,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerExtraCountersDarwin.o",
+      "sha256": "d8444d2cbf2fba7a52fd3b05c732bde0b82a51f63f18cd773fb4ed06f791d076"
+    },
+    {
+      "bytes": 5584,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerExtraCountersWindows.o",
+      "sha256": "cf589087b8162d31744be5f4996b5dbdc571ce81840397b38f40f1f0920c3dcd"
+    },
+    {
+      "bytes": 5556968,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerFork.o",
+      "sha256": "6c502f38bb9a23e8bbfe164c7b9c6159541f0ed8e657fee5a9270ac4f03f89e6"
+    },
+    {
+      "bytes": 920248,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerIO.o",
+      "sha256": "1f59431c10bb2290ffead4eb241bb89266c5fdaa88fa61b3a6d0f63ddb6ca3b9"
+    },
+    {
+      "bytes": 375400,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerIOPosix.o",
+      "sha256": "0adc069b1765db88b5d77da85c0ccce0982b573459613b378f2823e53939f6ee"
+    },
+    {
+      "bytes": 1528,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerIOWindows.o",
+      "sha256": "48fbac54cb8b07ed471fca82330da5971c98ef002c426baac4b5cfec2c28c1af"
+    },
+    {
+      "bytes": 87376,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerInterceptors.o",
+      "sha256": "e7965a15d684d3a538009bdc94ea6743086857e1337fbf25ff80922b021a4746"
+    },
+    {
+      "bytes": 4514152,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerLoop.o",
+      "sha256": "ebfeb5a495112a592df5803e863571e2fde5be768536d3e7f64e83a6e30641dd"
+    },
+    {
+      "bytes": 29496,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerMain.o",
+      "sha256": "d55381eb8dabbdb64f7a0f7f8c2dfd444176d342617b4d2b918cecf124bf0ca4"
+    },
+    {
+      "bytes": 5251616,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerMerge.o",
+      "sha256": "613dc5c988da756c7596ac14a59690b67c576e4ed60176bccce1407a85a988dc"
+    },
+    {
+      "bytes": 1396040,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerMutate.o",
+      "sha256": "2b1ca80ebf2064ee97f1222d9a8aa43f6a237d1dde586e72c0f55b86b4a04c7b"
+    },
+    {
+      "bytes": 225496,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerSHA1.o",
+      "sha256": "249e11355a0f3cd5d23d0da8b083318df6c7031278624e03bb56effeccdb0af0"
+    },
+    {
+      "bytes": 940808,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerTracePC.o",
+      "sha256": "b91b86ed511678b3a7041b383873f5cdec9b5315c4fd7cc8d6e4d06be1c86790"
+    },
+    {
+      "bytes": 508376,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerUtil.o",
+      "sha256": "c8da79750e3a2d7b29b4dc88e6b4e4b1155689ba09aa134cca5a3e43f8ac7fdb"
+    },
+    {
+      "bytes": 1528,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerUtilDarwin.o",
+      "sha256": "d011c86db23ae89a2c9d7b18d15e10da623368a0698d53bce5b216a14ab2a526"
+    },
+    {
+      "bytes": 1528,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerUtilFuchsia.o",
+      "sha256": "eba0425ad476a49acce1019ae38397ca4a40ebed82ce56224be3116c80f18913"
+    },
+    {
+      "bytes": 645520,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerUtilLinux.o",
+      "sha256": "52fbb027e89dbce6fa056d0d69895ca1d51548316f8f5704e4b8684db36d31ea"
+    },
+    {
+      "bytes": 758056,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerUtilPosix.o",
+      "sha256": "7564c1bfcfb750129d9ccc19980caea7c66f77896c8438b4a527e48b68a90915"
+    },
+    {
+      "bytes": 1528,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerUtilWindows.o",
+      "sha256": "827446758cc56b3a5abadd0a3a63c0d5a70060beb6e901084e336238a0108d71"
+    },
+    {
+      "bytes": 1304,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/flag_check",
+      "sha256": "c521a840ec1f176c3b19d7477148e89f6e893f20735fdb436487058990c6eba2"
+    },
+    {
+      "bytes": 28,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/flag_check.cpp",
+      "sha256": "65d2fad425e300ae19bd229a513aa7564086a7f0feb9405f806c70b2366ad59a"
+    },
+    {
+      "bytes": 30028030,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/libfuzzer.a",
+      "sha256": "236c12f237a94cb376f933a743bc7c53a36a7b68c56476db650cf0dc8f068d73"
+    },
+    {
+      "bytes": 22100,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/output",
+      "sha256": "522328837ac2e5701d0dd014b007f3be756e838452c7c3af88106eb76ac5c3c3"
+    },
+    {
+      "bytes": 122,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/root-output",
+      "sha256": "51c07a8ac813db04896853ce9f393c8f02139c5f2857bb1268e4e09bad1a3558"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 48,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/rayon-core-2f93655bdbd98f4b/invoked.timestamp",
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "bytes": 32,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/rayon-core-2f93655bdbd98f4b/output",
+      "sha256": "dd454a92dee8a02b053b2cf6f15c04b2ff982baaa108229e76ba230456bca222"
+    },
+    {
+      "bytes": 119,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/rayon-core-2f93655bdbd98f4b/root-output",
+      "sha256": "28947f524a9027d69a6ffb5e0fca2ea54354d97227bac726881089d09958f7e3"
+    },
+    {
+      "bytes": 0,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/build/rayon-core-2f93655bdbd98f4b/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 21748,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/arbitrary-9ce35286202d29f9.d",
+      "sha256": "1393a7179b3bbd22ab23069c7bfece900f6ffa5d73508efe09bcd9ab04a5c934"
+    },
+    {
+      "bytes": 715,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/cfg_if-d5dad1fa038038d1.d",
+      "sha256": "1e4d8fa32a4134485e31031ace5b742d90914886c8859e7a57bc52978f17da9b"
+    },
+    {
+      "bytes": 2745,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/crc32fast-c96b7480f77ca399.d",
+      "sha256": "59d10fc59e3c2a2ae19863915fb2ab878d74a87375e1af51ab4b4aa999b85574"
+    },
+    {
+      "bytes": 1179,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/crossbeam_deque-1c078648cd1b751e.d",
+      "sha256": "8ff255f0d79dfa57961bcbb1cc2d8bd4483e5acda2b09d60e5e411e5fc118845"
+    },
+    {
+      "bytes": 5373,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/crossbeam_epoch-ac2e6219d10ce8d3.d",
+      "sha256": "c5effd2ad8f5b72ca567707d216c93d8efcc4f2ef05bb1f6f8722381e9a3ddc2"
+    },
+    {
+      "bytes": 5990,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/crossbeam_utils-19df571209c01135.d",
+      "sha256": "4193c282658fb6daa2b3cf62d3837dce1898a0d1e0a941c592b0b168a2937572"
+    },
+    {
+      "bytes": 1493,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/either-2b08f73413e70746.d",
+      "sha256": "6f977a6e96134ac6500b16cc1103fd21cda1c6bcb68e346c5f05adb2a9478d26"
+    },
+    {
+      "bytes": 8014,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/flate2-ebfee09be1985cfe.d",
+      "sha256": "175dd1dd2a616bc47c6fffdf07dc3054acb48b42f393b25d9b11940f874194ab"
+    },
+    {
+      "bytes": 2236218,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libarbitrary-9ce35286202d29f9.rlib",
+      "sha256": "e582ac184e3d3a2b9d1840bffb1b148ade38342f1020221b45117d91221854b8"
+    },
+    {
+      "bytes": 1892069,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libarbitrary-9ce35286202d29f9.rmeta",
+      "sha256": "87c32b37b4ec46539e8da4d0efd852f8e31de25b23420cb534dd001e103bdeb8"
+    },
+    {
+      "bytes": 12934,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcfg_if-d5dad1fa038038d1.rlib",
+      "sha256": "a8296a9917578a257f24b6f96e51a183fcf51fea7ec61805d6e54a997cf4532d"
+    },
+    {
+      "bytes": 5499,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcfg_if-d5dad1fa038038d1.rmeta",
+      "sha256": "c2af3bc1438526e39304daf3a5f066be6c69d171b238491352871d03643cb1bb"
+    },
+    {
+      "bytes": 255402,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrc32fast-c96b7480f77ca399.rlib",
+      "sha256": "d8d1fe668070fe8ff246243a6ff3fe63e8e2297d45ec0cc118b9c1e2686baac8"
+    },
+    {
+      "bytes": 55736,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrc32fast-c96b7480f77ca399.rmeta",
+      "sha256": "0d722288d7f66229e081afe5d6ecd5a84cc15823f9a62db127864cd8096f5aee"
+    },
+    {
+      "bytes": 239132,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrossbeam_deque-1c078648cd1b751e.rlib",
+      "sha256": "8d409195516e2a6818aa714ef3eb79cba35437aa07e4c791e4c2de0533d80b7f"
+    },
+    {
+      "bytes": 231614,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrossbeam_deque-1c078648cd1b751e.rmeta",
+      "sha256": "ecd81b5af35d1f48a991bd0f3d1d5537ecfc5fa2213c96b4277fd4cf08729033"
+    },
+    {
+      "bytes": 574892,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrossbeam_epoch-ac2e6219d10ce8d3.rlib",
+      "sha256": "15ab408fc955d5e0eee91cec64370fe8126538f781d2adf407a81e6022666703"
+    },
+    {
+      "bytes": 369366,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrossbeam_epoch-ac2e6219d10ce8d3.rmeta",
+      "sha256": "4fee629437720db0ab7f454c3dbc195b2ac39b5ebad938affe951b2a5f2ff4c1"
+    },
+    {
+      "bytes": 993842,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrossbeam_utils-19df571209c01135.rlib",
+      "sha256": "d072d2ce5e4d50af8a5958cb944ff0fa62b1cdfe4774cee5dd4d97b384dd9336"
+    },
+    {
+      "bytes": 747422,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrossbeam_utils-19df571209c01135.rmeta",
+      "sha256": "40f79a24b147e9f89ed8cf252d194b973331a04c81130087d07740566a46bf12"
+    },
+    {
+      "bytes": 259890,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libeither-2b08f73413e70746.rlib",
+      "sha256": "c4ed9bc36238edbddbcd3ec430d09335f27067e2e40ae09f65ee54a582945308"
+    },
+    {
+      "bytes": 252447,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libeither-2b08f73413e70746.rmeta",
+      "sha256": "2e3e2cfe98005f28e3a7c3e635e6453f5bfe36791482178c979034a0404d1620"
+    },
+    {
+      "bytes": 989822,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libflate2-ebfee09be1985cfe.rlib",
+      "sha256": "30f2d5b56e461ffc8c7f14638e91bc0b4bcdf9ce2fd6d87d91dab606abd19667"
+    },
+    {
+      "bytes": 701335,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libflate2-ebfee09be1985cfe.rmeta",
+      "sha256": "be42c2585560602ec95e149eb2a905d81dc044de6275b3e82eb0761c7142641a"
+    },
+    {
+      "bytes": 768,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libfuzzer_sys-0d73bbe39909b0a1.d",
+      "sha256": "f9fdbf9b1304429c6f5adc2043199af7e2a2e8d3f90c86965c1f63ba12e6ee2e"
+    },
+    {
+      "bytes": 30147020,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/liblibfuzzer_sys-0d73bbe39909b0a1.rlib",
+      "sha256": "d9a458d752d933c0fd550a0e3d90503cb8a4b8792e3cc32bfe6b11eb853420ce"
+    },
+    {
+      "bytes": 43261,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/liblibfuzzer_sys-0d73bbe39909b0a1.rmeta",
+      "sha256": "53b30f2b934e110c6f88f77e4ea1af2f0060c7cbae1728364663313810c9ed24"
+    },
+    {
+      "bytes": 4719646,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/librayon-66ac96ff347d5241.rlib",
+      "sha256": "28baa92729015d277a93bed88af23a230f256f4ea3e8e8efeb118b198b5e9e9f"
+    },
+    {
+      "bytes": 4488172,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/librayon-66ac96ff347d5241.rmeta",
+      "sha256": "b3681360460eef3807cb0089b7c2e86fb25de450c5f4f0722009a0794fc12d5e"
+    },
+    {
+      "bytes": 1749670,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/librayon_core-e829cb1fd4f482a9.rlib",
+      "sha256": "1429ccfe26af947e424c44479f8236f1b24db10acd7a90ba8a9a698b283dc52d"
+    },
+    {
+      "bytes": 557829,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/librayon_core-e829cb1fd4f482a9.rmeta",
+      "sha256": "a7c0320ece76f4ac6902bbe44caff5261e049ac7f664d806c24a4c3d3a892298"
+    },
+    {
+      "bytes": 9440062,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libsoapberry_zip-20c24da7558441ac.rlib",
+      "sha256": "27ab1241f9f6ff3db145b5937d4427ee94bcd7ef94d8fdfca16c338a0d369fb7"
+    },
+    {
+      "bytes": 3326149,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libsoapberry_zip-20c24da7558441ac.rmeta",
+      "sha256": "179059dbdd8bd3cdc7b1f768ebbf5ac5b1ba8a5189aaf4eb9a481c16c45f5954"
+    },
+    {
+      "bytes": 2832856,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libzlib_rs-9f54bf36daf196c6.rlib",
+      "sha256": "4dbc6960a66e96491dfa920666607a1cba41779276437b4a49bf3389bf86b6b7"
+    },
+    {
+      "bytes": 835688,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/libzlib_rs-9f54bf36daf196c6.rmeta",
+      "sha256": "945a5df60a56c8947beafd730e73e564186f2654dda3ef9ffaac2e19adb42658"
+    },
+    {
+      "bytes": 21107400,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/parse_zip-3219d2f5e2aefc46",
+      "sha256": "7e988119ed860ec22c223cdfbbff717557f0ba9be7c917e06e5fcd86b8bccd26"
+    },
+    {
+      "bytes": 313,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/parse_zip-3219d2f5e2aefc46.d",
+      "sha256": "94569fa4b2e9d0fb1ab96e942ced7606b548e2aa8cd9e991ff7089def0c52536"
+    },
+    {
+      "bytes": 39569,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/rayon-66ac96ff347d5241.d",
+      "sha256": "c14312f4a2d4ca924e9a57e83dce0b85c9ecd68813bdfea98b5d04df6c0dc6b6"
+    },
+    {
+      "bytes": 10017,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/rayon_core-e829cb1fd4f482a9.d",
+      "sha256": "5db2b4fec6cc61a68556be21b6dd8383408c952ecc4f2c6f674ee6053c8db39d"
+    },
+    {
+      "bytes": 3679,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/soapberry_zip-20c24da7558441ac.d",
+      "sha256": "d2693877b876a920f6a50ccd3c713ebae760bfbda7127745c9667fc3237cb24f"
+    },
+    {
+      "bytes": 15843,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/deps/zlib_rs-9f54bf36daf196c6.d",
+      "sha256": "42fcabe7d9c5f365393afb3b0005f845888d7632400b3b3d2cc979bc85e43f83"
+    },
+    {
+      "bytes": 21107400,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/parse_zip",
+      "sha256": "7e988119ed860ec22c223cdfbbff717557f0ba9be7c917e06e5fcd86b8bccd26"
+    },
+    {
+      "bytes": 982,
+      "kind": "generated",
+      "path": "crate/fuzz/target/x86_64-unknown-linux-gnu/release/parse_zip.d",
+      "sha256": "dd121b502c4df9bb356489e352f0af2e94eb452f3f91617659b915f10b38f26e"
+    }
+  ],
+  "baseline_copies_verified": true,
+  "cargo_lock": {
+    "evidence": {
+      "bytes": 4463,
+      "path": "checks/soapberry-zip-fuzz-Cargo.lock.txt",
+      "sha256": "469113ba59e79b9b66c7acb0ad3f6f967319d2ae38d78ff132f7ed145e28779f"
+    },
+    "generated": {
+      "bytes": 4463,
+      "path": "crate/fuzz/Cargo.lock",
+      "sha256": "469113ba59e79b9b66c7acb0ad3f6f967319d2ae38d78ff132f7ed145e28779f"
+    }
+  },
+  "change": 450,
+  "cleaned_utc": "2026-09-06T21:47:35.758008+00:00",
+  "custody": {
+    "path": "checks/fuzz-source-custody.json",
+    "sha256": "db43da098a723bf534357eb9f556674666a0a6b8462c054513737cc4ec788683"
+  },
+  "driver": {
+    "bytes": 16974,
+    "path": "fuzz-control.py",
+    "sha256": "de6503edc245f8aa163806d7a388be42414660732dc1e2e3ad36740ed7ffb91b"
+  },
+  "removed_directory": "/tmp/litchi-goal-0450-zip-fuzz",
+  "schema": 1,
+  "source_originals_verified": true,
+  "status": "pass",
+  "task_root": "/tmp/litchi-goal-0450-zip-fuzz",
+  "temporary_directory_absent": true
+}
