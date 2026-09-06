@@ -1125,6 +1125,12 @@ impl Metadata {
 /// lifetime of those bytes is scoped to the callback invocation.
 pub const VERIFIED_ENTRY_READER_BUFFER_SIZE: usize = 16 * 1024;
 
+// Precompressed transfer captures are source reads rather than callback
+// decoder buffers. Keep their requests bounded to one 64 KiB range so a
+// short-read ReaderAt does not turn a large member into thousands of 16 KiB
+// positional requests.
+const PRECOMPRESSED_CAPTURE_BUFFER_SIZE: usize = 64 * 1024;
+
 /// Failure from a callback-scoped, verified indexed-entry read.
 ///
 /// Archive and transport failures are primary: when the callback has already
@@ -3891,7 +3897,7 @@ where
             })?;
 
         let mut captured = 0_u64;
-        let mut chunk = [0_u8; VERIFIED_ENTRY_READER_BUFFER_SIZE];
+        let mut chunk = [0_u8; PRECOMPRESSED_CAPTURE_BUFFER_SIZE];
         let mut source = self.archive.strict_payload_reader(wayfinder, target_layout);
         while captured < compressed_size {
             let remaining = compressed_size
@@ -13222,6 +13228,72 @@ mod tests {
     }
 
     #[test]
+    fn precompressed_capture_bounds_source_requests_and_cancels_after_short_read() {
+        let payload = (0..(PRECOMPRESSED_CAPTURE_BUFFER_SIZE * 2 + 37))
+            .map(|index| {
+                let index = u8::try_from(index % 251).expect("payload pattern fits in u8");
+                index.wrapping_mul(37).wrapping_add(11)
+            })
+            .collect::<Vec<_>>();
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("payload.bin", &payload).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let source_len = bytes.len() as u64;
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let archive = IndexedArchive::from_reader_with_limits(
+            InstrumentedChunkedReaderAt {
+                bytes,
+                max_chunk: 4096,
+                requests: Arc::clone(&requests),
+            },
+            source_len,
+            ArchiveLimits::default(),
+        )
+        .unwrap();
+        let entry_id = archive.entry_id("payload.bin").unwrap();
+
+        requests.lock().unwrap().clear();
+        let token = archive
+            .read_entry_precompressed_with_progress(entry_id, &payload, |_| Ok::<(), io::Error>(()))
+            .unwrap();
+        assert_eq!(token.compressed_size(), payload.len() as u64);
+        let successful_requests = requests.lock().unwrap().clone();
+        assert!(!successful_requests.is_empty());
+        assert!(
+            successful_requests
+                .iter()
+                .all(
+                    |(requested, returned)| *requested <= PRECOMPRESSED_CAPTURE_BUFFER_SIZE
+                        && *returned <= *requested
+                )
+        );
+        assert!(
+            successful_requests
+                .iter()
+                .any(
+                    |(requested, returned)| *requested == PRECOMPRESSED_CAPTURE_BUFFER_SIZE
+                        && *returned < *requested
+                )
+        );
+
+        requests.lock().unwrap().clear();
+        let error = archive
+            .read_entry_precompressed_with_progress(entry_id, &payload, |progress| {
+                if matches!(progress, PrecompressedProgress::Compressed { .. }) {
+                    Err(io::Error::other("transfer cancelled"))
+                } else {
+                    Ok(())
+                }
+            })
+            .unwrap_err();
+        assert!(matches!(error, VerifiedPrecompressedError::Callback(_)));
+        let cancelled_requests = requests.lock().unwrap().clone();
+        assert_eq!(cancelled_requests.len(), 1);
+        assert_eq!(cancelled_requests[0].0, PRECOMPRESSED_CAPTURE_BUFFER_SIZE);
+        assert!(cancelled_requests[0].1 < cancelled_requests[0].0);
+    }
+
+    #[test]
     fn precompressed_capture_handles_zip64_archive_member() {
         let payload = b"This small file is in ZIP64 format.\n";
         let bytes = include_bytes!("../assets/zip64.zip").to_vec();
@@ -13256,6 +13328,35 @@ mod tests {
                 .min(self.max_chunk)
                 .min(self.bytes.len() - start);
             output[..count].copy_from_slice(&self.bytes[start..start + count]);
+            Ok(count)
+        }
+    }
+
+    #[derive(Debug)]
+    struct InstrumentedChunkedReaderAt {
+        bytes: Vec<u8>,
+        max_chunk: usize,
+        requests: Arc<Mutex<Vec<(usize, usize)>>>,
+    }
+
+    impl ReaderAt for InstrumentedChunkedReaderAt {
+        fn read_at(&self, output: &mut [u8], offset: u64) -> io::Result<usize> {
+            let start = usize::try_from(offset).map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "instrumented source offset overflow",
+                )
+            })?;
+            if start >= self.bytes.len() {
+                self.requests.lock().unwrap().push((output.len(), 0));
+                return Ok(0);
+            }
+            let count = output
+                .len()
+                .min(self.max_chunk)
+                .min(self.bytes.len() - start);
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+            self.requests.lock().unwrap().push((output.len(), count));
             Ok(count)
         }
     }
