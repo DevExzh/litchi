@@ -9690,3 +9690,22 @@ compatibility gate is complete pending normal hooks; no further host API was
 retired.
 The current owned temporary workspace is
 `/private/tmp/litchi-media-watermark-20260907v`.
+
+### Final identifier-watermark verification receipt (2026-09-07)
+
+Commit `5dc89da2c` completed the focused physical identifier-suffix release and
+metadata-aware next-allocation compatibility slice. Normal hooks passed Rust
+formatting, workspace all-feature library lint, workspace all-feature
+library/integration tests, and workspace documentation tests. The 943 boundary
+tests and full scanner passed for 64 packages, 238 internal dependency
+declarations, and 11 explicit migration debt items. The final bounded review
+found no blocking correctness issue. These results supersede the pending
+verification notes above and close the focused watermark compatibility gate.
+
+After verification, the owned `/private/tmp/litchi-media-watermark-20260907v`
+directory was removed: 22 temporary files totaling 4,368,335 bytes. Both native
+watermark fixtures remain tracked. The 9.4 GiB Cargo cache is retained for
+continued migration, with approximately 53 GiB free. The earlier 9.8 GiB full
+`cargo clean` remains the latest full-clean receipt. Caption/title/stand-in
+comment support, native commented-audio verification, and unknown-reference
+completeness remain under review before further media host API retirement.
