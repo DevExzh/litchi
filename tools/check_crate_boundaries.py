@@ -2982,6 +2982,7 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_SOURCES = (
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "comment_graph.rs",
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "comment_removal.rs",
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "graph.rs",
+    KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "identifier_watermark.rs",
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "metadata.rs",
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "budget.rs",
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "clone_payload.rs",
@@ -3001,7 +3002,7 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_MODULE = re.compile(
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_CHILD_MODULE = re.compile(
     r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
-    r"(?:r#)?(?:comment_graph|comment_removal|graph|metadata|budget|clone_payload|node_cache)\b"
+    r"(?:r#)?(?:comment_graph|comment_removal|graph|identifier_watermark|metadata|budget|clone_payload|node_cache)\b"
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS = frozenset(
     {
@@ -3423,6 +3424,67 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_REMOVAL_MARKER_GROUPS = {
         "facts.author_identifier",
         "facts.reply_identifiers",
         "validate_comment_storage_relationship",
+    ),
+}
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_IDENTIFIER_WATERMARK_APIS = (
+    "plan_release",
+    "verify_release",
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_IDENTIFIER_WATERMARK_MARKER_GROUPS = {
+    "source-bounded release plan": (
+        "source",
+        "removed_ids",
+        "expected_last_identifier",
+        "LifecycleBudget",
+        "removed_ids.binary_search",
+        "source.state.source.components",
+        "component.archive().objects",
+        "budget.charge_entries",
+        "budget.charge_wire_work",
+        "maximum_remaining",
+        "Ok(Some(maximum_remaining))",
+    ),
+    "candidate release verification": (
+        "candidate",
+        "new_last_identifier",
+        "candidate.state.source.components",
+        "component.archive().objects",
+        "budget.charge_entries",
+        "budget.charge_wire_work",
+        "maximum_remaining != new_last_identifier",
+        "SlideMediaLifecycleError::Verification",
+    ),
+}
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_METADATA_IDENTIFIER_MARKERS = (
+    "metadata_identifier_maximum",
+    "fn observe_identifier",
+    "self.metadata_identifier_maximum",
+    ".max(identifier)",
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_METADATA_IDENTIFIER_CALLBACKS = {
+    "component identifier observation": re.compile(
+        r"\bfn\s+visit_component\b[\s\S]{0,900}?"
+        r"\bobserve_identifier\s*\(\s*component\.identifier\s*\(\s*\)\s*\)"
+    ),
+    "object UUID identifier observation": re.compile(
+        r"\bfn\s+visit_object_uuid\b[\s\S]{0,900}?"
+        r"\bobserve_identifier\s*\(\s*binding\.object_identifier\s*\(\s*\)\s*\)"
+    ),
+    "external object identifier observation": re.compile(
+        r"\bfn\s+visit_external_reference\b[\s\S]{0,1200}?"
+        r"\bobserve_identifier\s*\(\s*identifier\s*\)"
+    ),
+    "owner object identifier observation": re.compile(
+        r"\bfn\s+visit_data_reference_owner\b[\s\S]{0,900}?"
+        r"\bobserve_identifier\s*\(\s*owner\.object_identifier\s*\(\s*\)\s*\)"
+    ),
+    "ambiguous identifier observation": re.compile(
+        r"\bfn\s+visit_ambiguous_object_identifier\b[\s\S]{0,900}?"
+        r"\bobserve_identifier\s*\(\s*identifier\s*\)"
+    ),
+    "metadata-map object identifier observation": re.compile(
+        r"\bfn\s+visit_data_metadata_map\b[\s\S]{0,900}?"
+        r"\bobserve_identifier\s*\(\s*object_identifier\s*\)"
     ),
 }
 
@@ -54792,6 +54854,7 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
         "comment_graph",
         "comment_removal",
         "graph",
+        "identifier_watermark",
         "metadata",
         "budget",
         "clone_payload",
@@ -55458,6 +55521,251 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
                 "focused Keynote media lifecycle comment removal must never delete author "
                 f"objects: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
             )
+
+    identifier_watermark_code = child_sources_by_name.get("identifier_watermark", "")
+    if "identifier_watermark" in module_names:
+        for name in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_IDENTIFIER_WATERMARK_APIS:
+            if re.search(rf"\bfn\s+{re.escape(name)}\b", identifier_watermark_code) is None:
+                violations.append(
+                    "focused Keynote media lifecycle identifier watermark is missing strict "
+                    f"API {name}: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'identifier_watermark.rs'}"
+                )
+        for label, markers in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_IDENTIFIER_WATERMARK_MARKER_GROUPS.items():
+            if not all(
+                _keynote_lifecycle_marker_present(identifier_watermark_code, marker)
+                for marker in markers
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle identifier watermark is missing "
+                    f"{label} marker: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'identifier_watermark.rs'}"
+                )
+
+        def owner_call_arguments(name: str) -> list[tuple[int, str]]:
+            calls: list[tuple[int, str]] = []
+            for call in re.finditer(rf"\b{re.escape(name)}\s*\(", owner):
+                opening = owner.find("(", call.start(), call.end())
+                if opening < 0:
+                    continue
+                depth = 1
+                cursor = opening + 1
+                while cursor < len(owner) and depth:
+                    if owner[cursor] == "(":
+                        depth += 1
+                    elif owner[cursor] == ")":
+                        depth -= 1
+                    cursor += 1
+                if depth == 0:
+                    calls.append((call.start(), owner[opening + 1 : cursor - 1]))
+            return calls
+
+        release_calls = owner_call_arguments("identifier_watermark::plan_release")
+        if not release_calls:
+            violations.append(
+                "focused Keynote media lifecycle removal must route the effective source IDs "
+                "through identifier_watermark::plan_release: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+        else:
+            release_position, release_arguments = release_calls[0]
+            if not all(
+                re.search(pattern, release_arguments)
+                for pattern in (
+                    r"\bsource\b",
+                    r"\bsource_ids\b",
+                    r"\bsnapshot\.last_identifier\s*\(\s*\)",
+                    r"\bbudget\b",
+                )
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle release planning must use source_ids, the "
+                    "source watermark, and the shared budget: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                )
+            release_window = owner[max(0, release_position - 720) : release_position + 720]
+            if not re.search(r"\bLifecycleAction::Remove\b", release_window):
+                violations.append(
+                    "focused Keynote media lifecycle release planning must remain remove-only: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                )
+            release_prefix = owner[max(0, release_position - 300) : release_position + 260]
+            if not re.search(
+                r"if\s+action\s*==\s*LifecycleAction::Remove\s*\{"
+                r"[\s\S]{0,260}identifier_watermark::plan_release",
+                release_prefix,
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle release planning must be gated by the "
+                    "remove action directly: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                )
+            source_assignment = re.search(
+                r"\blet\s+source_ids\s*=\s*(?:removal_plan|plan)"
+                r"[\s\S]{0,420}?\bremoved_object_ids\b",
+                owner,
+            )
+            if source_assignment is None or source_assignment.start() > release_position:
+                violations.append(
+                    "focused Keynote media lifecycle release planning must follow the filtered "
+                    "effective removed-object set: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                )
+
+        verify_calls = owner_call_arguments("identifier_watermark::verify_release")
+        if not verify_calls:
+            violations.append(
+                "focused Keynote media lifecycle candidate verification must route through "
+                "identifier_watermark::verify_release: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+        else:
+            verify_position, verify_arguments = verify_calls[0]
+            if not all(
+                re.search(pattern, verify_arguments)
+                for pattern in (
+                    r"\bcandidate\b",
+                    r"\bnew_last_identifier\b",
+                    r"\bbudget\b",
+                )
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle watermark verification must use the "
+                    "candidate, released watermark, and shared budget: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                )
+            verify_window = owner[max(0, verify_position - 420) : verify_position + 420]
+            if not re.search(
+                r"if\s+let\s+Some\s*\(\s*new_last_identifier\s*\)\s*=\s*"
+                r"released_watermark",
+                verify_window,
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle watermark verification must be gated by "
+                    "the source release proof: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                )
+
+        identity_watermark_call = re.search(
+            r"\bwith_new_last_identifier\s*\(\s*new_last_identifier\s*\)", owner
+        )
+        if identity_watermark_call is None:
+            violations.append(
+                "focused Keynote media lifecycle removal must attach the released watermark "
+                "to its IdentityBatch: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+        else:
+            identity_window = owner[
+                max(0, identity_watermark_call.start() - 720) : identity_watermark_call.end() + 180
+            ]
+            if not re.search(r"\bLifecycleAction::Remove\b", identity_window) or not re.search(
+                r"\breleased_watermark\b", identity_window
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle released watermark must be attached only "
+                    "to the remove IdentityBatch: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                )
+
+    metadata_code = child_sources_by_name.get("metadata", "")
+    for marker in (
+        "batch.is_removal_transition()",
+        "batch.new_last_identifier()",
+        "with_new_last_object_identifier",
+    ):
+        if marker not in metadata_code:
+            violations.append(
+                "focused Keynote media lifecycle metadata adapter is missing optional removal "
+                f"watermark propagation marker {marker}: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'metadata.rs'}"
+            )
+
+    metadata_identifier_code = metadata_code
+    identity_start = metadata_identifier_code.find("struct IdentityCollector")
+    identity_end = metadata_identifier_code.find(
+        "struct NoopIdentityVisitor", identity_start + 1
+    )
+    identity_code = (
+        metadata_identifier_code[identity_start:identity_end]
+        if identity_start >= 0 and identity_end > identity_start
+        else ""
+    )
+    for marker in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_METADATA_IDENTIFIER_MARKERS:
+        if marker not in metadata_identifier_code:
+            violations.append(
+                "focused Keynote media lifecycle metadata identifier census is missing "
+                f"marker {marker}: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'metadata.rs'}"
+            )
+    for label, marker in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_METADATA_IDENTIFIER_CALLBACKS.items():
+        if marker.search(identity_code) is None:
+            violations.append(
+                "focused Keynote media lifecycle metadata identifier census is missing "
+                f"{label}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'metadata.rs'}"
+            )
+    for forbidden in (
+        r"\bfn\s+visit_data_reference\b",
+        r"\bobserve_identifier\s*\([^)]*\bdata_identifier\b",
+        r"\bobserve_identifier\s*\([^)]*\btarget_component_identifier\b",
+        r"\bobserve_identifier\s*\([^)]*\bsource\s*\(\s*\)\s*\.\s*identifier\b",
+    ):
+        if re.search(forbidden, identity_code):
+            violations.append(
+                "focused Keynote media lifecycle metadata identifier census must observe only "
+                f"host object identifiers ({forbidden}): "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'metadata.rs'}"
+            )
+
+    def owner_function_body(name: str) -> str:
+        declaration = re.search(
+            rf"(?m)^\s*(?:pub(?:\([^()]*\))?\s+)?"
+            rf"(?:unsafe\s+|async\s+|const\s+)*fn\s+{re.escape(name)}\b",
+            owner,
+        )
+        if declaration is None:
+            return ""
+        opening = owner.find("{", declaration.end())
+        if opening < 0:
+            return ""
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(owner) and depth:
+            if owner[cursor] == "{":
+                depth += 1
+            elif owner[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        return owner[opening + 1 : cursor - 1] if depth == 0 else ""
+
+    allocator_body = owner_function_body("allocate_clone_identities")
+    allocator_markers = (
+        r"\bglobal_max\s*=\s*snapshot\s*\.\s*last_identifier\s*\(\s*\)\s*\.\s*max\s*\(\s*"
+        r"snapshot\s*\.\s*metadata_identifier_maximum\s*\(\s*\)\s*\)",
+        r"\bpackage\.state\.source\.components\s*\(\s*\)\s*\.\s*iter\s*\(\s*\)",
+        r"\bcomponent\.archive\s*\(\s*\)\.objects\b",
+        r"\bobject\.archive_info\.identifier\b",
+        r"\bglobal_max\s*=\s*global_max\.max\s*\(\s*identifier\s*\)",
+        r"\bbudget\.charge_entries\s*\(\s*object_count\s*\)",
+    )
+    for marker in allocator_markers:
+        if re.search(marker, allocator_body) is None:
+            violations.append(
+                "focused Keynote media lifecycle clone allocation is missing its metadata and "
+                f"physical identifier census marker {marker}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+    census_position = allocator_body.find("budget.charge_entries(object_count)")
+    result_vector_position = allocator_body.find("let mut remap")
+    if (
+        census_position < 0
+        or result_vector_position < 0
+        or census_position > result_vector_position
+    ):
+        violations.append(
+            "focused Keynote media lifecycle clone allocation must charge its full identifier "
+            "census before growing result vectors: "
+            f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+        )
 
     budget_names = {
         match.group(1)

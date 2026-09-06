@@ -389,10 +389,19 @@ impl DataMetadataMapRemoval {
 /// from the DataMetadataMap object itself.
 pub type RootDataMetadataMapRemoval = DataMetadataMapRemoval;
 
-/// Borrowed atomic removal request. The last object identifier is retained.
+/// Borrowed atomic removal request.
+///
+/// By default the source `last_object_identifier` is retained.  A focused
+/// removal may instead attach a lower watermark with
+/// [`Self::with_new_last_object_identifier`].  The lower watermark is applied
+/// in the same candidate as the selected registry removals, which is
+/// important for packages whose removed physical objects occupied the
+/// trailing identifier suffix.  The request remains borrowed and the
+/// candidate writer preserves every unselected raw span.
 #[derive(Debug, Clone, Copy)]
 pub struct RemovalBatch<'source> {
     expected_last_object_identifier: u64,
+    new_last_object_identifier: Option<u64>,
     object_uuids: &'source [ObjectUuidRemoval<'source>],
     external_references: &'source [ExternalReferenceRemoval<'source>],
     data_reference_owners: &'source [DataReferenceOwnerRemoval<'source>],
@@ -409,11 +418,22 @@ impl<'source> RemovalBatch<'source> {
     ) -> Self {
         Self {
             expected_last_object_identifier,
+            new_last_object_identifier: None,
             object_uuids,
             external_references,
             data_reference_owners,
             data_metadata_map: None,
         }
+    }
+
+    /// Request a replacement `last_object_identifier` for this removal.
+    ///
+    /// The codec validates that the replacement is positive and does not
+    /// increase the source watermark.
+    #[must_use]
+    pub const fn with_new_last_object_identifier(mut self, identifier: u64) -> Self {
+        self.new_last_object_identifier = Some(identifier);
+        self
     }
 
     /// Add an exact root `data_metadata_map` edge removal to this borrowed
@@ -427,6 +447,10 @@ impl<'source> RemovalBatch<'source> {
     #[must_use]
     pub const fn expected_last_object_identifier(self) -> u64 {
         self.expected_last_object_identifier
+    }
+    #[must_use]
+    pub const fn new_last_object_identifier(self) -> Option<u64> {
+        self.new_last_object_identifier
     }
     #[must_use]
     pub const fn object_uuids(self) -> &'source [ObjectUuidRemoval<'source>] {
@@ -445,14 +469,44 @@ impl<'source> RemovalBatch<'source> {
     pub const fn data_metadata_map(self) -> Option<DataMetadataMapRemoval> {
         self.data_metadata_map
     }
+
+    #[must_use]
+    const fn with_expected_last_object_identifier(self, expected: u64) -> Self {
+        Self {
+            expected_last_object_identifier: expected,
+            new_last_object_identifier: self.new_last_object_identifier,
+            object_uuids: self.object_uuids,
+            external_references: self.external_references,
+            data_reference_owners: self.data_reference_owners,
+            data_metadata_map: self.data_metadata_map,
+        }
+    }
+
+    #[must_use]
+    const fn output_last_object_identifier(self) -> u64 {
+        match self.new_last_object_identifier {
+            Some(identifier) => identifier,
+            None => self.expected_last_object_identifier,
+        }
+    }
+
+    #[must_use]
+    const fn changes_last_object_identifier(self) -> bool {
+        match self.new_last_object_identifier {
+            Some(identifier) => identifier != self.expected_last_object_identifier,
+            None => false,
+        }
+    }
 }
 
-/// One atomic registry-removal and save-token transition.
+/// One atomic registry-removal, optional watermark release, and save-token
+/// transition.
 ///
 /// The two borrowed batches are evaluated against the same source snapshot
 /// and published as one candidate.  This is intentionally separate from
-/// [`Batch`]: removal keeps `last_object_identifier` unchanged, while a
-/// save-token transition changes only fields 8 and 12.
+/// [`Batch`]: removal normally keeps `last_object_identifier` unchanged, but
+/// may lower it when the embedded [`RemovalBatch`] carries a release target;
+/// a save-token transition changes fields 8 and 12.
 #[derive(Debug, Clone, Copy)]
 pub struct RemovalSaveTokenBatch<'source> {
     removals: RemovalBatch<'source>,
@@ -1006,7 +1060,7 @@ impl PreparedPackageMetadataSaveTokenRewrite<'_, '_> {
             self.batch,
             SaveTokenScanMode::Verification,
             &mut candidate_state,
-            Some((self.source_last_raw, self.source_last, self.new_root)),
+            Some((self.source_last_raw, self.source_last, self.new_root, None)),
             &mut self.budget,
         )?;
         candidate_state.validate_candidate(self.new_root)?;
@@ -1172,10 +1226,13 @@ impl PreparedPackageMetadataRemovalSaveTokenRewrite<'_, '_> {
         }
 
         self.budget.source_phase = false;
-        let mut verified_removals = RemovalScanState::new(self.batch.removals, &mut self.budget)?;
+        let candidate_removals = self.batch.removals.with_expected_last_object_identifier(
+            self.batch.removals.output_last_object_identifier(),
+        );
+        let mut verified_removals = RemovalScanState::new(candidate_removals, &mut self.budget)?;
         scan_removal_metadata(
             &candidate,
-            self.batch.removals,
+            candidate_removals,
             &mut verified_removals,
             &mut self.budget,
             true,
@@ -1189,7 +1246,12 @@ impl PreparedPackageMetadataRemovalSaveTokenRewrite<'_, '_> {
             self.batch.save_tokens,
             SaveTokenScanMode::Verification,
             &mut verified_tokens,
-            Some((self.source_last_raw, self.source_last, self.new_root)),
+            Some((
+                self.source_last_raw,
+                self.source_last,
+                self.new_root,
+                self.batch.removals.new_last_object_identifier,
+            )),
             &mut self.budget,
         )?;
         verified_tokens.validate_candidate(self.new_root)?;
@@ -3102,6 +3164,110 @@ mod tests {
     }
 
     #[test]
+    fn removal_can_release_watermark_without_registry_records_and_replay_exactly() {
+        let source = metadata(
+            10,
+            &[component(1, "a.iwa", None, &[], &[])],
+            &[component(2, "old.iwa", None, &[], &[])],
+        );
+        let batch = RemovalBatch::new(10, &[], &[], &[]).with_new_last_object_identifier(7);
+
+        reset_work_charges();
+        let baseline = remove_package_metadata(&source, batch, options(&source)).unwrap();
+        assert_eq!(baseline.report().removals(), 0);
+        assert_eq!(baseline.report().additions(), 0);
+        assert_eq!(scalar_values(baseline.bytes(), 1), vec![7]);
+        assert_eq!(work_charges(), baseline.report().work_bytes());
+        assert!(
+            baseline
+                .bytes()
+                .windows(3)
+                .any(|window| window == [0x90, 0x03, 0x07])
+        );
+        assert!(
+            baseline
+                .bytes()
+                .windows(4)
+                .any(|window| window == [0x9b, 0x03, 0x08, 0x00])
+        );
+
+        let report = baseline.report();
+        let exact = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.removals(),
+        );
+        reset_work_charges();
+        let replay = remove_package_metadata(&source, batch, exact).unwrap();
+        assert_eq!(replay.bytes(), baseline.bytes());
+        assert_eq!(replay.report(), baseline.report());
+        assert_eq!(work_charges(), report.work_bytes());
+    }
+
+    #[test]
+    fn removal_watermark_equal_preserves_root_bytes_and_zero_is_rejected_atomically() {
+        let source = metadata(10, &[], &[]);
+        let equal = RemovalBatch::new(10, &[], &[], &[]).with_new_last_object_identifier(10);
+        let equal_output = remove_package_metadata(&source, equal, options(&source)).unwrap();
+        assert_eq!(equal_output.bytes(), source);
+
+        let zero = RemovalBatch::new(10, &[], &[], &[]).with_new_last_object_identifier(0);
+        let before_allocations = output_allocations();
+        let error = remove_package_metadata(&source, zero, options(&source)).unwrap_err();
+        assert_eq!(reason(error), InvalidReason::InvalidIdentifier);
+        assert_eq!(output_allocations(), before_allocations);
+        assert_eq!(source, metadata(10, &[], &[]));
+    }
+
+    #[test]
+    fn removal_applies_uuid_drop_and_watermark_release_atomically() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let uuid = UuidBits::new(10, 20);
+        let source = metadata(10, &[component(1, "a.iwa", None, &[(10, uuid)], &[])], &[]);
+        let removals = [ObjectUuidRemoval::new(selector, 10, uuid)];
+        let batch = RemovalBatch::new(10, &removals, &[], &[]).with_new_last_object_identifier(7);
+
+        let output = remove_package_metadata(&source, batch, options(&source)).unwrap();
+        assert_eq!(output.report().removals(), 1);
+        assert_eq!(scalar_values(output.bytes(), 1), vec![7]);
+        assert!(
+            !output
+                .bytes()
+                .windows(uuid_entry(10, uuid).len())
+                .any(|window| { window == uuid_entry(10, uuid) })
+        );
+        assert_eq!(
+            inspect_package_metadata_with_visitor(
+                output.bytes(),
+                options(output.bytes()),
+                &mut Facts::default(),
+            )
+            .unwrap()
+            .last_object_identifier(),
+            7
+        );
+    }
+
+    #[test]
+    fn removal_rejects_watermark_increase_before_output_allocation() {
+        let source = metadata(10, &[component(1, "a.iwa", None, &[], &[])], &[]);
+        let batch = RemovalBatch::new(10, &[], &[], &[]).with_new_last_object_identifier(11);
+        let before = output_allocations();
+        let error = remove_package_metadata(&source, batch, options(&source)).unwrap_err();
+        assert_eq!(reason(error), InvalidReason::LastIdentifierNotIncreasing);
+        assert_eq!(output_allocations(), before);
+        assert_eq!(
+            source,
+            metadata(10, &[component(1, "a.iwa", None, &[], &[])], &[])
+        );
+    }
+
+    #[test]
     fn root_data_metadata_map_removal_is_exact_and_preserves_unselected_raw_bytes() {
         let map_reference = root_data_metadata_reference(80, Some(7), Some(1), false);
         let mut source = metadata(10, &[component(1, "a.iwa", None, &[], &[])], &[]);
@@ -3755,6 +3921,36 @@ mod tests {
             Some(RewriteLimit::OutputBytes { .. })
         ));
         assert_eq!(output_allocations(), allocations);
+    }
+
+    #[test]
+    fn combined_removal_and_save_tokens_can_release_watermark() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let uuid = UuidBits::new(10, 20);
+        let mut selected = component(1, "a.iwa", None, &[(5, uuid)], &[]);
+        put_varint_field(&mut selected, 12, 5);
+        let mut source = token_metadata(10, Some(5), &[selected], &[]);
+        source.extend_from_slice(&[0xd0, 0x05, 0x07]);
+
+        let uuid_removals = [ObjectUuidRemoval::new(selector, 5, uuid)];
+        let removals =
+            RemovalBatch::new(10, &uuid_removals, &[], &[]).with_new_last_object_identifier(7);
+        let save_tokens = SaveTokenBatch::new(core::slice::from_ref(&selector));
+        let batch = RemovalSaveTokenBatch::new(removals, save_tokens);
+        let output =
+            rewrite_package_metadata_removals_and_save_tokens(&source, batch, options(&source))
+                .unwrap();
+
+        assert_eq!(scalar_values(output.bytes(), 1), vec![7]);
+        assert_eq!(scalar_values(output.bytes(), 8), vec![6]);
+        assert_eq!(component_scalar_values(output.bytes(), 1, 12), vec![6]);
+        assert!(
+            !output
+                .bytes()
+                .windows(uuid_entry(5, uuid).len())
+                .any(|window| { window == uuid_entry(5, uuid) })
+        );
+        assert!(output.bytes().ends_with(&[0xd0, 0x05, 0x07]));
     }
 
     #[test]
@@ -5700,12 +5896,13 @@ pub fn rewrite_package_metadata_additions_and_save_tokens(
     Ok(output)
 }
 
-/// Atomically remove exact registry ownership records and advance the root
-/// plus selected current-component save tokens.
+/// Atomically remove exact registry ownership records, optionally lower the
+/// root watermark, and advance selected current-component save tokens.
 ///
 /// The source is scanned for both transitions before the sole output buffer
-/// is reserved.  Field 1 and every unselected/versioned record remain raw;
-/// the only scalar additions/replacements are root field 8 and selected
+/// is reserved.  Field 1 remains raw unless a strict lower watermark was
+/// requested; every unselected/versioned record remains raw;
+/// the only other scalar replacements are root field 8 and selected
 /// current-component field 12.  A removal that would cross a versioned or
 /// ambiguous owner is rejected by the same strict ownership scanner used by
 /// [`remove_package_metadata`].
@@ -7484,7 +7681,7 @@ fn scan_save_token_metadata(
     batch: SaveTokenBatch<'_>,
     mode: SaveTokenScanMode,
     state: &mut SaveTokenScanState,
-    expected: Option<(RawFieldBytes, u64, u64)>,
+    expected: Option<(RawFieldBytes, u64, u64, Option<u64>)>,
     budget: &mut Budget,
 ) -> Result<(), RewriteError> {
     budget.message(source, 1)?;
@@ -7494,8 +7691,11 @@ fn scan_save_token_metadata(
             1 => {
                 let value = field.varint()?;
                 set_once(&mut state.last, value)?;
-                if let Some((source_last_raw, source_last, _)) = expected {
-                    if !source_last_raw.matches(field.raw) || value != source_last {
+                if let Some((source_last_raw, source_last, _, replacement_last)) = expected {
+                    let expected_last = replacement_last.unwrap_or(source_last);
+                    if value != expected_last
+                        || (replacement_last.is_none() && !source_last_raw.matches(field.raw))
+                    {
                         return Err(RewriteError::invalid(InvalidReason::Verification));
                     }
                 } else {
@@ -7508,7 +7708,7 @@ fn scan_save_token_metadata(
                 batch,
                 mode,
                 state,
-                expected.map(|(_, _, root)| root),
+                expected.map(|(_, _, root, _)| root),
                 budget,
                 2,
             )?,
@@ -7528,8 +7728,10 @@ fn scan_save_token_metadata(
             SaveTokenScanMode::Verification => InvalidReason::Verification,
         }));
     }
-    if let Some((_, source_last, expected_root)) = expected {
-        if state.last != Some(source_last) || state.root_token != Some(expected_root) {
+    if let Some((_, source_last, expected_root, replacement_last)) = expected {
+        if state.last != Some(replacement_last.unwrap_or(source_last))
+            || state.root_token != Some(expected_root)
+        {
             return Err(RewriteError::invalid(InvalidReason::Verification));
         }
     }
@@ -7970,6 +8172,17 @@ fn combined_output_size(
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, 1)? {
         match field.number {
+            1 => {
+                let _ = field.varint()?;
+                output = checked_add(
+                    output,
+                    if batch.removals.changes_last_object_identifier() {
+                        varint_field_len(1, batch.removals.output_last_object_identifier())
+                    } else {
+                        field.raw.len()
+                    },
+                )?;
+            },
             3 => {
                 let payload = field.bytes()?;
                 let (identifier, locator) = component_header(payload, budget, 2)?;
@@ -8293,6 +8506,18 @@ fn rewrite_combined_into(
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, 1)? {
         match field.number {
+            1 => {
+                if batch.removals.changes_last_object_identifier() {
+                    let _ = field.varint()?;
+                    checked_put_varint_field(
+                        output,
+                        1,
+                        batch.removals.output_last_object_identifier(),
+                    )?;
+                } else {
+                    checked_append(output, field.raw)?;
+                }
+            },
             3 => rewrite_combined_component(field, batch, new_root, output, budget, 2)?,
             10 if root_data_metadata_map_selected(field.bytes()?, batch.removals, budget, 2)? => {},
             8 => {
@@ -9108,7 +9333,8 @@ impl RemovalScanState {
     }
 }
 
-/// Strictly remove exact current registry records while retaining the last identifier.
+/// Strictly remove exact current registry records and optionally lower the
+/// root last-object watermark in the same candidate.
 pub fn remove_package_metadata(
     source: &[u8],
     batch: RemovalBatch<'_>,
@@ -9162,8 +9388,16 @@ pub fn remove_package_metadata(
         return Err(RewriteError::invalid(InvalidReason::Verification));
     }
 
-    let mut verified = RemovalScanState::new(batch, &mut budget)?;
-    scan_removal_metadata(&candidate, batch, &mut verified, &mut budget, true)?;
+    let candidate_batch =
+        batch.with_expected_last_object_identifier(batch.output_last_object_identifier());
+    let mut verified = RemovalScanState::new(candidate_batch, &mut budget)?;
+    scan_removal_metadata(
+        &candidate,
+        candidate_batch,
+        &mut verified,
+        &mut budget,
+        true,
+    )?;
     verified.validate_candidate()?;
     budget.pad_repeated_counters(
         planned_fields,
@@ -9190,7 +9424,7 @@ fn validate_removal_batch(
         .and_then(|count| count.checked_add(batch.data_reference_owners.len()))
         .and_then(|count| count.checked_add(usize::from(batch.data_metadata_map.is_some())))
         .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
-    if removals == 0 {
+    if removals == 0 && batch.new_last_object_identifier.is_none() {
         return Err(RewriteError::invalid(InvalidReason::RemovalNotFound));
     }
     if removals > options.max_additions {
@@ -9201,6 +9435,16 @@ fn validate_removal_batch(
     }
     if batch.expected_last_object_identifier == 0 {
         return Err(RewriteError::invalid(InvalidReason::InvalidIdentifier));
+    }
+    if let Some(identifier) = batch.new_last_object_identifier {
+        if identifier == 0 {
+            return Err(RewriteError::invalid(InvalidReason::InvalidIdentifier));
+        }
+        if identifier > batch.expected_last_object_identifier {
+            return Err(RewriteError::invalid(
+                InvalidReason::LastIdentifierNotIncreasing,
+            ));
+        }
     }
     if batch
         .data_metadata_map
@@ -9904,6 +10148,18 @@ fn removal_output_size(
         {
             continue;
         }
+        if field.number == 1 {
+            let _ = field.varint()?;
+            size = checked_add(
+                size,
+                if batch.changes_last_object_identifier() {
+                    varint_field_len(1, batch.output_last_object_identifier())
+                } else {
+                    field.raw.len()
+                },
+            )?;
+            continue;
+        }
         if field.number != 3 {
             size = checked_add(size, field.raw.len())?;
             continue;
@@ -10225,6 +10481,15 @@ fn rewrite_removals_into(
     while let Some(field) = next_field(&mut remaining, budget, 1)? {
         if field.number == 10 && root_data_metadata_map_selected(field.bytes()?, batch, budget, 2)?
         {
+            continue;
+        }
+        if field.number == 1 {
+            if batch.changes_last_object_identifier() {
+                let _ = field.varint()?;
+                checked_put_varint_field(output, 1, batch.output_last_object_identifier())?;
+            } else {
+                checked_append(output, field.raw)?;
+            }
             continue;
         }
         if field.number != 3 {

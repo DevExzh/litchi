@@ -182,6 +182,7 @@ pub(super) type MediaBatch<'source> = media_codec::MediaRewriteBatch<'source>;
 pub(super) struct IdentityBatch<'source> {
     expected_last_identifier: u64,
     new_last_identifier: Option<u64>,
+    removal_transition: bool,
     additions: &'source [IdentityAddition<'source>],
     removals: &'source [IdentityRemoval<'source>],
     external_reference_removals: &'source [IdentityExternalRemoval<'source>],
@@ -201,6 +202,7 @@ impl<'source> IdentityBatch<'source> {
         Self {
             expected_last_identifier,
             new_last_identifier: Some(new_last_identifier),
+            removal_transition: false,
             additions,
             removals: &[],
             external_reference_removals: &[],
@@ -218,6 +220,7 @@ impl<'source> IdentityBatch<'source> {
         Self {
             expected_last_identifier,
             new_last_identifier: None,
+            removal_transition: true,
             additions: &[],
             removals,
             external_reference_removals: &[],
@@ -238,6 +241,16 @@ impl<'source> IdentityBatch<'source> {
         self
     }
 
+    /// Set the post-removal root watermark.  A removal target may retain or
+    /// decrease the source watermark; zero and increases are rejected during batch
+    /// validation.  Keeping this builder on a removal batch distinguishes a
+    /// watermark-only deletion transition from an additions watermark bump.
+    #[must_use]
+    pub(super) const fn with_new_last_identifier(mut self, new_last_identifier: u64) -> Self {
+        self.new_last_identifier = Some(new_last_identifier);
+        self
+    }
+
     #[must_use]
     pub(super) const fn expected_last_identifier(self) -> u64 {
         self.expected_last_identifier
@@ -246,6 +259,11 @@ impl<'source> IdentityBatch<'source> {
     #[must_use]
     pub(super) const fn new_last_identifier(self) -> Option<u64> {
         self.new_last_identifier
+    }
+
+    #[must_use]
+    const fn is_removal_transition(self) -> bool {
+        self.removal_transition
     }
 
     #[must_use]
@@ -298,6 +316,7 @@ impl MetadataSnapshotResources {
 pub(super) struct MetadataSnapshot<'source> {
     payload: &'source [u8],
     last_identifier: u64,
+    metadata_identifier_maximum: u64,
     resources: MetadataSnapshotResources,
     components: Vec<ComponentIdentity<'source>>,
     objects: Vec<ObjectIdentity<'source>>,
@@ -405,6 +424,7 @@ impl<'source> MetadataSnapshot<'source> {
             components: Vec::new(),
             objects: Vec::new(),
             external_references: Vec::new(),
+            metadata_identifier_maximum: 0,
         };
         try_reserve(
             &mut identity.components,
@@ -461,6 +481,7 @@ impl<'source> MetadataSnapshot<'source> {
         Ok(Self {
             payload,
             last_identifier: inspected.last_object_identifier(),
+            metadata_identifier_maximum: identity.metadata_identifier_maximum,
             resources: MetadataSnapshotResources {
                 identity_report,
                 media_report,
@@ -479,6 +500,20 @@ impl<'source> MetadataSnapshot<'source> {
     #[must_use]
     pub(super) const fn last_identifier(&self) -> u64 {
         self.last_identifier
+    }
+
+    /// Return the greatest identifier observed by the strict identity
+    /// PackageMetadata visitor, including current/versioned components,
+    /// object/UUID records, external owner object IDs, ambiguous IDs, and the
+    /// root map edge.  Data-reference IDs and external target-component IDs
+    /// are intentionally excluded because they are not host object-identity
+    /// callbacks.  This also excludes the root `last_object_identifier`;
+    /// callers that allocate new IDs should seed their candidate with both
+    /// values.  The value is retained as one scalar and therefore adds no
+    /// allocation or budget charge.
+    #[must_use]
+    pub(super) const fn metadata_identifier_maximum(&self) -> u64 {
+        self.metadata_identifier_maximum
     }
 
     #[must_use]
@@ -968,8 +1003,11 @@ fn rewrite_identity(
     options: identity_codec::RewriteOptions,
 ) -> Result<(Vec<u8>, Option<IdentityRewriteReport>), MetadataError> {
     let has_additions = !batch.uuid_additions().is_empty();
-    let has_removals =
+    let has_registry_removals =
         !batch.uuid_removals().is_empty() || !batch.external_reference_removals().is_empty();
+    let has_removal_transition = batch.is_removal_transition()
+        && (has_registry_removals || batch.new_last_identifier().is_some());
+    let has_removals = has_registry_removals || has_removal_transition;
     if !has_additions && !has_removals {
         if let Some(new_last) = batch.new_last_identifier() {
             if new_last < batch.expected_last_identifier() {
@@ -1034,12 +1072,17 @@ fn rewrite_identity(
         return Ok((current, Some(identity_report(output_report))));
     }
     if has_removals {
-        let removals = identity_codec::RemovalBatch::new(
+        let mut removals = identity_codec::RemovalBatch::new(
             batch.expected_last_identifier(),
             batch.uuid_removals(),
             batch.external_reference_removals(),
             &[],
         );
+        if batch.is_removal_transition() {
+            if let Some(new_last) = batch.new_last_identifier() {
+                removals = removals.with_new_last_object_identifier(new_last);
+            }
+        }
         let output = match batch.save_tokens {
             Some(tokens) if !has_additions => {
                 identity_codec::rewrite_package_metadata_removals_and_save_tokens(
@@ -1098,8 +1141,11 @@ fn charge_identity_allocations(
     // configured output ceiling.  A combined save-token transition emits one
     // candidate, while a no-token transition stages removal and addition
     // candidates independently.
-    let has_removals =
+    let has_registry_removals =
         !batch.uuid_removals().is_empty() || !batch.external_reference_removals().is_empty();
+    let has_removal_transition = batch.is_removal_transition()
+        && (has_registry_removals || batch.new_last_identifier().is_some());
+    let has_removals = has_registry_removals || has_removal_transition;
     let has_additions = !batch.uuid_additions().is_empty();
     let combined_save_tokens = has_removals && has_additions && batch.save_tokens.is_some();
     let watermark_only = !has_removals
@@ -1186,26 +1232,34 @@ fn validate_identity_batch(
         return Err(MetadataError::Invalid);
     }
     let has_additions = !batch.uuid_additions().is_empty();
-    let has_removals =
+    let has_registry_removals =
         !batch.uuid_removals().is_empty() || !batch.external_reference_removals().is_empty();
-    if !has_additions {
-        if !has_removals {
-            if batch
+    if batch.is_removal_transition() {
+        if has_additions
+            || batch
                 .new_last_identifier()
-                .is_some_and(|last| last < batch.expected_last_identifier())
-            {
-                return Err(MetadataError::Invalid);
-            }
-        } else if batch
-            .new_last_identifier()
-            .is_some_and(|last| last != batch.expected_last_identifier())
+                .is_some_and(|last| last == 0 || last > batch.expected_last_identifier())
         {
+            return Err(MetadataError::Invalid);
+        }
+    } else if has_additions {
+        if batch
+            .new_last_identifier()
+            .is_none_or(|last| last <= batch.expected_last_identifier())
+        {
+            return Err(MetadataError::Invalid);
+        }
+    } else if has_registry_removals {
+        if batch.new_last_identifier() != Some(batch.expected_last_identifier()) {
             return Err(MetadataError::Invalid);
         }
     } else if batch
         .new_last_identifier()
-        .is_none_or(|last| last <= batch.expected_last_identifier())
+        .is_some_and(|last| last < batch.expected_last_identifier())
     {
+        // An additions batch may advance the watermark or be a no-op, but it
+        // may never silently lower it.  Lower targets are reserved for the
+        // explicit removals constructor above.
         return Err(MetadataError::Invalid);
     }
     for addition in batch.uuid_additions().iter().copied() {
@@ -1288,6 +1342,13 @@ struct IdentityCollector<'source> {
     components: Vec<ComponentIdentity<'source>>,
     objects: Vec<ObjectIdentity<'source>>,
     external_references: Vec<ExternalReferenceIdentity<'source>>,
+    metadata_identifier_maximum: u64,
+}
+
+impl IdentityCollector<'_> {
+    fn observe_identifier(&mut self, identifier: u64) {
+        self.metadata_identifier_maximum = self.metadata_identifier_maximum.max(identifier);
+    }
 }
 
 impl identity_codec::PackageMetadataVisitor for IdentityCollector<'_> {
@@ -1295,6 +1356,7 @@ impl identity_codec::PackageMetadataVisitor for IdentityCollector<'_> {
         &mut self,
         component: identity_codec::ComponentDescriptor<'_>,
     ) -> Result<(), identity_codec::RewriteError> {
+        self.observe_identifier(component.identifier());
         if self.components.len() == self.components.capacity() {
             return Err(identity_codec::RewriteError::allocation(size_of::<
                 ComponentIdentity<'_>,
@@ -1314,6 +1376,7 @@ impl identity_codec::PackageMetadataVisitor for IdentityCollector<'_> {
         &mut self,
         binding: identity_codec::ObjectUuidDescriptor<'_>,
     ) -> Result<(), identity_codec::RewriteError> {
+        self.observe_identifier(binding.object_identifier());
         if self.objects.len() == self.objects.capacity() {
             return Err(identity_codec::RewriteError::allocation(size_of::<
                 ObjectIdentity<'_>,
@@ -1338,6 +1401,9 @@ impl identity_codec::PackageMetadataVisitor for IdentityCollector<'_> {
         &mut self,
         reference: identity_codec::ExternalReferenceDescriptor<'_>,
     ) -> Result<(), identity_codec::RewriteError> {
+        if let Some(identifier) = reference.object_identifier() {
+            self.observe_identifier(identifier);
+        }
         if self.external_references.len() == self.external_references.capacity() {
             return Err(identity_codec::RewriteError::allocation(size_of::<
                 ExternalReferenceIdentity<'_>,
@@ -1357,6 +1423,32 @@ impl identity_codec::PackageMetadataVisitor for IdentityCollector<'_> {
             versioned: reference.is_versioned(),
             unknown_fields: reference.has_unknown_fields(),
         });
+        Ok(())
+    }
+
+    fn visit_data_reference_owner(
+        &mut self,
+        owner: identity_codec::DataReferenceOwnerDescriptor<'_>,
+    ) -> Result<(), identity_codec::RewriteError> {
+        self.observe_identifier(owner.object_identifier());
+        Ok(())
+    }
+
+    fn visit_ambiguous_object_identifier(
+        &mut self,
+        _component: identity_codec::ComponentDescriptor<'_>,
+        identifier: u64,
+    ) -> Result<(), identity_codec::RewriteError> {
+        self.observe_identifier(identifier);
+        Ok(())
+    }
+
+    fn visit_data_metadata_map(
+        &mut self,
+        object_identifier: u64,
+        _has_unknown_fields: bool,
+    ) -> Result<(), identity_codec::RewriteError> {
+        self.observe_identifier(object_identifier);
         Ok(())
     }
 }
@@ -1595,6 +1687,32 @@ mod tests {
             varint_field(&mut reference, 4, 1);
         }
         reference
+    }
+
+    fn uuid_entry(object_identifier: u64, lower: u64, upper: u64) -> Vec<u8> {
+        let mut uuid = Vec::new();
+        varint_field(&mut uuid, 1, lower);
+        varint_field(&mut uuid, 2, upper);
+        let mut entry = Vec::new();
+        varint_field(&mut entry, 1, object_identifier);
+        bytes_field(&mut entry, 2, &uuid);
+        entry
+    }
+
+    fn data_reference(data_identifier: u64, object_identifier: u64, count: u64) -> Vec<u8> {
+        let mut owner = Vec::new();
+        varint_field(&mut owner, 1, object_identifier);
+        varint_field(&mut owner, 2, count);
+        let mut reference = Vec::new();
+        varint_field(&mut reference, 1, data_identifier);
+        bytes_field(&mut reference, 2, &owner);
+        reference
+    }
+
+    fn packed_varint(value: u64) -> Vec<u8> {
+        let mut packed = Vec::new();
+        put_varint(&mut packed, value);
+        packed
     }
 
     fn component(
@@ -1849,6 +1967,49 @@ mod tests {
     }
 
     #[test]
+    fn metadata_identifier_maximum_tracks_every_identity_callback_category() {
+        let versioned = metadata(
+            &[component(10, "source", &[])],
+            &[component(901, "versioned", &[])],
+        );
+        assert_eq!(test_snapshot(&versioned).metadata_identifier_maximum(), 901);
+
+        let mut uuid_component = component(10, "source", &[]);
+        bytes_field(&mut uuid_component, 11, &uuid_entry(902, 1, 2));
+        let uuid = metadata(&[uuid_component], &[]);
+        assert_eq!(test_snapshot(&uuid).metadata_identifier_maximum(), 902);
+
+        let external = metadata(
+            &[
+                component(10, "source", &[(6, 20, 903, None, false)]),
+                component(20, "target", &[]),
+            ],
+            &[],
+        );
+        assert_eq!(test_snapshot(&external).metadata_identifier_maximum(), 903);
+
+        let mut owner_component = component(10, "source", &[]);
+        bytes_field(
+            &mut owner_component,
+            7,
+            &data_reference(4_000_000_000, 905, 1),
+        );
+        let owner = metadata(&[owner_component], &[]);
+        assert_eq!(test_snapshot(&owner).metadata_identifier_maximum(), 905);
+
+        let mut ambiguous_component = component(10, "source", &[]);
+        bytes_field(&mut ambiguous_component, 20, &packed_varint(906));
+        let ambiguous = metadata(&[ambiguous_component], &[]);
+        assert_eq!(test_snapshot(&ambiguous).metadata_identifier_maximum(), 906);
+
+        let mut map = metadata(&[component(10, "source", &[])], &[]);
+        let mut map_reference = Vec::new();
+        varint_field(&mut map_reference, 1, 907);
+        bytes_field(&mut map, 10, &map_reference);
+        assert_eq!(test_snapshot(&map).metadata_identifier_maximum(), 907);
+    }
+
+    #[test]
     fn external_only_removal_is_wired_without_uuid_removals() {
         let source = package_with_reference(6, None, false);
         let snapshot = test_snapshot(&source);
@@ -1869,5 +2030,106 @@ mod tests {
         assert!(source.windows(edge.len()).any(|window| window == edge));
         assert!(!rewritten.windows(edge.len()).any(|window| window == edge));
         assert_eq!(report.expect("codec should report one removal").removals, 1);
+    }
+
+    #[test]
+    fn removal_watermark_only_accepts_a_lower_target() {
+        let source = metadata(
+            &[component(10, "source", &[]), component(20, "author", &[])],
+            &[],
+        );
+        let snapshot = test_snapshot(&source);
+        let batch = super::IdentityBatch::removals(snapshot.last_identifier(), &[])
+            .with_new_last_identifier(42);
+
+        super::validate_identity_batch(&snapshot, batch)
+            .expect("removal watermark may decrease from the source watermark");
+        let (rewritten, _) = super::rewrite_identity(&source, batch, identity_options(&source))
+            .expect("watermark-only removal should use RemovalBatch");
+        assert!(rewritten.windows(2).any(|window| window == [0x08, 42]));
+        assert!(!rewritten.windows(2).any(|window| window == [0x08, 100]));
+    }
+
+    #[test]
+    fn mixed_uuid_and_external_removal_carries_a_lower_target() {
+        let mut source_component = component(10, "source", &[(6, 20, 99, None, false)]);
+        bytes_field(&mut source_component, 11, &uuid_entry(88, 7, 8));
+        let source = metadata(&[source_component, component(20, "author", &[])], &[]);
+        let snapshot = test_snapshot(&source);
+        let source_component = test_source_component(&snapshot);
+        let external_removal = snapshot
+            .prepare_current_external_dependency_removal(source_component, "author", 99)
+            .expect("strong current edge should be removable");
+        let external_removals = [external_removal];
+        let uuid_removals = [identity_codec::ObjectUuidRemoval::new(
+            source_component.selector(),
+            88,
+            identity_codec::UuidBits::new(7, 8),
+        )];
+        let batch = super::IdentityBatch::removals(snapshot.last_identifier(), &uuid_removals)
+            .with_external_reference_removals(&external_removals)
+            .with_new_last_identifier(42);
+
+        super::validate_identity_batch(&snapshot, batch)
+            .expect("mixed removal should accept the lower target");
+        let (rewritten, report) =
+            super::rewrite_identity(&source, batch, identity_options(&source))
+                .expect("mixed lower-watermark removal should use RemovalBatch");
+        assert!(rewritten.windows(2).any(|window| window == [0x08, 42]));
+        assert!(!rewritten.windows(2).any(|window| window == [0x08, 100]));
+        let edge = external_reference(20, 99, None, false);
+        assert!(!rewritten.windows(edge.len()).any(|window| window == edge));
+        let uuid = uuid_entry(88, 7, 8);
+        assert!(!rewritten.windows(uuid.len()).any(|window| window == uuid));
+        assert_eq!(
+            report.expect("codec should report mixed removals").removals,
+            2
+        );
+    }
+
+    #[test]
+    fn removal_target_budget_accounts_for_source_and_candidate() {
+        let source = metadata(
+            &[component(10, "source", &[]), component(20, "author", &[])],
+            &[],
+        );
+        let snapshot = test_snapshot(&source);
+        let batch = super::IdentityBatch::removals(snapshot.last_identifier(), &[])
+            .with_new_last_identifier(42);
+        let mut charges = Vec::new();
+        super::charge_identity_allocations(
+            &mut |amount| {
+                charges.push(amount);
+                Ok(())
+            },
+            source.len(),
+            batch,
+            identity_options(&source),
+        )
+        .expect("removal allocation charges should fit the test budget");
+        assert_eq!(charges, vec![source.len(), source.len()]);
+    }
+
+    #[test]
+    fn removal_target_increase_and_addition_decrease_fail_validation() {
+        let source = metadata(
+            &[component(10, "source", &[]), component(20, "author", &[])],
+            &[],
+        );
+        let snapshot = test_snapshot(&source);
+        for target in [0, 101] {
+            let invalid = super::IdentityBatch::removals(snapshot.last_identifier(), &[])
+                .with_new_last_identifier(target);
+            assert!(matches!(
+                super::validate_identity_batch(&snapshot, invalid),
+                Err(MetadataError::Invalid)
+            ));
+        }
+
+        let decrease = super::IdentityBatch::additions(snapshot.last_identifier(), 42, &[]);
+        assert!(matches!(
+            super::validate_identity_batch(&snapshot, decrease),
+            Err(MetadataError::Invalid)
+        ));
     }
 }

@@ -41,6 +41,7 @@ mod comment_graph;
 mod comment_removal;
 mod graph;
 mod graph_caption_witness;
+mod identifier_watermark;
 mod metadata;
 mod node_cache;
 
@@ -1174,7 +1175,9 @@ fn allocate_clone_identities(
     wire_limits: WireLimits,
     budget: &mut LifecycleBudget,
 ) -> Result<(Vec<(u64, u64)>, Vec<u64>, Vec<SuperUuid>), SlideMediaLifecycleError> {
-    let mut global_max = snapshot.last_identifier();
+    let mut global_max = snapshot
+        .last_identifier()
+        .max(snapshot.metadata_identifier_maximum());
     // Object IDs are package-global, so a selected component's local maximum
     // is insufficient.  The census remains linear in the already indexed
     // source components and is charged before any result vectors grow.
@@ -2227,6 +2230,11 @@ fn rewrite_lifecycle(
         .map_or(selected_source_ids.as_slice(), |plan| {
             plan.removed_object_ids.as_slice()
         });
+    let released_watermark = if action == LifecycleAction::Remove {
+        identifier_watermark::plan_release(source, source_ids, snapshot.last_identifier(), budget)?
+    } else {
+        None
+    };
     let component_archive = source
         .state
         .source
@@ -2482,8 +2490,13 @@ fn rewrite_lifecycle(
             )
         },
         LifecycleAction::Remove => {
-            metadata::IdentityBatch::removals(snapshot.last_identifier(), &identity_removals)
-                .with_external_reference_removals(&external_removals)
+            let batch =
+                metadata::IdentityBatch::removals(snapshot.last_identifier(), &identity_removals)
+                    .with_external_reference_removals(&external_removals);
+            match released_watermark {
+                Some(new_last_identifier) => batch.with_new_last_identifier(new_last_identifier),
+                None => batch,
+            }
         },
     };
     let mut media_batch =
@@ -2642,6 +2655,9 @@ fn rewrite_lifecycle(
     )?;
     if let Some(plan) = removal_plan.as_ref() {
         verify_comment_removal_retention(source, &candidate, &selection, plan, budget)?;
+    }
+    if let Some(new_last_identifier) = released_watermark {
+        identifier_watermark::verify_release(&candidate, new_last_identifier, budget)?;
     }
     verify_zip_locality(
         catalog,

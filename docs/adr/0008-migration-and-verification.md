@@ -17594,3 +17594,59 @@ Cargo cache is retained for the next slice, with approximately 53 GiB free;
 the preceding turn's 9.8 GiB `cargo clean` remains the latest full-clean receipt.
 The caption, native commented-audio, unknown-reference, and identifier-watermark
 compatibility gates remain open; no additional host API was retired.
+
+## 2026-09-07 follow-up: identifier-watermark release compatibility
+
+Focused removal may lower `last_object_identifier` only when the effective
+physical removed set contains the old last identifier. Before lowering, the
+owner scans every source physical survivor, including retained comment graphs;
+missing, zero, or surviving identifiers greater than or equal to the old last
+value are terminal refusals. Candidate readback verifies the resulting maximum.
+
+Neutral `RemovalBatch::with_new_last_object_identifier` is an optional lower
+watermark transition. A target watermark of zero is rejected atomically before
+publication to match the public inspector; a valid package's physical metadata
+object survives, so the host raw setter of zero is unreachable. Save-token
+composition preserves valid lower transitions. Untouched spans must remain byte
+exact, including equal raw metadata. The package format therefore never emits
+a zero watermark because the metadata archive object survives.
+
+The P1 allocation fix snapshots the maximum known metadata identifier across
+current and versioned UUIDs, component identifiers, external-object
+references, data owners, ambiguous identifiers, and identifier maps. The next
+duplicate therefore advances past metadata-only identifiers after a release,
+matching the host `next_object_identifier` behavior.
+
+Native focused transitions source `2653763` → duplicate `2653771` → removed
+`2653763` → redoubled `2653771`; the retained metadata maximum is `2653763`.
+The permanent native fixtures were Cmd-S saved, actually closed to the theme
+chooser, reopened from their exact paths without alerts, and closed again:
+
+| Fixture | Native result | SHA-256 |
+| --- | --- | --- |
+| `test-data/iwork/keynote/media-watermark-removal-native.key` | 2 movies, 2 audio, 1 comment retained after removal | `bbf08b74439a2ef2e47fc44041c3007605c2813527751430e793d93cdb4f868a` |
+| `test-data/iwork/keynote/media-watermark-reduplicate-native.key` | 3 movies, 2 audio, 2 comments after redouble | `332071539d6c92820241a9547e27afe1649b315fdccecc27dc3a5cbb5d3e2b4a` |
+
+The removal candidate changed from SHA-256
+`41218101e5f56c1b154a9773744ea407e46e579f5a3f7859a0ea58c3b78859c5` to the
+native removal fixture `bbf08b74439a2ef2e47fc44041c3007605c2813527751430e793d93cdb4f868a`.
+The redouble candidate changed independently from
+`d3c839320da017b48e79627d50f48eace995978c2344b3be8fb7739711ae1869` to
+`332071539d6c92820241a9547e27afe1649b315fdccecc27dc3a5cbb5d3e2b4a`.
+The native watermark values are physical maximum `2653793` for removal and
+`2653794` for redouble. Ten watermark tests pass, including the new permanent
+native fixtures and two explicit saved-environment readbacks. The changed
+crate library Clippy check passed before the zero-target check.
+
+The neutral `package_metadata_codec` now passes 50 cases, including the
+zero-target refusal and watermark tests. The broader Keynote library has
+270 passing cases, including 41 lifecycle unit cases; the comment integration,
+lifecycle integration, and host slices report 21, 27, and 6 passing cases,
+respectively, with direct movie/audio removal-to-next-allocation parity in the
+host slice. Boundary verification passes 943 cases and the full scanner reports
+64 packages, 238 internal dependency declarations, and 11 migration-debt
+items. Hooks, final review, and cleanup remain pending. The watermark
+compatibility gate is complete pending normal hooks; no further host API was
+retired.
+The current owned temporary workspace is
+`/private/tmp/litchi-media-watermark-20260907v`.
