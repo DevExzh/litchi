@@ -55778,6 +55778,29 @@ fn write_streaming_rtf<W: Write>(
 }
 
 fn verify_streaming_xlsx(bytes: Vec<u8>, shape: SemanticShape) -> Result<(), Box<dyn Error>> {
+    let archive_member_names = ArchiveReader::new(&bytes)?
+        .file_names()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let expected_archive_members = [
+        "[Content_Types].xml".to_owned(),
+        "_rels/.rels".to_owned(),
+        "xl/workbook.xml".to_owned(),
+        "xl/_rels/workbook.xml.rels".to_owned(),
+        "xl/styles.xml".to_owned(),
+        "xl/worksheets/sheet1.xml".to_owned(),
+    ]
+    .into_iter()
+    .collect::<BTreeSet<_>>();
+    if archive_member_names.len() != expected_archive_members.len()
+        || archive_member_names
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            != expected_archive_members
+    {
+        return Err("streaming XLSX archive member set differs from its six-part shape".into());
+    }
     let workbook = Workbook::from_bytes(bytes)?;
     if workbook.len() != 1 {
         return Err("streaming XLSX workbook does not contain exactly one sheet".into());
@@ -55788,11 +55811,20 @@ fn verify_streaming_xlsx(bytes: Vec<u8>, shape: SemanticShape) -> Result<(), Box
     if sheet.rows()?.count() != shape.streaming_units() {
         return Err("streaming XLSX explicit row count differs from its shape".into());
     }
-    let area = format!("A1:D{}", shape.streaming_units());
+    let expected_rows = shape.streaming_units();
+    let expected_cells = expected_rows
+        .checked_mul(4)
+        .ok_or("streaming XLSX expected cell count overflows")?;
     let mut visited = 0usize;
-    for (address, cell) in sheet.cells(area.as_str())? {
+    for (address, cell) in sheet.cells("A1:XFD1048576")? {
         let row = usize::try_from(address.row().get())? + 1;
         let column = address.column().get();
+        if row > expected_rows || column >= 4 {
+            return Err(format!(
+                "streaming XLSX cell has unexpected coordinate at row {row}, column {column}"
+            )
+            .into());
+        }
         let matches = match (column, cell) {
             (0, XlsxCell::Value(XlsxValue::Number(value))) => value.as_f64() == Some(row as f64),
             (1, XlsxCell::Value(XlsxValue::Text(value))) => {
@@ -55811,7 +55843,7 @@ fn verify_streaming_xlsx(bytes: Vec<u8>, shape: SemanticShape) -> Result<(), Box
             .checked_add(1)
             .ok_or("streaming XLSX visited-cell count overflows")?;
     }
-    if visited != shape.streaming_units().saturating_mul(4) {
+    if visited != expected_cells {
         return Err("streaming XLSX stored-cell count differs from its shape".into());
     }
     Ok(())
@@ -55925,7 +55957,7 @@ fn run_streaming_creation(
     let mut elapsed = Vec::with_capacity(samples);
     let mut summaries = Vec::with_capacity(samples);
     let mut digests = Vec::with_capacity(samples);
-    let collect_resource_metrics = case == Case::RtfStreamingCreate;
+    let collect_resource_metrics = case.uses_streaming_creation();
     let mut resource_observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let sink = HashingDiscardSink::new(maximum, corpus.metrics.retained_authoring_window_bytes);
@@ -59470,44 +59502,90 @@ mod tests {
                 measured.output_sha256.as_deref(),
                 Some(small.manifest.archive_sha256.as_str())
             );
-            if case == Case::RtfStreamingCreate {
-                let operation = measured
-                    .operation_metrics
-                    .as_ref()
-                    .expect("RTF streaming must publish operation resource metrics");
-                assert_eq!(operation.sample_count, 1);
-                assert_eq!(operation.sample_indices, vec![0]);
+            let operation = measured
+                .operation_metrics
+                .as_ref()
+                .expect("streaming creation must publish operation resource metrics");
+            assert_eq!(operation.sample_count, 1);
+            assert_eq!(operation.sample_indices, vec![0]);
+            assert_eq!(
+                operation.sink.accepted_bytes.values,
+                Some(vec![small.manifest.archive_bytes as u64])
+            );
+            assert!(matches!(
+                operation.process.status,
+                crate::operation_metrics::MetricStatus::Measured
+                    | crate::operation_metrics::MetricStatus::Unavailable
+            ));
+            if operation.process.status == crate::operation_metrics::MetricStatus::Measured {
                 assert_eq!(
-                    operation.sink.accepted_bytes.values,
-                    Some(vec![small.manifest.archive_bytes as u64])
+                    operation
+                        .process
+                        .user_cpu_ticks
+                        .values
+                        .as_ref()
+                        .unwrap()
+                        .len(),
+                    1
                 );
-                assert!(matches!(
-                    operation.process.status,
-                    crate::operation_metrics::MetricStatus::Measured
-                        | crate::operation_metrics::MetricStatus::Unavailable
-                ));
-                if operation.process.status == crate::operation_metrics::MetricStatus::Measured {
-                    assert_eq!(
-                        operation
-                            .process
-                            .user_cpu_ticks
-                            .values
-                            .as_ref()
-                            .unwrap()
-                            .len(),
-                        1
-                    );
-                    assert_eq!(operation.process.rchar.values.as_ref().unwrap().len(), 1);
-                } else {
-                    assert!(operation.process.user_cpu_ticks.values.is_none());
-                    assert!(operation.process.rchar.values.is_none());
-                }
-                let json = serde_json::to_value(operation).unwrap();
-                assert_eq!(json["sample_count"], 1);
-                assert_eq!(json["sink"]["write_status"], "measured");
-                assert!(json["process"].get("status").is_some());
+                assert_eq!(operation.process.rchar.values.as_ref().unwrap().len(), 1);
+            } else {
+                assert!(operation.process.user_cpu_ticks.values.is_none());
+                assert!(operation.process.rchar.values.is_none());
             }
+            let json = serde_json::to_value(operation).unwrap();
+            assert_eq!(json["sample_count"], 1);
+            assert_eq!(json["sink"]["write_status"], "measured");
+            assert!(json["process"].get("status").is_some());
         }
+    }
+
+    #[test]
+    fn streaming_xlsx_oracle_rejects_unexpected_cells_and_members() {
+        let (artifact, _) = super::write_streaming_xlsx(Vec::new(), SemanticShape::Tiny).unwrap();
+        super::verify_streaming_xlsx(artifact.clone(), SemanticShape::Tiny).unwrap();
+
+        let mut package = super::OpcPackage::from_bytes(&artifact).unwrap();
+        let worksheet_uri = super::PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+        let sheet_xml = package.get_part(&worksheet_uri).unwrap().blob().to_vec();
+        let row_end = sheet_xml
+            .windows(b"</row>".len())
+            .position(|window| window == b"</row>")
+            .expect("streaming XLSX fixture has a first row");
+        let mut mutated_sheet = Vec::with_capacity(sheet_xml.len() + 27);
+        mutated_sheet.extend_from_slice(&sheet_xml[..row_end]);
+        mutated_sheet.extend_from_slice(br#"<c r="E1"><v>999</v></c>"#);
+        mutated_sheet.extend_from_slice(&sheet_xml[row_end..]);
+        package
+            .get_part_mut(&worksheet_uri)
+            .unwrap()
+            .set_blob(mutated_sheet);
+        let unexpected_cell = super::PackageWriter::to_bytes(&package).unwrap();
+        let error = super::verify_streaming_xlsx(unexpected_cell, SemanticShape::Tiny)
+            .expect_err("streaming XLSX oracle accepted an unexpected E1 cell")
+            .to_string();
+        assert!(
+            error.contains("unexpected coordinate"),
+            "unexpected E1 cell failed for the wrong reason: {error}"
+        );
+
+        let archive = super::ArchiveReader::new(&artifact).unwrap();
+        let mut writer = super::StreamingArchiveWriter::new();
+        for name in archive.file_names() {
+            let payload = archive.read(name).unwrap();
+            writer.write_stored(name, &payload).unwrap();
+        }
+        writer
+            .write_stored("xl/unexpected.xml", b"unexpected")
+            .unwrap();
+        let unexpected_member = writer.finish_to_bytes().unwrap();
+        let error = super::verify_streaming_xlsx(unexpected_member, SemanticShape::Tiny)
+            .expect_err("streaming XLSX oracle accepted an unexpected archive member")
+            .to_string();
+        assert!(
+            error.contains("archive member set"),
+            "unexpected archive member failed for the wrong reason: {error}"
+        );
     }
 
     #[test]

@@ -2484,20 +2484,26 @@ ordinary `Workbook` or `Document` facade, and exhaustively checked against the
 shape. That artifact is dropped before samples run. Every timed digest must
 equal the reopened artifact digest.
 
-RTF streaming results also publish aligned, per-retained-sample
+XLSX and RTF streaming results also publish aligned, per-retained-sample
 `operation_metrics`. Process counters are best-effort same-process procfs
 deltas whose scope includes the after-snapshot probe overhead; unsupported
 platforms report them as unavailable. The allocator target reports checked
-operation regions, while the ordinary binary leaves allocation metrics absent.
-Allocator live/high-water values are absolute before/after process counters,
-and `peak_rss_bytes` is the process-lifetime high-water mark, not an
-operation-local peak. Resource probes, digest finalization, and correctness
-checks remain outside the elapsed-time interval.
+operation regions for both writers, while the ordinary binary leaves
+allocation metrics absent. For XLSX, `region_peak_live_bytes` is the
+allocator's callback-order region peak, including entry live bytes and
+callbacks inside the timed writer region; it is not total process heap or an
+RSS peak. Allocator live/high-water values are absolute before/after process
+counters, and `peak_rss_bytes` is the process-lifetime high-water mark, not an
+operation-local peak. Corpus setup, artifact generation, reopen, and oracle
+validation are outside the timed samples; resource probes, digest finalization,
+and correctness checks remain outside the elapsed-time interval.
 
 The `sink` record additionally reports exact rows/cells or paragraphs/runs,
 input bytes, authored worksheet/RTF bytes, `retained_output_bytes: 0`, and the
-production writer's explicit `retained_authoring_window_bytes`. Increasing total output
-therefore cannot be mistaken for an increasing retained authoring window.
+production writer's explicit `retained_authoring_window_bytes`. The fixed XLSX
+row window and RTF text encoder window are authoring-retention bounds, separate
+from total heap; increasing total output therefore cannot be mistaken for an
+increasing retained authoring window.
 
 The RTF writer batches only escape-free printable ASCII, with a hard 32-byte
 sink-request ceiling and no additional retained writer buffer. Balanced
