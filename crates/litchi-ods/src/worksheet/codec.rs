@@ -335,6 +335,14 @@ impl OpenCell {
         Ok(())
     }
 
+    fn append_reference(&mut self, reference: &[u8]) -> Result<()> {
+        let character = crate::xml_reference::decode(reference).map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODS XML character reference: {error}"))
+        })?;
+        let mut encoded = [0_u8; 4];
+        self.append_characters(character.encode_utf8(&mut encoded))
+    }
+
     fn end_text(&mut self, local: &[u8]) -> Result<()> {
         if local == b"a" {
             if let Some(mut open) = self.open_hyperlink.take() {
@@ -676,6 +684,17 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                     cell.append_characters(&value)?;
                 }
             },
+            Event::GeneralRef(reference) => {
+                if let Some(cell) = current_cell.as_mut() {
+                    cell.append_reference(reference.as_ref())?;
+                } else {
+                    crate::xml_reference::decode(reference.as_ref()).map_err(|error| {
+                        Error::InvalidFormat(format!(
+                            "invalid ODS XML character reference: {error}"
+                        ))
+                    })?;
+                }
+            },
             Event::End(element) => {
                 let kind = stack.pop().ok_or_else(|| {
                     Error::InvalidFormat("ODS XML element stack underflow".to_string())
@@ -755,8 +774,7 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
             Event::Comment(_)
             | Event::Decl(_)
             | Event::PI(_)
-            | Event::DocType(_)
-            | Event::GeneralRef(_) => {},
+            | Event::DocType(_) => {},
         }
         buffer.clear();
     }
@@ -1085,6 +1103,17 @@ impl WorksheetHandler {
                     cell.append_characters(&value)?;
                 }
             },
+            Event::GeneralRef(reference) => {
+                if let Some(cell) = self.current_cell.as_mut() {
+                    cell.append_reference(reference.as_ref())?;
+                } else {
+                    crate::xml_reference::decode(reference.as_ref()).map_err(|error| {
+                        Error::InvalidFormat(format!(
+                            "invalid ODS XML character reference: {error}"
+                        ))
+                    })?;
+                }
+            },
             Event::End(element) => {
                 let kind = self.stack.pop().ok_or_else(|| {
                     Error::InvalidFormat("ODS XML element stack underflow".to_string())
@@ -1164,8 +1193,7 @@ impl WorksheetHandler {
             Event::Comment(_)
             | Event::Decl(_)
             | Event::PI(_)
-            | Event::DocType(_)
-            | Event::GeneralRef(_) => {},
+            | Event::DocType(_) => {},
         }
         Ok(())
     }
