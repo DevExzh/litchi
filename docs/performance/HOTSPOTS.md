@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## Change 0448: reduce excess waiting in the explicit pacing model
+
+[0448](changes/0448-pptx-minimum-service-pacing.md) credits elapsed source work and fixed-wait overshoot against a combined
+fixed-plus-transfer target. Plain API medians fall about 19.3% in both repeats;
+all service floors pass. The default separate-sleep model remains available and
+unchanged. Neither policy establishes ideal physical bandwidth or a shared link.
+
+Media-rich planning/publication still return 16,794,014/33,617,184 bytes. Their
+freshness checks and dependency-closure publication are the next source-work
+investigation; these counters alone do not identify redundant reads. SHA-256
+accounts for 63.2–63.9% of run-frame self period, but that subset includes untimed
+work and excludes blocked sleep. Preserve source identity and validation before
+considering reuse. Native/cold I/O, bounded append, repackaging and scaling remain.
+
 ## Change 0447: transfer-sensitive PPTX cross-copy evidence
 
 [0447](changes/0447-pptx-range-transfer-pacing.md) adds explicit requested transfer pacing around caller ReadAt. At the frozen

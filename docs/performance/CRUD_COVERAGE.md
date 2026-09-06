@@ -1,5 +1,15 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0448 calibrates the range-source timing policy
+
+[0448](changes/0448-pptx-minimum-service-pacing.md) adds minimum-service pacing to the existing category 9 managed PPTX
+cross-slide-copy lifecycle. The 240-sample comparison preserves exact source
+work/output and validates all combined service floors. It calibrates optional
+evidence tooling without promoting a semantic/native or default timing contract.
+Registry/default counts remain 438/36; representative coverage remains
+15 categories/33 mappings/10 measured/23 correctness-only. Native breadth, cold
+I/O, aggregate-link concurrency, bounded append, repackaging and scaling remain.
+
 ## 2026-09-06: change 0447 adds explicit transfer-rate simulation
 
 [0447](changes/0447-pptx-range-transfer-pacing.md) extends the standalone provider-lifecycle command for matched plain/media-rich

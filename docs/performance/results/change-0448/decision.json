@@ -1,0 +1,291 @@
+{
+  "change": 448,
+  "decision": "retain measured enabler",
+  "production_optimization": false,
+  "goal_complete": false,
+  "gate": {
+    "plain_p50_gate": true,
+    "scope": "frozen 5% timer-model gate; correctness and all paired/repeat reviews additionally required"
+  },
+  "repeat_review": [],
+  "paired_review": [
+    {
+      "corpus": "plain",
+      "repeat": "R1",
+      "metric": "open_ns.p50",
+      "separate": 51128939.0,
+      "minimum_service": 41165697.0,
+      "relative_percent": -19.48650254604345,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R1",
+      "metric": "open_ns.p95",
+      "separate": 51144024,
+      "minimum_service": 41171767,
+      "relative_percent": -19.498381668208197,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R1",
+      "metric": "open_ns.p99",
+      "separate": 51144414,
+      "minimum_service": 41174668,
+      "relative_percent": -19.493323356877255,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R1",
+      "metric": "plan_ns.p50",
+      "separate": 12379204.0,
+      "minimum_service": 10184824.0,
+      "relative_percent": -17.726341693698565,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R1",
+      "metric": "plan_ns.p95",
+      "separate": 12658786,
+      "minimum_service": 10249414,
+      "relative_percent": -19.033199550099035,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R1",
+      "metric": "plan_ns.p99",
+      "separate": 12675815,
+      "minimum_service": 10250284,
+      "relative_percent": -19.135108866767148,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R1",
+      "metric": "publication_ns.p50",
+      "separate": 89306445.5,
+      "minimum_service": 71976859.5,
+      "relative_percent": -19.404630766544173,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R1",
+      "metric": "publication_ns.p95",
+      "separate": 89415051,
+      "minimum_service": 72314871,
+      "relative_percent": -19.124498402399837,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R1",
+      "metric": "publication_ns.p99",
+      "separate": 89746983,
+      "minimum_service": 72471411,
+      "relative_percent": -19.249195262641862,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R1",
+      "metric": "api_sum_ns.p50",
+      "separate": 152814823.0,
+      "minimum_service": 123322545.5,
+      "relative_percent": -19.29935651595788,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R1",
+      "metric": "api_sum_ns.p95",
+      "separate": 153161050,
+      "minimum_service": 123668612,
+      "relative_percent": -19.255834299908493,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R1",
+      "metric": "api_sum_ns.p99",
+      "separate": 153164661,
+      "minimum_service": 123813771,
+      "relative_percent": -19.16296475203245,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R2",
+      "metric": "open_ns.p50",
+      "separate": 51130483.5,
+      "minimum_service": 41165069.0,
+      "relative_percent": -19.490162849721536,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R2",
+      "metric": "open_ns.p95",
+      "separate": 51132555,
+      "minimum_service": 41423035,
+      "relative_percent": -18.98892007254478,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R2",
+      "metric": "open_ns.p99",
+      "separate": 51139945,
+      "minimum_service": 41425865,
+      "relative_percent": -18.995092779235488,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R2",
+      "metric": "plan_ns.p50",
+      "separate": 12380830.5,
+      "minimum_service": 10230408.0,
+      "relative_percent": -17.368968099514813,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R2",
+      "metric": "plan_ns.p95",
+      "separate": 12383032,
+      "minimum_service": 10251643,
+      "relative_percent": -17.21217388439277,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R2",
+      "metric": "plan_ns.p99",
+      "separate": 12390582,
+      "minimum_service": 10252214,
+      "relative_percent": -17.258010963488235,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R2",
+      "metric": "publication_ns.p50",
+      "separate": 89305655.5,
+      "minimum_service": 72006099.5,
+      "relative_percent": -19.371176330484463,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R2",
+      "metric": "publication_ns.p95",
+      "separate": 89307253,
+      "minimum_service": 72298196,
+      "relative_percent": -19.045549413550987,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R2",
+      "metric": "publication_ns.p99",
+      "separate": 89307555,
+      "minimum_service": 72459046,
+      "relative_percent": -18.865715224204717,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R2",
+      "metric": "api_sum_ns.p50",
+      "separate": 152816472.5,
+      "minimum_service": 123346862.0,
+      "relative_percent": -19.28431537378931,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R2",
+      "metric": "api_sum_ns.p95",
+      "separate": 152819372,
+      "minimum_service": 123666453,
+      "relative_percent": -19.07671692303512,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "plain",
+      "repeat": "R2",
+      "metric": "api_sum_ns.p99",
+      "separate": 152820022,
+      "minimum_service": 123803233,
+      "relative_percent": -18.987557140909196,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "metric": "open_ns.p50",
+      "separate": 51458248.0,
+      "minimum_service": 41723542.5,
+      "relative_percent": -18.917677686966726,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "metric": "open_ns.p95",
+      "separate": 51552733,
+      "minimum_service": 42064338,
+      "relative_percent": -18.405222085897943,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "metric": "open_ns.p99",
+      "separate": 51689957,
+      "minimum_service": 42272240,
+      "relative_percent": -18.21962629994063,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "metric": "open_ns.p50",
+      "separate": 51431493.0,
+      "minimum_service": 41686994.5,
+      "relative_percent": -18.94655964974612,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "metric": "open_ns.p95",
+      "separate": 51567394,
+      "minimum_service": 41846858,
+      "relative_percent": -18.85015946316775,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    },
+    {
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "metric": "open_ns.p99",
+      "separate": 51864686,
+      "minimum_service": 42017905,
+      "relative_percent": -18.98552128513802,
+      "scope": "minimum-service versus separate-sleep model calibration; not production regression"
+    }
+  ],
+  "review": "All 30 paired triggers are lower latency: plain open, plan, publication and API sum p50/p95/p99 in both repeats, plus media-rich open p50/p95/p99 in both repeats. No positive paired trigger, RSS trigger or repeat trigger. Plain API medians fall 19.299%/19.284%, exceeding the frozen 5% gate in both repeats. Media-rich API medians fall 4.829%/4.344%. Every report passes combined fixed-plus-transfer service floors and exact source-work/output identity. These are intentionally different explicit timer models; neither establishes physical bandwidth or a production speedup.",
+  "default": "separate-sleeps remains the default; minimum-service requires explicit transfer rate",
+  "limits": [
+    "CPU profiles omit blocked sleep and include untimed lifecycle work",
+    "Nominal transfer counters are targets, not measured sleeping time",
+    "Operation allocation unavailable; sink retains full output",
+    "No shared-link concurrency, native breadth, cold-I/O or scaling claim"
+  ]
+}

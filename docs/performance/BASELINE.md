@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0448: minimum-service pacing calibration
+
+[0448](changes/0448-pptx-minimum-service-pacing.md) adds an explicit minimum-service policy beside the default separate sleeps.
+The matched 240-sample matrix passes its frozen 5% plain median gate in both
+repeats: 152.815/152.816 ms becomes 123.323/123.347 ms (-19.299%/-19.284%).
+Media-rich API medians fall 4.829%/4.344%. Every combined service floor and
+source-work/output equality check passes. No positive paired trigger or repeat
+latency/RSS trigger exceeds 5%; all 30 negative paired triggers are reviewed.
+This calibrates an optional timer model and makes no production speedup claim.
+See [all measurements](results/change-0448/measurements.md).
+
 ## Change 0447: requested transfer pacing in a range-source lifecycle
 
 [0447](changes/0447-pptx-range-transfer-pacing.md) adds optional per-read transfer-rate pacing to standalone PPTX provider

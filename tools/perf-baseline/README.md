@@ -4324,3 +4324,25 @@ owners carry null values. The extended strict report verifier is retained at
 reject the additive fields. Production crates, ambient networking, default case
 selection and native fixture behavior are unchanged. This custom journal has no
 operation allocator attribution and its CountingSink retains full output.
+
+## Minimum-service transfer policy (0448)
+
+Use `--transfer-delay-policy minimum-service` together with
+`--provider range --transfer-bytes-per-second RATE` to model a minimum request
+service time. The default `separate-sleeps` policy remains explicitly selectable.
+Both preserve the fixed delay before delegation and the maximum returned range.
+
+Minimum service credits elapsed time since the fixed wait began, including
+fixed-wait overshoot and the wrapped-source read, toward the combined fixed plus
+nominal transfer target. It requests only the remaining wait and skips a second
+sleep when that target is already satisfied. This differs from adding the full
+transfer wait after a fixed sleep; it is an explicit simulation choice.
+
+Provider JSON records `transfer_delay_policy`. `transfer_delay_ns` remains the
+nominal transfer target component for either policy, not the actual sleep time.
+The 0448 oracle checks the combined service floor against every serial API phase,
+as well as exact read/counter/output equivalence. The model is per-call and does
+not implement a shared-link scheduler or measure physical network bandwidth.
+See `docs/performance/results/change-0448/measurements.md` for the matched
+calibration and its repeat flags. Production behavior and default cases remain
+unchanged.
