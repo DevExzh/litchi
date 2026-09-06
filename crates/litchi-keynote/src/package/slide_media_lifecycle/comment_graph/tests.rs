@@ -99,7 +99,7 @@ fn unknown_root_payload_fields_reject_selected_comment_clone() {
     let limits = native_limits(&package);
     let mut budget = native_budget();
 
-    assert!(validate_comment_payload_wire(&payload, limits, &mut budget).is_err());
+    assert!(validate_comment_payload_wire(&payload, limits, &mut budget, true).is_err());
 }
 
 #[test]
@@ -115,7 +115,7 @@ fn unknown_reference_fields_fail_closed() {
     let limits = native_limits(&package);
     let mut budget = native_budget();
 
-    assert!(validate_comment_payload_wire(&payload, limits, &mut budget).is_err());
+    assert!(validate_comment_payload_wire(&payload, limits, &mut budget, true).is_err());
 }
 
 #[test]
@@ -131,7 +131,7 @@ fn unknown_date_and_uuid_fields_reject_selected_comment_clone() {
     append_length_delimited_field(&mut date_payload, COMMENT_DATE_FIELD, &date)
         .expect("date field");
     let mut budget = native_budget();
-    assert!(validate_comment_payload_wire(&date_payload, limits, &mut budget).is_err());
+    assert!(validate_comment_payload_wire(&date_payload, limits, &mut budget, true).is_err());
 
     let mut uuid = Vec::new();
     append_varint_field(&mut uuid, 99, 1).expect("unknown UUID field");
@@ -139,7 +139,7 @@ fn unknown_date_and_uuid_fields_reject_selected_comment_clone() {
     append_length_delimited_field(&mut uuid_payload, COMMENT_UUID_FIELD, &uuid)
         .expect("UUID field");
     let mut budget = native_budget();
-    assert!(validate_comment_payload_wire(&uuid_payload, limits, &mut budget).is_err());
+    assert!(validate_comment_payload_wire(&uuid_payload, limits, &mut budget, true).is_err());
 }
 
 #[test]

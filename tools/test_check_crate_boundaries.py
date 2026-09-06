@@ -3454,6 +3454,7 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
         "mod budget;\n"
         "mod clone_payload;\n"
         "mod comment_graph;\n"
+        "mod comment_removal;\n"
         "mod graph;\n"
         "mod metadata;\n"
         "mod node_cache;\n"
@@ -3468,6 +3469,14 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
         "fn clone_object() {}\n"
         "fn metadata_transition() {}\n"
         "fn candidate_reopen_verify() {}\n"
+        "fn remove_comment_graph(action: LifecycleAction, budget: &mut MediaLifecycleBudget) {\n"
+        "    if action == LifecycleAction::Remove {\n"
+        "        let plan = comment_removal::plan_comment_removal(package, component_name, selected_object_ids, comment_graph, archive_limits, budget);\n"
+        "        let source_ids = plan.removed_object_ids;\n"
+        "        let external_authors = plan.unused_external_author_ids;\n"
+        "        metadata::IdentityBatch::removals(last_identifier, &source_ids).with_external_reference_removals(&external_authors);\n"
+        "    }\n"
+        "}\n"
         "fn exact_source_fingerprint_inverse() { ExactArtifacts; source_fingerprint; inverse; PatchConflict; }\n"
         "impl Package {\n"
         "    pub fn duplicate_slide_media(&self, slide: SlideSelector, movie: MovieSelector) -> Result<LifecycleCommit, LifecycleError> { let mut budget = MediaLifecycleBudget::for_package(self); select_media(&mut budget); clone_object(&mut budget); replace_slide_message_with_lifecycle_refs(&mut budget); metadata_transition(); candidate_reopen_verify(); let _ = (slide, movie, budget); todo!() }\n"
@@ -3509,10 +3518,10 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
             "IdentifierRewrite; UuidRewrite; replace_slide_message_with_lifecycle_refs(); "
             "rewrite_slide_lifecycle(); rewrite_build(); rewrite_build_chunk(); }\n"
             "fn comment_graph_route() { match direct_drawable_comment() { "
-            "Some(root) if action == LifecycleAction::Remove => return Err(UnsupportedComment), "
             "Some(root) => plan_comment_graph(package, component_name, root, limits, budget), "
             "None => None }; let _ = (storage_ids, author_ids); continue; "
             "super::comment_clone::rewrite_comment_payload(message, object_remap, budget); }\n"
+            "fn private_graph(comment_graph: Option<&CommentGraphPlan>) { if comment_graph.is_none() { return Err(UnsupportedComment); } }\n"
             "fn clone_object() { let limits = reserve_core_header_work(source, object_remap.len(), limits, budget)?; source.clone_with_identity_remap_with_limits(new_identifier, object_remap, replacements, limits); }\n"
             "fn replace_slide_message_with_lifecycle_refs() { let limits = reserve_core_header_work(object, removed.len(), limits, budget)?; object.replace_message_pruning_object_references_preserving_header_with_limits(limits); let limits = reserve_core_header_work(object, growth, limits, budget)?; object.replace_message_transitioning_object_references_preserving_header_with_limits(limits); }\n"
             "fn reserve_core_header_inspection_work(source: &ArchiveObject, limits: ArchiveObjectLimits, budget: &mut MediaLifecycleBudget) { reserve_core_header_work_inner(source, 0, limits, budget, false); }\n"
@@ -3529,6 +3538,48 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
             "    storage_ids; storage_identities; author_ids; author_dependencies; binary_search; InvalidSource;\n"
             "    LifecycleBudget; charge_entries; charge_references; charge_allocations; try_reserve;\n"
             "    let _ = (package, component_name, root, limits, budget);\n"
+            "}\n"
+        ),
+            "comment_removal.rs": (
+            "struct CommentRemovalPlan { removed_object_ids: Vec<u64>, retained_comment_storage_ids: Vec<u64>, unused_external_author_ids: Vec<u64> }\n"
+            "fn plan_comment_removal(package: &Package, component_name: &str, selected_object_ids: &[u64], comment_graph: &CommentGraphPlan, archive_limits: ArchiveLimits, budget: &mut LifecycleBudget) {\n"
+            "    component_name; selected_object_ids; comment_graph; archive_limits; InvalidSource;\n"
+            "    LifecycleBudget; budget.charge_entries(1); budget.charge_wire_fields(1); budget.charge_wire_work(1); budget.charge_allocations(1);\n"
+            "    validate_known_payload_relationships(package, component.name(), object, comment_graph, limits, budget); reserve_core_header_inspection_work(object, archive_limits, budget); strict_reference_census(object, archive_limits, budget); source_component;\n"
+            "    retained_comment_storage_ids; comment_edges; selected_comment_author_edges; pending; processed;\n"
+            "    lower_bound_source; insert_sorted_unique; author_dependencies; external_author_ids;\n"
+            "    unused_external_author_ids; removed_object_ids; let _ = package;\n"
+            "    MOVIE_MESSAGE_TYPE; direct_drawable_comment; object_references; count; comment_storage_ids;\n"
+            "    validate_movie_payload_relationship; validate_comment_storage_payload_relationship; COMMENT_STORAGE_MESSAGE_TYPE; MessageInfo; message.data; comment_storage_codec; author; replies;\n"
+            "}\n"
+            "fn validate_known_payload_relationships(package: &Package, component: &str, object: &ArchiveObject, comment_graph: &CommentGraphPlan, limits: WireLimits, budget: &mut LifecycleBudget) {\n"
+            "    validate_movie_payload_relationship(package, component, payload, info, comment_graph.storage_ids, limits, budget);\n"
+            "    validate_comment_storage_relationship(package, component, storage_identifier, info, payload, limits, budget);\n"
+            "    let _ = (package, component, object, comment_graph, limits, budget);\n"
+            "}\n"
+            "fn validate_movie_payload_relationship(package: &Package, component_name: &str, payload: &[u8], info: &MessageInfo, comment_storage_ids: &[u64], limits: WireLimits, budget: &mut LifecycleBudget) {\n"
+            "    validate_comment_storage_target(package, component_name, identifier);\n"
+            "    let _ = (payload, info, comment_storage_ids, limits, budget, MOVIE_MESSAGE_TYPE, direct_drawable_comment, object_references, count);\n"
+            "}\n"
+            "fn validate_comment_storage_relationship(package: &Package, component_name: &str, storage_identifier: u64, info: &MessageInfo, payload: &[u8], limits: WireLimits, budget: &mut LifecycleBudget) {\n"
+            "    let facts = super::comment_graph::validate_comment_storage_payload_relationship(storage_identifier, info, payload, limits, budget);\n"
+            "    if let Some(author_identifier) = facts.author_identifier { validate_annotation_author_target(package, author_identifier); }\n"
+            "    for reply_identifier in facts.reply_identifiers { validate_comment_storage_target(package, component_name, reply_identifier); }\n"
+            "}\n"
+            "fn validate_comment_storage_target(package: &Package, component_name: &str, identifier: u64) {\n"
+            "    let Some((actual_component, object)) = package.object_with_component(identifier) else { return };\n"
+            "    if actual_component != component_name { return; }\n"
+            "    validate_single_message_type(object, identifier, COMMENT_STORAGE_MESSAGE_TYPE);\n"
+            "}\n"
+            "fn validate_annotation_author_target(package: &Package, identifier: u64) {\n"
+            "    let Some((_, object)) = package.object_with_component(identifier) else { return };\n"
+            "    validate_single_message_type(object, identifier, 212);\n"
+            "}\n"
+            "fn validate_single_message_type(object: &ArchiveObject, identifier: u64, expected_type: u32) {\n"
+            "    if object.archive_info.identifier != Some(identifier) || object.messages.len() != 1 || object.archive_info.message_infos.len() != 1 { return; }\n"
+            "    let message = object.messages.first().unwrap();\n"
+            "    let info = object.archive_info.message_infos.first().unwrap();\n"
+            "    if message.type_ != expected_type || info.type_ != expected_type || usize::try_from(info.length).ok() != Some(message.data.len()) { return; }\n"
             "}\n"
         ),
         "metadata.rs": (
@@ -19377,14 +19428,219 @@ fn rewrite_movie_title_operation(
             self.assertTrue(any("shared budget through plan_comment_graph" in item for item in violations), violations)
             graph.write_text(graph_source, encoding="utf-8")
 
-            graph.write_text(
-                graph_source.replace("LifecycleAction::Remove", "LifecycleAction::Duplicate", 1),
+            owner.write_text(
+                source.replace(
+                    "archive_limits, budget);",
+                    "archive_limits, archive_limits);",
+                    1,
+                ),
                 encoding="utf-8",
             )
             violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
                 root
             )
-            self.assertTrue(any("refuse selected-comment removal" in item for item in violations), violations)
+            self.assertTrue(any("plan_comment_removal" in item and "shared budget" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    "if action == LifecycleAction::Remove",
+                    "if action == LifecycleAction::Duplicate",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("gated by the remove action" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    "let source_ids = plan.removed_object_ids;",
+                    "let source_ids = selected_source_ids;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("filter physical source IDs" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    "let external_authors = plan.unused_external_author_ids;",
+                    "let external_authors = selected_source_ids;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("preserve author diagnostics" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            comment_removal = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "comment_removal.rs"
+            comment_removal_source = comment_removal.read_text(encoding="utf-8")
+            comment_removal.write_text(
+                comment_removal_source
+                + "fn delete_authors() { for identifier in external_author_ids { push_vec(&mut removed_object_ids, identifier, budget); } }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("never delete author objects" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "validate_known_payload_relationships(package, component.name(), object, comment_graph, limits, budget);",
+                    "reserve_core_header_inspection_work;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("known payload" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "validate_known_payload_relationships(package, component.name(), object, comment_graph, limits, budget); reserve_core_header_inspection_work(object, archive_limits, budget); strict_reference_census(object, archive_limits, budget);",
+                    "reserve_core_header_inspection_work(object, archive_limits, budget); strict_reference_census(object, archive_limits, budget); validate_known_payload_relationships(package, component.name(), object, comment_graph, limits, budget);",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("before its strict census" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "validate_movie_payload_relationship",
+                    "missing_movie_payload_relationship",
+                    3,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("movie comment payload/header relationship" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "validate_comment_storage_payload_relationship",
+                    "missing_comment_storage_payload_relationship",
+                    2,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("comment storage payload/header relationship" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "validate_known_payload_relationships(package, component.name(), object, comment_graph, limits, budget);",
+                    "validate_known_payload_relationships(object, comment_graph, limits, budget);",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("package and owning component" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "validate_comment_storage_target(package, component_name, identifier);",
+                    "missing_comment_storage_target(package, component_name, identifier);",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("Movie validation" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "facts.author_identifier",
+                    "facts.missing_author_identifier",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("author target" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "facts.reply_identifiers",
+                    "facts.missing_reply_identifiers",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("reply target" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "actual_component != component_name",
+                    "actual_component == component_name",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("same-component CommentStorage" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace("message.data.len()", "message.data.capacity()", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("exact singleton MessageInfo/message type and length" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            graph.write_text(
+                graph_source.replace("UnsupportedComment", "UnsupportedCaption", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("fail-closed" in item for item in violations), violations)
             graph.write_text(graph_source, encoding="utf-8")
 
             graph.write_text(

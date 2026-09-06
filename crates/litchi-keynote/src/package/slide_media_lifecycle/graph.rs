@@ -18,10 +18,9 @@ use litchi_iwa_core::{
 use super::budget::LifecycleBudget;
 use super::comment_graph::{CommentGraphPlan, plan_comment_graph};
 use super::{
-    BUILD_CHUNK_MESSAGE_TYPE, BUILD_MESSAGE_TYPE, COMMENT_STORAGE_MESSAGE_TYPE, LifecycleAction,
-    MOVIE_DATA_FIELD, MOVIE_MESSAGE_TYPE, POSTER_IMAGE_DATA_FIELD, Package,
-    SLIDE_BUILD_CHUNKS_FIELD, SLIDE_BUILDS_FIELD, SLIDE_OWNED_DRAWABLES_FIELD,
-    SlideMediaLifecycleError, SuperUuid,
+    BUILD_CHUNK_MESSAGE_TYPE, BUILD_MESSAGE_TYPE, COMMENT_STORAGE_MESSAGE_TYPE, MOVIE_DATA_FIELD,
+    MOVIE_MESSAGE_TYPE, POSTER_IMAGE_DATA_FIELD, Package, SLIDE_BUILD_CHUNKS_FIELD,
+    SLIDE_BUILDS_FIELD, SLIDE_OWNED_DRAWABLES_FIELD, SlideMediaLifecycleError, SuperUuid,
 };
 use crate::{MovieKind, MovieSelector, SlideSelector};
 
@@ -50,7 +49,6 @@ pub(super) fn select_media(
     package: &Package,
     slide_selector: SlideSelector<'_>,
     movie_selector: MovieSelector,
-    action: LifecycleAction,
     limits: WireLimits,
     budget: &mut LifecycleBudget,
 ) -> Result<MediaGraphSelection, SlideMediaLifecycleError> {
@@ -129,9 +127,6 @@ pub(super) fn select_media(
         return Err(SlideMediaLifecycleError::InvalidSource);
     }
     let comment_graph = match direct_drawable_comment(movie_payload, limits, budget)? {
-        Some(_) if action == LifecycleAction::Remove => {
-            return Err(SlideMediaLifecycleError::UnsupportedComment);
-        },
         Some(root) => {
             let message_index = movie
                 .messages
@@ -237,7 +232,7 @@ pub(super) fn select_media(
     })
 }
 
-fn direct_drawable_comment(
+pub(super) fn direct_drawable_comment(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut LifecycleBudget,

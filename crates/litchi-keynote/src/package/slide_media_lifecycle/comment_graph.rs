@@ -223,10 +223,10 @@ pub(super) fn plan_comment_graph(
 }
 
 #[derive(Debug)]
-struct StorageFacts {
-    author_identifier: Option<u64>,
-    reply_identifiers: Vec<u64>,
-    uuid: Option<SuperUuid>,
+pub(super) struct StorageFacts {
+    pub(super) author_identifier: Option<u64>,
+    pub(super) reply_identifiers: Vec<u64>,
+    pub(super) uuid: Option<SuperUuid>,
 }
 
 fn read_storage_facts(
@@ -253,7 +253,7 @@ fn read_storage_facts(
             .map_err(|_| SlideMediaLifecycleError::InvalidSource)?,
         budget,
     )?;
-    decode_storage_payload(storage_identifier, info, payload, limits, budget)
+    decode_storage_payload(storage_identifier, info, payload, limits, budget, true)
 }
 
 fn exact_comment_storage_payload<'source>(
@@ -295,12 +295,34 @@ fn exact_comment_storage_payload<'source>(
     Ok((info, message.data.as_slice()))
 }
 
+/// Validate one comment-storage payload against its ArchiveInfo references
+/// without requiring opaque root extensions to be understood.  The selected
+/// clone path remains strict; removal scans use this neutral semantic census
+/// for untouched storage objects and preserve their source bytes.
+pub(super) fn validate_comment_storage_payload_relationship(
+    storage_identifier: u64,
+    info: &MessageInfo,
+    payload: &[u8],
+    limits: WireLimits,
+    budget: &mut LifecycleBudget,
+) -> Result<StorageFacts, SlideMediaLifecycleError> {
+    if storage_identifier == 0
+        || info.type_ != COMMENT_STORAGE_MESSAGE_TYPE
+        || usize::try_from(info.length).ok() != Some(payload.len())
+    {
+        return Err(SlideMediaLifecycleError::InvalidSource);
+    }
+    validate_archive_reference_shape(info)?;
+    decode_storage_payload(storage_identifier, info, payload, limits, budget, false)
+}
+
 fn decode_storage_payload(
     storage_identifier: u64,
     info: &MessageInfo,
     payload: &[u8],
     limits: WireLimits,
     budget: &mut LifecycleBudget,
+    reject_unknown_root_fields: bool,
 ) -> Result<StorageFacts, SlideMediaLifecycleError> {
     // The neutral codec owns a bounded lazy projection and may allocate its
     // own temporary Buffa state.  Reserve an operation-wide upper bound before
@@ -328,7 +350,7 @@ fn decode_storage_payload(
         return Err(error);
     }
 
-    validate_comment_payload_wire(payload, limits, budget)?;
+    validate_comment_payload_wire(payload, limits, budget, reject_unknown_root_fields)?;
 
     let author_identifier = snapshot.author().map(|reference| {
         if reference.deprecated_type().is_some() || reference.deprecated_is_external().is_some() {
@@ -496,8 +518,9 @@ fn validate_storage_metadata(
     }
 
     // The aggregate header must match the decoded references exactly, while
-    // field-level records may partition that same multiset.  Unknown payload
-    // ownership shapes have already been rejected by the wire validator.
+    // field-level records may partition that same multiset.  Known nested
+    // ownership fields were checked by the wire pass; opaque root extensions
+    // remain source bytes and do not enter this reference census.
     let expected_len = usize::from(facts.author_identifier.is_some())
         .checked_add(facts.reply_identifiers.len())
         .ok_or(SlideMediaLifecycleError::InvalidSource)?;
@@ -564,6 +587,7 @@ fn validate_comment_payload_wire(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut LifecycleBudget,
+    reject_unknown_root_fields: bool,
 ) -> Result<(), SlideMediaLifecycleError> {
     let root = parse_wire_view(payload, limits, 1, budget)?;
     for field in root.fields() {
@@ -616,7 +640,10 @@ fn validate_comment_payload_wire(
             // when every payload field has a known ownership shape.  The
             // neutral codec still preserves these bytes during the later
             // rewrite; unselected existing comments are never routed here.
-            _ => return Err(SlideMediaLifecycleError::InvalidSource),
+            _ if reject_unknown_root_fields => {
+                return Err(SlideMediaLifecycleError::InvalidSource);
+            },
+            _ => {},
         }
     }
     Ok(())

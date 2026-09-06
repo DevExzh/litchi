@@ -14,7 +14,7 @@ use litchi_iwa::keynote::{BuildStart, KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
-use litchi_keynote::{MovieSelector, Package, SlideMediaLifecycleError, SlideSelector};
+use litchi_keynote::{MovieSelector, Package, SlideSelector};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -746,10 +746,22 @@ fn source_built_selected_commented_movie_duplicates_and_removal_is_atomic() -> T
         .package()
         .apply_slide_media_lifecycle(&duplicate.patch().inverse())?;
     assert_eq!(package_bytes(restored.package())?, before);
-    assert!(matches!(
-        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
-        Err(SlideMediaLifecycleError::UnsupportedComment)
-    ));
+    let removed = package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let removed_editor = host_from_package(removed.package())?;
+    let remaining = host_snapshot(&removed_editor)?;
+    assert_eq!(remaining.movies.len(), 1);
+    assert_eq!(remaining.movies[0].content, MOVIE_A);
+    assert_eq!(remaining.audio, host_snapshot(&editor)?.audio);
+    assert!(
+        removed_editor
+            .slide_movies(0)?
+            .iter()
+            .all(|movie| movie.drawable_object_id != fixture.movie_b_id)
+    );
+    let restored_removed = removed
+        .package()
+        .apply_slide_media_lifecycle(&removed.patch().inverse())?;
+    assert_eq!(package_bytes(restored_removed.package())?, before);
     assert_eq!(package_bytes(&package)?, before);
     Ok(())
 }
@@ -804,10 +816,26 @@ fn source_built_selected_commented_audio_with_reply_duplicates_and_removal_is_at
         .package()
         .apply_slide_media_lifecycle(&duplicate.patch().inverse())?;
     assert_eq!(package_bytes(restored.package())?, before);
-    assert!(matches!(
-        package.remove_slide_audio(SlideSelector::index(0), MovieSelector::index(1)),
-        Err(SlideMediaLifecycleError::UnsupportedComment)
-    ));
+    let removed = package.remove_slide_audio(SlideSelector::index(0), MovieSelector::index(1))?;
+    let removed_editor = host_from_package(removed.package())?;
+    let remaining = host_snapshot(&removed_editor)?;
+    assert_eq!(remaining.audio.len(), 1);
+    assert_eq!(remaining.audio[0].content, AUDIO_B);
+    assert_eq!(remaining.movies, host_snapshot(&reopened)?.movies);
+    assert_eq!(
+        comment_text(&removed_editor, fixture.movie_b_id)?,
+        Some("unselected movie B lifecycle comment".to_owned())
+    );
+    assert!(
+        removed_editor
+            .slide_audio(0)?
+            .iter()
+            .all(|audio| audio.drawable_object_id != fixture.audio_a_id)
+    );
+    let restored_removed = removed
+        .package()
+        .apply_slide_media_lifecycle(&removed.patch().inverse())?;
+    assert_eq!(package_bytes(restored_removed.package())?, before);
     assert_eq!(package_bytes(&package)?, before);
     Ok(())
 }

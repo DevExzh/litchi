@@ -3,9 +3,9 @@
 //! The native fixtures in this test deliberately keep comment storage in the
 //! slide component while the annotation author lives in the shared author
 //! component.  The lifecycle owner must clone every comment-storage node,
-//! preserve each storage UUID, and continue sharing the author object.
-//! Removal remains a compatibility guard until comment metadata ownership is
-//! implemented by the focused owner.
+//! preserve each storage UUID, and continue sharing the author object.  Final
+//! removal must cull the comment-storage closure and its last component-level
+//! author edge while retaining the shared author records.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -29,6 +29,10 @@ const NATIVE_COMMENT_BASELINE: &[u8] =
     include_bytes!("../../../test-data/iwork/keynote/media-comments-baseline-native.key");
 const NATIVE_COMMENT_DUPLICATE: &[u8] =
     include_bytes!("../../../test-data/iwork/keynote/media-comments-duplicate-native.key");
+const NATIVE_COMMENT_SHARED_REMOVAL: &[u8] =
+    include_bytes!("../../../test-data/iwork/keynote/media-comments-shared-removal-native.key");
+const NATIVE_COMMENT_FINAL_REMOVAL: &[u8] =
+    include_bytes!("../../../test-data/iwork/keynote/media-comments-final-removal-native.key");
 
 const NATIVE_SLIDE: u64 = 2_652_150;
 const NATIVE_AUDIO_A: u64 = 2_652_595;
@@ -39,14 +43,36 @@ const NATIVE_COMMENT_MOVIE_CLONE: u64 = 2_653_814;
 const NATIVE_COMMENT_ROOT: u64 = 2_653_723;
 const NATIVE_COMMENT_ROOT_CLONE: u64 = 2_653_826;
 const NATIVE_COMMENT_AUTHOR: u64 = 2_653_721;
+const NATIVE_COMMENT_AUTHOR_STORAGE: u64 = 2_652_381;
 const NATIVE_SLIDE_MESSAGE_TYPE: u32 = 5;
 const NATIVE_MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
+const ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE: u32 = 213;
+const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
+const NATIVE_ROTATED_COMPONENT_BEFORE: u64 = 2_653_653;
+const NATIVE_ROTATED_COMPONENT_AFTER: u64 = 2_654_075;
+const NATIVE_ROTATED_DOCUMENT_OBJECT: u64 = 2_652_149;
+
+fn native_comment_author_edge() -> (u64, u64, Option<u64>) {
+    (
+        NATIVE_SLIDE,
+        NATIVE_COMMENT_AUTHOR_STORAGE,
+        Some(NATIVE_COMMENT_AUTHOR),
+    )
+}
+
 const SYNTHETIC_REPLY_ID: u64 = 2_653_900;
+const SYNTHETIC_SURVIVING_COMMENT_ID: u64 = 2_654_500;
+const SYNTHETIC_MISSING_MOVIE_COMMENT_ID: u64 = 2_654_501;
+const SYNTHETIC_MISSING_REPLY_ID: u64 = 2_654_502;
 const SYNTHETIC_REPLY_UUID: tsp::Uuid = tsp::Uuid {
     lower: 0x0bad_cafe_dead_beef,
     upper: 0x0123_4567_89ab_cdef,
+};
+const SYNTHETIC_SURVIVING_COMMENT_UUID: tsp::Uuid = tsp::Uuid {
+    lower: 0x1357_9bdf_2468_ace0,
+    upper: 0x0eca_8642_fdb9_7531,
 };
 const UNKNOWN_COMMENT_MARKER: &[u8] = b"litchi-keynote-comment-unknown-extension";
 const UNKNOWN_COMMENT_REFERENCE_MARKER: &[u8] =
@@ -125,6 +151,114 @@ fn native_component_containing_object(
         .find(|(_, archive)| archive.object(identifier).is_some())
         .ok_or_else(|| io::Error::other(format!("missing native object {identifier}")))
         .map_err(Into::into)
+}
+
+fn native_object_exists(source: &[u8], identifier: u64) -> TestResult<bool> {
+    Ok(native_component_archives(source)?
+        .into_iter()
+        .any(|(_, archive)| archive.object(identifier).is_some()))
+}
+
+fn native_metadata(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
+    let (_, archive) = native_component_archives(source)?
+        .into_iter()
+        .find(|(name, _)| name == "Index/Metadata.iwa")
+        .ok_or_else(|| io::Error::other("missing native PackageMetadata component"))?;
+    let payload = archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .find(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
+        .map(|message| message.data.as_slice())
+        .ok_or_else(|| io::Error::other("missing native PackageMetadata payload"))?;
+    Ok(tsp::PackageMetadata::decode(payload)?)
+}
+
+fn native_external_edges(source: &[u8]) -> TestResult<BTreeSet<(u64, u64, Option<u64>)>> {
+    Ok(native_metadata(source)?
+        .components
+        .into_iter()
+        .flat_map(|component| {
+            component
+                .external_references
+                .into_iter()
+                .map(move |reference| {
+                    (
+                        component.identifier,
+                        reference.component_identifier,
+                        reference.object_identifier,
+                    )
+                })
+        })
+        .collect())
+}
+
+fn native_component_effective_locators(source: &[u8]) -> TestResult<BTreeMap<u64, String>> {
+    let mut locators = BTreeMap::new();
+    for component in native_metadata(source)?.components {
+        let locator = component
+            .locator
+            .unwrap_or(component.preferred_locator)
+            .to_owned();
+        if locators.insert(component.identifier, locator).is_some() {
+            return Err(io::Error::other("native metadata repeats a current component").into());
+        }
+    }
+    Ok(locators)
+}
+
+fn native_semantic_component_key(locators: &BTreeMap<u64, String>, identifier: u64) -> String {
+    locators
+        .get(&identifier)
+        .cloned()
+        .unwrap_or_else(|| format!("#component-{identifier}"))
+}
+
+fn native_semantic_external_edges(
+    source: &[u8],
+) -> TestResult<BTreeSet<(String, String, Option<u64>)>> {
+    let locators = native_component_effective_locators(source)?;
+    Ok(native_metadata(source)?
+        .components
+        .into_iter()
+        .flat_map(|component| {
+            let source_key = native_semantic_component_key(&locators, component.identifier);
+            let locators = &locators;
+            component
+                .external_references
+                .into_iter()
+                .map(move |reference| {
+                    let target_key =
+                        native_semantic_component_key(locators, reference.component_identifier);
+                    (source_key.clone(), target_key, reference.object_identifier)
+                })
+        })
+        .collect())
+}
+
+fn native_semantic_comment_author_edge(source: &[u8]) -> TestResult<(String, String, Option<u64>)> {
+    let locators = native_component_effective_locators(source)?;
+    let (source_identifier, target_identifier, object_identifier) = native_comment_author_edge();
+    Ok((
+        native_semantic_component_key(&locators, source_identifier),
+        native_semantic_component_key(&locators, target_identifier),
+        object_identifier,
+    ))
+}
+
+fn assert_compact_edge_sets_equal<T: Ord + std::fmt::Debug>(
+    actual: &BTreeSet<T>,
+    expected: &BTreeSet<T>,
+    context: &str,
+) {
+    let missing = expected.difference(actual).take(4).collect::<Vec<_>>();
+    let unexpected = actual.difference(expected).take(4).collect::<Vec<_>>();
+    assert!(
+        missing.is_empty() && unexpected.is_empty(),
+        "{context}: edge sets differ (actual {}, expected {}), first missing {missing:?}, first unexpected {unexpected:?}",
+        actual.len(),
+        expected.len()
+    );
 }
 
 fn native_component_stream_containing_object(
@@ -342,6 +476,161 @@ fn with_native_movie_comment_reference_mutation(
     replace_native_movie_payload(source, NATIVE_COMMENT_MOVIE, rewritten_root)
 }
 
+fn with_native_shared_movie_comment(
+    source: &[u8],
+    movie_identifier: u64,
+    root_identifier: u64,
+) -> TestResult<Vec<u8>> {
+    let (component_name, mut archive) =
+        native_component_containing_object(source, movie_identifier)?;
+    let movie_object = archive
+        .object_mut(movie_identifier)
+        .ok_or_else(|| io::Error::other(format!("missing native movie {movie_identifier}")))?;
+    let message_index = movie_object
+        .messages
+        .iter()
+        .position(|message| message.type_ == NATIVE_MOVIE_MESSAGE_TYPE)
+        .ok_or_else(|| io::Error::other("native movie has no movie payload"))?;
+    let payload = movie_object.messages[message_index].data.clone();
+    let root = WireView::parse(&payload)?;
+    let mut rewritten_root = Vec::with_capacity(payload.len().saturating_add(16));
+    let mut drawable_count = 0usize;
+    for root_field in root.fields() {
+        if root_field.number() != 1 {
+            rewritten_root.extend_from_slice(root_field.raw());
+            continue;
+        }
+        drawable_count = drawable_count
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("native movie drawable count overflow"))?;
+        let drawable = WireView::parse(root_field.payload())?;
+        let mut rewritten_drawable =
+            Vec::with_capacity(root_field.payload().len().saturating_add(8));
+        let mut comment_count = 0usize;
+        for drawable_field in drawable.fields() {
+            if drawable_field.number() == 6 {
+                comment_count = comment_count
+                    .checked_add(1)
+                    .ok_or_else(|| io::Error::other("native movie comment count overflow"))?;
+            }
+            rewritten_drawable.extend_from_slice(drawable_field.raw());
+        }
+        if comment_count != 0 {
+            return Err(io::Error::other("native movie already has a direct comment").into());
+        }
+        let reference = tsp::Reference {
+            identifier: root_identifier,
+            ..Default::default()
+        }
+        .encode_to_vec();
+        append_length_delimited_field(&mut rewritten_drawable, 6, &reference)?;
+        append_length_delimited_field(&mut rewritten_root, 1, &rewritten_drawable)?;
+    }
+    if drawable_count != 1 {
+        return Err(io::Error::other("native movie must have one drawable envelope").into());
+    }
+    let info = movie_object
+        .archive_info
+        .message_infos
+        .get_mut(message_index)
+        .ok_or_else(|| io::Error::other("native movie message metadata is missing"))?;
+    if info.object_references.contains(&root_identifier) {
+        return Err(io::Error::other("native movie already references comment root").into());
+    }
+    info.object_references.push(root_identifier);
+    movie_object.replace_message(
+        message_index,
+        RawMessage {
+            type_: NATIVE_MOVIE_MESSAGE_TYPE,
+            data: rewritten_root,
+        },
+    )?;
+    replace_native_component_archive(source, &component_name, archive)
+}
+
+fn without_native_movie_comment_header_reference(
+    source: &[u8],
+    movie_identifier: u64,
+    root_identifier: u64,
+) -> TestResult<Vec<u8>> {
+    let (component_name, mut archive) =
+        native_component_containing_object(source, movie_identifier)?;
+    let movie_object = archive
+        .object_mut(movie_identifier)
+        .ok_or_else(|| io::Error::other(format!("missing native movie {movie_identifier}")))?;
+    let message_index = movie_object
+        .messages
+        .iter()
+        .position(|message| message.type_ == NATIVE_MOVIE_MESSAGE_TYPE)
+        .ok_or_else(|| io::Error::other("native movie has no movie payload"))?;
+    let info = movie_object
+        .archive_info
+        .message_infos
+        .get_mut(message_index)
+        .ok_or_else(|| io::Error::other("native movie message metadata is missing"))?;
+    let before = info.object_references.len();
+    info.object_references
+        .retain(|identifier| *identifier != root_identifier);
+    if info.object_references.len() + 1 != before {
+        return Err(io::Error::other("native movie comment header reference is not unique").into());
+    }
+    replace_native_component_archive(source, &component_name, archive)
+}
+
+fn with_native_unselected_comment_reply(
+    source: &[u8],
+    reply_identifier: u64,
+    include_reply_header_reference: bool,
+) -> TestResult<Vec<u8>> {
+    let graph = native_comment_graph(source, NATIVE_COMMENT_MOVIE)?;
+    let root = native_comment_node(source, graph.root_identifier)?;
+    let author = root
+        .author
+        .ok_or_else(|| io::Error::other("native comment has no author"))?;
+    let (component_name, mut archive) =
+        native_component_containing_object(source, graph.root_identifier)?;
+    let payload = tsd::CommentStorageArchive {
+        text: Some("Unselected hidden reply reference".to_owned()),
+        creation_date: Some(tsp::Date { seconds: 43.0 }),
+        author: Some(tsp::Reference {
+            identifier: author,
+            ..Default::default()
+        }),
+        replies: vec![tsp::Reference {
+            identifier: reply_identifier,
+            ..Default::default()
+        }],
+        storage_uuid: Some(SYNTHETIC_SURVIVING_COMMENT_UUID),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let mut object = ArchiveObject::new(
+        SYNTHETIC_SURVIVING_COMMENT_ID,
+        vec![RawMessage {
+            type_: COMMENT_STORAGE_MESSAGE_TYPE,
+            data: payload,
+        }],
+    )?;
+    object.archive_info.message_infos[0]
+        .object_references
+        .push(author);
+    if include_reply_header_reference {
+        object.archive_info.message_infos[0]
+            .object_references
+            .push(reply_identifier);
+    }
+    archive.insert_object(object)?;
+    replace_native_component_archive(source, &component_name, archive)
+}
+
+fn with_native_unselected_comment_reply_missing_header(source: &[u8]) -> TestResult<Vec<u8>> {
+    with_native_unselected_comment_reply(source, SYNTHETIC_REPLY_ID, false)
+}
+
+fn with_native_unselected_comment_reply_missing_target(source: &[u8]) -> TestResult<Vec<u8>> {
+    with_native_unselected_comment_reply(source, SYNTHETIC_MISSING_REPLY_ID, true)
+}
+
 fn native_movie_archive(source: &[u8], identifier: u64) -> TestResult<tsd::MovieArchive> {
     let (_, archive) = native_component_containing_object(source, identifier)?;
     Ok(tsd::MovieArchive::decode(native_object_message(
@@ -435,6 +724,21 @@ fn native_annotation_author_ids(source: &[u8]) -> TestResult<BTreeSet<u64>> {
                     .messages
                     .iter()
                     .any(|message| message.type_ == ANNOTATION_AUTHOR_MESSAGE_TYPE)
+            })
+        }));
+    }
+    Ok(identifiers)
+}
+
+fn native_annotation_author_storage_ids(source: &[u8]) -> TestResult<BTreeSet<u64>> {
+    let mut identifiers = BTreeSet::new();
+    for (_, archive) in native_component_archives(source)? {
+        identifiers.extend(archive.objects.into_iter().filter_map(|object| {
+            object.archive_info.identifier.filter(|_| {
+                object
+                    .messages
+                    .iter()
+                    .any(|message| message.type_ == ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE)
             })
         }));
     }
@@ -721,6 +1025,156 @@ fn native_comment_duplicate_oracle_matches_storage_identity_policy() -> TestResu
 }
 
 #[test]
+fn native_comment_removal_oracles_retain_authors_and_cull_only_final_edge() -> TestResult {
+    let baseline = Package::from_bytes(NATIVE_COMMENT_BASELINE)?;
+    let shared = Package::from_bytes(NATIVE_COMMENT_SHARED_REMOVAL)?;
+    let final_removal = Package::from_bytes(NATIVE_COMMENT_FINAL_REMOVAL)?;
+    baseline.validate()?;
+    shared.validate()?;
+    final_removal.validate()?;
+
+    let baseline_edges = native_external_edges(NATIVE_COMMENT_BASELINE)?;
+    let shared_edges = native_external_edges(NATIVE_COMMENT_SHARED_REMOVAL)?;
+    let final_edges = native_external_edges(NATIVE_COMMENT_FINAL_REMOVAL)?;
+    let author_edge = native_comment_author_edge();
+    assert_eq!(baseline_edges.len(), 700);
+    assert_eq!(shared_edges.len(), 700);
+    assert_eq!(final_edges.len(), 699);
+    assert!(baseline_edges.contains(&author_edge));
+    assert_compact_edge_sets_equal(
+        &shared_edges,
+        &baseline_edges,
+        "native shared-removal raw metadata",
+    );
+    assert!(!final_edges.contains(&author_edge));
+    let baseline_rotated_locators = native_component_effective_locators(NATIVE_COMMENT_BASELINE)?;
+    let final_rotated_locators = native_component_effective_locators(NATIVE_COMMENT_FINAL_REMOVAL)?;
+    let baseline_rotated = baseline_rotated_locators
+        .get(&NATIVE_ROTATED_COMPONENT_BEFORE)
+        .ok_or_else(|| io::Error::other("baseline rotated component locator is missing"))?;
+    let final_rotated = final_rotated_locators
+        .get(&NATIVE_ROTATED_COMPONENT_AFTER)
+        .ok_or_else(|| io::Error::other("final rotated component locator is missing"))?;
+    assert_eq!(
+        baseline_rotated, "ViewState",
+        "native baseline rotated component {} for object {}",
+        NATIVE_ROTATED_COMPONENT_BEFORE, NATIVE_ROTATED_DOCUMENT_OBJECT
+    );
+    assert_eq!(
+        final_rotated, "ViewState-2654075",
+        "native final rotated component {} for object {}",
+        NATIVE_ROTATED_COMPONENT_AFTER, NATIVE_ROTATED_DOCUMENT_OBJECT
+    );
+    assert_eq!(
+        baseline_rotated_locators.get(&NATIVE_ROTATED_COMPONENT_AFTER),
+        None,
+        "baseline unexpectedly contains final rotated component identity"
+    );
+    assert_eq!(
+        final_rotated_locators.get(&NATIVE_ROTATED_COMPONENT_BEFORE),
+        None,
+        "final unexpectedly retains baseline rotated component identity"
+    );
+    let removed_rotation_edges = [
+        (1, NATIVE_ROTATED_COMPONENT_BEFORE, None),
+        (
+            NATIVE_ROTATED_COMPONENT_BEFORE,
+            1,
+            Some(NATIVE_ROTATED_DOCUMENT_OBJECT),
+        ),
+    ];
+    let inserted_rotation_edges = [
+        (1, NATIVE_ROTATED_COMPONENT_AFTER, None),
+        (
+            NATIVE_ROTATED_COMPONENT_AFTER,
+            1,
+            Some(NATIVE_ROTATED_DOCUMENT_OBJECT),
+        ),
+    ];
+    let mut expected_final_edges = baseline_edges.clone();
+    assert!(expected_final_edges.remove(&author_edge));
+    for edge in removed_rotation_edges {
+        assert!(expected_final_edges.remove(&edge));
+    }
+    for edge in inserted_rotation_edges {
+        assert!(expected_final_edges.insert(edge));
+    }
+    assert_eq!(final_edges, expected_final_edges);
+
+    assert_eq!(
+        native_media_ids(NATIVE_COMMENT_SHARED_REMOVAL)?,
+        vec![
+            NATIVE_AUDIO_A,
+            NATIVE_AUDIO_B,
+            NATIVE_COMMENT_MOVIE,
+            NATIVE_MOVIE_B,
+        ]
+    );
+    assert_eq!(
+        native_commented_media_ids(NATIVE_COMMENT_SHARED_REMOVAL)?,
+        vec![NATIVE_COMMENT_MOVIE]
+    );
+    assert_eq!(
+        native_comment_node(NATIVE_COMMENT_SHARED_REMOVAL, NATIVE_COMMENT_ROOT)?.storage_uuid,
+        native_comment_node(NATIVE_COMMENT_BASELINE, NATIVE_COMMENT_ROOT)?.storage_uuid
+    );
+    assert_eq!(
+        native_media_ids(NATIVE_COMMENT_FINAL_REMOVAL)?,
+        vec![NATIVE_AUDIO_A, NATIVE_AUDIO_B, NATIVE_MOVIE_B]
+    );
+    assert!(native_commented_media_ids(NATIVE_COMMENT_FINAL_REMOVAL)?.is_empty());
+    assert!(native_object_exists(
+        NATIVE_COMMENT_SHARED_REMOVAL,
+        NATIVE_COMMENT_MOVIE
+    )?);
+    assert!(!native_object_exists(
+        NATIVE_COMMENT_SHARED_REMOVAL,
+        NATIVE_COMMENT_MOVIE_CLONE
+    )?);
+    assert!(native_object_exists(
+        NATIVE_COMMENT_SHARED_REMOVAL,
+        NATIVE_COMMENT_ROOT
+    )?);
+    assert!(!native_object_exists(
+        NATIVE_COMMENT_SHARED_REMOVAL,
+        NATIVE_COMMENT_ROOT_CLONE
+    )?);
+    assert!(!native_object_exists(
+        NATIVE_COMMENT_FINAL_REMOVAL,
+        NATIVE_COMMENT_MOVIE
+    )?);
+    assert!(!native_object_exists(
+        NATIVE_COMMENT_FINAL_REMOVAL,
+        NATIVE_COMMENT_MOVIE_CLONE
+    )?);
+    assert!(!native_object_exists(
+        NATIVE_COMMENT_FINAL_REMOVAL,
+        NATIVE_COMMENT_ROOT
+    )?);
+    assert!(!native_object_exists(
+        NATIVE_COMMENT_FINAL_REMOVAL,
+        NATIVE_COMMENT_ROOT_CLONE
+    )?);
+    let baseline_author_ids = native_annotation_author_ids(NATIVE_COMMENT_BASELINE)?;
+    let baseline_author_storage_ids =
+        native_annotation_author_storage_ids(NATIVE_COMMENT_BASELINE)?;
+    for source in [
+        NATIVE_COMMENT_BASELINE,
+        NATIVE_COMMENT_SHARED_REMOVAL,
+        NATIVE_COMMENT_FINAL_REMOVAL,
+    ] {
+        assert!(native_object_exists(source, NATIVE_COMMENT_AUTHOR)?);
+        assert!(native_object_exists(source, NATIVE_COMMENT_AUTHOR_STORAGE)?);
+        assert_eq!(native_annotation_author_ids(source)?, baseline_author_ids);
+        assert_eq!(
+            native_annotation_author_storage_ids(source)?,
+            baseline_author_storage_ids
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn duplicate_selected_native_commented_movie_preserves_comment_graph() -> TestResult {
     let source_package = Package::from_bytes(NATIVE_COMMENT_BASELINE)?;
     let source = exact_bytes(&source_package)?;
@@ -763,7 +1217,7 @@ fn duplicate_selected_native_commented_movie_preserves_comment_graph() -> TestRe
 }
 
 #[test]
-fn duplicate_selected_native_commented_movie_clones_replies() -> TestResult {
+fn duplicate_selected_commented_movie_clones_synthetic_replies() -> TestResult {
     let source = with_native_reply_graph(NATIVE_COMMENT_BASELINE, false)?;
     let source_package = Package::from_bytes(&source)?;
     let before = exact_bytes(&source_package)?;
@@ -811,12 +1265,360 @@ fn duplicate_selected_native_commented_movie_clones_replies() -> TestResult {
 }
 
 #[test]
-fn selected_native_commented_movie_removal_remains_unsupported_atomically() -> TestResult {
-    let package = Package::from_bytes(NATIVE_COMMENT_BASELINE)?;
+fn selected_native_commented_movie_removal_culls_storage_and_reuses_author_until_final_owner()
+-> TestResult {
+    let source_package = Package::from_bytes(NATIVE_COMMENT_BASELINE)?;
+    let source = exact_bytes(&source_package)?;
+    let source_edges = native_external_edges(&source)?;
+    let author_edge = native_comment_author_edge();
+    assert!(source_edges.contains(&author_edge));
+    let source_author_ids = native_annotation_author_ids(&source)?;
+    let source_author_storage_ids = native_annotation_author_storage_ids(&source)?;
+    assert!(source_author_ids.contains(&NATIVE_COMMENT_AUTHOR));
+    assert!(source_author_storage_ids.contains(&NATIVE_COMMENT_AUTHOR_STORAGE));
+
+    let duplicate =
+        source_package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let duplicate_bytes = exact_bytes(duplicate.package())?;
+    let clone_movie = native_commented_media_ids(&duplicate_bytes)?
+        .into_iter()
+        .find(|identifier| *identifier != NATIVE_COMMENT_MOVIE)
+        .ok_or_else(|| io::Error::other("duplicate has no selected comment clone"))?;
+    assert_eq!(native_external_edges(&duplicate_bytes)?, source_edges);
+    assert_comment_graph_clone(&source, &duplicate_bytes, NATIVE_COMMENT_MOVIE, clone_movie)?;
+
+    let shared = duplicate
+        .package()
+        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let shared_bytes = exact_bytes(shared.package())?;
+    assert_eq!(
+        native_media_ids(&shared_bytes)?,
+        vec![NATIVE_AUDIO_A, NATIVE_AUDIO_B, NATIVE_MOVIE_B, clone_movie]
+    );
+    assert_eq!(
+        native_commented_media_ids(&shared_bytes)?,
+        vec![clone_movie]
+    );
+    assert!(!native_object_exists(&shared_bytes, NATIVE_COMMENT_MOVIE)?);
+    assert!(!native_object_exists(&shared_bytes, NATIVE_COMMENT_ROOT)?);
+    assert!(native_object_exists(&shared_bytes, NATIVE_COMMENT_AUTHOR)?);
+    assert!(native_object_exists(
+        &shared_bytes,
+        NATIVE_COMMENT_AUTHOR_STORAGE
+    )?);
+    assert_eq!(
+        native_annotation_author_ids(&shared_bytes)?,
+        source_author_ids
+    );
+    assert_eq!(
+        native_annotation_author_storage_ids(&shared_bytes)?,
+        source_author_storage_ids
+    );
+    assert_eq!(native_external_edges(&shared_bytes)?, source_edges);
+    assert_comment_graph_clone(&source, &shared_bytes, NATIVE_COMMENT_MOVIE, clone_movie)?;
+    export_if_requested(
+        shared.package(),
+        "focused-media-comment-remove-shared-movie.key",
+    )?;
+
+    let final_removal = shared
+        .package()
+        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(3))?;
+    let final_bytes = exact_bytes(final_removal.package())?;
+    assert_eq!(
+        native_media_ids(&final_bytes)?,
+        vec![NATIVE_AUDIO_A, NATIVE_AUDIO_B, NATIVE_MOVIE_B]
+    );
+    assert!(native_commented_media_ids(&final_bytes)?.is_empty());
+    assert!(!native_object_exists(&final_bytes, NATIVE_COMMENT_MOVIE)?);
+    assert!(!native_object_exists(&final_bytes, clone_movie)?);
+    assert!(!native_object_exists(&final_bytes, NATIVE_COMMENT_ROOT)?);
+    assert!(!native_object_exists(
+        &final_bytes,
+        NATIVE_COMMENT_ROOT_CLONE
+    )?);
+    assert!(native_object_exists(&final_bytes, NATIVE_COMMENT_AUTHOR)?);
+    assert!(native_object_exists(
+        &final_bytes,
+        NATIVE_COMMENT_AUTHOR_STORAGE
+    )?);
+    assert_eq!(
+        native_annotation_author_ids(&final_bytes)?,
+        source_author_ids
+    );
+    assert_eq!(
+        native_annotation_author_storage_ids(&final_bytes)?,
+        source_author_storage_ids
+    );
+    let mut expected_final_edges = source_edges.clone();
+    assert!(expected_final_edges.remove(&author_edge));
+    assert_eq!(native_external_edges(&final_bytes)?, expected_final_edges);
+    export_if_requested(
+        final_removal.package(),
+        "focused-media-comment-remove-final-movie.key",
+    )?;
+
+    let restored_shared = final_removal
+        .package()
+        .apply_slide_media_lifecycle(&final_removal.patch().inverse())?;
+    let restored_duplicate = restored_shared
+        .package()
+        .apply_slide_media_lifecycle(&shared.patch().inverse())?;
+    let restored_source = restored_duplicate
+        .package()
+        .apply_slide_media_lifecycle(&duplicate.patch().inverse())?;
+    assert_eq!(exact_bytes(restored_source.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn remove_selected_commented_movie_with_synthetic_reply_graph_is_atomic_and_reversible()
+-> TestResult {
+    let source = with_native_reply_graph(NATIVE_COMMENT_BASELINE, false)?;
+    let source_package = Package::from_bytes(&source)?;
+    let before = exact_bytes(&source_package)?;
+    let source_graph = native_comment_graph(&source, NATIVE_COMMENT_MOVIE)?;
+    let reply = source_graph
+        .nodes
+        .iter()
+        .find(|node| node.identifier == SYNTHETIC_REPLY_ID)
+        .ok_or_else(|| io::Error::other("reply fixture has no synthetic reply"))?;
+
+    let removal =
+        source_package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let candidate = exact_bytes(removal.package())?;
+    assert_eq!(native_commented_media_ids(&candidate)?, Vec::<u64>::new());
+    assert_eq!(
+        native_media_ids(&candidate)?,
+        vec![NATIVE_AUDIO_A, NATIVE_AUDIO_B, NATIVE_MOVIE_B]
+    );
+    assert!(!native_object_exists(
+        &candidate,
+        source_graph.root_identifier
+    )?);
+    assert!(!native_object_exists(&candidate, reply.identifier)?);
+    assert!(native_object_exists(&candidate, NATIVE_COMMENT_AUTHOR)?);
+    assert!(native_object_exists(
+        &candidate,
+        NATIVE_COMMENT_AUTHOR_STORAGE
+    )?);
+    let mut expected_edges = native_external_edges(&source)?;
+    assert!(expected_edges.remove(&native_comment_author_edge()));
+    assert_eq!(native_external_edges(&candidate)?, expected_edges);
+    let restored = removal
+        .package()
+        .apply_slide_media_lifecycle(&removal.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, before);
+    Ok(())
+}
+
+#[test]
+fn remove_shared_comment_root_preserves_replies_until_final_media_owner() -> TestResult {
+    let with_reply = with_native_reply_graph(NATIVE_COMMENT_BASELINE, false)?;
+    let root_identifier = native_comment_graph(&with_reply, NATIVE_COMMENT_MOVIE)?.root_identifier;
+    let source = with_native_shared_movie_comment(&with_reply, NATIVE_MOVIE_B, root_identifier)?;
+    let source_package = Package::from_bytes(&source)?;
+    let before = exact_bytes(&source_package)?;
+    let author_edge = native_comment_author_edge();
+    let source_edges = native_external_edges(&source)?;
+    assert!(source_edges.contains(&author_edge));
+    assert_eq!(
+        native_commented_media_ids(&source)?,
+        vec![NATIVE_COMMENT_MOVIE, NATIVE_MOVIE_B]
+    );
+    assert_eq!(
+        native_comment_graph(&source, NATIVE_MOVIE_B)?.root_identifier,
+        root_identifier
+    );
+
+    let first_removal =
+        source_package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let first_bytes = exact_bytes(first_removal.package())?;
+    assert_eq!(
+        native_media_ids(&first_bytes)?,
+        vec![NATIVE_AUDIO_A, NATIVE_AUDIO_B, NATIVE_MOVIE_B]
+    );
+    assert_eq!(
+        native_commented_media_ids(&first_bytes)?,
+        vec![NATIVE_MOVIE_B]
+    );
+    assert_eq!(
+        native_comment_graph(&first_bytes, NATIVE_MOVIE_B)?.root_identifier,
+        root_identifier
+    );
+    assert_eq!(
+        native_comment_node(&first_bytes, root_identifier)?.storage_uuid,
+        native_comment_node(&source, root_identifier)?.storage_uuid
+    );
+    assert_eq!(
+        native_comment_node(&first_bytes, SYNTHETIC_REPLY_ID)?.storage_uuid,
+        native_comment_node(&source, SYNTHETIC_REPLY_ID)?.storage_uuid
+    );
+    assert!(native_object_exists(&first_bytes, root_identifier)?);
+    assert!(native_object_exists(&first_bytes, SYNTHETIC_REPLY_ID)?);
+    assert!(native_object_exists(&first_bytes, NATIVE_COMMENT_AUTHOR)?);
+    assert!(native_object_exists(
+        &first_bytes,
+        NATIVE_COMMENT_AUTHOR_STORAGE
+    )?);
+    assert_eq!(native_external_edges(&first_bytes)?, source_edges);
+    export_if_requested(
+        first_removal.package(),
+        "focused-media-comment-shared-root-remove-first.key",
+    )?;
+
+    let final_removal = first_removal
+        .package()
+        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let final_bytes = exact_bytes(final_removal.package())?;
+    assert_eq!(
+        native_media_ids(&final_bytes)?,
+        vec![NATIVE_AUDIO_A, NATIVE_AUDIO_B]
+    );
+    assert!(native_commented_media_ids(&final_bytes)?.is_empty());
+    assert!(!native_object_exists(&final_bytes, NATIVE_MOVIE_B)?);
+    assert!(!native_object_exists(&final_bytes, root_identifier)?);
+    assert!(!native_object_exists(&final_bytes, SYNTHETIC_REPLY_ID)?);
+    assert!(native_object_exists(&final_bytes, NATIVE_COMMENT_AUTHOR)?);
+    assert!(native_object_exists(
+        &final_bytes,
+        NATIVE_COMMENT_AUTHOR_STORAGE
+    )?);
+    let mut expected_final_edges = source_edges.clone();
+    assert!(expected_final_edges.remove(&author_edge));
+    assert_eq!(native_external_edges(&final_bytes)?, expected_final_edges);
+    export_if_requested(
+        final_removal.package(),
+        "focused-media-comment-shared-root-remove-final.key",
+    )?;
+
+    let restored_first = final_removal
+        .package()
+        .apply_slide_media_lifecycle(&final_removal.patch().inverse())?;
+    assert_eq!(exact_bytes(restored_first.package())?, first_bytes);
+    let restored_source = restored_first
+        .package()
+        .apply_slide_media_lifecycle(&first_removal.patch().inverse())?;
+    assert_eq!(exact_bytes(restored_source.package())?, before);
+    Ok(())
+}
+
+#[test]
+fn remove_selected_comment_rejects_surviving_movie_payload_header_mismatch_atomically() -> TestResult
+{
+    let with_reply = with_native_reply_graph(NATIVE_COMMENT_BASELINE, false)?;
+    let root_identifier = native_comment_graph(&with_reply, NATIVE_COMMENT_MOVIE)?.root_identifier;
+    let attached = with_native_shared_movie_comment(&with_reply, NATIVE_MOVIE_B, root_identifier)?;
+    let source =
+        without_native_movie_comment_header_reference(&attached, NATIVE_MOVIE_B, root_identifier)?;
+    let movie = native_movie_archive(&source, NATIVE_MOVIE_B)?;
+    assert_eq!(
+        movie
+            .super_
+            .comment
+            .ok_or_else(|| io::Error::other("surviving movie comment payload is missing"))?
+            .identifier,
+        root_identifier
+    );
+    let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
         package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
-        Err(SlideMediaLifecycleError::UnsupportedComment)
+        Err(SlideMediaLifecycleError::InvalidSource)
+    ));
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn remove_selected_comment_rejects_surviving_movie_payload_missing_target_atomically() -> TestResult
+{
+    let source = with_native_shared_movie_comment(
+        NATIVE_COMMENT_BASELINE,
+        NATIVE_MOVIE_B,
+        SYNTHETIC_MISSING_MOVIE_COMMENT_ID,
+    )?;
+    let movie = native_movie_archive(&source, NATIVE_MOVIE_B)?;
+    assert_eq!(
+        movie
+            .super_
+            .comment
+            .ok_or_else(|| io::Error::other("surviving movie comment payload is missing"))?
+            .identifier,
+        SYNTHETIC_MISSING_MOVIE_COMMENT_ID
+    );
+    assert!(!native_object_exists(
+        &source,
+        SYNTHETIC_MISSING_MOVIE_COMMENT_ID
+    )?);
+    let (_, archive) = native_component_containing_object(&source, NATIVE_MOVIE_B)?;
+    let movie_object = archive
+        .object(NATIVE_MOVIE_B)
+        .ok_or_else(|| io::Error::other("missing surviving movie object"))?;
+    let message_index = movie_object
+        .messages
+        .iter()
+        .position(|message| message.type_ == NATIVE_MOVIE_MESSAGE_TYPE)
+        .ok_or_else(|| io::Error::other("surviving movie has no movie payload"))?;
+    assert!(
+        movie_object.archive_info.message_infos[message_index]
+            .object_references
+            .contains(&SYNTHETIC_MISSING_MOVIE_COMMENT_ID)
+    );
+    let package = Package::from_bytes(&source)?;
+    let before = exact_bytes(&package)?;
+    assert!(matches!(
+        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        Err(SlideMediaLifecycleError::InvalidSource)
+    ));
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn remove_selected_comment_rejects_unselected_reply_payload_header_mismatch_atomically()
+-> TestResult {
+    let with_reply = with_native_reply_graph(NATIVE_COMMENT_BASELINE, false)?;
+    let source = with_native_unselected_comment_reply_missing_header(&with_reply)?;
+    let hidden = native_comment_node(&source, SYNTHETIC_SURVIVING_COMMENT_ID)?;
+    assert_eq!(hidden.replies, vec![SYNTHETIC_REPLY_ID]);
+    let package = Package::from_bytes(&source)?;
+    let before = exact_bytes(&package)?;
+    assert!(matches!(
+        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        Err(SlideMediaLifecycleError::InvalidSource)
+    ));
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn remove_selected_comment_rejects_unselected_reply_payload_missing_target_atomically() -> TestResult
+{
+    let with_reply = with_native_reply_graph(NATIVE_COMMENT_BASELINE, false)?;
+    let source = with_native_unselected_comment_reply_missing_target(&with_reply)?;
+    let hidden = native_comment_node(&source, SYNTHETIC_SURVIVING_COMMENT_ID)?;
+    assert_eq!(hidden.replies, vec![SYNTHETIC_MISSING_REPLY_ID]);
+    assert!(!native_object_exists(&source, SYNTHETIC_MISSING_REPLY_ID)?);
+    let (_, archive) = native_component_containing_object(&source, SYNTHETIC_SURVIVING_COMMENT_ID)?;
+    let hidden_object = archive
+        .object(SYNTHETIC_SURVIVING_COMMENT_ID)
+        .ok_or_else(|| io::Error::other("missing surviving comment storage"))?;
+    let message_index = hidden_object
+        .messages
+        .iter()
+        .position(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+        .ok_or_else(|| io::Error::other("surviving comment has no storage payload"))?;
+    assert!(
+        hidden_object.archive_info.message_infos[message_index]
+            .object_references
+            .contains(&SYNTHETIC_MISSING_REPLY_ID)
+    );
+    let package = Package::from_bytes(&source)?;
+    let before = exact_bytes(&package)?;
+    assert!(matches!(
+        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -964,6 +1766,102 @@ fn native_saved_media_comment_candidate_has_strict_readback() -> TestResult {
         NATIVE_COMMENT_MOVIE,
         clone_movie,
     )?;
+    assert_eq!(exact_bytes(&package)?, bytes);
+    Ok(())
+}
+
+#[test]
+fn native_saved_media_comment_shared_removal_candidate_has_strict_readback() -> TestResult {
+    let Some(path) = env::var_os("LITCHI_KEYNOTE_MEDIA_COMMENT_NATIVE_SAVED_SHARED_REMOVAL_PATH")
+    else {
+        return Ok(());
+    };
+    let bytes = fs::read(path)?;
+    let package = Package::from_bytes(&bytes)?;
+    package.validate()?;
+    let media_ids = native_media_ids(&bytes)?;
+    assert_eq!(media_ids.len(), 4);
+    assert_eq!(
+        &media_ids[..3],
+        &[NATIVE_AUDIO_A, NATIVE_AUDIO_B, NATIVE_MOVIE_B]
+    );
+    let commented = native_commented_media_ids(&bytes)?;
+    assert_eq!(commented.len(), 1);
+    let clone_movie = commented[0];
+    assert_ne!(clone_movie, NATIVE_COMMENT_MOVIE);
+    assert_eq!(media_ids[3], clone_movie);
+    assert!(!native_object_exists(&bytes, NATIVE_COMMENT_MOVIE)?);
+    assert!(!native_object_exists(&bytes, NATIVE_COMMENT_ROOT)?);
+    assert_comment_graph_clone(
+        NATIVE_COMMENT_BASELINE,
+        &bytes,
+        NATIVE_COMMENT_MOVIE,
+        clone_movie,
+    )?;
+    assert!(native_object_exists(&bytes, NATIVE_COMMENT_AUTHOR)?);
+    assert!(native_object_exists(&bytes, NATIVE_COMMENT_AUTHOR_STORAGE)?);
+    assert_eq!(
+        native_annotation_author_ids(&bytes)?,
+        native_annotation_author_ids(NATIVE_COMMENT_BASELINE)?
+    );
+    assert_eq!(
+        native_annotation_author_storage_ids(&bytes)?,
+        native_annotation_author_storage_ids(NATIVE_COMMENT_BASELINE)?
+    );
+    let baseline_edges = native_external_edges(NATIVE_COMMENT_BASELINE)?;
+    let saved_edges = native_external_edges(&bytes)?;
+    assert_eq!(saved_edges.len(), 700);
+    assert!(saved_edges.contains(&native_comment_author_edge()));
+    assert_compact_edge_sets_equal(
+        &native_semantic_external_edges(&bytes)?,
+        &native_semantic_external_edges(NATIVE_COMMENT_BASELINE)?,
+        "native saved shared-removal semantic metadata",
+    );
+    assert_eq!(baseline_edges.len(), 700);
+    assert_eq!(exact_bytes(&package)?, bytes);
+    Ok(())
+}
+
+#[test]
+fn native_saved_media_comment_removal_candidate_has_strict_readback() -> TestResult {
+    let Some(path) = env::var_os("LITCHI_KEYNOTE_MEDIA_COMMENT_NATIVE_SAVED_REMOVAL_PATH") else {
+        return Ok(());
+    };
+    let bytes = fs::read(path)?;
+    let package = Package::from_bytes(&bytes)?;
+    package.validate()?;
+    assert_eq!(
+        native_media_ids(&bytes)?,
+        vec![NATIVE_AUDIO_A, NATIVE_AUDIO_B, NATIVE_MOVIE_B]
+    );
+    assert!(native_commented_media_ids(&bytes)?.is_empty());
+    assert!(!native_object_exists(&bytes, NATIVE_COMMENT_MOVIE)?);
+    assert!(!native_object_exists(&bytes, NATIVE_COMMENT_MOVIE_CLONE)?);
+    assert!(!native_object_exists(&bytes, NATIVE_COMMENT_ROOT)?);
+    assert!(!native_object_exists(&bytes, NATIVE_COMMENT_ROOT_CLONE)?);
+    assert!(native_object_exists(&bytes, NATIVE_COMMENT_AUTHOR)?);
+    assert!(native_object_exists(&bytes, NATIVE_COMMENT_AUTHOR_STORAGE)?);
+    assert_eq!(
+        native_annotation_author_ids(&bytes)?,
+        native_annotation_author_ids(NATIVE_COMMENT_BASELINE)?
+    );
+    assert_eq!(
+        native_annotation_author_storage_ids(&bytes)?,
+        native_annotation_author_storage_ids(NATIVE_COMMENT_BASELINE)?
+    );
+    let saved_edges = native_external_edges(&bytes)?;
+    assert_eq!(saved_edges.len(), 699);
+    assert!(!saved_edges.contains(&native_comment_author_edge()));
+    let baseline_semantic_edges = native_semantic_external_edges(NATIVE_COMMENT_BASELINE)?;
+    let mut expected_semantic_edges = baseline_semantic_edges.clone();
+    let author_semantic_edge = native_semantic_comment_author_edge(NATIVE_COMMENT_BASELINE)?;
+    assert!(expected_semantic_edges.remove(&author_semantic_edge));
+    let saved_semantic_edges = native_semantic_external_edges(&bytes)?;
+    assert_compact_edge_sets_equal(
+        &saved_semantic_edges,
+        &expected_semantic_edges,
+        "native saved final-removal semantic metadata",
+    );
     assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }

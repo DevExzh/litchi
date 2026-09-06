@@ -484,3 +484,82 @@ After verification, the owned temporary directory
 14,129 files and reclaimed 9.8 GiB; free disk space was approximately 62 GiB.
 The two checked-in native comment fixtures remain. Native reply authoring and
 selected commented-media removal remain outside this completed duplication slice.
+
+## Keynote selected commented-media removal follow-up (2026-09-07)
+
+This current-turn record is additive to the completed comment-duplication
+receipt. The focused owner implements selected commented movie/audio
+removal while preserving a shared comment root and reply closure through a
+global incoming-header census. Metadata author usage is limited to the source
+component: a global `authorStorage` reference does not count as usage of that
+source component.
+
+The native policy retains physical author and author-storage records. The
+owner removes only the exact strong current external edge, and only when the
+source component is its final owner. It reuses the neutral
+`ExternalReferenceRemoval` path and adds no protobuf encoding. This corrects
+the previous next-slice shorthand: required cleanup is the final
+source-component edge, not physical author or author-storage removal.
+
+Two permanent Keynote fixtures were authored with Cmd-S, actually closed to the
+theme chooser, reopened from their exact paths without alerts, and closed:
+
+| Fixture | Native result | SHA-256 |
+| --- | --- | --- |
+| `test-data/iwork/keynote/media-comments-shared-removal-native.key` | 2 movies, 2 audio, 1 comment; removed clone `2653814` from the previous duplicate | `3dea8fded4216538b398942516f8fb9316d10fe40e1a0e1be54e020c59394c11` |
+| `test-data/iwork/keynote/media-comments-final-removal-native.key` | 1 movie, 2 audio, 0 comments; removed original `2653286` | `c3c7c8952914263bb299df95f36a67be5fd46e7add6f37e90ab03e12810db5b7` |
+
+The neutral metadata slice has 45 passing cases. Host-retirement gates remain
+under review and the existing APIs are preserved. Final verification and
+cleanup status are recorded below; no current-turn cleanup receipt is claimed.
+
+### Current verification update (2026-09-07)
+
+The root lifecycle library now passes 36 cases; strict Keynote all-feature
+library Clippy, neutral metadata 45 cases, the existing focused lifecycle
+integration 27-case slice, the host 5-case slice, and the boundary guard 943
+case slice pass. The current comment-removal integration slice passes all 21
+cases, including both explicit native-saved focused readbacks and the corrected
+exact native-fixture oracle. The full current totals are 36 lifecycle-library,
+21 comment-integration, 27 lifecycle-integration, and 5 host cases, plus
+neutral metadata 45. Boundary scanning, normal hooks, and cleanup remain
+pending.
+
+Both focused native-saved candidates were Cmd-S saved, actually closed to the
+theme selector, reopened from their exact paths without alerts, and closed.
+Their byte transitions are:
+
+| Candidate | Native result | Before SHA-256 | After SHA-256 |
+| --- | --- | --- | --- |
+| Shared removal | 2 movies, 2 audio, 1 comment | `5bd6aa9ad0921339bc851dcab5ebc350ddf64df32de020d38928cb4c83b70a36` | `164cdf00d8b4d25e0ff8c927ece58da8b446ebe19e074825c598df637519b32d` |
+| Final removal | 1 movie, 2 audio, 0 comments | `0394b3a87c7cd957bae5795f6fbc6e970c303e6da4ad88b690242f7fbe5428ee` | `a7e5e735f94da1c2ba84320e9664e15ebe44067c1aab581c1553cbe8eb0f5c2f` |
+
+Both explicit native-saved strict readbacks pass. The native final-removal
+artifact rotates the unrelated locator `ViewState` to `ViewState-2654075`.
+The corrected oracle compares the exact raw delta after excluding that
+documented two-edge `ViewState` rotation and the author removal; no broad
+semantic normalization is permitted. Raw edge counts remain 700 → 700 → 699.
+The focused candidate comparison remains exact-raw-edge based.
+
+Known `Movie` and `CommentStorage` survivor payload/header validation rejects
+stale references before removal, preserves opaque survivor-root extensions, and
+keeps selected cloning strict. The real Keynote selected-Audio Comment toolbar
+was disabled and the authoring probe closed unchanged, so there is no native
+commented-audio E4 claim. Host retirement remains gated by caption/title/
+stand-in comment graphs, native audio coverage, unknown outer-reference
+completeness, and identifier-watermark compatibility; the host APIs remain
+retained and full host retirement is not claimed.
+
+The two environment-path strict readbacks and corrected oracle are complete.
+The boundary scanner, normal hooks, and cleanup remain pending. The current
+disposable target is approximately 1 GiB with about 61 GiB free, and the owned
+temporary payload at `/private/tmp/litchi-media-comment-removal-20260907u`
+remains pending removal. The previous full clean belongs to the preceding turn.
+
+Final source-target validation also resolves known survivor comment roots and
+replies to same-component type-3056 objects, and authors to type-212 objects.
+Missing or wrongly typed targets are rejected atomically even when payload and
+header IDs agree. The full Keynote library passes 265 tests (including 36
+lifecycle cases), alongside 21 comment and 27 lifecycle integration tests.
+Both explicit native-saved readbacks pass after this hardening, and regenerated
+shared/final candidates retain the before-save hashes recorded above.
