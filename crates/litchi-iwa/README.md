@@ -1290,13 +1290,18 @@ surfaces.
 
 The focused `litchi-numbers` Custom owner handles one existing rooted cell's
 document-scoped Number, Text, or Date & Time custom format through selector-first
-`Package` transactions. Native IDs, registry UUIDs, format-list keys, archive
-members, and wire payloads remain private. Its current evidence is limited to
-deterministic source-built exact-source fixtures and strict codec/package tests;
-there is no Apple-authored fixture, native Numbers acceptance/resave evidence,
-or E2/E3/E4 claim. The generic and source-built Custom compatibility routes
-remain host-owned, and a focused-owner refusal is terminal rather than a
-fallback trigger.
+`Package` transactions. Its admitted registry routes are
+`TN.DocumentArchive` field 9/message type 222 and `TN.super` field 8 →
+`TSA.custom_format_list` field 12. Native IDs, registry UUIDs, format-list
+keys, archive members, and wire payloads remain private. Deterministic
+source-built exact-source fixtures and strict codec/package tests are joined by
+operation-specific Numbers 14.4 replacement/clear evidence; focused validation
+passes 37 integration tests and boundary verification passes 927 policy tests.
+The three dedicated raw-ID `NumbersEditor` Custom conveniences are retired.
+Generic source-built/cross-format `DataFormat::Custom` compatibility and
+private attached Pages/Keynote table adapters remain host-owned, and a
+focused-owner refusal is terminal rather than a fallback trigger. The native
+resaved artifacts are recorded in the [fixture README](../../test-data/iwork/README.md#numbers-custom-format-raw-id-retirement-2026-09-06).
 
 ```rust,no_run
 use litchi_numbers::{Package, SheetSelector, TableSelector};

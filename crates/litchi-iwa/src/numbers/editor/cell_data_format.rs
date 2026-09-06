@@ -2145,16 +2145,16 @@ mod tests {
         )
         .unwrap();
         editor
-            .set_table_cell_custom_format(table_id, 1, 1, number.clone())
+            .set_table_cell_data_format(table_id, 1, 1, number.clone().into())
             .unwrap();
         editor
-            .set_table_cell_custom_format(table_id, 1, 2, number.clone())
+            .set_table_cell_data_format(table_id, 1, 2, number.clone().into())
             .unwrap();
         editor
-            .set_table_cell_custom_format(table_id, 2, 1, date_time.clone())
+            .set_table_cell_data_format(table_id, 2, 1, date_time.clone().into())
             .unwrap();
         editor
-            .set_table_cell_custom_format(table_id, 2, 2, text.clone())
+            .set_table_cell_data_format(table_id, 2, 2, text.clone().into())
             .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
@@ -2173,24 +2173,22 @@ mod tests {
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened.table_cell_custom_format(table_id, 1, 1).unwrap(),
-            Some(number)
+            reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
+            number.clone().into()
         );
         assert_eq!(
-            reopened.table_cell_custom_format(table_id, 2, 1).unwrap(),
-            Some(date_time)
+            reopened.table_cell_data_format(table_id, 2, 1).unwrap(),
+            date_time.clone().into()
         );
         assert_eq!(
-            reopened.table_cell_custom_format(table_id, 2, 2).unwrap(),
-            Some(text)
+            reopened.table_cell_data_format(table_id, 2, 2).unwrap(),
+            text.clone().into()
         );
 
         for (row, column) in [(1, 1), (1, 2), (2, 1), (2, 2)] {
-            assert!(
-                reopened
-                    .reset_table_cell_custom_format(table_id, row, column)
-                    .unwrap()
-            );
+            reopened
+                .set_table_cell_data_format(table_id, row, column, DataFormat::Automatic)
+                .unwrap();
         }
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 1).unwrap();
         assert!(
