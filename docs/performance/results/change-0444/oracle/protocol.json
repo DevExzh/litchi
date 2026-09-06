@@ -1,0 +1,42 @@
+{
+  "change": 444,
+  "fixtures": {
+    "large-output.zip": {
+      "bytes": 2916848,
+      "sha256": "fdb0bcc41ff1e890c8559f767a0d2629da62f9c94814d08ffdb8d5dffb494b57"
+    },
+    "large-source.zip": {
+      "bytes": 2851063,
+      "sha256": "6cf70a6d836d2eddf9b50f954347cc7c0c86be166fbbe86553b739dcc891b7cb"
+    },
+    "large.json": {
+      "bytes": 1942,
+      "sha256": "b66e73f5502d5427b2ee0a558afb9d05da46f2efe0770554d350af382c86922c"
+    },
+    "medium-output.zip": {
+      "bytes": 779088,
+      "sha256": "72a40b5d494d0664df10ddba567ddbd0856d971f0384537d592ebd8d48f8e2e4"
+    },
+    "medium-source.zip": {
+      "bytes": 713311,
+      "sha256": "eba4eb84cc47280d4de3ff8a09a157923962fdc5af770b99cbd996905dbc4079"
+    },
+    "medium.json": {
+      "bytes": 1941,
+      "sha256": "962e3f01d134698ea78545a854bad56a6d848a1c9805b926ebdd5236dc954a9f"
+    },
+    "tiny-output.zip": {
+      "bytes": 111002,
+      "sha256": "f04c7e312624e39aa915f1fbf5b76563318a3d86cff5764e34acc49c9babf2fe"
+    },
+    "tiny-source.zip": {
+      "bytes": 45234,
+      "sha256": "2f8596a10ff5634850c7ecfd07571177f115438bab08918dc9392b4a31d5a165"
+    },
+    "tiny.json": {
+      "bytes": 1930,
+      "sha256": "e1f86a1879f6b4fcbc7a0ed4bc7d2b701fdabc96364695a9bfa1df6bc19b872b"
+    }
+  },
+  "scope": "independent archive/payload/XML/raw-record verification; producer typed refusal gates separately tested in Rust"
+}

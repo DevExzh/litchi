@@ -1,0 +1,173 @@
+{
+  "schema": "litchi-0444-opc-part-add-baseline-v1",
+  "change": 444,
+  "status": "frozen",
+  "frozen_utc": "2026-09-06T18:32:08.027632+00:00",
+  "purpose": "single current-revision OPC Part-addition baseline; no before/after claim",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "repeats": 2,
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "shapes": {
+    "tiny": 64,
+    "medium": 1024,
+    "large": 4096
+  },
+  "roles": {
+    "after": {
+      "build_directory": "after",
+      "build_receipt": "checks/after-build.json",
+      "selector": "opc_part_add_lifecycle",
+      "source_field": "opc_part_add",
+      "oracle_role": "after"
+    }
+  },
+  "order": [
+    {
+      "phase": "R1",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R2",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R2"
+    }
+  ],
+  "matrix": {
+    "reports": 12,
+    "retained_samples": 360,
+    "reports_per_phase": 6,
+    "samples_per_report": 30
+  },
+  "timing_scope": {
+    "inside": [
+      "source-backed catalog opening",
+      "one Part and root relationship plan construction",
+      "consuming sequential publication including catalog drop"
+    ],
+    "outside": [
+      "source wrapper and prepared input/payload",
+      "sink setup",
+      "digest finalization, source snapshots, full artifact oracles and report assembly"
+    ],
+    "data_path_sha256": "63642c98756851a9b090a0081ac239a292507006b4f173e8fd696229ee21da5e"
+  },
+  "profiles": {
+    "shape": "large",
+    "mode": "normal",
+    "kinds": [
+      "stat",
+      "record"
+    ],
+    "events": [
+      "cycles:u",
+      "instructions:u",
+      "branches:u",
+      "branch-misses:u",
+      "L1-dcache-load-misses:u"
+    ],
+    "record_frequency_hz": 999,
+    "call_graph": "fp,127",
+    "scope": "whole fresh process including fixtures, untimed gates, warmups, timed samples and report hashing; Python oracle afterward"
+  },
+  "oracle": {
+    "verifier_path": "oracle/verify-report.py",
+    "verifier_sha256": "6023a3a328f9466a902291c25ac06fe533d6e6452d7a333636490fffa7442586",
+    "fixtures_verifier_sha256": "9848d4c0217d6ac56917fe72c2ff8961be6e29faf48384c041f30ddca4ae875b",
+    "protocol_path": "oracle/protocol.json",
+    "protocol_sha256": "5bfe91170260a8d015c5b9e758aaef61878b1f89b2e7fbcb829ee668e1ebfd38",
+    "role_map": {
+      "after": "after"
+    },
+    "contract": "actual ZIP fixture identities, independent payload/XML/raw-record verification, report/catalog hashes, source/sink alignment and allocation balance; producer refusal gates are separate Rust checks"
+  },
+  "analysis": {
+    "p50": "arithmetic midpoint of central observations",
+    "p95_p99": "nearest rank",
+    "bootstrap_95": "2000 deterministic resamples per report",
+    "bootstrap_seed": 4440301,
+    "repeat_review_trigger_percent": 5,
+    "scope": "descriptive baseline; allocator elapsed time is not a latency claim"
+  },
+  "claims": {
+    "allowed": [
+      "baseline observations for this named synthetic OPC case"
+    ],
+    "withheld": [
+      "speedup or before/after regression",
+      "native Office owner creation",
+      "cold/range or scaling",
+      "bounded total memory",
+      "causal attribution from whole-process profiles"
+    ]
+  },
+  "freeze_scope": "implementation and fixture validation preceded this freeze; all retained capture and profile runs must follow it"
+}

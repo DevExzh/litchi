@@ -1,0 +1,55 @@
+{
+  "ambient_source_manifest": {
+    "files": 6661,
+    "path": "sources/7c1377a9b227f922ac1c95c5d66f228f3956259ef4a74ae1f346c88e60b7090d.json",
+    "sha256": "7c1377a9b227f922ac1c95c5d66f228f3956259ef4a74ae1f346c88e60b7090d"
+  },
+  "attempt": "formal",
+  "change": 444,
+  "completed_lanes": 6,
+  "driver_sha256": "35a324cfe7f778dbd092cd510ba5e8cb2af5f14c74b76d48aabf4355dd15530c",
+  "expected_lanes": 6,
+  "finished_utc": "2026-09-06T18:32:19.348795+00:00",
+  "index": [
+    "runs/R1/formal/R1-normal-tiny-r1-receipt.json",
+    "runs/R1/formal/R1-normal-medium-r1-receipt.json",
+    "runs/R1/formal/R1-normal-large-r1-receipt.json",
+    "runs/R1/formal/R1-allocator-tiny-r1-receipt.json",
+    "runs/R1/formal/R1-allocator-medium-r1-receipt.json",
+    "runs/R1/formal/R1-allocator-large-r1-receipt.json"
+  ],
+  "phase": "R1",
+  "protocol_sha256": "a93aed6929b709ed2a5c715ef50d9b057baacb1c6edea9bc2e16f743b7cc9eff",
+  "role": "after",
+  "schema": "litchi-0444-capture-state-v1",
+  "source_after": {
+    "files": 6661,
+    "path": "sources/7c1377a9b227f922ac1c95c5d66f228f3956259ef4a74ae1f346c88e60b7090d.json",
+    "sha256": "7c1377a9b227f922ac1c95c5d66f228f3956259ef4a74ae1f346c88e60b7090d"
+  },
+  "source_before": {
+    "files": 6661,
+    "path": "sources/7c1377a9b227f922ac1c95c5d66f228f3956259ef4a74ae1f346c88e60b7090d.json",
+    "sha256": "7c1377a9b227f922ac1c95c5d66f228f3956259ef4a74ae1f346c88e60b7090d"
+  },
+  "source_manifest": {
+    "files": 6661,
+    "path": "sources/7c1377a9b227f922ac1c95c5d66f228f3956259ef4a74ae1f346c88e60b7090d.json",
+    "sha256": "7c1377a9b227f922ac1c95c5d66f228f3956259ef4a74ae1f346c88e60b7090d"
+  },
+  "status": "pass",
+  "status_after": [
+    " M tools/perf-baseline/src/lib.rs",
+    " M tools/perf-baseline/src/operation_metrics.rs",
+    "?? docs/GOAL.md",
+    "?? tools/perf-baseline/examples/opc_part_add_fixtures.rs",
+    "?? tools/perf-baseline/src/opc_part_add.rs"
+  ],
+  "status_before": [
+    " M tools/perf-baseline/src/lib.rs",
+    " M tools/perf-baseline/src/operation_metrics.rs",
+    "?? docs/GOAL.md",
+    "?? tools/perf-baseline/examples/opc_part_add_fixtures.rs",
+    "?? tools/perf-baseline/src/opc_part_add.rs"
+  ]
+}

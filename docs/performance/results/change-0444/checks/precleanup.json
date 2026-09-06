@@ -1,0 +1,18 @@
+{
+  "change": 444,
+  "status": "pass",
+  "exit_code": 0,
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "docs/performance/results/change-0444/verify.py",
+    "--sealed"
+  ],
+  "started_utc": "2026-09-06T18:40:44.790212+00:00",
+  "finished_utc": "2026-09-06T18:40:49.644459+00:00",
+  "stdout": "{\"status\": \"pass\", \"reports\": 12, \"samples\": 360, \"profiles\": 2, \"sealed\": true, \"cleanup\": false}\n",
+  "stderr": "",
+  "verifier_sha256": "4b886f1ea1fb8170aac8987da2b378133c7c386247e555b2095469147c6cc784",
+  "protocol_sha256": "a93aed6929b709ed2a5c715ef50d9b057baacb1c6edea9bc2e16f743b7cc9eff",
+  "scope": "receipt published only after verifier terminates; original binaries not invoked"
+}

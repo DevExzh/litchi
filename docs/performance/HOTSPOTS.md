@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## Change 0444: Part-addition observer cost precedes production attribution
+
+[0444](changes/0444-opc-part-add-baseline.md) establishes a low-level OPC one-Part/root-relationship addition
+baseline. Large normal p50 is about 61.7–61.9 ms, but the instrumented source
+reader accounts for 55.24% of whole-process sampled self time. Code inspection
+shows a full ordinary-range scan on each read, so observer cost grows with both
+member count and read count. SHA-256 follows at 9.79%. Profiles include untimed
+fixture/gate/report work and addr2line limitations. The zero L1 event on this
+guest supports no cache-miss claim.
+
+The highest-priority follow-up for this slice is a matched plain-source lifecycle
+with identical output and gates, followed by operation-specific attribution.
+Do not treat the observed growth as evidence that production topology is
+quadratic. No production optimization or Amdahl speedup is accepted in this
+batch. The 372 harness/458 OPC tests and 29 independent corruption probes pass;
+strict harness lint retains only inherited debt.
+
 ## Change 0443: compact preservation-scanner frames
 
 [0443](changes/0443-odp-compact-fragment-frames.md) eliminates temporary namespace/local-name copies

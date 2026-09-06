@@ -1,6 +1,22 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0443
+## Current evidence through 0444
+
+[0444](changes/0444-opc-part-add-baseline.md) adds a low-level source-backed OPC Part-addition baseline:
+12 reports/360 samples, three sizes, normal and allocator repeats, actual
+independently verified ZIP fixtures, 29 corruption probes, and complete source
+and sink observations. The 372 harness and 458 OPC tests pass; strict harness
+Clippy retains inherited debt with zero new diagnostics. No production code
+changes or comparative performance claim are made.
+
+The observed source reader accounts for 55.24% of whole-process sampled self
+time and scans all ordinary ranges per read. A matched plain-source baseline
+must precede production attribution for this path. This partially fills package
+Part-addition evidence only: semantic owner creation, broader dependency closures,
+repackaging, bounded existing append, native breadth, cold/range and scaling
+remain open. The user-owned non-iWork goal remains active and uncompleted.
+
+## Earlier evidence through 0443
 
 [0443](changes/0443-odp-compact-fragment-frames.md) replaces copied namespace/local-name frame data
 in ODP source-fragment scanning with exact element kinds. The 720-sample matrix

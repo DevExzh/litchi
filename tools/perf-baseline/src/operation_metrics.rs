@@ -869,7 +869,32 @@ pub(crate) fn from_in_process_materialization_observations(
         status: MetricStatus::Measured,
         opc_parts: MetricVector::measured(ordered_parts, MATERIALIZATION_SCOPE),
     };
-    let ordered_sources = order
+    attach_in_process_sources(&mut metrics, source_observations)?;
+
+    Ok(metrics)
+}
+
+/// Build a timed sink envelope with actual logical ReadAt counters, without
+/// inventing payload-materialization, requested-length or codec byte counts.
+pub(crate) fn from_in_process_source_and_sink_observations(
+    observations: &[InProcessObservation],
+    source_observations: &[InProcessSourceObservation],
+    sink: SinkObservation,
+) -> Result<OperationMetrics, Box<dyn Error>> {
+    let mut metrics = from_in_process_observations(observations, sink)?;
+    attach_in_process_sources(&mut metrics, source_observations)?;
+    Ok(metrics)
+}
+
+fn attach_in_process_sources(
+    metrics: &mut OperationMetrics,
+    source_observations: &[InProcessSourceObservation],
+) -> Result<(), Box<dyn Error>> {
+    if metrics.sample_count != source_observations.len() {
+        return Err("in-process source counts do not match observations".into());
+    }
+    let ordered_sources = metrics
+        .sample_indices
         .iter()
         .map(|&index| source_observations[index])
         .collect::<Vec<_>>();
@@ -897,7 +922,7 @@ pub(crate) fn from_in_process_materialization_observations(
         recompressed_bytes: unavailable_source(SOURCE_RECOMPRESSED_SCOPE),
         max_concurrent_reads: measured_source(|observation| observation.max_concurrent_reads),
     };
-    Ok(metrics)
+    Ok(())
 }
 
 /// Builds an in-process operation envelope for a read/materialization
@@ -2216,6 +2241,62 @@ mod opc_zip_tests {
             from_sink_observation(2, observation)
                 .unwrap()
                 .set_opc_zip(&[10], &reports)
+                .is_err()
+        );
+    }
+}
+
+#[cfg(test)]
+mod source_and_sink_tests {
+    use super::{InProcessObservation, InProcessSourceObservation, MetricStatus};
+
+    #[test]
+    fn source_and_sink_observations_align_ties_without_inventing_codec_counters() {
+        let observations = [20, 10, 10].map(|elapsed_ns| InProcessObservation {
+            elapsed_ns,
+            process_metrics: None,
+            allocation_metrics: None,
+        });
+        let sources = [5, 7, 9].map(|value| InProcessSourceObservation {
+            read_calls: value,
+            read_bytes: value * 100,
+            max_concurrent_reads: 1,
+        });
+        let sink = super::SinkObservation {
+            accepted_bytes: 3,
+            write_calls: 1,
+            largest_write: 3,
+            bytes_0: 0,
+            bytes_1_to_512: 1,
+            bytes_513_to_4096: 0,
+            bytes_4097_to_16384: 0,
+            bytes_16385_to_65536: 0,
+            bytes_over_65536: 0,
+        };
+        let metrics =
+            super::from_in_process_source_and_sink_observations(&observations, &sources, sink)
+                .unwrap();
+        assert_eq!(metrics.sample_indices, vec![1, 2, 0]);
+        assert_eq!(
+            metrics.source.logical_read_calls.values,
+            Some(vec![7, 9, 5])
+        );
+        assert_eq!(
+            metrics.source.logical_read_returned_bytes.values,
+            Some(vec![700, 900, 500])
+        );
+        assert_eq!(
+            metrics.source.logical_read_requested_bytes.status,
+            MetricStatus::Unavailable
+        );
+        assert_eq!(
+            metrics.source.decompressed_bytes.status,
+            MetricStatus::Unavailable
+        );
+        assert_eq!(metrics.materialization.status, MetricStatus::NotApplicable);
+        assert_eq!(metrics.sink.accepted_bytes.values, Some(vec![3, 3, 3]));
+        assert!(
+            super::from_in_process_source_and_sink_observations(&observations, &sources[..2], sink)
                 .is_err()
         );
     }

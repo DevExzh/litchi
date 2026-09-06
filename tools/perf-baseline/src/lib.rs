@@ -16,6 +16,7 @@ mod odp_buffered_create;
 mod odp_existing_append;
 mod odp_streaming_create;
 mod odt_streaming_create;
+mod opc_part_add;
 mod operation_metrics;
 mod parallel_metrics;
 pub mod pptx_cache_retention;
@@ -1089,6 +1090,7 @@ enum Case {
     OpcSourceCacheBudgetBoundary,
     OpcSourceCacheControlContention,
     OpcSourceCacheManagedContention,
+    OpcPartAddLifecycle,
     OpcSourceOverlayOnePartSave,
     OpcSourceOverlayMultiPartChanged,
     OpcSourceOverlayMultiPartNoop,
@@ -1569,6 +1571,7 @@ impl Case {
             Self::OpcSourceCacheBudgetBoundary => "opc_source_cache_budget_boundary",
             Self::OpcSourceCacheControlContention => "opc_source_cache_control_contention",
             Self::OpcSourceCacheManagedContention => "opc_source_cache_managed_contention",
+            Self::OpcPartAddLifecycle => "opc_part_add_lifecycle",
             Self::OpcSourceOverlayOnePartSave => "opc_source_overlay_one_part_save",
             Self::OpcSourceOverlayMultiPartChanged => "opc_source_overlay_multi_part_changed",
             Self::OpcSourceOverlayMultiPartNoop => "opc_source_overlay_multi_part_noop",
@@ -2669,6 +2672,10 @@ impl Case {
 
     const fn uses_odp_streaming_creation(self) -> bool {
         matches!(self, Self::OdpStreamingCreate)
+    }
+
+    const fn uses_opc_part_add(self) -> bool {
+        matches!(self, Self::OpcPartAddLifecycle)
     }
 
     const fn uses_odp_existing_append(self) -> bool {
@@ -4369,6 +4376,8 @@ struct SourceSummary {
     odp_slides: Option<odp_buffered_create::OdpSlidesSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_append: Option<odp_existing_append::OdpExistingAppendSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    opc_part_add: Option<opc_part_add::Summary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ppt_pictures: Option<PptPicturesSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -8769,6 +8778,16 @@ fn xls_writer_semantic_dispatch_selected(case: Case, selected_cases: &[Case]) ->
             }))
 }
 
+/// Export source/output OPC Part-addition fixtures to a new caller-selected directory.
+///
+/// This is a standalone benchmark helper, not a production library API.
+///
+/// # Errors
+/// Returns fixture validation or filesystem errors; an existing directory is refused.
+pub fn write_opc_part_add_fixtures(directory: &std::path::Path) -> Result<(), Box<dyn Error>> {
+    opc_part_add::export(directory)
+}
+
 pub fn run() -> Result<(), Box<dyn Error>> {
     if filesystem::run_child_if_requested()? {
         return Ok(());
@@ -8957,6 +8976,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_odp_buffered_creation()
                     && !case.uses_odp_streaming_creation()
                     && !case.uses_odp_existing_append()
+                    && !case.uses_opc_part_add()
                     && !case.uses_ods_buffered_creation()
                     && !case.uses_ods_streaming_creation()
                     && !case.uses_semantic_rtf()
@@ -10557,6 +10577,17 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options.cases.iter().any(|case| case.uses_opc_part_add()) {
+        for shape in &options.semantic_shapes {
+            let fixture = opc_part_add::build(*shape)?;
+            results.push(opc_part_add::run(
+                &fixture,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
     if options
         .cases
         .iter()
@@ -11259,6 +11290,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_source_cache_budget_boundary" => Some(Case::OpcSourceCacheBudgetBoundary),
         "opc_source_cache_control_contention" => Some(Case::OpcSourceCacheControlContention),
         "opc_source_cache_managed_contention" => Some(Case::OpcSourceCacheManagedContention),
+        "opc_part_add_lifecycle" => Some(Case::OpcPartAddLifecycle),
         "opc_source_overlay_one_part_save" => Some(Case::OpcSourceOverlayOnePartSave),
         "opc_source_overlay_multi_part_changed" => Some(Case::OpcSourceOverlayMultiPartChanged),
         "opc_source_overlay_multi_part_noop" => Some(Case::OpcSourceOverlayMultiPartNoop),
@@ -11924,7 +11956,7 @@ fn usage_text() -> String {
                                        opc_source_cache_budget_boundary,\n\
                                        opc_source_cache_control_contention,\n\
                                        opc_source_cache_managed_contention,\n\
-                                       opc_source_overlay_one_part_save,\n\
+                                       opc_part_add_lifecycle, opc_source_overlay_one_part_save,\n\
                                        opc_source_overlay_multi_part_changed,\n\
                                        opc_source_overlay_multi_part_noop,\n\
                                        opc_source_overlay_multi_part_mixed,\n\
@@ -22604,6 +22636,9 @@ fn run_case_with_config(
         | Case::OpcSourceCacheControlContention
         | Case::OpcSourceCacheManagedContention => {
             Err("OPC source-cache evidence uses its fixed matrix runner".into())
+        },
+        Case::OpcPartAddLifecycle => {
+            Err("OPC Part addition uses its dedicated corpus runner".into())
         },
         Case::OpcSourceOverlayOnePartSave => {
             run_opc_source_overlay_one_part_save(corpus, warmup_iterations, samples)
@@ -58643,7 +58678,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 436);
+        assert_eq!(selectable_count, 437);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 

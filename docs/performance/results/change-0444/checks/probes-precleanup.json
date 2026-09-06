@@ -1,0 +1,47 @@
+{
+  "change": 444,
+  "status": "pass",
+  "stage": "precleanup",
+  "exported_bundle_verification": {
+    "exit_code": 0,
+    "stdout": "{\"status\": \"pass\", \"reports\": 12, \"samples\": 360, \"profiles\": 2, \"sealed\": true, \"cleanup\": false}\n",
+    "stderr": ""
+  },
+  "rejected": [
+    {
+      "mutation": 0,
+      "path": "protocol.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: protocol dimensions\n"
+    },
+    {
+      "mutation": 1,
+      "path": "after/build.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: binary copies\n"
+    },
+    {
+      "mutation": 2,
+      "path": "runs/R1/formal/R1-normal-tiny-r1-receipt.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: receipt source\n"
+    },
+    {
+      "mutation": 3,
+      "path": "runs/R1/formal/R1-normal-tiny-r1-receipt.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: capture argv\n"
+    },
+    {
+      "mutation": "extra-seal-member",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: sealed inventory coverage\n"
+    }
+  ],
+  "scope": "portable verification runs no Git, original binaries, workload or profiler; scratch copy removed before receipt publication"
+}
