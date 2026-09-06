@@ -771,10 +771,7 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                 let _ = element;
             },
             Event::Eof => break,
-            Event::Comment(_)
-            | Event::Decl(_)
-            | Event::PI(_)
-            | Event::DocType(_) => {},
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
         }
         buffer.clear();
     }
@@ -1190,10 +1187,7 @@ impl WorksheetHandler {
                 let _ = element;
             },
             Event::Eof => {},
-            Event::Comment(_)
-            | Event::Decl(_)
-            | Event::PI(_)
-            | Event::DocType(_) => {},
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
         }
         Ok(())
     }
