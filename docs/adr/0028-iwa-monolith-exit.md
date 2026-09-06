@@ -8997,7 +8997,7 @@ Pages retaining its literal trailing tab.
 
 The copied native resaved fixtures are:
 
-- [`image-adjustments-retirement-resaved.numbers`](../../test-data/iwork/numbers/image-adjustments-retirement-resaved.numbers) — SHA-256 `4da809196887120afe3e12cddc65234c76f1a7098bda9bc284a91dde8489d1ef`.
+- [`image-adjustments-retirement-resaved.numbers`](../../test-data/iwork/numbers/image-adjustments-retirement-resaved.numbers) — SHA-256 `4be76e8e71c8ac461c7c289f42f526f1fe0df73e96a54e49168c7156681f61c9`.
 - [`image-adjustments-retirement-resaved.pages`](../../test-data/iwork/pages/image-adjustments-retirement-resaved.pages) — SHA-256 `b3f6a7f281433732f7f9ec490d3d4bc684038d74235b203f2ae20d5f3b21b7bd`.
 - [`image-adjustments-retirement-resaved.key`](../../test-data/iwork/keynote/image-adjustments-retirement-resaved.key) — SHA-256 `254ea31b758362dd292dcb79e659879f8ac2c2cab38e2a0b2e5090ce243da877`.
 
