@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0447: requested transfer pacing in a range-source lifecycle
+
+[0447](changes/0447-pptx-range-transfer-pacing.md) adds optional per-read transfer-rate pacing to standalone PPTX provider
+journals. Eight matched reports/240 samples use plain/media-rich inputs, 64 KiB
+ranges, 200 us fixed delay and optional 25 MiB/s requested pacing. Media-rich API
+p50 is 539–550 ms unpaced and 2,601–2,613 ms paced; requested transfer sleep totals
+1,923.768 ms. Underlying read work/output identity match every sample. Twelve
+repeat tail flags remain, with no p50/RSS repeat crossing 5%. These are simulation
+costs, not production regressions or achieved network bandwidth. See
+[measurements](results/change-0447/measurements.md). Operation allocation remains
+unavailable; whole-process RSS and managed boundary gauges are separate.
+
 ## Change 0446: fewer content-type Part-name allocations
 
 [0446](changes/0446-opc-owned-content-type-name.md) transfers an owned Part-name String into PackURI instead of cloning it.

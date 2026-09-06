@@ -1,0 +1,7 @@
+{
+  "change": 447,
+  "status": "failed",
+  "finished_utc": "2026-09-06T20:35:43.053119+00:00",
+  "error": "exported verifier failed with IndexError(3)",
+  "scope": "Verifier imported the capture command helper whose module assumes repository-relative parents. Replaced that import with independent explicit argv reconstruction. Frozen capture driver and all raw evidence unchanged; failed scratch export removed by TemporaryDirectory."
+}

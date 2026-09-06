@@ -8,6 +8,7 @@
 
 use std::{
     fmt, io,
+    num::NonZeroU64,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -48,6 +49,10 @@ pub struct PptxRangeSourceConfig {
     /// Fixed delay applied once per nonempty delegated range call.  Empty
     /// caller buffers and zero-byte capped calls do not sleep.
     pub fixed_delay: Option<Duration>,
+    /// Optional transfer rate per successful read, in bytes per second.
+    /// Pacing requests ceil(returned bytes / rate) of sleep after delegation.
+    /// OS oversleep is not measured bandwidth; concurrent reads do not share a cap.
+    pub transfer_bytes_per_second: Option<NonZeroU64>,
 }
 
 impl PptxRangeSourceConfig {
@@ -57,6 +62,7 @@ impl PptxRangeSourceConfig {
         Self {
             max_returned_bytes,
             fixed_delay,
+            transfer_bytes_per_second: None,
         }
     }
 }
@@ -85,6 +91,10 @@ pub struct PptxRangeSourceSnapshot {
     /// Number of nonempty delegated calls for which the configured delay was
     /// recorded.  A zero-duration configured delay is still recorded.
     pub delayed_calls: u64,
+    /// Successful nonempty reads with configured transfer pacing.
+    pub transfer_paced_calls: u64,
+    /// Sum of requested transfer sleep nanoseconds, excluding fixed delay and OS oversleep.
+    pub transfer_delay_ns: u64,
     /// Number of nonempty caller requests in each fixed request-size bucket.
     pub request_size_counts: [u64; PPTX_RANGE_REQUEST_SIZE_BUCKETS],
 }
@@ -137,6 +147,16 @@ impl PptxRangeSourceSnapshot {
                 before.delayed_calls,
                 "delayed range calls",
             )?,
+            transfer_paced_calls: checked_difference(
+                self.transfer_paced_calls,
+                before.transfer_paced_calls,
+                "transfer paced calls",
+            )?,
+            transfer_delay_ns: checked_difference(
+                self.transfer_delay_ns,
+                before.transfer_delay_ns,
+                "requested transfer delay",
+            )?,
             request_size_counts,
         })
     }
@@ -177,6 +197,10 @@ pub struct PptxRangeSourceDelta {
     pub short_reads: u64,
     /// Recorded delayed calls in the interval.
     pub delayed_calls: u64,
+    /// Successful nonempty reads with configured transfer pacing.
+    pub transfer_paced_calls: u64,
+    /// Sum of requested transfer sleep nanoseconds, excluding fixed delay and OS oversleep.
+    pub transfer_delay_ns: u64,
     /// Checked request-size histogram counters for the interval.  Snapshot
     /// fields are cumulative; each bucket here is the checked after-minus-
     /// before count.
@@ -215,6 +239,8 @@ pub struct PptxRangeSource {
     max_request_bytes: AtomicU64,
     short_reads: AtomicU64,
     delayed_calls: AtomicU64,
+    transfer_paced_calls: AtomicU64,
+    transfer_delay_ns: AtomicU64,
     request_size_counts: [AtomicU64; PPTX_RANGE_REQUEST_SIZE_BUCKETS],
     metrics_failed: AtomicBool,
 }
@@ -246,6 +272,8 @@ impl PptxRangeSource {
             max_request_bytes: AtomicU64::new(0),
             short_reads: AtomicU64::new(0),
             delayed_calls: AtomicU64::new(0),
+            transfer_paced_calls: AtomicU64::new(0),
+            transfer_delay_ns: AtomicU64::new(0),
             request_size_counts: std::array::from_fn(|_| AtomicU64::new(0)),
             metrics_failed: AtomicBool::new(false),
         }
@@ -313,6 +341,8 @@ impl PptxRangeSource {
                 .then(|| self.max_request_bytes.load(Ordering::Acquire)),
             short_reads: self.short_reads.load(Ordering::Acquire),
             delayed_calls: self.delayed_calls.load(Ordering::Acquire),
+            transfer_paced_calls: self.transfer_paced_calls.load(Ordering::Acquire),
+            transfer_delay_ns: self.transfer_delay_ns.load(Ordering::Acquire),
             request_size_counts: std::array::from_fn(|index| {
                 self.request_size_counts[index].load(Ordering::Acquire)
             }),
@@ -421,6 +451,15 @@ impl ReadAt for PptxRangeSource {
         }
         let returned_u64 = u64::try_from(returned)
             .map_err(|error| self.fail_metrics(io::Error::other(error.to_string())))?;
+        if returned_u64 != 0
+            && let Some(rate) = self.config.transfer_bytes_per_second
+        {
+            let nanos =
+                transfer_delay_ns(returned_u64, rate).map_err(|error| self.fail_metrics(error))?;
+            self.checked_add(&self.transfer_paced_calls, 1, "transfer paced calls")?;
+            self.checked_add(&self.transfer_delay_ns, nanos, "requested transfer delay")?;
+            thread::sleep(Duration::from_nanos(nanos));
+        }
         self.checked_add(&self.returned_bytes, returned_u64, "returned range bytes")?;
         if returned < output.len() {
             self.checked_add(&self.short_reads, 1, "short range reads")?;
@@ -431,6 +470,16 @@ impl ReadAt for PptxRangeSource {
     fn version(&self) -> io::Result<SourceVersion> {
         self.inner.version()
     }
+}
+
+fn transfer_delay_ns(bytes: u64, rate: NonZeroU64) -> io::Result<u64> {
+    let nanos = (u128::from(bytes) * 1_000_000_000).div_ceil(u128::from(rate.get()));
+    u64::try_from(nanos).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "transfer delay exceeds u64 nanoseconds",
+        )
+    })
 }
 
 fn checked_difference(after: u64, before: u64, label: &'static str) -> io::Result<u64> {
@@ -512,6 +561,8 @@ mod tests {
                 max_request_bytes: Some(4),
                 short_reads: 4,
                 delayed_calls: 0,
+                transfer_paced_calls: 0,
+                transfer_delay_ns: 0,
                 request_size_counts: {
                     let mut counts = [0_u64; PPTX_RANGE_REQUEST_SIZE_BUCKETS];
                     counts[2] = 4;
@@ -644,5 +695,130 @@ mod tests {
         assert_eq!(error.kind(), io::ErrorKind::Other);
         assert_eq!(adapter.logical_calls.load(Ordering::Relaxed), u64::MAX);
         assert!(adapter.snapshot().is_err());
+    }
+    #[test]
+    fn transfer_pacing_counts_returned_chunks_and_excludes_empty_eof_and_zero_cap() {
+        let mut config = PptxRangeSourceConfig::new(Some(2), Some(Duration::ZERO));
+        config.transfer_bytes_per_second = NonZeroU64::new(3_000_000_000);
+        let adapter = PptxRangeSource::new(source(b"abcde"), config);
+        let before = adapter.snapshot().unwrap();
+        let mut output = [0_u8; 4];
+        let mut actual = Vec::new();
+        for offset in [0, 2, 4, 5] {
+            let returned = adapter.read_at(offset, &mut output).unwrap();
+            actual.extend_from_slice(&output[..returned]);
+        }
+        assert_eq!(adapter.read_at(0, &mut []).unwrap(), 0);
+        assert_eq!(actual, b"abcde");
+        let delta = adapter.checked_delta(before).unwrap();
+        assert_eq!(
+            (
+                delta.logical_calls,
+                delta.returned_bytes,
+                delta.delayed_calls
+            ),
+            (4, 5, 4)
+        );
+        assert_eq!(
+            (delta.transfer_paced_calls, delta.transfer_delay_ns),
+            (3, 3)
+        );
+        config.max_returned_bytes = Some(0);
+        let zero = PptxRangeSource::new(source(b"abcde"), config);
+        assert_eq!(zero.read_at(0, &mut output).unwrap(), 0);
+        let snapshot = zero.snapshot().unwrap();
+        assert_eq!(
+            (
+                snapshot.transfer_paced_calls,
+                snapshot.transfer_delay_ns,
+                snapshot.delayed_calls
+            ),
+            (0, 0, 0)
+        );
+    }
+
+    #[test]
+    fn transfer_delay_rounds_up_and_refuses_overflow() {
+        for (bytes, rate, expected) in [
+            (0, 3, 0),
+            (1, 3, 333_333_334),
+            (3, 3, 1_000_000_000),
+            (1, u64::MAX, 1),
+            (u64::MAX, u64::MAX, 1_000_000_000),
+        ] {
+            assert_eq!(
+                transfer_delay_ns(bytes, NonZeroU64::new(rate).unwrap()).unwrap(),
+                expected
+            );
+        }
+        assert!(transfer_delay_ns(u64::MAX, NonZeroU64::new(1).unwrap()).is_err());
+    }
+
+    #[derive(Debug)]
+    struct FailedRead;
+    impl ReadAt for FailedRead {
+        fn len(&self) -> io::Result<u64> {
+            Ok(1)
+        }
+        fn read_at(&self, _: u64, _: &mut [u8]) -> io::Result<usize> {
+            Err(io::Error::other("injected read failure"))
+        }
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(1, 1))
+        }
+    }
+
+    #[test]
+    fn failed_reads_do_not_accrue_transfer_pacing() {
+        let mut config = PptxRangeSourceConfig::new(None, Some(Duration::ZERO));
+        config.transfer_bytes_per_second = NonZeroU64::new(1_048_576);
+        let adapter = PptxRangeSource::new(Arc::new(FailedRead), config);
+        assert!(adapter.read_at(0, &mut [0]).is_err());
+        let snapshot = adapter.snapshot().unwrap();
+        assert_eq!(
+            (
+                snapshot.returned_bytes,
+                snapshot.transfer_paced_calls,
+                snapshot.transfer_delay_ns
+            ),
+            (0, 0, 0)
+        );
+        assert_eq!((snapshot.logical_calls, snapshot.delayed_calls), (1, 1));
+    }
+
+    #[test]
+    fn transfer_counter_overflow_and_delta_regression_fail_closed() {
+        let config = PptxRangeSourceConfig {
+            transfer_bytes_per_second: NonZeroU64::new(u64::MAX),
+            ..PptxRangeSourceConfig::default()
+        };
+        for calls_overflow in [false, true] {
+            let adapter = PptxRangeSource::new(source(b"abc"), config);
+            let counter = if calls_overflow {
+                &adapter.transfer_paced_calls
+            } else {
+                &adapter.transfer_delay_ns
+            };
+            counter.store(u64::MAX, Ordering::Relaxed);
+            assert!(adapter.read_at(0, &mut [0]).is_err());
+            assert_eq!(counter.load(Ordering::Relaxed), u64::MAX);
+            assert!(adapter.snapshot().is_err());
+        }
+        for before in [
+            PptxRangeSourceSnapshot {
+                transfer_paced_calls: 1,
+                ..Default::default()
+            },
+            PptxRangeSourceSnapshot {
+                transfer_delay_ns: 1,
+                ..Default::default()
+            },
+        ] {
+            assert!(
+                PptxRangeSourceSnapshot::default()
+                    .checked_delta(before)
+                    .is_err()
+            );
+        }
     }
 }

@@ -1,0 +1,20 @@
+{
+  "change": 447,
+  "status": "pass",
+  "finished_utc": "2026-09-06T20:36:54.233993+00:00",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0447/verify.py",
+    "--sealed"
+  ],
+  "result": {
+    "reports": 8,
+    "samples": 240,
+    "pilots": 4,
+    "profiles": 4,
+    "sealed": true,
+    "cleanup": false
+  },
+  "scope": "Bare sealed verifier terminal exit 0; exported baseline verification and five tamper probes passed before receipt publication."
+}

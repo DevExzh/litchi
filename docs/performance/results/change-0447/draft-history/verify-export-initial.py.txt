@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Replay the complete pacing bundle without original binaries, Git or profiling."""
+import argparse,datetime as dt,gzip,hashlib,importlib.util,json,subprocess,sys
+from pathlib import Path
+ROOT=Path(__file__).resolve().parent
+spec=importlib.util.spec_from_file_location('oracle',ROOT/'verify-report.py');oracle=importlib.util.module_from_spec(spec);spec.loader.exec_module(oracle)
+def require(ok,label):
+    if not ok:raise ValueError(label)
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+def load(p):return oracle.base.load_json(p)
+def member(name):
+    p=Path(name);require(not p.is_absolute() and '..' not in p.parts,'unsafe bundle path');p=(ROOT/p).resolve();require(p.is_relative_to(ROOT.resolve()),'bundle path escapes');return p
+def raw(name):
+    path=member(name)
+    if path.exists():data=path.read_bytes()
+    else:
+        with gzip.open(Path(str(path)+'.gz'),'rb') as f:data=f.read(64*1024*1024+1)
+    require(len(data)<=64*1024*1024,'oversized artifact');return data
+def artifact(row):
+    data=raw(row['path']);require(len(data)==row['bytes'] and sha(data)==row['sha256'],'artifact identity '+row['path']);return data
+def source(row):
+    data=raw(row['path']);value=json.loads(data);require(sha(data)==row['sha256'] and len(value)==row['files'],'source manifest');return value
+def time(value):
+    result=dt.datetime.fromisoformat(value);require(result.tzinfo is not None,'timestamp timezone');return result
+def check(sealed,cleanup):
+    protocol=load(ROOT/'protocol.json');build=load(ROOT/'build.json');manifest=source(build['source_manifest'])
+    require(protocol['change']==447 and protocol['status']=='frozen','protocol identity')
+    require((protocol['cpu'],protocol['workers'],protocol['samples'],protocol['warmups'],protocol['reports'],protocol['retained_samples'])==(2,1,30,3,8,240),'protocol dimensions')
+    require((protocol['max_range'],protocol['fixed_delay_us'],protocol['paced_transfer_bytes_per_second'])==(65536,200,26214400),'simulation parameters')
+    expected=[{'corpus':c,'paced':p} for p in [False,True] for c in ['plain','media-rich']]
+    require(protocol['order']==[dict(v,repeat='R1') for v in expected]+[dict(v,repeat='R2') for v in reversed(expected)],'matched order')
+    for name,digest in protocol['bound_files'].items():require(sha(raw(name))==digest,'frozen '+name)
+    require(set(protocol['bound_files'])=={'build.json','capture.py','verify-report.py','base-verify-report.py','data-path.md'},'frozen file set')
+    files=load(ROOT/'source-files.json');require(files==['tools/perf-baseline/src/pptx_range_source.rs','tools/perf-baseline/src/pptx_provider_lifecycle.rs'],'candidate source set')
+    baseline=load(ROOT/'lint-baseline/candidate-harness-strict.json');before=source(baseline['source_after'])
+    require(baseline['driver_sha256']==sha(raw('lint-baseline/check.py.txt')),'baseline lint driver')
+    artifact(dict(baseline['log'],path='lint-baseline/candidate-harness-strict.log'))
+    require({name for name in before.keys()|manifest.keys() if before.get(name)!=manifest.get(name)}==set(files),'two-file source delta')
+    for name in files:
+        for role,table in [('before',before),('after',manifest)]:require(sha(raw('candidate/'+role+'-'+Path(name).name+'.txt'))==table[name],'retained candidate')
+    for path in (ROOT/'checks').glob('*.json'):
+        row=load(path)
+        if 'source_before' not in row:require(row.get('status')!='running','live manual receipt');continue
+        expected='failed' if path.name in ['candidate-harness-strict.json','pilot-0.json'] else 'pass'
+        require(row['status']==expected and (row['exit_code']==0)==(expected=='pass'),'check status '+path.name)
+        require(row['driver_sha256']==sha(raw('check.py')) and row['change']==447,'check driver')
+        require(row['source_before']==row['source_after']==build['source_manifest'] and row['source_unchanged'],'check source custody')
+        artifact(row['log'])
+    failed = load(ROOT/'pilots/0/receipt.json')
+    require(failed['status']=='failed' and failed['exit_code']==0 and failed['oracle_exit_code']==1, 'retained pilot rejection')
+    require(failed['capture_sha256']==sha(raw('draft-history/capture.py.txt')), 'initial capture driver')
+    require(failed['source_before']==failed['source_after']==build['source_manifest'] and failed['source_unchanged'], 'initial pilot custody')
+    for value in failed['artifacts'].values():artifact(value)
+    required=['candidate-harness-tests','candidate-harness-strict','candidate-harness-check','candidate-harness-doc','candidate-workspace-check','final-format','final-boundaries','candidate-build']+['pilot-'+str(i)+'-control' for i in range(4)]+['formal-'+str(i) for i in range(8)]+[f'profile-{i}-{k}' for i in [1,3] for k in ['stat','record']]
+    for tag in required:require((ROOT/'checks'/(tag+'.json')).is_file(),'required check '+tag)
+    require(load(ROOT/'checks/candidate-harness-tests.json')['passed_tests']==378,'test count')
+    frozen=time(protocol['frozen_utc']);previous=frozen;reports=[]
+    profile_order=[{'lane':i,'kind':k} for i in [1,3] for k in ['stat','record']];require(protocol['profile_order']==profile_order,'profile order')
+    paths=[(f'pilots/{i}/control/receipt.json',True,None,i) for i in range(4)]+[(f'runs/{i}/receipt.json',False,None,i) for i in range(8)]+[(f"profiles/{r['lane']}/{r['kind']}/receipt.json",False,r['kind'],r['lane']) for r in profile_order]
+    import importlib.util
+    cs=importlib.util.spec_from_file_location('capture',ROOT/'capture.py');capture=importlib.util.module_from_spec(cs);cs.loader.exec_module(capture)
+    for name,pilot,kind,i in paths:
+        row=load(member(name));lane=({'corpus':('plain','media-rich')[i//2],'paced':bool(i%2),'repeat':'pilot'} if pilot else protocol['order'][i])
+        require(row['status']=='pass' and row['exit_code']==row['oracle_exit_code']==0,'capture status '+name)
+        require(row['lane']==lane and row['pilot']==pilot and row['profile']==kind,'lane '+name)
+        require(row['source_before']==row['source_after']==build['source_manifest'] and row['source_unchanged'],'capture source')
+        require(row['binary']==build['binary'] and row['build_sha256']==sha(raw('build.json')),'capture build')
+        require(row['capture_sha256']==sha(raw('capture.py')) and row['oracle_sha256']==sha(raw('verify-report.py')),'capture drivers')
+        require(row['protocol_sha256']==(None if pilot else sha(raw('protocol.json'))),'capture protocol')
+        start,end=time(row['started_utc']),time(row['finished_utc']);require(start<=end,'capture interval')
+        if pilot:require(end<frozen,'pilot before freeze')
+        else:require(previous<=start,'serial capture chronology');previous=end
+        data={k:artifact(v) for k,v in row['artifacts'].items()};require({'report','resource','workload','oracle'}<=set(data),'capture artifacts')
+        report=json.loads(data['report']);oracle.check_report(report)
+        require(report['provider_config']['transfer_bytes_per_second']==(26214400 if lane['paced'] else None),'selected pacing')
+        require(report['samples']==(1 if pilot else 30) and report['warmup']==(0 if pilot else 3),'sample dimensions')
+        require(report['binary_sha256']==build['binary']['sha256'] and report['binary_bytes']==build['binary']['bytes'] and report['current_exe']==build['binary']['path'],'report binary')
+        require(report['source_revision']==build['revision'],'report revision')
+        require(all(report[k]==v for k,v in protocol['corpora'][lane['corpus']].items()),'frozen corpus/output')
+        # Reconstruct exact command using original absolute artifact paths from argv.
+        argv=row['argv'];require(argv[:6]==['taskset','-c','2','/usr/bin/time','-v','-o'],'CPU/resource argv')
+        require(argv[6].endswith('/'+row['artifacts']['resource']['path']),'resource path')
+        workload=capture.command(build['binary']['path'],lane,argv[argv.index('--output')+1],1 if pilot else 30,0 if pilot else 3,build['revision'])
+        prefix=[]
+        if kind=='stat':prefix=['perf','stat','--no-big-num','-x,','-e','cycles:u,instructions:u,branches:u,branch-misses:u,L1-dcache-load-misses:u','-o',argv[14],'--'];require('perf_stat' in data,'stat evidence')
+        if kind=='record':prefix=['perf','record','--no-buildid-cache','-o',argv[11],'-F','999','-e','cycles:u','--call-graph','fp,127','--'];require({'perf_data','perf_report','perf_script'}<=set(data),'stack evidence')
+        require(argv[7:]==prefix+workload,'exact workload/profile argv')
+        require(argv[argv.index('--output')+1].endswith('/'+row['artifacts']['report']['path']),'report path')
+        if not pilot and not kind:reports.append(report)
+    for corpus in ['plain','media-rich']:
+        selected=[report for report in reports if report['corpus']==corpus]
+        reference=None
+        for report in selected:
+            for sample in report['samples_raw']:
+                counts=[{owner:{k:p[owner][k] for k in ['availability','logical_calls','requested_bytes','returned_bytes','short_reads','delayed_calls','request_size_counts']} for owner in ['source_reads','destination_reads']} for p in sample['phases']]
+                if reference is None:reference=counts
+                require(counts==reference,'matched source work differs across pacing/repeat/sample')
+    for name in ['derive.py','lint-comparison.py','profile-summary.py','measurements.py']:
+        result=subprocess.run([sys.executable,'-B',str(ROOT/name),'--check'],capture_output=True,text=True);require(result.returncode==0,'derived '+name+': '+result.stderr)
+    decision=load(ROOT/'decision.json');summary=load(ROOT/'summary.json')
+    require(decision['decision']=='retain measured enabler' and decision['production_optimization'] is False and decision['goal_complete'] is False,'scoped decision')
+    require(decision['repeat_review']==[row for row in summary['repeat_review'] if row['flagged']],'complete repeat review')
+    probes=load(ROOT/'oracle-probes.json');require(probes['status']=='pass' and len(probes['rejected'])==17,'oracle corruption probes')
+    if cleanup:
+        proof=load(ROOT/'checks/cleanup-inventory.json');require(proof['status']=='pass' and proof['cleanup_paths']==['/tmp/litchi-goal-0447-binaries'],'cleanup')
+        require(proof['goal_sha256']=='bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1','goal preservation')
+        require(load(ROOT/'checks/precleanup.json')['status']=='pass','precleanup')
+    if sealed:
+        inventory={}
+        for line in (ROOT/'SHA256SUMS').read_text().splitlines():
+            digest,name=line.split('  ',1);require(name not in inventory and sha(member(name).read_bytes())==digest,'seal member');inventory[name]=digest
+        actual={str(p.relative_to(ROOT)) for p in ROOT.rglob('*') if p.is_file() and p.name!='SHA256SUMS'};require(actual==set(inventory),'seal coverage')
+    return {'status':'pass','reports':8,'samples':240,'pilots':4,'profiles':4,'sealed':sealed,'cleanup':cleanup}
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args()
+    try:print(json.dumps(check(a.sealed,a.cleanup)))
+    except Exception as error:print('INVALID: '+str(error),file=sys.stderr);raise SystemExit(1)

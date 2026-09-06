@@ -1,0 +1,14 @@
+{
+  "change": 447,
+  "status": "pass",
+  "finished_utc": "2026-09-06T20:35:02.048949+00:00",
+  "source_files": {
+    "tools/perf-baseline/src/pptx_range_source.rs": "945f454cbb45ff7956411a82f7f564220d3ae4bc6b473af616913e428bc49e60",
+    "tools/perf-baseline/src/pptx_provider_lifecycle.rs": "6afd53fa3e358e667c218a015d0d51a8ad3d73b1fc90e5c681365423598a288a"
+  },
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "production_and_previous_bundle_unchanged": true,
+  "all_owned_cpu_handles_terminal": true,
+  "scope": "two standalone Rust modules, tooling README and evidence/docs only; candidate bytes match tested/captured source"
+}

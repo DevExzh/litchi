@@ -1,0 +1,47 @@
+{
+  "change": 447,
+  "status": "pass",
+  "stage": "precleanup",
+  "exported_bundle_verification": {
+    "exit_code": 0,
+    "stdout": "{\"status\": \"pass\", \"reports\": 8, \"samples\": 240, \"pilots\": 4, \"profiles\": 4, \"sealed\": true, \"cleanup\": false}\n",
+    "stderr": ""
+  },
+  "rejected": [
+    {
+      "mutation": 0,
+      "path": "protocol.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: protocol dimensions\n"
+    },
+    {
+      "mutation": 1,
+      "path": "build.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: frozen build.json\n"
+    },
+    {
+      "mutation": 2,
+      "path": "runs/0/receipt.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: capture source\n"
+    },
+    {
+      "mutation": 3,
+      "path": "runs/0/receipt.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: CPU/resource argv\n"
+    },
+    {
+      "mutation": "extra-seal-member",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: seal coverage\n"
+    }
+  ],
+  "scope": "portable verification runs no Git, original binaries, workload or profiler; scratch copy removed before receipt publication"
+}

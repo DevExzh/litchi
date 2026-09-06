@@ -1,6 +1,22 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0446
+## Current evidence through 0447
+
+[0447](changes/0447-pptx-range-transfer-pacing.md) fills a range-simulation tooling gap with optional configured transfer rate,
+checked requested-delay counters and matched managed PPTX lifecycles. Eight
+reports/240 samples and four profiles retain exact source-work/output equality.
+The 378 harness tests pass; strict lint adds zero diagnostics. Twelve repeat
+tail flags and sleep-granularity limitations remain explicit. This is a measured
+enabler, with no production speedup, actual network-bandwidth or allocator claim.
+
+The representative index intentionally reserves measured status for its default
+full-run contract; later opt-in timing bundles do not automatically promote
+those rows. Counts remain 438 selectors/36 defaults and 15 categories/33 mappings,
+10 measured/23 correctness-only. Shared-link concurrency, cold I/O, native
+breadth, bounded existing append, repackaging and full scaling evidence remain
+incomplete. The full user-owned non-iWork goal stays active and uncompleted.
+
+## Earlier evidence through 0446
 
 [0446](changes/0446-opc-owned-content-type-name.md) retains a one-line ownership optimization in content-type parsing.
 The 720-sample matrix passes the allocation gate: 5.963%/5.990% fewer calls at

@@ -13,6 +13,7 @@ use std::{
     ffi::OsString,
     fs::{self, OpenOptions},
     io::{self, Write},
+    num::NonZeroU64,
     path::{Path, PathBuf},
     sync::Arc,
     time::{Duration, Instant},
@@ -78,6 +79,7 @@ struct Config {
     provider: ProviderKind,
     max_range: Option<usize>,
     delay_us: Option<u64>,
+    transfer_bytes_per_second: Option<NonZeroU64>,
     samples: usize,
     warmup: usize,
     source_revision: String,
@@ -89,6 +91,7 @@ struct ProviderConfigRecord {
     provider: &'static str,
     max_range_bytes: Option<usize>,
     delay_us: Option<u64>,
+    transfer_bytes_per_second: Option<NonZeroU64>,
     adapter_max_range_bytes: Option<usize>,
     adapter_delay_us: Option<u64>,
     delay_configured: bool,
@@ -116,6 +119,8 @@ struct ReadDelta {
     max_request_bytes: Option<u64>,
     short_reads: u64,
     delayed_calls: u64,
+    transfer_paced_calls: u64,
+    transfer_delay_ns: u64,
     request_size_counts: [u64; pptx_range_source::PPTX_RANGE_REQUEST_SIZE_BUCKETS],
 }
 
@@ -130,6 +135,8 @@ struct ReadPoint {
     max_request_bytes: Option<u64>,
     short_reads: Option<u64>,
     delayed_calls: Option<u64>,
+    transfer_paced_calls: Option<u64>,
+    transfer_delay_ns: Option<u64>,
     request_size_counts: Option<[u64; pptx_range_source::PPTX_RANGE_REQUEST_SIZE_BUCKETS]>,
     counter_delta_checked: Option<bool>,
     delta: Option<ReadDelta>,
@@ -147,6 +154,8 @@ impl ReadPoint {
             max_request_bytes: None,
             short_reads: None,
             delayed_calls: None,
+            transfer_paced_calls: None,
+            transfer_delay_ns: None,
             request_size_counts: None,
             counter_delta_checked: None,
             delta: None,
@@ -164,6 +173,8 @@ impl ReadPoint {
             max_request_bytes: snapshot.max_request_bytes,
             short_reads: Some(snapshot.short_reads),
             delayed_calls: Some(snapshot.delayed_calls),
+            transfer_paced_calls: Some(snapshot.transfer_paced_calls),
+            transfer_delay_ns: Some(snapshot.transfer_delay_ns),
             request_size_counts: Some(snapshot.request_size_counts),
             counter_delta_checked: Some(true),
             delta: Some(delta),
@@ -381,6 +392,7 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
     let mut provider = None;
     let mut max_range = None;
     let mut delay_us = None;
+    let mut transfer_bytes_per_second = None;
     let mut samples = None;
     let mut warmup = None;
     let mut source_revision = None;
@@ -430,6 +442,19 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
                     return Err("duplicate --delay-us".into());
                 }
                 delay_us = Some(parse_u64(value_text, "--delay-us")?);
+            },
+            "--transfer-bytes-per-second" => {
+                if transfer_bytes_per_second.is_some() {
+                    return Err("duplicate --transfer-bytes-per-second".into());
+                }
+                let rate = value_text.parse::<u64>()?;
+                if !(1_048_576..=1_099_511_627_776).contains(&rate) {
+                    return Err(
+                        "--transfer-bytes-per-second must be between 1048576 and 1099511627776"
+                            .into(),
+                    );
+                }
+                transfer_bytes_per_second = NonZeroU64::new(rate);
             },
             "--samples" => {
                 if samples.is_some() {
@@ -488,6 +513,11 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
             Some(delay_us.ok_or("range provider requires --delay-us")?),
         ),
         ProviderKind::Bytes | ProviderKind::File => {
+            if transfer_bytes_per_second.is_some() {
+                return Err(
+                    "--transfer-bytes-per-second is valid only with --provider range".into(),
+                );
+            }
             if max_range.is_some() {
                 return Err("--max-range is valid only with --provider range".into());
             }
@@ -502,6 +532,7 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
         provider,
         max_range,
         delay_us,
+        transfer_bytes_per_second,
         samples: samples.ok_or("missing --samples")?,
         warmup: warmup.ok_or("missing --warmup")?,
         source_revision: source_revision.ok_or("missing --source-revision")?,
@@ -514,6 +545,7 @@ fn provider_config(config: &Config) -> ProviderConfigRecord {
         provider: config.provider.name(),
         max_range_bytes: config.max_range,
         delay_us: config.delay_us,
+        transfer_bytes_per_second: config.transfer_bytes_per_second,
         adapter_max_range_bytes: config.max_range,
         adapter_delay_us: config.delay_us,
         delay_configured: config.delay_us.is_some(),
@@ -555,11 +587,12 @@ fn make_provider(
         ProviderKind::Bytes | ProviderKind::File => (None, None),
         ProviderKind::Range => (config.max_range, config.delay_us),
     };
-    Ok(Arc::new(ProviderSource::with_limits(
-        inner,
+    let mut adapter_config = pptx_range_source::PptxRangeSourceConfig::new(
         max_range,
         delay_us.map(Duration::from_micros),
-    )))
+    );
+    adapter_config.transfer_bytes_per_second = config.transfer_bytes_per_second;
+    Ok(Arc::new(ProviderSource::new(inner, adapter_config)))
 }
 
 fn read_point(
@@ -588,6 +621,8 @@ fn read_point(
         max_request_bytes: delta.max_request_bytes,
         short_reads: delta.short_reads,
         delayed_calls: delta.delayed_calls,
+        transfer_paced_calls: delta.transfer_paced_calls,
+        transfer_delay_ns: delta.transfer_delay_ns,
         request_size_counts: delta.request_size_counts,
     };
     Ok((ReadPoint::available(snapshot, delta), Some(snapshot)))
@@ -1146,16 +1181,23 @@ mod tests {
     #[test]
     fn plain_lifecycle_output_identity_matches_all_providers() {
         let mut digests = Vec::new();
-        for (provider, max_range, delay_us) in [
-            (ProviderKind::Bytes, None, None),
-            (ProviderKind::File, None, None),
-            (ProviderKind::Range, Some(97), Some(0)),
+        for (provider, max_range, delay_us, transfer_bytes_per_second) in [
+            (ProviderKind::Bytes, None, None, None),
+            (ProviderKind::File, None, None, None),
+            (ProviderKind::Range, Some(97), Some(0), None),
+            (
+                ProviderKind::Range,
+                Some(65536),
+                Some(0),
+                NonZeroU64::new(26_214_400),
+            ),
         ] {
             let report = run_capture(&Config {
                 corpus: CorpusKind::Plain,
                 provider,
                 max_range,
                 delay_us,
+                transfer_bytes_per_second,
                 samples: 1,
                 warmup: 0,
                 source_revision: REVISION.to_owned(),
@@ -1169,5 +1211,73 @@ mod tests {
         }
         assert_eq!(digests[0], digests[1]);
         assert_eq!(digests[1], digests[2]);
+        assert_eq!(digests[2], digests[3]);
+    }
+    #[test]
+    fn transfer_rate_requires_range_provider_and_explicit_bounded_nonzero_value() {
+        let base = [
+            "--corpus",
+            "plain",
+            "--provider",
+            "range",
+            "--max-range",
+            "65536",
+            "--delay-us",
+            "0",
+            "--samples",
+            "1",
+            "--warmup",
+            "0",
+            "--source-revision",
+            REVISION,
+            "--output",
+            "provider.json",
+        ];
+        for value in ["1048576", "26214400", "1099511627776"] {
+            let mut values = base.to_vec();
+            values.extend(["--transfer-bytes-per-second", value]);
+            assert_eq!(
+                parse_config(&args(&values))
+                    .unwrap()
+                    .transfer_bytes_per_second
+                    .unwrap()
+                    .get()
+                    .to_string(),
+                value
+            );
+            values.extend(["--transfer-bytes-per-second", value]);
+            assert!(parse_config(&args(&values)).is_err());
+        }
+        for value in [
+            "0",
+            "1048575",
+            "1099511627777",
+            "-1",
+            "18446744073709551616",
+            "fast",
+        ] {
+            let mut values = base.to_vec();
+            values.extend(["--transfer-bytes-per-second", value]);
+            assert!(parse_config(&args(&values)).is_err());
+        }
+        for provider in ["bytes", "file"] {
+            let values = [
+                "--corpus",
+                "plain",
+                "--provider",
+                provider,
+                "--samples",
+                "1",
+                "--warmup",
+                "0",
+                "--source-revision",
+                REVISION,
+                "--output",
+                "provider.json",
+                "--transfer-bytes-per-second",
+                "26214400",
+            ];
+            assert!(parse_config(&args(&values)).is_err());
+        }
     }
 }
