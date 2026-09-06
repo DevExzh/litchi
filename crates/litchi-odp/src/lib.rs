@@ -16,6 +16,7 @@ pub mod facade;
 pub mod handout_master;
 pub mod model;
 pub mod package;
+pub mod streaming;
 
 pub use facade::settings as show;
 pub use facade::slide::{Shape, Slide};
@@ -38,3 +39,9 @@ pub use litchi_odf_common::core;
 pub use litchi_odf_common::drawing;
 pub use litchi_odf_common::rdf;
 pub use litchi_odf_common::{constants, datatype, namespace};
+
+// Bounded fresh plain-slide publication.
+pub use streaming::{
+    PlainSlide, PublicationError, PublicationFailureKind, SlideStreamReport, StreamingError,
+    StreamingLimits, XmlAuditLimits, stream_plain_slides_to, try_stream_plain_slides_to,
+};

@@ -13,6 +13,7 @@ mod docx_story_hyperlink_publication;
 mod docx_story_hyperlinks;
 mod filesystem;
 mod odp_buffered_create;
+mod odp_streaming_create;
 mod odt_streaming_create;
 mod operation_metrics;
 mod parallel_metrics;
@@ -1470,6 +1471,7 @@ enum Case {
     OdpSemanticTextToSink,
     OdpSemanticCreateSmall,
     OdpBufferedCreate,
+    OdpStreamingCreate,
     OdpSemanticNoopEditSave,
     OdpSemanticOneEditSave,
     OdpMediaTextBoxEditSave,
@@ -2054,6 +2056,7 @@ impl Case {
             Self::OdpSemanticTextToSink => "odp_semantic_text_to_sink",
             Self::OdpSemanticCreateSmall => "odp_semantic_create_small",
             Self::OdpBufferedCreate => "odp_buffered_create",
+            Self::OdpStreamingCreate => "odp_streaming_create",
             Self::OdpSemanticNoopEditSave => "odp_semantic_noop_edit_save",
             Self::OdpSemanticOneEditSave => "odp_semantic_one_edit_save",
             Self::OdpMediaTextBoxEditSave => "odp_media_textbox_edit_save",
@@ -2659,6 +2662,10 @@ impl Case {
 
     const fn uses_odp_buffered_creation(self) -> bool {
         matches!(self, Self::OdpBufferedCreate)
+    }
+
+    const fn uses_odp_streaming_creation(self) -> bool {
+        matches!(self, Self::OdpStreamingCreate)
     }
 
     const fn uses_odp_media(self) -> bool {
@@ -8939,6 +8946,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_odt_buffered_creation()
                     && !case.uses_odt_streaming_creation()
                     && !case.uses_odp_buffered_creation()
+                    && !case.uses_odp_streaming_creation()
                     && !case.uses_ods_buffered_creation()
                     && !case.uses_ods_streaming_creation()
                     && !case.uses_semantic_rtf()
@@ -10516,6 +10524,29 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_odp_streaming_creation())
+    {
+        for shape in &options.semantic_shapes {
+            let corpus = odp_streaming_create::build_odp_streaming_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_odp_streaming_creation())
+            {
+                results.push(odp_streaming_create::run_odp_streaming_creation(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
+        }
+    }
+
     if options.cases.iter().any(|case| case.uses_odp_media()) {
         let corpus = build_odp_media_corpus()?;
         for case in options.cases.iter().filter(|case| case.uses_odp_media()) {
@@ -11712,6 +11743,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_semantic_text_to_sink" => Some(Case::OdpSemanticTextToSink),
         "odp_semantic_create_small" => Some(Case::OdpSemanticCreateSmall),
         "odp_buffered_create" => Some(Case::OdpBufferedCreate),
+        "odp_streaming_create" => Some(Case::OdpStreamingCreate),
         "odp_semantic_noop_edit_save" => Some(Case::OdpSemanticNoopEditSave),
         "odp_semantic_one_edit_save" => Some(Case::OdpSemanticOneEditSave),
         "odp_media_textbox_edit_save" => Some(Case::OdpMediaTextBoxEditSave),
@@ -12145,6 +12177,7 @@ fn usage_text() -> String {
                                        odp_semantic_one_slide,odp_semantic_full_text,\n\
                                        odp_semantic_text_to_sink,\n\
                                        odp_semantic_create_small,odp_buffered_create,\n\
+                                       odp_streaming_create,\n\
                                        odp_semantic_noop_edit_save,\n\
                                        odp_semantic_one_edit_save,odp_media_textbox_edit_save,\n\
                                        odp_media_textbox_scalar_replace_save,\n\
@@ -23112,6 +23145,9 @@ fn run_case_with_config(
         },
         Case::OdpBufferedCreate => {
             Err("buffered ODP creation cases use their dedicated corpus runner".into())
+        },
+        Case::OdpStreamingCreate => {
+            Err("streaming ODP creation cases use their dedicated corpus runner".into())
         },
         Case::OdpMediaTextBoxEditSave => {
             run_odp_media_textbox_edit_save(corpus, warmup_iterations, samples)
@@ -58570,7 +58606,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 434);
+        assert_eq!(selectable_count, 435);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -60612,6 +60648,60 @@ mod tests {
         assert_eq!(odp.content_xml_sha256.len(), 64);
         assert_eq!(odp.styles_xml_sha256.len(), 64);
         assert_eq!(odp.meta_xml_sha256.len(), 64);
+        assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
+    }
+
+    #[test]
+    fn odp_streaming_creation_is_opt_in_and_binds_shared_semantics() {
+        let case = parse_case("odp_streaming_create").expect("streaming ODP selector parses");
+        assert_eq!(case, Case::OdpStreamingCreate);
+        assert!(!Case::DEFAULT.contains(&case));
+        let corpus =
+            super::odp_streaming_create::build_odp_streaming_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(corpus.manifest.archive_member_count, 5);
+        assert_eq!(corpus.manifest.entry_count, 64);
+        let measured =
+            super::odp_streaming_create::run_odp_streaming_creation(case, &corpus, 0, 1).unwrap();
+        assert_eq!(measured.elapsed_ns.samples.len(), 1);
+        assert_eq!(
+            measured.output_sha256.as_deref(),
+            Some(corpus.manifest.archive_sha256.as_str())
+        );
+        let sink = measured.sink.as_ref().unwrap();
+        assert_eq!(sink.accepted_bytes, corpus.manifest.archive_bytes as u64);
+        assert_eq!(sink.retained_output_bytes, Some(0));
+        assert_eq!(sink.retained_authoring_window_bytes, Some(4_096));
+        let counts =
+            super::odp_buffered_create::odp_buffered_text_shape_counts(SemanticShape::Tiny)
+                .unwrap();
+        assert_eq!(
+            sink.input_bytes,
+            Some(u64::try_from(counts.title_text_bytes + counts.body_text_bytes).unwrap(),)
+        );
+        let source = measured.source.as_ref().unwrap();
+        let odp = source.odp_slides.as_ref().unwrap();
+        assert_eq!(odp.role, "streaming");
+        assert_eq!(
+            odp.implementation,
+            "litchi_odp::streaming::stream_plain_slides_to"
+        );
+        assert_eq!(odp.slide_count, 64);
+        assert_eq!(odp.title_variant_counts, [16; 4]);
+        assert_eq!(odp.body_variant_counts, [16; 4]);
+        assert!(odp.archive_member_set_verified);
+        assert!(odp.manifest_bindings_verified);
+        assert!(odp.semantic_reopen_verified);
+        assert!(odp.immutable_styles_meta_verified);
+        assert!(odp.runtime_output_digest_verified);
+        assert!(odp.runtime_sink_length_verified);
+        assert_eq!(
+            odp.provider_input_text_bytes,
+            Some(usize::try_from(sink.input_bytes.unwrap()).unwrap())
+        );
+        assert_eq!(
+            odp.semantic_sha256,
+            "167428219fc1603b63046c349a06ef8d0033ac9f720567c5383bb79e379d10d1"
+        );
         assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
     }
 

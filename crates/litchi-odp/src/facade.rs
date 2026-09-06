@@ -72,3 +72,11 @@ pub use crate::package::{
     MasterPage, Presentation, SlideCatalogEntry, SourceBackedPresentation,
     SourceBackedPresentationCatalog,
 };
+
+/// Bounded fresh publication of plain titled slides.
+pub mod streaming {
+    pub use crate::streaming::{
+        PlainSlide, PublicationError, PublicationFailureKind, SlideStreamReport, StreamingError,
+        StreamingLimits, XmlAuditLimits, stream_plain_slides_to, try_stream_plain_slides_to,
+    };
+}
