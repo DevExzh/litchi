@@ -45,6 +45,9 @@ const DEFAULT_MAX_ROW_XML_BYTES: usize = 4096;
 const DEFAULT_MAX_CONTENT_XML_BYTES: usize = 32 << 20;
 const DEFAULT_MAX_OUTPUT_BYTES: u64 = 512 << 20;
 const COMMON_METADATA_RESERVATION: usize = 64 * 1024;
+// Keep cancellation polling bounded while replacing per-character Work
+// charges for already-safe text with one charge per borrowed span.
+const MAX_PLAIN_TEXT_SPAN_BYTES: usize = 256;
 
 /// A scalar cell accepted by the streaming worksheet grammar.
 ///
@@ -1015,6 +1018,45 @@ impl<'a> RowWriter<'a> {
     fn write_ascii(&mut self, text: &str) -> litchi_core::Result<()> {
         self.write_bytes(text.as_bytes())
     }
+
+    /// Attempts the borrowed-span path for one already-safe UTF-8 span.
+    ///
+    /// `Fallback` deliberately leaves all failure state untouched. The caller
+    /// then uses the scalar path so a row-window or aggregate-Work refusal
+    /// reports the same first failing scalar write and cumulative usage as the
+    /// original encoder. A cancellation is returned directly because it is an
+    /// execution-policy failure rather than a batching boundary.
+    fn write_plain_span(&mut self, bytes: &[u8]) -> litchi_core::Result<PlainSpanResult> {
+        if let Err(error) = self.context.check() {
+            self.execution_error = Some(error.clone());
+            return Err(Error::Other(error.to_string()));
+        }
+        let Some(next) = self.bytes.checked_add(bytes.len()) else {
+            return Ok(PlainSpanResult::Fallback);
+        };
+        if next > self.maximum {
+            return Ok(PlainSpanResult::Fallback);
+        }
+        let Ok(amount) = u64::try_from(bytes.len()) else {
+            return Ok(PlainSpanResult::Fallback);
+        };
+        if let Err(error) = self.context.consume(Resource::Work, amount) {
+            if matches!(error, ExecutionError::ResourceLimit(_)) {
+                return Ok(PlainSpanResult::Fallback);
+            }
+            self.execution_error = Some(error.clone());
+            return Err(Error::Other(error.to_string()));
+        }
+        self.output.write_all(bytes)?;
+        self.bytes = next;
+        Ok(PlainSpanResult::Written)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PlainSpanResult {
+    Written,
+    Fallback,
 }
 
 fn emit_scalar_row<'a, R>(
@@ -1157,10 +1199,34 @@ fn write_attribute_ascii(output: &mut RowWriter<'_>, value: &str) -> litchi_core
 }
 
 fn write_text(output: &mut RowWriter<'_>, value: &str) -> litchi_core::Result<()> {
-    // Encode one scalar at a time.  This avoids a second text-sized retained
-    // buffer when a text value contains no entities; the common FragmentBuffer
-    // remains the only row XML window.
-    for character in value.chars() {
+    // Scan one scalar at a time to retain cancellation polling while grouping
+    // already-safe UTF-8 bytes into borrowed spans. The span cap bounds the
+    // time before the next policy check and avoids a second text-sized buffer.
+    // If cancellation arrives while a span is pending, that prefix is neither
+    // charged nor serialized; Resource::Work measures encoded XML bytes, and
+    // the common producer boundary discards the failed row.
+    let mut span_start = 0usize;
+    for (offset, character) in value.char_indices() {
+        if let Err(error) = output.context.check() {
+            output.execution_error = Some(error.clone());
+            return Err(Error::Other(error.to_string()));
+        }
+        let character_end = offset + character.len_utf8();
+        if is_plain_text_character(character) {
+            let span_len = offset - span_start;
+            if span_len != 0 && span_len + character.len_utf8() > MAX_PLAIN_TEXT_SPAN_BYTES {
+                write_plain_span_or_scalars(output, &value[span_start..offset])?;
+                span_start = offset;
+            }
+            if character_end - span_start == MAX_PLAIN_TEXT_SPAN_BYTES {
+                write_plain_span_or_scalars(output, &value[span_start..character_end])?;
+                span_start = character_end;
+            }
+            continue;
+        }
+        if span_start < offset {
+            write_plain_span_or_scalars(output, &value[span_start..offset])?;
+        }
         match character {
             '&' => output.write_ascii("&amp;")?,
             '<' => output.write_ascii("&lt;")?,
@@ -1176,8 +1242,32 @@ fn write_text(output: &mut RowWriter<'_>, value: &str) -> litchi_core::Result<()
                 output.write_bytes(encoded.as_bytes())?;
             },
         }
+        span_start = character_end;
+    }
+    if span_start < value.len() {
+        write_plain_span_or_scalars(output, &value[span_start..])?;
     }
     Ok(())
+}
+
+fn write_plain_span_or_scalars(output: &mut RowWriter<'_>, bytes: &str) -> litchi_core::Result<()> {
+    match output.write_plain_span(bytes.as_bytes())? {
+        PlainSpanResult::Written => Ok(()),
+        PlainSpanResult::Fallback => write_plain_scalars(output, bytes),
+    }
+}
+
+fn write_plain_scalars(output: &mut RowWriter<'_>, value: &str) -> litchi_core::Result<()> {
+    for character in value.chars() {
+        let mut encoded = [0u8; 4];
+        let encoded = character.encode_utf8(&mut encoded);
+        output.write_bytes(encoded.as_bytes())?;
+    }
+    Ok(())
+}
+
+const fn is_plain_text_character(character: char) -> bool {
+    !matches!(character, '&' | '<' | '>' | '"' | '\'' | '\r' | '\n' | '\t')
 }
 
 fn requires_xml_space_preserve(value: &str) -> bool {
@@ -1259,3 +1349,7 @@ fn map_package_error<W: ?Sized>(
         source: Box::new(error),
     })
 }
+
+#[cfg(test)]
+#[path = "streaming_text_unit_tests.rs"]
+mod streaming_text_unit_tests;
