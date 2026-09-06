@@ -834,6 +834,8 @@ validation passes 6 cases, neutral map validation passes 22 unit plus 18
 integration cases (40 total), Keynote validation passes 22 replacement plus 4
 native-oracle integration cases (26 total), and boundary verification passes
 936 units. Workspace strict linting passes, and both clone/remap and metadata fuzz
-targets pass 256 AddressSanitizer runs. Full scanner and workspace hooks
-remain pending root verification. The selector-level lifecycle
+targets pass 256 AddressSanitizer runs. The full boundary scanner passes (64 packages, 238 internal dependency
+declarations, 11 explicit debts). Commit `55499d9c5` passed normal formatting,
+manifest sorting, strict workspace lint, all-feature workspace library and
+integration tests, and documentation tests. The selector-level lifecycle
 owner and further host-route retirement remain pending.
