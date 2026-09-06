@@ -1,0 +1,4 @@
+[
+  "tools/perf-baseline/src/pptx_range_source.rs",
+  "tools/perf-baseline/src/pptx_provider_lifecycle.rs"
+]

@@ -80,6 +80,7 @@ struct Config {
     max_range: Option<usize>,
     delay_us: Option<u64>,
     transfer_bytes_per_second: Option<NonZeroU64>,
+    transfer_delay_policy: pptx_range_source::TransferDelayPolicy,
     samples: usize,
     warmup: usize,
     source_revision: String,
@@ -92,6 +93,7 @@ struct ProviderConfigRecord {
     max_range_bytes: Option<usize>,
     delay_us: Option<u64>,
     transfer_bytes_per_second: Option<NonZeroU64>,
+    transfer_delay_policy: pptx_range_source::TransferDelayPolicy,
     adapter_max_range_bytes: Option<usize>,
     adapter_delay_us: Option<u64>,
     delay_configured: bool,
@@ -393,6 +395,7 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
     let mut max_range = None;
     let mut delay_us = None;
     let mut transfer_bytes_per_second = None;
+    let mut transfer_delay_policy = None;
     let mut samples = None;
     let mut warmup = None;
     let mut source_revision = None;
@@ -442,6 +445,20 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
                     return Err("duplicate --delay-us".into());
                 }
                 delay_us = Some(parse_u64(value_text, "--delay-us")?);
+            },
+            "--transfer-delay-policy" => {
+                if transfer_delay_policy.is_some() {
+                    return Err("duplicate --transfer-delay-policy".into());
+                }
+                transfer_delay_policy =
+                    Some(match value_text {
+                        "separate-sleeps" => pptx_range_source::TransferDelayPolicy::SeparateSleeps,
+                        "minimum-service" => pptx_range_source::TransferDelayPolicy::MinimumService,
+                        _ => return Err(
+                            "--transfer-delay-policy must be separate-sleeps or minimum-service"
+                                .into(),
+                        ),
+                    });
             },
             "--transfer-bytes-per-second" => {
                 if transfer_bytes_per_second.is_some() {
@@ -505,6 +522,9 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
             _ => return Err(format!("unknown provider-lifecycle argument: {flag}").into()),
         }
     }
+    if transfer_delay_policy.is_some() && transfer_bytes_per_second.is_none() {
+        return Err("--transfer-delay-policy requires --transfer-bytes-per-second".into());
+    }
     let corpus = corpus.ok_or("missing --corpus")?;
     let provider = provider.ok_or("missing --provider")?;
     let (max_range, delay_us) = match provider {
@@ -533,6 +553,7 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
         max_range,
         delay_us,
         transfer_bytes_per_second,
+        transfer_delay_policy: transfer_delay_policy.unwrap_or_default(),
         samples: samples.ok_or("missing --samples")?,
         warmup: warmup.ok_or("missing --warmup")?,
         source_revision: source_revision.ok_or("missing --source-revision")?,
@@ -546,6 +567,7 @@ fn provider_config(config: &Config) -> ProviderConfigRecord {
         max_range_bytes: config.max_range,
         delay_us: config.delay_us,
         transfer_bytes_per_second: config.transfer_bytes_per_second,
+        transfer_delay_policy: config.transfer_delay_policy,
         adapter_max_range_bytes: config.max_range,
         adapter_delay_us: config.delay_us,
         delay_configured: config.delay_us.is_some(),
@@ -592,6 +614,7 @@ fn make_provider(
         delay_us.map(Duration::from_micros),
     );
     adapter_config.transfer_bytes_per_second = config.transfer_bytes_per_second;
+    adapter_config.transfer_delay_policy = config.transfer_delay_policy;
     Ok(Arc::new(ProviderSource::new(inner, adapter_config)))
 }
 
@@ -1181,15 +1204,41 @@ mod tests {
     #[test]
     fn plain_lifecycle_output_identity_matches_all_providers() {
         let mut digests = Vec::new();
-        for (provider, max_range, delay_us, transfer_bytes_per_second) in [
-            (ProviderKind::Bytes, None, None, None),
-            (ProviderKind::File, None, None, None),
-            (ProviderKind::Range, Some(97), Some(0), None),
+        for (provider, max_range, delay_us, transfer_bytes_per_second, transfer_delay_policy) in [
+            (
+                ProviderKind::Bytes,
+                None,
+                None,
+                None,
+                pptx_range_source::TransferDelayPolicy::SeparateSleeps,
+            ),
+            (
+                ProviderKind::File,
+                None,
+                None,
+                None,
+                pptx_range_source::TransferDelayPolicy::SeparateSleeps,
+            ),
+            (
+                ProviderKind::Range,
+                Some(97),
+                Some(0),
+                None,
+                pptx_range_source::TransferDelayPolicy::SeparateSleeps,
+            ),
             (
                 ProviderKind::Range,
                 Some(65536),
                 Some(0),
                 NonZeroU64::new(26_214_400),
+                pptx_range_source::TransferDelayPolicy::SeparateSleeps,
+            ),
+            (
+                ProviderKind::Range,
+                Some(65536),
+                Some(0),
+                NonZeroU64::new(26_214_400),
+                pptx_range_source::TransferDelayPolicy::MinimumService,
             ),
         ] {
             let report = run_capture(&Config {
@@ -1198,6 +1247,7 @@ mod tests {
                 max_range,
                 delay_us,
                 transfer_bytes_per_second,
+                transfer_delay_policy,
                 samples: 1,
                 warmup: 0,
                 source_revision: REVISION.to_owned(),
@@ -1212,6 +1262,7 @@ mod tests {
         assert_eq!(digests[0], digests[1]);
         assert_eq!(digests[1], digests[2]);
         assert_eq!(digests[2], digests[3]);
+        assert_eq!(digests[3], digests[4]);
     }
     #[test]
     fn transfer_rate_requires_range_provider_and_explicit_bounded_nonzero_value() {
@@ -1279,5 +1330,47 @@ mod tests {
             ];
             assert!(parse_config(&args(&values)).is_err());
         }
+    }
+    #[test]
+    fn explicit_delay_policy_requires_rate_and_rejects_unknown_or_duplicate_values() {
+        let base = [
+            "--corpus",
+            "plain",
+            "--provider",
+            "range",
+            "--max-range",
+            "65536",
+            "--delay-us",
+            "200",
+            "--samples",
+            "1",
+            "--warmup",
+            "0",
+            "--source-revision",
+            REVISION,
+            "--output",
+            "provider.json",
+        ];
+        for policy in ["separate-sleeps", "minimum-service"] {
+            let mut values = base.to_vec();
+            values.extend(["--transfer-delay-policy", policy]);
+            assert!(parse_config(&args(&values)).is_err());
+            values.extend(["--transfer-bytes-per-second", "26214400"]);
+            let parsed = parse_config(&args(&values)).unwrap();
+            assert_eq!(
+                serde_json::to_string(&parsed.transfer_delay_policy).unwrap(),
+                format!("\"{policy}\"")
+            );
+            values.extend(["--transfer-delay-policy", policy]);
+            assert!(parse_config(&args(&values)).is_err());
+        }
+        let mut values = base.to_vec();
+        values.extend([
+            "--transfer-bytes-per-second",
+            "26214400",
+            "--transfer-delay-policy",
+            "unknown",
+        ]);
+        assert!(parse_config(&args(&values)).is_err());
     }
 }

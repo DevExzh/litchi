@@ -1,0 +1,16 @@
+{
+  "change": 448,
+  "status": "pass",
+  "finished_utc": "2026-09-06T21:11:07.251097+00:00",
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "docs/performance/results/change-0448/verify.py",
+    "--sealed"
+  ],
+  "exit_code": 0,
+  "stdout": "{\"status\": \"pass\", \"reports\": 8, \"samples\": 240, \"pilots\": 4, \"profiles\": 4, \"sealed\": true, \"cleanup\": false}\n",
+  "stderr": "",
+  "owned_cpu_processes": "all terminal before cleanup",
+  "scope": "sealed portable replay and five exported corruption probes passed before removing the copied binary"
+}

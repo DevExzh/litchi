@@ -1,6 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0447
+## Current evidence through 0448
+
+[0448](changes/0448-pptx-minimum-service-pacing.md) completes the scoped minimum-service timer calibration identified in 0447.
+Eight reports/240 samples and four profiles support retention of the opt-in
+policy; both plain median gates and all service floors pass. All 381 harness
+tests pass and strict lint adds zero diagnostics. No repeat trigger exceeds 5%.
+This is a measured tooling enabler, with no production or physical-network claim.
+
+Registry/default counts remain 438/36; the representative index remains
+15 categories/33 mappings/10 measured/23 correctness-only. Its default full-run
+contract is not promoted by opt-in captures. Native breadth, cold I/O, shared-link
+concurrency, bounded existing append, repackaging and full scaling evidence are
+incomplete. The full user-owned non-iWork goal remains active and uncompleted.
+
+## Earlier evidence through 0447
 
 [0447](changes/0447-pptx-range-transfer-pacing.md) fills a range-simulation tooling gap with optional configured transfer rate,
 checked requested-delay counters and matched managed PPTX lifecycles. Eight

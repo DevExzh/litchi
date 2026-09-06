@@ -14,7 +14,7 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use litchi_core::{ReadAt, SourceVersion};
@@ -39,6 +39,18 @@ pub fn request_size_bucket(requested_bytes: u64) -> usize {
     }
 }
 
+/// How nominal transfer delay combines with the fixed request delay.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum TransferDelayPolicy {
+    /// Request fixed and transfer sleeps separately, preserving the original model.
+    #[default]
+    SeparateSleeps,
+    /// Wait only until the fixed-plus-transfer minimum service time is met.
+    /// Fixed-sleep overshoot and wrapped-source work count toward that minimum.
+    MinimumService,
+}
+
 /// Configuration for [`PptxRangeSource`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PptxRangeSourceConfig {
@@ -50,9 +62,11 @@ pub struct PptxRangeSourceConfig {
     /// caller buffers and zero-byte capped calls do not sleep.
     pub fixed_delay: Option<Duration>,
     /// Optional transfer rate per successful read, in bytes per second.
-    /// Pacing requests ceil(returned bytes / rate) of sleep after delegation.
+    /// The nominal target is ceil(returned bytes / rate), combined using the policy.
     /// OS oversleep is not measured bandwidth; concurrent reads do not share a cap.
     pub transfer_bytes_per_second: Option<NonZeroU64>,
+    /// Delay model used only when a transfer rate is configured.
+    pub transfer_delay_policy: TransferDelayPolicy,
 }
 
 impl PptxRangeSourceConfig {
@@ -63,6 +77,7 @@ impl PptxRangeSourceConfig {
             max_returned_bytes,
             fixed_delay,
             transfer_bytes_per_second: None,
+            transfer_delay_policy: TransferDelayPolicy::SeparateSleeps,
         }
     }
 }
@@ -93,7 +108,8 @@ pub struct PptxRangeSourceSnapshot {
     pub delayed_calls: u64,
     /// Successful nonempty reads with configured transfer pacing.
     pub transfer_paced_calls: u64,
-    /// Sum of requested transfer sleep nanoseconds, excluding fixed delay and OS oversleep.
+    /// Sum of nominal transfer-delay targets in nanoseconds, excluding fixed delay.
+    /// Minimum-service targets can be met partly by elapsed request work/oversleep.
     pub transfer_delay_ns: u64,
     /// Number of nonempty caller requests in each fixed request-size bucket.
     pub request_size_counts: [u64; PPTX_RANGE_REQUEST_SIZE_BUCKETS],
@@ -199,7 +215,8 @@ pub struct PptxRangeSourceDelta {
     pub delayed_calls: u64,
     /// Successful nonempty reads with configured transfer pacing.
     pub transfer_paced_calls: u64,
-    /// Sum of requested transfer sleep nanoseconds, excluding fixed delay and OS oversleep.
+    /// Sum of nominal transfer-delay targets in nanoseconds, excluding fixed delay.
+    /// Minimum-service targets can be met partly by elapsed request work/oversleep.
     pub transfer_delay_ns: u64,
     /// Checked request-size histogram counters for the interval.  Snapshot
     /// fields are cumulative; each bucket here is the checked after-minus-
@@ -429,6 +446,10 @@ impl ReadAt for PptxRangeSource {
             .config
             .max_returned_bytes
             .map_or(output.len(), |maximum| output.len().min(maximum));
+        let service_started = (delegated_len != 0
+            && self.config.transfer_bytes_per_second.is_some()
+            && self.config.transfer_delay_policy == TransferDelayPolicy::MinimumService)
+            .then(Instant::now);
         if delegated_len != 0 {
             if self.config.fixed_delay.is_some() {
                 self.checked_add(&self.delayed_calls, 1, "delayed range calls")?;
@@ -458,7 +479,19 @@ impl ReadAt for PptxRangeSource {
                 transfer_delay_ns(returned_u64, rate).map_err(|error| self.fail_metrics(error))?;
             self.checked_add(&self.transfer_paced_calls, 1, "transfer paced calls")?;
             self.checked_add(&self.transfer_delay_ns, nanos, "requested transfer delay")?;
-            thread::sleep(Duration::from_nanos(nanos));
+            let nominal = Duration::from_nanos(nanos);
+            let remaining = match service_started {
+                Some(started) => minimum_service_wait(
+                    self.config.fixed_delay.unwrap_or_default(),
+                    nominal,
+                    started.elapsed(),
+                )
+                .map_err(|error| self.fail_metrics(error))?,
+                None => nominal,
+            };
+            if !remaining.is_zero() {
+                thread::sleep(remaining);
+            }
         }
         self.checked_add(&self.returned_bytes, returned_u64, "returned range bytes")?;
         if returned < output.len() {
@@ -470,6 +503,20 @@ impl ReadAt for PptxRangeSource {
     fn version(&self) -> io::Result<SourceVersion> {
         self.inner.version()
     }
+}
+
+fn minimum_service_wait(
+    fixed: Duration,
+    transfer: Duration,
+    elapsed: Duration,
+) -> io::Result<Duration> {
+    let target = fixed.checked_add(transfer).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "combined service delay overflows Duration",
+        )
+    })?;
+    Ok(target.saturating_sub(elapsed))
 }
 
 fn transfer_delay_ns(bytes: u64, rate: NonZeroU64) -> io::Result<u64> {
@@ -820,5 +867,51 @@ mod tests {
                     .is_err()
             );
         }
+    }
+    #[test]
+    fn minimum_service_wait_credits_elapsed_work_and_checks_duration_overflow() {
+        let fixed = Duration::from_micros(200);
+        let transfer = Duration::from_micros(10);
+        for (elapsed, expected) in [(0, 210), (199, 11), (200, 10), (205, 5), (210, 0), (500, 0)] {
+            assert_eq!(
+                minimum_service_wait(fixed, transfer, Duration::from_micros(elapsed)).unwrap(),
+                Duration::from_micros(expected)
+            );
+        }
+        assert!(
+            minimum_service_wait(Duration::MAX, Duration::from_nanos(1), Duration::ZERO).is_err()
+        );
+        assert_eq!(
+            minimum_service_wait(Duration::ZERO, Duration::ZERO, Duration::MAX).unwrap(),
+            Duration::ZERO
+        );
+    }
+
+    #[test]
+    fn delay_policies_preserve_nominal_counters_and_short_read_bytes() {
+        let mut evidence = Vec::new();
+        for policy in [
+            TransferDelayPolicy::SeparateSleeps,
+            TransferDelayPolicy::MinimumService,
+        ] {
+            let config = PptxRangeSourceConfig {
+                max_returned_bytes: Some(2),
+                fixed_delay: Some(Duration::ZERO),
+                transfer_bytes_per_second: NonZeroU64::new(3_000_000_000),
+                transfer_delay_policy: policy,
+            };
+            let adapter = PptxRangeSource::new(source(b"abc"), config);
+            let mut output = [0; 4];
+            assert_eq!(adapter.read_at(0, &mut output).unwrap(), 2);
+            assert_eq!(&output[..2], b"ab");
+            assert_eq!(adapter.read_at(2, &mut output).unwrap(), 1);
+            assert_eq!(output[0], b'c');
+            assert_eq!(adapter.read_at(3, &mut output).unwrap(), 0);
+            assert_eq!(adapter.read_at(0, &mut []).unwrap(), 0);
+            evidence.push(adapter.snapshot().unwrap());
+        }
+        assert_eq!(evidence[0], evidence[1]);
+        assert_eq!(evidence[0].transfer_paced_calls, 2);
+        assert_eq!(evidence[0].transfer_delay_ns, 2);
     }
 }

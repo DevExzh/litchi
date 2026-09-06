@@ -1,0 +1,792 @@
+{
+  "change": 448,
+  "profiles": [
+    {
+      "role": "separate-sleeps",
+      "sample_blocks": 6441,
+      "missing_callchain_blocks": 0,
+      "missing_callchain_period": 0,
+      "total_period": 25696727900,
+      "whole_process_self": [
+        {
+          "symbol": "sha2::sha256::x86_sha::compress",
+          "period": 10128172566,
+          "percent": 39.41424995981687
+        },
+        {
+          "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+          "period": 7268536944,
+          "percent": 28.285846245817158
+        },
+        {
+          "symbol": "zlib_rs::deflate::longest_match::longest_match",
+          "period": 2176446942,
+          "percent": 8.469743503802288
+        },
+        {
+          "symbol": "__memmove_avx512_unaligned_erms",
+          "period": 1911750260,
+          "percent": 7.439664176075897
+        },
+        {
+          "symbol": "__memcmp_evex_movbe",
+          "period": 617017291,
+          "percent": 2.4011512026011683
+        },
+        {
+          "symbol": "<zlib_rs::deflate::Heap>::pqdownheap",
+          "period": 609348548,
+          "percent": 2.3713079360582716
+        },
+        {
+          "symbol": "crc32fast::specialized::pclmulqdq::calculate",
+          "period": 576996547,
+          "percent": 2.2454086343032023
+        },
+        {
+          "symbol": "litchi_perf_baseline::payload_bytes",
+          "period": 507756845,
+          "percent": 1.9759591453665195
+        },
+        {
+          "symbol": "[unknown]",
+          "period": 435578534,
+          "percent": 1.6950739241784942
+        },
+        {
+          "symbol": "__memset_avx512_unaligned_erms",
+          "period": 160576400,
+          "percent": 0.6248904554108619
+        },
+        {
+          "symbol": "<litchi_core::budget::Budget>::reserve",
+          "period": 62934202,
+          "percent": 0.24491134530789813
+        },
+        {
+          "symbol": "_int_malloc",
+          "period": 57781646,
+          "percent": 0.22485993635010626
+        },
+        {
+          "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+          "period": 56307342,
+          "percent": 0.21912261443994976
+        },
+        {
+          "symbol": "zlib_rs::deflate::flush_block_only",
+          "period": 52290454,
+          "percent": 0.20349070980356218
+        },
+        {
+          "symbol": "<litchi_perf_baseline::pptx_range_source::PptxRangeSource>::checked_add",
+          "period": 50355394,
+          "percent": 0.1959603347008239
+        },
+        {
+          "symbol": "zlib_rs::inflate::inflate",
+          "period": 43636121,
+          "percent": 0.16981197438760287
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::IterState>::next",
+          "period": 42775286,
+          "percent": 0.1664619953422163
+        },
+        {
+          "symbol": "<zlib_rs::deflate::Heap>::construct_huffman_tree",
+          "period": 39335418,
+          "percent": 0.1530755906085615
+        },
+        {
+          "symbol": "zlib_rs::deflate::gen_codes",
+          "period": 39321201,
+          "percent": 0.15302026449834494
+        },
+        {
+          "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+          "period": 37167770,
+          "percent": 0.14464008859275815
+        },
+        {
+          "symbol": "zlib_rs::inflate::inftrees::inflate_table",
+          "period": 36504957,
+          "percent": 0.14206072127961475
+        },
+        {
+          "symbol": "zlib_rs::deflate::slide_hash::avx2::slide_hash_chain",
+          "period": 30597672,
+          "percent": 0.11907224966179449
+        },
+        {
+          "symbol": "zlib_rs::inflate::inflate_fast_help_avx2",
+          "period": 26722771,
+          "percent": 0.10399289397464492
+        },
+        {
+          "symbol": "<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write",
+          "period": 26639818,
+          "percent": 0.10367007855502101
+        },
+        {
+          "symbol": "litchi_pptx::presentation::source_cross_copy::validate_xml_with_policy",
+          "period": 23088658,
+          "percent": 0.08985057587818408
+        }
+      ],
+      "run_frame_blocks": 1914,
+      "run_frame_period": 7037939921,
+      "run_frame_percent": 27.3884673114354,
+      "run_frame_self": [
+        {
+          "symbol": "sha2::sha256::x86_sha::compress",
+          "period": 4499251774,
+          "percent": 63.928533413236565
+        },
+        {
+          "symbol": "__memmove_avx512_unaligned_erms",
+          "period": 1240486427,
+          "percent": 17.62570355706792
+        },
+        {
+          "symbol": "crc32fast::specialized::pclmulqdq::calculate",
+          "period": 259162689,
+          "percent": 3.682365747776607
+        },
+        {
+          "symbol": "__memcmp_evex_movbe",
+          "period": 209117537,
+          "percent": 2.971289032690224
+        },
+        {
+          "symbol": "<litchi_core::budget::Budget>::reserve",
+          "period": 62934202,
+          "percent": 0.8942134020242939
+        },
+        {
+          "symbol": "__memset_avx512_unaligned_erms",
+          "period": 55405556,
+          "percent": 0.7872411049528765
+        },
+        {
+          "symbol": "<litchi_perf_baseline::pptx_range_source::PptxRangeSource>::checked_add",
+          "period": 50355394,
+          "percent": 0.7154848516076158
+        },
+        {
+          "symbol": "_int_malloc",
+          "period": 38208831,
+          "percent": 0.5428979421377473
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::IterState>::next",
+          "period": 33157754,
+          "percent": 0.47112868782899064
+        },
+        {
+          "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+          "period": 30082622,
+          "percent": 0.4274350497116157
+        },
+        {
+          "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+          "period": 25562343,
+          "percent": 0.36320774668346306
+        },
+        {
+          "symbol": "[unknown]",
+          "period": 23891150,
+          "percent": 0.3394622612323377
+        },
+        {
+          "symbol": "litchi_pptx::presentation::source_cross_copy::validate_xml_with_policy",
+          "period": 23088658,
+          "percent": 0.32805989052431983
+        },
+        {
+          "symbol": "zlib_rs::inflate::inflate",
+          "period": 22124976,
+          "percent": 0.31436721893551384
+        },
+        {
+          "symbol": "<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at",
+          "period": 17482253,
+          "percent": 0.24840014544363997
+        },
+        {
+          "symbol": "<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write",
+          "period": 17412467,
+          "percent": 0.24740857687693807
+        },
+        {
+          "symbol": "litchi_pptx::presentation::source_cross_copy::lock_source_state",
+          "period": 16063660,
+          "percent": 0.22824377843960852
+        },
+        {
+          "symbol": "zlib_rs::inflate::inftrees::inflate_table",
+          "period": 15266904,
+          "percent": 0.21692290885357218
+        },
+        {
+          "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+          "period": 12875131,
+          "percent": 0.18293891599703527
+        },
+        {
+          "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+          "period": 12729278,
+          "percent": 0.18086653399836547
+        },
+        {
+          "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event",
+          "period": 12614408,
+          "percent": 0.179234380253244
+        },
+        {
+          "symbol": "<litchi_perf_baseline::pptx_range_source::PptxRangeSource as litchi_core::source::ReadAt>::read_at",
+          "period": 11634762,
+          "percent": 0.16531488092536675
+        },
+        {
+          "symbol": "<litchi_core::budget::Reservation>::commit",
+          "period": 11450195,
+          "percent": 0.1626924231881348
+        },
+        {
+          "symbol": "<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader> as std::io::Read>::read",
+          "period": 10992167,
+          "percent": 0.15618443924480327
+        },
+        {
+          "symbol": "litchi_pptx::presentation::source_cross_copy::relationship_list",
+          "period": 9458348,
+          "percent": 0.13439086019728472
+        }
+      ],
+      "run_frame_inclusive": [
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::write_topology_to_stream::<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>",
+          "period": 639844016,
+          "percent": 9.091353765195064
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::write_changed_overlays_with_omissions_and_appended::<litchi_opc::source_backed::TransferSourceCheckedSink<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>>",
+          "period": 559873280,
+          "percent": 7.955073306741858
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::PartView>::authorize_precompressed",
+          "period": 541957505,
+          "percent": 7.7005133758373265
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceReader as soapberry_zip::reader_at::ReaderAt>::read_at",
+          "period": 537516343,
+          "percent": 7.637410222786129
+        },
+        {
+          "symbol": "litchi_opc::source_backed::read_source_at_with_context",
+          "period": 537516343,
+          "percent": 7.637410222786129
+        },
+        {
+          "symbol": "<soapberry_zip::preserve::PreservationIndex<litchi_opc::source_backed::SourceReader>>::write_to_with_accounting::<litchi_opc::source_backed::Chunked<litchi_opc::source_backed::OutputBudgetedSink<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<litchi_opc::source_backed::TransferSourceCheckedSink<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>>>>>>>",
+          "period": 537014044,
+          "percent": 7.630273205340139
+        },
+        {
+          "symbol": "<soapberry_zip::office::IndexedReadSession<litchi_opc::source_backed::SourceReader>>::read_entry_with_accounting",
+          "period": 498848877,
+          "percent": 7.087995672022163
+        },
+        {
+          "symbol": "std::io::default_read_to_end::<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>>",
+          "period": 490068123,
+          "percent": 6.96323254391134
+        },
+        {
+          "symbol": "<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>::read_entry_precompressed_with_progress::<litchi_opc::error::OpcError, <litchi_opc::source_backed::SourceBackedPackage>::authorize_precompressed::{closure#5}>",
+          "period": 469125819,
+          "percent": 6.665669560494675
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::PartView>::data",
+          "period": 462280658,
+          "percent": 6.568408698980709
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::read_part_with_observer::<litchi_opc::source_backed::NoopDiagnosticObserver>",
+          "period": 462280658,
+          "percent": 6.568408698980709
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::load_part_with_accounting::<litchi_opc::source_backed::NoopDiagnosticObserver>",
+          "period": 449987783,
+          "percent": 6.3937428857173675
+        },
+        {
+          "symbol": "<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>> as std::io::Read>::read_buf",
+          "period": 447923029,
+          "percent": 6.364405408796896
+        },
+        {
+          "symbol": "<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader> as std::io::Read>::read",
+          "period": 443530115,
+          "percent": 6.301987797261278
+        },
+        {
+          "symbol": "soapberry_zip::preserve::write_prepared_local::<litchi_opc::source_backed::SourceReader, litchi_opc::source_backed::Chunked<litchi_opc::source_backed::OutputBudgetedSink<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<litchi_opc::source_backed::TransferSourceCheckedSink<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>>>>>>>",
+          "period": 427221426,
+          "percent": 6.070262474467065
+        },
+        {
+          "symbol": "soapberry_zip::office::verify_captured_precompressed_payload::<litchi_opc::error::OpcError, <litchi_opc::source_backed::SourceBackedPackage>::authorize_precompressed::{closure#5}>",
+          "period": 297168439,
+          "percent": 4.222378172244702
+        },
+        {
+          "symbol": "flate2::zio::read::<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>, flate2::mem::Decompress>",
+          "period": 278113677,
+          "percent": 3.9516347130238594
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::Chunked<litchi_opc::source_backed::OutputBudgetedSink<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<litchi_opc::source_backed::TransferSourceCheckedSink<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>>>>>> as std::io::Write>::write",
+          "period": 262300922,
+          "percent": 3.726955969279295
+        },
+        {
+          "symbol": "soapberry_zip::accounting::write_all_counted::<litchi_opc::source_backed::Chunked<litchi_opc::source_backed::OutputBudgetedSink<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<litchi_opc::source_backed::TransferSourceCheckedSink<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>>>>>>>",
+          "period": 254737091,
+          "percent": 3.6194837389831704
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<litchi_opc::source_backed::TransferSourceCheckedSink<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>>>> as std::io::Write>::write",
+          "period": 246827732,
+          "percent": 3.5071020038620757
+        },
+        {
+          "symbol": "<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>> as std::io::Read>::read",
+          "period": 174285229,
+          "percent": 2.476367103958403
+        },
+        {
+          "symbol": "soapberry_zip::office::compare_captured_decoded_chunk::<litchi_opc::error::OpcError, <litchi_opc::source_backed::SourceBackedPackage>::authorize_precompressed::{closure#5}>",
+          "period": 112785259,
+          "percent": 1.6025322788486476
+        },
+        {
+          "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare",
+          "period": 105176504,
+          "percent": 1.4944217367666273
+        },
+        {
+          "symbol": "soapberry_zip::preserve::generated_entry",
+          "period": 105176504,
+          "percent": 1.4944217367666273
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::from_read_at_inner",
+          "period": 96566513,
+          "percent": 1.3720849294530373
+        }
+      ],
+      "unparsed_lines": [],
+      "scope": "cycles:u weighted self; run-frame subset includes setup/probes/warmups/report work inside the run function, not just elapsed intervals; inclusive rows overlap and must not be added"
+    },
+    {
+      "role": "minimum-service",
+      "sample_blocks": 6443,
+      "missing_callchain_blocks": 0,
+      "missing_callchain_period": 0,
+      "total_period": 25708005118,
+      "whole_process_self": [
+        {
+          "symbol": "sha2::sha256::x86_sha::compress",
+          "period": 10077434708,
+          "percent": 39.199598186418875
+        },
+        {
+          "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+          "period": 7251964753,
+          "percent": 28.208975063266905
+        },
+        {
+          "symbol": "zlib_rs::deflate::longest_match::longest_match",
+          "period": 2311913277,
+          "percent": 8.99297034673945
+        },
+        {
+          "symbol": "__memmove_avx512_unaligned_erms",
+          "period": 1888693363,
+          "percent": 7.346713034834397
+        },
+        {
+          "symbol": "__memcmp_evex_movbe",
+          "period": 659253344,
+          "percent": 2.5643893447742077
+        },
+        {
+          "symbol": "crc32fast::specialized::pclmulqdq::calculate",
+          "period": 572527883,
+          "percent": 2.2270412673876923
+        },
+        {
+          "symbol": "<zlib_rs::deflate::Heap>::pqdownheap",
+          "period": 523548201,
+          "percent": 2.03651819188968
+        },
+        {
+          "symbol": "litchi_perf_baseline::payload_bytes",
+          "period": 501165503,
+          "percent": 1.9494531010852274
+        },
+        {
+          "symbol": "[unknown]",
+          "period": 491159949,
+          "percent": 1.9105331072775618
+        },
+        {
+          "symbol": "__memset_avx512_unaligned_erms",
+          "period": 199588508,
+          "percent": 0.7763671552261124
+        },
+        {
+          "symbol": "zlib_rs::deflate::flush_block_only",
+          "period": 85301315,
+          "percent": 0.3318083787849976
+        },
+        {
+          "symbol": "<litchi_perf_baseline::pptx_range_source::PptxRangeSource>::checked_add",
+          "period": 42455852,
+          "percent": 0.16514642736815718
+        },
+        {
+          "symbol": "litchi_pptx::presentation::source_cross_copy::validate_xml_with_policy",
+          "period": 38267729,
+          "percent": 0.14885530333587044
+        },
+        {
+          "symbol": "<litchi_core::budget::Budget>::reserve",
+          "period": 37464199,
+          "percent": 0.14572970103296212
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::IterState>::next",
+          "period": 36335600,
+          "percent": 0.14133963266779834
+        },
+        {
+          "symbol": "zlib_rs::inflate::inflate_fast_help_avx2",
+          "period": 27561863,
+          "percent": 0.10721120862350375
+        },
+        {
+          "symbol": "_int_malloc",
+          "period": 26891065,
+          "percent": 0.10460191242599239
+        },
+        {
+          "symbol": "<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write",
+          "period": 26214387,
+          "percent": 0.1019697439753715
+        },
+        {
+          "symbol": "zlib_rs::inflate::inflate",
+          "period": 24981803,
+          "percent": 0.09717519070551478
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>",
+          "period": 24348273,
+          "percent": 0.09471086102652145
+        },
+        {
+          "symbol": "<zlib_rs::deflate::Heap>::construct_huffman_tree",
+          "period": 23722520,
+          "percent": 0.09227678262515274
+        },
+        {
+          "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+          "period": 21344538,
+          "percent": 0.08302681558537256
+        },
+        {
+          "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event",
+          "period": 20721533,
+          "percent": 0.08060342646147749
+        },
+        {
+          "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+          "period": 20196824,
+          "percent": 0.078562392948408
+        },
+        {
+          "symbol": "<quick_xml::reader::state::ReaderState>::emit_start",
+          "period": 19527193,
+          "percent": 0.07595763619296787
+        }
+      ],
+      "run_frame_blocks": 1917,
+      "run_frame_period": 7041862899,
+      "run_frame_percent": 27.391712685125817,
+      "run_frame_self": [
+        {
+          "symbol": "sha2::sha256::x86_sha::compress",
+          "period": 4452733876,
+          "percent": 63.2323284316189
+        },
+        {
+          "symbol": "__memmove_avx512_unaligned_erms",
+          "period": 1260107246,
+          "percent": 17.894515472304143
+        },
+        {
+          "symbol": "crc32fast::specialized::pclmulqdq::calculate",
+          "period": 252516600,
+          "percent": 3.5859346258482163
+        },
+        {
+          "symbol": "__memcmp_evex_movbe",
+          "period": 216690469,
+          "percent": 3.0771753456144646
+        },
+        {
+          "symbol": "__memset_avx512_unaligned_erms",
+          "period": 89530166,
+          "percent": 1.2713988795878715
+        },
+        {
+          "symbol": "<litchi_perf_baseline::pptx_range_source::PptxRangeSource>::checked_add",
+          "period": 42455852,
+          "percent": 0.6029065406261895
+        },
+        {
+          "symbol": "litchi_pptx::presentation::source_cross_copy::validate_xml_with_policy",
+          "period": 38267729,
+          "percent": 0.5434318950662093
+        },
+        {
+          "symbol": "<litchi_core::budget::Budget>::reserve",
+          "period": 37464199,
+          "percent": 0.5320211361303301
+        },
+        {
+          "symbol": "[unknown]",
+          "period": 29345251,
+          "percent": 0.41672567928249865
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::IterState>::next",
+          "period": 26620101,
+          "percent": 0.37802640269778987
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>",
+          "period": 24348273,
+          "percent": 0.3457646555921679
+        },
+        {
+          "symbol": "_int_malloc",
+          "period": 19752161,
+          "percent": 0.2804962448616397
+        },
+        {
+          "symbol": "litchi_pptx::presentation::source_cross_copy::lock_source_state",
+          "period": 19107055,
+          "percent": 0.27133523151541833
+        },
+        {
+          "symbol": "<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write",
+          "period": 17442758,
+          "percent": 0.2477009031584101
+        },
+        {
+          "symbol": "<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at",
+          "period": 17222313,
+          "percent": 0.24457041051517353
+        },
+        {
+          "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2",
+          "period": 17115096,
+          "percent": 0.24304784466097
+        },
+        {
+          "symbol": "<litchi_perf_baseline::pptx_range_source::PptxRangeSource as litchi_core::source::ReadAt>::read_at",
+          "period": 17083471,
+          "percent": 0.24259874475014256
+        },
+        {
+          "symbol": "zlib_rs::inflate::inflate_fast_help_avx2",
+          "period": 16885361,
+          "percent": 0.23978542670005482
+        },
+        {
+          "symbol": "<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match",
+          "period": 15718866,
+          "percent": 0.22322027885876908
+        },
+        {
+          "symbol": "<litchi_core::execution::ExecutionContext>::check",
+          "period": 15060663,
+          "percent": 0.21387327779611745
+        },
+        {
+          "symbol": "zlib_rs::inflate::inflate",
+          "period": 12745302,
+          "percent": 0.18099332779980612
+        },
+        {
+          "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+          "period": 12552434,
+          "percent": 0.1782544502788111
+        },
+        {
+          "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event",
+          "period": 11969057,
+          "percent": 0.1699700373561618
+        },
+        {
+          "symbol": "cfree@GLIBC_2.2.5",
+          "period": 11958883,
+          "percent": 0.16982555854216155
+        },
+        {
+          "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+          "period": 11808022,
+          "percent": 0.16768321350983462
+        }
+      ],
+      "run_frame_inclusive": [
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::write_topology_to_stream::<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>",
+          "period": 628783440,
+          "percent": 8.929220137036355
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::write_changed_overlays_with_omissions_and_appended::<litchi_opc::source_backed::TransferSourceCheckedSink<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>>",
+          "period": 570458346,
+          "percent": 8.1009578599011
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::PartView>::authorize_precompressed",
+          "period": 570403674,
+          "percent": 8.100181474436287
+        },
+        {
+          "symbol": "<soapberry_zip::preserve::PreservationIndex<litchi_opc::source_backed::SourceReader>>::write_to_with_accounting::<litchi_opc::source_backed::Chunked<litchi_opc::source_backed::OutputBudgetedSink<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<litchi_opc::source_backed::TransferSourceCheckedSink<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>>>>>>>",
+          "period": 541474407,
+          "percent": 7.6893630956219505
+        },
+        {
+          "symbol": "<soapberry_zip::office::IndexedReadSession<litchi_opc::source_backed::SourceReader>>::read_entry_with_accounting",
+          "period": 512080289,
+          "percent": 7.271943466447201
+        },
+        {
+          "symbol": "std::io::default_read_to_end::<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>>",
+          "period": 502250259,
+          "percent": 7.132349297390091
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::PartView>::data",
+          "period": 499015390,
+          "percent": 7.086411609502709
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::read_part_with_observer::<litchi_opc::source_backed::NoopDiagnosticObserver>",
+          "period": 499015390,
+          "percent": 7.086411609502709
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::load_part_with_accounting::<litchi_opc::source_backed::NoopDiagnosticObserver>",
+          "period": 486477150,
+          "percent": 6.908358725204429
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceReader as soapberry_zip::reader_at::ReaderAt>::read_at",
+          "period": 484523550,
+          "percent": 6.88061606636514
+        },
+        {
+          "symbol": "litchi_opc::source_backed::read_source_at_with_context",
+          "period": 479939867,
+          "percent": 6.815524157224862
+        },
+        {
+          "symbol": "<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>::read_entry_precompressed_with_progress::<litchi_opc::error::OpcError, <litchi_opc::source_backed::SourceBackedPackage>::authorize_precompressed::{closure#5}>",
+          "period": 434027688,
+          "percent": 6.163535050670119
+        },
+        {
+          "symbol": "<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>> as std::io::Read>::read_buf",
+          "period": 422342461,
+          "percent": 5.997595622885188
+        },
+        {
+          "symbol": "<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader> as std::io::Read>::read",
+          "period": 422342461,
+          "percent": 5.997595622885188
+        },
+        {
+          "symbol": "soapberry_zip::preserve::write_prepared_local::<litchi_opc::source_backed::SourceReader, litchi_opc::source_backed::Chunked<litchi_opc::source_backed::OutputBudgetedSink<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<litchi_opc::source_backed::TransferSourceCheckedSink<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>>>>>>>",
+          "period": 418240758,
+          "percent": 5.939348209397736
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::Chunked<litchi_opc::source_backed::OutputBudgetedSink<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<litchi_opc::source_backed::TransferSourceCheckedSink<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>>>>>> as std::io::Write>::write",
+          "period": 279220647,
+          "percent": 3.965153127869779
+        },
+        {
+          "symbol": "soapberry_zip::accounting::write_all_counted::<litchi_opc::source_backed::Chunked<litchi_opc::source_backed::OutputBudgetedSink<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<litchi_opc::source_backed::TransferSourceCheckedSink<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>>>>>>>",
+          "period": 277814152,
+          "percent": 3.9451797909818977
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<litchi_opc::source_backed::TransferSourceCheckedSink<litchi_pptx::presentation::source_cross_copy::SourceCheckedWriter<&mut litchi_perf_baseline::CountingSink>>>>> as std::io::Write>::write",
+          "period": 274683621,
+          "percent": 3.9007237848809475
+        },
+        {
+          "symbol": "soapberry_zip::office::verify_captured_precompressed_payload::<litchi_opc::error::OpcError, <litchi_opc::source_backed::SourceBackedPackage>::authorize_precompressed::{closure#5}>",
+          "period": 267839113,
+          "percent": 3.8035263799020465
+        },
+        {
+          "symbol": "flate2::zio::read::<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>, flate2::mem::Decompress>",
+          "period": 264732582,
+          "percent": 3.7594111927057554
+        },
+        {
+          "symbol": "<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>> as std::io::Read>::read",
+          "period": 149344476,
+          "percent": 2.120809196969854
+        },
+        {
+          "symbol": "soapberry_zip::office::compare_captured_decoded_chunk::<litchi_opc::error::OpcError, <litchi_opc::source_backed::SourceBackedPackage>::authorize_precompressed::{closure#5}>",
+          "period": 129696832,
+          "percent": 1.841797175835644
+        },
+        {
+          "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare",
+          "period": 117876478,
+          "percent": 1.673938838211965
+        },
+        {
+          "symbol": "soapberry_zip::preserve::generated_entry",
+          "period": 117876478,
+          "percent": 1.673938838211965
+        },
+        {
+          "symbol": "<soapberry_zip::writer::ZipArchiveWriter<alloc::vec::Vec<u8>>>::write_precompressed_file",
+          "period": 80468882,
+          "percent": 1.1427215092674867
+        }
+      ],
+      "unparsed_lines": [],
+      "scope": "cycles:u weighted self; run-frame subset includes setup/probes/warmups/report work inside the run function, not just elapsed intervals; inclusive rows overlap and must not be added"
+    }
+  ],
+  "scope": "diagnostic CPU attribution for a pacing model; blocked sleep is absent from cycles; no exact timed-region or production CPU improvement claim"
+}

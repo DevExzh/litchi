@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0448: explicit minimum-service policy in standalone tooling
+
+[0448](changes/0448-pptx-minimum-service-pacing.md) uses a local monotonic timer only in the caller-configured range simulator.
+Production source/version, snapshot/publication, cache/budget and ownership
+contracts remain unchanged (0002/0003/0005/0006/0008/0023/0024). Checked duration
+addition fails closed; elapsed time saturates at the combined target. Fixed delay
+still precedes delegation and nominal counters retain their documented meaning.
+No dependency, public document API, unsafe policy, hidden pool or ambient network
+change. Accepted ADRs are unchanged. See
+[source review](results/change-0448/source-review.md).
+
 ## Change 0447: caller-owned transfer simulation remains in tooling
 
 [0447](changes/0447-pptx-range-transfer-pacing.md) adds optional per-read sleep around explicit ReadAt in the standalone harness.
