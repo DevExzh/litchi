@@ -1,7 +1,7 @@
 //! Native-style duplication of populated Numbers sheets.
 
 use super::*;
-use litchi_numbers::{SheetSelector, TableSelector};
+use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};
 
 mod wire;
 
@@ -133,10 +133,7 @@ impl NumbersEditor {
                 } => {
                     let source_index = super::selectors::table_index(&working, model_id)?;
                     let cloned = working.duplicate_table(TableSelector::index(source_index))?;
-                    working.move_table(
-                        TableSelector::name(&cloned.name),
-                        SheetSelector::name(&new_sheet_name),
-                    )?;
+                    place_cloned_table(&mut working, &cloned, new_sheet_id, &new_sheet_name)?;
                     rename_attached_table_in_package(
                         &mut working.package,
                         cloned.native_id(),
@@ -212,6 +209,90 @@ impl NumbersEditor {
         self.package = working.package;
         Ok(created)
     }
+}
+
+/// Place one table produced by [`NumbersEditor::duplicate_table`] while
+/// keeping the focused compatibility seam private to populated-sheet
+/// duplication.
+///
+/// The provenance bit is captured once before the focused transaction. Source
+/// built snapshots use the focused compatibility ingress; exact snapshots use
+/// the strict focused package reader and public relocation transaction. Both
+/// routes are terminal after focused admission, and the same bit is passed to
+/// [`NumbersEditor::from_validation_bytes`] so validation preserves provenance.
+fn place_cloned_table(
+    editor: &mut NumbersEditor,
+    cloned: &NumbersTableInfo,
+    target_sheet_id: u64,
+    target_sheet_name: &str,
+) -> Result<()> {
+    let source_built = !editor.package.source_is_exact();
+    let table_id = cloned.object_id;
+    let owner = find_table_owner(editor.package(), table_id)?;
+    // `duplicate_table` places the clone on its source sheet, while the
+    // destination is the freshly inserted sheet, so this alias is impossible.
+    debug_assert_ne!(owner.sheet_id, target_sheet_id);
+    let (source_sheet, focused_table) = super::selectors::focused_table_location(editor, table_id)?;
+    let source_bytes = editor.to_bytes()?;
+    let bytes = if source_built {
+        FocusedNumbersPackage::__move_table_from_bytes_for_compatibility(
+            &source_bytes,
+            source_sheet,
+            focused_table,
+            SheetSelector::name(target_sheet_name),
+        )
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "focused Numbers table-move compatibility admission failed: {error}"
+            ))
+        })?
+    } else {
+        let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "focused Numbers table-move source validation failed: {error}"
+            ))
+        })?;
+        let commit = source
+            .move_table(
+                source_sheet,
+                focused_table,
+                SheetSelector::name(target_sheet_name),
+            )
+            .map_err(|error| {
+                Error::InvalidFormat(format!("focused Numbers table move failed: {error}"))
+            })?;
+        let mut bytes = Vec::new();
+        commit
+            .package()
+            .write_to(&mut bytes)
+            .map_err(|error| Error::Io(error.into_io_error()))?;
+        bytes
+    };
+    let verified = NumbersEditor::from_validation_bytes(&bytes, source_built)?;
+    let verified_owner = find_table_owner(verified.package(), table_id)?;
+    let verified_table = verified
+        .tables()?
+        .into_iter()
+        .find(|candidate| candidate.object_id == table_id)
+        .ok_or_else(|| Error::InvalidFormat("Moved Numbers table disappeared".to_owned()))?;
+    // `NumbersTableInfo::index` is rooted in workbook table order. Moving a
+    // later clone behind an earlier clone legitimately changes that position;
+    // the owner check below plus `duplicate_sheet`'s final drawable-order
+    // validation prove placement. Identity, name, dimensions, and appearance
+    // remain stable metadata and must all survive the focused transaction.
+    let stable_metadata_matches = verified_table.object_id == cloned.object_id
+        && verified_table.name == cloned.name
+        && verified_table.rows == cloned.rows
+        && verified_table.columns == cloned.columns
+        && verified_table.appearance == cloned.appearance;
+    if verified_owner.sheet_id != target_sheet_id || !stable_metadata_matches {
+        return Err(Error::InvalidFormat(
+            "Numbers table move failed validation".to_owned(),
+        ));
+    }
+
+    editor.package = verified.package;
+    Ok(())
 }
 
 fn classify_sheet_drawables(

@@ -33,6 +33,7 @@ impl Package {
     /// This is not a second mutation implementation. It performs physical-only
     /// selector admission and delegates rewriting plus source, target, and
     /// locality verification to the focused transaction engine.
+    #[cfg(feature = "internal-iwork-source")]
     #[doc(hidden)]
     pub fn __move_table_from_bytes_for_compatibility<'source_sheet, 'table, 'destination_sheet>(
         bytes: &[u8],
