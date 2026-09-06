@@ -41,6 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_soundtrack_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_media_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_media_lifecycle_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_media_lifecycle_codec/node_cache.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_background_codec.rs");
     println!("cargo:rerun-if-changed=src/hyperlink_codec.rs");
@@ -1568,8 +1569,8 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
         ),
         (
             "KNMediaLifecycleArchive.proto",
-            957,
-            "d49b2fca989d49f0c114339322b24107d46661e69c452928dbb24dc10135a8b7",
+            1523,
+            "3aaf5292d6ce41859188d13d4fdd8ed7c697ac8b59f231f8480cc159db453adc",
         ),
         (
             "TSPPackageMetadataMediaArchive.proto",
@@ -2094,7 +2095,13 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
 
     let lib = fs::read_to_string("src/lib.rs")?;
     for (path, generated_marker, private_module_marker) in CODECS {
-        let source = fs::read_to_string(path)?;
+        let mut source = fs::read_to_string(path)?;
+        if *path == "src/keynote_media_lifecycle_codec.rs" {
+            source.push('\n');
+            source.push_str(&fs::read_to_string(
+                "src/keynote_media_lifecycle_codec/node_cache.rs",
+            )?);
+        }
         // Some codecs have cfg(test) allocation probes near their imports;
         // the shared source slicer removes every test-only item without
         // truncating production at the first such probe.
@@ -9985,7 +9992,7 @@ fn enforce_keynote_media_lifecycle_projection_budget(
     // files are build artifacts, so enforce their shape rather than exposing
     // a generated repeated collection to the public crate.
     const EXPECTED_FILES: usize = 5;
-    const MAX_GENERATED_BYTES: u64 = 180 * 1024;
+    const MAX_GENERATED_BYTES: u64 = 192 * 1024;
     let mut files = 0usize;
     let mut bytes = 0u64;
     let mut repeated_views = 0usize;

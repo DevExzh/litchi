@@ -26,6 +26,10 @@ use buffa::DecodeOptions as BuffaDecodeOptions;
 
 use crate::buffa_keynote_media_lifecycle_generated::LitchiIwaProjection as projection;
 
+/// Bounded lazy scalar seam for the native `KN.SlideNodeArchive` build cache.
+#[doc(hidden)]
+pub mod node_cache;
+
 const MAX_RECURSION_LIMIT: u32 = 64;
 const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;
 const MIN_SIGN_EXTENDED_INT32: u64 = 0xffff_ffff_8000_0000;

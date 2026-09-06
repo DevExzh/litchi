@@ -121,6 +121,13 @@ pub(super) fn select_media(
     if !matches!(movie_info.kind(), MovieKind::File | MovieKind::Audio) {
         return Err(SlideMediaLifecycleError::InvalidSource);
     }
+    // A direct drawable comment owns a separate comment/reply graph.  The
+    // lifecycle clone/removal path has no comment-owner transaction, so
+    // carrying this edge into a cloned or deleted drawable could leave stale
+    // reply IDs or duplicate generated authors.  Inspect only the selected
+    // MovieArchive's DrawableArchive.super.comment edge; comments attached to
+    // sibling drawables remain outside this operation's closure.
+    reject_direct_drawable_comment(movie_payload, limits, budget)?;
     let parent = drawable_parent(movie_payload, limits, budget)?;
     if parent != slide_record.slide_identifier {
         return Err(SlideMediaLifecycleError::InvalidSource);
@@ -181,6 +188,40 @@ pub(super) fn select_media(
         chunk_ids,
         data_references,
     })
+}
+
+fn reject_direct_drawable_comment(
+    payload: &[u8],
+    limits: WireLimits,
+    budget: &mut LifecycleBudget,
+) -> Result<(), SlideMediaLifecycleError> {
+    let root = parse_view(payload, limits, budget, 1)?;
+    let mut drawable = None;
+    for field in root.fields().filter(|field| field.number() == 1) {
+        if drawable.is_some() || field.wire_type() != 2 {
+            return Err(SlideMediaLifecycleError::InvalidSource);
+        }
+        field
+            .validate_canonical_framing()
+            .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+        drawable = Some(field.payload());
+    }
+    let drawable = drawable.ok_or(SlideMediaLifecycleError::InvalidSource)?;
+    let drawable_view = parse_view(drawable, limits, budget, 2)?;
+    let mut comment = None;
+    for field in drawable_view.fields().filter(|field| field.number() == 6) {
+        if comment.is_some() || field.wire_type() != 2 {
+            return Err(SlideMediaLifecycleError::InvalidSource);
+        }
+        field
+            .validate_canonical_framing()
+            .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+        comment = Some(reference_identifier(field.payload(), limits, budget, 3)?);
+    }
+    if comment.is_some() {
+        return Err(SlideMediaLifecycleError::UnsupportedComment);
+    }
+    Ok(())
 }
 
 fn resolve_slide_position(
@@ -650,6 +691,7 @@ pub(super) fn clone_object(
     limits: ArchiveObjectLimits,
     movie_geometry_offset: bool,
     movie_uuid: Option<SuperUuid>,
+    transitive_style_witnesses: &[u64],
     budget: &mut LifecycleBudget,
 ) -> Result<ArchiveObject, SlideMediaLifecycleError> {
     if source.archive_info.should_merge == Some(true)
@@ -710,6 +752,25 @@ pub(super) fn clone_object(
                 },
             }
         } else {
+            let mut direct_header_references = Vec::new();
+            let source_references =
+                if message.type_ == MOVIE_MESSAGE_TYPE && !transitive_style_witnesses.is_empty() {
+                    reserve_bytes(
+                        &mut direct_header_references,
+                        info.object_references.len(),
+                        budget,
+                    )?;
+                    budget.charge_wire_work(info.object_references.len().saturating_mul(2))?;
+                    direct_header_references.extend(
+                        info.object_references
+                            .iter()
+                            .copied()
+                            .filter(|identifier| !transitive_style_witnesses.contains(identifier)),
+                    );
+                    direct_header_references.as_slice()
+                } else {
+                    info.object_references.as_slice()
+                };
             let mut budget_error = None;
             let mut charge = |amount| {
                 budget.charge_allocations(amount).map_err(|error| {
@@ -721,7 +782,7 @@ pub(super) fn clone_object(
                 &message.data,
                 message.type_,
                 object_remap,
-                &info.object_references,
+                source_references,
                 wire_limits,
                 &mut charge,
             ) {
@@ -1706,7 +1767,7 @@ fn transition_reference_ids(
 /// Reserve a source-sized core header arena before entering its bounded codecs.
 /// The input is an unchanged physical source header; mutations only add known
 /// references or grow identifiers/message lengths to at most ten-byte varints.
-fn reserve_core_header_work(
+pub(super) fn reserve_core_header_work(
     source: &ArchiveObject,
     additional_references: usize,
     limits: ArchiveObjectLimits,
