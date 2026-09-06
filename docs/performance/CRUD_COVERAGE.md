@@ -1,5 +1,16 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0441 lowers owned ODP append peak
+
+[0441](changes/0441-odp-shared-preservation-projection.md) reuses category 6's
+opt-in existing-append lifecycle for immutable source-projection sharing.
+Medium/large peak above entry falls 9.834%/9.857%, with an explicitly post-hoc
+memory decision after the original practical gate fails. It adds no scenario
+or coverage promotion. The registry remains 436 selectors, the default matrix
+36 cases, and the representative index 15 categories/33 mappings (10 measured
+and 23 correctness-only under its default-baseline contract). Bounded existing
+append, Part addition, repackaging, native breadth, cold/range and scaling remain open.
+
 ## 2026-09-06: change 0440 reduces existing ODP append allocations
 
 [0440](changes/0440-odp-borrowed-attribute-namespaces.md) reuses the opt-in

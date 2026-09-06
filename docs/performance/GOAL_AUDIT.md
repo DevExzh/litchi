@@ -1,6 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0440
+## Current evidence through 0441
+
+[0441](changes/0441-odp-shared-preservation-projection.md) shares the immutable
+ODP preservation comparison projection and keeps the mutable draft detached.
+The 720-sample comparison shows 9.834%/9.857% lower medium/large operation peak,
+with unchanged retained live bytes. Its original practical gate failed;
+retention is explicitly based on a post-hoc peak-memory review. All raw timing
+costs and the baseline tiny p99 repeat flag remain visible. No normal latency,
+RSS or bounded existing-append claim is made.
+
+Repeated XML staging scans remain a larger CPU target. Part addition,
+repackaging, bounded existing append, native breadth, cold/range and scaling
+remain open. This measured ownership improvement does not complete or narrow
+the user-owned non-iWork goal.
+
+## Earlier evidence through 0440
 
 [0440](changes/0440-odp-borrowed-attribute-namespaces.md) reduces temporary
 namespace allocation work in owned ODP append: about 20% fewer medium/large

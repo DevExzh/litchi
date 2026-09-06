@@ -1,0 +1,14 @@
+{
+  "status": "pass",
+  "role": "after",
+  "files": [
+    "crates/litchi-odp/src/authoring/edit.rs",
+    "crates/litchi-odp/src/authoring/mutable.rs"
+  ],
+  "source_manifest": {
+    "path": "sources/d4d18f732e87419ff70c386655cd336287bfc2da5edefbfc929fc74ef825cec6.json",
+    "sha256": "d4d18f732e87419ff70c386655cd336287bfc2da5edefbfc929fc74ef825cec6",
+    "files": 6657
+  },
+  "utc": "2026-09-06T16:19:07.469321+00:00"
+}

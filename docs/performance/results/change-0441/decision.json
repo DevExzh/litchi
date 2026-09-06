@@ -1,0 +1,13 @@
+{
+  "change": 441,
+  "decision": "keep",
+  "basis": "post-hoc operation peak-memory review against the program objective",
+  "original_frozen_practical_gate_met": false,
+  "protocol_design_omission": "The original gate copied calls/requested-bytes/latency thresholds from 0440 and omitted peak memory despite naming peak in the hypothesis. The original protocol and failed gate are unchanged. This retention decision is explicitly post-hoc.",
+  "memory_review": "All 60 allocator observations per role and shape agree. Medium/large peak above operation entry falls 9.834%/9.857%, saving 1,966,080/3,932,160 bytes. The mutable draft stays detached and shares only its immutable preservation comparison authority. Retained live delta is unchanged; this is not bounded-memory append.",
+  "latency_review": "Medium/large normal p50 is 0.664–1.279% slower. There are no matched adverse changes above 5%. Baseline tiny normal p99 has a +5.807% repeat flag. No normal latency improvement is claimed.",
+  "allocation_review": "Medium/large calls fall only 1.398%/1.403%, and requested bytes 1.708%/1.778%; these miss the original 5% practical gate. Requested bytes are not physical-copy measurements.",
+  "profile_review": "Whole-process cycles fall 0.713% and instructions 0.279%; setup, warmups and Rust oracle work are included. No operation-only causal speedup or cache-miss claim follows. Baseline/candidate symbolization retains 13/11 warnings per conversion.",
+  "withheld": ["original practical gate passed", "normal latency speedup", "RSS improvement", "bounded existing-document append", "physical-copy counts", "compressed passthrough", "native compatibility", "scaling or universal Office performance"],
+  "followup": "Prioritize the measured repeated XML scanning cost in transaction staging. The full non-iWork goal remains active."
+}

@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "exit_code": 0,
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0441/verify.py"
+  ],
+  "started_utc": "2026-09-06T16:29:20.798264+00:00",
+  "finished_utc": "2026-09-06T16:29:24.751557+00:00",
+  "verifier_sha256": "f8370e0fa872f3daee07a9feac4d9547965e9a1585526435b206d986302bb8dd",
+  "log": {
+    "path": "checks/precleanup.log",
+    "bytes": 100,
+    "sha256": "6562ddba1c49841d39134ccb460ce82cdafa7c2c54f85fcfbba3e9bf633e9c09"
+  },
+  "changed_markdown_links_valid": true,
+  "generated_check_bytecode_removed": true
+}

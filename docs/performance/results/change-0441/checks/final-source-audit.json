@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "source_manifest": {
+    "path": "sources/d4d18f732e87419ff70c386655cd336287bfc2da5edefbfc929fc74ef825cec6.json",
+    "sha256": "d4d18f732e87419ff70c386655cd336287bfc2da5edefbfc929fc74ef825cec6",
+    "files": 6657
+  },
+  "candidate_copies_match_current_and_head": true,
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "prior_bundle_unchanged": true,
+  "oracle_byte_identical_to_0440": true
+}

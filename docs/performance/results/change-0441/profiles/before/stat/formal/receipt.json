@@ -1,0 +1,134 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0441/profiles/before/stat/formal/resource.log",
+    "perf",
+    "stat",
+    "--no-big-num",
+    "-x,",
+    "-e",
+    "cycles:u,instructions:u,branches:u,branch-misses:u,L1-dcache-load-misses:u",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0441/profiles/before/stat/formal/perf-stat.txt",
+    "--",
+    "/tmp/litchi-goal-0441-binaries/before/normal",
+    "--case",
+    "odp_existing_append_lifecycle",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0441/profiles/before/stat/formal/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0441/profiles/before/stat/formal/report-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4945,
+      "path": "profiles/before/stat/formal/report-catalog.json",
+      "sha256": "4a4b00a722de4def38e2da3d947717bd2094ff7a3fdef34dc4e4d0a7a4a4c42d"
+    },
+    "oracle": {
+      "bytes": 296,
+      "path": "profiles/before/stat/formal/oracle.log",
+      "sha256": "bac95367718b6882c9bae469807dcbd9a8ba1986d5832415a02e4974f4f0269c"
+    },
+    "perf_stat": {
+      "bytes": 267,
+      "path": "profiles/before/stat/formal/perf-stat.txt",
+      "sha256": "bfc3c1b822dba17513edfc41cbee854dea0c97a1004cea7f85afb5db8a8bd467"
+    },
+    "report": {
+      "bytes": 45297,
+      "path": "profiles/before/stat/formal/report.json",
+      "sha256": "036a0227dbcad6b7b4b20bba7a82c658a69d5a0c00caedc49e8e20ba60a2eae4"
+    },
+    "resource": {
+      "bytes": 1311,
+      "path": "profiles/before/stat/formal/resource.log",
+      "sha256": "b7b2d7408feb11f070cdb692a31ff44bba5bf815eb426c7edc4cca7056e6ca8a"
+    },
+    "workload": {
+      "bytes": 0,
+      "path": "profiles/before/stat/formal/workload.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "bytes": 457884856,
+    "path": "/tmp/litchi-goal-0441-binaries/before/normal",
+    "sha256": "81bd81b4fc34033be3aa7b47954c1319dacba3c1c2333b445103af4187cbc26d"
+  },
+  "call_graph": null,
+  "capture_driver_sha256": "f8126a044e2332a0e9d001d15c8c53d228d7a51a793e14270fbe689f07cada82",
+  "change": 441,
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "7433a1d59c26f88d98256f99b00b484844223490a753798c19547b13193e8bcf",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T16:15:47.233787+00:00",
+  "kind": "stat",
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0441/oracle/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0441/profiles/before/stat/formal/report.json",
+    "--mode",
+    "normal",
+    "--shape",
+    "large"
+  ],
+  "oracle_exit_code": 0,
+  "outside_bundle_status_unchanged": true,
+  "protocol_sha256": "28b500fa6e5277497401f8e52644448d07c8ced01ce834968d17bd7eaeccb26d",
+  "record_event": null,
+  "record_frequency_hz": null,
+  "revision": "25b5516b080c86b404eeec29461970e61cfe24d0",
+  "role": "before",
+  "schema": "litchi-0441-profile-receipt-v1",
+  "scope": "whole fresh executable including setup, corpus generation, warmups, samples, hashing, and checks; Python oracle afterward",
+  "selector": "odp_existing_append_lifecycle",
+  "shape": "large",
+  "source_after": {
+    "files": 6657,
+    "path": "sources/67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1.json",
+    "sha256": "67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1"
+  },
+  "source_before": {
+    "files": 6657,
+    "path": "sources/67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1.json",
+    "sha256": "67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1"
+  },
+  "source_field": "odp_append",
+  "source_manifest": {
+    "files": 6657,
+    "path": "sources/67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1.json",
+    "sha256": "67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T16:15:40.198746+00:00",
+  "stat_events": [
+    "cycles:u",
+    "instructions:u",
+    "branches:u",
+    "branch-misses:u",
+    "L1-dcache-load-misses:u"
+  ],
+  "status": "pass",
+  "status_after": [
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md"
+  ]
+}

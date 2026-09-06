@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## Change 0441: avoid a temporary preservation-model copy
+
+[0441](changes/0441-odp-shared-preservation-projection.md) removes one deep
+source-slide copy from ODP staging. Large peak above entry falls by 3,932,160
+bytes to 35,958,388 bytes. The original latency/calls/requested-bytes gate fails;
+the explicit post-hoc memory review keeps the 9.857% large peak benefit.
+Normal medium/large p50 remains slightly slower, and retained bytes are unchanged.
+
+The previous candidate's observed transaction call chains account for 30.56%
+of weighted sampled periods, with only 0.266% visibly under clone frames.
+These include warmups and incomplete symbolization, not operation-only causal
+fractions. Repeated settings, declaration, page-metadata and source-fragment
+XML traversals remain the larger CPU investigation. Preserve error order,
+namespace and publication contracts before consolidating any traversal.
+
 ## Change 0440: borrowed namespace cache reduces allocation work
 
 [0440](changes/0440-odp-borrowed-attribute-namespaces.md) removes per-attribute
