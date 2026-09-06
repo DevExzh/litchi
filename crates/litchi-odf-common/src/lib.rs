@@ -29,6 +29,7 @@ pub mod validation;
 pub use core::{
     ArchiveLimits, OwnedPackage, PreparedPackage, SourceBackedPackage, SourcePackageLimits,
 };
+pub use core::{GeneratedXmlEnvelope, GeneratedXmlLimits, GeneratedXmlReport};
 pub use core::{
     SourceContentPublicationError, SourceContentPublicationOptions,
     SourceContentPublicationProgress, SourceContentPublicationReport, write_content_xml_to_stream,

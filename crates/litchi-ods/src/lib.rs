@@ -71,6 +71,7 @@ pub mod package;
 pub mod protection;
 pub mod settings;
 pub mod source_features;
+pub mod streaming;
 pub mod styles;
 pub mod worksheet;
 mod xml_reference;
@@ -99,5 +100,9 @@ pub use settings::{Iteration, IterationStatus, NullDate, Settings};
 pub use source_features::{
     Drawing, DrawingKind, Hyperlink as SourceHyperlink, Limits as SourceFeatureLimits,
     Sheet as SourceSheet, Snapshot as SourceFeatures,
+};
+pub use streaming::{
+    PublicationError, PublicationFailureKind, ScalarStreamReport, StreamingCell, StreamingError,
+    StreamingLimits, XmlAuditLimits, stream_scalar_rows_to,
 };
 pub use worksheet::{Cell, CellValue, CellView, Merge, Row, Sheet};
