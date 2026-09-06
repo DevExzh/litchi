@@ -1,5 +1,37 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0434: ODS borrowed text-span comparison
+
+[0434](changes/0434-ods-bounded-text-spans.md) compares the existing ODS
+streaming selector before and after private ordinary-text span batching. The
+formal ABBA contains 24 reports and 720 retained samples across 64, 8,192 and
+32,768 rows, normal and allocator modes, two repeats, and four passing whole-
+process profiles. Descriptive normal p50 deltas (after versus before) are:
+
+| Rows | R1 | R2 |
+| ---: | ---: | ---: |
+| 64 | −12.499% | −16.211% |
+| 8,192 | −13.731% | −13.121% |
+| 32,768 | −13.562% | −13.492% |
+
+No matched comparison exceeds the 5% regression trigger, including whole-
+process RSS. The only repeat flag is a +9.844% p99 drift inside the baseline
+role's tiny lane. Allocation calls, requested bytes, and regional peak-above-entry vectors
+are identical before and after for every shape/repeat; the regional peak above
+entry is 419,347 bytes. The profiles sample the whole process, including setup
+and the untimed oracle: `ExecutionContext::consume` self samples move from
+25.01% to 10.57%. Ten before and eleven after addr2line warnings remain
+retained; zero L1 readings are not proof of zero misses, and LLC was not
+captured. These are descriptive observations, with no accepted speedup,
+physical-copy, RSS, total-memory, or scaling claim. The derived `claims[]` is
+empty. Copied-bundle replay and six mutation probes pass before and after task cleanup.
+
+The 0434 release checks report 454 ODS tests passed, with scoped Clippy
+retaining the existing common `ArchiveReaderKind` large-enum debt. The
+overall non-iWork goal remains open; bounded ODT paragraph creation is the next
+implementation slice, followed by ODP, while append, package-Part,
+repackaging, and native breadth remain separate.
+
 ## Change 0433: bounded ODS fresh scalar creation
 
 [0433](changes/0433-ods-bounded-fresh-scalar-creation.md) adds a measured
@@ -13,8 +45,8 @@ operation-region requested-allocation peak is 71,050,076 bytes before and
 419,347 bytes after streaming. These values are descriptive requested-heap
 and timer observations; process RSS, physical copies, allocator internals,
 and total-memory bounds are outside the claim scope. The [bundle](results/change-0433/README.md)
-contains semantic-oracle, build, profile, and check receipts; portable replay
-finalization remains pending for root.
+contains semantic-oracle, build, profile, and check receipts; sealed portable
+replay and mutation checks pass before and after task cleanup.
 
 ## Change 0432: XLSX streaming operation memory
 

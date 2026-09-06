@@ -1,0 +1,119 @@
+{
+  "ambient_source_manifest": {
+    "files": 6644,
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/profiles/before-streaming/stat/resource.log",
+    "perf",
+    "stat",
+    "--no-big-num",
+    "-x,",
+    "-e",
+    "cycles:u,instructions:u,branches:u,branch-misses:u,L1-dcache-load-misses:u",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/profiles/before-streaming/stat/perf-stat.txt",
+    "--",
+    "/tmp/litchi-goal-0434-binaries/before/normal",
+    "--case",
+    "ods_streaming_create",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/profiles/before-streaming/stat/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/profiles/before-streaming/stat/report-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4860,
+      "path": "profiles/before-streaming/stat/report-catalog.json",
+      "sha256": "c046eabdbc02277a860b7821528278d3d9653a3576fc3d2701fe400dbf2e35a6"
+    },
+    "oracle_log": {
+      "bytes": 20,
+      "path": "profiles/before-streaming/stat/oracle.log",
+      "sha256": "a5877c6ed4457d98d613157c653b24aac2870f55ea0cd32e928f55acfac72489"
+    },
+    "perf_stat": {
+      "bytes": 266,
+      "path": "profiles/before-streaming/stat/perf-stat.txt",
+      "sha256": "a1a109558a21ce1e453aa24e278afa32ffc19a3390c29a17f8facd3347205f09"
+    },
+    "report": {
+      "bytes": 32965,
+      "path": "profiles/before-streaming/stat/report.json",
+      "sha256": "ceff37cda7793024f66738ac31da8c2ec8f724dbf7d737549fbc26a310e1976d"
+    },
+    "resource": {
+      "bytes": 1310,
+      "path": "profiles/before-streaming/stat/resource.log",
+      "sha256": "961f793eee0d0a87ad281bae23be6c10902768bdf9967d75c7a7a84c47097660"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "profiles/before-streaming/stat/workload.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "bytes": 454475192,
+    "path": "/tmp/litchi-goal-0434-binaries/before/normal",
+    "sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4"
+  },
+  "call_graph": null,
+  "change": 434,
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "e69bb732b8d44ffb201b02e35f10daa901428d3d924bf98b0bffa9d27a688395",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T06:23:44.477922+00:00",
+  "kind": "stat",
+  "oracle_exit_code": 0,
+  "protocol_sha256": "cb6ac713e39b269c432291ffad5c56bb6141bf2a04eddd96db8fbc30d3f7b068",
+  "record_event": null,
+  "record_frequency_hz": null,
+  "revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+  "role": "before-streaming",
+  "schema": "litchi-0434-profile-receipt-v1",
+  "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle",
+  "selector": "ods_streaming_create",
+  "shape": "large",
+  "source_after": {
+    "files": 6644,
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+  },
+  "source_before": {
+    "files": 6644,
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+  },
+  "source_manifest": {
+    "files": 6642,
+    "path": "sources/7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e.json",
+    "sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T06:23:40.613506+00:00",
+  "stat_events": [
+    "cycles:u",
+    "instructions:u",
+    "branches:u",
+    "branch-misses:u",
+    "L1-dcache-load-misses:u"
+  ],
+  "status": "pass"
+}

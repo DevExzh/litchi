@@ -1,0 +1,63 @@
+{
+  "status": "pass",
+  "shape": "medium",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/before/pilots/medium-resource.log",
+    "/tmp/litchi-goal-0434-binaries/before/normal",
+    "--case",
+    "ods_streaming_create",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/before/pilots/medium.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/before/pilots/medium-catalog.json"
+  ],
+  "binary": {
+    "path": "/tmp/litchi-goal-0434-binaries/before/normal",
+    "sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4",
+    "bytes": 454475192
+  },
+  "driver_sha256": "53c165ef51e0a1ae2e5827053312ce6dbed852a3bdf1d138bdb52de52d7d4445",
+  "frozen_inputs": {
+    "status": "frozen",
+    "utc": "2026-09-06T05:53:37.491975+00:00",
+    "files": {
+      "protocol.json": "cb6ac713e39b269c432291ffad5c56bb6141bf2a04eddd96db8fbc30d3f7b068",
+      "oracle/verify-report.py": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+      "oracle/protocol.json": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+      "check.py": "e4d1efae847f272dd89155e1ec0a465a09a57c40c34f1c95f2dde7a85deb275f"
+    }
+  },
+  "build_receipt": "checks/before-build.json",
+  "artifacts": {
+    "before/pilots/medium.json": {
+      "bytes": 32931,
+      "sha256": "afd0ac78d76976abe4cd9862a30a4fe561b415b290d0763dbb66816c422fb659"
+    },
+    "before/pilots/medium-catalog.json": {
+      "bytes": 4857,
+      "sha256": "65d224e34a84daf528f3339980a8f5e4e9763c901b12f6c2795c967a5f104bbb"
+    },
+    "before/pilots/medium-resource.log": {
+      "bytes": 1057,
+      "sha256": "c5d3d9055987f33184edf30cf396dcc05d72373eb06aaa4ad3449a87efd3b2a3"
+    },
+    "before/pilots/medium.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "change": 434,
+  "required_pass": [
+    "checks/before-build.json",
+    "checks/before-pilots.json",
+    "checks/ods-text-unit-v2.json",
+    "checks/ods-text-integration-first.json",
+    "checks/ods-strict-scoped-v2.json",
+    "checks/ods-tests-final.json",
+    "checks/ods-doc-final.json",
+    "checks/owned-format-final.json",
+    "checks/boundaries-final.json",
+    "checks/after-build.json",
+    "checks/after-pilots.json",
+    "checks/pilot-identity.json",
+    "checks/drivers-ast.json",
+    "checks/build-descriptors.json",
+    "checks/formal-a1.json",
+    "checks/formal-b1.json",
+    "checks/formal-b2.json",
+    "checks/formal-a2.json",
+    "checks/profile-before-stat.json",
+    "checks/profile-before-record.json",
+    "checks/profile-after-stat.json",
+    "checks/profile-after-record.json",
+    "checks/summary-derive.json"
+  ],
+  "required_review": [
+    "checks/ods-text-unit-first.json",
+    "checks/ods-strict-first.json",
+    "checks/ods-strict-scoped-first.json"
+  ],
+  "lifecycle": "Precleanup portable replay precedes task-cleanup; aftercleanup and final replay require recorded cleanup. Failed attempts remain terminal receipts."
+}

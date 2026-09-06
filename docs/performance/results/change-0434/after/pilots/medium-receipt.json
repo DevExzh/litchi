@@ -1,0 +1,63 @@
+{
+  "status": "pass",
+  "shape": "medium",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/after/pilots/medium-resource.log",
+    "/tmp/litchi-goal-0434-binaries/after/normal",
+    "--case",
+    "ods_streaming_create",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/after/pilots/medium.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/after/pilots/medium-catalog.json"
+  ],
+  "binary": {
+    "path": "/tmp/litchi-goal-0434-binaries/after/normal",
+    "sha256": "dfa919bc9bb52cb2044c5d4ac893dcaacd49ed4367b2fbbe22ea612a3c9403d4",
+    "bytes": 454552200
+  },
+  "driver_sha256": "b804af178bc819b3e1d12df5ad2bd980e7f02b0b9954c0a9d4d14cc64b81e7d4",
+  "frozen_inputs": {
+    "status": "frozen",
+    "utc": "2026-09-06T05:53:37.491975+00:00",
+    "files": {
+      "protocol.json": "cb6ac713e39b269c432291ffad5c56bb6141bf2a04eddd96db8fbc30d3f7b068",
+      "oracle/verify-report.py": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+      "oracle/protocol.json": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+      "check.py": "e4d1efae847f272dd89155e1ec0a465a09a57c40c34f1c95f2dde7a85deb275f"
+    }
+  },
+  "build_receipt": "checks/after-build.json",
+  "artifacts": {
+    "after/pilots/medium.json": {
+      "bytes": 32929,
+      "sha256": "5129b79c9d41ec5f3c06bd00556fa4e144c4779e838c4b5a3e69a4b1677cbcb3"
+    },
+    "after/pilots/medium-catalog.json": {
+      "bytes": 4857,
+      "sha256": "a03ca7023ed9b9c19ef87c37037b75fe584524796a8bbe4e79bca1aa48c896df"
+    },
+    "after/pilots/medium-resource.log": {
+      "bytes": 1055,
+      "sha256": "f71f30ce9dcdaa22999df01c0b43e79883098f38c607263a32e06093be6cb2af"
+    },
+    "after/pilots/medium.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

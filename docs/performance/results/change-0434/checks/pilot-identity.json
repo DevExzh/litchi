@@ -1,0 +1,38 @@
+{
+  "change": 434,
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0434/pilot-identity.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "65dfb1b141190271763367defce4086ef146c056",
+  "driver_sha256": "e4d1efae847f272dd89155e1ec0a465a09a57c40c34f1c95f2dde7a85deb275f",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T06:11:16.573721+00:00",
+  "source_before": {
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31",
+    "files": 6644
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T06:11:16.723142+00:00",
+  "source_after": {
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31",
+    "files": 6644
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/pilot-identity.log",
+    "bytes": 1161,
+    "sha256": "6b3e2a3f684568799d94fd245e40d4f9fd225120e766e6ea893b15ceef15461f"
+  }
+}

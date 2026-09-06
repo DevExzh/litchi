@@ -1,0 +1,4231 @@
+{
+  "ambient": {
+    "git_revision": "65dfb1b141190271763367defce4086ef146c056",
+    "git_worktree_dirty": true
+  },
+  "builds": {
+    "after-streaming": {
+      "binaries": {
+        "allocator": {
+          "bytes": 453891528,
+          "path": "/tmp/litchi-goal-0434-binaries/after/allocator",
+          "sha256": "375b361d3d09f49a1381386c81aef2014d43d2ea413c8f7181b911dd9f4a99ee"
+        },
+        "normal": {
+          "bytes": 454552200,
+          "path": "/tmp/litchi-goal-0434-binaries/after/normal",
+          "sha256": "dfa919bc9bb52cb2044c5d4ac893dcaacd49ed4367b2fbbe22ea612a3c9403d4"
+        }
+      },
+      "directory": "after",
+      "revision": "65dfb1b141190271763367defce4086ef146c056",
+      "source_manifest": {
+        "files": 6644,
+        "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+        "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      }
+    },
+    "before-streaming": {
+      "binaries": {
+        "allocator": {
+          "bytes": 453814528,
+          "path": "/tmp/litchi-goal-0434-binaries/before/allocator",
+          "sha256": "cb0e6b9c2494cc6e073bed21905b8e39910e2e79b2f994a72c076899bfb959e3"
+        },
+        "normal": {
+          "bytes": 454475192,
+          "path": "/tmp/litchi-goal-0434-binaries/before/normal",
+          "sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4"
+        }
+      },
+      "directory": "before",
+      "revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+      "source_manifest": {
+        "files": 6642,
+        "path": "sources/7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e.json",
+        "sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      }
+    }
+  },
+  "change": 434,
+  "claims": [],
+  "classification": "Matched current-revision ODS streaming evidence; no speedup or causal optimization claim.",
+  "comparison_scope": "Matched before/after deltas are descriptive. Normal rows compare operation latency, archive throughput, and whole-process GNU time RSS; allocator rows compare requested count/bytes, regional peak, and whole-process GNU time RSS only.",
+  "comparisons": [
+    {
+      "after": 161725.5,
+      "baseline_role": "before-streaming",
+      "before": 184826.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p50",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -12.498512114096503,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 172761.0,
+      "baseline_role": "before-streaming",
+      "before": 196851.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p95",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -12.237682307938492,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 173050.0,
+      "baseline_role": "before-streaming",
+      "before": 199411.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p99",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -13.2194312249575,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 163572.0,
+      "baseline_role": "before-streaming",
+      "before": 186616.1,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.mean",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -12.34839866442392,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 8056864.033087407,
+      "baseline_role": "before-streaming",
+      "before": 7049876.210760608,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": false,
+      "metric": "throughput.archive_bytes_per_second.p50",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": 14.283766015490865,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 84709376.0,
+      "baseline_role": "before-streaming",
+      "before": 84668416.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "whole_process_rss_bytes",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": 0.04837695321948624,
+      "repeat": "R1",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 161516.0,
+      "baseline_role": "before-streaming",
+      "before": 192766.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p50",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -16.211365074753846,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 170091.0,
+      "baseline_role": "before-streaming",
+      "before": 206220.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p95",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -17.51963922025022,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 170981.0,
+      "baseline_role": "before-streaming",
+      "before": 219041.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p99",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -21.941097785346123,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 163217.0,
+      "baseline_role": "before-streaming",
+      "before": 195781.1,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.mean",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -16.632912982918167,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 8067312.286325665,
+      "baseline_role": "before-streaming",
+      "before": 6759491.331842769,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": false,
+      "metric": "throughput.archive_bytes_per_second.p50",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": 19.34791969215173,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 84668416.0,
+      "baseline_role": "before-streaming",
+      "before": 84652032.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "whole_process_rss_bytes",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": 0.01935452653989452,
+      "repeat": "R2",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 17853291.5,
+      "baseline_role": "before-streaming",
+      "before": 20694993.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p50",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -13.731347964215306,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 18257668.0,
+      "baseline_role": "before-streaming",
+      "before": 21108650.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p95",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -13.506226120571425,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 18357679.0,
+      "baseline_role": "before-streaming",
+      "before": 21113810.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p99",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -13.053688557394425,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 17893900.066666666,
+      "baseline_role": "before-streaming",
+      "before": 20741554.933333334,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.mean",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -13.729225585157353,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 2637496.8550476553,
+      "baseline_role": "before-streaming",
+      "before": 2275332.995360897,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": false,
+      "metric": "throughput.archive_bytes_per_second.p50",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": 15.91696074487394,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 84721664.0,
+      "baseline_role": "before-streaming",
+      "before": 84701184.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "whole_process_rss_bytes",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": 0.024179118912906812,
+      "repeat": "R1",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 17928945.5,
+      "baseline_role": "before-streaming",
+      "before": 20636726.5,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p50",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -13.121175008061478,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 18424427.0,
+      "baseline_role": "before-streaming",
+      "before": 20730827.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p95",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -11.12546064853081,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 18621399.0,
+      "baseline_role": "before-streaming",
+      "before": 20754197.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p99",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -10.276466008297021,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 17988674.066666666,
+      "baseline_role": "before-streaming",
+      "before": 20632167.466666665,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.mean",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -12.812485184946407,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 2626367.5146806855,
+      "baseline_role": "before-streaming",
+      "before": 2281757.3061009226,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": false,
+      "metric": "throughput.archive_bytes_per_second.p50",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": 15.102842342537926,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 84717568.0,
+      "baseline_role": "before-streaming",
+      "before": 84533248.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "whole_process_rss_bytes",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": 0.21804438414575056,
+      "repeat": "R2",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 71260562.0,
+      "baseline_role": "before-streaming",
+      "before": 82441441.5,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p50",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -13.562207667123335,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 72662643.0,
+      "baseline_role": "before-streaming",
+      "before": 84657136.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p95",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -14.168318899897583,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 72671214.0,
+      "baseline_role": "before-streaming",
+      "before": 84734706.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p99",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -14.236778021038981,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 71259645.66666667,
+      "baseline_role": "before-streaming",
+      "before": 82774400.83333333,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.mean",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -13.911009987075198,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 2596709.866043297,
+      "baseline_role": "before-streaming",
+      "before": 2244538.649070061,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": false,
+      "metric": "throughput.archive_bytes_per_second.p50",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": 15.690138243738645,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 84721664.0,
+      "baseline_role": "before-streaming",
+      "before": 84725760.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "whole_process_rss_bytes",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -0.004834421078075901,
+      "repeat": "R1",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 71559096.0,
+      "baseline_role": "before-streaming",
+      "before": 82719982.5,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p50",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -13.49237048013157,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 73221148.0,
+      "baseline_role": "before-streaming",
+      "before": 84035013.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p95",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -12.868285032573269,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 73594520.0,
+      "baseline_role": "before-streaming",
+      "before": 84403534.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.p99",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -12.80635239751928,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 71685539.16666667,
+      "baseline_role": "before-streaming",
+      "before": 82812450.23333333,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "latency_ns.mean",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": -13.436278041907162,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 2585878.0522684567,
+      "baseline_role": "before-streaming",
+      "before": 2236980.6671971506,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": false,
+      "metric": "throughput.archive_bytes_per_second.p50",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": 15.596799301285907,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 84713472.0,
+      "baseline_role": "before-streaming",
+      "before": 84656128.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "whole_process_rss_bytes",
+      "mode": "normal",
+      "regression": false,
+      "relative_percent": 0.06773756531836655,
+      "repeat": "R2",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 1059.0,
+      "baseline_role": "before-streaming",
+      "before": 1059.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.requested_count.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 882097.0,
+      "baseline_role": "before-streaming",
+      "before": 882097.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.requested_bytes.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 419347.0,
+      "baseline_role": "before-streaming",
+      "before": 419347.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.regional_peak_minus_entry.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 84647936.0,
+      "baseline_role": "before-streaming",
+      "before": 84721664.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "whole_process_rss_bytes",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": -0.08702378650164379,
+      "repeat": "R1",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 1059.0,
+      "baseline_role": "before-streaming",
+      "before": 1059.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.requested_count.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 882097.0,
+      "baseline_role": "before-streaming",
+      "before": 882097.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.requested_bytes.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 419347.0,
+      "baseline_role": "before-streaming",
+      "before": 419347.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.regional_peak_minus_entry.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 84668416.0,
+      "baseline_role": "before-streaming",
+      "before": 84713472.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "whole_process_rss_bytes",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": -0.05318634561454405,
+      "repeat": "R2",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 122979.0,
+      "baseline_role": "before-streaming",
+      "before": 122979.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.requested_count.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 6230321.0,
+      "baseline_role": "before-streaming",
+      "before": 6230321.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.requested_bytes.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 419347.0,
+      "baseline_role": "before-streaming",
+      "before": 419347.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.regional_peak_minus_entry.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 84660224.0,
+      "baseline_role": "before-streaming",
+      "before": 84668416.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "whole_process_rss_bytes",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": -0.009675390643897247,
+      "repeat": "R1",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 122979.0,
+      "baseline_role": "before-streaming",
+      "before": 122979.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.requested_count.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 6230321.0,
+      "baseline_role": "before-streaming",
+      "before": 6230321.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.requested_bytes.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 419347.0,
+      "baseline_role": "before-streaming",
+      "before": 419347.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.regional_peak_minus_entry.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 84656128.0,
+      "baseline_role": "before-streaming",
+      "before": 84590592.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "whole_process_rss_bytes",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.07747433662599264,
+      "repeat": "R2",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 491619.0,
+      "baseline_role": "before-streaming",
+      "before": 491619.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.requested_count.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 22401329.0,
+      "baseline_role": "before-streaming",
+      "before": 22401329.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.requested_bytes.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 419347.0,
+      "baseline_role": "before-streaming",
+      "before": 419347.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.regional_peak_minus_entry.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R1",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 84709376.0,
+      "baseline_role": "before-streaming",
+      "before": 84656128.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "whole_process_rss_bytes",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.06289916779562608,
+      "repeat": "R1",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 491619.0,
+      "baseline_role": "before-streaming",
+      "before": 491619.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.requested_count.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 22401329.0,
+      "baseline_role": "before-streaming",
+      "before": 22401329.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.requested_bytes.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 419347.0,
+      "baseline_role": "before-streaming",
+      "before": 419347.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "allocation.regional_peak_minus_entry.p50",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.0,
+      "repeat": "R2",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "after": 84652032.0,
+      "baseline_role": "before-streaming",
+      "before": 84635648.0,
+      "candidate_role": "after-streaming",
+      "higher_is_regression": true,
+      "metric": "whole_process_rss_bytes",
+      "mode": "allocator",
+      "regression": false,
+      "relative_percent": 0.01935827324202681,
+      "repeat": "R2",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    }
+  ],
+  "cross_phase_identity": [
+    {
+      "identity": {
+        "archive_bytes": 185043,
+        "archive_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "output_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "semantic_sha256": "abe7b81f008211ea29ba17ef4835518fc8f9d912b7f29ff44f2e7196cc0ade7e",
+        "sink_accepted_bytes": 185043,
+        "target_payload_bytes": 10753593,
+        "target_payload_sha256": "58e1ad301969f8903210c10bb3700be08c3ca0a8acecf0ecc831de10967732f1"
+      },
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "large",
+      "status": "pass"
+    },
+    {
+      "identity": {
+        "archive_bytes": 185043,
+        "archive_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "output_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "semantic_sha256": "abe7b81f008211ea29ba17ef4835518fc8f9d912b7f29ff44f2e7196cc0ade7e",
+        "sink_accepted_bytes": 185043,
+        "target_payload_bytes": 10753593,
+        "target_payload_sha256": "58e1ad301969f8903210c10bb3700be08c3ca0a8acecf0ecc831de10967732f1"
+      },
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "large",
+      "status": "pass"
+    },
+    {
+      "identity": {
+        "archive_bytes": 47088,
+        "archive_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "output_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "semantic_sha256": "90f62262bcbf9ea7634cebb58883b19a3d4285d8de462a4670391a5a72122a46",
+        "sink_accepted_bytes": 47088,
+        "target_payload_bytes": 2682184,
+        "target_payload_sha256": "eb8be53522cfa7ab66e8f808f925d4693a0b98c6a1619f8c1974652878b65cb5"
+      },
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "medium",
+      "status": "pass"
+    },
+    {
+      "identity": {
+        "archive_bytes": 47088,
+        "archive_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "output_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "semantic_sha256": "90f62262bcbf9ea7634cebb58883b19a3d4285d8de462a4670391a5a72122a46",
+        "sink_accepted_bytes": 47088,
+        "target_payload_bytes": 2682184,
+        "target_payload_sha256": "eb8be53522cfa7ab66e8f808f925d4693a0b98c6a1619f8c1974652878b65cb5"
+      },
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "medium",
+      "status": "pass"
+    },
+    {
+      "identity": {
+        "archive_bytes": 1303,
+        "archive_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "output_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "semantic_sha256": "2fc3bcbb04ee98bb0b13958106a69b046caa719293b1267d742813757ffecd26",
+        "sink_accepted_bytes": 1303,
+        "target_payload_bytes": 21234,
+        "target_payload_sha256": "92430bf845c8115f4489dbee3293567cabc1cd708a34ae2d972f06dbf082044e"
+      },
+      "mode": "allocator",
+      "repeat": "R1",
+      "shape": "tiny",
+      "status": "pass"
+    },
+    {
+      "identity": {
+        "archive_bytes": 1303,
+        "archive_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "output_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "semantic_sha256": "2fc3bcbb04ee98bb0b13958106a69b046caa719293b1267d742813757ffecd26",
+        "sink_accepted_bytes": 1303,
+        "target_payload_bytes": 21234,
+        "target_payload_sha256": "92430bf845c8115f4489dbee3293567cabc1cd708a34ae2d972f06dbf082044e"
+      },
+      "mode": "allocator",
+      "repeat": "R2",
+      "shape": "tiny",
+      "status": "pass"
+    },
+    {
+      "identity": {
+        "archive_bytes": 185043,
+        "archive_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "output_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "semantic_sha256": "abe7b81f008211ea29ba17ef4835518fc8f9d912b7f29ff44f2e7196cc0ade7e",
+        "sink_accepted_bytes": 185043,
+        "target_payload_bytes": 10753593,
+        "target_payload_sha256": "58e1ad301969f8903210c10bb3700be08c3ca0a8acecf0ecc831de10967732f1"
+      },
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "large",
+      "status": "pass"
+    },
+    {
+      "identity": {
+        "archive_bytes": 185043,
+        "archive_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "output_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "semantic_sha256": "abe7b81f008211ea29ba17ef4835518fc8f9d912b7f29ff44f2e7196cc0ade7e",
+        "sink_accepted_bytes": 185043,
+        "target_payload_bytes": 10753593,
+        "target_payload_sha256": "58e1ad301969f8903210c10bb3700be08c3ca0a8acecf0ecc831de10967732f1"
+      },
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "large",
+      "status": "pass"
+    },
+    {
+      "identity": {
+        "archive_bytes": 47088,
+        "archive_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "output_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "semantic_sha256": "90f62262bcbf9ea7634cebb58883b19a3d4285d8de462a4670391a5a72122a46",
+        "sink_accepted_bytes": 47088,
+        "target_payload_bytes": 2682184,
+        "target_payload_sha256": "eb8be53522cfa7ab66e8f808f925d4693a0b98c6a1619f8c1974652878b65cb5"
+      },
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "medium",
+      "status": "pass"
+    },
+    {
+      "identity": {
+        "archive_bytes": 47088,
+        "archive_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "output_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "semantic_sha256": "90f62262bcbf9ea7634cebb58883b19a3d4285d8de462a4670391a5a72122a46",
+        "sink_accepted_bytes": 47088,
+        "target_payload_bytes": 2682184,
+        "target_payload_sha256": "eb8be53522cfa7ab66e8f808f925d4693a0b98c6a1619f8c1974652878b65cb5"
+      },
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "medium",
+      "status": "pass"
+    },
+    {
+      "identity": {
+        "archive_bytes": 1303,
+        "archive_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "output_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "semantic_sha256": "2fc3bcbb04ee98bb0b13958106a69b046caa719293b1267d742813757ffecd26",
+        "sink_accepted_bytes": 1303,
+        "target_payload_bytes": 21234,
+        "target_payload_sha256": "92430bf845c8115f4489dbee3293567cabc1cd708a34ae2d972f06dbf082044e"
+      },
+      "mode": "normal",
+      "repeat": "R1",
+      "shape": "tiny",
+      "status": "pass"
+    },
+    {
+      "identity": {
+        "archive_bytes": 1303,
+        "archive_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "output_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "semantic_sha256": "2fc3bcbb04ee98bb0b13958106a69b046caa719293b1267d742813757ffecd26",
+        "sink_accepted_bytes": 1303,
+        "target_payload_bytes": 21234,
+        "target_payload_sha256": "92430bf845c8115f4489dbee3293567cabc1cd708a34ae2d972f06dbf082044e"
+      },
+      "mode": "normal",
+      "repeat": "R2",
+      "shape": "tiny",
+      "status": "pass"
+    }
+  ],
+  "extra_attempts": [],
+  "limitations": [
+    "The operation timer excludes artifact creation/reopen oracle, procfs probes, sink construction, and digest extraction; GNU time RSS is whole-process and includes setup, corpus generation, and the harness oracle.",
+    "Normal p50 intervals are descriptive bootstrap intervals over the 30 within-process samples from each report, not independent-process confidence intervals.",
+    "GNU time RSS is one whole-process maximum-resident-set observation per fresh report process; it is reviewed separately from the within-process operation vectors.",
+    "Allocator vectors are descriptive; allocator elapsed time is not a latency claim.",
+    "Runtime ambient checkout identity is retained separately from executable build revision/source manifest."
+  ],
+  "matrix": {
+    "formal_reports": 24,
+    "phases": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ],
+    "reports": 24,
+    "retained_samples": 720,
+    "roles": [
+      "before-streaming",
+      "after-streaming"
+    ],
+    "samples_per_report": 30,
+    "warmups": 3
+  },
+  "oracle": {
+    "protocol_sha256": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+    "verifier_sha256": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9"
+  },
+  "protocol_sha256": "cb6ac713e39b269c432291ffad5c56bb6141bf2a04eddd96db8fbc30d3f7b068",
+  "repeat_flags": [
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p50",
+      "mode": "normal",
+      "r1": 184826.0,
+      "r2": 192766.0,
+      "relative_percent": 4.295932390464545,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p95",
+      "mode": "normal",
+      "r1": 196851.0,
+      "r2": 206220.0,
+      "relative_percent": 4.7594373409329895,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": true,
+      "metric": "elapsed_ns.p99",
+      "mode": "normal",
+      "r1": 199411.0,
+      "r2": 219041.0,
+      "relative_percent": 9.843990552176159,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.mean",
+      "mode": "normal",
+      "r1": 186616.1,
+      "r2": 195781.1,
+      "relative_percent": 4.911151824521035,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "whole_process_rss_bytes",
+      "mode": "normal",
+      "r1": 84668416.0,
+      "r2": 84652032.0,
+      "relative_percent": -0.019350781287794494,
+      "role": "before-streaming",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p50",
+      "mode": "normal",
+      "r1": 20694993.0,
+      "r2": 20636726.5,
+      "relative_percent": -0.2815487784895603,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p95",
+      "mode": "normal",
+      "r1": 21108650.0,
+      "r2": 20730827.0,
+      "relative_percent": -1.789896558993588,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p99",
+      "mode": "normal",
+      "r1": 21113810.0,
+      "r2": 20754197.0,
+      "relative_percent": -1.703212257759258,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.mean",
+      "mode": "normal",
+      "r1": 20741554.933333334,
+      "r2": 20632167.466666665,
+      "relative_percent": -0.5273831543404408,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "whole_process_rss_bytes",
+      "mode": "normal",
+      "r1": 84701184.0,
+      "r2": 84533248.0,
+      "relative_percent": -0.1982687750858359,
+      "role": "before-streaming",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p50",
+      "mode": "normal",
+      "r1": 82441441.5,
+      "r2": 82719982.5,
+      "relative_percent": 0.33786527131503397,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p95",
+      "mode": "normal",
+      "r1": 84657136.0,
+      "r2": 84035013.0,
+      "relative_percent": -0.7348736673539251,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p99",
+      "mode": "normal",
+      "r1": 84734706.0,
+      "r2": 84403534.0,
+      "relative_percent": -0.39083395179302327,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.mean",
+      "mode": "normal",
+      "r1": 82774400.83333333,
+      "r2": 82812450.23333333,
+      "relative_percent": 0.045967593382667454,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "whole_process_rss_bytes",
+      "mode": "normal",
+      "r1": 84725760.0,
+      "r2": 84656128.0,
+      "relative_percent": -0.0821851583272903,
+      "role": "before-streaming",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.requested_bytes.p50",
+      "mode": "allocator",
+      "r1": 882097.0,
+      "r2": 882097.0,
+      "relative_percent": 0.0,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.requested_count.p50",
+      "mode": "allocator",
+      "r1": 1059.0,
+      "r2": 1059.0,
+      "relative_percent": 0.0,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.regional_peak_minus_entry.p50",
+      "mode": "allocator",
+      "r1": 419347.0,
+      "r2": 419347.0,
+      "relative_percent": 0.0,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "whole_process_rss_bytes",
+      "mode": "allocator",
+      "r1": 84721664.0,
+      "r2": 84713472.0,
+      "relative_percent": -0.009669309611293753,
+      "role": "before-streaming",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.requested_bytes.p50",
+      "mode": "allocator",
+      "r1": 6230321.0,
+      "r2": 6230321.0,
+      "relative_percent": 0.0,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.requested_count.p50",
+      "mode": "allocator",
+      "r1": 122979.0,
+      "r2": 122979.0,
+      "relative_percent": 0.0,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.regional_peak_minus_entry.p50",
+      "mode": "allocator",
+      "r1": 419347.0,
+      "r2": 419347.0,
+      "relative_percent": 0.0,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "whole_process_rss_bytes",
+      "mode": "allocator",
+      "r1": 84668416.0,
+      "r2": 84590592.0,
+      "relative_percent": -0.09191621111702386,
+      "role": "before-streaming",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.requested_bytes.p50",
+      "mode": "allocator",
+      "r1": 22401329.0,
+      "r2": 22401329.0,
+      "relative_percent": 0.0,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.requested_count.p50",
+      "mode": "allocator",
+      "r1": 491619.0,
+      "r2": 491619.0,
+      "relative_percent": 0.0,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.regional_peak_minus_entry.p50",
+      "mode": "allocator",
+      "r1": 419347.0,
+      "r2": 419347.0,
+      "relative_percent": 0.0,
+      "role": "before-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "whole_process_rss_bytes",
+      "mode": "allocator",
+      "r1": 84656128.0,
+      "r2": 84635648.0,
+      "relative_percent": -0.02419198761370234,
+      "role": "before-streaming",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p50",
+      "mode": "normal",
+      "r1": 161725.5,
+      "r2": 161516.0,
+      "relative_percent": -0.1295404868125311,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p95",
+      "mode": "normal",
+      "r1": 172761.0,
+      "r2": 170091.0,
+      "relative_percent": -1.5454876968760312,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p99",
+      "mode": "normal",
+      "r1": 173050.0,
+      "r2": 170981.0,
+      "relative_percent": -1.1956082057208899,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.mean",
+      "mode": "normal",
+      "r1": 163572.0,
+      "r2": 163217.0,
+      "relative_percent": -0.21702980950284892,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "whole_process_rss_bytes",
+      "mode": "normal",
+      "r1": 84709376.0,
+      "r2": 84668416.0,
+      "relative_percent": -0.04835356123978531,
+      "role": "after-streaming",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p50",
+      "mode": "normal",
+      "r1": 17853291.5,
+      "r2": 17928945.5,
+      "relative_percent": 0.4237537935231719,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p95",
+      "mode": "normal",
+      "r1": 18257668.0,
+      "r2": 18424427.0,
+      "relative_percent": 0.9133641821069372,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p99",
+      "mode": "normal",
+      "r1": 18357679.0,
+      "r2": 18621399.0,
+      "relative_percent": 1.4365650472480753,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.mean",
+      "mode": "normal",
+      "r1": 17893900.066666666,
+      "r2": 17988674.066666666,
+      "relative_percent": 0.529644178445749,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "whole_process_rss_bytes",
+      "mode": "normal",
+      "r1": 84721664.0,
+      "r2": 84717568.0,
+      "relative_percent": -0.004834654805646876,
+      "role": "after-streaming",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p50",
+      "mode": "normal",
+      "r1": 71260562.0,
+      "r2": 71559096.0,
+      "relative_percent": 0.41893298568147697,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p95",
+      "mode": "normal",
+      "r1": 72662643.0,
+      "r2": 73221148.0,
+      "relative_percent": 0.7686274224844808,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.p99",
+      "mode": "normal",
+      "r1": 72671214.0,
+      "r2": 73594520.0,
+      "relative_percent": 1.2705250802608032,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "elapsed_ns.mean",
+      "mode": "normal",
+      "r1": 71259645.66666667,
+      "r2": 71685539.16666667,
+      "relative_percent": 0.5976643526859711,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "whole_process_rss_bytes",
+      "mode": "normal",
+      "r1": 84721664.0,
+      "r2": 84713472.0,
+      "relative_percent": -0.009669309611293753,
+      "role": "after-streaming",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.requested_bytes.p50",
+      "mode": "allocator",
+      "r1": 882097.0,
+      "r2": 882097.0,
+      "relative_percent": 0.0,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.requested_count.p50",
+      "mode": "allocator",
+      "r1": 1059.0,
+      "r2": 1059.0,
+      "relative_percent": 0.0,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.regional_peak_minus_entry.p50",
+      "mode": "allocator",
+      "r1": 419347.0,
+      "r2": 419347.0,
+      "relative_percent": 0.0,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "whole_process_rss_bytes",
+      "mode": "allocator",
+      "r1": 84647936.0,
+      "r2": 84668416.0,
+      "relative_percent": 0.02419432884931772,
+      "role": "after-streaming",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.requested_bytes.p50",
+      "mode": "allocator",
+      "r1": 6230321.0,
+      "r2": 6230321.0,
+      "relative_percent": 0.0,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.requested_count.p50",
+      "mode": "allocator",
+      "r1": 122979.0,
+      "r2": 122979.0,
+      "relative_percent": 0.0,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.regional_peak_minus_entry.p50",
+      "mode": "allocator",
+      "r1": 419347.0,
+      "r2": 419347.0,
+      "relative_percent": 0.0,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "whole_process_rss_bytes",
+      "mode": "allocator",
+      "r1": 84660224.0,
+      "r2": 84656128.0,
+      "relative_percent": -0.004838163433160772,
+      "role": "after-streaming",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "medium",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.requested_bytes.p50",
+      "mode": "allocator",
+      "r1": 22401329.0,
+      "r2": 22401329.0,
+      "relative_percent": 0.0,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.requested_count.p50",
+      "mode": "allocator",
+      "r1": 491619.0,
+      "r2": 491619.0,
+      "relative_percent": 0.0,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "allocation.regional_peak_minus_entry.p50",
+      "mode": "allocator",
+      "r1": 419347.0,
+      "r2": 419347.0,
+      "relative_percent": 0.0,
+      "role": "after-streaming",
+      "scope": "operation_samples_within_one_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    },
+    {
+      "flagged": false,
+      "metric": "whole_process_rss_bytes",
+      "mode": "allocator",
+      "r1": 84709376.0,
+      "r2": 84652032.0,
+      "relative_percent": -0.06769498573569943,
+      "role": "after-streaming",
+      "scope": "gnu_time_v_verbose_whole_fresh_process",
+      "shape": "large",
+      "threshold_percent": 5.0
+    }
+  ],
+  "rows": [
+    {
+      "allocation": {
+        "reason": "normal binary or unavailable allocator vectors",
+        "scope": "operation_global_system_allocator",
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 1303,
+        "archive_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "target_payload_bytes": 21234,
+        "target_payload_sha256": "92430bf845c8115f4489dbee3293567cabc1cd708a34ae2d972f06dbf082044e"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 199411,
+        "mean": 186616.1,
+        "min": 183330,
+        "p50": 184826,
+        "p50_ci": {
+          "high": 185410.5,
+          "level": 0.95,
+          "low": 184475.5,
+          "method": "bootstrap_median_percentile",
+          "resamples": 2000,
+          "seed": 434
+        },
+        "p95": 196851,
+        "p99": 199411
+      },
+      "latency_claim_scope": "normal operation elapsed vectors; 30 samples inside one fresh process per report",
+      "mode": "normal",
+      "name": "A1-normal-tiny-r1",
+      "output_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+      "phase": "A1",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 12021760,
+            "mean": 12020394.666666666,
+            "min": 12017664,
+            "p50": 12021760,
+            "p95": 12021760,
+            "p99": 12021760
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84668416,
+          "kib": 82684,
+          "path": "runs/A1/formal/A1-normal-tiny-r1-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R1",
+      "report": "runs/A1/formal/A1-normal-tiny-r1.json",
+      "role": "before-streaming",
+      "semantic_sha256": "2fc3bcbb04ee98bb0b13958106a69b046caa719293b1267d742813757ffecd26",
+      "shape": "tiny",
+      "sink": {
+        "sink_accepted_bytes": 1303,
+        "sink_write_calls": 24
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4",
+        "build_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+        "source_manifest_sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      },
+      "throughput": {
+        "archive_bytes_per_second": {
+          "count": 30,
+          "max": 7107401.952762778,
+          "mean": 6985624.411455264,
+          "min": 6534243.3466559015,
+          "p50": 7049876.210760608,
+          "p95": 7096911.236866902,
+          "p99": 7107401.952762778
+        }
+      }
+    },
+    {
+      "allocation": {
+        "reason": "normal binary or unavailable allocator vectors",
+        "scope": "operation_global_system_allocator",
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 47088,
+        "archive_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "target_payload_bytes": 2682184,
+        "target_payload_sha256": "eb8be53522cfa7ab66e8f808f925d4693a0b98c6a1619f8c1974652878b65cb5"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 21113810,
+        "mean": 20741554.933333334,
+        "min": 20571678,
+        "p50": 20694993,
+        "p50_ci": {
+          "high": 20714343,
+          "level": 0.95,
+          "low": 20676898,
+          "method": "bootstrap_median_percentile",
+          "resamples": 2000,
+          "seed": 434
+        },
+        "p95": 21108650,
+        "p99": 21113810
+      },
+      "latency_claim_scope": "normal operation elapsed vectors; 30 samples inside one fresh process per report",
+      "mode": "normal",
+      "name": "A1-normal-medium-r1",
+      "output_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+      "phase": "A1",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 22159360,
+            "mean": 22159360,
+            "min": 22159360,
+            "p50": 22159360,
+            "p95": 22159360,
+            "p99": 22159360
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84701184,
+          "kib": 82716,
+          "path": "runs/A1/formal/A1-normal-medium-r1-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R1",
+      "report": "runs/A1/formal/A1-normal-medium-r1.json",
+      "role": "before-streaming",
+      "semantic_sha256": "90f62262bcbf9ea7634cebb58883b19a3d4285d8de462a4670391a5a72122a46",
+      "shape": "medium",
+      "sink": {
+        "sink_accepted_bytes": 47088,
+        "sink_write_calls": 26
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4",
+        "build_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+        "source_manifest_sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      },
+      "throughput": {
+        "archive_bytes_per_second": {
+          "count": 30,
+          "max": 2288972.246211515,
+          "mean": 2270349.821574674,
+          "min": 2230199.0971785765,
+          "p50": 2275332.995360897,
+          "p95": 2288413.8164442126,
+          "p99": 2288972.246211515
+        }
+      }
+    },
+    {
+      "allocation": {
+        "reason": "normal binary or unavailable allocator vectors",
+        "scope": "operation_global_system_allocator",
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 185043,
+        "archive_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "target_payload_bytes": 10753593,
+        "target_payload_sha256": "58e1ad301969f8903210c10bb3700be08c3ca0a8acecf0ecc831de10967732f1"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 84734706,
+        "mean": 82774400.83333333,
+        "min": 82102195,
+        "p50": 82441441.5,
+        "p50_ci": {
+          "high": 82736453,
+          "level": 0.95,
+          "low": 82329006,
+          "method": "bootstrap_median_percentile",
+          "resamples": 2000,
+          "seed": 434
+        },
+        "p95": 84657136,
+        "p99": 84734706
+      },
+      "latency_claim_scope": "normal operation elapsed vectors; 30 samples inside one fresh process per report",
+      "mode": "normal",
+      "name": "A1-normal-large-r1",
+      "output_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+      "phase": "A1",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 56291328,
+            "mean": 56291328,
+            "min": 56291328,
+            "p50": 56291328,
+            "p95": 56291328,
+            "p99": 56291328
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84725760,
+          "kib": 82740,
+          "path": "runs/A1/formal/A1-normal-large-r1-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R1",
+      "report": "runs/A1/formal/A1-normal-large-r1.json",
+      "role": "before-streaming",
+      "semantic_sha256": "abe7b81f008211ea29ba17ef4835518fc8f9d912b7f29ff44f2e7196cc0ade7e",
+      "shape": "large",
+      "sink": {
+        "sink_accepted_bytes": 185043,
+        "sink_write_calls": 32
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4",
+        "build_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+        "source_manifest_sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      },
+      "throughput": {
+        "archive_bytes_per_second": {
+          "count": 30,
+          "max": 2253813.0679697418,
+          "mean": 2235708.0289945225,
+          "min": 2183792.317636648,
+          "p50": 2244538.649070061,
+          "p95": 2253226.5860596774,
+          "p99": 2253813.0679697418
+        }
+      }
+    },
+    {
+      "allocation": {
+        "raw_live_after": {
+          "count": 30,
+          "max": 46498,
+          "mean": 45570,
+          "min": 44642,
+          "p50": 45570,
+          "p95": 46434,
+          "p99": 46498
+        },
+        "raw_live_before": {
+          "count": 30,
+          "max": 46498,
+          "mean": 45570,
+          "min": 44642,
+          "p50": 45570,
+          "p95": 46434,
+          "p99": 46498
+        },
+        "regional_peak_minus_entry": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "regional_peak_minus_exit": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "requested_bytes": {
+          "count": 30,
+          "max": 882097,
+          "mean": 882097,
+          "min": 882097,
+          "p50": 882097,
+          "p95": 882097,
+          "p99": 882097
+        },
+        "requested_count": {
+          "count": 30,
+          "max": 1059,
+          "mean": 1059,
+          "min": 1059,
+          "p50": 1059,
+          "p95": 1059,
+          "p99": 1059
+        },
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 1303,
+        "archive_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "target_payload_bytes": 21234,
+        "target_payload_sha256": "92430bf845c8115f4489dbee3293567cabc1cd708a34ae2d972f06dbf082044e"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 213531,
+        "mean": 199816.9,
+        "min": 195901,
+        "p50": 197905.5,
+        "p95": 209821,
+        "p99": 213531
+      },
+      "latency_claim_scope": "descriptive allocator-process elapsed vectors; no allocator latency claim",
+      "mode": "allocator",
+      "name": "A1-allocator-tiny-r1",
+      "output_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+      "phase": "A1",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 12099584,
+            "mean": 12098082.133333333,
+            "min": 12095488,
+            "p50": 12099584,
+            "p95": 12099584,
+            "p99": 12099584
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84721664,
+          "kib": 82736,
+          "path": "runs/A1/formal/A1-allocator-tiny-r1-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R1",
+      "report": "runs/A1/formal/A1-allocator-tiny-r1.json",
+      "role": "before-streaming",
+      "semantic_sha256": "2fc3bcbb04ee98bb0b13958106a69b046caa719293b1267d742813757ffecd26",
+      "shape": "tiny",
+      "sink": {
+        "sink_accepted_bytes": 1303,
+        "sink_write_calls": 24
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "cb0e6b9c2494cc6e073bed21905b8e39910e2e79b2f994a72c076899bfb959e3",
+        "build_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+        "source_manifest_sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      }
+    },
+    {
+      "allocation": {
+        "raw_live_after": {
+          "count": 30,
+          "max": 2794414,
+          "mean": 2793486,
+          "min": 2792558,
+          "p50": 2793486,
+          "p95": 2794350,
+          "p99": 2794414
+        },
+        "raw_live_before": {
+          "count": 30,
+          "max": 2794414,
+          "mean": 2793486,
+          "min": 2792558,
+          "p50": 2793486,
+          "p95": 2794350,
+          "p99": 2794414
+        },
+        "regional_peak_minus_entry": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "regional_peak_minus_exit": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "requested_bytes": {
+          "count": 30,
+          "max": 6230321,
+          "mean": 6230321,
+          "min": 6230321,
+          "p50": 6230321,
+          "p95": 6230321,
+          "p99": 6230321
+        },
+        "requested_count": {
+          "count": 30,
+          "max": 122979,
+          "mean": 122979,
+          "min": 122979,
+          "p50": 122979,
+          "p95": 122979,
+          "p99": 122979
+        },
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 47088,
+        "archive_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "target_payload_bytes": 2682184,
+        "target_payload_sha256": "eb8be53522cfa7ab66e8f808f925d4693a0b98c6a1619f8c1974652878b65cb5"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 22306223,
+        "mean": 21978156.033333335,
+        "min": 21762491,
+        "p50": 21970807.5,
+        "p95": 22240494,
+        "p99": 22306223
+      },
+      "latency_claim_scope": "descriptive allocator-process elapsed vectors; no allocator latency claim",
+      "mode": "allocator",
+      "name": "A1-allocator-medium-r1",
+      "output_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+      "phase": "A1",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 22134784,
+            "mean": 22134784,
+            "min": 22134784,
+            "p50": 22134784,
+            "p95": 22134784,
+            "p99": 22134784
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84668416,
+          "kib": 82684,
+          "path": "runs/A1/formal/A1-allocator-medium-r1-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R1",
+      "report": "runs/A1/formal/A1-allocator-medium-r1.json",
+      "role": "before-streaming",
+      "semantic_sha256": "90f62262bcbf9ea7634cebb58883b19a3d4285d8de462a4670391a5a72122a46",
+      "shape": "medium",
+      "sink": {
+        "sink_accepted_bytes": 47088,
+        "sink_write_calls": 26
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "cb0e6b9c2494cc6e073bed21905b8e39910e2e79b2f994a72c076899bfb959e3",
+        "build_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+        "source_manifest_sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      }
+    },
+    {
+      "allocation": {
+        "raw_live_after": {
+          "count": 30,
+          "max": 11131801,
+          "mean": 11130873,
+          "min": 11129945,
+          "p50": 11130873,
+          "p95": 11131737,
+          "p99": 11131801
+        },
+        "raw_live_before": {
+          "count": 30,
+          "max": 11131801,
+          "mean": 11130873,
+          "min": 11129945,
+          "p50": 11130873,
+          "p95": 11131737,
+          "p99": 11131801
+        },
+        "regional_peak_minus_entry": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "regional_peak_minus_exit": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "requested_bytes": {
+          "count": 30,
+          "max": 22401329,
+          "mean": 22401329,
+          "min": 22401329,
+          "p50": 22401329,
+          "p95": 22401329,
+          "p99": 22401329
+        },
+        "requested_count": {
+          "count": 30,
+          "max": 491619,
+          "mean": 491619,
+          "min": 491619,
+          "p50": 491619,
+          "p95": 491619,
+          "p99": 491619
+        },
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 185043,
+        "archive_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "target_payload_bytes": 10753593,
+        "target_payload_sha256": "58e1ad301969f8903210c10bb3700be08c3ca0a8acecf0ecc831de10967732f1"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 88406671,
+        "mean": 87649858.66666667,
+        "min": 86777385,
+        "p50": 87584773,
+        "p95": 88279281,
+        "p99": 88406671
+      },
+      "latency_claim_scope": "descriptive allocator-process elapsed vectors; no allocator latency claim",
+      "mode": "allocator",
+      "name": "A1-allocator-large-r1",
+      "output_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+      "phase": "A1",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 56078336,
+            "mean": 56078336,
+            "min": 56078336,
+            "p50": 56078336,
+            "p95": 56078336,
+            "p99": 56078336
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84656128,
+          "kib": 82672,
+          "path": "runs/A1/formal/A1-allocator-large-r1-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R1",
+      "report": "runs/A1/formal/A1-allocator-large-r1.json",
+      "role": "before-streaming",
+      "semantic_sha256": "abe7b81f008211ea29ba17ef4835518fc8f9d912b7f29ff44f2e7196cc0ade7e",
+      "shape": "large",
+      "sink": {
+        "sink_accepted_bytes": 185043,
+        "sink_write_calls": 32
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "cb0e6b9c2494cc6e073bed21905b8e39910e2e79b2f994a72c076899bfb959e3",
+        "build_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+        "source_manifest_sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      }
+    },
+    {
+      "allocation": {
+        "reason": "normal binary or unavailable allocator vectors",
+        "scope": "operation_global_system_allocator",
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 1303,
+        "archive_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "target_payload_bytes": 21234,
+        "target_payload_sha256": "92430bf845c8115f4489dbee3293567cabc1cd708a34ae2d972f06dbf082044e"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 173050,
+        "mean": 163572,
+        "min": 160561,
+        "p50": 161725.5,
+        "p50_ci": {
+          "high": 163060.5,
+          "level": 0.95,
+          "low": 161260.5,
+          "method": "bootstrap_median_percentile",
+          "resamples": 2000,
+          "seed": 434
+        },
+        "p95": 172761,
+        "p99": 173050
+      },
+      "latency_claim_scope": "normal operation elapsed vectors; 30 samples inside one fresh process per report",
+      "mode": "normal",
+      "name": "B1-normal-tiny-r1",
+      "output_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+      "phase": "B1",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 12099584,
+            "mean": 12098218.666666666,
+            "min": 12095488,
+            "p50": 12099584,
+            "p95": 12099584,
+            "p99": 12099584
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84709376,
+          "kib": 82724,
+          "path": "runs/B1/formal/B1-normal-tiny-r1-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R1",
+      "report": "runs/B1/formal/B1-normal-tiny-r1.json",
+      "role": "after-streaming",
+      "semantic_sha256": "2fc3bcbb04ee98bb0b13958106a69b046caa719293b1267d742813757ffecd26",
+      "shape": "tiny",
+      "sink": {
+        "sink_accepted_bytes": 1303,
+        "sink_write_calls": 24
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "dfa919bc9bb52cb2044c5d4ac893dcaacd49ed4367b2fbbe22ea612a3c9403d4",
+        "build_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "source_manifest_sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      },
+      "throughput": {
+        "archive_bytes_per_second": {
+          "count": 30,
+          "max": 8115295.74429656,
+          "mean": 7970025.0092821205,
+          "min": 7529615.718000578,
+          "p50": 8056864.033087407,
+          "p95": 8108225.835557962,
+          "p99": 8115295.74429656
+        }
+      }
+    },
+    {
+      "allocation": {
+        "reason": "normal binary or unavailable allocator vectors",
+        "scope": "operation_global_system_allocator",
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 47088,
+        "archive_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "target_payload_bytes": 2682184,
+        "target_payload_sha256": "eb8be53522cfa7ab66e8f808f925d4693a0b98c6a1619f8c1974652878b65cb5"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 18357679,
+        "mean": 17893900.066666666,
+        "min": 17780007,
+        "p50": 17853291.5,
+        "p50_ci": {
+          "high": 17911657,
+          "level": 0.95,
+          "low": 17825437,
+          "method": "bootstrap_median_percentile",
+          "resamples": 2000,
+          "seed": 434
+        },
+        "p95": 18257668,
+        "p99": 18357679
+      },
+      "latency_claim_scope": "normal operation elapsed vectors; 30 samples inside one fresh process per report",
+      "mode": "normal",
+      "name": "B1-normal-medium-r1",
+      "output_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+      "phase": "B1",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 22110208,
+            "mean": 22110208,
+            "min": 22110208,
+            "p50": 22110208,
+            "p95": 22110208,
+            "p99": 22110208
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84721664,
+          "kib": 82736,
+          "path": "runs/B1/formal/B1-normal-medium-r1-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R1",
+      "report": "runs/B1/formal/B1-normal-medium-r1.json",
+      "role": "after-streaming",
+      "semantic_sha256": "90f62262bcbf9ea7634cebb58883b19a3d4285d8de462a4670391a5a72122a46",
+      "shape": "medium",
+      "sink": {
+        "sink_accepted_bytes": 47088,
+        "sink_write_calls": 26
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "dfa919bc9bb52cb2044c5d4ac893dcaacd49ed4367b2fbbe22ea612a3c9403d4",
+        "build_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "source_manifest_sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      },
+      "throughput": {
+        "archive_bytes_per_second": {
+          "count": 30,
+          "max": 2648367.911216233,
+          "mean": 2631642.8891450805,
+          "min": 2565030.143516509,
+          "p50": 2637496.8550476553,
+          "p95": 2647949.4221865973,
+          "p99": 2648367.911216233
+        }
+      }
+    },
+    {
+      "allocation": {
+        "reason": "normal binary or unavailable allocator vectors",
+        "scope": "operation_global_system_allocator",
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 185043,
+        "archive_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "target_payload_bytes": 10753593,
+        "target_payload_sha256": "58e1ad301969f8903210c10bb3700be08c3ca0a8acecf0ecc831de10967732f1"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 72671214,
+        "mean": 71259645.66666667,
+        "min": 70280792,
+        "p50": 71260562,
+        "p50_ci": {
+          "high": 71429507.5,
+          "level": 0.95,
+          "low": 71100506,
+          "method": "bootstrap_median_percentile",
+          "resamples": 2000,
+          "seed": 434
+        },
+        "p95": 72662643,
+        "p99": 72671214
+      },
+      "latency_claim_scope": "normal operation elapsed vectors; 30 samples inside one fresh process per report",
+      "mode": "normal",
+      "name": "B1-normal-large-r1",
+      "output_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+      "phase": "B1",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 56676352,
+            "mean": 56676352,
+            "min": 56676352,
+            "p50": 56676352,
+            "p95": 56676352,
+            "p99": 56676352
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84721664,
+          "kib": 82736,
+          "path": "runs/B1/formal/B1-normal-large-r1-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R1",
+      "report": "runs/B1/formal/B1-normal-large-r1.json",
+      "role": "after-streaming",
+      "semantic_sha256": "abe7b81f008211ea29ba17ef4835518fc8f9d912b7f29ff44f2e7196cc0ade7e",
+      "shape": "large",
+      "sink": {
+        "sink_accepted_bytes": 185043,
+        "sink_write_calls": 32
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "dfa919bc9bb52cb2044c5d4ac893dcaacd49ed4367b2fbbe22ea612a3c9403d4",
+        "build_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "source_manifest_sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      },
+      "throughput": {
+        "archive_bytes_per_second": {
+          "count": 30,
+          "max": 2632909.9990791227,
+          "mean": 2596873.1356290434,
+          "min": 2546303.960189794,
+          "p50": 2596709.866043297,
+          "p95": 2630549.680012552,
+          "p99": 2632909.9990791227
+        }
+      }
+    },
+    {
+      "allocation": {
+        "raw_live_after": {
+          "count": 30,
+          "max": 46498,
+          "mean": 45570,
+          "min": 44642,
+          "p50": 45570,
+          "p95": 46434,
+          "p99": 46498
+        },
+        "raw_live_before": {
+          "count": 30,
+          "max": 46498,
+          "mean": 45570,
+          "min": 44642,
+          "p50": 45570,
+          "p95": 46434,
+          "p99": 46498
+        },
+        "regional_peak_minus_entry": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "regional_peak_minus_exit": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "requested_bytes": {
+          "count": 30,
+          "max": 882097,
+          "mean": 882097,
+          "min": 882097,
+          "p50": 882097,
+          "p95": 882097,
+          "p99": 882097
+        },
+        "requested_count": {
+          "count": 30,
+          "max": 1059,
+          "mean": 1059,
+          "min": 1059,
+          "p50": 1059,
+          "p95": 1059,
+          "p99": 1059
+        },
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 1303,
+        "archive_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "target_payload_bytes": 21234,
+        "target_payload_sha256": "92430bf845c8115f4489dbee3293567cabc1cd708a34ae2d972f06dbf082044e"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 183871,
+        "mean": 175991.5,
+        "min": 172261,
+        "p50": 174701,
+        "p95": 183021,
+        "p99": 183871
+      },
+      "latency_claim_scope": "descriptive allocator-process elapsed vectors; no allocator latency claim",
+      "mode": "allocator",
+      "name": "B1-allocator-tiny-r1",
+      "output_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+      "phase": "B1",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 12218368,
+            "mean": 12216866.133333333,
+            "min": 12214272,
+            "p50": 12218368,
+            "p95": 12218368,
+            "p99": 12218368
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84647936,
+          "kib": 82664,
+          "path": "runs/B1/formal/B1-allocator-tiny-r1-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R1",
+      "report": "runs/B1/formal/B1-allocator-tiny-r1.json",
+      "role": "after-streaming",
+      "semantic_sha256": "2fc3bcbb04ee98bb0b13958106a69b046caa719293b1267d742813757ffecd26",
+      "shape": "tiny",
+      "sink": {
+        "sink_accepted_bytes": 1303,
+        "sink_write_calls": 24
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "375b361d3d09f49a1381386c81aef2014d43d2ea413c8f7181b911dd9f4a99ee",
+        "build_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "source_manifest_sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      }
+    },
+    {
+      "allocation": {
+        "raw_live_after": {
+          "count": 30,
+          "max": 2794414,
+          "mean": 2793486,
+          "min": 2792558,
+          "p50": 2793486,
+          "p95": 2794350,
+          "p99": 2794414
+        },
+        "raw_live_before": {
+          "count": 30,
+          "max": 2794414,
+          "mean": 2793486,
+          "min": 2792558,
+          "p50": 2793486,
+          "p95": 2794350,
+          "p99": 2794414
+        },
+        "regional_peak_minus_entry": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "regional_peak_minus_exit": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "requested_bytes": {
+          "count": 30,
+          "max": 6230321,
+          "mean": 6230321,
+          "min": 6230321,
+          "p50": 6230321,
+          "p95": 6230321,
+          "p99": 6230321
+        },
+        "requested_count": {
+          "count": 30,
+          "max": 122979,
+          "mean": 122979,
+          "min": 122979,
+          "p50": 122979,
+          "p95": 122979,
+          "p99": 122979
+        },
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 47088,
+        "archive_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "target_payload_bytes": 2682184,
+        "target_payload_sha256": "eb8be53522cfa7ab66e8f808f925d4693a0b98c6a1619f8c1974652878b65cb5"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 19473904,
+        "mean": 18932736.866666667,
+        "min": 18772611,
+        "p50": 18888821.5,
+        "p95": 19233013,
+        "p99": 19473904
+      },
+      "latency_claim_scope": "descriptive allocator-process elapsed vectors; no allocator latency claim",
+      "mode": "allocator",
+      "name": "B1-allocator-medium-r1",
+      "output_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+      "phase": "B1",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 22147072,
+            "mean": 22147072,
+            "min": 22147072,
+            "p50": 22147072,
+            "p95": 22147072,
+            "p99": 22147072
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84660224,
+          "kib": 82676,
+          "path": "runs/B1/formal/B1-allocator-medium-r1-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R1",
+      "report": "runs/B1/formal/B1-allocator-medium-r1.json",
+      "role": "after-streaming",
+      "semantic_sha256": "90f62262bcbf9ea7634cebb58883b19a3d4285d8de462a4670391a5a72122a46",
+      "shape": "medium",
+      "sink": {
+        "sink_accepted_bytes": 47088,
+        "sink_write_calls": 26
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "375b361d3d09f49a1381386c81aef2014d43d2ea413c8f7181b911dd9f4a99ee",
+        "build_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "source_manifest_sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      }
+    },
+    {
+      "allocation": {
+        "raw_live_after": {
+          "count": 30,
+          "max": 11131801,
+          "mean": 11130873,
+          "min": 11129945,
+          "p50": 11130873,
+          "p95": 11131737,
+          "p99": 11131801
+        },
+        "raw_live_before": {
+          "count": 30,
+          "max": 11131801,
+          "mean": 11130873,
+          "min": 11129945,
+          "p50": 11130873,
+          "p95": 11131737,
+          "p99": 11131801
+        },
+        "regional_peak_minus_entry": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "regional_peak_minus_exit": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "requested_bytes": {
+          "count": 30,
+          "max": 22401329,
+          "mean": 22401329,
+          "min": 22401329,
+          "p50": 22401329,
+          "p95": 22401329,
+          "p99": 22401329
+        },
+        "requested_count": {
+          "count": 30,
+          "max": 491619,
+          "mean": 491619,
+          "min": 491619,
+          "p50": 491619,
+          "p95": 491619,
+          "p99": 491619
+        },
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 185043,
+        "archive_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "target_payload_bytes": 10753593,
+        "target_payload_sha256": "58e1ad301969f8903210c10bb3700be08c3ca0a8acecf0ecc831de10967732f1"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 76290098,
+        "mean": 75568988.93333334,
+        "min": 74741822,
+        "p50": 75535035.5,
+        "p95": 76284248,
+        "p99": 76290098
+      },
+      "latency_claim_scope": "descriptive allocator-process elapsed vectors; no allocator latency claim",
+      "mode": "allocator",
+      "name": "B1-allocator-large-r1",
+      "output_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+      "phase": "B1",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 56274944,
+            "mean": 56274944,
+            "min": 56274944,
+            "p50": 56274944,
+            "p95": 56274944,
+            "p99": 56274944
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84709376,
+          "kib": 82724,
+          "path": "runs/B1/formal/B1-allocator-large-r1-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R1",
+      "report": "runs/B1/formal/B1-allocator-large-r1.json",
+      "role": "after-streaming",
+      "semantic_sha256": "abe7b81f008211ea29ba17ef4835518fc8f9d912b7f29ff44f2e7196cc0ade7e",
+      "shape": "large",
+      "sink": {
+        "sink_accepted_bytes": 185043,
+        "sink_write_calls": 32
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "375b361d3d09f49a1381386c81aef2014d43d2ea413c8f7181b911dd9f4a99ee",
+        "build_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "source_manifest_sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      }
+    },
+    {
+      "allocation": {
+        "raw_live_after": {
+          "count": 30,
+          "max": 11131801,
+          "mean": 11130873,
+          "min": 11129945,
+          "p50": 11130873,
+          "p95": 11131737,
+          "p99": 11131801
+        },
+        "raw_live_before": {
+          "count": 30,
+          "max": 11131801,
+          "mean": 11130873,
+          "min": 11129945,
+          "p50": 11130873,
+          "p95": 11131737,
+          "p99": 11131801
+        },
+        "regional_peak_minus_entry": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "regional_peak_minus_exit": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "requested_bytes": {
+          "count": 30,
+          "max": 22401329,
+          "mean": 22401329,
+          "min": 22401329,
+          "p50": 22401329,
+          "p95": 22401329,
+          "p99": 22401329
+        },
+        "requested_count": {
+          "count": 30,
+          "max": 491619,
+          "mean": 491619,
+          "min": 491619,
+          "p50": 491619,
+          "p95": 491619,
+          "p99": 491619
+        },
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 185043,
+        "archive_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "target_payload_bytes": 10753593,
+        "target_payload_sha256": "58e1ad301969f8903210c10bb3700be08c3ca0a8acecf0ecc831de10967732f1"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 77254185,
+        "mean": 76375123.2,
+        "min": 75599748,
+        "p50": 76363351,
+        "p95": 77133915,
+        "p99": 77254185
+      },
+      "latency_claim_scope": "descriptive allocator-process elapsed vectors; no allocator latency claim",
+      "mode": "allocator",
+      "name": "B2-allocator-large-r2",
+      "output_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+      "phase": "B2",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 55783424,
+            "mean": 55783424,
+            "min": 55783424,
+            "p50": 55783424,
+            "p95": 55783424,
+            "p99": 55783424
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84652032,
+          "kib": 82668,
+          "path": "runs/B2/formal/B2-allocator-large-r2-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R2",
+      "report": "runs/B2/formal/B2-allocator-large-r2.json",
+      "role": "after-streaming",
+      "semantic_sha256": "abe7b81f008211ea29ba17ef4835518fc8f9d912b7f29ff44f2e7196cc0ade7e",
+      "shape": "large",
+      "sink": {
+        "sink_accepted_bytes": 185043,
+        "sink_write_calls": 32
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "375b361d3d09f49a1381386c81aef2014d43d2ea413c8f7181b911dd9f4a99ee",
+        "build_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "source_manifest_sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      }
+    },
+    {
+      "allocation": {
+        "raw_live_after": {
+          "count": 30,
+          "max": 2794414,
+          "mean": 2793486,
+          "min": 2792558,
+          "p50": 2793486,
+          "p95": 2794350,
+          "p99": 2794414
+        },
+        "raw_live_before": {
+          "count": 30,
+          "max": 2794414,
+          "mean": 2793486,
+          "min": 2792558,
+          "p50": 2793486,
+          "p95": 2794350,
+          "p99": 2794414
+        },
+        "regional_peak_minus_entry": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "regional_peak_minus_exit": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "requested_bytes": {
+          "count": 30,
+          "max": 6230321,
+          "mean": 6230321,
+          "min": 6230321,
+          "p50": 6230321,
+          "p95": 6230321,
+          "p99": 6230321
+        },
+        "requested_count": {
+          "count": 30,
+          "max": 122979,
+          "mean": 122979,
+          "min": 122979,
+          "p50": 122979,
+          "p95": 122979,
+          "p99": 122979
+        },
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 47088,
+        "archive_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "target_payload_bytes": 2682184,
+        "target_payload_sha256": "eb8be53522cfa7ab66e8f808f925d4693a0b98c6a1619f8c1974652878b65cb5"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 19576913,
+        "mean": 19317369.666666668,
+        "min": 19126090,
+        "p50": 19320821.5,
+        "p95": 19473292,
+        "p99": 19576913
+      },
+      "latency_claim_scope": "descriptive allocator-process elapsed vectors; no allocator latency claim",
+      "mode": "allocator",
+      "name": "B2-allocator-medium-r2",
+      "output_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+      "phase": "B2",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 22409216,
+            "mean": 22409216,
+            "min": 22409216,
+            "p50": 22409216,
+            "p95": 22409216,
+            "p99": 22409216
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84656128,
+          "kib": 82672,
+          "path": "runs/B2/formal/B2-allocator-medium-r2-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R2",
+      "report": "runs/B2/formal/B2-allocator-medium-r2.json",
+      "role": "after-streaming",
+      "semantic_sha256": "90f62262bcbf9ea7634cebb58883b19a3d4285d8de462a4670391a5a72122a46",
+      "shape": "medium",
+      "sink": {
+        "sink_accepted_bytes": 47088,
+        "sink_write_calls": 26
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "375b361d3d09f49a1381386c81aef2014d43d2ea413c8f7181b911dd9f4a99ee",
+        "build_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "source_manifest_sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      }
+    },
+    {
+      "allocation": {
+        "raw_live_after": {
+          "count": 30,
+          "max": 46498,
+          "mean": 45570,
+          "min": 44642,
+          "p50": 45570,
+          "p95": 46434,
+          "p99": 46498
+        },
+        "raw_live_before": {
+          "count": 30,
+          "max": 46498,
+          "mean": 45570,
+          "min": 44642,
+          "p50": 45570,
+          "p95": 46434,
+          "p99": 46498
+        },
+        "regional_peak_minus_entry": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "regional_peak_minus_exit": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "requested_bytes": {
+          "count": 30,
+          "max": 882097,
+          "mean": 882097,
+          "min": 882097,
+          "p50": 882097,
+          "p95": 882097,
+          "p99": 882097
+        },
+        "requested_count": {
+          "count": 30,
+          "max": 1059,
+          "mean": 1059,
+          "min": 1059,
+          "p50": 1059,
+          "p95": 1059,
+          "p99": 1059
+        },
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 1303,
+        "archive_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "target_payload_bytes": 21234,
+        "target_payload_sha256": "92430bf845c8115f4489dbee3293567cabc1cd708a34ae2d972f06dbf082044e"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 180401,
+        "mean": 173353.73333333334,
+        "min": 169951,
+        "p50": 172540,
+        "p95": 180111,
+        "p99": 180401
+      },
+      "latency_claim_scope": "descriptive allocator-process elapsed vectors; no allocator latency claim",
+      "mode": "allocator",
+      "name": "B2-allocator-tiny-r2",
+      "output_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+      "phase": "B2",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 11980800,
+            "mean": 11979571.2,
+            "min": 11976704,
+            "p50": 11980800,
+            "p95": 11980800,
+            "p99": 11980800
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84668416,
+          "kib": 82684,
+          "path": "runs/B2/formal/B2-allocator-tiny-r2-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R2",
+      "report": "runs/B2/formal/B2-allocator-tiny-r2.json",
+      "role": "after-streaming",
+      "semantic_sha256": "2fc3bcbb04ee98bb0b13958106a69b046caa719293b1267d742813757ffecd26",
+      "shape": "tiny",
+      "sink": {
+        "sink_accepted_bytes": 1303,
+        "sink_write_calls": 24
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "375b361d3d09f49a1381386c81aef2014d43d2ea413c8f7181b911dd9f4a99ee",
+        "build_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "source_manifest_sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      }
+    },
+    {
+      "allocation": {
+        "reason": "normal binary or unavailable allocator vectors",
+        "scope": "operation_global_system_allocator",
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 185043,
+        "archive_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "target_payload_bytes": 10753593,
+        "target_payload_sha256": "58e1ad301969f8903210c10bb3700be08c3ca0a8acecf0ecc831de10967732f1"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 73594520,
+        "mean": 71685539.16666667,
+        "min": 71080399,
+        "p50": 71559096,
+        "p50_ci": {
+          "high": 71677237,
+          "level": 0.95,
+          "low": 71427041,
+          "method": "bootstrap_median_percentile",
+          "resamples": 2000,
+          "seed": 434
+        },
+        "p95": 73221148,
+        "p99": 73594520
+      },
+      "latency_claim_scope": "normal operation elapsed vectors; 30 samples inside one fresh process per report",
+      "mode": "normal",
+      "name": "B2-normal-large-r2",
+      "output_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+      "phase": "B2",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 56295424,
+            "mean": 56295424,
+            "min": 56295424,
+            "p50": 56295424,
+            "p95": 56295424,
+            "p99": 56295424
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84713472,
+          "kib": 82728,
+          "path": "runs/B2/formal/B2-normal-large-r2-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R2",
+      "report": "runs/B2/formal/B2-normal-large-r2.json",
+      "role": "after-streaming",
+      "semantic_sha256": "abe7b81f008211ea29ba17ef4835518fc8f9d912b7f29ff44f2e7196cc0ade7e",
+      "shape": "large",
+      "sink": {
+        "sink_accepted_bytes": 185043,
+        "sink_write_calls": 32
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "dfa919bc9bb52cb2044c5d4ac893dcaacd49ed4367b2fbbe22ea612a3c9403d4",
+        "build_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "source_manifest_sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      },
+      "throughput": {
+        "archive_bytes_per_second": {
+          "count": 30,
+          "max": 2603291.520634261,
+          "mean": 2581448.85327315,
+          "min": 2514358.4060334926,
+          "p50": 2585878.0522684567,
+          "p95": 2597184.772580888,
+          "p99": 2603291.520634261
+        }
+      }
+    },
+    {
+      "allocation": {
+        "reason": "normal binary or unavailable allocator vectors",
+        "scope": "operation_global_system_allocator",
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 47088,
+        "archive_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "target_payload_bytes": 2682184,
+        "target_payload_sha256": "eb8be53522cfa7ab66e8f808f925d4693a0b98c6a1619f8c1974652878b65cb5"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 18621399,
+        "mean": 17988674.066666666,
+        "min": 17869095,
+        "p50": 17928945.5,
+        "p50_ci": {
+          "high": 17966290.5,
+          "level": 0.95,
+          "low": 17906410.5,
+          "method": "bootstrap_median_percentile",
+          "resamples": 2000,
+          "seed": 434
+        },
+        "p95": 18424427,
+        "p99": 18621399
+      },
+      "latency_claim_scope": "normal operation elapsed vectors; 30 samples inside one fresh process per report",
+      "mode": "normal",
+      "name": "B2-normal-medium-r2",
+      "output_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+      "phase": "B2",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 22421504,
+            "mean": 22421504,
+            "min": 22421504,
+            "p50": 22421504,
+            "p95": 22421504,
+            "p99": 22421504
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84717568,
+          "kib": 82732,
+          "path": "runs/B2/formal/B2-normal-medium-r2-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R2",
+      "report": "runs/B2/formal/B2-normal-medium-r2.json",
+      "role": "after-streaming",
+      "semantic_sha256": "90f62262bcbf9ea7634cebb58883b19a3d4285d8de462a4670391a5a72122a46",
+      "shape": "medium",
+      "sink": {
+        "sink_accepted_bytes": 47088,
+        "sink_write_calls": 26
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "dfa919bc9bb52cb2044c5d4ac893dcaacd49ed4367b2fbbe22ea612a3c9403d4",
+        "build_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "source_manifest_sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      },
+      "throughput": {
+        "archive_bytes_per_second": {
+          "count": 30,
+          "max": 2635164.2318763207,
+          "mean": 2617882.0281144795,
+          "min": 2528703.67043851,
+          "p50": 2626367.5146806855,
+          "p95": 2632550.552819962,
+          "p99": 2635164.2318763207
+        }
+      }
+    },
+    {
+      "allocation": {
+        "reason": "normal binary or unavailable allocator vectors",
+        "scope": "operation_global_system_allocator",
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 1303,
+        "archive_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "target_payload_bytes": 21234,
+        "target_payload_sha256": "92430bf845c8115f4489dbee3293567cabc1cd708a34ae2d972f06dbf082044e"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 170981,
+        "mean": 163217,
+        "min": 160731,
+        "p50": 161516,
+        "p50_ci": {
+          "high": 162165.5,
+          "level": 0.95,
+          "low": 161421,
+          "method": "bootstrap_median_percentile",
+          "resamples": 2000,
+          "seed": 434
+        },
+        "p95": 170091,
+        "p99": 170981
+      },
+      "latency_claim_scope": "normal operation elapsed vectors; 30 samples inside one fresh process per report",
+      "mode": "normal",
+      "name": "B2-normal-tiny-r2",
+      "output_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+      "phase": "B2",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 12337152,
+            "mean": 12335786.666666666,
+            "min": 12333056,
+            "p50": 12337152,
+            "p95": 12337152,
+            "p99": 12337152
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84668416,
+          "kib": 82684,
+          "path": "runs/B2/formal/B2-normal-tiny-r2-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R2",
+      "report": "runs/B2/formal/B2-normal-tiny-r2.json",
+      "role": "after-streaming",
+      "semantic_sha256": "2fc3bcbb04ee98bb0b13958106a69b046caa719293b1267d742813757ffecd26",
+      "shape": "tiny",
+      "sink": {
+        "sink_accepted_bytes": 1303,
+        "sink_write_calls": 24
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "dfa919bc9bb52cb2044c5d4ac893dcaacd49ed4367b2fbbe22ea612a3c9403d4",
+        "build_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "source_manifest_sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+      },
+      "throughput": {
+        "archive_bytes_per_second": {
+          "count": 30,
+          "max": 8106712.45745998,
+          "mean": 7986049.843410117,
+          "min": 7620729.788689971,
+          "p50": 8067312.286325665,
+          "p95": 8105250.062204529,
+          "p99": 8106712.45745998
+        }
+      }
+    },
+    {
+      "allocation": {
+        "raw_live_after": {
+          "count": 30,
+          "max": 11131801,
+          "mean": 11130873,
+          "min": 11129945,
+          "p50": 11130873,
+          "p95": 11131737,
+          "p99": 11131801
+        },
+        "raw_live_before": {
+          "count": 30,
+          "max": 11131801,
+          "mean": 11130873,
+          "min": 11129945,
+          "p50": 11130873,
+          "p95": 11131737,
+          "p99": 11131801
+        },
+        "regional_peak_minus_entry": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "regional_peak_minus_exit": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "requested_bytes": {
+          "count": 30,
+          "max": 22401329,
+          "mean": 22401329,
+          "min": 22401329,
+          "p50": 22401329,
+          "p95": 22401329,
+          "p99": 22401329
+        },
+        "requested_count": {
+          "count": 30,
+          "max": 491619,
+          "mean": 491619,
+          "min": 491619,
+          "p50": 491619,
+          "p95": 491619,
+          "p99": 491619
+        },
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 185043,
+        "archive_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "target_payload_bytes": 10753593,
+        "target_payload_sha256": "58e1ad301969f8903210c10bb3700be08c3ca0a8acecf0ecc831de10967732f1"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 89040244,
+        "mean": 88174440.86666666,
+        "min": 87651979,
+        "p50": 88148561,
+        "p95": 88987304,
+        "p99": 89040244
+      },
+      "latency_claim_scope": "descriptive allocator-process elapsed vectors; no allocator latency claim",
+      "mode": "allocator",
+      "name": "A2-allocator-large-r2",
+      "output_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+      "phase": "A2",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 56332288,
+            "mean": 56332288,
+            "min": 56332288,
+            "p50": 56332288,
+            "p95": 56332288,
+            "p99": 56332288
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84635648,
+          "kib": 82652,
+          "path": "runs/A2/formal/A2-allocator-large-r2-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R2",
+      "report": "runs/A2/formal/A2-allocator-large-r2.json",
+      "role": "before-streaming",
+      "semantic_sha256": "abe7b81f008211ea29ba17ef4835518fc8f9d912b7f29ff44f2e7196cc0ade7e",
+      "shape": "large",
+      "sink": {
+        "sink_accepted_bytes": 185043,
+        "sink_write_calls": 32
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "cb0e6b9c2494cc6e073bed21905b8e39910e2e79b2f994a72c076899bfb959e3",
+        "build_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+        "source_manifest_sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      }
+    },
+    {
+      "allocation": {
+        "raw_live_after": {
+          "count": 30,
+          "max": 2794414,
+          "mean": 2793486,
+          "min": 2792558,
+          "p50": 2793486,
+          "p95": 2794350,
+          "p99": 2794414
+        },
+        "raw_live_before": {
+          "count": 30,
+          "max": 2794414,
+          "mean": 2793486,
+          "min": 2792558,
+          "p50": 2793486,
+          "p95": 2794350,
+          "p99": 2794414
+        },
+        "regional_peak_minus_entry": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "regional_peak_minus_exit": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "requested_bytes": {
+          "count": 30,
+          "max": 6230321,
+          "mean": 6230321,
+          "min": 6230321,
+          "p50": 6230321,
+          "p95": 6230321,
+          "p99": 6230321
+        },
+        "requested_count": {
+          "count": 30,
+          "max": 122979,
+          "mean": 122979,
+          "min": 122979,
+          "p50": 122979,
+          "p95": 122979,
+          "p99": 122979
+        },
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 47088,
+        "archive_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "target_payload_bytes": 2682184,
+        "target_payload_sha256": "eb8be53522cfa7ab66e8f808f925d4693a0b98c6a1619f8c1974652878b65cb5"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 22289844,
+        "mean": 21977923.7,
+        "min": 21724371,
+        "p50": 21953647.5,
+        "p95": 22258383,
+        "p99": 22289844
+      },
+      "latency_claim_scope": "descriptive allocator-process elapsed vectors; no allocator latency claim",
+      "mode": "allocator",
+      "name": "A2-allocator-medium-r2",
+      "output_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+      "phase": "A2",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 22392832,
+            "mean": 22392832,
+            "min": 22392832,
+            "p50": 22392832,
+            "p95": 22392832,
+            "p99": 22392832
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84590592,
+          "kib": 82608,
+          "path": "runs/A2/formal/A2-allocator-medium-r2-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R2",
+      "report": "runs/A2/formal/A2-allocator-medium-r2.json",
+      "role": "before-streaming",
+      "semantic_sha256": "90f62262bcbf9ea7634cebb58883b19a3d4285d8de462a4670391a5a72122a46",
+      "shape": "medium",
+      "sink": {
+        "sink_accepted_bytes": 47088,
+        "sink_write_calls": 26
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "cb0e6b9c2494cc6e073bed21905b8e39910e2e79b2f994a72c076899bfb959e3",
+        "build_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+        "source_manifest_sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      }
+    },
+    {
+      "allocation": {
+        "raw_live_after": {
+          "count": 30,
+          "max": 46498,
+          "mean": 45570,
+          "min": 44642,
+          "p50": 45570,
+          "p95": 46434,
+          "p99": 46498
+        },
+        "raw_live_before": {
+          "count": 30,
+          "max": 46498,
+          "mean": 45570,
+          "min": 44642,
+          "p50": 45570,
+          "p95": 46434,
+          "p99": 46498
+        },
+        "regional_peak_minus_entry": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "regional_peak_minus_exit": {
+          "count": 30,
+          "max": 419347,
+          "mean": 419347,
+          "min": 419347,
+          "p50": 419347,
+          "p95": 419347,
+          "p99": 419347
+        },
+        "requested_bytes": {
+          "count": 30,
+          "max": 882097,
+          "mean": 882097,
+          "min": 882097,
+          "p50": 882097,
+          "p95": 882097,
+          "p99": 882097
+        },
+        "requested_count": {
+          "count": 30,
+          "max": 1059,
+          "mean": 1059,
+          "min": 1059,
+          "p50": 1059,
+          "p95": 1059,
+          "p99": 1059
+        },
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "corpus": {
+        "archive_bytes": 1303,
+        "archive_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "target_payload_bytes": 21234,
+        "target_payload_sha256": "92430bf845c8115f4489dbee3293567cabc1cd708a34ae2d972f06dbf082044e"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 207111,
+        "mean": 197680.13333333333,
+        "min": 193821,
+        "p50": 196026,
+        "p95": 205391,
+        "p99": 207111
+      },
+      "latency_claim_scope": "descriptive allocator-process elapsed vectors; no allocator latency claim",
+      "mode": "allocator",
+      "name": "A2-allocator-tiny-r2",
+      "output_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+      "phase": "A2",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 12009472,
+            "mean": 12007970.133333333,
+            "min": 12005376,
+            "p50": 12009472,
+            "p95": 12009472,
+            "p99": 12009472
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84713472,
+          "kib": 82728,
+          "path": "runs/A2/formal/A2-allocator-tiny-r2-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R2",
+      "report": "runs/A2/formal/A2-allocator-tiny-r2.json",
+      "role": "before-streaming",
+      "semantic_sha256": "2fc3bcbb04ee98bb0b13958106a69b046caa719293b1267d742813757ffecd26",
+      "shape": "tiny",
+      "sink": {
+        "sink_accepted_bytes": 1303,
+        "sink_write_calls": 24
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "cb0e6b9c2494cc6e073bed21905b8e39910e2e79b2f994a72c076899bfb959e3",
+        "build_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+        "source_manifest_sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      }
+    },
+    {
+      "allocation": {
+        "reason": "normal binary or unavailable allocator vectors",
+        "scope": "operation_global_system_allocator",
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 185043,
+        "archive_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+        "target_payload_bytes": 10753593,
+        "target_payload_sha256": "58e1ad301969f8903210c10bb3700be08c3ca0a8acecf0ecc831de10967732f1"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 84403534,
+        "mean": 82812450.23333333,
+        "min": 82418276,
+        "p50": 82719982.5,
+        "p50_ci": {
+          "high": 82832828,
+          "level": 0.95,
+          "low": 82625177.5,
+          "method": "bootstrap_median_percentile",
+          "resamples": 2000,
+          "seed": 434
+        },
+        "p95": 84035013,
+        "p99": 84403534
+      },
+      "latency_claim_scope": "normal operation elapsed vectors; 30 samples inside one fresh process per report",
+      "mode": "normal",
+      "name": "A2-normal-large-r2",
+      "output_sha256": "eddf578ef307bfe28823cd0bd29df53559dff146fe77b6feaaac107905e5cf56",
+      "phase": "A2",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 56373248,
+            "mean": 56373248,
+            "min": 56373248,
+            "p50": 56373248,
+            "p95": 56373248,
+            "p99": 56373248
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84656128,
+          "kib": 82672,
+          "path": "runs/A2/formal/A2-normal-large-r2-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R2",
+      "report": "runs/A2/formal/A2-normal-large-r2.json",
+      "role": "before-streaming",
+      "semantic_sha256": "abe7b81f008211ea29ba17ef4835518fc8f9d912b7f29ff44f2e7196cc0ade7e",
+      "shape": "large",
+      "sink": {
+        "sink_accepted_bytes": 185043,
+        "sink_write_calls": 32
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4",
+        "build_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+        "source_manifest_sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      },
+      "throughput": {
+        "archive_bytes_per_second": {
+          "count": 30,
+          "max": 2245169.5058508627,
+          "mean": 2234539.689039885,
+          "min": 2192360.808020195,
+          "p50": 2236980.6671971506,
+          "p95": 2244853.2532866388,
+          "p99": 2245169.5058508627
+        }
+      }
+    },
+    {
+      "allocation": {
+        "reason": "normal binary or unavailable allocator vectors",
+        "scope": "operation_global_system_allocator",
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 47088,
+        "archive_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+        "target_payload_bytes": 2682184,
+        "target_payload_sha256": "eb8be53522cfa7ab66e8f808f925d4693a0b98c6a1619f8c1974652878b65cb5"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 20754197,
+        "mean": 20632167.466666665,
+        "min": 20508626,
+        "p50": 20636726.5,
+        "p50_ci": {
+          "high": 20654156,
+          "level": 0.95,
+          "low": 20600551,
+          "method": "bootstrap_median_percentile",
+          "resamples": 2000,
+          "seed": 434
+        },
+        "p95": 20730827,
+        "p99": 20754197
+      },
+      "latency_claim_scope": "normal operation elapsed vectors; 30 samples inside one fresh process per report",
+      "mode": "normal",
+      "name": "A2-normal-medium-r2",
+      "output_sha256": "07daa044d6cb95564440b21fe590306c7b40e2ae9a17b494e2e141fb9e4d3c1b",
+      "phase": "A2",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 22163456,
+            "mean": 22163456,
+            "min": 22163456,
+            "p50": 22163456,
+            "p95": 22163456,
+            "p99": 22163456
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84533248,
+          "kib": 82552,
+          "path": "runs/A2/formal/A2-normal-medium-r2-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R2",
+      "report": "runs/A2/formal/A2-normal-medium-r2.json",
+      "role": "before-streaming",
+      "semantic_sha256": "90f62262bcbf9ea7634cebb58883b19a3d4285d8de462a4670391a5a72122a46",
+      "shape": "medium",
+      "sink": {
+        "sink_accepted_bytes": 47088,
+        "sink_write_calls": 26
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4",
+        "build_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+        "source_manifest_sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      },
+      "throughput": {
+        "archive_bytes_per_second": {
+          "count": 30,
+          "max": 2296009.493761308,
+          "mean": 2282278.6565988315,
+          "min": 2268842.2972953375,
+          "p50": 2281757.3061009226,
+          "p95": 2290955.7602956174,
+          "p99": 2296009.493761308
+        }
+      }
+    },
+    {
+      "allocation": {
+        "reason": "normal binary or unavailable allocator vectors",
+        "scope": "operation_global_system_allocator",
+        "status": "unavailable"
+      },
+      "corpus": {
+        "archive_bytes": 1303,
+        "archive_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+        "target_payload_bytes": 21234,
+        "target_payload_sha256": "92430bf845c8115f4489dbee3293567cabc1cd708a34ae2d972f06dbf082044e"
+      },
+      "elapsed_ns": {
+        "count": 30,
+        "max": 219041,
+        "mean": 195781.1,
+        "min": 191310,
+        "p50": 192766,
+        "p50_ci": {
+          "high": 194351,
+          "level": 0.95,
+          "low": 192525,
+          "method": "bootstrap_median_percentile",
+          "resamples": 2000,
+          "seed": 434
+        },
+        "p95": 206220,
+        "p99": 219041
+      },
+      "latency_claim_scope": "normal operation elapsed vectors; 30 samples inside one fresh process per report",
+      "mode": "normal",
+      "name": "A2-normal-tiny-r2",
+      "output_sha256": "3deb10709f5f3bca33afea0935d67cc6c65f7d179560192b9d52da63b98962fa",
+      "phase": "A2",
+      "process_memory": {
+        "reported_process_peak_rss": {
+          "scope": "process_lifetime_high_water_after_not_operation_peak",
+          "statistics": {
+            "count": 30,
+            "max": 12181504,
+            "mean": 12177134.933333334,
+            "min": 12173312,
+            "p50": 12177408,
+            "p95": 12181504,
+            "p99": 12181504
+          }
+        },
+        "whole_process_max_rss": {
+          "bytes": 84652032,
+          "kib": 82668,
+          "path": "runs/A2/formal/A2-normal-tiny-r2-resource.log",
+          "scope": "gnu_time_v_verbose_whole_fresh_process",
+          "status": "measured"
+        }
+      },
+      "repeat": "R2",
+      "report": "runs/A2/formal/A2-normal-tiny-r2.json",
+      "role": "before-streaming",
+      "semantic_sha256": "2fc3bcbb04ee98bb0b13958106a69b046caa719293b1267d742813757ffecd26",
+      "shape": "tiny",
+      "sink": {
+        "sink_accepted_bytes": 1303,
+        "sink_write_calls": 24
+      },
+      "source_identity": {
+        "ambient_revision": "65dfb1b141190271763367defce4086ef146c056",
+        "ambient_worktree_dirty": true,
+        "binary_sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4",
+        "build_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+        "source_manifest_sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+      },
+      "throughput": {
+        "archive_bytes_per_second": {
+          "count": 30,
+          "max": 6810935.1314620245,
+          "mean": 6661347.261841182,
+          "min": 5948658.013796504,
+          "p50": 6759491.331842769,
+          "p95": 6795270.950347065,
+          "p99": 6810935.1314620245
+        }
+      }
+    }
+  ],
+  "schema_version": 1,
+  "timing_scope": "Operation timer covers deterministic scalar-row authoring, publication validation, compression/finalization, and writes to the hashing discard sink; artifact creation/reopen oracle, procfs probes, sink construction, and digest extraction are outside the operation timer.",
+  "uncertainty": {
+    "level": 0.95,
+    "method": "deterministic bootstrap median percentile",
+    "resamples": 2000,
+    "sample_count": 30,
+    "sample_scope": "30 within-process timed samples from one fresh process per report; not 30 independent process replicates",
+    "scope": "normal operation samples",
+    "seed": 434
+  }
+}

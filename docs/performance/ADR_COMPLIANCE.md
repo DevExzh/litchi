@@ -1,5 +1,31 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0434: ODS ordinary-text span batching
+
+[0434](changes/0434-ods-bounded-text-spans.md) stays inside the existing
+`litchi-ods` scalar encoder. It adds no public API, allocation strategy,
+dependency, unsafe path, or common-crate ownership change. Ordinary borrowed
+UTF-8 spans are capped at 256 bytes; cancellation is still checked per scalar,
+span Work is charged in encoded XML bytes, and row/Work refusal falls back to
+the scalar baseline without changing the first failing prefix. Entity and
+whitespace encoding, generated-XML audit, ZIP publication, output accounting,
+and partial-output semantics remain unchanged.
+
+This preserves ADRs 0001/0002/0004/0010/0023/0024 ownership boundaries,
+ADR 0003's separation from edit/append state, ADR 0005's finite budget and
+measurement rules, and ADR 0006's deterministic validation and security
+boundary. The exact-limit differential tests cover every row-window and Work
+offset, competing limits, cancellation, and failed-span prefixes. The formal
+ABBA contains 24 reports/720 samples and four profiles; the derived
+`claims[]` is empty; copied-bundle replay and six mutation probes pass before and after cleanup. No performance or causal
+optimization claim is authorized.
+
+The ODS release receipt reports 454 tests passed. Scoped Clippy retains the
+pre-existing common `ArchiveReaderKind` large-enum debt; the receipt is not a
+blanket workspace strict pass. Bounded ODT paragraph creation remains the next
+implementation slice, followed by ODP; the broader non-iWork goal remains
+open.
+
 ## Change 0433: bounded ODS fresh scalar creation
 
 [0433](changes/0433-ods-bounded-fresh-scalar-creation.md) keeps the ODS
@@ -17,8 +43,8 @@ are separate observations; ZIP/compression/parser allocations, process RSS,
 and profile work are not folded into that number. The [bundle ADR record](results/change-0433/adr-compliance.md)
 and [protocol](results/change-0433/protocol.json) preserve the exact timing,
 oracle, provenance, and failure boundaries. Its `claims` array remains empty;
-no broad performance or memory claim follows. Portable replay finalization is
-pending root evidence.
+no broad performance or memory claim follows. Sealed portable replay and
+mutation checks pass before and after task cleanup.
 
 ## Change 0432: streaming resource observation and oracle checks
 

@@ -1,0 +1,11 @@
+{
+  "status": "pass",
+  "matched_reports": 6,
+  "samples_per_report": 30,
+  "exact_fields": [
+    "allocation_calls",
+    "allocated_bytes",
+    "region_peak_live_bytes_minus_live_bytes_before"
+  ],
+  "regional_peak_above_entry_bytes": 419347
+}

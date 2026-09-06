@@ -1,6 +1,33 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0433
+## Current evidence through 0434
+
+[0434](changes/0434-ods-bounded-text-spans.md) retains a matched ODS
+streaming comparison with 24 formal reports, 720 samples, and four passing
+whole-process profiles. The same selector and deterministic scalar rows are
+used before and after the private ordinary-text span batching. Descriptive
+normal p50 deltas (after versus before) are tiny **−12.499% / −16.211%**,
+medium **−13.731% / −13.121%**, and large **−13.562% / −13.492%** for R1/R2.
+No matched comparison exceeds the 5% regression trigger, including RSS; the
+only repeat flag is baseline tiny p99 at **+9.844%**.
+
+Allocator calls, requested bytes, and regional peak-above-entry vectors are identical
+before and after for every shape/repeat, with a 419,347-byte regional peak
+above entry. The four profiles are whole-process samples that include setup
+and the untimed oracle; `ExecutionContext::consume` self samples move from
+25.01% to 10.57%. Ten before and eleven after addr2line warnings remain in the
+retained diagnostics, zero L1 readings are not a zero-miss proof, and LLC was
+not captured. The derived `claims[]` is empty: no broad 10x, RSS, physical-copy,
+total-memory, or scaling claim follows. Copied-bundle replay and six mutation probes pass before and after task cleanup.
+
+The ODS release receipt reports 454 tests passed; scoped Clippy retains the
+known common `ArchiveReaderKind` large-enum debt. This is descriptive evidence
+for one fresh ODS scalar-creation path. The next implementation slice is
+bounded ODT paragraph creation, then bounded ODP creation; logical append,
+package-Part addition, arbitrary repackaging, native breadth, and the overall
+non-iWork goal remain open.
+
+## Prior evidence through 0433
 
 [0433](changes/0433-ods-bounded-fresh-scalar-creation.md) records 36 formal
 reports and 1,080 samples for fresh one-sheet ODS scalar creation. The new

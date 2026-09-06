@@ -1,5 +1,30 @@
 # Performance program phase report
 
+## Change 0434: ODS ordinary-text span batching
+
+[0434](changes/0434-ods-bounded-text-spans.md) retains 24 formal reports and
+720 samples for the same fresh ODS scalar-stream selector before and after a
+private borrowed-span encoder path, plus four whole-process profiles. Normal
+p50 deltas (after versus before), R1 / R2, are **−12.499% / −16.211%** for 64
+rows, **−13.731% / −13.121%** for 8,192 rows, and **−13.562% / −13.492%** for
+32,768 rows. No matched >5% regression flag occurs, including RSS; the only
+repeat flag is baseline tiny p99 at **+9.844%**.
+
+Allocator calls, requested bytes, and regional peak-above-entry vectors are identical
+before/after across shapes and repeats; regional peak above entry is 419,347
+bytes. Profile self samples for `ExecutionContext::consume` are 25.01% before
+and 10.57% after in whole-process recordings that include setup and the
+untimed oracle. Ten/eleven addr2line warnings are retained, L1 zero readings
+are not a zero-miss proof, and LLC was not captured. `claims[]` is empty, so
+these are descriptive observations with no broad speedup, 10x, RSS,
+physical-copy, total-memory, or scaling claim. Copied-bundle replay and six mutation probes pass before and after task cleanup.
+
+The ODS release receipt reports 454 tests passed; scoped Clippy, documentation,
+format, boundaries, and the candidate harness build pass with the existing
+common large-enum strict debt recorded separately. The fresh ODS creation scope
+does not cover logical append, package-Part addition, arbitrary repackaging,
+native compatibility breadth, or the full non-iWork goal.
+
 ## Change 0433: bounded ODS scalar creation
 
 [0433](changes/0433-ods-bounded-fresh-scalar-creation.md) retains 36 formal

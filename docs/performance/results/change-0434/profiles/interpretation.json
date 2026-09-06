@@ -1,0 +1,136 @@
+{
+  "change": 434,
+  "scope": "whole fresh process including setup, warmups,30samples and untimed oracle; sampled self percentages are not operation-local or latency attribution",
+  "rows": [
+    {
+      "role": "before-streaming",
+      "counters": {
+        "cycles:u": 15795953982,
+        "instructions:u": 59792527128,
+        "branches:u": 12201778606,
+        "branch-misses:u": 18840111,
+        "L1-dcache-load-misses:u": 0
+      },
+      "ipc": 3.7853064902655147,
+      "addr2line_warnings": 10,
+      "top_self_symbols": [
+        {
+          "symbol": "<litchi_core::execution::ExecutionContext>::consume",
+          "self_percent": 25.01
+        },
+        {
+          "symbol": "litchi_perf_baseline::ods_scalar_semantic_sha256",
+          "self_percent": 9.22
+        },
+        {
+          "symbol": "xml_minifier::audit::verify_with_policy",
+          "self_percent": 8.31
+        },
+        {
+          "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+          "self_percent": 6.77
+        },
+        {
+          "symbol": "sha2::sha256::x86_sha::compress",
+          "self_percent": 6.13
+        },
+        {
+          "symbol": "litchi_odf_common::core::generated_xml::validate_fragment_shape",
+          "self_percent": 5.27
+        },
+        {
+          "symbol": "__memset_avx512_unaligned_erms",
+          "self_percent": 4.92
+        },
+        {
+          "symbol": "<quick_xml::reader::state::ReaderState>::emit_start",
+          "self_percent": 2.03
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::IterState>::next",
+          "self_percent": 1.74
+        },
+        {
+          "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+          "self_percent": 1.73
+        },
+        {
+          "symbol": "zlib_rs::deflate::longest_match::longest_match",
+          "self_percent": 1.39
+        },
+        {
+          "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+          "self_percent": 1.34
+        }
+      ]
+    },
+    {
+      "role": "after-streaming",
+      "counters": {
+        "cycles:u": 14156028329,
+        "instructions:u": 51861693346,
+        "branches:u": 10708496107,
+        "branch-misses:u": 10694543,
+        "L1-dcache-load-misses:u": 0
+      },
+      "ipc": 3.6635765442596835,
+      "addr2line_warnings": 11,
+      "top_self_symbols": [
+        {
+          "symbol": "<litchi_core::execution::ExecutionContext>::consume",
+          "self_percent": 10.57
+        },
+        {
+          "symbol": "litchi_perf_baseline::ods_scalar_semantic_sha256",
+          "self_percent": 10.43
+        },
+        {
+          "symbol": "xml_minifier::audit::verify_with_policy",
+          "self_percent": 9.12
+        },
+        {
+          "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+          "self_percent": 8.34
+        },
+        {
+          "symbol": "litchi_odf_common::core::generated_xml::validate_fragment_shape",
+          "self_percent": 7.21
+        },
+        {
+          "symbol": "sha2::sha256::x86_sha::compress",
+          "self_percent": 6.9
+        },
+        {
+          "symbol": "__memset_avx512_unaligned_erms",
+          "self_percent": 5.3
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::IterState>::next",
+          "self_percent": 2.01
+        },
+        {
+          "symbol": "<quick_xml::reader::state::ReaderState>::emit_start",
+          "self_percent": 2.0
+        },
+        {
+          "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+          "self_percent": 1.81
+        },
+        {
+          "symbol": "xml_minifier::audit::check_attribute_layout",
+          "self_percent": 1.79
+        },
+        {
+          "symbol": "<litchi_core::execution::ExecutionContext>::check",
+          "self_percent": 1.66
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Single stat and record process per role; descriptive diagnostic counts only.",
+    "L1 miss counts report zero, without proof of true zero misses. LLC was not captured.",
+    "Addr2line warnings limit complete inline/source resolution; raw perf data and decoded stacks retained."
+  ],
+  "claims": []
+}

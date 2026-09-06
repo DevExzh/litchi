@@ -1,0 +1,112 @@
+{
+  "ambient_source_manifest": {
+    "files": 6644,
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/runs/B2/formal/B2-normal-tiny-r2-resource.log",
+    "/tmp/litchi-goal-0434-binaries/after/normal",
+    "--case",
+    "ods_streaming_create",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/runs/B2/formal/B2-normal-tiny-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/runs/B2/formal/B2-normal-tiny-r2-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4830,
+      "path": "runs/B2/formal/B2-normal-tiny-r2-catalog.json",
+      "sha256": "c37c96fb5379a1864fd5cdeeba72d2447b42630f02680e04aaad17e24fec7667"
+    },
+    "oracle_log": {
+      "bytes": 322,
+      "path": "runs/B2/formal/B2-normal-tiny-r2-oracle.log",
+      "sha256": "979e816ce45c01d675430af288036ab4f19b4a53074568f1a3371811f4045eb4"
+    },
+    "report": {
+      "bytes": 32746,
+      "path": "runs/B2/formal/B2-normal-tiny-r2.json",
+      "sha256": "40a91ddc3fc0202a6c82d9372e3c999172229151ec4bcb0262677ed353f6b04a"
+    },
+    "resource_log": {
+      "bytes": 1078,
+      "path": "runs/B2/formal/B2-normal-tiny-r2-resource.log",
+      "sha256": "edb231ca3b9ed5319df76640a77d8f6b5af3991353807499518fab5954da23c6"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/B2/formal/B2-normal-tiny-r2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 454552200,
+    "path": "/tmp/litchi-goal-0434-binaries/after/normal",
+    "sha256": "dfa919bc9bb52cb2044c5d4ac893dcaacd49ed4367b2fbbe22ea612a3c9403d4"
+  },
+  "build_directory": "after",
+  "change": 434,
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "4ba055b982bec22de39189b0789411c69cb7d7a5e9a5875740a9db3ed0639b01",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T06:23:14.269748+00:00",
+  "lane": {
+    "mode": "normal",
+    "repeat": "R2",
+    "shape": "tiny"
+  },
+  "name": "B2-normal-tiny-r2",
+  "oracle_exit_code": 0,
+  "oracle_protocol_sha256": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+  "oracle_stdout_sha256": "979e816ce45c01d675430af288036ab4f19b4a53074568f1a3371811f4045eb4",
+  "oracle_verifier_sha256": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+  "outside_bundle_status_unchanged": true,
+  "phase": "B2",
+  "protocol_sha256": "cb6ac713e39b269c432291ffad5c56bb6141bf2a04eddd96db8fbc30d3f7b068",
+  "revision": "65dfb1b141190271763367defce4086ef146c056",
+  "role": "after-streaming",
+  "schema": "litchi-0434-capture-receipt-v1",
+  "selector": "ods_streaming_create",
+  "source_after": {
+    "files": 6644,
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+  },
+  "source_before": {
+    "files": 6644,
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+  },
+  "source_manifest": {
+    "files": 6644,
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T06:23:13.932690+00:00",
+  "status": "pass",
+  "status_after": [
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md"
+  ],
+  "verifier_sha256": "4bf8e691bc59f5dc7a988788b1f6a3157e6b10416c3460f4364c7aee09927fa4"
+}

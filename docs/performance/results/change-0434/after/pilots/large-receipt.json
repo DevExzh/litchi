@@ -1,0 +1,63 @@
+{
+  "status": "pass",
+  "shape": "large",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/after/pilots/large-resource.log",
+    "/tmp/litchi-goal-0434-binaries/after/normal",
+    "--case",
+    "ods_streaming_create",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/after/pilots/large.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0434/after/pilots/large-catalog.json"
+  ],
+  "binary": {
+    "path": "/tmp/litchi-goal-0434-binaries/after/normal",
+    "sha256": "dfa919bc9bb52cb2044c5d4ac893dcaacd49ed4367b2fbbe22ea612a3c9403d4",
+    "bytes": 454552200
+  },
+  "driver_sha256": "b804af178bc819b3e1d12df5ad2bd980e7f02b0b9954c0a9d4d14cc64b81e7d4",
+  "frozen_inputs": {
+    "status": "frozen",
+    "utc": "2026-09-06T05:53:37.491975+00:00",
+    "files": {
+      "protocol.json": "cb6ac713e39b269c432291ffad5c56bb6141bf2a04eddd96db8fbc30d3f7b068",
+      "oracle/verify-report.py": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+      "oracle/protocol.json": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+      "check.py": "e4d1efae847f272dd89155e1ec0a465a09a57c40c34f1c95f2dde7a85deb275f"
+    }
+  },
+  "build_receipt": "checks/after-build.json",
+  "artifacts": {
+    "after/pilots/large.json": {
+      "bytes": 32963,
+      "sha256": "d0c997cddfedaa1711a5af151e6235780ce76efe992512dacb446335d4f9df83"
+    },
+    "after/pilots/large-catalog.json": {
+      "bytes": 4860,
+      "sha256": "c046eabdbc02277a860b7821528278d3d9653a3576fc3d2701fe400dbf2e35a6"
+    },
+    "after/pilots/large-resource.log": {
+      "bytes": 1053,
+      "sha256": "fe9bf9700cf6178becacc7a1b05ce23e660b0f214c62777494422e9090852cc8"
+    },
+    "after/pilots/large.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}
