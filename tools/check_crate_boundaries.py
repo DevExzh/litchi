@@ -2979,6 +2979,7 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT = (
     KEYNOTE_SOURCE_ROOT / "package" / "slide_media_lifecycle"
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_SOURCES = (
+    KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "comment_graph.rs",
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "graph.rs",
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "metadata.rs",
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "budget.rs",
@@ -2999,7 +3000,7 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_MODULE = re.compile(
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_CHILD_MODULE = re.compile(
     r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
-    r"(?:r#)?(?:graph|metadata|budget|clone_payload|node_cache)\b"
+    r"(?:r#)?(?:comment_graph|graph|metadata|budget|clone_payload|node_cache)\b"
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS = frozenset(
     {
@@ -3181,6 +3182,58 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_NODE_CACHE_MARKER_GROUPS = {
         ("noncanonical", "invalid"),
     ),
 }
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/comment_storage_codec/lifecycle.rs"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_PARENT_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/comment_storage_codec.rs"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_TEST_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/comment_storage_codec/lifecycle_tests.rs"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_APIS = (
+    "CommentStorageLifecycleRewrite",
+    "PreparedCommentStorageLifecycleRewrite",
+    "prepare_comment_storage_lifecycle_rewrite",
+    "rewrite_comment_storage_lifecycle",
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_MARKER_GROUPS = {
+    "source-witnessed UUID rewrite": (
+        "expecting_fingerprint",
+        "expecting_storage_uuid",
+        "replacing_storage_uuid",
+        "storage_uuid",
+    ),
+    "prepared execution accounting": (
+        "prepare_report",
+        "execution_requirements",
+        "RewriteExecutionRequirements",
+        "RewriteExecutionLimits",
+        "execute",
+    ),
+    "streamed reply preservation": (
+        "reply_remaps",
+        "scan_comment_storage_raw",
+        "emit_lifecycle_rewrite",
+        "replies",
+        "RawField",
+    ),
+    "bounded source rewrite": (
+        "max_message_bytes",
+        "output_bytes",
+        "scratch_bytes",
+        "retained_bytes",
+        "try_reserve_exact",
+    ),
+}
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_TEST_MARKERS = (
+    "#[test]",
+    "prepare_comment_storage_lifecycle_rewrite",
+    "execution_requirements",
+    "execute",
+    "replacing_storage_uuid",
+    "unknown",
+)
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_MESSAGES = {
     "Reference": {"identifier": 1, "deprecated_type": 2, "deprecated_is_external": 3},
     "UUID": {"lower": 1, "upper": 2},
@@ -3254,6 +3307,41 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_NODE_CACHE_REQUIRED_TYPES = (
     "InvalidSource",
     "Verification",
 )
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_GRAPH_APIS = (
+    "CommentStorageIdentity",
+    "CommentAuthorDependency",
+    "CommentGraphPlan",
+    "plan_comment_graph",
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_GRAPH_MARKER_GROUPS = {
+    "strict comment-storage visitor": (
+        "comment_storage_codec",
+        "decode_comment_storage_archive_with_visitor",
+        "CommentStorageVisitor",
+        "ReplyCollector",
+    ),
+    "same-component closure": (
+        "storage_ids",
+        "storage_identities",
+        "author_ids",
+        "author_dependencies",
+        "binary_search",
+        "InvalidSource",
+    ),
+    "storage identity and UUID": (
+        "CommentStorageIdentity",
+        "storage_uuid",
+        "root_storage_uuid",
+        "uuid",
+    ),
+    "bounded graph budget": (
+        "LifecycleBudget",
+        "charge_entries",
+        "charge_references",
+        "charge_allocations",
+        "try_reserve",
+    ),
+}
 
 # Wave98 moves existing canonical Keynote slide-table title settings behind a
 # selector-first package facade.  The strict Buffa projections remain shared
@@ -54253,6 +54341,96 @@ def audit_keynote_slide_media_lifecycle_facade_source_topology(
     return sorted(set(violations))
 
 
+def _audit_keynote_slide_media_lifecycle_comment_codec(
+    root: Path,
+) -> list[str]:
+    """Keep the selected comment graph rewrite neutral and source-bound.
+
+    The child is activated only once the hidden parent module is wired.  This
+    lets the neutral codec land before the Keynote owner while still making a
+    missing child or test seam fail as soon as the production module claims it.
+    """
+
+    parent_path = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_PARENT_SOURCE
+    parent = parent_path.read_text(encoding="utf-8") if parent_path.is_file() else ""
+    if re.search(
+        r"(?ms)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\].{0,180}?"
+        r"^\s*pub\s+mod\s+lifecycle\s*;",
+        parent,
+    ) is None:
+        return []
+
+    child_path = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_SOURCE
+    test_path = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_TEST_SOURCE
+    violations: list[str] = []
+    if not child_path.is_file():
+        return [
+            "focused Keynote media lifecycle comment codec is missing its private lifecycle "
+            f"child: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_SOURCE}"
+        ]
+
+    raw = child_path.read_text(encoding="utf-8")
+    production = _mask_rust_cfg_test_items(raw)
+    code = _mask_rust_non_code(production)
+    for name in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_APIS:
+        kind = "fn" if name.startswith(("prepare_", "rewrite_")) else ""
+        pattern = (
+            rf"\b(?:pub\s+)?fn\s+{re.escape(name)}\b"
+            if kind == "fn"
+            else rf"\b(?:pub\s+)?(?:struct|enum|type|trait)\s+{re.escape(name)}\b"
+        )
+        if re.search(pattern, code) is None:
+            violations.append(
+                "focused Keynote media lifecycle comment codec is missing strict API "
+                f"{name}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_SOURCE}"
+            )
+    for label, markers in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_MARKER_GROUPS.items():
+        if not all(_keynote_lifecycle_marker_present(code, marker) for marker in markers):
+            violations.append(
+                "focused Keynote media lifecycle comment codec is missing "
+                f"{label} marker: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_SOURCE}"
+            )
+
+    for pattern in (
+        re.compile(r"\bprost(?:_types)?\b"),
+        re.compile(r"\bMessage\s*::\s*(?:decode|encode)\s*\("),
+        re.compile(r"\b(?:to_owned_message|try_encode_to_vec|encode_to_vec)\s*\("),
+    ):
+        for match in pattern.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused Keynote media lifecycle comment codec must remain lazy/source-preserving; "
+                f"eager generated operation {match.group(0).strip()}: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_SOURCE}:{line_number}"
+            )
+    for marker in ("IWorkPackage", "ArchiveObject", "SourceCatalog", "RawMessage"):
+        if re.search(rf"\b{re.escape(marker)}\b", code):
+            violations.append(
+                "focused Keynote media lifecycle comment codec must remain neutral and archive-free "
+                f"({marker}): {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_SOURCE}"
+            )
+
+    if not test_path.is_file():
+        violations.append(
+            "focused Keynote media lifecycle comment codec is missing direct lifecycle tests: "
+            f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_TEST_SOURCE}"
+        )
+    else:
+        test_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(test_path.read_text(encoding="utf-8"))
+        )
+        # The helper is itself a cfg(test) file, so retain the test attributes
+        # from the raw source for this coverage-only assertion.
+        test_raw = test_path.read_text(encoding="utf-8")
+        for marker in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_TEST_MARKERS:
+            if marker not in test_raw and marker not in test_code:
+                violations.append(
+                    "focused Keynote media lifecycle comment codec tests are missing "
+                    f"{marker}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_TEST_SOURCE}"
+                )
+    return sorted(set(violations))
+
+
 def audit_keynote_slide_media_lifecycle_codec_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -54378,6 +54556,7 @@ def audit_keynote_slide_media_lifecycle_codec_source_topology(
         )
     projection = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_SOURCE
     violations.extend(_audit_keynote_media_lifecycle_projection(root, projection))
+    violations.extend(_audit_keynote_slide_media_lifecycle_comment_codec(root))
     return sorted(set(violations))
 
 
@@ -54526,7 +54705,14 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
             owner,
         )
     }
-    for child in ("graph", "metadata", "budget", "clone_payload", "node_cache"):
+    for child in (
+        "comment_graph",
+        "graph",
+        "metadata",
+        "budget",
+        "clone_payload",
+        "node_cache",
+    ):
         if child not in module_names:
             violations.append(
                 "focused Keynote media lifecycle owner must wire private "
@@ -54649,33 +54835,67 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
                     f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
                 )
 
-        reservation_body = graph_function_body("reserve_core_header_work")
-        if not reservation_body:
+        def require_core_budget_wrapper(
+            name: str, arguments_pattern: str, label: str
+        ) -> str:
+            body = graph_function_body(name)
+            if not body:
+                violations.append(
+                    "focused Keynote media lifecycle graph is missing its bounded core-header "
+                    f"{label} wrapper: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                )
+                return ""
+            inner_calls = graph_call_records(body, "reserve_core_header_work_inner")
+            if not any(re.search(arguments_pattern, arguments) for _call, arguments in inner_calls):
+                violations.append(
+                    "focused Keynote media lifecycle core-header "
+                    f"{label} wrapper must delegate source, limits, and the shared budget "
+                    f"to reserve_core_header_work_inner: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                )
+            if re.search(r"\bcharge_(?:allocation_plan|wire_work)\b", body):
+                violations.append(
+                    "focused Keynote media lifecycle core-header wrappers must leave atomic "
+                    "allocation and wire charging to the shared inner helper: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                )
+            return body
+
+        require_core_budget_wrapper(
+            "reserve_core_header_inspection_work",
+            r"\bsource\b\s*,\s*0\s*,\s*\blimits\b\s*,\s*\bbudget\b\s*,\s*false\b",
+            "inspection",
+        )
+        require_core_budget_wrapper(
+            "reserve_core_header_work",
+            r"\bsource\b\s*,\s*\badditional_references\b\s*,\s*\blimits\b\s*,\s*\bbudget\b\s*,\s*true\b",
+            "mutation",
+        )
+        inner_body = graph_function_body("reserve_core_header_work_inner")
+        if not inner_body:
             violations.append(
-                "focused Keynote media lifecycle graph is missing its bounded core-header "
-                "reservation helper: "
-                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                "focused Keynote media lifecycle graph is missing its shared core-header "
+                f"reservation inner helper: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
             )
         else:
-            reservation_calls = graph_call_records(
-                reservation_body, "charge_allocation_plan"
+            inner_allocation_calls = graph_call_records(
+                inner_body, "charge_allocation_plan"
             )
             if not any(
                 re.search(r"\bbytes\b\s*,\s*\bevents\b", arguments)
-                and re.search(r"\bbudget\b", reservation_body)
-                for _call, arguments in reservation_calls
+                for _call, arguments in inner_allocation_calls
             ):
                 violations.append(
-                    "focused Keynote media lifecycle core-header reservation must charge "
+                    "focused Keynote media lifecycle core-header inner helper must charge "
                     "one atomic byte/event allocation plan: "
                     f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
                 )
             if not re.search(
                 r"\bbudget\s*\.\s*charge_wire_work\s*\(\s*bytes\s*\)",
-                reservation_body,
+                inner_body,
             ):
                 violations.append(
-                    "focused Keynote media lifecycle core-header reservation must charge "
+                    "focused Keynote media lifecycle core-header inner helper must charge "
                     "its bounded wire work through the shared budget: "
                     f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
                 )
@@ -54823,6 +55043,74 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
                     "focused Keynote media lifecycle transaction must route its shared budget "
                     f"through node-cache helper {helper}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
                 )
+
+    comment_graph_code = child_sources_by_name.get("comment_graph", "")
+    if comment_graph_code:
+        for name in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_GRAPH_APIS:
+            kind = "fn" if name.startswith("plan_") else ""
+            pattern = (
+                rf"\b(?:pub(?:\([^()]*\))?\s+)?fn\s+{re.escape(name)}\b"
+                if kind == "fn"
+                else rf"\b(?:pub(?:\([^()]*\))?\s+)?(?:struct|enum|type|trait)\s+{re.escape(name)}\b"
+            )
+            if re.search(pattern, comment_graph_code) is None:
+                violations.append(
+                    "focused Keynote media lifecycle comment graph is missing strict API "
+                    f"{name}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_graph.rs'}"
+                )
+        for label, markers in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_GRAPH_MARKER_GROUPS.items():
+            if not all(_keynote_lifecycle_marker_present(comment_graph_code, marker) for marker in markers):
+                violations.append(
+                    "focused Keynote media lifecycle comment graph is missing "
+                    f"{label} marker: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_graph.rs'}"
+                )
+
+        graph_code = child_sources_by_name.get("graph", "")
+        if not re.search(
+            r"\bplan_comment_graph\s*\([^)]*\bbudget\b",
+            graph_code,
+            re.DOTALL,
+        ):
+            violations.append(
+                "focused Keynote media lifecycle graph must route the shared budget through "
+                f"plan_comment_graph: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+            )
+        if not re.search(
+            r"Some\([^)]*\)[\s\S]{0,260}?\bLifecycleAction::Remove\b[\s\S]{0,260}?"
+            r"\bUnsupportedComment\b",
+            graph_code,
+        ):
+            violations.append(
+                "focused Keynote media lifecycle graph must refuse selected-comment removal "
+                f"until comment culling is owned: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+            )
+        clone_routes = graph_call_records(graph_code, "rewrite_comment_payload")
+        if not clone_routes or not any(
+            re.search(r"\bbudget\b", arguments)
+            for _call, arguments in clone_routes
+        ):
+            violations.append(
+                "focused Keynote media lifecycle graph must route comment cloning through its "
+                f"shared budget: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+            )
+        author_dependency_marker = re.compile(
+            r"\bauthor_ids\b[\s\S]{0,420}?\bcontinue\b"
+        )
+        if author_dependency_marker.search(graph_code) is None:
+            violations.append(
+                "focused Keynote media lifecycle graph is missing shared author dependency "
+                "skip semantics: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+            )
+        if re.search(
+            r"\b(?:storage_uuid|root_storage_uuid|storage_identities)\b",
+            comment_graph_code,
+        ) is None:
+            violations.append(
+                "focused Keynote media lifecycle comment graph is missing source storage UUID "
+                "witness marker: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_graph.rs'}"
+            )
 
     budget_names = {
         match.group(1)

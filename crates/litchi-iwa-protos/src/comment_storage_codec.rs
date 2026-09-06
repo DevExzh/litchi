@@ -18,6 +18,9 @@ use buffa::DecodeOptions as BuffaDecodeOptions;
 
 use crate::buffa_comment_storage_generated::LitchiIwaCommentStorageProjection as projection;
 
+#[doc(hidden)]
+pub mod lifecycle;
+
 const TEXT_FIELD: u32 = 1;
 const CREATION_DATE_FIELD: u32 = 2;
 const AUTHOR_FIELD: u32 = 3;

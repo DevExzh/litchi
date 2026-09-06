@@ -66,6 +66,20 @@ impl<'source> ObjectIdentity<'source> {
     }
 }
 
+/// Borrowed component-external-reference ownership observed in the source
+/// PackageMetadata registry.  The target locator is resolved from the
+/// snapshot's current component census because the wire record stores only
+/// the target component identifier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ExternalReferenceIdentity<'source> {
+    source: ComponentIdentity<'source>,
+    target_component_identifier: u64,
+    object_identifier: Option<u64>,
+    is_weak: Option<bool>,
+    versioned: bool,
+    unknown_fields: bool,
+}
+
 /// Borrowed DataInfo facts required to decide whether a payload can be
 /// reclaimed after its final component owner is removed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -262,6 +276,7 @@ pub(super) struct MetadataSnapshot<'source> {
     resources: MetadataSnapshotResources,
     components: Vec<ComponentIdentity<'source>>,
     objects: Vec<ObjectIdentity<'source>>,
+    external_references: Vec<ExternalReferenceIdentity<'source>>,
     data: Vec<DataIdentity<'source>>,
     references: Vec<DataReferenceIdentity<'source>>,
     owners: Vec<DataOwnerIdentity>,
@@ -293,6 +308,12 @@ impl<'source> MetadataSnapshot<'source> {
 
         let component_capacity = identity_report.components_scanned();
         let object_capacity = identity_report.references_scanned();
+        // The neutral identity report intentionally exposes the aggregate
+        // reference count rather than a second per-kind counter.  Reusing it
+        // as a strict upper bound keeps this collector allocation-free while
+        // retaining every external-reference witness needed by lifecycle
+        // ownership checks.
+        let external_reference_capacity = identity_report.references_scanned();
         let data_capacity = media_report.data_records();
         let reference_capacity = media_report.data_references();
         let owner_capacity = media_report.owners();
@@ -302,6 +323,9 @@ impl<'source> MetadataSnapshot<'source> {
                 .ok_or(MetadataError::Invalid)?,
             object_capacity
                 .checked_mul(size_of::<ObjectIdentity<'source>>())
+                .ok_or(MetadataError::Invalid)?,
+            external_reference_capacity
+                .checked_mul(size_of::<ExternalReferenceIdentity<'source>>())
                 .ok_or(MetadataError::Invalid)?,
             data_capacity
                 .checked_mul(size_of::<DataIdentity<'source>>())
@@ -335,6 +359,11 @@ impl<'source> MetadataSnapshot<'source> {
             object_capacity,
             size_of::<ObjectIdentity<'source>>(),
         )?;
+        charge_nonempty(
+            charge,
+            external_reference_capacity,
+            size_of::<ExternalReferenceIdentity<'source>>(),
+        )?;
         charge_nonempty(charge, data_capacity, size_of::<DataIdentity<'source>>())?;
         charge_nonempty(
             charge,
@@ -350,6 +379,7 @@ impl<'source> MetadataSnapshot<'source> {
             source: payload,
             components: Vec::new(),
             objects: Vec::new(),
+            external_references: Vec::new(),
         };
         try_reserve(
             &mut identity.components,
@@ -360,6 +390,11 @@ impl<'source> MetadataSnapshot<'source> {
             &mut identity.objects,
             object_capacity,
             size_of::<ObjectIdentity<'source>>(),
+        )?;
+        try_reserve(
+            &mut identity.external_references,
+            external_reference_capacity,
+            size_of::<ExternalReferenceIdentity<'source>>(),
         )?;
         let inspected = identity_codec::inspect_package_metadata_with_visitor(
             payload,
@@ -408,6 +443,7 @@ impl<'source> MetadataSnapshot<'source> {
             },
             components: identity.components,
             objects: identity.objects,
+            external_references: identity.external_references,
             data: media.data,
             references: media.references,
             owners: media.owners,
@@ -444,6 +480,103 @@ impl<'source> MetadataSnapshot<'source> {
             }
         }
         selected.ok_or(MetadataError::Missing)
+    }
+
+    /// Return the bounded census cost of one external-dependency witness.
+    /// The lookup resolves both current selectors and then scans every
+    /// retained external record.  Callers should charge this once for each
+    /// distinct dependency before invoking [`Self::require_current_external_dependency`].
+    #[must_use]
+    pub(super) fn external_dependency_lookup_work(&self) -> usize {
+        self.components
+            .len()
+            .saturating_mul(3)
+            .saturating_add(self.external_references.len())
+            .max(1)
+    }
+
+    /// Require one exact current field-6 external edge from `source` to the
+    /// current component selected by `target_locator` and `author_id`.
+    ///
+    /// Component-external references are component-level owners shared by
+    /// every archive object in the source component.  A clone therefore must
+    /// reuse the existing edge when its author is external; it must not infer
+    /// ownership from a raw object identifier alone.  Versioned records,
+    /// duplicate matching records, and selected records carrying unknown
+    /// fields are rejected as ambiguous so a lifecycle caller cannot publish
+    /// against an uncertain source witness.  Explicitly weak author edges are
+    /// also refused; comment authors require a strong dependency (the native
+    /// representation is either an omitted weakness flag or `false`).
+    pub(super) fn require_current_external_dependency(
+        &self,
+        source: ComponentIdentity<'source>,
+        target_locator: &str,
+        author_id: u64,
+    ) -> Result<(), MetadataError> {
+        if author_id == 0 {
+            return Err(MetadataError::Invalid);
+        }
+        if !source.current {
+            return Err(MetadataError::Ambiguous);
+        }
+        let selected_source = self.current_component(source.locator)?;
+        if selected_source.identifier != source.identifier {
+            return Err(MetadataError::Ambiguous);
+        }
+        let target = self.current_component(target_locator)?;
+        let mut source_identifier_matches = 0usize;
+        let mut target_identifier_matches = 0usize;
+        for component in self.components.iter().copied() {
+            if !component.current {
+                continue;
+            }
+            if component.identifier == selected_source.identifier {
+                source_identifier_matches = source_identifier_matches
+                    .checked_add(1)
+                    .ok_or(MetadataError::Invalid)?;
+            }
+            if component.identifier == target.identifier {
+                target_identifier_matches = target_identifier_matches
+                    .checked_add(1)
+                    .ok_or(MetadataError::Invalid)?;
+            }
+        }
+        if source_identifier_matches != 1 || target_identifier_matches != 1 {
+            return Err(MetadataError::Ambiguous);
+        }
+
+        let mut current_matches = 0usize;
+        let mut versioned_matches = 0usize;
+        let mut unknown_match = false;
+        let mut weak_match = false;
+        for reference in self.external_references.iter().copied() {
+            if reference.source.identifier != selected_source.identifier
+                || reference.source.locator != selected_source.locator
+                || reference.target_component_identifier != target.identifier
+                || reference.object_identifier != Some(author_id)
+            {
+                continue;
+            }
+            if reference.versioned || !reference.source.current {
+                versioned_matches = versioned_matches
+                    .checked_add(1)
+                    .ok_or(MetadataError::Invalid)?;
+            } else {
+                current_matches = current_matches
+                    .checked_add(1)
+                    .ok_or(MetadataError::Invalid)?;
+            }
+            unknown_match |= reference.unknown_fields;
+            weak_match |= reference.is_weak == Some(true);
+        }
+
+        if versioned_matches != 0 || unknown_match || current_matches > 1 || weak_match {
+            return Err(MetadataError::Ambiguous);
+        }
+        if current_matches == 0 {
+            return Err(MetadataError::Missing);
+        }
+        Ok(())
     }
 
     /// Resolve one unique current object UUID in the selected component.
@@ -1071,6 +1204,7 @@ struct IdentityCollector<'source> {
     source: &'source [u8],
     components: Vec<ComponentIdentity<'source>>,
     objects: Vec<ObjectIdentity<'source>>,
+    external_references: Vec<ExternalReferenceIdentity<'source>>,
 }
 
 impl identity_codec::PackageMetadataVisitor for IdentityCollector<'_> {
@@ -1113,6 +1247,32 @@ impl identity_codec::PackageMetadataVisitor for IdentityCollector<'_> {
             object_identifier: binding.object_identifier(),
             uuid: binding.uuid(),
             current: binding.component().is_current(),
+        });
+        Ok(())
+    }
+
+    fn visit_external_reference(
+        &mut self,
+        reference: identity_codec::ExternalReferenceDescriptor<'_>,
+    ) -> Result<(), identity_codec::RewriteError> {
+        if self.external_references.len() == self.external_references.capacity() {
+            return Err(identity_codec::RewriteError::allocation(size_of::<
+                ExternalReferenceIdentity<'_>,
+            >()));
+        }
+        let locator = rebind_source_str(self.source, reference.source().effective_locator())
+            .ok_or_else(|| identity_codec::RewriteError::allocation(0))?;
+        self.external_references.push(ExternalReferenceIdentity {
+            source: ComponentIdentity {
+                identifier: reference.source().identifier(),
+                locator,
+                current: reference.source().is_current(),
+            },
+            target_component_identifier: reference.target_component_identifier(),
+            object_identifier: reference.object_identifier(),
+            is_weak: reference.is_weak(),
+            versioned: reference.is_versioned(),
+            unknown_fields: reference.has_unknown_fields(),
         });
         Ok(())
     }
@@ -1284,7 +1444,10 @@ fn checked_sum<const N: usize>(parts: [usize; N]) -> Result<usize, MetadataError
 
 #[cfg(test)]
 mod tests {
-    use super::{rebind_source_bytes, rebind_source_str};
+    use super::{
+        ComponentIdentity, MetadataError, MetadataSnapshot, identity_codec, media_codec,
+        rebind_source_bytes, rebind_source_str,
+    };
 
     #[test]
     fn source_subslices_rebind_to_the_source_lifetime() {
@@ -1312,5 +1475,285 @@ mod tests {
         assert_eq!(rebind_source_bytes(source, &[]), Some(&source[..0]));
         assert_eq!(rebind_source_str(source, ""), Some(""));
         assert_eq!(rebind_source_bytes(&[], &[]), Some([].as_slice()));
+    }
+
+    fn put_varint(output: &mut Vec<u8>, mut value: u64) {
+        while value >= 0x80 {
+            output.push((value as u8 & 0x7f) | 0x80);
+            value >>= 7;
+        }
+        output.push(value as u8);
+    }
+
+    fn varint_field(output: &mut Vec<u8>, number: u32, value: u64) {
+        put_varint(output, u64::from(number) << 3);
+        put_varint(output, value);
+    }
+
+    fn bytes_field(output: &mut Vec<u8>, number: u32, value: &[u8]) {
+        put_varint(output, (u64::from(number) << 3) | 2);
+        put_varint(output, value.len() as u64);
+        output.extend_from_slice(value);
+    }
+
+    fn external_reference(
+        target_identifier: u64,
+        object_identifier: u64,
+        weak: Option<bool>,
+        unknown: bool,
+    ) -> Vec<u8> {
+        let mut reference = Vec::new();
+        varint_field(&mut reference, 1, target_identifier);
+        varint_field(&mut reference, 2, object_identifier);
+        if let Some(weak) = weak {
+            varint_field(&mut reference, 3, u64::from(weak));
+        }
+        if unknown {
+            varint_field(&mut reference, 4, 1);
+        }
+        reference
+    }
+
+    fn component(
+        identifier: u64,
+        locator: &str,
+        references: &[(u32, u64, u64, Option<bool>, bool)],
+    ) -> Vec<u8> {
+        let mut component = Vec::new();
+        varint_field(&mut component, 1, identifier);
+        bytes_field(&mut component, 2, locator.as_bytes());
+        for (field, target, object, weak, unknown) in references {
+            bytes_field(
+                &mut component,
+                *field,
+                &external_reference(*target, *object, *weak, *unknown),
+            );
+        }
+        component
+    }
+
+    fn metadata(current: &[Vec<u8>], versioned: &[Vec<u8>]) -> Vec<u8> {
+        let mut source = Vec::new();
+        varint_field(&mut source, 1, 100);
+        for component in current {
+            bytes_field(&mut source, 3, component);
+        }
+        for component in versioned {
+            bytes_field(&mut source, 11, component);
+        }
+        source
+    }
+
+    fn identity_options(source: &[u8]) -> identity_codec::RewriteOptions {
+        let bytes = source.len().max(1);
+        identity_codec::RewriteOptions::new(
+            bytes,
+            bytes.saturating_mul(2).max(1),
+            bytes.saturating_mul(64).max(1),
+            bytes.saturating_mul(256).max(1),
+            16,
+            64,
+            256,
+            64,
+        )
+    }
+
+    fn test_snapshot<'source>(source: &'source [u8]) -> MetadataSnapshot<'source> {
+        let mut charge = |_amount: usize| -> Result<(), MetadataError> { Ok(()) };
+        MetadataSnapshot::inspect(
+            source,
+            identity_options(source),
+            media_codec::DecodeOptions::for_source(source),
+            None,
+            &mut charge,
+        )
+        .expect("synthetic PackageMetadata must be inspectable")
+    }
+
+    fn test_source_component<'source>(
+        snapshot: &MetadataSnapshot<'source>,
+    ) -> ComponentIdentity<'source> {
+        snapshot
+            .current_component("source")
+            .expect("synthetic source component")
+    }
+
+    fn package_with_reference(field: u32, weak: Option<bool>, unknown: bool) -> Vec<u8> {
+        metadata(
+            &[
+                component(10, "source", &[(field, 20, 99, weak, unknown)]),
+                component(20, "author", &[]),
+            ],
+            &[],
+        )
+    }
+
+    #[test]
+    fn native_shaped_strong_author_edges_are_accepted_but_weak_edges_are_not() {
+        for weak in [None, Some(false)] {
+            let source = package_with_reference(6, weak, false);
+            let snapshot = test_snapshot(&source);
+            let source_component = test_source_component(&snapshot);
+
+            assert!(matches!(
+                snapshot.require_current_external_dependency(source_component, "author", 99),
+                Ok(())
+            ));
+        }
+
+        let source = package_with_reference(6, Some(true), false);
+        let snapshot = test_snapshot(&source);
+        let source_component = test_source_component(&snapshot);
+        assert!(matches!(
+            snapshot.require_current_external_dependency(source_component, "author", 99),
+            Err(MetadataError::Ambiguous)
+        ));
+    }
+
+    #[test]
+    fn missing_duplicate_versioned_and_unknown_matching_edges_fail_closed() {
+        let missing = metadata(
+            &[component(10, "source", &[]), component(20, "author", &[])],
+            &[],
+        );
+        let snapshot = test_snapshot(&missing);
+        let source_component = test_source_component(&snapshot);
+        assert!(matches!(
+            snapshot.require_current_external_dependency(source_component, "author", 99),
+            Err(MetadataError::Missing)
+        ));
+
+        let duplicate = metadata(
+            &[
+                component(
+                    10,
+                    "source",
+                    &[(6, 20, 99, None, false), (6, 20, 99, None, false)],
+                ),
+                component(20, "author", &[]),
+            ],
+            &[],
+        );
+        let snapshot = test_snapshot(&duplicate);
+        let source_component = test_source_component(&snapshot);
+        assert!(matches!(
+            snapshot.require_current_external_dependency(source_component, "author", 99),
+            Err(MetadataError::Ambiguous)
+        ));
+
+        let versioned = metadata(
+            &[component(10, "source", &[]), component(20, "author", &[])],
+            &[component(10, "source", &[(18, 20, 99, None, false)])],
+        );
+        let snapshot = test_snapshot(&versioned);
+        let source_component = test_source_component(&snapshot);
+        assert!(matches!(
+            snapshot.require_current_external_dependency(source_component, "author", 99),
+            Err(MetadataError::Ambiguous)
+        ));
+
+        let unknown = package_with_reference(6, None, true);
+        let snapshot = test_snapshot(&unknown);
+        let source_component = test_source_component(&snapshot);
+        assert!(matches!(
+            snapshot.require_current_external_dependency(source_component, "author", 99),
+            Err(MetadataError::Ambiguous)
+        ));
+    }
+
+    #[test]
+    fn unrelated_unknown_edges_do_not_poison_the_selected_dependency() {
+        let source = metadata(
+            &[
+                component(
+                    10,
+                    "source",
+                    &[(6, 20, 99, None, false), (6, 20, 100, None, true)],
+                ),
+                component(20, "author", &[]),
+            ],
+            &[],
+        );
+        let snapshot = test_snapshot(&source);
+        let source_component = test_source_component(&snapshot);
+
+        assert!(matches!(
+            snapshot.require_current_external_dependency(source_component, "author", 99),
+            Ok(())
+        ));
+        assert_eq!(snapshot.external_references.len(), 2);
+        assert_eq!(snapshot.external_dependency_lookup_work(), 8);
+    }
+
+    #[test]
+    fn source_and_target_locator_or_identifier_ambiguity_is_rejected() {
+        let duplicate_source_locator = metadata(
+            &[
+                component(10, "source", &[(6, 20, 99, None, false)]),
+                component(11, "source", &[]),
+                component(20, "author", &[]),
+            ],
+            &[],
+        );
+        let snapshot = test_snapshot(&duplicate_source_locator);
+        assert!(matches!(
+            snapshot.current_component("source"),
+            Err(MetadataError::Ambiguous)
+        ));
+
+        let duplicate_target_locator = metadata(
+            &[
+                component(10, "source", &[(6, 20, 99, None, false)]),
+                component(20, "author", &[]),
+                component(21, "author", &[]),
+            ],
+            &[],
+        );
+        let snapshot = test_snapshot(&duplicate_target_locator);
+        let source_component = test_source_component(&snapshot);
+        assert!(matches!(
+            snapshot.require_current_external_dependency(source_component, "author", 99),
+            Err(MetadataError::Ambiguous)
+        ));
+
+        let duplicate_source_identifier = metadata(
+            &[
+                component(10, "source", &[(6, 20, 99, None, false)]),
+                component(10, "source-v2", &[]),
+                component(20, "author", &[]),
+            ],
+            &[],
+        );
+        let snapshot = test_snapshot(&duplicate_source_identifier);
+        let source_component = test_source_component(&snapshot);
+        assert!(matches!(
+            snapshot.require_current_external_dependency(source_component, "author", 99),
+            Err(MetadataError::Ambiguous)
+        ));
+
+        let duplicate_target_identifier = metadata(
+            &[
+                component(10, "source", &[(6, 20, 99, None, false)]),
+                component(20, "author", &[]),
+                component(20, "author-v2", &[]),
+            ],
+            &[],
+        );
+        let snapshot = test_snapshot(&duplicate_target_identifier);
+        let source_component = test_source_component(&snapshot);
+        assert!(matches!(
+            snapshot.require_current_external_dependency(source_component, "author", 99),
+            Err(MetadataError::Ambiguous)
+        ));
+    }
+
+    #[test]
+    fn dependency_lookup_work_is_bounded_by_component_and_edge_counts() {
+        let source = package_with_reference(6, None, false);
+        let snapshot = test_snapshot(&source);
+
+        assert_eq!(snapshot.components.len(), 2);
+        assert_eq!(snapshot.external_references.len(), 1);
+        assert_eq!(snapshot.external_dependency_lookup_work(), 7);
     }
 }

@@ -3453,6 +3453,7 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
     owner.write_text(
         "mod budget;\n"
         "mod clone_payload;\n"
+        "mod comment_graph;\n"
         "mod graph;\n"
         "mod metadata;\n"
         "mod node_cache;\n"
@@ -3507,9 +3508,28 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
             "remap_clone_payload_with_budget(source, &mut charge); "
             "IdentifierRewrite; UuidRewrite; replace_slide_message_with_lifecycle_refs(); "
             "rewrite_slide_lifecycle(); rewrite_build(); rewrite_build_chunk(); }\n"
+            "fn comment_graph_route() { match direct_drawable_comment() { "
+            "Some(root) if action == LifecycleAction::Remove => return Err(UnsupportedComment), "
+            "Some(root) => plan_comment_graph(package, component_name, root, limits, budget), "
+            "None => None }; let _ = (storage_ids, author_ids); continue; "
+            "super::comment_clone::rewrite_comment_payload(message, object_remap, budget); }\n"
             "fn clone_object() { let limits = reserve_core_header_work(source, object_remap.len(), limits, budget)?; source.clone_with_identity_remap_with_limits(new_identifier, object_remap, replacements, limits); }\n"
             "fn replace_slide_message_with_lifecycle_refs() { let limits = reserve_core_header_work(object, removed.len(), limits, budget)?; object.replace_message_pruning_object_references_preserving_header_with_limits(limits); let limits = reserve_core_header_work(object, growth, limits, budget)?; object.replace_message_transitioning_object_references_preserving_header_with_limits(limits); }\n"
-            "fn reserve_core_header_work(source: ArchiveObject, additional_references: usize, limits: ArchiveObjectLimits, budget: &mut MediaLifecycleBudget) { let bytes = source.header_length; let events = additional_references; budget.charge_allocation_plan(bytes, events); budget.charge_wire_work(bytes); }\n"
+            "fn reserve_core_header_inspection_work(source: &ArchiveObject, limits: ArchiveObjectLimits, budget: &mut MediaLifecycleBudget) { reserve_core_header_work_inner(source, 0, limits, budget, false); }\n"
+            "fn reserve_core_header_work(source: &ArchiveObject, additional_references: usize, limits: ArchiveObjectLimits, budget: &mut MediaLifecycleBudget) { reserve_core_header_work_inner(source, additional_references, limits, budget, true); }\n"
+            "fn reserve_core_header_work_inner(source: &ArchiveObject, additional_references: usize, limits: ArchiveObjectLimits, budget: &mut MediaLifecycleBudget, rewrite: bool) { let bytes = source.header_length; let events = additional_references; budget.charge_allocation_plan(bytes, events); budget.charge_wire_work(bytes); let _ = (limits, rewrite); }\n"
+        ),
+        "comment_graph.rs": (
+            "struct CommentStorageIdentity { identifier: u64, uuid: Option<SuperUuid> }\n"
+            "struct CommentAuthorDependency;\n"
+            "struct CommentGraphPlan { storage_ids: Vec<u64>, storage_identities: Vec<CommentStorageIdentity>, author_ids: Vec<u64>, author_dependencies: Vec<CommentAuthorDependency> }\n"
+            "impl CommentGraphPlan { fn root_storage_uuid() { storage_uuid; root_storage_uuid; uuid; } }\n"
+            "fn plan_comment_graph(package: &Package, component_name: &str, root: u64, limits: WireLimits, budget: &mut LifecycleBudget) {\n"
+            "    comment_storage_codec; decode_comment_storage_archive_with_visitor; CommentStorageVisitor; ReplyCollector;\n"
+            "    storage_ids; storage_identities; author_ids; author_dependencies; binary_search; InvalidSource;\n"
+            "    LifecycleBudget; charge_entries; charge_references; charge_allocations; try_reserve;\n"
+            "    let _ = (package, component_name, root, limits, budget);\n"
+            "}\n"
         ),
         "metadata.rs": (
             "fn metadata() { MetadataSnapshot; IdentityBatch; MediaBatch; "
@@ -19230,6 +19250,25 @@ fn rewrite_movie_title_operation(
 
             owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE
             source = owner.read_text(encoding="utf-8")
+            owner.write_text(source.replace("mod comment_graph;\n", "", 1), encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("comment_graph child" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            comment_graph = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "comment_graph.rs"
+            comment_graph_source = comment_graph.read_text(encoding="utf-8")
+            comment_graph.write_text(
+                comment_graph_source.replace("CommentStorageVisitor", "MissingVisitor", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("strict comment-storage visitor" in item for item in violations), violations)
+            comment_graph.write_text(comment_graph_source, encoding="utf-8")
+
             owner.write_text(source.replace("mod graph;\n", "", 1), encoding="utf-8")
             violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
                 root
@@ -19324,6 +19363,58 @@ fn rewrite_movie_title_operation(
 
             graph = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "graph.rs"
             graph_source = graph.read_text(encoding="utf-8")
+            graph.write_text(
+                graph_source.replace(
+                    "plan_comment_graph(package, component_name, root, limits, budget)",
+                    "plan_comment_graph(package, component_name, root, limits)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("shared budget through plan_comment_graph" in item for item in violations), violations)
+            graph.write_text(graph_source, encoding="utf-8")
+
+            graph.write_text(
+                graph_source.replace("LifecycleAction::Remove", "LifecycleAction::Duplicate", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("refuse selected-comment removal" in item for item in violations), violations)
+            graph.write_text(graph_source, encoding="utf-8")
+
+            graph.write_text(
+                graph_source.replace(
+                    "rewrite_comment_payload(message, object_remap, budget)",
+                    "rewrite_comment_payload(message, object_remap, limits)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("comment cloning through its shared budget" in item for item in violations), violations)
+            graph.write_text(graph_source, encoding="utf-8")
+
+            graph.write_text(
+                graph_source.replace(
+                    "let _ = (storage_ids, author_ids); continue;",
+                    "let _ = (storage_ids, author_ids); break;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("shared author dependency skip semantics" in item for item in violations), violations)
+            graph.write_text(graph_source, encoding="utf-8")
+
             graph.write_text(
                 graph_source.replace(
                     "remap_clone_payload_with_budget", "remap_clone_payload", 1
@@ -19466,6 +19557,58 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(any("lazy_views" in item for item in violations), violations)
 
+    def test_keynote_media_lifecycle_comment_codec_remains_neutral_and_prepared(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            parent = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_PARENT_SOURCE
+            parent.parent.mkdir(parents=True, exist_ok=True)
+            parent.write_text(
+                "#[doc(hidden)]\npub mod lifecycle;\n",
+                encoding="utf-8",
+            )
+            child = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_SOURCE
+            child.parent.mkdir(parents=True, exist_ok=True)
+            child.write_text(
+                "pub struct CommentStorageLifecycleRewrite<'a> { remaps: &'a [(u64, u64)] }\n"
+                "pub struct PreparedCommentStorageLifecycleRewrite<'a, 'b> { source: &'a [u8], remaps: &'b [(u64, u64)] }\n"
+                "pub fn prepare_comment_storage_lifecycle_rewrite() {}\n"
+                "pub fn rewrite_comment_storage_lifecycle() {}\n"
+                "fn source_witness() { expecting_fingerprint; expecting_storage_uuid; replacing_storage_uuid; storage_uuid; }\n"
+                "fn prepared() { prepare_report; execution_requirements; RewriteExecutionRequirements; RewriteExecutionLimits; execute; }\n"
+                "fn preserve() { reply_remaps; scan_comment_storage_raw; emit_lifecycle_rewrite; replies; RawField; }\n"
+                "fn bounded() { max_message_bytes; output_bytes; scratch_bytes; retained_bytes; try_reserve_exact; }\n",
+                encoding="utf-8",
+            )
+            tests = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_TEST_SOURCE
+            tests.write_text(
+                "#[test]\nfn lifecycle_rewrite_round_trip() { prepare_comment_storage_lifecycle_rewrite(); execution_requirements; execute; replacing_storage_uuid; unknown; }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(root),
+                [],
+            )
+
+            child.write_text(
+                child.read_text(encoding="utf-8")
+                + "fn eager() { prost::Message::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "eager generated operation" in item
+                    and str(boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_SOURCE) in item
+                    for item in violations
+                ),
+                violations,
+            )
+
     def test_keynote_media_lifecycle_reserves_core_header_work_and_bulk_budget_atomically(
         self,
     ) -> None:
@@ -19483,6 +19626,51 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+            graph.write_text(
+                graph_source.replace(
+                    "reserve_core_header_work_inner(source, additional_references, limits, budget, true)",
+                    "reserve_core_header_work_inner(source, additional_references, limits, other_budget, true)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("mutation wrapper must delegate" in item for item in violations), violations)
+
+            graph.write_text(
+                graph_source.replace(
+                    "reserve_core_header_work_inner(source, 0, limits, budget, false)",
+                    "reserve_core_header_work_inner(source, 0, limits, other_budget, false)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("inspection wrapper must delegate" in item for item in violations), violations)
+
+            graph.write_text(
+                graph_source.replace("charge_allocation_plan", "charge_allocation_batch", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("inner helper must charge one atomic byte/event allocation plan" in item for item in violations), violations)
+
+            graph.write_text(
+                graph_source.replace("charge_wire_work", "charge_wire_batch", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("inner helper must charge its bounded wire work" in item for item in violations), violations)
+
+            graph.write_text(graph_source, encoding="utf-8")
             graph.write_text(
                 graph_source.replace(
                     "reserve_core_header_work(source, object_remap.len(), limits, budget)?;",
