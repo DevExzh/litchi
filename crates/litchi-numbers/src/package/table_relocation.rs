@@ -760,6 +760,7 @@ pub(super) fn rewrite_bytes(
 /// requires that edge for a strict relocation, while this compatibility seam
 /// preserves the producer-authored omission and still moves the rooted sheet
 /// ownership. All archive, wire, and verification work remains in this owner.
+#[cfg(feature = "internal-iwork-source")]
 pub(super) fn rewrite_bytes_for_compatibility(
     source: &Package,
     operation: Operation,
@@ -1684,6 +1685,7 @@ pub(super) fn verify_source_state(source: &Package, operation: Operation) -> Res
 /// table graph while its table storage is outside the focused semantic
 /// projection. The optional TableInfo parent is preserved when absent; a
 /// present parent must still identify the source sheet.
+#[cfg(feature = "internal-iwork-source")]
 pub(super) fn verify_physical_source_state(
     source: &Package,
     operation: Operation,
@@ -1762,6 +1764,7 @@ pub(super) fn verify_target_state(candidate: &Package, operation: Operation) -> 
 /// The target must retain the source's parent-edge shape: a present parent is
 /// rewritten to the destination sheet, while an omitted parent remains
 /// omitted. Sheet ownership and cardinality are checked in both cases.
+#[cfg(feature = "internal-iwork-source")]
 pub(super) fn verify_physical_target_state(
     candidate: &Package,
     operation: Operation,

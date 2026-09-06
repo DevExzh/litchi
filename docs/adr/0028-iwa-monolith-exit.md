@@ -8839,3 +8839,42 @@ retirement or monolith completion. Boundary verification passes 912 cases; the
 scanner remains at 64 packages, 238 declarations, and 11 ordered debts.
 Normal commit hooks enforce workspace formatting, lint, library/integration,
 and documentation tests. The default-feature Keynote library check passes.
+
+## 2026-09-06 follow-up: selector-first Numbers table relocation
+
+The 92-line host `numbers/editor/table_move.rs` module is deleted. Populated
+sheet duplication now retains the exact focused public `move_table` route
+alongside a source-built compatibility route used only by the duplication
+helper, with a known clone identity. The package `replace_archive` path keeps
+the reassembled exact source, preserving source provenance and readback; exact
+input is not normalized into compatibility output. Another-sheet clone-name
+collisions and legitimate rooted table-index changes during multi-table
+duplication are fixed. The hidden compatibility entry is restricted to
+`internal-iwork-source`.
+
+Computer Use authored and reopened the exact path in Numbers 14.4 build
+7043.0.93. The source
+[`table-relocation-native.numbers`](../../test-data/iwork/numbers/table-relocation-native.numbers)
+has SHA-256
+`8aaddd0615b93dacb5e1b13a2a4ca888307b98d65935a4d2cdeb6d01e61fc81b`.
+`Sheet 1/Table 1` is 22 × 7 with `Native image adjustment marker` in B2 and
+a 600 × 450 image at X 57.6, Y 8.6. `Sheet 2/Destination table` is 10 × 5
+with its `Destination stays` B2 marker at X 800, Y 28.
+
+The focused name-selector move `Table 1` → `Sheet 2` succeeded. After a
+forced B2 edit to `Native relocation saved marker`, native save, close, and
+exact-path reopen preserved both markers without repair: Sheet 1 retained only
+the image, while Sheet 2 retained its existing table and the moved table at
+X 0, Y 28.3. The copied resaved fixture is
+[`table-relocation-native-resaved.numbers`](../../test-data/iwork/numbers/table-relocation-native-resaved.numbers)
+with SHA-256
+`bd17f1ec7554a3da1050e56db0d8f5da276efdd7d2a4e46f7197c601cb7ffdbf`.
+Scoped validation passes 18 tests: four existing media-duplication library
+tests, four new host duplication integration tests, two default-feature native
+relocation tests, and eight all-feature focused relocation integration tests.
+Workspace formatting passes. Graph creation remains host-owned, and this
+record does not claim full relocation, native-producer parity, or monolith
+completion. Boundary verification passes 915 tests; the scanner passes with
+64 packages, 238 declarations, and 11 ordered debts. Normal commit hooks
+enforce workspace formatting, lint, library/integration, and documentation
+tests.

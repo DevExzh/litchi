@@ -1193,7 +1193,7 @@ def add_numbers_table_sort_canonical_scaffold(root: Path) -> None:
 
 
 def add_numbers_table_move_canonical_scaffold(root: Path) -> None:
-    """Create the minimal focused relocation owner used by boundary tests."""
+    """Create the focused owner and duplication-only host route used by tests."""
 
     owner = root / boundaries.NUMBERS_TABLE_MOVE_OWNER_SOURCE
     owner.parent.mkdir(parents=True, exist_ok=True)
@@ -1213,7 +1213,71 @@ def add_numbers_table_move_canonical_scaffold(root: Path) -> None:
     )
     package = root / boundaries.NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]
     package.parent.mkdir(parents=True, exist_ok=True)
-    package.write_text("mod table_relocation;\n", encoding="utf-8")
+    package.write_text(
+        "mod table_relocation;\n"
+        "#[cfg(feature = \"internal-iwork-source\")]\n"
+        "mod table_relocation_compat;\n",
+        encoding="utf-8",
+    )
+    compat = root / boundaries.NUMBERS_TABLE_MOVE_COMPAT_SOURCE
+    compat.parent.mkdir(parents=True, exist_ok=True)
+    compat.write_text(
+        "impl Package {\n"
+        "    #[cfg(feature = \"internal-iwork-source\")]\n"
+        "    #[doc(hidden)]\n"
+        "    pub fn __move_table_from_bytes_for_compatibility(\n"
+        "        bytes: &[u8],\n"
+        "        source_sheet: impl Into<SheetSelector<'_>>,\n"
+        "        table: impl Into<TableSelector<'_>>,\n"
+        "        destination_sheet: impl Into<SheetSelector<'_>>,\n"
+        "    ) -> Result<Vec<u8>> {\n"
+        "        let _ = (bytes, source_sheet, table, destination_sheet);\n"
+        "        todo!()\n"
+        "    }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    editor = root / boundaries.IWA_NUMBERS_TABLE_MOVE_EDITOR_SOURCE
+    editor.parent.mkdir(parents=True, exist_ok=True)
+    editor.write_text("mod sheet_duplicate;\n", encoding="utf-8")
+    duplicate = root / boundaries.IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE
+    duplicate.parent.mkdir(parents=True, exist_ok=True)
+    duplicate.write_text(
+        "fn place_cloned_table(\n"
+        "    editor: &mut NumbersEditor,\n"
+        "    cloned: &NumbersTableInfo,\n"
+        "    target_sheet_id: u64,\n"
+        "    target_sheet_name: &str,\n"
+        ") -> Result<()> {\n"
+        "    let source_built = !editor.package.source_is_exact();\n"
+        "    let table_id = cloned.object_id;\n"
+        "    let owner = find_table_owner(editor.package(), table_id)?;\n"
+        "    let (source_sheet, focused_table) = focused_table_location(editor, table_id)?;\n"
+        "    let source_bytes = editor.to_bytes()?;\n"
+        "    let bytes = if source_built {\n"
+        "        FocusedNumbersPackage::__move_table_from_bytes_for_compatibility(\n"
+        "            &source_bytes, source_sheet, focused_table,\n"
+        "            SheetSelector::name(target_sheet_name),\n"
+        "        )?\n"
+        "    } else {\n"
+        "        let focused = FocusedNumbersPackage::from_bytes(&source_bytes)\n"
+        "            .map_err(|error| Error::InvalidFormat(error.to_string()))?;\n"
+        "        let commit = focused.move_table(\n"
+        "            source_sheet, focused_table, SheetSelector::name(target_sheet_name),\n"
+        "        ).map_err(|error| Error::InvalidFormat(error.to_string()))?;\n"
+        "        commit.to_bytes()?\n"
+        "    };\n"
+        "    let verified = NumbersEditor::from_validation_bytes(&bytes, source_built)?;\n"
+        "    let verified_owner = find_table_owner(verified.package(), table_id)?;\n"
+        "    let verified_table = verified.tables()?.into_iter().find(|candidate| candidate.object_id == table_id).ok_or_else(|| Error::InvalidFormat(\"missing\".into()))?;\n"
+        "    if verified_owner.sheet_id != target_sheet_id || verified_table != *cloned {\n"
+        "        return Err(Error::InvalidFormat(\"invalid\".into()));\n"
+        "    }\n"
+        "    editor.package = verified.package;\n"
+        "    Ok(())\n"
+        "}\n",
+        encoding="utf-8",
+    )
 
 
 def add_numbers_table_title_settings_canonical_scaffold(root: Path) -> None:
@@ -12992,12 +13056,24 @@ class BoundaryPolicyTests(unittest.TestCase):
             Path("crates/litchi-iwa/src/numbers/editor/table_move.rs"),
         )
         self.assertEqual(
+            boundaries.IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/editor/sheet_duplicate.rs"),
+        )
+        self.assertEqual(
             boundaries.NUMBERS_TABLE_MOVE_OWNER_SOURCE,
             Path("crates/litchi-numbers/src/package/table_relocation.rs"),
         )
         self.assertEqual(
+            boundaries.NUMBERS_TABLE_MOVE_COMPAT_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_relocation_compat.rs"),
+        )
+        self.assertEqual(
             boundaries.NUMBERS_TABLE_MOVE_PACKAGE_METHOD,
             "move_table",
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_MOVE_COMPAT_METHOD,
+            "__move_table_from_bytes_for_compatibility",
         )
         self.assertEqual(
             boundaries.NUMBERS_TABLE_MOVE_SELECTOR_TYPES,
@@ -13040,21 +13116,22 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "fn decode_table_info() {}\n",
                 encoding="utf-8",
             )
+            editor = root / boundaries.IWA_NUMBERS_TABLE_MOVE_EDITOR_SOURCE
+            editor.write_text(
+                "mod sheet_duplicate;\nmod table_move;\n",
+                encoding="utf-8",
+            )
             violations = boundaries.audit_iwa_numbers_table_move_source_topology(root)
             self.assertTrue(
-                any("does not delegate" in violation for violation in violations),
+                any("source was restored" in violation for violation in violations),
                 violations,
             )
             self.assertTrue(
-                any("independent archive/wire mutation helper" in violation for violation in violations),
+                any("module declaration" in violation for violation in violations),
                 violations,
             )
             self.assertTrue(
-                any("archive/wire import" in violation for violation in violations),
-                violations,
-            )
-            self.assertTrue(
-                any("generated Sheet/TableInfo decode" in violation for violation in violations),
+                any("NumbersEditor::move_table" in violation for violation in violations),
                 violations,
             )
 
@@ -13064,19 +13141,10 @@ class BoundaryPolicyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             add_numbers_table_move_canonical_scaffold(root)
-            host = root / boundaries.IWA_NUMBERS_TABLE_MOVE_SOURCE
-            host.parent.mkdir(parents=True, exist_ok=True)
-            host.write_text(
-                "use litchi_numbers::Package as FocusedNumbersPackage;\n"
-                "pub(crate) fn move_table(&mut self, table: TableSelector, target: SheetSelector) {\n"
-                "    let source = FocusedNumbersPackage::from_bytes(bytes).unwrap();\n"
-                "    source.move_table(source_sheet, table, target);\n"
-                "}\n"
-                "#[cfg(test)]\n"
-                "mod tests {\n"
-                "    fn remove_sheet_drawable() {}\n"
-                "    fn decode_table_info() {}\n"
-                "}\n",
+            duplicate = root / boundaries.IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE
+            duplicate.write_text(
+                duplicate.read_text(encoding="utf-8")
+                + "\n#[cfg(test)]\nfn move_table() { decode_table_info(); }\n",
                 encoding="utf-8",
             )
             self.assertEqual(
@@ -13110,11 +13178,15 @@ class BoundaryPolicyTests(unittest.TestCase):
                 root
             )
             self.assertTrue(
-                any("public litchi-iwa NumbersEditor::move_table" in item for item in violations),
+                any("source was restored" in item for item in violations),
                 violations,
             )
             self.assertTrue(
                 any("table-move example returned" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("NumbersEditor::move_table" in item for item in violations),
                 violations,
             )
 
@@ -13144,6 +13216,92 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
             self.assertTrue(
                 any("selector-first SheetSelector" in violation for violation in violations),
+                violations,
+            )
+
+    def test_focused_numbers_table_move_requires_hidden_feature_seam(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_move_canonical_scaffold(root)
+            package = root / boundaries.NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]
+            package.write_text(
+                "mod table_relocation;\nmod table_relocation_compat;\n",
+                encoding="utf-8",
+            )
+            compat = root / boundaries.NUMBERS_TABLE_MOVE_COMPAT_SOURCE
+            compat.write_text(
+                "impl Package {\n"
+                "    #[doc(hidden)]\n"
+                "    pub fn __move_table_from_bytes_for_compatibility(\n"
+                "        bytes: &[u8], source_sheet: SheetSelector<'_>,\n"
+                "        table: TableSelector<'_>, destination_sheet: SheetSelector<'_>,\n"
+                "    ) -> Result<Vec<u8>> { todo!() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_move_facade_source_topology(root)
+            self.assertTrue(
+                any("compatibility module must" in violation for violation in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("compatibility seam must be feature-gated" in violation for violation in violations),
+                violations,
+            )
+
+    def test_focused_numbers_table_move_requires_hidden_compat_seam(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_move_canonical_scaffold(root)
+            package = root / boundaries.NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]
+            package.write_text(
+                "mod table_relocation;\n"
+                "pub(crate) mod table_relocation_compat;\n",
+                encoding="utf-8",
+            )
+            compat = root / boundaries.NUMBERS_TABLE_MOVE_COMPAT_SOURCE
+            compat.write_text(
+                "impl Package {\n"
+                "    #[cfg(feature = \"internal-iwork-source\")]\n"
+                "    pub fn __move_table_from_bytes_for_compatibility(\n"
+                "        bytes: &[u8], source_sheet: SheetSelector<'_>,\n"
+                "        table: TableSelector<'_>, destination_sheet: SheetSelector<'_>,\n"
+                "    ) -> Result<Vec<u8>> { todo!() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_move_facade_source_topology(root)
+            self.assertTrue(
+                any("compatibility module must remain private" in violation for violation in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("compatibility seam must be doc(hidden)" in violation for violation in violations),
+                violations,
+            )
+
+    def test_focused_numbers_table_move_requires_one_clone_identity_caller(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_move_canonical_scaffold(root)
+            duplicate = root / boundaries.IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE
+            duplicate.write_text(
+                duplicate.read_text(encoding="utf-8").replace(
+                    "let table_id = cloned.object_id;",
+                    "let table_id = 42;",
+                ).replace(
+                    "let (source_sheet, focused_table) = focused_table_location(editor, table_id)?;",
+                    "let (source_sheet, focused_table) = (SheetSelector::index(0), TableSelector::index(0));",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_move_source_topology(root)
+            self.assertTrue(
+                any("cloned table identity" in violation for violation in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("focused_table_location" in violation for violation in violations),
                 violations,
             )
 

@@ -826,6 +826,7 @@ fn malformed_or_ambiguous_ownership_is_refused_without_partial_mutation() -> Tes
     Ok(())
 }
 
+#[cfg(feature = "internal-iwork-source")]
 #[test]
 fn physical_compatibility_relocates_projection_unsupported_model() -> TestResult {
     let source = with_projection_unsupported_model(&fixture()?)?;
@@ -857,6 +858,7 @@ fn physical_compatibility_relocates_projection_unsupported_model() -> TestResult
     Ok(())
 }
 
+#[cfg(feature = "internal-iwork-source")]
 #[test]
 fn physical_compatibility_preserves_missing_parent_and_round_trips() -> TestResult {
     let source = with_missing_parent(&fixture()?)?;

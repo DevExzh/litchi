@@ -11919,23 +11919,25 @@ NUMBERS_TABLE_SORT_RAW_PARAMETER = re.compile(
 IWA_NUMBERS_TABLE_MOVE_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "table_move.rs"
 )
+IWA_NUMBERS_TABLE_MOVE_EDITOR_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "editor.rs"
+IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "sheet_duplicate.rs"
+)
 RETIRED_IWA_NUMBERS_TABLE_MOVE_EXAMPLE = (
     IWA_CORE_EXAMPLE_SOURCE_ROOT / "move_numbers_table.rs"
 )
-IWA_NUMBERS_TABLE_MOVE_EXTERNAL_METHOD = re.compile(
-    r"^[ \t]*pub(?![ \t\r\n]*\()[ \t\r\n]+"
-    r"(?:(?:async|const|unsafe)[ \t\r\n]+)*fn[ \t\r\n]+"
-    r"(?:r#)?move_table\b",
-    re.MULTILINE,
-)
 NUMBERS_TABLE_MOVE_OWNER_SOURCE = (
     NUMBERS_SOURCE_ROOT / "package" / "table_relocation.rs"
+)
+NUMBERS_TABLE_MOVE_COMPAT_SOURCE = (
+    NUMBERS_SOURCE_ROOT / "package" / "table_relocation_compat.rs"
 )
 NUMBERS_TABLE_MOVE_EXPORT_SOURCES = (
     NUMBERS_SOURCE_ROOT / "lib.rs",
     NUMBERS_SOURCE_ROOT / "package.rs",
 )
 NUMBERS_TABLE_MOVE_PACKAGE_METHOD = "move_table"
+NUMBERS_TABLE_MOVE_COMPAT_METHOD = "__move_table_from_bytes_for_compatibility"
 NUMBERS_TABLE_MOVE_SELECTOR_TYPES = ("SheetSelector", "TableSelector")
 NUMBERS_PACKAGE_TABLE_MOVE_MODULE = re.compile(
     r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
@@ -11947,92 +11949,50 @@ PUBLIC_NUMBERS_PACKAGE_TABLE_MOVE_MODULE = re.compile(
     r"[ \t\r\n]*(?:;|\{)",
     re.MULTILINE,
 )
+NUMBERS_TABLE_MOVE_COMPAT_MODULE = re.compile(
+    r"(?m)^[ \t]*(?P<visibility>pub(?:\([^()]*\))?[ \t]+)?"
+    r"[ \t]*mod[ \t\r\n]+(?:r#)?table_relocation_compat\b"
+    r"[ \t\r\n]*;"
+)
+NUMBERS_TABLE_MOVE_COMPAT_PUBLIC_MODULE = re.compile(
+    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t\r\n]+"
+    r"(?:r#)?table_relocation_compat\b[ \t\r\n]*;"
+)
+NUMBERS_TABLE_MOVE_COMPAT_METHOD_DECLARATION = re.compile(
+    r"(?m)^[ \t]*pub[ \t\r\n]+fn[ \t\r\n]+"
+    rf"(?:r#)?{re.escape(NUMBERS_TABLE_MOVE_COMPAT_METHOD)}\b"
+    r"(?:[ \t\r\n]*<[^{}]*>)?"
+    r"[ \t\r\n]*\("
+)
+IWA_NUMBERS_TABLE_MOVE_HOST_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?mod[ \t\r\n]+"
+    r"(?:r#)?table_move\b[ \t\r\n]*;",
+    re.MULTILINE,
+)
+IWA_NUMBERS_TABLE_MOVE_FOCUSED_CALL = re.compile(
+    rf"(?<![A-Za-z0-9_])(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::)+"
+    rf"(?:r#)?{re.escape(NUMBERS_TABLE_MOVE_COMPAT_METHOD)}\b"
+    r"[ \t\r\n]*\("
+)
+IWA_NUMBERS_TABLE_MOVE_FOCUSED_PUBLIC_UFCS_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:FocusedNumbersPackage|Package|"
+    r"litchi_numbers[ \t\r\n]*::[ \t\r\n]*Package)"
+    r"[ \t\r\n]*::[ \t\r\n]*move_table\b[ \t\r\n]*\("
+)
+IWA_NUMBERS_TABLE_MOVE_FOCUSED_FROM_BYTES = re.compile(
+    r"\b(?:FocusedNumbersPackage|litchi_numbers[ \t\r\n]*::[ \t\r\n]*Package)"
+    r"[ \t\r\n]*::[ \t\r\n]*from_bytes\b[ \t\r\n]*\("
+)
+IWA_NUMBERS_TABLE_MOVE_HOST_METHOD_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:[A-Za-z_][A-Za-z0-9_]*)"
+    r"[ \t\r\n]*\.[ \t\r\n]*move_table\b[ \t\r\n]*\("
+)
 NUMBERS_TABLE_MOVE_RAW_PARAMETER = re.compile(
     r"\b(?:[A-Za-z_]+_)?(?:sheet|table|sheet_id|table_id|table_object_id|"
     r"object_id|model_id|native_id|raw_object_id|raw_object_identifier|"
     r"object_identifier|native_object_id)"
     r"\b[ \t\r\n]*:[ \t\r\n]*"
     r"(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize)\b"
-)
-IWA_NUMBERS_TABLE_MOVE_MUTATION_HELPER_NAMES = frozenset(
-    {
-        "add_metadata_reference",
-        "append_sheet_drawable",
-        "decode_sheet",
-        "decode_sheet_data",
-        "decode_table_info",
-        "find_table_owner",
-        "object_locations",
-        "patch_table_parent",
-        "remove_metadata_reference",
-        "remove_repeated_length_delimited_field_where",
-        "remove_sheet_drawable",
-        "replace_metadata_reference",
-        "replace_reference_values",
-        "remap_numbers_reference_paths",
-        "transform_length_delimited_field",
-        "transform_sheet_wire",
-    }
-)
-IWA_NUMBERS_TABLE_MOVE_MUTATION_HELPER_NAME = re.compile(
-    r"(?i)^(?:[a-z_]*(?:archive|wire|metadata|drawable|reference|payload|"
-    r"message|table_info|sheet_info|parent)[a-z_]*)$"
-)
-IWA_NUMBERS_TABLE_MOVE_FORBIDDEN_IMPORTS = (
-    re.compile(
-        r"(?m)^[ \t]*(?:pub[ \t]+)?use[^;\n]*(?:crate[ \t\r\n]*::"
-        r"(?:wire|protobuf)|litchi_iwa_(?:archive|core|protos|common)|"
-        r"(?:tn|tsp|tst)[ \t\r\n]*::)"
-    ),
-)
-IWA_NUMBERS_TABLE_MOVE_FORBIDDEN_PATTERNS = (
-    (
-        "archive mutation helper",
-        re.compile(
-            r"\b(?:update_archive|object_mut|replace_message|"
-            r"replace_message_preserving_header|add_metadata_reference|"
-            r"remove_metadata_reference|replace_metadata_reference|"
-            r"replace_reference_values|remap_numbers_reference_paths)\b"
-            r"[ \t\r\n]*(?:\(|::)"
-        ),
-    ),
-    (
-        "wire mutation helper",
-        re.compile(
-            r"\b(?:append_repeated_length_delimited_field|"
-            r"remove_repeated_length_delimited_field_where|"
-            r"transform_length_delimited_field|transform_sheet_wire|"
-            r"parse_wire_fields|parse_wire_field)\b"
-            r"[ \t\r\n]*(?:\(|::)"
-        ),
-    ),
-    (
-        "archive/IWA type",
-        re.compile(
-            r"\b(?:Archive|ArchiveObject|IWorkPackage|RawMessage|"
-            r"SheetArchive|FormBasedSheetArchive|TableInfoArchive|"
-            r"TableModelArchive)\b"
-        ),
-    ),
-)
-IWA_NUMBERS_TABLE_MOVE_GENERATED_DECODE = re.compile(
-    r"\b(?:Sheet|SheetArchive|FormBasedSheetArchive|TableInfo|"
-    r"TableInfoArchive|TableModelArchive)\b[ \t\r\n]*::"
-    r"[ \t\r\n]*decode\b[ \t\r\n]*\("
-    r"|\b(?:decode_sheet|decode_sheet_data|decode_table_info)\b"
-    r"[ \t\r\n]*\("
-    r"|\b(?:decode_type|decode_unique(?:_any)?|decode_message)\b"
-    r"[ \t\r\n]*::?[ \t\r\n]*<[^>]*\b(?:Sheet|TableInfo)"
-)
-IWA_NUMBERS_TABLE_MOVE_FOCUSED_UFCS_CALL = re.compile(
-    r"(?<![A-Za-z0-9_#])(?:litchi_numbers[ \t\r\n]*::[ \t\r\n]*)?"
-    r"Package[ \t\r\n]*::[ \t\r\n]*move_table\b"
-    r"[ \t\r\n]*\("
-)
-IWA_NUMBERS_TABLE_MOVE_RECEIVER_CALL = re.compile(
-    r"(?<![A-Za-z0-9_#])(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)"
-    r"[ \t\r\n]*(?:\([^;{}\n]*\))?[ \t\r\n]*\??"
-    r"[ \t\r\n]*\.[ \t\r\n]*move_table\b[ \t\r\n]*\("
 )
 
 NUMBERS_TABLE_LOCK_IMPLEMENTATION_SOURCES = (
@@ -23377,87 +23337,51 @@ def _numbers_table_move_owner_present(root: Path) -> bool:
     ) is not None
 
 
-def _numbers_table_move_focused_call_in_body(
-    body: str,
-    source: str = "",
-) -> bool:
-    """Return whether a host body calls the focused ``Package`` owner.
+def _rust_attribute_block_before(source: str, offset: int) -> str:
+    """Return the contiguous Rust attribute block immediately before an item."""
 
-    Rust method calls are normally written as ``package.move_table(...)``;
-    accept that spelling for the conventional focused-package variable names
-    and for a source that visibly constructs/imports ``litchi_numbers::Package``.
-    An unqualified or ``self`` call is not enough because it can simply route
-    back to the compatibility host method.
-    """
+    lines = source[:offset].splitlines(keepends=True)
+    index = len(lines) - 1
+    while index >= 0 and not lines[index].strip():
+        index -= 1
+    if index < 0:
+        return ""
+    stripped = lines[index].strip()
+    if not (stripped.startswith("#[") or stripped.endswith("]")):
+        return ""
 
-    code = _mask_rust_non_code(body)
-    if IWA_NUMBERS_TABLE_MOVE_FOCUSED_UFCS_CALL.search(code) is not None:
-        return True
-    focused_receivers = {
-        "focused",
-        "focused_package",
-        "litchi_package",
-        "numbers_package",
-        "package",
-    }
-    host_receivers = {
-        "editor",
-        "host",
-        "legacy",
-        "self",
-        "staged",
-    }
-    for match in IWA_NUMBERS_TABLE_MOVE_RECEIVER_CALL.finditer(code):
-        receiver = match.group("receiver")
-        if receiver in host_receivers:
-            continue
-        if receiver in focused_receivers:
-            return True
-        if receiver in host_receivers:
-            continue
-        if re.search(
-            r"(?:litchi_numbers[ \t\r\n]*::[ \t\r\n]*)?Package\b",
-            source or code,
-        ) is not None:
-            return True
-    return False
+    end = index + 1
+    start = index
+    while index >= 0:
+        stripped = lines[index].strip()
+        if stripped.startswith("#["):
+            start = index
+            index -= 1
+            while index >= 0 and not lines[index].strip():
+                index -= 1
+            if index >= 0 and lines[index].strip().startswith("#["):
+                continue
+            break
+        index -= 1
+    return "".join(lines[start:end])
 
 
 def audit_iwa_numbers_table_move_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep physical Numbers table relocation out of the compatibility host.
+    """Keep the retired table-move host module out of Numbers duplication.
 
-    The host ``NumbersEditor`` method remains a source-compatibility wrapper,
-    but once the focused owner is wired it must delegate the complete graph
-    transaction to ``litchi_numbers::Package::move_table``.  The old host
-    implementation decoded generated sheet/table-info messages and patched
-    archive metadata/wire fields itself; those helpers and their imports are
-    the exact seam this ratchet retires.  Test-gated fixtures are masked before
-    scanning so production ownership cannot be hidden in ``cfg(test)`` code.
+    Table relocation is now owned by the focused Numbers package.  The legacy
+    editor only stages a duplicated table, resolves that clone by identity,
+    and splits exact-source and source-built admission at one focused helper.
+    Test-gated fixtures are masked before scanning so a production route cannot
+    be hidden in ``cfg(test)`` code.
     """
 
     if not _numbers_table_move_owner_present(root):
         return []
 
-    path = root / IWA_NUMBERS_TABLE_MOVE_SOURCE
-    if not path.is_file():
-        return [
-            "litchi-iwa Numbers table-move production source is missing: "
-            f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}"
-        ]
-
-    raw_source = path.read_text(encoding="utf-8")
-    production_source = _mask_rust_cfg_test_items(raw_source)
-    code = _mask_rust_non_code(production_source)
     violations: list[str] = []
-
-    for match in IWA_NUMBERS_TABLE_MOVE_EXTERNAL_METHOD.finditer(code):
-        line_number = code.count("\n", 0, match.start()) + 1
-        violations.append(
-            "retired public litchi-iwa NumbersEditor::move_table returned: "
-            f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
-        )
     retired_example = root / RETIRED_IWA_NUMBERS_TABLE_MOVE_EXAMPLE
     if retired_example.is_file():
         violations.append(
@@ -23465,141 +23389,284 @@ def audit_iwa_numbers_table_move_source_topology(
             f"{RETIRED_IWA_NUMBERS_TABLE_MOVE_EXAMPLE}"
         )
 
-    def function_records(source: str) -> dict[str, list[tuple[str, int]]]:
-        """Return production function bodies for this dedicated host module."""
-
-        masked = _mask_rust_non_code(source)
-        records: dict[str, list[tuple[str, int]]] = {}
-        for declaration in RUST_FUNCTION_DECLARATION.finditer(masked):
-            opening = masked.find("{", declaration.end())
-            if opening < 0:
-                continue
-            depth = 1
-            cursor = opening + 1
-            while cursor < len(masked) and depth:
-                if masked[cursor] == "{":
-                    depth += 1
-                elif masked[cursor] == "}":
-                    depth -= 1
-                cursor += 1
-            if depth:
-                continue
-            records.setdefault(declaration.group(1), []).append(
-                (masked[opening + 1 : cursor - 1], opening + 1)
-            )
-        return records
-
-    functions = function_records(production_source)
-    move_records = functions.get(NUMBERS_TABLE_MOVE_PACKAGE_METHOD, [])
-    if not move_records:
+    retired_source = root / IWA_NUMBERS_TABLE_MOVE_SOURCE
+    if retired_source.is_file():
         violations.append(
-            "litchi-iwa Numbers table-move compatibility wrapper is missing "
-            f"production move_table: {IWA_NUMBERS_TABLE_MOVE_SOURCE}"
+            "retired litchi-iwa Numbers table-move source was restored: "
+            f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}"
+        )
+
+    host_editor_root = root / IWA_NUMBERS_SOURCE_ROOT / "editor"
+    host_sources: list[Path] = []
+    editor_path = root / IWA_NUMBERS_TABLE_MOVE_EDITOR_SOURCE
+    if editor_path.is_file():
+        host_sources.append(editor_path)
+        editor_code = _mask_rust_non_code(editor_path.read_text(encoding="utf-8"))
+        for match in IWA_NUMBERS_TABLE_MOVE_HOST_MODULE.finditer(editor_code):
+            line_number = editor_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Numbers table-move module declaration: "
+                f"{IWA_NUMBERS_TABLE_MOVE_EDITOR_SOURCE}:{line_number}"
+            )
+    if host_editor_root.is_dir():
+        host_sources.extend(sorted(host_editor_root.rglob("*.rs")))
+
+    focused_call_count = 0
+    focused_call_path: Path | None = None
+    host_move_calls: list[tuple[Path, re.Match[str]]] = []
+    host_public_ufcs_calls: list[tuple[Path, re.Match[str]]] = []
+    host_code_by_path: dict[Path, str] = {}
+    for path in host_sources:
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        code = _mask_rust_non_code(production_source)
+        host_code_by_path[path] = code
+        for name, line_number in _rust_function_declarations(production_source):
+            if name != NUMBERS_TABLE_MOVE_PACKAGE_METHOD:
+                continue
+            violations.append(
+                "retired litchi-iwa NumbersEditor::move_table returned: "
+                f"{path.relative_to(root)}:{line_number}"
+            )
+        host_move_calls.extend(
+            (path, match)
+            for match in IWA_NUMBERS_TABLE_MOVE_HOST_METHOD_CALL.finditer(code)
+        )
+        host_public_ufcs_calls.extend(
+            (path, match)
+            for match in IWA_NUMBERS_TABLE_MOVE_FOCUSED_PUBLIC_UFCS_CALL.finditer(code)
+        )
+        calls = list(IWA_NUMBERS_TABLE_MOVE_FOCUSED_CALL.finditer(code))
+        if calls:
+            focused_call_count += len(calls)
+            focused_call_path = path
+
+    duplicate_path = root / IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE
+    duplicate_source = ""
+    duplicate_body: str | None = None
+    duplicate_body_span: tuple[int, int] | None = None
+    if not duplicate_path.is_file():
+        violations.append(
+            "Numbers sheet duplication is missing its focused table-placement "
+            f"helper: {IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
         )
     else:
-        pending = [
-            (NUMBERS_TABLE_MOVE_PACKAGE_METHOD, body)
-            for body, _offset in move_records
-        ]
-        reachable: list[tuple[str, str]] = []
-        visited: set[tuple[str, str]] = set()
-        while pending:
-            name, body = pending.pop()
-            key = (name, body)
-            if key in visited:
-                continue
-            visited.add(key)
-            reachable.append((name, body))
-            for helper_name, helper_records in functions.items():
-                if helper_name == name:
-                    continue
-                call = re.compile(
-                    rf"(?<![A-Za-z0-9_:#])(?:r#)?{re.escape(helper_name)}"
-                    r"[ \t\r\n]*\("
-                )
-                if call.search(body) is None:
-                    continue
-                pending.extend(
-                    (helper_name, helper_body)
-                    for helper_body, _helper_offset in helper_records
-                )
-        if not any(
-            _numbers_table_move_focused_call_in_body(body, production_source)
-            for _name, body in reachable
-        ):
-            body_offset = move_records[0][1]
-            line_number = production_source.count("\n", 0, body_offset) + 1
+        duplicate_source = _mask_rust_cfg_test_items(
+            duplicate_path.read_text(encoding="utf-8")
+        )
+        duplicate_code = _mask_rust_non_code(duplicate_source)
+        duplicate_record = _rust_named_function_body(
+            duplicate_source, "place_cloned_table"
+        )
+        if duplicate_record is not None:
+            duplicate_body, body_offset = duplicate_record
+            duplicate_body_span = (body_offset, body_offset + len(duplicate_body))
+        if duplicate_body is None:
             violations.append(
-                "litchi-iwa Numbers table-move wrapper does not delegate to "
-                "litchi_numbers::Package::move_table: "
-                f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
+                "Numbers sheet duplication is missing private place_cloned_table: "
+                f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+            )
+        else:
+            body_code = _mask_rust_non_code(duplicate_body)
+            compatibility_calls = list(
+                IWA_NUMBERS_TABLE_MOVE_FOCUSED_CALL.finditer(body_code)
+            )
+            if len(compatibility_calls) != 1:
+                violations.append(
+                    "Numbers table relocation compatibility seam must be called "
+                    "exactly once from place_cloned_table: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            if IWA_NUMBERS_TABLE_MOVE_FOCUSED_FROM_BYTES.search(body_code) is None:
+                violations.append(
+                    "Numbers table placement must retain the strict focused "
+                    "Package::from_bytes branch: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            if re.search(
+                r"FocusedNumbersPackage\s*::\s*from_bytes\b[\s\S]{0,800}"
+                r"\bmap_err\s*\(",
+                body_code,
+            ) is None:
+                violations.append(
+                    "Numbers table placement must terminate exact-source reader "
+                    "errors at the host boundary: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            if re.search(
+                r"\.\s*move_table\b[\s\S]{0,800}\bmap_err\s*\(",
+                body_code,
+            ) is None:
+                violations.append(
+                    "Numbers table placement must terminate exact relocation "
+                    "errors at the host boundary: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            if re.search(
+                r"FocusedNumbersPackage\s*::\s*from_bytes\b[\s\S]{0,1000}"
+                r"\bor_else\s*\(",
+                body_code,
+            ) is not None:
+                violations.append(
+                    "Numbers table placement must not fall back from exact-source "
+                    "admission to compatibility relocation: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            public_move_calls = list(
+                IWA_NUMBERS_TABLE_MOVE_HOST_METHOD_CALL.finditer(body_code)
+            )
+            public_move_calls.extend(
+                IWA_NUMBERS_TABLE_MOVE_FOCUSED_PUBLIC_UFCS_CALL.finditer(body_code)
+            )
+            if not public_move_calls:
+                violations.append(
+                    "Numbers table placement must retain the focused public "
+                    "Package::move_table branch: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            focused_receivers = {
+                match.group("receiver")
+                for match in re.finditer(
+                    r"\blet\s+(?:mut\s+)?(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)"
+                    r"\s*=\s*(?:FocusedNumbersPackage|Package|"
+                    r"litchi_numbers\s*::\s*Package)\s*::\s*from_bytes\b",
+                    body_code,
+                )
+            }
+            for match in IWA_NUMBERS_TABLE_MOVE_HOST_METHOD_CALL.finditer(
+                body_code
+            ):
+                receiver = re.match(
+                    r"(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)\s*\.",
+                    match.group(0),
+                )
+                if receiver is None or receiver.group("receiver") not in focused_receivers:
+                    violations.append(
+                        "Numbers table placement must call move_table only on the "
+                        "focused Package value: "
+                        f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                    )
+            if re.search(
+                r"\blet\s+[A-Za-z_][A-Za-z0-9_]*\s*=\s*"
+                r"[A-Za-z_][A-Za-z0-9_]*\s*\.\s*object_id\b",
+                body_code,
+            ) is None:
+                violations.append(
+                    "Numbers table placement must resolve the focused source by "
+                    "the cloned table identity: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            if re.search(r"\bfocused_table_location\s*\(", body_code) is None:
+                violations.append(
+                    "Numbers table placement must use focused_table_location for "
+                    "the cloned table: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            if re.search(r"\bsource_is_exact\s*\(\s*\)", body_code) is None:
+                violations.append(
+                    "Numbers table placement must check source provenance before "
+                    "splitting exact and source-built paths: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            if re.search(r"\bsource_built\b", body_code) is None or re.search(
+                r"\bif\s+!?\s*source_built\b[\s\S]*?\belse\b", body_code
+            ) is None:
+                violations.append(
+                    "Numbers table placement must preserve separate exact and "
+                    "source-built paths: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            if re.search(
+                r"\bfrom_validation_bytes\s*\(\s*&?\s*[A-Za-z_][A-Za-z0-9_]*"
+                r"\s*,\s*source_built\s*\)",
+                body_code,
+            ) is None:
+                violations.append(
+                    "Numbers table placement must validate the focused candidate "
+                    "with its preserved provenance flag: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            if len(re.findall(r"\bfind_table_owner\s*\(", body_code)) < 2:
+                violations.append(
+                    "Numbers table placement must preserve source and candidate "
+                    "table ownership checks: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            if re.search(r"\btables\s*\(\s*\)", body_code) is None or len(
+                re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\s*\.\s*object_id\b", body_code)
+            ) < 2:
+                violations.append(
+                    "Numbers table placement must verify the candidate table: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            if re.search(
+                r"\b[A-Za-z_][A-Za-z0-9_]*\s*\.\s*sheet_id\b", body_code
+            ) is None:
+                violations.append(
+                    "Numbers table placement must verify the destination sheet: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+            if re.search(r"\bTableSelector\s*::\s*name\s*\(", body_code):
+                violations.append(
+                    "Numbers table placement must not select a clone by its name: "
+                    f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
+                )
+        if re.search(
+            r"\bpub(?:\([^()]*\))?[ \t\r\n]+fn[ \t\r\n]+"
+            r"place_cloned_table\b",
+            duplicate_code,
+        ):
+            violations.append(
+                "Numbers table placement helper must remain private: "
+                f"{IWA_NUMBERS_TABLE_MOVE_DUPLICATION_SOURCE}"
             )
 
-    for name, line_number in _rust_function_declarations(production_source):
-        if name == NUMBERS_TABLE_MOVE_PACKAGE_METHOD:
+    for path, match in host_move_calls:
+        allowed = (
+            path == duplicate_path
+            and duplicate_body_span is not None
+            and duplicate_body_span[0] <= match.start() < duplicate_body_span[1]
+        )
+        if allowed:
             continue
-        if (
-            name in IWA_NUMBERS_TABLE_MOVE_MUTATION_HELPER_NAMES
-            or IWA_NUMBERS_TABLE_MOVE_MUTATION_HELPER_NAME.fullmatch(name)
-            is not None
-        ):
-            violations.append(
-                "litchi-iwa Numbers table-move production path retains "
-                f"independent archive/wire mutation helper {name}: "
-                f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
-            )
-
-    for pattern in IWA_NUMBERS_TABLE_MOVE_FORBIDDEN_IMPORTS:
-        for match in pattern.finditer(code):
-            line_number = code.count("\n", 0, match.start()) + 1
-            violations.append(
-                "litchi-iwa Numbers table-move production path retains "
-                f"archive/wire import: {IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
-            )
-
-    for label, pattern in IWA_NUMBERS_TABLE_MOVE_FORBIDDEN_PATTERNS:
-        for match in pattern.finditer(code):
-            line_number = code.count("\n", 0, match.start()) + 1
-            token = re.sub(r"\s+", " ", match.group(0)).strip()
-            violations.append(
-                "litchi-iwa Numbers table-move production path uses "
-                f"{label} {token}: {IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
-            )
-
-    for match in IWA_NUMBERS_TABLE_MOVE_GENERATED_DECODE.finditer(code):
+        code = host_code_by_path[path]
         line_number = code.count("\n", 0, match.start()) + 1
-        token = re.sub(r"\s+", " ", match.group(0)).strip()
         violations.append(
-            "litchi-iwa Numbers table-move production path retains generated "
-            f"Sheet/TableInfo decode {token}: "
-            f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
+            "retired litchi-iwa Numbers table-move host call returned: "
+            f"{path.relative_to(root)}:{line_number}"
         )
 
-    # A type alias can hide the generated message name from the direct decode
-    # expression.  Resolve only aliases declared in this dedicated source;
-    # unrelated aliases in the wider Numbers host are outside this boundary.
-    aliases: list[tuple[str, str]] = []
-    for match in re.finditer(
-        r"\b(?:Sheet|SheetArchive|FormBasedSheetArchive|TableInfo|"
-        r"TableInfoArchive|TableModelArchive)\b"
-        r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
-        r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
-        code,
-    ):
-        aliases.append((match.group("alias"), match.group(0).split()[0]))
-    for alias, original in aliases:
-        decode = re.compile(
-            rf"\b(?:r#)?{re.escape(alias)}[ \t\r\n]*::"
-            r"[ \t\r\n]*decode\b[ \t\r\n]*\("
+    for path, match in host_public_ufcs_calls:
+        allowed = (
+            path == duplicate_path
+            and duplicate_body_span is not None
+            and duplicate_body_span[0] <= match.start() < duplicate_body_span[1]
         )
-        for match in decode.finditer(code):
-            line_number = code.count("\n", 0, match.start()) + 1
-            violations.append(
-                "litchi-iwa Numbers table-move production path retains generated "
-                f"{original} alias decode {alias}: "
-                f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
-            )
+        if allowed:
+            continue
+        code = host_code_by_path[path]
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "retired litchi-iwa Numbers table-move host call returned: "
+            f"{path.relative_to(root)}:{line_number}"
+        )
 
+    if focused_call_count != 1:
+        violations.append(
+            "Numbers table relocation compatibility seam must have exactly one "
+            f"host caller; found {focused_call_count}: {IWA_NUMBERS_SOURCE_ROOT / 'editor'}"
+        )
+    elif focused_call_path != duplicate_path:
+        violations.append(
+            "Numbers table relocation compatibility seam must be called only by "
+            "sheet duplication: "
+            f"{focused_call_path.relative_to(root)}"
+        )
+
+    # The focused owner is the only place allowed to retain archive/wire
+    # relocation details.  The host deletion check above intentionally does
+    # not scan the focused package or unrelated Numbers editor features.
     return sorted(set(violations))
 
 
@@ -23622,12 +23689,72 @@ def audit_numbers_table_move_facade_source_topology(
     package_code = _mask_rust_non_code(package_source)
     violations: list[str] = []
 
+    for match in NUMBERS_TABLE_MOVE_COMPAT_PUBLIC_MODULE.finditer(package_code):
+        line_number = package_code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-numbers table-move compatibility module must remain "
+            "private: "
+            f"{NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]}:{line_number}"
+        )
     for match in PUBLIC_NUMBERS_PACKAGE_TABLE_MOVE_MODULE.finditer(package_code):
         line_number = package_code.count("\n", 0, match.start()) + 1
         violations.append(
             "focused litchi-numbers table-move package module must remain private: "
             f"{NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]}:{line_number}"
         )
+
+    compat_path = root / NUMBERS_TABLE_MOVE_COMPAT_SOURCE
+    if not compat_path.is_file():
+        violations.append(
+            "focused litchi-numbers table-move compatibility source is missing: "
+            f"{NUMBERS_TABLE_MOVE_COMPAT_SOURCE}"
+        )
+    else:
+        compat_source = _mask_rust_cfg_test_items(
+            compat_path.read_text(encoding="utf-8")
+        )
+        compat_declarations = _mask_rust_comments(compat_source)
+        module_match = NUMBERS_TABLE_MOVE_COMPAT_MODULE.search(package_source)
+        if module_match is None:
+            violations.append(
+                "focused litchi-numbers table-move compatibility module must be "
+                "private and feature-gated: "
+                f"{NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]}"
+            )
+        else:
+            module_attributes = _rust_attribute_block_before(
+                package_source, module_match.start()
+            )
+            if IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(module_attributes) is None:
+                violations.append(
+                    "focused litchi-numbers table-move compatibility module must "
+                    "use the internal-iwork-source feature gate: "
+                    f"{NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]}"
+                )
+        method_match = NUMBERS_TABLE_MOVE_COMPAT_METHOD_DECLARATION.search(
+            compat_declarations
+        )
+        if method_match is None:
+            violations.append(
+                "focused litchi-numbers table-move compatibility seam is missing: "
+                f"{NUMBERS_TABLE_MOVE_COMPAT_SOURCE}"
+            )
+        else:
+            method_attributes = _rust_attribute_block_before(
+                compat_declarations, method_match.start()
+            )
+            if IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(method_attributes) is None:
+                violations.append(
+                    "focused litchi-numbers table-move compatibility seam must be "
+                    "feature-gated: "
+                    f"{NUMBERS_TABLE_MOVE_COMPAT_SOURCE}"
+                )
+            if IWA_DOC_HIDDEN_ATTRIBUTE.search(method_attributes) is None:
+                violations.append(
+                    "focused litchi-numbers table-move compatibility seam must be "
+                    "doc(hidden): "
+                    f"{NUMBERS_TABLE_MOVE_COMPAT_SOURCE}"
+                )
 
     methods = {
         name: (declaration, line_number)
