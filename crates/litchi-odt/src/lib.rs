@@ -151,6 +151,7 @@ pub mod protection;
 pub mod ruby_family;
 pub mod section_properties;
 pub mod settings;
+pub mod streaming;
 pub mod style;
 pub mod transaction;
 pub mod variable_declaration;

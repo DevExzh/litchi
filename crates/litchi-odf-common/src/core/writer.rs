@@ -330,6 +330,26 @@ pub enum PackageWriterError {
 }
 
 impl PackageWriterError {
+    /// Recover typed generated-XML audit attribution through reader adapters.
+    ///
+    /// Traversal is bounded to 64 source links, including owned I/O errors,
+    /// so a caller error with a cyclic source chain cannot hang inspection.
+    #[must_use]
+    pub fn xml_limit(&self) -> Option<super::GeneratedXmlLimitExceeded> {
+        let mut current: &(dyn std::error::Error + 'static) = self;
+        for _ in 0..64 {
+            if let Some(limit) = current.downcast_ref::<super::GeneratedXmlLimitExceeded>() {
+                return Some(*limit);
+            }
+            current = if let Some(error) = current.downcast_ref::<io::Error>() {
+                error.get_ref()?
+            } else {
+                current.source()?
+            };
+        }
+        None
+    }
+
     /// Return the number of output bytes accepted before this failure, if any.
     #[must_use]
     pub const fn written(&self) -> Option<u64> {
@@ -1185,6 +1205,42 @@ impl<W: Write> PackageWriter<W> {
         let inserted = self.member_paths.insert(path.to_string());
         debug_assert!(inserted);
         self.archive_entry_count += 1;
+    }
+
+    /// Publish a complete authored XML member while retaining typed transport
+    /// failures and accepted-output progress.
+    ///
+    /// The input slice is borrowed for this call. Existing bounded XML auditing
+    /// and ZIP staging still apply. The authored XML audit accepts comments and
+    /// preserves the supplied bytes; validation precedes this member's header.
+    /// XML classification, reserved paths, collisions, encryption, and signing
+    /// follow the generated-XML publication policy. A transport failure poisons
+    /// the package, whose partial output must be discarded.
+    pub fn add_authored_xml(
+        &mut self,
+        path: &str,
+        content: &[u8],
+        media_type: &str,
+    ) -> PackageWriterResult<()> {
+        self.validate_generated_xml_publication(path, media_type)?;
+        Self::validate_authored_xml(path, content, media_type).map_err(PackageWriterError::Core)?;
+        let entry = ManifestEntry {
+            full_path: path.to_string(),
+            media_type: media_type.to_string(),
+            size: None,
+            encryption: None,
+        };
+        let entry_bytes = self.validate_manifest_candidate(&entry)?;
+        if let Err(error) = self.zip_writer.write_deflated_sized(path, content) {
+            return Err(self.map_archive_error(error));
+        }
+        self.record_manifest_entry(entry, entry_bytes);
+        self.wrote_any_entry = true;
+        self.record_member_path(path);
+        if !path.starts_with("META-INF/") {
+            self.wrote_payload_entry = true;
+        }
+        Ok(())
     }
 
     /// Publish an XML member from independently audited bounded fragments.
