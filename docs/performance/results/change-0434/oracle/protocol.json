@@ -1,0 +1,144 @@
+{
+  "change": 433,
+  "declared_utc": "2026-09-06T03:26:11.905912+00:00",
+  "baseline_revision": "1518a0901",
+  "hypothesis": "Fresh ODS scalar row creation can avoid retaining the full worksheet model, content XML, and output package by consuming rows into one bounded audited XML fragment window and a sequential non-seek sink.",
+  "classification": "Necessary bounded-memory capability enabler with matched existing-builder measurements; no logical existing-document append claim.",
+  "shapes": {
+    "tiny": 64,
+    "medium": 8192,
+    "large": 32768
+  },
+  "cells_per_row": 4,
+  "cpu": 2,
+  "workers": 1,
+  "warmups": 3,
+  "samples": 30,
+  "repeats": 2,
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "timing_scope": "Create deterministic scalar row inputs, author content, validate publication, compress/finalize package, and write to hashing discard sink. Exclude artifact creation/reopen oracle, procfs probes, sink construction and digest extraction.",
+  "preservation_scope": "Fresh one-sheet scalar documents only; no existing source or unknown content is modified.",
+  "comparison_scope": "Matched semantic rows and cells, not necessarily identical XML/package lexical representation. Full-byte hashes must be stable within each implementation.",
+  "regression_trigger_percent": 5,
+  "allocator_policy": "serialized_region_peak_v3; derive peak minus entry; normal binaries own latency claims; process maximum RSS includes setup and oracle.",
+  "shape_revision_utc": "2026-09-06T03:29:44.198290+00:00",
+  "shape_revision_reason": "Existing PackageWriter authored XML default permits 250000 aggregate attributes. The 131072-row proposal would require more than this. The matched large shape is 32768 rows; no production limit is relaxed.",
+  "protocol_declared_utc": "2026-09-06T04:02:23.730224+00:00",
+  "before_revision": "be82ef53d",
+  "correctness_prerequisite_commits": [
+    "d1b18749d",
+    "0d477f8fa"
+  ],
+  "accepted_adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "roles": {
+    "before-buffered": {
+      "selector": "ods_buffered_create",
+      "retention": "nonfixed",
+      "retained_authoring_window_bytes": null,
+      "oracle": {
+        "generator": "litchi-ods-buffered-scalar-rows-v1",
+        "corpus_names": {
+          "tiny": "ods-buffered-scalar-rows-tiny",
+          "medium": "ods-buffered-scalar-rows-medium",
+          "large": "ods-buffered-scalar-rows-large"
+        },
+        "sheet_name": "Sheet1"
+      }
+    },
+    "after-buffered": {
+      "selector": "ods_buffered_create",
+      "retention": "nonfixed",
+      "retained_authoring_window_bytes": null,
+      "oracle": {
+        "generator": "litchi-ods-buffered-scalar-rows-v1",
+        "corpus_names": {
+          "tiny": "ods-buffered-scalar-rows-tiny",
+          "medium": "ods-buffered-scalar-rows-medium",
+          "large": "ods-buffered-scalar-rows-large"
+        },
+        "sheet_name": "Sheet1"
+      }
+    },
+    "after-streaming": {
+      "selector": "ods_streaming_create",
+      "retention": "fixed",
+      "retained_authoring_window_bytes": 4096,
+      "oracle": {
+        "generator": "litchi-ods-streaming-scalar-rows-v1",
+        "corpus_names": {
+          "tiny": "ods-streaming-scalar-rows-tiny",
+          "medium": "ods-streaming-scalar-rows-medium",
+          "large": "ods-streaming-scalar-rows-large"
+        },
+        "sheet_name": "Sheet1"
+      }
+    }
+  },
+  "order": [
+    {
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R2"
+    }
+  ],
+  "region_lifetime": "Operation-owned rows/model/XML/output and writer context drop before observer finish. Each role retains its own untimed expected archive and target XML as Corpus for matching setup storage strategy.",
+  "profile_scope": "Separate perf process measurements include harness setup, oracle, samples and executable hashing. They are excluded from the formal latency matrix and are not operation-scoped IPC or cache evidence."
+}

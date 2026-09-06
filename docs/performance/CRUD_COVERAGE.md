@@ -1,5 +1,27 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0434 compares ODS text-span encoding
+
+[0434](changes/0434-ods-bounded-text-spans.md) reuses the existing opt-in
+`ods_streaming_create` selector to compare the before and after ODS scalar
+writer. The ABBA retains 24 reports and 720 samples over 64, 8,192, and
+32,768 four-cell rows in normal and allocator modes, with exact semantic,
+archive, output, and sink identity gates. The descriptive normal p50 deltas
+(after versus before) are tiny −12.499% / −16.211%, medium −13.731% /
+−13.121%, and large −13.562% / −13.492% for R1/R2. Allocator calls, requested
+bytes, and regional peak-above-entry vectors are identical before/after; the regional peak
+above entry is 419,347 bytes. No new selector, CRUD category, default-matrix
+row, or JSON index status is added.
+
+This remains fresh one-sheet scalar creation only. It does not measure logical
+append to an existing worksheet, package-Part addition, arbitrary
+modification/repackaging, native application behavior, physical copies, RSS,
+or scaling. The only repeat flag is baseline tiny p99 at +9.844%; no matched
+comparison crosses the 5% review trigger. `claims[]` is empty and the 0434
+portable replay and six mutation probes pass before and after cleanup. Bounded ODT paragraph creation is the next
+creation slice, followed by ODP; these are future opt-in coverage additions,
+not current index promotions.
+
 ## 2026-09-06: change 0433 adds bounded ODS fresh scalar creation
 
 [0433](changes/0433-ods-bounded-fresh-scalar-creation.md) adds measured

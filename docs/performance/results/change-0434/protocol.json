@@ -1,0 +1,155 @@
+{
+  "change": 434,
+  "baseline_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+  "selector": "ods_streaming_create",
+  "hypothesis": "A matched current streaming implementation comparison can identify scalar-text work-charge changes while preserving the exact deterministic ODS archive.",
+  "classification": "Matched current-revision streaming evidence; no speedup or causal optimization claim is authorized by the protocol alone.",
+  "shapes": {
+    "tiny": 64,
+    "medium": 8192,
+    "large": 32768
+  },
+  "cells_per_row": 4,
+  "cpu": 2,
+  "workers": 1,
+  "warmups": 3,
+  "samples": 30,
+  "repeats": 2,
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "timing_scope": "Create deterministic scalar row inputs, author content, validate publication, compress/finalize package, and write to hashing discard sink. Exclude artifact creation/reopen oracle, procfs probes, sink construction and digest extraction.",
+  "preservation_scope": "Fresh one-sheet scalar documents only; no existing source or unknown content is modified.",
+  "comparison_scope": "Control and candidate use the same streaming selector and deterministic four-cell rows. Exact archive bytes, target XML bytes, output hashes, semantic rows, member-set/reopen gates, and sink accepted bytes must agree by shape, mode, and repeat before any performance comparison.",
+  "regression_trigger_percent": 5,
+  "allocator_policy": "serialized_region_peak_v3; derive regional peak minus entry; normal binaries own latency claims; allocator elapsed time is descriptive; process maximum RSS includes setup and oracle.",
+  "uncertainty": {
+    "normal_latency_p50": "deterministic bootstrap 95% CI over the retained 30 samples, 2000 resamples, fixed seed 434",
+    "allocator": "raw vectors and descriptive min/median/max only; no allocator elapsed-latency claim"
+  },
+  "ambient_binding": "Each report environment.git_revision and git_worktree_dirty value is retained as runtime checkout evidence. The outer verifier requires one identical ambient checkout identity across all 24 reports and binds the executable revision/source manifest to the role build.json separately; the ambient checkout revision is not substituted for the binary build revision.",
+  "oracle": {
+    "path": "oracle/protocol.json",
+    "sha256": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+    "verifier_path": "oracle/verify-report.py",
+    "verifier_sha256": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+    "role": "after-streaming",
+    "note": "The copied 0433 semantic verifier and protocol are immutable oracle inputs; the outer 0434 verifier owns revision and cross-phase identity."
+  },
+  "roles": {
+    "before-streaming": {
+      "build_directory": "before",
+      "selector": "ods_streaming_create",
+      "oracle_role": "after-streaming",
+      "retention": "fixed",
+      "retained_authoring_window_bytes": 4096
+    },
+    "after-streaming": {
+      "build_directory": "after",
+      "selector": "ods_streaming_create",
+      "oracle_role": "after-streaming",
+      "retention": "fixed",
+      "retained_authoring_window_bytes": 4096
+    }
+  },
+  "order": [
+    {
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R2"
+    }
+  ],
+  "cross_phase_identity": {
+    "required_fields": [
+      "archive_bytes",
+      "archive_sha256",
+      "target_payload_bytes",
+      "target_payload_sha256",
+      "output_sha256",
+      "semantic_sha256",
+      "sink_accepted_bytes"
+    ],
+    "scope": "same shape, mode, and repeat across before-streaming and after-streaming",
+    "on_mismatch": "correctness failure; withhold performance comparison"
+  },
+  "matrix": {
+    "reports_per_role": 12,
+    "reports_total": 24,
+    "retained_samples_per_report": 30,
+    "retained_samples_total": 720,
+    "role_order": [
+      "before-streaming-R1",
+      "after-streaming-R1",
+      "after-streaming-R2",
+      "before-streaming-R2"
+    ]
+  },
+  "profile_scope": {
+    "required": true,
+    "roles": ["before-streaming", "after-streaming"],
+    "mode": "normal",
+    "shape": "large",
+    "captures": ["perf-stat", "perf-record"],
+    "events": ["cycles:u", "instructions:u", "branches:u", "branch-misses:u", "L1-dcache-load-misses:u"],
+    "call_graph": "fp",
+    "scope": "whole fresh process including setup, corpus generation, warmups, measured samples, output hashing, and harness oracle; diagnostic only and not operation-local evidence",
+    "retained_raw": ["perf.data", "perf.stat.txt", "perf.script.txt", "perf.report.txt"],
+    "p50_uncertainty": "Use uncertainty.normal_latency_p50; profiles do not establish a speedup claim."
+  }
+}

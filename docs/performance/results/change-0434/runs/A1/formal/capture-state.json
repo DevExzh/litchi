@@ -1,0 +1,54 @@
+{
+  "ambient_source_manifest": {
+    "files": 6644,
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+  },
+  "attempt": "formal",
+  "build_source_manifest": {
+    "files": 6642,
+    "path": "sources/7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e.json",
+    "sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+  },
+  "change": 434,
+  "completed_lanes": 6,
+  "driver_sha256": "4ba055b982bec22de39189b0789411c69cb7d7a5e9a5875740a9db3ed0639b01",
+  "expected_lanes": 6,
+  "finished_utc": "2026-09-06T06:22:23.550372+00:00",
+  "index": [
+    "runs/A1/formal/A1-normal-tiny-r1-receipt.json",
+    "runs/A1/formal/A1-normal-medium-r1-receipt.json",
+    "runs/A1/formal/A1-normal-large-r1-receipt.json",
+    "runs/A1/formal/A1-allocator-tiny-r1-receipt.json",
+    "runs/A1/formal/A1-allocator-medium-r1-receipt.json",
+    "runs/A1/formal/A1-allocator-large-r1-receipt.json"
+  ],
+  "oracle_protocol_sha256": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+  "oracle_verifier_sha256": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+  "phase": "A1",
+  "protocol_sha256": "cb6ac713e39b269c432291ffad5c56bb6141bf2a04eddd96db8fbc30d3f7b068",
+  "role": "before-streaming",
+  "schema": "litchi-0434-capture-state-v1",
+  "source_after": {
+    "files": 6644,
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+  },
+  "source_before": {
+    "files": 6644,
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31"
+  },
+  "source_manifest": {
+    "files": 6642,
+    "path": "sources/7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e.json",
+    "sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+  },
+  "status": "pass",
+  "status_after": [
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md"
+  ]
+}

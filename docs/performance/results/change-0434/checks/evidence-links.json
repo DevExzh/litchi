@@ -1,0 +1,38 @@
+{
+  "change": 434,
+  "argv": [
+    "python3",
+    "-c",
+    "import pathlib,re; ps=[pathlib.Path(\"docs/performance/changes/0434-ods-bounded-text-spans.md\")]+list(pathlib.Path(\"docs/performance/results/change-0434\").glob(\"*.md\")); bad=[(str(p),x) for p in ps for x in re.findall(r\"\\]\\(([^)]+)\\)\",p.read_text()) if not x.startswith((\"http\", \"#\")) and not (p.parent/x.split(\"#\")[0]).exists()]; print(bad); assert not bad"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "65dfb1b141190271763367defce4086ef146c056",
+  "driver_sha256": "e4d1efae847f272dd89155e1ec0a465a09a57c40c34f1c95f2dde7a85deb275f",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T06:36:49.042960+00:00",
+  "source_before": {
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31",
+    "files": 6644
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T06:36:49.190757+00:00",
+  "source_after": {
+    "path": "sources/c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31.json",
+    "sha256": "c27549e2420311aa8588e0b2de44d127177ec100a71d2234f10e4e0c9af70f31",
+    "files": 6644
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/evidence-links.log",
+    "bytes": 3,
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  }
+}

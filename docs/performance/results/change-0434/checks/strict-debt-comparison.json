@@ -1,0 +1,12 @@
+{
+  "change": 434,
+  "status": "pass",
+  "scope": "Single preexisting common large_enum_variant finding; scoped Clippy permits only this lint. No common production changes in batch434.",
+  "baseline_revision": "91de70866df67bafd7d2f4c8931269ea540e1a1d",
+  "file": "crates/litchi-odf-common/src/package/model.rs",
+  "baseline_sha256": "d71f1c9fb2297f394fc1d0db7e680bc4c5c97af34964404e72b478e050d98bab",
+  "candidate_sha256": "d71f1c9fb2297f394fc1d0db7e680bc4c5c97af34964404e72b478e050d98bab",
+  "source_identical": true,
+  "unscoped_receipt": "checks/ods-strict-first.json",
+  "scoped_passing_receipt": "checks/ods-strict-scoped-v2.json"
+}

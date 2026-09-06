@@ -1,5 +1,24 @@
 # Performance hotspot inventory
 
+## Change 0434: ODS ordinary-text work batching
+
+[0434](changes/0434-ods-bounded-text-spans.md) measures a private ODS
+serialization change that batches already-safe borrowed UTF-8 spans up to 256
+bytes while retaining per-scalar cancellation checks and exact scalar fallback
+at row/Work limits. Matched normal p50 is descriptively lower by 12.499–16.211%
+for 64 rows, 13.121–13.731% for 8,192 rows, and 13.492–13.562% for 32,768
+rows across the two repeats. Allocation vectors are identical before/after;
+the regional peak above entry is 419,347 bytes. The four profiles are whole-
+process diagnostics, including setup and the untimed oracle; sampled
+`ExecutionContext::consume` self share changes from 25.01% to 10.57%.
+
+No universal hotspot, release speedup, RSS, physical-copy, or scaling claim is
+authorized. The only repeat flag is baseline tiny p99 at +9.844%; no matched
+comparison or RSS point crosses 5%. L1 zero readings do not prove zero misses,
+and LLC was not captured. The next concrete hotspot/coverage work is bounded
+ODT paragraph creation, then ODP creation; existing append and native breadth
+remain separate.
+
 ## Change 0433: bounded ODS fresh creation
 
 [0433](changes/0433-ods-bounded-fresh-scalar-creation.md) supplies the missing
