@@ -72,12 +72,12 @@ pub use pkgreader::{
 };
 pub use pkgwriter::PackageWriter;
 pub use rel::{Relationship, Relationships, TargetMode};
+pub use source_backed::{
+    AuthorizedPrecompressedPart, PartData, PartView, SourceArtifact, SourceArtifactFingerprint,
+    SourceBackedPackage, SourceCacheCounterDelta, SourceCacheDiagnostics,
+    SourceCacheDiagnosticsError, SourceCacheLimitError, SourceCacheLimits, SourceLineage,
+    SourceRelationshipTarget, SourceTopologyPlan, VerifiedDecodedReaderError,
+};
 #[cfg(feature = "performance-diagnostics")]
 pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};
-pub use source_backed::{
-    PartData, PartView, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
-    SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheDiagnosticsError,
-    SourceCacheLimitError, SourceCacheLimits, SourceLineage, SourceRelationshipTarget,
-    SourceTopologyPlan, VerifiedDecodedReaderError,
-};
 pub use validation::{validate_read_at, validate_read_at_with_limits};

@@ -40,6 +40,10 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
+/// Fixed part of the ZIP preservation writer's bounded generated-member
+/// capacity. The payload and target-name terms are charged separately using
+/// the same checked formula as `soapberry_zip::preserve::generated_entry`.
+const PRECOMPRESSED_WRITER_FIXED_OVERHEAD: u64 = 4096;
 /// Conservative measured tuning boundary for retaining the casefold order
 /// index. This is a performance threshold, not a semantic part-count limit.
 const SOURCE_CASEFOLD_INDEX_MIN_PARTS: usize = 2_048;
@@ -150,7 +154,127 @@ struct TopologyReplacement {
 struct TopologyPartAddition {
     partname: PackURI,
     content_type: ContentType,
-    payload: Arc<Vec<u8>>,
+    payload: TopologyPartPayload,
+}
+
+#[derive(Debug)]
+enum TopologyPartPayload {
+    Decoded(Arc<Vec<u8>>),
+    Precompressed(Box<AuthorizedPrecompressedPart>),
+}
+
+/// An OPC-authorized wrapper around a ZIP-reader-issued verified compressed
+/// payload.
+///
+/// This value has no public constructor. It can only be issued by a
+/// [`PartView`] after strict ZIP verification against the exact decoded
+/// allocation supplied by the semantic caller. The source lineage, revision,
+/// Part URI, content type, and managed reservation remain attached until the
+/// topology publication has finished.
+pub struct AuthorizedPrecompressedPart {
+    physical: soapberry_zip::office::VerifiedPrecompressedEntry,
+    source_artifact: SourceArtifact,
+    source_lineage: SourceLineage,
+    source_version: SourceVersion,
+    source_partname: PackURI,
+    source_content_type: ContentType,
+    expected_decoded: Arc<Vec<u8>>,
+    memory_reservation: Option<Arc<Reservation>>,
+    writer_name_reservation: Option<Arc<Reservation>>,
+}
+
+impl std::fmt::Debug for AuthorizedPrecompressedPart {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("AuthorizedPrecompressedPart")
+            .field("source_lineage", &self.source_lineage)
+            .field("source_version", &self.source_version)
+            .field("source_partname", &self.source_partname)
+            .field("source_content_type", &self.source_content_type)
+            .field("compressed_size", &self.physical.compressed_size())
+            .field("uncompressed_size", &self.physical.uncompressed_size())
+            .field("crc32", &self.physical.crc32())
+            .field(
+                "memory_reservation",
+                &self
+                    .memory_reservation
+                    .as_ref()
+                    .map(|reservation| reservation.amount()),
+            )
+            .field(
+                "writer_name_reservation",
+                &self
+                    .writer_name_reservation
+                    .as_ref()
+                    .map(|reservation| reservation.amount()),
+            )
+            .finish()
+    }
+}
+
+impl AuthorizedPrecompressedPart {
+    fn logical_size(&self) -> u64 {
+        self.physical.uncompressed_size()
+    }
+
+    fn compressed_size(&self) -> u64 {
+        self.physical.compressed_size()
+    }
+
+    fn expected_decoded(&self) -> &[u8] {
+        self.expected_decoded.as_slice()
+    }
+
+    fn reserve_writer_name(&mut self, target_member_name: &str) -> Result<()> {
+        let Some(context) = self.source_artifact.snapshot.context.as_ref() else {
+            return Ok(());
+        };
+        let name_bytes = u64::try_from(target_member_name.len())
+            .map_err(|_| overlay_unavailable("precompressed target member name exceeds u64"))?;
+        let name_bytes = name_bytes.checked_mul(2).ok_or_else(|| {
+            overlay_unavailable("precompressed target member name bound overflows")
+        })?;
+        if name_bytes == 0 {
+            return Ok(());
+        }
+        let reservation = context
+            .reserve(Resource::Memory, name_bytes)
+            .map_err(map_execution_error)?;
+        self.writer_name_reservation = Some(Arc::new(reservation));
+        Ok(())
+    }
+
+    fn check_for_publication(&self, destination_content_type: &str) -> Result<()> {
+        if self.source_content_type.as_str() != destination_content_type {
+            return Err(overlay_unavailable(
+                "authorized precompressed content type differs from destination content type",
+            ));
+        }
+        if self.source_artifact.snapshot.lineage != self.source_lineage {
+            return Err(overlay_unavailable(
+                "authorized precompressed source lineage authority is inconsistent",
+            ));
+        }
+        self.source_artifact.snapshot.ensure_current()?;
+        if let Some(context) = self.source_artifact.snapshot.context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
+        let current = self.source_artifact.snapshot.version;
+        if current != self.source_version {
+            return Err(OpcError::SourceChanged {
+                expected: self.source_version,
+                actual: current,
+            });
+        }
+        let expected_size = u64::try_from(self.expected_decoded.len())
+            .map_err(|_| overlay_unavailable("authorized decoded size exceeds u64"))?;
+        if expected_size != self.logical_size() {
+            return Err(OpcError::ZipError(
+                "authorized precompressed decoded size changed".to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// The target requested for a source-backed relationship operation.
@@ -325,6 +449,42 @@ impl SourceTopologyPlan {
         self.try_add_part_with_payload(partname, content_type, || payload)
     }
 
+    /// Add a new Part using a source-authorized, strictly verified compressed
+    /// payload. The destination member receives a fresh canonical ZIP wrapper;
+    /// only the verified Store/Deflate payload crosses the OPC boundary.
+    ///
+    /// The token is intentionally consumed by the topology. Its source
+    /// lineage, revision, content type, and managed reservation are checked
+    /// again by [`SourceBackedPackage::write_topology_to_stream`] before any
+    /// output is accepted.
+    pub fn try_add_precompressed_part(
+        &mut self,
+        partname: PackURI,
+        content_type: impl Into<String>,
+        mut payload: AuthorizedPrecompressedPart,
+    ) -> Result<()> {
+        self.validate_addition_name(&partname)?;
+        let content_type = ContentType::new(content_type.into())?;
+        if payload.source_content_type.as_str() != content_type.as_str() {
+            return Err(overlay_unavailable(
+                "authorized precompressed content type differs from destination content type",
+            ));
+        }
+        payload.reserve_writer_name(partname.membername())?;
+        self.additions
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology Part additions",
+                source,
+            })?;
+        self.additions.push(TopologyPartAddition {
+            partname,
+            content_type,
+            payload: TopologyPartPayload::Precompressed(Box::new(payload)),
+        });
+        Ok(())
+    }
+
     fn try_add_part_with_payload<F>(
         &mut self,
         partname: PackURI,
@@ -334,6 +494,23 @@ impl SourceTopologyPlan {
     where
         F: FnOnce() -> Arc<Vec<u8>>,
     {
+        self.validate_addition_name(&partname)?;
+        let content_type = ContentType::new(content_type.into())?;
+        self.additions
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology Part additions",
+                source,
+            })?;
+        self.additions.push(TopologyPartAddition {
+            partname,
+            content_type,
+            payload: TopologyPartPayload::Decoded(payload()),
+        });
+        Ok(())
+    }
+
+    fn validate_addition_name(&self, partname: &PackURI) -> Result<()> {
         if partname.as_str() == PACKAGE_URI {
             return Err(OpcError::InvalidPackUri(
                 "the package root is not a Part URI".to_string(),
@@ -353,30 +530,18 @@ impl SourceTopologyPlan {
         if self
             .additions
             .iter()
-            .any(|candidate| candidate.partname.is_equivalent_to(&partname))
+            .any(|candidate| candidate.partname.is_equivalent_to(partname))
             || self
                 .replacements
                 .iter()
-                .any(|candidate| candidate.partname.is_equivalent_to(&partname))
+                .any(|candidate| candidate.partname.is_equivalent_to(partname))
             || self
                 .removals
                 .iter()
-                .any(|candidate| candidate.is_equivalent_to(&partname))
+                .any(|candidate| candidate.is_equivalent_to(partname))
         {
             return Err(OpcError::DuplicatePartName(partname.to_string()));
         }
-        let content_type = ContentType::new(content_type.into())?;
-        self.additions
-            .try_reserve(1)
-            .map_err(|source| OpcError::Allocation {
-                resource: "source-backed OPC topology Part additions",
-                source,
-            })?;
-        self.additions.push(TopologyPartAddition {
-            partname,
-            content_type,
-            payload: payload(),
-        });
         Ok(())
     }
 
@@ -1743,6 +1908,94 @@ impl<W: Write> Write for SourceCheckedSink<W> {
     }
 }
 
+/// Source fence for compressed payloads captured from a package different
+/// from the destination package being rewritten. The token's source snapshot
+/// remains live through every destination sink write, so a later source
+/// mutation cannot turn an already captured payload into an authorized
+/// publication.
+struct TransferSourceCheckedSink<W> {
+    inner: W,
+    sources: Arc<Vec<SourceSnapshot>>,
+    state: Arc<Mutex<TransferSourceState>>,
+    pending_failure: Option<OpcError>,
+}
+
+#[derive(Default)]
+struct TransferSourceState {
+    accepted: u64,
+}
+
+impl<W> TransferSourceCheckedSink<W> {
+    fn check_sources(&self) -> Result<()> {
+        for source in self.sources.iter() {
+            source.ensure_current()?;
+            if let Some(context) = source.context.as_ref() {
+                context.check().map_err(map_execution_error)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn check_before_write(&mut self) -> std::io::Result<()> {
+        if let Some(error) = self.pending_failure.take() {
+            return Err(transfer_source_io_error(error));
+        }
+        match self.check_sources() {
+            Ok(()) => Ok(()),
+            Err(error) => Err(transfer_source_io_error(error)),
+        }
+    }
+
+    fn record_after_write(&mut self) {
+        if self.pending_failure.is_none() {
+            if let Err(error) = self.check_sources() {
+                self.pending_failure = Some(error);
+            }
+        }
+    }
+}
+
+impl<W: Write> Write for TransferSourceCheckedSink<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.check_before_write()?;
+        let written = self.inner.write(bytes)?;
+        if written > bytes.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "source-backed OPC transfer sink reported more bytes than provided",
+            ));
+        }
+        if let Ok(mut state) = self.state.lock() {
+            state.accepted = state
+                .accepted
+                .saturating_add(u64::try_from(written).unwrap_or(u64::MAX));
+        }
+        self.record_after_write();
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.check_before_write()?;
+        self.inner.flush()?;
+        match self.check_sources() {
+            Ok(()) => Ok(()),
+            Err(error) => Err(transfer_source_io_error(error)),
+        }
+    }
+}
+
+fn transfer_source_io_error(error: OpcError) -> std::io::Error {
+    match error {
+        OpcError::SourceChanged { expected, actual } => {
+            std::io::Error::other(SourceChangedIoError { expected, actual })
+        },
+        OpcError::Cancelled => execution_io_error(ExecutionError::Cancelled),
+        OpcError::Execution(error) => execution_io_error(error),
+        OpcError::IoError(error) => error,
+        other => std::io::Error::other(other.to_string()),
+    }
+}
+
 struct Chunked<W> {
     inner: W,
 }
@@ -1951,6 +2204,23 @@ impl<'package> PartView<'package> {
     /// Read this part's payload, using the package's bounded cache when able.
     pub fn data(&self) -> Result<PartData> {
         self.package.read_part(self.index)
+    }
+
+    /// Capture this Part's verified Store/Deflate payload for a new OPC
+    /// member while proving it decodes to `expected_decoded`.
+    ///
+    /// The returned token is source-authorized and cannot be constructed from
+    /// caller-supplied compressed bytes or metadata. It retains the source
+    /// lineage/revision and a managed memory reservation until the topology
+    /// publication drops it. Callers must retain their decoded allocation for
+    /// semantic validation; this helper does not replace the normal decoded
+    /// read or XML checks.
+    pub fn authorize_precompressed(
+        &self,
+        expected_decoded: Arc<Vec<u8>>,
+    ) -> Result<AuthorizedPrecompressedPart> {
+        self.package
+            .authorize_precompressed(self.index, expected_decoded)
     }
 
     /// Read this part's payload while observing the cache and same-Part
@@ -4365,6 +4635,129 @@ impl SourceBackedPackage {
         }
     }
 
+    /// Issue an OPC-authorized compressed transfer token for one catalog Part.
+    ///
+    /// The ZIP layer proves the bounded local/central layout, captures the
+    /// exact compressed span, decodes it, compares the decoded bytes with the
+    /// already validated allocation, and records the actual CRC. This method
+    /// adds the package-local source lineage/revision/content-type guard and
+    /// keeps the compressed capture plus writer staging under the managed
+    /// memory budget. Source encryption, signatures, relationship-owned Parts,
+    /// trailing bytes, and every source/context fence remain refusal cases.
+    fn authorize_precompressed(
+        &self,
+        index: usize,
+        expected_decoded: Arc<Vec<u8>>,
+    ) -> Result<AuthorizedPrecompressedPart> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        self.validate_topology_source_boundary()?;
+        if self.has_encrypted_entries() {
+            return Err(overlay_unavailable(
+                "source-backed compressed transfer refuses encrypted ZIP members",
+            ));
+        }
+        if self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        let part = self
+            .parts
+            .get(index)
+            .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
+        if !part.relationships.is_empty() {
+            return Err(overlay_unavailable(
+                "source-backed compressed transfer requires a relationship-leaf Part",
+            ));
+        }
+        let entry_id = part.entry_id;
+        let metadata = self
+            .archive
+            .metadata_for(entry_id)
+            .map_err(map_preservation_error)?;
+        let logical_size = u64::try_from(expected_decoded.len())
+            .map_err(|_| overlay_unavailable("precompressed decoded size exceeds u64"))?;
+        if logical_size != metadata.uncompressed_size() {
+            return Err(OpcError::ZipError(format!(
+                "source-backed precompressed payload expected {logical_size} decoded bytes but ZIP metadata declares {}",
+                metadata.uncompressed_size()
+            )));
+        }
+        self.limits.check(
+            ReadResource::ArchiveCompressedBytes,
+            metadata.compressed_size(),
+            self.limits.max_archive_compressed_bytes(),
+        )?;
+        self.limits.check(
+            ReadResource::ArchiveEntryBytes,
+            metadata.uncompressed_size(),
+            self.limits.max_archive_entry_bytes(),
+        )?;
+        self.limits.check(
+            ReadResource::PartBytes,
+            logical_size,
+            self.limits.max_part_bytes(),
+        )?;
+        // The verified capture remains retained while the preservation writer
+        // builds one fresh generated member. Its bounded capacity is
+        // `C + 2*name + 4096`; reserve the capture `C` plus the
+        // payload/fixed portion here. The target-name term is added by
+        // `try_add_precompressed_part` once the destination URI is known.
+        let reservation_bytes = metadata
+            .compressed_size()
+            .checked_mul(2)
+            .and_then(|bytes| bytes.checked_add(PRECOMPRESSED_WRITER_FIXED_OVERHEAD))
+            .ok_or_else(|| overlay_unavailable("precompressed staging size overflows u64"))?;
+        let memory_reservation = self.reserve_topology_memory(reservation_bytes)?;
+
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if let Some(context) = self.source.context.as_ref() {
+            let work = metadata
+                .compressed_size()
+                .checked_add(metadata.uncompressed_size())
+                .ok_or_else(|| overlay_unavailable("precompressed verification work overflows"))?;
+            context
+                .consume(Resource::Work, work)
+                .map_err(map_execution_error)?;
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+        }
+        self.source.monitor_publication();
+        let physical = self.archive.read_entry_precompressed_with_progress(
+            entry_id,
+            expected_decoded.as_slice(),
+            |_| {
+                self.source.ensure_current()?;
+                self.cache.check_context().map_err(map_execution_error)
+            },
+        );
+        let source_error = self.source.ensure_current().err();
+        let execution_error = self.cache.check_context().err().map(map_execution_error);
+        if let Some(error) = source_error {
+            return Err(error);
+        }
+        if let Some(error) = execution_error {
+            return Err(error);
+        }
+        let physical = physical.map_err(map_verified_precompressed_error)?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+
+        Ok(AuthorizedPrecompressedPart {
+            physical,
+            source_artifact: SourceArtifact {
+                snapshot: self.source.clone(),
+            },
+            source_lineage: self.source.lineage.clone(),
+            source_version: self.source.version,
+            source_partname: part.partname.clone(),
+            source_content_type: ContentType::new(part.content_type.clone())?,
+            expected_decoded,
+            memory_reservation,
+            writer_name_reservation: None,
+        })
+    }
+
     /// Validate that the located ZIP ends at the exact source boundary.
     ///
     /// The offset was retained by the initial positional archive locator, so
@@ -4580,6 +4973,14 @@ impl SourceBackedPackage {
                 .cmp(right.owner.as_str())
                 .then_with(|| left.r_id.cmp(&right.r_id))
         });
+        for (index, addition) in additions.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            if let TopologyPartPayload::Precompressed(payload) = &addition.payload {
+                payload.check_for_publication(addition.content_type.as_str())?;
+            }
+        }
         self.check_topology_progress()?;
         let has_signature_infrastructure = self.has_signature_infrastructure();
         if introduces_signature && !has_signature_infrastructure {
@@ -5371,23 +5772,61 @@ impl SourceBackedPackage {
                 resource: "source-backed OPC topology appended members",
                 source,
             })?;
+        let mut transfer_sources = Vec::new();
+        transfer_sources
+            .try_reserve_exact(
+                additions
+                    .iter()
+                    .filter(|addition| {
+                        matches!(&addition.payload, TopologyPartPayload::Precompressed(_))
+                    })
+                    .count(),
+            )
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC precompressed source guards",
+                source,
+            })?;
         for (index, addition) in additions.iter().enumerate() {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
             }
-            if xml_minifier::audit::package::is_xml_part(
-                addition.partname.as_str(),
-                addition.content_type.as_str(),
-            ) {
-                validate_overlay_xml(addition.partname.as_str(), &addition.payload)?;
-            }
-            appended.push(
-                soapberry_zip::RegeneratedEntry::new_shared(
-                    addition.partname.membername(),
-                    Arc::clone(&addition.payload),
-                )
-                .compression_method(soapberry_zip::CompressionMethod::Deflate),
-            );
+            let entry = match &addition.payload {
+                TopologyPartPayload::Decoded(payload) => {
+                    if xml_minifier::audit::package::is_xml_part(
+                        addition.partname.as_str(),
+                        addition.content_type.as_str(),
+                    ) {
+                        validate_overlay_xml(addition.partname.as_str(), payload)?;
+                    }
+                    soapberry_zip::RegeneratedEntry::new_shared(
+                        addition.partname.membername(),
+                        Arc::clone(payload),
+                    )
+                    .compression_method(soapberry_zip::CompressionMethod::Deflate)
+                },
+                TopologyPartPayload::Precompressed(payload) => {
+                    payload.source_artifact.snapshot.monitor_publication();
+                    transfer_sources.push(payload.source_artifact.snapshot.clone());
+                    // The decoded bytes remain the XML-validation subject even
+                    // when the physical member uses the source's compressed
+                    // payload. This keeps chart/XML validation at the OPC
+                    // boundary instead of silently trusting the fast path.
+                    if xml_minifier::audit::package::is_xml_part(
+                        addition.partname.as_str(),
+                        addition.content_type.as_str(),
+                    ) {
+                        validate_overlay_xml(
+                            addition.partname.as_str(),
+                            payload.expected_decoded(),
+                        )?;
+                    }
+                    soapberry_zip::RegeneratedEntry::new_precompressed_shared(
+                        addition.partname.membername(),
+                        payload.physical.clone(),
+                    )
+                },
+            };
+            appended.push(entry);
         }
         for (index, publication) in relationship_publications.into_iter().enumerate() {
             if index & 0x3f == 0 {
@@ -5400,12 +5839,55 @@ impl SourceBackedPackage {
                 );
             }
         }
-        self.write_changed_overlays_with_omissions_and_appended(
-            writer,
+        if transfer_sources.is_empty() {
+            return self.write_changed_overlays_with_omissions_and_appended(
+                writer,
+                &changed,
+                &omitted_members,
+                appended,
+            );
+        }
+        let transfer_sources = Arc::new(transfer_sources);
+        let transfer_state = Arc::new(Mutex::new(TransferSourceState::default()));
+        let checked_writer = TransferSourceCheckedSink {
+            inner: writer,
+            sources: Arc::clone(&transfer_sources),
+            state: Arc::clone(&transfer_state),
+            pending_failure: None,
+        };
+        let publication = self.write_changed_overlays_with_omissions_and_appended(
+            checked_writer,
             &changed,
             &omitted_members,
             appended,
-        )
+        );
+        let transfer_error = transfer_sources.iter().find_map(|source| {
+            source.ensure_current().err().or_else(|| {
+                source
+                    .context
+                    .as_ref()?
+                    .check()
+                    .err()
+                    .map(map_execution_error)
+            })
+        });
+        let transfer_accepted = transfer_state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .accepted;
+        match (publication, transfer_error) {
+            // The preservation writer already classifies sink failures with
+            // its exact Counted byte total. Keep that typed result intact;
+            // the final source fence must not erase an IncompleteOutput
+            // written count with a bare SourceChanged/Cancelled error.
+            (Err(publication), _) => Err(publication),
+            (Ok(()), Some(error)) if transfer_accepted != 0 => Err(OpcError::IncompleteOutput {
+                written: transfer_accepted,
+                source: Box::new(error),
+            }),
+            (Ok(()), Some(error)) => Err(error),
+            (Ok(()), None) => Ok(()),
+        }
     }
 
     fn topology_relationship_target_ref(
@@ -6574,11 +7056,21 @@ impl SourceBackedPackage {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
             }
-            let bytes = u64::try_from(addition.payload.len())
-                .map_err(|_| overlay_unavailable("topology Part length overflows u64"))?;
+            let (bytes, compressed_bytes) = match &addition.payload {
+                TopologyPartPayload::Decoded(payload) => (
+                    u64::try_from(payload.len())
+                        .map_err(|_| overlay_unavailable("topology Part length overflows u64"))?,
+                    None,
+                ),
+                TopologyPartPayload::Precompressed(payload) => {
+                    (payload.logical_size(), Some(payload.compressed_size()))
+                },
+            };
+            let member_name_bytes = u64::try_from(addition.partname.membername().len())
+                .map_err(|_| overlay_unavailable("topology member name length overflows u64"))?;
             self.limits.check(
                 ReadResource::ArchiveMemberNameBytes,
-                addition.partname.membername().len() as u64,
+                member_name_bytes,
                 self.limits.max_archive_member_name_bytes(),
             )?;
             self.limits
@@ -6588,6 +7080,13 @@ impl SourceBackedPackage {
                 bytes,
                 self.limits.max_archive_entry_bytes(),
             )?;
+            if let Some(compressed_bytes) = compressed_bytes {
+                self.limits.check(
+                    ReadResource::ArchiveCompressedBytes,
+                    compressed_bytes,
+                    self.limits.max_archive_compressed_bytes(),
+                )?;
+            }
             part_total = checked_overlay_total(
                 part_total,
                 bytes,
@@ -6730,8 +7229,20 @@ impl SourceBackedPackage {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
             }
+            let payload_bytes = match &addition.payload {
+                TopologyPartPayload::Decoded(payload) => u64::try_from(payload.len())
+                    .map_err(|_| overlay_unavailable("topology Part length overflows u64"))?,
+                TopologyPartPayload::Precompressed(payload) => payload.compressed_size(),
+            };
+            let member_name_bytes = u64::try_from(addition.partname.membername().len())
+                .map_err(|_| overlay_unavailable("topology member name length overflows u64"))?;
             output_bound = output_bound
-                .checked_add(addition.payload.len() as u64)
+                .checked_add(payload_bytes)
+                .and_then(|value| {
+                    member_name_bytes
+                        .checked_mul(2)
+                        .and_then(|name_bytes| value.checked_add(name_bytes))
+                })
                 .and_then(|value| value.checked_add(4096))
                 .ok_or_else(|| overlay_unavailable("topology output bound overflows u64"))?;
         }
@@ -8290,6 +8801,21 @@ fn map_verified_decoded_reader_error<E>(
     }
 }
 
+fn map_verified_precompressed_error(
+    error: soapberry_zip::office::VerifiedPrecompressedError<OpcError>,
+) -> OpcError {
+    match error {
+        soapberry_zip::office::VerifiedPrecompressedError::Archive(error) => {
+            map_preservation_error(error)
+        },
+        soapberry_zip::office::VerifiedPrecompressedError::Transport(error) => map_io_error(error),
+        soapberry_zip::office::VerifiedPrecompressedError::Callback(error) => error,
+        _ => {
+            OpcError::ZipError("unrecognized verified ZIP precompressed-entry failure".to_string())
+        },
+    }
+}
+
 fn with_verified_primary_error<T, E>(
     result: std::result::Result<T, VerifiedDecodedReaderError<E>>,
     error: OpcError,
@@ -9706,7 +10232,10 @@ mod tests {
             Arc::clone(&payload),
         )
         .unwrap();
-        assert!(Arc::ptr_eq(&payload, &plan.additions[0].payload));
+        let TopologyPartPayload::Decoded(retained) = &plan.additions[0].payload else {
+            panic!("shared decoded addition must retain its decoded payload");
+        };
+        assert!(Arc::ptr_eq(&payload, retained));
 
         assert!(matches!(
             plan.try_add_part_shared(
