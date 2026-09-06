@@ -1,0 +1,14 @@
+{
+  "change": 446,
+  "status": "pass",
+  "finished_utc": "2026-09-06T19:58:20.703942+00:00",
+  "source_files": [
+    "crates/litchi-opc/src/content_type.rs"
+  ],
+  "candidate_sha256": "97b26306bd823a416ccc413f547d02513947948c4ec08bce5efc65e1b3e22d01",
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "previous_bundle_unchanged": true,
+  "all_owned_cpu_handles_terminal": true,
+  "scope": "One production line; tests and measurements bound to exact candidate; prior bundle and user goal preserved."
+}

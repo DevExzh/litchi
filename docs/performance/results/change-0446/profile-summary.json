@@ -1,0 +1,788 @@
+{
+  "change": 446,
+  "profiles": [
+    {
+      "role": "before",
+      "sample_blocks": 1217,
+      "total_period": 5057807099,
+      "whole_process_self": [
+        {
+          "symbol": "sha2::sha256::x86_sha::compress",
+          "period": 1120704390,
+          "percent": 22.15791089030618
+        },
+        {
+          "symbol": "__memcmp_evex_movbe",
+          "period": 275175958,
+          "percent": 5.440617892572577
+        },
+        {
+          "symbol": "[unknown]",
+          "period": 180256974,
+          "percent": 3.5639353275382795
+        },
+        {
+          "symbol": "__memmove_avx512_unaligned_erms",
+          "period": 159599945,
+          "percent": 3.1555166473540512
+        },
+        {
+          "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+          "period": 136032492,
+          "percent": 2.6895547682491796
+        },
+        {
+          "symbol": "<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write",
+          "period": 130422169,
+          "percent": 2.578630747419891
+        },
+        {
+          "symbol": "<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match",
+          "period": 121968118,
+          "percent": 2.4114822019233357
+        },
+        {
+          "symbol": "_int_malloc",
+          "period": 108635022,
+          "percent": 2.1478680359612503
+        },
+        {
+          "symbol": "<core::str::iter::Chars as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any::check<char, <litchi_opc::packuri::PackURI>::new<alloc::string::String>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+          "period": 104210877,
+          "percent": 2.0603964318964234
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::IterState>::next",
+          "period": 100905276,
+          "percent": 1.9950400247559936
+        },
+        {
+          "symbol": "<zlib_rs::deflate::Heap>::pqdownheap",
+          "period": 99813091,
+          "percent": 1.9734459825431947
+        },
+        {
+          "symbol": "<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&litchi_opc::packuri::PackURI>",
+          "period": 95987093,
+          "percent": 1.897800590674524
+        },
+        {
+          "symbol": "<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>::metadata",
+          "period": 83084438,
+          "percent": 1.642696852088862
+        },
+        {
+          "symbol": "soapberry_zip::office::normalize_str_fallibly",
+          "period": 77946721,
+          "percent": 1.5411169203232598
+        },
+        {
+          "symbol": "_int_free_merge_chunk",
+          "period": 77054085,
+          "percent": 1.5234682440782426
+        },
+        {
+          "symbol": "cfree@GLIBC_2.2.5",
+          "period": 64528578,
+          "percent": 1.27582125488254
+        },
+        {
+          "symbol": "<litchi_opc::members::PartNameIndex>::insert",
+          "period": 61184418,
+          "percent": 1.2097024817750963
+        },
+        {
+          "symbol": "<[u8]>::eq_ignore_ascii_case_chunks::<16>",
+          "period": 59215459,
+          "percent": 1.1707733774921494
+        },
+        {
+          "symbol": "core::slice::memchr::memchr_aligned",
+          "period": 56955829,
+          "percent": 1.1260972964204383
+        },
+        {
+          "symbol": "<litchi_opc::packuri::PackURI>::validate_percent_encoding",
+          "period": 56620733,
+          "percent": 1.1194719745479167
+        },
+        {
+          "symbol": "__memset_avx512_unaligned_erms",
+          "period": 56620169,
+          "percent": 1.1194608234702073
+        },
+        {
+          "symbol": "malloc",
+          "period": 52506132,
+          "percent": 1.038120493175416
+        },
+        {
+          "symbol": "<hashbrown::map::HashMap<alloc::string::String,",
+          "period": 47183589,
+          "percent": 0.9328862899759238
+        },
+        {
+          "symbol": "litchi_perf_baseline::payload_bytes",
+          "period": 46067341,
+          "percent": 0.9108164882189391
+        },
+        {
+          "symbol": "<litchi_opc::packuri::PackURI>::conflict_with",
+          "period": 45059596,
+          "percent": 0.8908919442362465
+        }
+      ],
+      "run_frame_blocks": 614,
+      "run_frame_period": 2692132541,
+      "run_frame_percent": 53.22726802950379,
+      "run_frame_self": [
+        {
+          "symbol": "sha2::sha256::x86_sha::compress",
+          "period": 180056848,
+          "percent": 6.688260895695626
+        },
+        {
+          "symbol": "__memcmp_evex_movbe",
+          "period": 157654513,
+          "percent": 5.856120031201688
+        },
+        {
+          "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+          "period": 109789572,
+          "percent": 4.078163698404625
+        },
+        {
+          "symbol": "__memmove_avx512_unaligned_erms",
+          "period": 100794243,
+          "percent": 3.7440297409190597
+        },
+        {
+          "symbol": "<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match",
+          "period": 100698559,
+          "percent": 3.7404755325529124
+        },
+        {
+          "symbol": "<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write",
+          "period": 91961428,
+          "percent": 3.415932410439223
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::IterState>::next",
+          "period": 78951046,
+          "percent": 2.9326582104562138
+        },
+        {
+          "symbol": "<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&litchi_opc::packuri::PackURI>",
+          "period": 78846732,
+          "percent": 2.9287834383782667
+        },
+        {
+          "symbol": "_int_malloc",
+          "period": 74429464,
+          "percent": 2.7647028096303523
+        },
+        {
+          "symbol": "<core::str::iter::Chars as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any::check<char, <litchi_opc::packuri::PackURI>::new<alloc::string::String>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+          "period": 65732449,
+          "percent": 2.4416498073153377
+        },
+        {
+          "symbol": "<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>::metadata",
+          "period": 65612085,
+          "percent": 2.437178853594935
+        },
+        {
+          "symbol": "soapberry_zip::office::normalize_str_fallibly",
+          "period": 56956165,
+          "percent": 2.1156523363015207
+        },
+        {
+          "symbol": "_int_free_merge_chunk",
+          "period": 52681529,
+          "percent": 1.956869812228164
+        },
+        {
+          "symbol": "<litchi_opc::packuri::PackURI>::validate_percent_encoding",
+          "period": 52578900,
+          "percent": 1.953057629936356
+        },
+        {
+          "symbol": "core::slice::memchr::memchr_aligned",
+          "period": 48178013,
+          "percent": 1.7895854779164828
+        },
+        {
+          "symbol": "<litchi_opc::members::PartNameIndex>::insert",
+          "period": 48127117,
+          "percent": 1.787694932067611
+        },
+        {
+          "symbol": "cfree@GLIBC_2.2.5",
+          "period": 43898745,
+          "percent": 1.6306308969354715
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>",
+          "period": 39505754,
+          "percent": 1.4674520439965217
+        },
+        {
+          "symbol": "malloc",
+          "period": 39488505,
+          "percent": 1.4668113251709325
+        },
+        {
+          "symbol": "litchi_opc::content_type::is_token",
+          "period": 35100937,
+          "percent": 1.3038339110511128
+        },
+        {
+          "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+          "period": 35078585,
+          "percent": 1.303003639893969
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates",
+          "period": 30750836,
+          "percent": 1.142248218900007
+        },
+        {
+          "symbol": "<hashbrown::map::HashMap<alloc::string::String,",
+          "period": 30741292,
+          "percent": 1.14189370440807
+        },
+        {
+          "symbol": "_int_free_maybe_trim",
+          "period": 30724266,
+          "percent": 1.1412612689785098
+        },
+        {
+          "symbol": "core::slice::memchr::memrchr",
+          "period": 30722353,
+          "percent": 1.141190210069973
+        }
+      ],
+      "run_frame_inclusive": [
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::write_topology_to_stream::<&mut litchi_perf_baseline::HashingDiscardSink>",
+          "period": 1598140843,
+          "percent": 59.36337898156999
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::from_read_at_with_cache_limits",
+          "period": 1089597798,
+          "percent": 40.47340840043729
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::from_read_at_inner",
+          "period": 1054546004,
+          "percent": 39.171399919570305
+        },
+        {
+          "symbol": "<litchi_opc::pkgreader::PackageReader>::source_catalog::<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>",
+          "period": 870279129,
+          "percent": 32.32675641878807
+        },
+        {
+          "symbol": "<litchi_opc::content_type::ContentTypeMap>::from_xml",
+          "period": 824596774,
+          "percent": 30.629872840276327
+        },
+        {
+          "symbol": "litchi_opc::content_type::inspect_element",
+          "period": 622968097,
+          "percent": 23.14032045274401
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::write_changed_overlays_with_omissions_and_appended::<&mut litchi_perf_baseline::HashingDiscardSink>",
+          "period": 597195865,
+          "percent": 22.183003841934543
+        },
+        {
+          "symbol": "<litchi_opc::pkgreader::PackageReader>::load_part_catalog::<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>",
+          "period": 524438778,
+          "percent": 19.48042193365397
+        },
+        {
+          "symbol": "<soapberry_zip::preserve::PreservationIndex<litchi_opc::source_backed::SourceReader>>::write_to_with_accounting::<litchi_opc::source_backed::Chunked<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut litchi_perf_baseline::HashingDiscardSink>>>>>",
+          "period": 417196360,
+          "percent": 15.496872967667159
+        },
+        {
+          "symbol": "litchi_opc::source_backed::content_types_with_changes",
+          "period": 325027236,
+          "percent": 12.073225632467105
+        },
+        {
+          "symbol": "litchi_opc::source_backed::content_types_with_overrides",
+          "period": 325027236,
+          "percent": 12.073225632467105
+        },
+        {
+          "symbol": "<litchi_opc::pkgreader::PackageReader>::classify_part_members::<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>",
+          "period": 323079502,
+          "percent": 12.000876519994488
+        },
+        {
+          "symbol": "<litchi_opc::members::PartNameIndex>::insert",
+          "period": 288876186,
+          "percent": 10.730384986643196
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut litchi_perf_baseline::HashingDiscardSink>> as std::io::Write>::write",
+          "period": 223934382,
+          "percent": 8.318103904231215
+        },
+        {
+          "symbol": "soapberry_zip::accounting::write_all_counted::<litchi_opc::source_backed::Chunked<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut litchi_perf_baseline::HashingDiscardSink>>>>>",
+          "period": 219580324,
+          "percent": 8.156371228232183
+        },
+        {
+          "symbol": "soapberry_zip::preserve::write_prepared_local::<litchi_opc::source_backed::SourceReader, litchi_opc::source_backed::Chunked<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut litchi_perf_baseline::HashingDiscardSink>>>>>",
+          "period": 206405302,
+          "percent": 7.666981430391617
+        },
+        {
+          "symbol": "<litchi_opc::packuri::PackURI>::new::<&alloc::string::String>",
+          "period": 197337763,
+          "percent": 7.33016521269411
+        },
+        {
+          "symbol": "<litchi_opc::pkgreader::PackageReader>::load_rels_lazy::<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>",
+          "period": 188273475,
+          "percent": 6.993469754281314
+        },
+        {
+          "symbol": "litchi_opc::content_type::required_attributes",
+          "period": 171154037,
+          "percent": 6.357563544639759
+        },
+        {
+          "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare",
+          "period": 158110391,
+          "percent": 5.8730537442732835
+        },
+        {
+          "symbol": "soapberry_zip::preserve::generated_entry",
+          "period": 149322475,
+          "percent": 5.5466241994361
+        },
+        {
+          "symbol": "<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>::metadata",
+          "period": 144481082,
+          "percent": 5.366789331491536
+        },
+        {
+          "symbol": "<litchi_opc::packuri::PackURI>::new::<alloc::string::String>",
+          "period": 144238327,
+          "percent": 5.3577721305809956
+        },
+        {
+          "symbol": "<litchi_opc::content_type::ContentTypeMap>::add_override",
+          "period": 140356464,
+          "percent": 5.213579267084087
+        },
+        {
+          "symbol": "<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&litchi_opc::packuri::PackURI>",
+          "period": 140165256,
+          "percent": 5.20647679359558
+        }
+      ],
+      "unparsed_lines": [],
+      "scope": "cycles:u weighted self; run-frame subset includes setup/probes/warmups/report work inside the run function, not just elapsed intervals; inclusive rows overlap and must not be added"
+    },
+    {
+      "role": "after",
+      "sample_blocks": 1210,
+      "total_period": 5023208888,
+      "whole_process_self": [
+        {
+          "symbol": "sha2::sha256::x86_sha::compress",
+          "period": 1129002194,
+          "percent": 22.475716602132273
+        },
+        {
+          "symbol": "__memcmp_evex_movbe",
+          "period": 228585378,
+          "percent": 4.550584757605247
+        },
+        {
+          "symbol": "__memmove_avx512_unaligned_erms",
+          "period": 164140069,
+          "percent": 3.2676337508502993
+        },
+        {
+          "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+          "period": 157526212,
+          "percent": 3.1359677750275554
+        },
+        {
+          "symbol": "<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&litchi_opc::packuri::PackURI>",
+          "period": 156690034,
+          "percent": 3.1193214834111034
+        },
+        {
+          "symbol": "soapberry_zip::office::normalize_str_fallibly",
+          "period": 122435889,
+          "percent": 2.437403893206362
+        },
+        {
+          "symbol": "<zlib_rs::deflate::Heap>::pqdownheap",
+          "period": 95436763,
+          "percent": 1.8999162712104198
+        },
+        {
+          "symbol": "<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write",
+          "period": 91497645,
+          "percent": 1.821497911794585
+        },
+        {
+          "symbol": "<[u8]>::eq_ignore_ascii_case_chunks::<16>",
+          "period": 86503815,
+          "percent": 1.7220827747508158
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::IterState>::next",
+          "period": 78900914,
+          "percent": 1.5707273131421486
+        },
+        {
+          "symbol": "<core::str::iter::Chars as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any::check<char, <litchi_opc::packuri::PackURI>::new<alloc::string::String>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+          "period": 75158746,
+          "percent": 1.4962297542423046
+        },
+        {
+          "symbol": "<litchi_opc::packuri::PackURI>::new::<alloc::string::String>",
+          "period": 74468796,
+          "percent": 1.482494510190475
+        },
+        {
+          "symbol": "core::slice::memchr::memchr_aligned",
+          "period": 74302510,
+          "percent": 1.4791841561178571
+        },
+        {
+          "symbol": "<litchi_opc::members::PartNameIndex>::insert",
+          "period": 73847054,
+          "percent": 1.470117123267839
+        },
+        {
+          "symbol": "<litchi_opc::packuri::PackURI>::validate_percent_encoding",
+          "period": 73841837,
+          "percent": 1.4700132653531808
+        },
+        {
+          "symbol": "__memset_avx512_unaligned_erms",
+          "period": 73740089,
+          "percent": 1.467987707542056
+        },
+        {
+          "symbol": "_int_malloc",
+          "period": 72791339,
+          "percent": 1.4491003783237453
+        },
+        {
+          "symbol": "<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>::metadata",
+          "period": 69770552,
+          "percent": 1.3889637790432259
+        },
+        {
+          "symbol": "_int_free_merge_chunk",
+          "period": 69464945,
+          "percent": 1.382879879153455
+        },
+        {
+          "symbol": "<litchi_opc::content_type::ContentTypeMap>::add_override",
+          "period": 65861870,
+          "percent": 1.3111513271394737
+        },
+        {
+          "symbol": "<hashbrown::map::HashMap<alloc::string::String,",
+          "period": 65272512,
+          "percent": 1.2994186277208228
+        },
+        {
+          "symbol": "<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match",
+          "period": 56847308,
+          "percent": 1.1316930923538373
+        },
+        {
+          "symbol": "<litchi_opc::packuri::PackURI>::conflict_with",
+          "period": 55567940,
+          "percent": 1.106223954427754
+        },
+        {
+          "symbol": "cfree@GLIBC_2.2.5",
+          "period": 55209731,
+          "percent": 1.0990928753110616
+        },
+        {
+          "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+          "period": 52739297,
+          "percent": 1.0499124797694457
+        }
+      ],
+      "run_frame_blocks": 614,
+      "run_frame_period": 2693579033,
+      "run_frame_percent": 53.622676123119646,
+      "run_frame_self": [
+        {
+          "symbol": "sha2::sha256::x86_sha::compress",
+          "period": 180214176,
+          "percent": 6.690510053431947
+        },
+        {
+          "symbol": "__memcmp_evex_movbe",
+          "period": 135742711,
+          "percent": 5.039492412770055
+        },
+        {
+          "symbol": "<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&litchi_opc::packuri::PackURI>",
+          "period": 127227126,
+          "percent": 4.723348542637694
+        },
+        {
+          "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+          "period": 114267249,
+          "percent": 4.242208882682522
+        },
+        {
+          "symbol": "soapberry_zip::office::normalize_str_fallibly",
+          "period": 105297951,
+          "percent": 3.9092207694653522
+        },
+        {
+          "symbol": "__memmove_avx512_unaligned_erms",
+          "period": 92158892,
+          "percent": 3.4214289193273504
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::IterState>::next",
+          "period": 70296051,
+          "percent": 2.609763817537111
+        },
+        {
+          "symbol": "<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write",
+          "period": 65706444,
+          "percent": 2.4393731609507965
+        },
+        {
+          "symbol": "<litchi_opc::packuri::PackURI>::new::<alloc::string::String>",
+          "period": 65688674,
+          "percent": 2.4387134439058427
+        },
+        {
+          "symbol": "core::slice::memchr::memchr_aligned",
+          "period": 61347172,
+          "percent": 2.277533766353757
+        },
+        {
+          "symbol": "<litchi_opc::content_type::ContentTypeMap>::add_override",
+          "period": 57082564,
+          "percent": 2.119208803627482
+        },
+        {
+          "symbol": "<litchi_opc::members::PartNameIndex>::insert",
+          "period": 56927146,
+          "percent": 2.113438859694302
+        },
+        {
+          "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+          "period": 52739297,
+          "percent": 1.957963599874814
+        },
+        {
+          "symbol": "<hashbrown::map::HashMap<alloc::string::String,",
+          "period": 52657046,
+          "percent": 1.9549100046770373
+        },
+        {
+          "symbol": "<litchi_opc::packuri::PackURI>::validate_percent_encoding",
+          "period": 52621710,
+          "percent": 1.9535981441536563
+        },
+        {
+          "symbol": "<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>::metadata",
+          "period": 52614996,
+          "percent": 1.9533488847141616
+        },
+        {
+          "symbol": "<core::str::iter::Chars as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any::check<char, <litchi_opc::packuri::PackURI>::new<alloc::string::String>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+          "period": 52592306,
+          "percent": 1.9525065110647526
+        },
+        {
+          "symbol": "_int_malloc",
+          "period": 52463012,
+          "percent": 1.947706429150839
+        },
+        {
+          "symbol": "_int_free_merge_chunk",
+          "period": 43917409,
+          "percent": 1.6304481309793444
+        },
+        {
+          "symbol": "<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match",
+          "period": 39383441,
+          "percent": 1.4621230904123985
+        },
+        {
+          "symbol": "<litchi_perf_baseline::HashingDiscardSink as std::io::Write>::write",
+          "period": 35152279,
+          "percent": 1.3050398213431593
+        },
+        {
+          "symbol": "unlink_chunk.isra.0",
+          "period": 35141622,
+          "percent": 1.3046441767428176
+        },
+        {
+          "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::read_event_impl::<()>",
+          "period": 35069864,
+          "percent": 1.3019801375919011
+        },
+        {
+          "symbol": "<litchi_opc::content_type::ContentTypeMap>::from_xml",
+          "period": 30747801,
+          "percent": 1.1415221392540442
+        },
+        {
+          "symbol": "cfree@GLIBC_2.2.5",
+          "period": 30737757,
+          "percent": 1.1411492524786073
+        }
+      ],
+      "run_frame_inclusive": [
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::write_topology_to_stream::<&mut litchi_perf_baseline::HashingDiscardSink>",
+          "period": 1620842752,
+          "percent": 60.174315739114235
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::from_read_at_with_cache_limits",
+          "period": 1063951618,
+          "percent": 39.499550782254694
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::from_read_at_inner",
+          "period": 1033265015,
+          "percent": 38.36030063870786
+        },
+        {
+          "symbol": "<litchi_opc::pkgreader::PackageReader>::source_catalog::<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>",
+          "period": 853297644,
+          "percent": 31.6789533013862
+        },
+        {
+          "symbol": "<litchi_opc::content_type::ContentTypeMap>::from_xml",
+          "period": 802955731,
+          "percent": 29.80999336431945
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceBackedPackage>::write_changed_overlays_with_omissions_and_appended::<&mut litchi_perf_baseline::HashingDiscardSink>",
+          "period": 593343554,
+          "percent": 22.028072936815143
+        },
+        {
+          "symbol": "litchi_opc::content_type::inspect_element",
+          "period": 579094473,
+          "percent": 21.499071157939177
+        },
+        {
+          "symbol": "<litchi_opc::pkgreader::PackageReader>::load_part_catalog::<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>",
+          "period": 537875579,
+          "percent": 19.96880627634437
+        },
+        {
+          "symbol": "<soapberry_zip::preserve::PreservationIndex<litchi_opc::source_backed::SourceReader>>::write_to_with_accounting::<litchi_opc::source_backed::Chunked<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut litchi_perf_baseline::HashingDiscardSink>>>>>",
+          "period": 426337468,
+          "percent": 15.827917531907815
+        },
+        {
+          "symbol": "litchi_opc::source_backed::content_types_with_changes",
+          "period": 333881669,
+          "percent": 12.395465843381475
+        },
+        {
+          "symbol": "litchi_opc::source_backed::content_types_with_overrides",
+          "period": 333881669,
+          "percent": 12.395465843381475
+        },
+        {
+          "symbol": "<litchi_opc::packuri::PackURI>::new::<alloc::string::String>",
+          "period": 332951133,
+          "percent": 12.36091939092548
+        },
+        {
+          "symbol": "<litchi_opc::pkgreader::PackageReader>::classify_part_members::<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>",
+          "period": 314554469,
+          "percent": 11.677937240611124
+        },
+        {
+          "symbol": "<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut litchi_perf_baseline::HashingDiscardSink>> as std::io::Write>::write",
+          "period": 232950558,
+          "percent": 8.648365432981153
+        },
+        {
+          "symbol": "soapberry_zip::accounting::write_all_counted::<litchi_opc::source_backed::Chunked<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut litchi_perf_baseline::HashingDiscardSink>>>>>",
+          "period": 232930941,
+          "percent": 8.647637145458877
+        },
+        {
+          "symbol": "<litchi_opc::members::PartNameIndex>::insert",
+          "period": 232036146,
+          "percent": 8.614417589283336
+        },
+        {
+          "symbol": "<litchi_opc::pkgreader::PackageReader>::load_rels_lazy::<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>",
+          "period": 214586216,
+          "percent": 7.9665832474572875
+        },
+        {
+          "symbol": "<litchi_opc::content_type::ContentTypeMap>::add_override",
+          "period": 206315434,
+          "percent": 7.659527768532344
+        },
+        {
+          "symbol": "soapberry_zip::preserve::write_prepared_local::<litchi_opc::source_backed::SourceReader, litchi_opc::source_backed::Chunked<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut litchi_perf_baseline::HashingDiscardSink>>>>>",
+          "period": 193400150,
+          "percent": 7.180043638244343
+        },
+        {
+          "symbol": "<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&litchi_opc::packuri::PackURI>",
+          "period": 184168609,
+          "percent": 6.837319668132419
+        },
+        {
+          "symbol": "<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>::metadata",
+          "period": 175232155,
+          "percent": 6.505550899125966
+        },
+        {
+          "symbol": "<soapberry_zip::preserve::PreservationIndex<core::io::cursor::Cursor<&[u8]>>>::prepare",
+          "period": 171421193,
+          "percent": 6.364067692087652
+        },
+        {
+          "symbol": "<litchi_opc::packuri::PackURI>::rels_uri",
+          "period": 166438716,
+          "percent": 6.179091608632967
+        },
+        {
+          "symbol": "soapberry_zip::preserve::generated_entry",
+          "period": 162628357,
+          "percent": 6.037630788166296
+        },
+        {
+          "symbol": "soapberry_zip::office::lookup_member_name",
+          "period": 135833339,
+          "percent": 5.0428570068246446
+        }
+      ],
+      "unparsed_lines": [],
+      "scope": "cycles:u weighted self; run-frame subset includes setup/probes/warmups/report work inside the run function, not just elapsed intervals; inclusive rows overlap and must not be added"
+    }
+  ],
+  "scope": "diagnostic stack attribution; no paired production CPU improvement or exact timed-region claim"
+}

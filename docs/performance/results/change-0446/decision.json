@@ -1,0 +1,72 @@
+{
+  "change": 446,
+  "decision": "retain",
+  "goal_complete": false,
+  "normal_latency_claim": false,
+  "performance_claim": "5.963%/5.990% fewer medium/large allocation calls in both repeats; no latency or peak-memory claim",
+  "scope": "synthetic plain-source OPC one-Part/root relationship addition, CPU 2, one worker, three sizes, 24 reports/720 samples",
+  "paired_review": [
+    {
+      "after": 3333,
+      "before": 3526,
+      "metric": "allocation.allocation_calls",
+      "mode": "allocator",
+      "relative_percent": -5.473624503686898,
+      "repeat": "R1",
+      "scope": "matched before/after production ownership handoff",
+      "shape": "tiny"
+    },
+    {
+      "after": 3333,
+      "before": 3526,
+      "metric": "allocation.allocation_calls",
+      "mode": "allocator",
+      "relative_percent": -5.473624503686898,
+      "repeat": "R2",
+      "scope": "matched before/after production ownership handoff",
+      "shape": "tiny"
+    },
+    {
+      "after": 48465,
+      "before": 51538,
+      "metric": "allocation.allocation_calls",
+      "mode": "allocator",
+      "relative_percent": -5.96259070976755,
+      "repeat": "R1",
+      "scope": "matched before/after production ownership handoff",
+      "shape": "medium"
+    },
+    {
+      "after": 48465,
+      "before": 51538,
+      "metric": "allocation.allocation_calls",
+      "mode": "allocator",
+      "relative_percent": -5.96259070976755,
+      "repeat": "R2",
+      "scope": "matched before/after production ownership handoff",
+      "shape": "medium"
+    },
+    {
+      "after": 192856,
+      "before": 205145,
+      "metric": "allocation.allocation_calls",
+      "mode": "allocator",
+      "relative_percent": -5.9903970362426575,
+      "repeat": "R1",
+      "scope": "matched before/after production ownership handoff",
+      "shape": "large"
+    },
+    {
+      "after": 192856,
+      "before": 205145,
+      "metric": "allocation.allocation_calls",
+      "mode": "allocator",
+      "relative_percent": -5.9903970362426575,
+      "repeat": "R2",
+      "scope": "matched before/after production ownership handoff",
+      "shape": "large"
+    }
+  ],
+  "repeat_review": [],
+  "review": "All six absolute paired triggers are allocation-call improvements. No paired latency/RSS regression or repeat trigger exceeds 5%. Calls save exactly 3*N+1 in every sample; requested bytes save 78*N+25. Above-entry peaks are unchanged and endpoint live deltas are zero. Normal medium/large p50 reductions do not meet the separate 3% gate. Retain the one-line ownership transfer on the frozen allocation gate and passing correctness evidence."
+}

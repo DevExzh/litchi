@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0446: fewer content-type Part-name allocations
+
+[0446](changes/0446-opc-owned-content-type-name.md) transfers an owned Part-name String into PackURI instead of cloning it.
+The 24-report/720-sample plain-source ABBA matrix saves exactly `3*N+1` calls:
+medium/large calls fall 5.963%/5.990% in both repeats. Requested bytes fall
+1.070%/1.329%; above-entry peaks and endpoint live deltas are unchanged. Normal
+medium/large p50 falls 2.096–2.846%, below the separate 3% gate; no latency gain
+is claimed. No paired latency/RSS or repeat flag crosses 5%. See
+[all measurements](results/change-0446/measurements.md). Four profiles still place
+content-type parsing near 30% inclusive in the run-frame subset, including
+untimed work. No native/cold/range, scaling or bounded-memory claim follows.
+
 ## Change 0445: matched plain-source Part addition
 
 [0445](changes/0445-opc-part-add-plain-source.md) adds `opc_part_add_plain_lifecycle` beside the observed case.

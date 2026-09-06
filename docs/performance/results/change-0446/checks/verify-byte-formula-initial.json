@@ -1,0 +1,7 @@
+{
+  "change": 446,
+  "status": "failed",
+  "finished_utc": "2026-09-06T19:57:50.999173+00:00",
+  "error": "per-sample predicted allocation saving",
+  "scope": "Added exact requested-byte assertion used 26*(3*N+1); final added Part name is 25 bytes, so correct formula is 78*N+25. No workload, raw observation or frozen acceptance threshold changed."
+}

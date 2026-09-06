@@ -313,7 +313,7 @@ fn inspect_element(
         b"Override" => {
             let (partname, content_type) =
                 required_attributes(element, decoder, "PartName", "Override", limits)?;
-            let part_uri = PackURI::new(&partname).map_err(OpcError::InvalidPackUri)?;
+            let part_uri = PackURI::new(partname).map_err(OpcError::InvalidPackUri)?;
             map.add_override(part_uri, ContentType::new(content_type)?)
         },
         _ => Err(OpcError::InvalidContentTypesManifest(

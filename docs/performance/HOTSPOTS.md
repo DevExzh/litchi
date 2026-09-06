@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## Change 0446: remove one owned Part-name clone per override
+
+[0446](changes/0446-opc-owned-content-type-name.md) removes exactly `3*N+1` temporary allocations in the measured Part-addition
+lifecycle. Medium/large calls fall about 6%, passing the frozen gate; peak memory
+is unchanged. The normal latency gate fails despite 2.096–2.846% lower medians.
+No paired latency/RSS or repeat flag exceeds 5%.
+
+Candidate content-type parsing remains 29.810% inclusive within the sampled
+run-frame subset; catalog opening and publication overlap that cost. Profiles
+include untimed work and do not isolate timer-only causality. Further reductions
+in repeated attribute/map allocations warrant measurement. Preserve all three
+required parses, freshness and managed-memory accounting; a manifest cache or
+SIMD rewrite is not justified by this ownership change. Native/CRUD breadth and
+cold/range/scaling gaps remain priorities alongside this scoped substrate work.
+
 ## Change 0445: observer separated; content-type allocations next
 
 [0445](changes/0445-opc-part-add-plain-source.md) measures the same Part-addition lifecycle with a plain OwnedSource.

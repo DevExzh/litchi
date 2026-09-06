@@ -1,0 +1,9 @@
+{
+  "change": 446,
+  "status": "pass",
+  "role": "after",
+  "finished_utc": "2026-09-06T19:54:29.775354+00:00",
+  "path": "crates/litchi-opc/src/content_type.rs",
+  "before_sha256": "090f3a405ae3b0f8f211ff29285f55522798c73cce2accda93fc072c61ef0f4a",
+  "after_sha256": "97b26306bd823a416ccc413f547d02513947948c4ec08bce5efc65e1b3e22d01"
+}

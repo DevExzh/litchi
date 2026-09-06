@@ -1,0 +1,115 @@
+{
+  "ambient_source_manifest": {
+    "files": 6661,
+    "path": "sources/9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8.json",
+    "sha256": "9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0446/runs/B2/formal/B2-normal-large-r2-resource.log",
+    "/tmp/litchi-goal-0446-binaries/after/normal",
+    "--case",
+    "opc_part_add_plain_lifecycle",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0446/runs/B2/formal/B2-normal-large-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0446/runs/B2/formal/B2-normal-large-r2-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4820,
+      "path": "runs/B2/formal/B2-normal-large-r2-catalog.json",
+      "sha256": "acaa1ae5881f5a1cbf9a603745da38d06b878a824f26227896081a84bfbe15c5"
+    },
+    "oracle_log": {
+      "bytes": 314,
+      "path": "runs/B2/formal/B2-normal-large-r2-oracle.log",
+      "sha256": "9e29a9510e3199171ebf5d1d27ee9b4079f92738348ec93e34ba5eddd918c506"
+    },
+    "report": {
+      "bytes": 37419,
+      "path": "runs/B2/formal/B2-normal-large-r2.json",
+      "sha256": "b571e27ec7435b5da1335412eda7f2c467b5ef19063c01a5a52ac69dbe6896bb"
+    },
+    "resource_log": {
+      "bytes": 1090,
+      "path": "runs/B2/formal/B2-normal-large-r2-resource.log",
+      "sha256": "4d77d3183ceb413a222be907a8716bdcecd50f2768249e5e1e1e40f7f30fd840"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/B2/formal/B2-normal-large-r2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 458723680,
+    "path": "/tmp/litchi-goal-0446-binaries/after/normal",
+    "sha256": "54d88ba2b81a16638028908d55e589b5e78256fea71e5d4f69ba67d5dbf8542e"
+  },
+  "build_directory": "after",
+  "change": 446,
+  "custody_driver": "/home/zhuhe/code/litchi/docs/performance/results/change-0446/check.py",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "1c069dcd64027e4b43618208500aa9b491fbfb8401c75f35245413c5f6fd6f1c",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T19:53:29.685863+00:00",
+  "lane": {
+    "mode": "normal",
+    "phase": "B2",
+    "repeat": "R2",
+    "shape": "large"
+  },
+  "name": "B2-normal-large-r2",
+  "oracle_exit_code": 0,
+  "oracle_role": "plain",
+  "oracle_stdout_sha256": "9e29a9510e3199171ebf5d1d27ee9b4079f92738348ec93e34ba5eddd918c506",
+  "outside_bundle_status_unchanged": true,
+  "phase": "B2",
+  "protocol_sha256": "556720f49a4d1f0f66f7e5a433999551cfc2507291524d9a97afae804bfe7321",
+  "revision": "28330dc99e13add0f7abe9641aa9c29fbbea8d4c",
+  "role": "after",
+  "schema": "litchi-0446-capture-receipt-v1",
+  "selector": "opc_part_add_plain_lifecycle",
+  "source_after": {
+    "files": 6661,
+    "path": "sources/9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8.json",
+    "sha256": "9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8"
+  },
+  "source_before": {
+    "files": 6661,
+    "path": "sources/9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8.json",
+    "sha256": "9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8"
+  },
+  "source_field": "opc_part_add",
+  "source_manifest": {
+    "files": 6661,
+    "path": "sources/9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8.json",
+    "sha256": "9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T19:53:27.915521+00:00",
+  "status": "pass",
+  "status_after": [
+    " M crates/litchi-opc/src/content_type.rs",
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    " M crates/litchi-opc/src/content_type.rs",
+    "?? docs/GOAL.md"
+  ]
+}

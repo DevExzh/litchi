@@ -1,0 +1,115 @@
+{
+  "ambient_source_manifest": {
+    "files": 6661,
+    "path": "sources/9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8.json",
+    "sha256": "9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0446/runs/B2/formal/B2-allocator-tiny-r2-resource.log",
+    "/tmp/litchi-goal-0446-binaries/after/allocator",
+    "--case",
+    "opc_part_add_plain_lifecycle",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0446/runs/B2/formal/B2-allocator-tiny-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0446/runs/B2/formal/B2-allocator-tiny-r2-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4796,
+      "path": "runs/B2/formal/B2-allocator-tiny-r2-catalog.json",
+      "sha256": "daf73d580dbd175af1c5325d6f65d2f578fa2b8c2b870c9db4cc56bd2d885671"
+    },
+    "oracle_log": {
+      "bytes": 318,
+      "path": "runs/B2/formal/B2-allocator-tiny-r2-oracle.log",
+      "sha256": "b8476db5c64a72c41c664b6bbadebaf0e75438c2bdeb91b1762e6372fac14111"
+    },
+    "report": {
+      "bytes": 46349,
+      "path": "runs/B2/formal/B2-allocator-tiny-r2.json",
+      "sha256": "c4a4cdd05fc2e52888c1d87b6d4285923f289b65bb85ee4f60a8fbbd74d1dd54"
+    },
+    "resource_log": {
+      "bytes": 1096,
+      "path": "runs/B2/formal/B2-allocator-tiny-r2-resource.log",
+      "sha256": "a75aaa92722b41ac21ce7d46f0b1d07ade9acaf7c12d8f7aede27d7a980f8931"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/B2/formal/B2-allocator-tiny-r2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 458069752,
+    "path": "/tmp/litchi-goal-0446-binaries/after/allocator",
+    "sha256": "24ccd7668366a0d51235bc48dbd7de42c83ccb6b8c9d025ca24f78cfd106ae6e"
+  },
+  "build_directory": "after",
+  "change": 446,
+  "custody_driver": "/home/zhuhe/code/litchi/docs/performance/results/change-0446/check.py",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "1c069dcd64027e4b43618208500aa9b491fbfb8401c75f35245413c5f6fd6f1c",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T19:53:27.751274+00:00",
+  "lane": {
+    "mode": "allocator",
+    "phase": "B2",
+    "repeat": "R2",
+    "shape": "tiny"
+  },
+  "name": "B2-allocator-tiny-r2",
+  "oracle_exit_code": 0,
+  "oracle_role": "plain",
+  "oracle_stdout_sha256": "b8476db5c64a72c41c664b6bbadebaf0e75438c2bdeb91b1762e6372fac14111",
+  "outside_bundle_status_unchanged": true,
+  "phase": "B2",
+  "protocol_sha256": "556720f49a4d1f0f66f7e5a433999551cfc2507291524d9a97afae804bfe7321",
+  "revision": "28330dc99e13add0f7abe9641aa9c29fbbea8d4c",
+  "role": "after",
+  "schema": "litchi-0446-capture-receipt-v1",
+  "selector": "opc_part_add_plain_lifecycle",
+  "source_after": {
+    "files": 6661,
+    "path": "sources/9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8.json",
+    "sha256": "9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8"
+  },
+  "source_before": {
+    "files": 6661,
+    "path": "sources/9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8.json",
+    "sha256": "9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8"
+  },
+  "source_field": "opc_part_add",
+  "source_manifest": {
+    "files": 6661,
+    "path": "sources/9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8.json",
+    "sha256": "9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T19:53:27.341876+00:00",
+  "status": "pass",
+  "status_after": [
+    " M crates/litchi-opc/src/content_type.rs",
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    " M crates/litchi-opc/src/content_type.rs",
+    "?? docs/GOAL.md"
+  ]
+}

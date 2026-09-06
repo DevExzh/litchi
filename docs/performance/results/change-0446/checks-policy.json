@@ -1,0 +1,92 @@
+{
+  "change": 446,
+  "expected_status": {
+    "formal-a1.json": "failed",
+    "candidate-harness-strict.json": "failed"
+  },
+  "required": {
+    "before-opc-strict.json": {
+      "role": "before"
+    },
+    "before-build.json": {
+      "role": "before"
+    },
+    "independent-fixtures.json": {
+      "role": "before"
+    },
+    "pilot-before.json": {
+      "role": "before"
+    },
+    "independent-oracle-probes.json": {
+      "role": "before"
+    },
+    "formal-a1-fixed.json": {
+      "role": "before"
+    },
+    "formal-a2.json": {
+      "role": "before"
+    },
+    "before-stat.json": {
+      "role": "before"
+    },
+    "before-record.json": {
+      "role": "before"
+    },
+    "candidate-opc-tests.json": {
+      "role": "after",
+      "tests": 458
+    },
+    "candidate-opc-strict.json": {
+      "role": "after"
+    },
+    "candidate-opc-doc.json": {
+      "role": "after"
+    },
+    "candidate-harness-tests.json": {
+      "role": "after",
+      "tests": 373
+    },
+    "candidate-workspace-check.json": {
+      "role": "after"
+    },
+    "candidate-harness-check.json": {
+      "role": "after"
+    },
+    "candidate-harness-doc.json": {
+      "role": "after"
+    },
+    "final-format.json": {
+      "role": "after"
+    },
+    "final-boundaries.json": {
+      "role": "after"
+    },
+    "after-build.json": {
+      "role": "after"
+    },
+    "pilot-after.json": {
+      "role": "after"
+    },
+    "formal-b1.json": {
+      "role": "after"
+    },
+    "formal-b2.json": {
+      "role": "after"
+    },
+    "after-stat.json": {
+      "role": "after"
+    },
+    "after-record.json": {
+      "role": "after"
+    },
+    "formal-summary.json": {
+      "role": "after"
+    },
+    "profile-summary.json": {
+      "role": "after"
+    }
+  },
+  "cleanup_paths": [
+    "/tmp/litchi-goal-0446-binaries"
+  ]
+}

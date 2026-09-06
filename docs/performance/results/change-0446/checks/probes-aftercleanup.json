@@ -1,0 +1,54 @@
+{
+  "change": 446,
+  "status": "pass",
+  "stage": "aftercleanup",
+  "exported_bundle_verification": {
+    "exit_code": 0,
+    "stdout": "{\"status\": \"pass\", \"reports\": 24, \"samples\": 720, \"profiles\": 4, \"sealed\": true, \"cleanup\": true}\n",
+    "stderr": ""
+  },
+  "rejected": [
+    {
+      "mutation": 0,
+      "path": "protocol.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: protocol dimensions\n"
+    },
+    {
+      "mutation": 1,
+      "path": "before/build.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: binary copies\n"
+    },
+    {
+      "mutation": 2,
+      "path": "runs/A1/formal/A1-normal-tiny-r1-receipt.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: receipt source\n"
+    },
+    {
+      "mutation": 3,
+      "path": "runs/A1/formal/A1-normal-tiny-r1-receipt.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: capture argv\n"
+    },
+    {
+      "mutation": 4,
+      "path": "checks/cleanup-inventory.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: cleanup proof\n"
+    },
+    {
+      "mutation": "extra-seal-member",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "INVALID: sealed inventory coverage\n"
+    }
+  ],
+  "scope": "portable verification runs no Git, original binaries, workload or profiler; scratch copy removed before receipt publication"
+}
