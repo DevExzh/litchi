@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0447: caller-owned transfer simulation remains in tooling
+
+[0447](changes/0447-pptx-range-transfer-pacing.md) adds optional per-read sleep around explicit ReadAt in the standalone harness.
+Production source/version, snapshot/publication and cache/budget contracts stay
+unchanged (0002/0003/0005/0006/0008/0023/0024). No public document API, dependency,
+unsafe policy, hidden pool or ambient networking change. Pacing uses checked
+integer arithmetic, explicit configuration and fail-closed counters; CLI limits
+are checked before corpus construction. Unsupported aggregate-link concurrency,
+physical bandwidth and cold-I/O claims remain withheld. Accepted ADRs are
+unchanged. See [source review](results/change-0447/source-review.md) and
+[validation](results/change-0447/validation-notes.md).
+
 ## Change 0446: transfer owned content-type names without skipping validation
 
 [0446](changes/0446-opc-owned-content-type-name.md) moves an already owned String into the existing PackURI constructor.

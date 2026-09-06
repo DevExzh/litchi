@@ -1,0 +1,104 @@
+{
+  "change": 447,
+  "decision": "retain measured enabler",
+  "production_optimization": false,
+  "goal_complete": false,
+  "scope": "Optional caller-configured per-read transfer pacing in standalone PPTX range-source tooling; matched plain/media-rich simulation baseline",
+  "claims_withheld": [
+    "production speedup",
+    "physical network bandwidth",
+    "cold I/O",
+    "shared-link concurrency",
+    "operation allocator attribution",
+    "bounded total memory",
+    "native compatibility",
+    "scaling"
+  ],
+  "repeat_review": [
+    {
+      "corpus": "plain",
+      "paced": false,
+      "metric": "plan_ns.p95",
+      "relative_percent": -14.4797761745731,
+      "flagged": true
+    },
+    {
+      "corpus": "plain",
+      "paced": false,
+      "metric": "plan_ns.p99",
+      "relative_percent": -25.654874940020445,
+      "flagged": true
+    },
+    {
+      "corpus": "plain",
+      "paced": false,
+      "metric": "publication_ns.p95",
+      "relative_percent": -8.227093996130586,
+      "flagged": true
+    },
+    {
+      "corpus": "plain",
+      "paced": false,
+      "metric": "publication_ns.p99",
+      "relative_percent": -7.599199428730719,
+      "flagged": true
+    },
+    {
+      "corpus": "plain",
+      "paced": false,
+      "metric": "api_sum_ns.p99",
+      "relative_percent": -7.60593937240116,
+      "flagged": true
+    },
+    {
+      "corpus": "plain",
+      "paced": true,
+      "metric": "open_ns.p95",
+      "relative_percent": -7.4587149815125375,
+      "flagged": true
+    },
+    {
+      "corpus": "plain",
+      "paced": true,
+      "metric": "publication_ns.p95",
+      "relative_percent": 5.233068886447745,
+      "flagged": true
+    },
+    {
+      "corpus": "plain",
+      "paced": true,
+      "metric": "publication_ns.p99",
+      "relative_percent": 5.2716362650080395,
+      "flagged": true
+    },
+    {
+      "corpus": "media-rich",
+      "paced": false,
+      "metric": "open_ns.p95",
+      "relative_percent": -14.9996192403136,
+      "flagged": true
+    },
+    {
+      "corpus": "media-rich",
+      "paced": false,
+      "metric": "open_ns.p99",
+      "relative_percent": -5.750406970481792,
+      "flagged": true
+    },
+    {
+      "corpus": "media-rich",
+      "paced": false,
+      "metric": "publication_ns.p99",
+      "relative_percent": -5.509590026024713,
+      "flagged": true
+    },
+    {
+      "corpus": "media-rich",
+      "paced": true,
+      "metric": "open_ns.p99",
+      "relative_percent": 10.69414331569889,
+      "flagged": true
+    }
+  ],
+  "review": "12 absolute repeat flags, all tail metrics; three increases (paced plain publication p95/p99 and paced media-rich open p99), nine decreases. No p50 or process-RSS repeat crosses 5%. All paired pacing increases are simulation cost, not production regression. Exact source work and output identity match every retained sample. Requested transfer sleeps sum to 2.767330 ms plain and 1923.768399 ms media-rich; OS scheduling and the separate additional sleep make paced elapsed differences larger and are not attributed as network transfer time."
+}

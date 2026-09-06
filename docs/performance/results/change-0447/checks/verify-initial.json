@@ -1,0 +1,7 @@
+{
+  "change": 447,
+  "status": "failed",
+  "finished_utc": "2026-09-06T20:30:27.580749+00:00",
+  "error": "sample dimensions",
+  "scope": "Pilot contract adaptation left zero instead of one in verifier sample count and argv; actual pilots remain 1 sample/0 warmup. Corrected replay only; raw evidence and frozen protocol unchanged."
+}

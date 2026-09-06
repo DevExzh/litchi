@@ -1,0 +1,75 @@
+{
+  "change": 447,
+  "status": "pass",
+  "rejected": [
+    {
+      "mutation": "missing-rate",
+      "rejected": "missing transfer configuration"
+    },
+    {
+      "mutation": "zero-rate",
+      "rejected": "invalid transfer rate/provider"
+    },
+    {
+      "mutation": "boolean-rate",
+      "rejected": "expected u64 pacing counter"
+    },
+    {
+      "mutation": "rate-on-bytes",
+      "rejected": "invalid transfer rate/provider"
+    },
+    {
+      "mutation": "missing-counter",
+      "rejected": "missing pacing snapshot"
+    },
+    {
+      "mutation": "negative-delay",
+      "rejected": "expected u64 pacing counter"
+    },
+    {
+      "mutation": "oversized-delay",
+      "rejected": "expected u64 pacing counter"
+    },
+    {
+      "mutation": "boolean-counter",
+      "rejected": "expected u64 pacing counter"
+    },
+    {
+      "mutation": "invented-unavailable",
+      "rejected": "unavailable pacing has values"
+    },
+    {
+      "mutation": "zero-transfer",
+      "rejected": "pacing zero state differs from returned bytes"
+    },
+    {
+      "mutation": "bad-ceiling-sum",
+      "rejected": "sum of per-read ceiling delays is inconsistent"
+    },
+    {
+      "mutation": "bad-delta",
+      "rejected": "pacing delta differs from snapshots"
+    },
+    {
+      "mutation": "counter-underflow",
+      "rejected": "paced calls exceed reads"
+    },
+    {
+      "mutation": "missing-budget",
+      "rejected": "report.samples_raw[0].phases[1].source_budget: missing fields: memory_used"
+    },
+    {
+      "mutation": "wrong-output",
+      "rejected": "report.samples_raw[0].output_sha256: row output identity differs from expected output"
+    },
+    {
+      "mutation": "inconsistent-timer",
+      "rejected": "report.samples_raw[0].timings.api_sum_ns: API duration sum is inconsistent"
+    },
+    {
+      "mutation": "invented-pacing-control",
+      "rejected": "unconfigured pacing fabricates delay"
+    }
+  ],
+  "scope": "new pacing arithmetic/availability/CLI configuration plus inherited output, timer and budget report contracts; does not independently replay semantic publication"
+}

@@ -4298,3 +4298,29 @@ rather than changing system policy merely to complete a smoke run.
 Timing is only a first baseline. It intentionally does not claim peak RSS,
 allocation counts, CPU utilization, lock contention, or cache misses; those
 need dedicated instrumentation and a controlled runner.
+
+## Explicit PPTX range transfer pacing (0447)
+
+The standalone `provider-lifecycle` target accepts an optional
+`--transfer-bytes-per-second RATE` with `--provider range`. The accepted CLI range
+is 1,048,576 through 1,099,511,627,776 bytes/second; omitted pacing preserves the
+existing configuration. For example, use `--max-range 65536 --delay-us 200
+--transfer-bytes-per-second 26214400` to request 200 us per delegated call plus
+transfer pacing at 25 MiB/s. Plain and media-rich corpora use the same managed
+cross-slide-copy lifecycle and exact output checks.
+
+Each successful nonempty read requests `ceil(returned_bytes * 1e9 / RATE)` ns of
+additional sleep. `transfer_paced_calls` and `transfer_delay_ns` are cumulative
+and phase-delta **requested pacing** counters; they do not measure actual sleep,
+network traffic or achieved bandwidth. Fixed and transfer sleeps are separate,
+and OS scheduling can add oversleep. Concurrent calls do not share a link budget.
+Empty buffers, zero-cap calls, EOF and failed source reads add no transfer delay.
+The source adapter also accepts an explicit `NonZeroU64` rate in its config.
+
+Provider JSON retains its v1 lifecycle and adds the rate to `provider_config`
+and pacing counters to every source/destination read point and delta. Unavailable
+owners carry null values. The extended strict report verifier is retained at
+`docs/performance/results/change-0447/verify-report.py`; older strict verifiers
+reject the additive fields. Production crates, ambient networking, default case
+selection and native fixture behavior are unchanged. This custom journal has no
+operation allocator attribution and its CountingSink retains full output.

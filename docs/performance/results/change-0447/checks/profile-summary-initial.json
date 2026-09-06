@@ -1,0 +1,7 @@
+{
+  "change": 447,
+  "status": "failed",
+  "finished_utc": "2026-09-06T20:29:58.316253+00:00",
+  "error": "sample header has no frames",
+  "scope": "Four unpaced perf sample headers have no callchain. Initial parser rejected them. Corrected derivation retains their full weight as missing-callchain self samples instead of dropping them. Raw profiles are unchanged."
+}

@@ -1,5 +1,16 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0447 adds explicit transfer-rate simulation
+
+[0447](changes/0447-pptx-range-transfer-pacing.md) extends the standalone provider-lifecycle command for matched plain/media-rich
+PPTX cross-slide copying with configurable requested transfer pacing. It improves
+the caller-range-source evidence dimension for the existing category 9 slice;
+no new semantic/native direction or default timing contract is certified. Eight
+reports/240 samples retain identical source work/output across configurations.
+Registry/default counts remain 438/36 and the representative index remains
+15 categories/33 mappings/10 measured/23 correctness-only. Cold I/O, aggregate
+link concurrency, native breadth, bounded append, repackaging and scaling remain.
+
 ## 2026-09-06: change 0446 reduces allocations in package addition
 
 [0446](changes/0446-opc-owned-content-type-name.md) reuses the plain-source category 6/15 OPC Part-addition slice.

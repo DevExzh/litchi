@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+"""Run tool-only validation and retain the matched profiling executable."""
+import hashlib,json,shutil,subprocess,sys
+from pathlib import Path
+ROOT=Path(__file__).resolve().parent
+
+def run(tag,argv,expected=0):
+    result=subprocess.run([sys.executable,'-B',str(ROOT/'check.py'),'--tag',tag,'--',*argv]);assert result.returncode==expected,(tag,result.returncode)
+run('candidate-harness-strict',['cargo','clippy','--locked','--release','--manifest-path','tools/perf-baseline/Cargo.toml','--all-features','--all-targets','--no-deps','--','-D','warnings'],1)
+subprocess.run([sys.executable,'-B',str(ROOT/'lint-comparison.py')],check=True)
+run('candidate-harness-check',['cargo','check','--locked','--release','--manifest-path','tools/perf-baseline/Cargo.toml','--all-features','--all-targets'])
+run('candidate-harness-doc',['cargo','doc','--locked','--release','--manifest-path','tools/perf-baseline/Cargo.toml','--all-features','--no-deps'])
+run('candidate-workspace-check',['cargo','check','--locked','--release','--workspace','--all-targets','--no-default-features','--exclude','litchi-iwa*','--exclude','litchi-keynote','--exclude','litchi-numbers*','--exclude','litchi-pages','--features','litchi/odf'])
+run('final-format',['rustfmt','--check','--edition','2024','--config','skip_children=true',*json.loads((ROOT/'source-files.json').read_text())])
+run('final-boundaries',['python3','-B','tools/check_crate_boundaries.py'])
+run('candidate-build',['env','RUSTFLAGS=-Cforce-frame-pointers=yes','CARGO_PROFILE_RELEASE_DEBUG=1','cargo','build','--locked','--release','--manifest-path','tools/perf-baseline/Cargo.toml','--features','allocator-metrics','--bin','litchi-perf-baseline'])
+target=Path('/tmp/litchi-goal-0447-binaries');target.mkdir(exist_ok=False)
+source=ROOT.parents[3]/'tools/perf-baseline/target/release/litchi-perf-baseline';binary=target/'normal';shutil.copy2(source,binary)
+def sha(p):
+    with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+assert sha(source)==sha(binary)
+check=json.loads((ROOT/'checks/candidate-build.json').read_text())
+(ROOT/'build.json').write_text(json.dumps({'change':447,'revision':check['revision'],'source_manifest':check['source_after'],'build_receipt':'checks/candidate-build.json','binary':{'path':str(binary),'bytes':binary.stat().st_size,'sha256':sha(binary)}},indent=2)+'\n')
+for i in range(4):run('pilot-'+str(i)+'-control',[sys.executable,'-B',str(ROOT/'capture.py'),'--pilot','--lane',str(i)])

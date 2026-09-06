@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## Change 0447: transfer-sensitive PPTX cross-copy evidence
+
+[0447](changes/0447-pptx-range-transfer-pacing.md) adds explicit requested transfer pacing around caller ReadAt. At the frozen
+25 MiB/s rate, media-rich planning/publication return 16,794,014/33,617,184 bytes
+and request 640.641/1,282.394 ms of transfer sleep. Underlying work matches the
+unpaced control; publication accounts for roughly two-thirds of requested
+transfer delay. This identifies an I/O-sensitive path to examine while preserving
+source freshness, dependency closure and exact publication. It does not prove
+that those bytes are redundant or that an optimization is safe.
+
+The plain result exposes per-request sleep granularity: observed latency growth
+exceeds the 2.767 ms requested transfer delay. Calibrate a combined deadline model
+before interpreting small-payload comparisons as ideal link-rate effects. CPU
+profiles omit blocked sleep and include untimed work; SHA-256 dominates the
+lifecycle-frame subset. Native/cold I/O and shared-link scaling remain open.
+
 ## Change 0446: remove one owned Part-name clone per override
 
 [0446](changes/0446-opc-owned-content-type-name.md) removes exactly `3*N+1` temporary allocations in the measured Part-addition

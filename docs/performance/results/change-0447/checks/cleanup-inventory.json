@@ -1,0 +1,28 @@
+{
+  "change": 447,
+  "cleanup_paths": [
+    "/tmp/litchi-goal-0447-binaries"
+  ],
+  "goal_path": "/home/zhuhe/code/litchi/docs/GOAL.md",
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "precleanup_receipt": "checks/precleanup.json",
+  "preserved_target_directory_identity": {
+    "/home/zhuhe/code/litchi/target": [
+      66305,
+      25854451
+    ],
+    "/home/zhuhe/code/litchi/tools/perf-baseline/target": [
+      66305,
+      25593433
+    ]
+  },
+  "removed": [
+    {
+      "path": "/tmp/litchi-goal-0447-binaries",
+      "regular_file_bytes": 459723864,
+      "regular_files": 1
+    }
+  ],
+  "schema": "litchi-0447-cleanup-inventory-v1",
+  "status": "pass"
+}

@@ -1,0 +1,86 @@
+{
+  "change": 447,
+  "status": "pass",
+  "lane": {
+    "corpus": "media-rich",
+    "paced": true,
+    "repeat": "R1"
+  },
+  "pilot": false,
+  "profile": null,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0447/runs/3/resource.log",
+    "/tmp/litchi-goal-0447-binaries/normal",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "range",
+    "--max-range",
+    "65536",
+    "--delay-us",
+    "200",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "42519a6a1559480e45210a62185501f42ca6e2c5",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0447/runs/3/report.json",
+    "--transfer-bytes-per-second",
+    "26214400"
+  ],
+  "source_before": {
+    "path": "sources/3f2f1ab40d09d8727a824f0cc3e96ea216556a6af3f24b1db02fc917ba7383df.json",
+    "sha256": "3f2f1ab40d09d8727a824f0cc3e96ea216556a6af3f24b1db02fc917ba7383df",
+    "files": 6661
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0447-binaries/normal",
+    "bytes": 459723864,
+    "sha256": "147700f4ed33ccb2c419449f4a1d0bf5b3d7cb8c360671bb38424eafd8543461"
+  },
+  "build_sha256": "ae4fab60fe975470816744480e5f139244eb787f364ef792429afdc20e0a01f6",
+  "protocol_sha256": "a3cbbb34907cb912dc353a6488e8d91f942b5bb41b6a6d4cb3e106177e0c28aa",
+  "capture_sha256": "0cd5657180ba5c2227d120b1e181480b1621a3b516bf025d5b0b70b2b28d5c50",
+  "oracle_sha256": "9cef5ca8b149fde48c479da9990db17cd184320a59629c0dc16c1f47416e1c9f",
+  "started_utc": "2026-09-06T20:21:28.393951+00:00",
+  "exit_code": 0,
+  "oracle_exit_code": 0,
+  "source_after": {
+    "path": "sources/3f2f1ab40d09d8727a824f0cc3e96ea216556a6af3f24b1db02fc917ba7383df.json",
+    "sha256": "3f2f1ab40d09d8727a824f0cc3e96ea216556a6af3f24b1db02fc917ba7383df",
+    "files": 6661
+  },
+  "source_unchanged": true,
+  "finished_utc": "2026-09-06T20:23:00.556197+00:00",
+  "artifacts": {
+    "report": {
+      "path": "runs/3/report.json",
+      "bytes": 1831202,
+      "sha256": "65b2fadd41f7574f1f393dce2b728cbf181b1b39df323ad6ff2be4ec9024b5d5"
+    },
+    "resource": {
+      "path": "runs/3/resource.log",
+      "bytes": 1062,
+      "sha256": "8a85e2acd5b94421c7b18d8de63d39d8979d697830c03d231167e6f3c7acca84"
+    },
+    "workload": {
+      "path": "runs/3/workload.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "oracle": {
+      "path": "runs/3/oracle.log",
+      "bytes": 244,
+      "sha256": "c42cb85aa1fb02e74456b6426229779bbeec1be685a409896e94bb6797140c1a"
+    }
+  }
+}
