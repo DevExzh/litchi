@@ -1,11 +1,14 @@
 //! Transactional reassignment of a live slide to a theme layout.
 
 use super::*;
+use crate::archive::ArchiveLimits;
 use litchi_keynote::slide::placeholder::Kind as PlaceholderKind;
 use slide_create::layout::{read_layout_graph, resolve_layout};
 
+mod dependencies;
 mod wire;
 
+use dependencies::{capture_slide_layout_dependencies, reconcile_slide_layout_dependencies};
 use wire::*;
 
 const SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
@@ -19,6 +22,84 @@ const SLIDE_NODE_TEMPLATE_UUID_FIELD: u32 = 29;
 const PLACEHOLDER_GEOMETRY_PATH: &[u32] = &[1, 1, 1, 1];
 const PLACEHOLDER_STYLE_PATH: &[u32] = &[1, 1, 2];
 const PLACEHOLDER_PATH_SOURCE_PATH: &[u32] = &[1, 1, 3];
+
+fn slide_preview_wire_limits(package: &IWorkPackage) -> Result<WireLimits> {
+    slide_preview_wire_limits_for(
+        package.limits().effective_archive_limits()?,
+        package.limits().max_iwa_stream_bytes(),
+    )
+}
+
+fn slide_preview_wire_limits_for(
+    archive_limits: ArchiveLimits,
+    max_iwa_stream_bytes: usize,
+) -> Result<WireLimits> {
+    let source_bytes = archive_limits
+        .max_message_bytes()
+        .min(archive_limits.max_archive_bytes())
+        .min(max_iwa_stream_bytes)
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    // Archive header budgets do not describe the semantic protobuf payload.
+    // Keep the payload profile source-sized and give its traversal an explicit
+    // positive depth budget independent of header-only ceilings.
+    let fields = source_bytes
+        .saturating_mul(4)
+        .clamp(1, WireLimits::MAX_FIELDS);
+    let work = source_bytes
+        .saturating_mul(8)
+        .clamp(1, WireLimits::MAX_REWRITE_WORK);
+    WireLimits::default()
+        .with_input_bytes(source_bytes)
+        .and_then(|limits| limits.with_fields(fields))
+        .and_then(|limits| limits.with_output_bytes(source_bytes))
+        .and_then(|limits| limits.with_nesting(WireLimits::MAX_NESTING))
+        .and_then(|limits| limits.with_rewrite_work(work))
+        .map_err(|error| {
+            Error::InvalidFormat(format!("invalid Keynote slide preview limits: {error}"))
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slide_preview_payload_limits_do_not_use_header_only_budgets() {
+        let archive_limits = ArchiveLimits::default()
+            .with_header_fields(1)
+            .unwrap()
+            .with_header_nesting(1)
+            .unwrap();
+        let wire_limits =
+            slide_preview_wire_limits_for(archive_limits, archive_limits.max_archive_bytes())
+                .unwrap();
+
+        assert!(wire_limits.max_fields() > archive_limits.max_header_fields());
+        assert_eq!(wire_limits.max_nesting(), WireLimits::MAX_NESTING);
+        assert!(wire_limits.max_rewrite_work() > 1);
+    }
+}
+
+fn invalidate_slide_preview(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    node_id: u64,
+) -> Result<()> {
+    let archive_limits = package.limits().effective_archive_limits()?;
+    let wire_limits = slide_preview_wire_limits(package)?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(node_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Keynote slide node {node_id} is missing"))
+        })?;
+        litchi_keynote::__invalidate_slide_preview(object, archive_limits, wire_limits).map_err(
+            |error| {
+                Error::InvalidFormat(format!(
+                    "Keynote slide preview invalidation failed: {error}"
+                ))
+            },
+        )
+    })
+}
 
 impl KeynoteEditor {
     /// Reassign an existing slide to a theme layout without replacing user content.
@@ -73,6 +154,12 @@ impl KeynoteEditor {
             before_node_id,
             SLIDE_NODE_MESSAGE_TYPE,
             "KN.SlideNodeArchive",
+        )?;
+        let dependencies = capture_slide_layout_dependencies(
+            self.package(),
+            &graph,
+            before_slide_id,
+            &current_slide,
         )?;
 
         let title = placeholder_plan(
@@ -139,10 +226,17 @@ impl KeynoteEditor {
             &current_node,
             &target_node,
         )?;
-        slide_preview::invalidate(
+        invalidate_slide_preview(
             &mut staged,
             graph.archive_name(before_node_id)?,
             before_node_id,
+        )?;
+        reconcile_slide_layout_dependencies(
+            &mut staged,
+            graph.archive_name(before_slide_id)?,
+            target.archive_name.as_str(),
+            target.slide_id,
+            &dependencies,
         )?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;

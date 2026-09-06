@@ -702,6 +702,25 @@ pub(crate) fn add_component_link(
     )
 }
 
+/// Remove one unversioned component-only edge emitted by `add_component_link`.
+///
+/// Both the object identifier and weakness annotation are absent from this
+/// edge. Keep the operation exact: annotated links, object-bearing references
+/// to the same target component, versioned component records, and every
+/// unrelated or unknown field remain untouched.
+pub(crate) fn remove_component_link(
+    package: &mut IWorkPackage,
+    source_component_identifier: u64,
+    target_component_identifier: u64,
+) -> Result<()> {
+    remove_component_external_reference_value(
+        package,
+        source_component_identifier,
+        target_component_identifier,
+        None,
+    )
+}
+
 fn add_component_external_reference_value(
     package: &mut IWorkPackage,
     source_component_identifier: u64,
@@ -851,6 +870,20 @@ pub(crate) fn remove_component_external_reference(
     target_component_identifier: u64,
     object_identifier: u64,
 ) -> Result<()> {
+    remove_component_external_reference_value(
+        package,
+        source_component_identifier,
+        target_component_identifier,
+        Some(object_identifier),
+    )
+}
+
+fn remove_component_external_reference_value(
+    package: &mut IWorkPackage,
+    source_component_identifier: u64,
+    target_component_identifier: u64,
+    object_identifier: Option<u64>,
+) -> Result<()> {
     if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
         return Ok(());
     }
@@ -874,14 +907,20 @@ pub(crate) fn remove_component_external_reference(
                     .iter()
                     .filter(|reference| {
                         reference.component_identifier == target_component_identifier
-                            && reference.object_identifier == Some(object_identifier)
+                            && reference.object_identifier == object_identifier
+                            && (object_identifier.is_some() || reference.is_weak.is_none())
                     })
                     .count();
                 match_count += matches;
                 if matches > 1 {
-                    return Err(Error::InvalidFormat(format!(
-                        "component {source_component_identifier} duplicates its external reference to object {object_identifier}"
-                    )));
+                    return Err(Error::InvalidFormat(match object_identifier {
+                        Some(object_identifier) => format!(
+                            "component {source_component_identifier} duplicates its external reference to object {object_identifier}"
+                        ),
+                        None => format!(
+                            "component {source_component_identifier} duplicates its component link to {target_component_identifier}"
+                        ),
+                    }));
                 }
                 if matches == 0 {
                     return Ok(component_data.to_vec());
@@ -890,14 +929,23 @@ pub(crate) fn remove_component_external_reference(
                     let reference =
                         crate::protobuf::tsp::ComponentExternalReference::decode(payload)?;
                     Ok(reference.component_identifier == target_component_identifier
-                        && reference.object_identifier == Some(object_identifier))
+                        && reference.object_identifier == object_identifier
+                        && (object_identifier.is_some() || reference.is_weak.is_none()))
                 })
             },
         )?;
         if source_count != 1 || match_count > 1 {
-            return Err(Error::InvalidFormat(format!(
-                "component {source_component_identifier} must exist once and contain at most one matching external reference"
-            )));
+            return Err(Error::InvalidFormat(match object_identifier {
+                Some(object_identifier) => format!(
+                    "component {source_component_identifier} must exist once and contain at most one matching external reference to object {object_identifier}"
+                ),
+                None => format!(
+                    "component {source_component_identifier} must exist once and contain at most one matching component link"
+                ),
+            }));
+        }
+        if match_count == 0 {
+            return Ok(());
         }
         let verified = crate::protobuf::tsp::PackageMetadata::decode(data.as_slice())?;
         if verified
@@ -907,7 +955,8 @@ pub(crate) fn remove_component_external_reference(
             .is_none_or(|component| {
                 component.external_references.iter().any(|reference| {
                     reference.component_identifier == target_component_identifier
-                        && reference.object_identifier == Some(object_identifier)
+                        && reference.object_identifier == object_identifier
+                        && (object_identifier.is_some() || reference.is_weak.is_none())
                 })
             })
         {
@@ -2151,6 +2200,179 @@ mod tests {
                 .data,
             original
         );
+    }
+
+    #[test]
+    fn removing_component_link_preserves_other_edges_and_unknown_fields() {
+        let metadata = PackageMetadata {
+            last_object_identifier: 10,
+            components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "Slide".to_owned(),
+                external_references: vec![
+                    ComponentExternalReference {
+                        component_identifier: 2,
+                        object_identifier: None,
+                        is_weak: None,
+                    },
+                    ComponentExternalReference {
+                        component_identifier: 2,
+                        object_identifier: Some(40),
+                        is_weak: None,
+                    },
+                    ComponentExternalReference {
+                        component_identifier: 2,
+                        object_identifier: None,
+                        is_weak: Some(true),
+                    },
+                    ComponentExternalReference {
+                        component_identifier: 3,
+                        object_identifier: None,
+                        is_weak: None,
+                    },
+                ],
+                ..Default::default()
+            }],
+            versioned_components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "Slide-versioned".to_owned(),
+                external_references: vec![ComponentExternalReference {
+                    component_identifier: 2,
+                    object_identifier: None,
+                    is_weak: None,
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let mut source = metadata.encode_to_vec();
+        let root_unknown = [0xd0, 0x05, 0x07];
+        source.extend_from_slice(&root_unknown);
+        let component_unknown = [0xd8, 0x05, 0x09];
+        source = transform_length_delimited_fields_at_path(&source, &[3], |data| {
+            let component = ComponentInfo::decode(data)?;
+            if component.identifier != 1 || component.preferred_locator != "Slide" {
+                return Ok(data.to_vec());
+            }
+            let mut data = data.to_vec();
+            data.extend_from_slice(&component_unknown);
+            Ok(data)
+        })
+        .unwrap();
+        let mut package = package_with_metadata_data(source.clone());
+        let before_revision = package.mutation_revision();
+
+        remove_component_link(&mut package, 1, 2).unwrap();
+
+        assert_eq!(package.mutation_revision(), before_revision + 1);
+        let candidate = metadata_payload(&package);
+        assert!(candidate.ends_with(&root_unknown));
+        let mut selected_component = None;
+        let _ = transform_length_delimited_fields_at_path(&candidate, &[3], |data| {
+            let component = ComponentInfo::decode(data)?;
+            if component.identifier == 1 && component.preferred_locator == "Slide" {
+                selected_component = Some(data.to_vec());
+            }
+            Ok(data.to_vec())
+        })
+        .unwrap();
+        assert!(
+            selected_component
+                .expect("current component remains present")
+                .ends_with(&component_unknown)
+        );
+
+        let metadata = PackageMetadata::decode(candidate.as_slice()).unwrap();
+        let component = metadata
+            .components
+            .iter()
+            .find(|component| component.identifier == 1)
+            .unwrap();
+        assert_eq!(
+            component.external_references,
+            vec![
+                ComponentExternalReference {
+                    component_identifier: 2,
+                    object_identifier: Some(40),
+                    is_weak: None,
+                },
+                ComponentExternalReference {
+                    component_identifier: 2,
+                    object_identifier: None,
+                    is_weak: Some(true),
+                },
+                ComponentExternalReference {
+                    component_identifier: 3,
+                    object_identifier: None,
+                    is_weak: None,
+                },
+            ]
+        );
+        assert_eq!(
+            metadata.versioned_components[0].external_references,
+            vec![ComponentExternalReference {
+                component_identifier: 2,
+                object_identifier: None,
+                is_weak: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn removing_weak_component_link_is_an_exact_no_op() {
+        let metadata = PackageMetadata {
+            components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "Slide".to_owned(),
+                external_references: vec![ComponentExternalReference {
+                    component_identifier: 2,
+                    object_identifier: None,
+                    is_weak: Some(true),
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let original = metadata.encode_to_vec();
+        let mut package = package_with_metadata_data(original.clone());
+        let before_revision = package.mutation_revision();
+
+        remove_component_link(&mut package, 1, 2).unwrap();
+
+        assert_eq!(metadata_payload(&package), original);
+        assert_eq!(package.mutation_revision(), before_revision);
+    }
+
+    #[test]
+    fn removing_duplicate_component_link_rejects_atomically() {
+        let metadata = PackageMetadata {
+            components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "Slide".to_owned(),
+                external_references: vec![
+                    ComponentExternalReference {
+                        component_identifier: 2,
+                        object_identifier: None,
+                        is_weak: None,
+                    },
+                    ComponentExternalReference {
+                        component_identifier: 2,
+                        object_identifier: None,
+                        is_weak: None,
+                    },
+                ],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let original = metadata.encode_to_vec();
+        let mut package = package_with_metadata_data(original.clone());
+        let before_revision = package.mutation_revision();
+
+        assert!(remove_component_link(&mut package, 1, 2).is_err());
+
+        assert_eq!(metadata_payload(&package), original);
+        assert_eq!(package.mutation_revision(), before_revision);
     }
 
     #[test]
