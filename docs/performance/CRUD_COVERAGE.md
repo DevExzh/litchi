@@ -1,5 +1,13 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0449 refines category 9 attribution
+
+[0449](changes/0449-pptx-caller-source-attribution.md) separates caller CPU samples and source/destination read counters in the
+existing PPTX cross-copy evidence. It adds no timed/native direction or selector:
+registry/default counts remain 438/36; representative coverage remains
+15 categories/33 mappings/10 measured/23 correctness-only. Native breadth,
+cold I/O, bounded append, repackaging and scaling remain incomplete.
+
 ## 2026-09-06: change 0448 calibrates the range-source timing policy
 
 [0448](changes/0448-pptx-minimum-service-pacing.md) adds minimum-service pacing to the existing category 9 managed PPTX

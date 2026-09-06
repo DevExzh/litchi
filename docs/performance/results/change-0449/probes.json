@@ -1,0 +1,48 @@
+{
+  "status": "pass",
+  "parser_and_classification_checks": 7,
+  "exported_valid": {
+    "exit_code": 0,
+    "stdout": "{\"change\": 449, \"status\": \"pass\", \"reports_reanalysed\": 8, \"samples_reanalysed\": 240, \"profiles_reanalysed\": 2, \"sealed\": false, \"new_workload_executions\": 0}\n"
+  },
+  "rejected": [
+    {
+      "path": "attribution.json",
+      "exit_code": 1,
+      "stdout": "INVALID: recomputed attribution\n",
+      "stderr": ""
+    },
+    {
+      "path": "inputs/runs/3/report.json",
+      "exit_code": 1,
+      "stdout": "INVALID: input custody inputs/runs/3/report.json\n",
+      "stderr": ""
+    },
+    {
+      "path": "inputs/profiles/3/record/receipt.json",
+      "exit_code": 1,
+      "stdout": "INVALID: input custody inputs/profiles/3/record/receipt.json\n",
+      "stderr": ""
+    },
+    {
+      "path": "inputs.json",
+      "exit_code": 1,
+      "stdout": "INVALID: sealed origin member\n",
+      "stderr": ""
+    },
+    {
+      "path": "inputs.json",
+      "exit_code": 1,
+      "stdout": "INVALID: origin path\n",
+      "stderr": ""
+    },
+    {
+      "path": "source/crates/soapberry-zip/src/preserve.rs",
+      "exit_code": 1,
+      "stdout": "INVALID: input custody source/crates/soapberry-zip/src/preserve.rs\n",
+      "stderr": ""
+    }
+  ],
+  "temporary_directory_removed": true,
+  "scope": "export replay invokes no Rust workload or profiler"
+}

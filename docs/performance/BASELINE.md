@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0449: attribute existing PPTX samples to callers and source owners
+
+[0449](changes/0449-pptx-caller-source-attribution.md) reanalyses the two 0448 profiles and all eight reports/240 samples.
+The untimed harness output hash is 49.762%/50.088% of lifecycle-frame SHA period.
+Media-rich publication returns 16,786,581 source bytes and 16,830,603 destination
+bytes; its source cache records 23 hits and zero cold loads. No new workload ran,
+and no production speedup follows. See [separated measurements](results/change-0449/measurements.md).
+
 ## Change 0448: minimum-service pacing calibration
 
 [0448](changes/0448-pptx-minimum-service-pacing.md) adds an explicit minimum-service policy beside the default separate sleeps.
