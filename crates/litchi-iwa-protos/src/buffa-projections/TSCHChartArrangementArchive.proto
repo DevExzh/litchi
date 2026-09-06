@@ -1,4 +1,4 @@
-// Wire-only projection for the Keynote chart Arrange state.
+// Wire-only projection for the shared iWork chart Arrange state.
 //
 // The native path is TSCH.ChartDrawableArchive.super (field 1) to the two
 // selected TSD.DrawableArchive scalar controls (fields 5 and 7). The chart

@@ -538,12 +538,12 @@ mod buffa_keynote_chart_legend_generated {
     ));
 }
 
-/// Private Buffa lazy-view projection for the selected Keynote chart Arrange
+/// Private Buffa lazy-view projection for the selected shared chart Arrange
 /// controls. The chart drawable envelope carries only the nested drawable
 /// `super`; the lock booleans and every unrelated source byte remain owned by
 /// the strict handwritten codec.
 #[doc(hidden)]
-mod buffa_keynote_chart_arrangement_generated {
+mod buffa_chart_arrangement_generated {
     #![allow(
         elided_lifetimes_in_paths,
         reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
@@ -573,7 +573,7 @@ mod buffa_keynote_chart_arrangement_generated {
 
     include!(concat!(
         env!("OUT_DIR"),
-        "/buffa-keynote-chart-arrangement/iwa_keynote_chart_arrangement_buffa_protos.rs"
+        "/buffa-chart-arrangement/iwa_chart_arrangement_buffa_protos.rs"
     ));
 }
 
@@ -1848,11 +1848,11 @@ pub mod keynote_chart_title_codec;
 #[doc(hidden)]
 pub mod keynote_chart_legend_codec;
 
-/// Internal strict Keynote chart Arrange-state projection. Generated types
+/// Internal strict shared chart Arrange-state projection. Generated types
 /// remain private and caller-owned source bytes remain the preservation
 /// authority.
 #[doc(hidden)]
-pub mod keynote_chart_arrangement_codec;
+pub mod chart_arrangement_codec;
 
 /// Internal strict Keynote chart-axis-title generated-extension projection.
 /// Generated types remain private and caller-owned source bytes remain the

@@ -1,5 +1,6 @@
 //! Archive-free chart vocabulary shared by concrete iWork owners.
 
+pub mod arrangement;
 pub mod axis;
 pub mod category_labels;
 pub mod direction;
@@ -11,4 +12,5 @@ pub mod pie;
 pub mod reference_line;
 pub mod series_labels;
 
+pub use arrangement::ChartArrangement;
 pub use direction::{Direction, Kind as DirectionKind};

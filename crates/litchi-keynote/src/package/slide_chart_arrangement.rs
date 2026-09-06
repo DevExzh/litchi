@@ -32,7 +32,7 @@ use litchi_iwa_archive::{
 };
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
-use litchi_iwa_protos::keynote_chart_arrangement_codec::{
+use litchi_iwa_protos::chart_arrangement_codec::{
     ChartArrangementWrite, DecodeError as ChartArrangementDecodeError,
     DecodeLimit as ChartArrangementDecodeLimit, DecodeOptions,
     WireResourceLimit as ChartArrangementWireResourceLimit, decode_chart_arrangement,
@@ -863,7 +863,7 @@ impl ArrangementTransactionBudget {
 
     fn codec(
         &mut self,
-        requirements: litchi_iwa_protos::keynote_chart_arrangement_codec::RewriteExecutionRequirements,
+        requirements: litchi_iwa_protos::chart_arrangement_codec::RewriteExecutionRequirements,
     ) -> Result<(), ChartArrangementError> {
         self.output(requirements.output_bytes)?;
         self.fields(requirements.fields)?;
@@ -1137,7 +1137,7 @@ impl ArrangementReadBudget {
 
     fn charge(
         &mut self,
-        report: litchi_iwa_protos::keynote_chart_arrangement_codec::DecodeReport,
+        report: litchi_iwa_protos::chart_arrangement_codec::DecodeReport,
     ) -> Result<(), ChartArrangementError> {
         self.input_used = charge_aggregate_limit(
             ChartArrangementLimitKind::WireBytes,

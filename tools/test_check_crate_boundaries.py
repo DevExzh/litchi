@@ -3400,7 +3400,23 @@ def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
     semantic.parent.mkdir(parents=True, exist_ok=True)
     semantic.write_text(
         "pub use litchi_iwa_common::chart::axis::Axis;\n"
-        "pub struct ChartArrangement;\n",
+        "pub use litchi_iwa_common::chart::arrangement::ChartArrangement;\n",
+        encoding="utf-8",
+    )
+    common = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_COMMON_SOURCE
+    common.parent.mkdir(parents=True, exist_ok=True)
+    common.write_text(
+        "pub struct ChartArrangement {\n"
+        "    locked: bool,\n"
+        "    constrain_proportions: bool,\n"
+        "}\n"
+        "impl ChartArrangement {\n"
+        "    pub const fn new(locked: bool, constrain_proportions: bool) -> Self { Self { locked, constrain_proportions } }\n"
+        "    pub const fn locked(self) -> bool { self.locked }\n"
+        "    pub const fn constrain_proportions(self) -> bool { self.constrain_proportions }\n"
+        "    pub const fn with_locked(self, locked: bool) -> Self { let _ = locked; self }\n"
+        "    pub const fn with_constrain_proportions(self, constrain_proportions: bool) -> Self { let _ = constrain_proportions; self }\n"
+        "}\n",
         encoding="utf-8",
     )
 
@@ -3455,11 +3471,11 @@ def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
         encoding="utf-8",
     )
 
-    codec = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE
+    codec = root / boundaries.CHART_ARRANGEMENT_CODEC_SOURCE
     codec.parent.mkdir(parents=True, exist_ok=True)
     codec.write_text(
         "use buffa::DecodeOptions as BuffaDecodeOptions;\n"
-        f"use crate::{boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}::Projection;\n"
+        f"use crate::{boundaries.CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}::Projection;\n"
         "pub struct DecodeError;\n"
         "pub struct DecodeOptions;\n"
         "pub struct ChartArrangementSnapshot;\n"
@@ -3483,12 +3499,12 @@ def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
         "#[cfg(test)] mod tests { #[test] fn codec_round_trip() {} }\n",
         encoding="utf-8",
     )
-    codec_lib = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE
+    codec_lib = root / boundaries.CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE
     codec_lib.parent.mkdir(parents=True, exist_ok=True)
     codec_lib.write_text(
         "#[doc(hidden)]\n"
-        f"pub mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_MODULE};\n"
-        f"mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};\n",
+        f"pub mod {boundaries.CHART_ARRANGEMENT_CODEC_MODULE};\n"
+        f"mod {boundaries.CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};\n",
         encoding="utf-8",
     )
 
@@ -3522,6 +3538,99 @@ def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
         "        Ok(charts)\n"
         "    }\n"
         "}\n",
+        encoding="utf-8",
+    )
+
+
+def add_focused_chart_arrangement_owner_scaffolds(root: Path) -> None:
+    """Install minimal Numbers/Pages focused Arrange owner fixtures."""
+
+    numbers_owner = root / boundaries.NUMBERS_CHART_ARRANGEMENT_OWNER_SOURCE
+    numbers_owner.parent.mkdir(parents=True, exist_ok=True)
+    numbers_owner.write_text(
+        "use litchi_iwa_protos::chart_arrangement_codec as codec;\n"
+        "impl Package {\n"
+        "    pub fn sheet_chart_arrangement<'sheet>(&self, sheet_selector: impl Into<SheetSelector<'sheet>>, chart_selector: impl Into<ChartSelector>) -> Result<ChartArrangement, Error> {\n"
+        "        select_chart_with_budget(self, sheet_selector.into(), chart_selector.into())\n"
+        "    }\n"
+        "    pub fn sheet_chart_arrangements<'sheet>(&self, sheet_selector: impl Into<SheetSelector<'sheet>>) -> Result<Box<[ChartArrangement]>, Error> {\n"
+        "        discover_sheet_charts(self, resolve_sheet_position(self, sheet_selector.into()))\n"
+        "    }\n"
+        "    pub fn edit_sheet_chart_arrangement<'sheet>(&self, sheet_selector: impl Into<SheetSelector<'sheet>>, chart_selector: impl Into<ChartSelector>) -> Result<ChartArrangementEdit, Error> {\n"
+        "        ChartArrangementEdit::new(self, sheet_selector.into(), chart_selector.into())\n"
+        "    }\n"
+        "    pub fn apply_sheet_chart_arrangement(&self, patch: &ChartArrangementPatch) -> Result<ChartArrangementCommit, Error> {\n"
+        "        let selected = select_chart_with_budget(self, SheetSelector::position(patch.position()), ChartSelector::position(patch.position()));\n"
+        "        verify_locality(self, selected)\n"
+        "    }\n"
+        "}\n"
+        "fn select_chart_with_budget(_: &Package, _: SheetSelector<'_>, _: ChartSelector) -> Result<ChartArrangement, Error> { todo!() }\n"
+        "fn resolve_sheet_position(_: &Package, _: SheetSelector<'_>) -> usize { 0 }\n"
+        "fn discover_sheet_charts(_: &Package, _: usize) -> Result<Box<[ChartArrangement]>, Error> { todo!() }\n"
+        "fn verify_locality(_: &Package, _: Result<ChartArrangement, Error>) -> Result<ChartArrangementCommit, Error> { todo!() }\n"
+        "fn codec_path() {\n"
+        "    codec::decode_chart_arrangement_with_report();\n"
+        "    codec::prepare_chart_arrangement_rewrite();\n"
+        "    execution_requirements; execute;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    numbers_package = root / boundaries.NUMBERS_PACKAGE_SOURCE
+    numbers_package.parent.mkdir(parents=True, exist_ok=True)
+    numbers_package.write_text(
+        "mod chart_arrangement;\n"
+        "pub use chart_arrangement::{SheetChartArrangementCommit, SheetChartArrangementDiagnostics, SheetChartArrangementEdit, SheetChartArrangementError, SheetChartArrangementLimitKind, SheetChartArrangementPatch};\n",
+        encoding="utf-8",
+    )
+    numbers_public = root / (boundaries.NUMBERS_SOURCE_ROOT / "lib.rs")
+    numbers_public.parent.mkdir(parents=True, exist_ok=True)
+    numbers_public.write_text(
+        "pub use litchi_iwa_common::chart::arrangement::ChartArrangement;\n"
+        "pub use package::{SheetChartArrangementCommit, SheetChartArrangementDiagnostics, SheetChartArrangementEdit, SheetChartArrangementError, SheetChartArrangementLimitKind, SheetChartArrangementPatch};\n",
+        encoding="utf-8",
+    )
+
+    pages_owner = root / boundaries.PAGES_BODY_CHART_ARRANGEMENT_OWNER_SOURCE
+    pages_owner.parent.mkdir(parents=True, exist_ok=True)
+    pages_owner.write_text(
+        "use litchi_iwa_protos::chart_arrangement_codec as codec;\n"
+        "impl Package {\n"
+        "    pub fn body_chart_arrangement(&self, selector: impl Into<BodyChartSelector>) -> Result<ChartArrangement, Error> {\n"
+        "        resolve_target(self, selector.into())\n"
+        "    }\n"
+        "    pub fn body_chart_arrangements(&self) -> Result<Box<[ChartArrangement]>, Error> {\n"
+        "        resolve_targets(self)\n"
+        "    }\n"
+        "    pub fn edit_body_chart_arrangement(&self, selector: impl Into<BodyChartSelector>) -> Result<BodyChartArrangementEdit, Error> {\n"
+        "        resolve_target(self, selector.into())\n"
+        "    }\n"
+        "    pub fn apply_body_chart_arrangement(&self, patch: &BodyChartArrangementPatch) -> Result<BodyChartArrangementCommit, Error> {\n"
+        "        let selected = resolve_target(self, BodyChartSelector::position(patch.position()));\n"
+        "        verify_locality(self, selected)\n"
+        "    }\n"
+        "}\n"
+        "fn resolve_target(_: &Package, _: BodyChartSelector) -> Result<ChartArrangement, Error> { todo!() }\n"
+        "fn resolve_targets(_: &Package) -> Result<Box<[ChartArrangement]>, Error> { todo!() }\n"
+        "fn verify_locality(_: &Package, _: Result<ChartArrangement, Error>) -> Result<BodyChartArrangementCommit, Error> { todo!() }\n"
+        "fn codec_path() {\n"
+        "    codec::decode_chart_arrangement_with_report();\n"
+        "    codec::prepare_chart_arrangement_rewrite();\n"
+        "    execution_requirements; execute;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    pages_package = root / boundaries.PAGES_PACKAGE_SOURCE
+    pages_package.parent.mkdir(parents=True, exist_ok=True)
+    pages_package.write_text(
+        "mod body_chart_arrangement;\n"
+        "pub use body_chart_arrangement::{BodyChartArrangementCommit, BodyChartArrangementDiagnostics, BodyChartArrangementEdit, BodyChartArrangementError, BodyChartArrangementLimitKind, BodyChartArrangementPatch};\n",
+        encoding="utf-8",
+    )
+    pages_public = root / (boundaries.PAGES_SOURCE_ROOT / "lib.rs")
+    pages_public.parent.mkdir(parents=True, exist_ok=True)
+    pages_public.write_text(
+        "pub use litchi_iwa_common::chart::arrangement::ChartArrangement;\n"
+        "pub use package::{BodyChartArrangementCommit, BodyChartArrangementDiagnostics, BodyChartArrangementEdit, BodyChartArrangementError, BodyChartArrangementLimitKind, BodyChartArrangementPatch};\n",
         encoding="utf-8",
     )
 
@@ -36738,13 +36847,206 @@ fn rewrite_movie_title_operation(
                 violations,
             )
 
-    def test_keynote_chart_arrangement_codec_requires_buffa_and_private_generated_types(
+    def test_keynote_chart_arrangement_accepts_only_the_common_value_reexport(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             add_keynote_chart_arrangement_canonical_scaffold(root)
-            codec = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE
+            self.assertEqual(
+                boundaries.audit_keynote_chart_arrangement_facade_source_topology(root),
+                [],
+            )
+
+            semantic = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_SOURCE
+            source = semantic.read_text(encoding="utf-8")
+            semantic.write_text(
+                source.replace(
+                    "pub use litchi_iwa_common::chart::arrangement::ChartArrangement;",
+                    "pub use litchi_iwa_common::chart::arrangement::ChartArrangementArchive as ChartArrangement;",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_arrangement_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "exact common ChartArrangement re-export" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+            semantic.write_text(source, encoding="utf-8")
+            common = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_COMMON_SOURCE
+            common.write_text(
+                common.read_text(encoding="utf-8").replace(
+                    "pub const fn with_locked",
+                    "fn with_locked",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_arrangement_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("common value is missing API method with_locked" in item for item in violations),
+                violations,
+            )
+
+    def test_chart_arrangement_codec_uses_neutral_source_names(self) -> None:
+        self.assertEqual(
+            boundaries.CHART_ARRANGEMENT_CODEC_SOURCE,
+            Path("crates/litchi-iwa-protos/src/chart_arrangement_codec.rs"),
+        )
+        self.assertEqual(
+            boundaries.CHART_ARRANGEMENT_CODEC_MODULE,
+            "chart_arrangement_codec",
+        )
+        self.assertEqual(
+            boundaries.CHART_ARRANGEMENT_CODEC_GENERATED_MODULE,
+            "buffa_chart_arrangement_generated",
+        )
+        self.assertNotIn("keynote", boundaries.CHART_ARRANGEMENT_CODEC_SOURCE.name)
+        self.assertNotIn("keynote", boundaries.CHART_ARRANGEMENT_CODEC_MODULE)
+        self.assertNotIn("keynote", boundaries.CHART_ARRANGEMENT_CODEC_GENERATED_MODULE)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_arrangement_canonical_scaffold(root)
+            add_focused_chart_arrangement_owner_scaffolds(root)
+            retired = root / boundaries.RETIRED_KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE
+            retired.parent.mkdir(parents=True, exist_ok=True)
+            retired.write_text("// stale format-specific codec\n", encoding="utf-8")
+            violations = boundaries.audit_chart_arrangement_codec_source_topology(root)
+            self.assertTrue(
+                any("must remain deleted" in item for item in violations),
+                violations,
+            )
+
+            retired.unlink()
+            codec_lib = root / boundaries.CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE
+            codec_lib.write_text(
+                codec_lib.read_text(encoding="utf-8")
+                + f"mod {boundaries.RETIRED_KEYNOTE_CHART_ARRANGEMENT_CODEC_MODULE};\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_chart_arrangement_codec_source_topology(root)
+            self.assertTrue(
+                any("codec module must remain deleted" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_and_pages_chart_arrangement_owners_require_focused_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_focused_chart_arrangement_owner_scaffolds(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_chart_arrangement_owner_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_pages_body_chart_arrangement_owner_source_topology(root),
+                [],
+            )
+
+            numbers_owner = root / boundaries.NUMBERS_CHART_ARRANGEMENT_OWNER_SOURCE
+            numbers_owner.write_text(
+                numbers_owner.read_text(encoding="utf-8").replace(
+                    "verify_locality", "verify_locality_removed"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_chart_arrangement_owner_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing admission/locality marker verify_locality" in item for item in violations),
+                violations,
+            )
+
+            pages_package = root / boundaries.PAGES_PACKAGE_SOURCE
+            pages_package.write_text(
+                pages_package.read_text(encoding="utf-8").replace(
+                    "mod body_chart_arrangement;",
+                    "pub mod body_chart_arrangement;",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_body_chart_arrangement_owner_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("owner module must remain private" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_shared_chart_arrangement_shell_and_helpers_are_tombstoned(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            retired = root / boundaries.RETIRED_IWA_SHARED_CHART_ARRANGEMENT_SOURCE
+            retired.parent.mkdir(parents=True, exist_ok=True)
+            retired.write_text("fn chart_arrangement() {}\n", encoding="utf-8")
+            module = root / boundaries.RETIRED_IWA_SHARED_CHART_ARRANGEMENT_MODULE_SOURCE
+            module.parent.mkdir(parents=True, exist_ok=True)
+            module.write_text("mod arrangement;\n", encoding="utf-8")
+            helper = root / "crates/litchi-iwa/src/legacy.rs"
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text("fn set_chart_arrangement() {}\n", encoding="utf-8")
+
+            violations = boundaries.audit_iwa_shared_chart_arrangement_retirement_source_topology(
+                root
+            )
+            self.assertTrue(any("source was restored" in item for item in violations), violations)
+            self.assertTrue(any("module declaration" in item for item in violations), violations)
+            self.assertTrue(any("helper/call" in item for item in violations), violations)
+
+    def test_iwa_numbers_and_pages_chart_arrangement_host_wrappers_are_tombstoned(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            numbers = root / boundaries.RETIRED_IWA_NUMBERS_CHART_ARRANGEMENT_HOST_ROOT
+            numbers.mkdir(parents=True, exist_ok=True)
+            (numbers / "arrangement.rs").write_text(
+                "impl NumbersEditor {\n"
+                "    pub fn sheet_chart_arrangement(&self, id: u64) {}\n"
+                "    pub fn set_sheet_chart_arrangement(&mut self, id: u64) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            pages = root / boundaries.RETIRED_IWA_PAGES_CHART_ARRANGEMENT_HOST_ROOT
+            pages.mkdir(parents=True, exist_ok=True)
+            (pages / "arrangement.rs").write_text(
+                "impl PagesEditor {\n"
+                "    pub fn body_chart_arrangement(&self, id: u64) {}\n"
+                "    pub fn set_body_chart_arrangement(&mut self, id: u64) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_chart_arrangement_host_public_method_retirement_source_topology(
+                root
+            )
+            self.assertTrue(any("Numbers chart-arrangement host method sheet_chart_arrangement" in item for item in violations), violations)
+            self.assertTrue(any("Numbers chart-arrangement host method set_sheet_chart_arrangement" in item for item in violations), violations)
+            self.assertTrue(any("Pages body-chart arrangement host method body_chart_arrangement" in item for item in violations), violations)
+            self.assertTrue(any("Pages body-chart arrangement host method set_body_chart_arrangement" in item for item in violations), violations)
+
+    def test_chart_arrangement_codec_requires_buffa_and_private_generated_types(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_arrangement_canonical_scaffold(root)
+            add_focused_chart_arrangement_owner_scaffolds(root)
+            codec = root / boundaries.CHART_ARRANGEMENT_CODEC_SOURCE
             codec.write_text(
                 codec.read_text(encoding="utf-8").replace(
                     "use buffa::DecodeOptions as BuffaDecodeOptions;",
@@ -36752,7 +37054,7 @@ fn rewrite_movie_title_operation(
                 ),
                 encoding="utf-8",
             )
-            violations = boundaries.audit_keynote_chart_arrangement_codec_source_topology(
+            violations = boundaries.audit_chart_arrangement_codec_source_topology(
                 root
             )
             self.assertTrue(any("must use Buffa" in item for item in violations), violations)
@@ -36766,10 +37068,10 @@ fn rewrite_movie_title_operation(
             )
             codec.write_text(
                 codec.read_text(encoding="utf-8")
-                + "pub fn generated_leak() -> buffa_keynote_chart_arrangement_generated::Projection { todo!() }\n",
+                + f"pub fn generated_leak() -> {boundaries.CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}::Projection {{ todo!() }}\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_keynote_chart_arrangement_codec_source_topology(
+            violations = boundaries.audit_chart_arrangement_codec_source_topology(
                 root
             )
             self.assertTrue(
@@ -36779,20 +37081,20 @@ fn rewrite_movie_title_operation(
 
             codec.write_text(
                 codec.read_text(encoding="utf-8").replace(
-                    "pub fn generated_leak() -> buffa_keynote_chart_arrangement_generated::Projection { todo!() }\n",
+                    f"pub fn generated_leak() -> {boundaries.CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}::Projection {{ todo!() }}\n",
                     "",
                 ),
                 encoding="utf-8",
             )
-            codec_lib = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE
+            codec_lib = root / boundaries.CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE
             codec_lib.write_text(
                 codec_lib.read_text(encoding="utf-8").replace(
-                    f"mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};",
-                    f"pub mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};",
+                    f"mod {boundaries.CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};",
+                    f"pub mod {boundaries.CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};",
                 ),
                 encoding="utf-8",
             )
-            violations = boundaries.audit_keynote_chart_arrangement_codec_source_topology(
+            violations = boundaries.audit_chart_arrangement_codec_source_topology(
                 root
             )
             self.assertTrue(
@@ -36802,13 +37104,13 @@ fn rewrite_movie_title_operation(
 
             codec_lib.write_text(
                 "#[doc(hidden)]\n"
-                f"pub mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_MODULE};\n"
-                f"mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE} {{\n"
+                f"pub mod {boundaries.CHART_ARRANGEMENT_CODEC_MODULE};\n"
+                f"mod {boundaries.CHART_ARRANGEMENT_CODEC_GENERATED_MODULE} {{\n"
                 "    include!(\"not-a-buffa-generated-file.rs\");\n"
                 "}\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_keynote_chart_arrangement_codec_source_topology(
+            violations = boundaries.audit_chart_arrangement_codec_source_topology(
                 root
             )
             self.assertTrue(
@@ -36818,13 +37120,13 @@ fn rewrite_movie_title_operation(
 
             codec_lib.write_text(
                 "#[doc(hidden)]\n"
-                f"pub mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_MODULE};\n"
-                f"mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};\n"
-                f"use crate::{boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE} as projection;\n"
+                f"pub mod {boundaries.CHART_ARRANGEMENT_CODEC_MODULE};\n"
+                f"mod {boundaries.CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};\n"
+                f"use crate::{boundaries.CHART_ARRANGEMENT_CODEC_GENERATED_MODULE} as projection;\n"
                 "pub(crate) use projection::*;\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_keynote_chart_arrangement_codec_source_topology(
+            violations = boundaries.audit_chart_arrangement_codec_source_topology(
                 root
             )
             self.assertTrue(
@@ -36835,12 +37137,12 @@ fn rewrite_movie_title_operation(
             codec_lib.write_text(
                 "#[cfg(test)]\n"
                 "#[doc(hidden)]\n"
-                f"pub mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_MODULE};\n"
+                f"pub mod {boundaries.CHART_ARRANGEMENT_CODEC_MODULE};\n"
                 "#[cfg(all(test, feature = \"oracle\"))]\n"
-                f"mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};\n",
+                f"mod {boundaries.CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_keynote_chart_arrangement_codec_source_topology(
+            violations = boundaries.audit_chart_arrangement_codec_source_topology(
                 root
             )
             self.assertTrue(any("module must be hidden" in item for item in violations), violations)
@@ -37022,7 +37324,11 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         for expression in (
             "+ audit_keynote_chart_arrangement_facade_source_topology()",
-            "+ audit_keynote_chart_arrangement_codec_source_topology()",
+            "+ audit_chart_arrangement_codec_source_topology()",
+            "+ audit_numbers_chart_arrangement_owner_source_topology()",
+            "+ audit_pages_body_chart_arrangement_owner_source_topology()",
+            "+ audit_iwa_shared_chart_arrangement_retirement_source_topology()",
+            "+ audit_iwa_chart_arrangement_host_public_method_retirement_source_topology()",
             "+ audit_iwa_keynote_chart_arrangement_source_topology()",
         ):
             self.assertIn(expression, main_source)

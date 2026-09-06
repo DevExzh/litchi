@@ -729,8 +729,8 @@ mod tests {
             include_str!("keynote_chart_legend_codec.rs"),
         ),
         (
-            "keynote_chart_arrangement",
-            include_str!("keynote_chart_arrangement_codec.rs"),
+            "chart_arrangement",
+            include_str!("chart_arrangement_codec.rs"),
         ),
         (
             "keynote_chart_title",

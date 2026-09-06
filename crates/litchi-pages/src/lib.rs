@@ -73,6 +73,7 @@ pub use drawable_order::{BodyDrawableHandle, BodyDrawableSelector, DrawableLayer
 pub use header_footer::{HeaderFooter, HeaderFooterSelector, Kind, Template};
 pub use image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 pub use litchi_core::Position;
+pub use litchi_iwa_common::chart::arrangement::ChartArrangement;
 /// Maximum bytes retained for each canonical Pages metadata sidecar.
 pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
 pub use litchi_iwa_text::{TextPosition, TextSpan};
@@ -95,6 +96,10 @@ pub use package::{
 pub use package::{
     __is_valid_pages_text_storage, __pages_body_storage_discovery,
     __semantic_document_from_prepared_source, BodyStorageDiscovery,
+};
+pub use package::{
+    BodyChartArrangementCommit, BodyChartArrangementDiagnostics, BodyChartArrangementEdit,
+    BodyChartArrangementError, BodyChartArrangementLimitKind, BodyChartArrangementPatch,
 };
 pub use package::{
     BodyDrawableOrderCommit, BodyDrawableOrderDiagnostics, BodyDrawableOrderEdit,
@@ -171,7 +176,7 @@ pub use package::{
     SectionTextLimitKind, SectionTextPatch,
 };
 pub use section::{Section, SectionType};
-pub use selector::{BodyTableSelector, ImageSelector};
+pub use selector::{BodyChartSelector, BodyTableSelector, ImageSelector};
 pub use selector::{SectionSelector, SelectorError, SelectorResult};
 pub use table::headers::Settings as BodyTableHeaderSettings;
 pub use table::lock::BodyTableLockState;

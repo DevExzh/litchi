@@ -334,6 +334,7 @@ pub use document::{
     MAX_MATERIALIZED_CELLS, MAX_SHEETS, MAX_TABLES, ReadError as DocumentReadError,
     ReadLimitKind as DocumentReadLimitKind, Result as DocumentResult, Stats as DocumentStats,
 };
+pub use litchi_iwa_common::chart::arrangement::ChartArrangement;
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::table_appearance::SourceBuiltAppearancePayload;
@@ -349,6 +350,14 @@ pub use package::{__decode_image_adjustments_payload, ImageAdjustmentsError};
 #[doc(hidden)]
 pub use package::{
     __movie_playback_settings, __rewrite_movie_playback_settings, MoviePlaybackError,
+};
+pub use package::{
+    ChartArrangementCommit as SheetChartArrangementCommit,
+    ChartArrangementDiagnostics as SheetChartArrangementDiagnostics,
+    ChartArrangementEdit as SheetChartArrangementEdit,
+    ChartArrangementError as SheetChartArrangementError,
+    ChartArrangementLimitKind as SheetChartArrangementLimitKind,
+    ChartArrangementPatch as SheetChartArrangementPatch,
 };
 pub use package::{
     Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, Package,
@@ -376,7 +385,7 @@ pub use package::{
     },
     compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
 };
-pub use selector::{SheetSelector, TableSelector};
+pub use selector::{ChartSelector, SheetSelector, TableSelector};
 pub use shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement, ImageSelector};
 pub use sheet::{Builder as SheetBuilder, SelectorError as TableSelectorError, Sheet};
 pub use table::appearance::{Appearance, Banding, GridlineVisibility, Gridlines, RowSizing};

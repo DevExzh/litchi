@@ -85,6 +85,64 @@ impl From<litchi_core::Position> for SheetSelector<'_> {
     }
 }
 
+/// Selects one chart by its checked zero-based position within a sheet's
+/// source-order chart sequence.
+///
+/// Numbers does not currently expose a stable archive-free chart-name
+/// catalog. Keeping this selector positional prevents native drawable IDs,
+/// archive names, and generated payloads from leaking through the semantic
+/// package boundary.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "The public selector name intentionally identifies the selected Numbers object."
+)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ChartSelector {
+    /// Select by zero-based source-order position among ordinary charts.
+    Index(usize),
+}
+
+impl ChartSelector {
+    /// Creates a checked zero-based chart selector.
+    #[must_use]
+    pub const fn index(index: usize) -> Self {
+        Self::Index(index)
+    }
+
+    /// Creates a selector from a typed zero-based collection position.
+    #[must_use]
+    pub const fn position(position: litchi_core::Position) -> Self {
+        Self::index(position.get())
+    }
+
+    /// Returns the selected zero-based index.
+    #[must_use]
+    pub const fn as_index(self) -> usize {
+        match self {
+            Self::Index(index) => index,
+        }
+    }
+
+    /// Returns the selected typed zero-based collection position.
+    #[must_use]
+    pub const fn as_position(self) -> litchi_core::Position {
+        litchi_core::Position::new(self.as_index())
+    }
+}
+
+impl From<usize> for ChartSelector {
+    fn from(index: usize) -> Self {
+        Self::index(index)
+    }
+}
+
+impl From<litchi_core::Position> for ChartSelector {
+    fn from(position: litchi_core::Position) -> Self {
+        Self::position(position)
+    }
+}
+
 /// Selects one table by its exact visible name or checked zero-based position
 /// within a sheet without allocating for the selector itself.
 #[allow(
@@ -181,6 +239,7 @@ mod tests {
             SheetSelector::Name("Summary")
         );
         assert_eq!(SheetSelector::index(1), SheetSelector::Index(1));
+        assert_eq!(ChartSelector::index(2), ChartSelector::Index(2));
     }
 
     #[test]
@@ -249,8 +308,10 @@ mod tests {
         let position = litchi_core::Position::new(7);
         let sheet: SheetSelector<'_> = position.into();
         let table: TableSelector<'_> = position.into();
+        let chart: ChartSelector = position.into();
 
         assert_eq!(sheet, SheetSelector::Index(7));
         assert_eq!(table, TableSelector::Index(7));
+        assert_eq!(chart, ChartSelector::Index(7));
     }
 }

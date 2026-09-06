@@ -25,6 +25,8 @@ pub(super) struct BodyChartGraph {
     pub(super) archive_groups: Vec<BodyChartArchiveGroup>,
     pub(super) attachment_id: u64,
     pub(super) component_id: u64,
+    pub(super) chart_count: usize,
+    pub(super) chart_position: usize,
     pub(super) info: PagesBodyChartInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) private_preset_id: Option<u64>,
@@ -46,6 +48,7 @@ pub(super) fn body_chart_infos(editor: &PagesEditor) -> Result<Vec<PagesBodyChar
         "TSWP.StorageArchive",
     )?;
     let mut charts = Vec::new();
+    let mut chart_positions = Vec::new();
     for entry in body
         .table_attachment
         .as_ref()
@@ -81,8 +84,10 @@ pub(super) fn body_chart_infos(editor: &PagesEditor) -> Result<Vec<PagesBodyChar
                 drawable.identifier
             )));
         }
+        chart_positions.push(graph.chart_position);
         charts.push(graph.info);
     }
+    super::arrangement::fill_focused_chart_arrangements(editor, &mut charts, &chart_positions)?;
     Ok(charts)
 }
 
@@ -97,6 +102,7 @@ pub(super) fn body_chart_graph(
         "TSWP.StorageArchive",
     )?;
     let mut attachments = Vec::new();
+    let mut chart_positions = Vec::new();
     for entry in body
         .table_attachment
         .as_ref()
@@ -119,10 +125,14 @@ pub(super) fn body_chart_graph(
             DRAWABLE_ATTACHMENT_MESSAGE_TYPE,
             "TSWP.DrawableAttachmentArchive",
         )?;
-        if attachment
-            .drawable
-            .is_some_and(|drawable| drawable.identifier == drawable_object_id)
-        {
+        let Some(drawable) = attachment.drawable else {
+            continue;
+        };
+        if !object_has_message_type(editor.package(), drawable.identifier, CHART_MESSAGE_TYPE)? {
+            continue;
+        }
+        chart_positions.push(drawable.identifier);
+        if drawable.identifier == drawable_object_id {
             attachments.push((entry.character_index, reference.identifier));
         }
     }
@@ -132,6 +142,15 @@ pub(super) fn body_chart_graph(
             attachments.len()
         )));
     };
+    let chart_position = chart_positions
+        .iter()
+        .position(|identifier| *identifier == drawable_object_id)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Pages chart {drawable_object_id} is not in body chart order"
+            ))
+        })?;
+    let chart_count = chart_positions.len();
     let body_units = editor.body_text()?.encode_utf16().collect::<Vec<_>>();
     if body_units.get(*anchor_character_index as usize) != Some(&0xfffc) {
         return Err(Error::InvalidFormat(format!(
@@ -541,6 +560,8 @@ pub(super) fn body_chart_graph(
         archive_groups,
         attachment_id: *attachment_id,
         component_id,
+        chart_count,
+        chart_position,
         info: PagesBodyChartInfo {
             anchor_character_index: *anchor_character_index,
             drawable_object_id,
@@ -556,10 +577,10 @@ pub(super) fn body_chart_graph(
             ),
             data: chart_data("Pages", drawable_object_id, payload)?,
             geometry: drawable_geometry("Pages", drawable_object_id, drawable)?,
-            arrangement: ChartArrangement::new(
-                drawable.locked.unwrap_or(false),
-                drawable.aspect_ratio_locked.unwrap_or(false),
-            ),
+            // Arrange-panel state is projected by the focused Pages package
+            // when the public chart listing is assembled. Internal graph
+            // checks do not own that semantic projection.
+            arrangement: ChartArrangement::default(),
         },
         object_ids,
         private_preset_id,
