@@ -17194,8 +17194,9 @@ on the native-resaved artifact. Focused validation passes 21 owner cases plus
 policy units across 64 crates, 238 internal edges, and 11 explicit debt items.
 A bounded 256-run ASAN smoke passed with harness assertions covering all three
 changed paths and their exact inverses; this is bounded E1 fuzz evidence, not
-exhaustive coverage. Workspace hooks remain a separate pending check and are
-not included in this E4 claim. This does not promote native geometry or caption
+exhaustive coverage. Commit `f57f5e74c` passed the normal formatting, manifest sorting, workspace
+lint, library/integration test, and doctest hooks. These complement the
+operation-specific E4 evidence. This does not promote native geometry or caption
 mutation parity:
 the separate caption mutation owner refuses this profile. The three-wrapper
 host cutover remains bounded to these content/poster paths; generic

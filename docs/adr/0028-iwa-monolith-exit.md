@@ -9240,8 +9240,9 @@ and 18 integration cases (33 total), and full boundary verification passes
 933 policy units across 64 crates, 238 internal edges, and 11 explicit debt
 items. A bounded 256-run ASAN smoke passed with harness assertions covering
 all three changed paths and their exact inverses; this is bounded E1 fuzz
-evidence, not exhaustive coverage. Workspace hooks remain a separate pending
-check and are not included in this E4 claim. The caption mutation owner also
+evidence, not exhaustive coverage. Commit `f57f5e74c` passed the normal
+formatting, manifest sorting, workspace lint, library/integration test, and
+doctest hooks. These complement the operation-specific E4 evidence. The caption mutation owner also
 refuses this profile, so no native geometry or caption mutation parity claim
 follows. The
 three-wrapper cutover changes no workspace dependency, ordered-debt entry,
