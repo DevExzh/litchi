@@ -1,0 +1,6 @@
+{
+  "status": "failed",
+  "exit_code": 1,
+  "error": "INVALID: 'status_before'",
+  "scope": "initial portable verifier assumed the ABBA profile receipt schema; corrected for the pinned single-baseline driver schema without changing captured artifacts"
+}

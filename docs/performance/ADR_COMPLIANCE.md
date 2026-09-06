@@ -1,5 +1,19 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0444: tooling-only OPC Part-addition baseline
+
+[0444](changes/0444-opc-part-add-baseline.md) adds a standalone benchmark selector and fixture exporter using
+existing OPC ownership/publication APIs. Core/format ownership and dependency
+direction remain unchanged (0002/0023/0024); source identity, raw member authority
+and typed preflight refusals remain OPC-owned (0003). Existing bounds, malformed
+input validation and sequential sink failure behavior remain intact
+(0005/0006/0008). The shared operation envelope reports measured ReadAt counters
+and leaves unobserved codec/materialization fields unavailable or not applicable.
+No production API, dependency, unsafe code, executor or ambient production I/O
+changes. The accepted ADR tree is unchanged. Exported fixture and report
+verification is harness tooling, not a substitute for semantic owner publication
+rules. See [validation](results/change-0444/validation-notes.md).
+
 ## Change 0443: retain exact source semantics with compact frame state
 
 [0443](changes/0443-odp-compact-fragment-frames.md) keeps preservation scanning in the ODP owner

@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0444: OPC Part-addition observed baseline
+
+[0444](changes/0444-opc-part-add-baseline.md) adds opt-in `opc_part_add_lifecycle`: open a source-backed OPC
+catalog, plan one 64 KiB Part/root relationship, and publish to a hashing discard
+sink. The 12-report/360-sample baseline covers 64/1024/4096 existing Parts, normal
+and allocator modes, two reversed repeats, CPU 2 and one worker. Normal p50 is
+1.101–1.108 / 8.017–8.020 / 61.689–61.876 ms; all repeat checks stay within 5%.
+These timings include the ReadAt observer. Its reader accounts for 55.24% of
+whole-process sampled self time and scans member ranges on every read. This is
+an observed-path baseline, not a plain production latency estimate or speedup.
+Allocation calls are 3,526 / 51,538 / 205,145; incremental region peaks are
+705,777 / 2,716,017 / 9,181,553 bytes. Endpoint live delta and sink retained output
+are zero. See [all rows and limitations](results/change-0444/measurements.md).
+A matched plain-source baseline is required before optimizing the production
+path. Native semantic owner, repackaging, cold/range and scaling gaps remain.
+
 ## Change 0443: fewer ODP fragment-scanner allocation calls
 
 [0443](changes/0443-odp-compact-fragment-frames.md) replaces copied namespace/local-name frame data

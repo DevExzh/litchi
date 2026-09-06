@@ -1,5 +1,18 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0444 adds an opt-in OPC Part-addition baseline
+
+[0444](changes/0444-opc-part-add-baseline.md) adds `opc_part_add_lifecycle` for one flat package Part and root
+internal relationship, with normal/allocator/source/sink observations across
+three sizes. It provides scoped category 6/15 package-topology evidence; the
+synthetic binary officeDocument target does not establish semantic Office owner
+creation or native compatibility. Its observer materially affects timing.
+The registry is now 437 selectors and the default set remains 36. The
+representative index remains 15 categories, 33 mappings, 10 measured and 23
+correctness-only mappings. No semantic coverage promotion follows. Repackaging,
+broader Part dependency closures, bounded semantic append/creation, native,
+cold/range and scaling coverage remain open.
+
 ## 2026-09-06: change 0443 reduces owned ODP append allocation calls
 
 [0443](changes/0443-odp-compact-fragment-frames.md) reuses category 6's opt-in existing-append case.

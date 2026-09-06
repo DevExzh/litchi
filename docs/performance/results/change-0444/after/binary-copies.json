@@ -1,0 +1,12 @@
+{
+  "normal": {
+    "path": "/tmp/litchi-goal-0444-binaries/after/normal",
+    "bytes": 458662400,
+    "sha256": "6aaa080aadd62e42063ec77668b27d665fbe06337e55e77b1431599788b908fe"
+  },
+  "allocator": {
+    "path": "/tmp/litchi-goal-0444-binaries/after/allocator",
+    "bytes": 458008632,
+    "sha256": "b580d2bade58a068ccf5ee7fbfa63d665b9bebb1cd0a19dd75c86f2d2d914c7c"
+  }
+}

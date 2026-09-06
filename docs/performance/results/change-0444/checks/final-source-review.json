@@ -1,0 +1,22 @@
+{
+  "change": 444,
+  "status": "pass",
+  "finished_utc": "2026-09-06T18:39:57.754136+00:00",
+  "source_manifest": {
+    "path": "sources/7c1377a9b227f922ac1c95c5d66f228f3956259ef4a74ae1f346c88e60b7090d.json",
+    "sha256": "7c1377a9b227f922ac1c95c5d66f228f3956259ef4a74ae1f346c88e60b7090d",
+    "files": 6661
+  },
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "prior_0443_unchanged": true,
+  "source_files": [
+    "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline/src/opc_part_add.rs",
+    "tools/perf-baseline/examples/opc_part_add_fixtures.rs",
+    "tools/perf-baseline/src/operation_metrics.rs"
+  ],
+  "root_cpu_checks_nonoverlapping": 25,
+  "production_rust_changes": 0,
+  "review": "Final four-file harness source matches completed release build/test checks; exact HEAD baseline snapshots retained; observed reader performs a linear member-range scan per read; no plain-source production timing attribution."
+}
