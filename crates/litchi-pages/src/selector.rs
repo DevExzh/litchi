@@ -217,6 +217,62 @@ impl From<Position> for BodyTableSelector<'_> {
     }
 }
 
+/// Selects one body anchored image by its zero based source order.
+///
+/// The order is the order of ordinary `TSD.ImageArchive` attachments in the
+/// rooted body storage. Native object identifiers, archive members, and
+/// generated protobuf values are deliberately not representable here.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "The selector name identifies the Pages body-image domain."
+)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ImageSelector {
+    /// Select the image at this zero-based body source position.
+    Index(Position),
+}
+
+impl ImageSelector {
+    /// Create a selector from a zero-based body-image index.
+    #[must_use]
+    pub const fn index(index: usize) -> Self {
+        Self::Index(Position::new(index))
+    }
+
+    /// Create a selector from a typed zero-based body-image position.
+    #[must_use]
+    pub const fn position(position: Position) -> Self {
+        Self::Index(position)
+    }
+
+    /// Return the selected typed body-image position.
+    #[must_use]
+    pub const fn as_position(self) -> Position {
+        match self {
+            Self::Index(position) => position,
+        }
+    }
+
+    /// Return the selected zero-based body-image index.
+    #[must_use]
+    pub const fn as_index(self) -> usize {
+        self.as_position().get()
+    }
+}
+
+impl From<usize> for ImageSelector {
+    fn from(index: usize) -> Self {
+        Self::index(index)
+    }
+}
+
+impl From<Position> for ImageSelector {
+    fn from(position: Position) -> Self {
+        Self::position(position)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,5 +324,15 @@ mod tests {
         assert_eq!(name.as_index(), None);
         assert_eq!(index.as_index(), Some(2));
         assert_eq!(index.as_position(), Some(position));
+    }
+
+    #[test]
+    fn body_image_selector_is_typed_and_source_ordered() {
+        let from_index = ImageSelector::index(3);
+        let from_position = ImageSelector::from(Position::new(3));
+
+        assert_eq!(from_index, from_position);
+        assert_eq!(from_index.as_index(), 3);
+        assert_eq!(from_index.as_position(), Position::new(3));
     }
 }

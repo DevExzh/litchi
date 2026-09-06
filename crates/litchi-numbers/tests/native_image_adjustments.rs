@@ -13,17 +13,14 @@ use litchi_iwa_archive::{
     Limits,
     package::{Catalog, EntryEdit},
 };
-use litchi_iwa_common::{
-    WireLimits,
-    shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement},
-    wire::WireView,
-};
+use litchi_iwa_common::{WireLimits, wire::WireView};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsd;
 use litchi_numbers::cell::Value;
 use litchi_numbers::{
     __decode_image_adjustments_payload, __rewrite_image_adjustments_payload, ImageAdjustmentsError,
-    Package,
+    Package, SheetImageAdjustmentsError, SheetSelector,
+    shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement, ImageSelector},
 };
 use prost::Message as _;
 
@@ -36,6 +33,7 @@ const IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const IMAGE_ADJUSTMENTS_FIELD: u32 = 14;
 const ADJUSTMENT_FIELDS: [u32; 3] = [1, 2, 13];
 const SHARPNESS_FIELD: u32 = 6;
+const DIRECT_RESAVED_MARKER: &str = "Native image adjustment marker direct saved";
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -45,6 +43,11 @@ fn fixture_path() -> PathBuf {
 fn resaved_fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/numbers/image-adjustments-native-resaved.numbers")
+}
+
+fn direct_resaved_fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/image-adjustments-direct-resaved.numbers")
 }
 
 #[derive(Debug, Clone)]
@@ -239,6 +242,14 @@ fn sharpness_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
         .collect())
 }
 
+fn sharpness_value(source: &[u8]) -> TestResult<Option<f32>> {
+    let image = tsd::ImageArchive::decode(source)?;
+    Ok(image
+        .image_adjustments
+        .as_ref()
+        .and_then(|adjustments| adjustments.sharpness))
+}
+
 fn native_source_adjustments() -> ImageAdjustments {
     ImageAdjustments::new().with_enhancement(Some(ImageEnhancement::Disabled))
 }
@@ -260,6 +271,10 @@ fn alternate_adjustments(baseline: ImageAdjustments) -> TestResult<ImageAdjustme
     Ok(baseline
         .with_exposure(Some(ImageAdjustment::new(0.5)?))
         .with_saturation(Some(ImageAdjustment::new(-0.4)?)))
+}
+
+fn public_image_adjustments(package: &Package) -> TestResult<ImageAdjustments> {
+    Ok(package.sheet_image_adjustments(SheetSelector::index(0), ImageSelector::index(0))?)
 }
 
 #[test]
@@ -387,5 +402,128 @@ fn native_image_adjustments_reject_truncated_payload_with_typed_errors() -> Test
     )
     .unwrap_err();
     assert!(matches!(error, ImageAdjustmentsError::Codec(_)));
+    Ok(())
+}
+
+#[test]
+fn native_image_public_api_reads_exactly_and_keeps_noop_bytes() -> TestResult {
+    let source = std::fs::read(fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+    let baseline = native_source_adjustments();
+
+    assert_eq!(public_image_adjustments(&package)?, baseline);
+    let no_op = package
+        .edit_sheet_image_adjustments(SheetSelector::index(0), ImageSelector::index(0))?
+        .set(baseline)?
+        .commit()?;
+    assert!(no_op.patch().is_noop());
+    assert_eq!(exact_bytes(no_op.package())?, source);
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.diagnostics().touched_components(), 0);
+    assert!(!no_op.diagnostics().full_reparse_performed());
+    assert_eq!(public_image_adjustments(no_op.package())?, baseline);
+    assert_eq!(marker(no_op.package())?, marker(&package)?);
+    Ok(())
+}
+
+#[test]
+fn native_image_public_api_replaces_reopens_preserves_and_inverts_exactly() -> TestResult {
+    let source = std::fs::read(fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+    let baseline = public_image_adjustments(&package)?;
+    assert_eq!(baseline, native_source_adjustments());
+    let replacement = alternate_adjustments(baseline)?;
+    assert_eq!(replacement.enhancement(), baseline.enhancement());
+
+    let changed = package
+        .edit_sheet_image_adjustments(SheetSelector::index(0), ImageSelector::index(0))?
+        .set(replacement)?
+        .commit()?;
+    let candidate = exact_bytes(changed.package())?;
+    let source_location = image_payload(&source)?;
+    let candidate_location = image_payload(&candidate)?;
+
+    assert_eq!(public_image_adjustments(changed.package())?, replacement);
+    assert_eq!(
+        __decode_image_adjustments_payload(&candidate_location.bytes, WireLimits::default())?,
+        replacement
+    );
+    assert_eq!(
+        unknown_image_wire(&candidate_location.bytes)?,
+        unknown_image_wire(&source_location.bytes)?
+    );
+    assert_eq!(
+        sharpness_wire(&candidate_location.bytes)?,
+        sharpness_wire(&source_location.bytes)?
+    );
+    assert_eq!(marker(changed.package())?, marker(&package)?);
+    assert_image_assets_untouched(&source, &candidate)?;
+    assert_member_locality(&source, &candidate, &source_location.member)?;
+    assert!(changed.diagnostics().changed());
+    assert_eq!(changed.diagnostics().touched_components(), 1);
+    assert!(changed.diagnostics().full_reparse_performed());
+
+    let reopened = Package::from_bytes(&candidate)?;
+    assert_eq!(public_image_adjustments(&reopened)?, replacement);
+    let restored = changed
+        .package()
+        .apply_sheet_image_adjustments(&changed.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    assert_eq!(public_image_adjustments(restored.package())?, baseline);
+    Ok(())
+}
+
+#[test]
+fn native_image_public_api_rejects_stale_selection_and_out_of_range_values() -> TestResult {
+    let source = std::fs::read(fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+    let replacement = alternate_adjustments(public_image_adjustments(&package)?)?;
+    let changed = package
+        .edit_sheet_image_adjustments(SheetSelector::index(0), ImageSelector::index(0))?
+        .set(replacement)?
+        .commit()?;
+    let candidate = exact_bytes(changed.package())?;
+    let stale = changed
+        .package()
+        .apply_sheet_image_adjustments(changed.patch())
+        .expect_err("a patch must not apply to its own target as its source");
+    assert!(matches!(stale, SheetImageAdjustmentsError::PatchConflict));
+    assert_eq!(exact_bytes(changed.package())?, candidate);
+
+    assert!(matches!(
+        ImageAdjustment::new(1.01),
+        Err(litchi_numbers::shape::image::Error::AdjustmentOutOfRange)
+    ));
+    assert!(matches!(
+        ImageAdjustment::new(-1.01),
+        Err(litchi_numbers::shape::image::Error::AdjustmentOutOfRange)
+    ));
+    Ok(())
+}
+
+#[test]
+fn native_image_public_api_reads_the_directly_resaved_fixture_and_keeps_noop() -> TestResult {
+    let source = std::fs::read(direct_resaved_fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+    let expected = alternate_adjustments(native_source_adjustments())?;
+    assert_eq!(public_image_adjustments(&package)?, expected);
+    let location = image_payload(&source)?;
+    assert_eq!(
+        __decode_image_adjustments_payload(&location.bytes, WireLimits::default())?,
+        expected
+    );
+    assert_eq!(marker(&package)?, DIRECT_RESAVED_MARKER);
+    assert_eq!(sharpness_value(&location.bytes)?, Some(0.25));
+    assert_image_assets_untouched(&source, &source)?;
+
+    let no_op = package
+        .edit_sheet_image_adjustments(SheetSelector::index(0), ImageSelector::index(0))?
+        .set(expected)?
+        .commit()?;
+    assert!(no_op.patch().is_noop());
+    assert_eq!(exact_bytes(no_op.package())?, source);
+    assert_eq!(public_image_adjustments(no_op.package())?, expected);
+    assert_eq!(marker(no_op.package())?, DIRECT_RESAVED_MARKER);
+    assert_eq!(sharpness_value(&image_payload(&source)?.bytes)?, Some(0.25));
     Ok(())
 }

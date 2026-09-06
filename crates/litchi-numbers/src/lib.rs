@@ -318,6 +318,8 @@ pub mod names;
 pub mod package;
 /// Human-readable and checked positional selectors for Numbers objects.
 pub mod selector;
+/// Archive-free semantic shape selectors and values.
+pub mod shape;
 /// Semantic sheet containers.
 pub mod sheet;
 /// Sparse semantic table vocabulary.
@@ -355,8 +357,11 @@ pub use package::{
     PayloadLimitKind as PackagePayloadLimitKind, ReadOptions as PackageReadOptions,
     ResourceError as PackageResourceError, Result as PackageResult, SaveError, SemanticLimitKind,
     SemanticLimits as PackageSemanticLimits, SemanticLimitsError as PackageSemanticLimitsError,
-    SemanticPath as PackageSemanticPath, TableLockCommit, TableLockDiagnostics, TableLockEdit,
-    TableLockError, TableLockLimitKind, TableLockPatch, WriteError,
+    SemanticPath as PackageSemanticPath, SheetImageAdjustmentsCommit,
+    SheetImageAdjustmentsDiagnostics, SheetImageAdjustmentsEdit, SheetImageAdjustmentsError,
+    SheetImageAdjustmentsLimitKind, SheetImageAdjustmentsPatch, TableLockCommit,
+    TableLockDiagnostics, TableLockEdit, TableLockError, TableLockLimitKind, TableLockPatch,
+    WriteError,
     comments::{
         Comment as TableCellComment, CommentReply as TableCellCommentReply,
         CommentReplyCommit as TableCellCommentReplyCommit,
@@ -374,6 +379,7 @@ pub use package::{
     compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
 };
 pub use selector::{SheetSelector, TableSelector};
+pub use shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement, ImageSelector};
 pub use sheet::{Builder as SheetBuilder, SelectorError as TableSelectorError, Sheet};
 pub use table::appearance::{Appearance, Banding, GridlineVisibility, Gridlines, RowSizing};
 pub use table::dimension::{Dimension, Points, Size};

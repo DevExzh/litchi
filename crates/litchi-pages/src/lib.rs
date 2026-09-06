@@ -71,6 +71,7 @@ pub use document::{
 };
 pub use drawable_order::{BodyDrawableHandle, BodyDrawableSelector, DrawableLayerMove};
 pub use header_footer::{HeaderFooter, HeaderFooterSelector, Kind, Template};
+pub use image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 pub use litchi_core::Position;
 /// Maximum bytes retained for each canonical Pages metadata sidecar.
 pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
@@ -104,6 +105,10 @@ pub use package::{
 pub use package::{
     BodyFootnoteCommit, BodyFootnoteDiagnostics, BodyFootnoteEdit, BodyFootnoteError,
     BodyFootnoteLimitKind, BodyFootnotePatch, BodyFootnoteSnapshot,
+};
+pub use package::{
+    BodyImageAdjustmentsCommit, BodyImageAdjustmentsDiagnostics, BodyImageAdjustmentsEdit,
+    BodyImageAdjustmentsError, BodyImageAdjustmentsLimitKind, BodyImageAdjustmentsPatch,
 };
 pub use package::{
     BodyTableAppearanceCommit, BodyTableAppearanceDiagnostics, BodyTableAppearanceEdit,
@@ -168,7 +173,7 @@ pub use package::{
     SectionTextLimitKind, SectionTextPatch,
 };
 pub use section::{Section, SectionType};
-pub use selector::BodyTableSelector;
+pub use selector::{BodyTableSelector, ImageSelector};
 pub use selector::{SectionSelector, SelectorError, SelectorResult};
 pub use table::headers::Settings as BodyTableHeaderSettings;
 pub use table::lock::BodyTableLockState;
