@@ -1,0 +1,48 @@
+{
+  "change": 452,
+  "argv": [
+    "env",
+    "RUSTC_BOOTSTRAP=1",
+    "RUSTFLAGS=-C passes=sancov-module -C llvm-args=-sanitizer-coverage-level=4 -C llvm-args=-sanitizer-coverage-inline-8bit-counters -C llvm-args=-sanitizer-coverage-pc-table -C llvm-args=-sanitizer-coverage-trace-compares -Z sanitizer=address --cfg fuzzing",
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "/tmp/litchi-goal-0452-opc-fuzz/Cargo.toml",
+    "--target",
+    "x86_64-unknown-linux-gnu",
+    "--bin",
+    "parse_opc"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "3778dc08b6f8165b23fc8466af2b73722121d956",
+  "driver_sha256": "57c2835aff86e838dd4e69f16d3e8717545ff3e001966028c9865eb061688d07",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T23:29:58.624164+00:00",
+  "source_before": {
+    "path": "sources/62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb.json",
+    "sha256": "62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb",
+    "files": 6668
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T23:30:29.742929+00:00",
+  "source_after": {
+    "path": "sources/62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb.json",
+    "sha256": "62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb",
+    "files": 6668
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/fuzz-build.log",
+    "bytes": 2408,
+    "sha256": "3f904c5a37977049ee59482dcdffb58adcde7c68b1a3185bbd9dbdc928d7e432"
+  }
+}

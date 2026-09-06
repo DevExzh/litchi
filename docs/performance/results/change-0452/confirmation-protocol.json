@@ -1,0 +1,42 @@
+{
+  "change": 452,
+  "status": "frozen",
+  "frozen_utc": "2026-09-06T23:47:15.220796+00:00",
+  "reason": "Investigate primary bytes/media baseline repeat drift (-30.685%) and candidate planning increase (+6.524% in R2); do not replace or pool primary estimates.",
+  "cpu": 2,
+  "samples": 30,
+  "warmups": 3,
+  "order": [
+    {
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "repeat": "R3"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "candidate",
+      "repeat": "R3"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "candidate",
+      "repeat": "R4"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "repeat": "R4"
+    }
+  ],
+  "bound_files": {
+    "baseline-build.json": "2b259e31dbc2c0280eb281834114387b27c8e3b49ed53b1d463d0e84616e855a",
+    "candidate-build.json": "b6d2bdfea85fa5dae651a2c68ce7cc09865953887b7b22ada6ebd16cae8363d5",
+    "confirmation-capture.py": "c8739724f16c71ba8a0f68ba1c3cd2330e30e7e0c777f67b80ba51cdac2f8316",
+    "verify-report.py": "59b33e888d5233b5462c1c705bedcf4f6b6c118e9e209a0fa1e0ea4af5d2fc95",
+    "base-verify-report.py": "d8ec5862592192dbb3b3f08205f6faec19eba10c5f4b9d0a64d536a373474b00"
+  }
+}

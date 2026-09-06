@@ -1,0 +1,13 @@
+{
+  "binary": {
+    "path": "/tmp/litchi-goal-0452-pptx-capture/baseline",
+    "bytes": 57542712,
+    "sha256": "10248d56548185e3b23d4e6bb0520d5e3f49196fb469d565bd4e3e53dadb61c4"
+  },
+  "source_manifest": {
+    "path": "sources/d8b39928a60411c056c01b41d130303ca5fb52e088bbfbe16fe2187d25c770f5.json",
+    "sha256": "d8b39928a60411c056c01b41d130303ca5fb52e088bbfbe16fe2187d25c770f5",
+    "files": 6668
+  },
+  "revision": "3778dc08b6f8165b23fc8466af2b73722121d956"
+}

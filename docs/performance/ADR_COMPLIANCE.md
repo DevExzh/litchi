@@ -1,5 +1,20 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0452: shared OPC capture with independent publication reservations
+
+[0452](changes/0452-pptx-retained-capture.md) keeps physical ZIP proof behind an opaque OPC retained handle
+(0002/0010/0011/0024). Each publication checks lineage/version/context and reserves
+its own writer payload and metadata; retained metadata stays charged even for
+empty or long-name captures (0003/0005/0006). PPTX reuses a capture only after
+existing exact metadata/byte checks reuse the staged allocation. Semantic chart
+validation, touched digest, candidate rereads and partial-output behavior remain.
+
+Final validation passes 471 OPC, 848 PPTX and 381 harness tests plus strict lint,
+warning-denied docs, workspace/boundary/format checks and 1,000 instrumented fuzz
+runs. The empty-retention negative control fails against the old implementation
+as intended. No dependency, unsafe, ambient-provider or accepted-ADR change.
+See [source review](results/change-0452/source-review.md).
+
 ## Change 0451: OPC-owned authorization and managed payload lifetime
 
 [0451](changes/0451-opc-combined-capture.md) keeps the combined ZIP token private behind OPC Part/source authority

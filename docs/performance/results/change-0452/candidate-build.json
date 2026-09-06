@@ -1,0 +1,14 @@
+{
+  "binary": {
+    "path": "/tmp/litchi-goal-0452-pptx-capture/candidate",
+    "bytes": 57551464,
+    "sha256": "5bc8b7c664e68abbdba3b57fc03843bb6cf952472fbd18de6e5d284d10a1ab53"
+  },
+  "source_manifest": {
+    "path": "sources/62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb.json",
+    "sha256": "62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb",
+    "files": 6668
+  },
+  "revision": "3778dc08b6f8165b23fc8466af2b73722121d956",
+  "uncommitted_candidate": true
+}

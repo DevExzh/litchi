@@ -1,0 +1,44 @@
+{
+  "change": 452,
+  "argv": [
+    "cargo",
+    "clippy",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "/tmp/litchi-goal-0452-opc-fuzz/Cargo.toml",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "3778dc08b6f8165b23fc8466af2b73722121d956",
+  "driver_sha256": "57c2835aff86e838dd4e69f16d3e8717545ff3e001966028c9865eb061688d07",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T23:30:30.749647+00:00",
+  "source_before": {
+    "path": "sources/62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb.json",
+    "sha256": "62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb",
+    "files": 6668
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T23:30:40.967998+00:00",
+  "source_after": {
+    "path": "sources/62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb.json",
+    "sha256": "62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb",
+    "files": 6668
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/final-fuzz-strict.log",
+    "bytes": 2408,
+    "sha256": "3623dc2863f1658102cc91781f6b5a43a83131a801986da7250042160caf16b4"
+  }
+}

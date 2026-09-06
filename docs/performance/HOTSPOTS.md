@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## Change 0452: compressed capture is retained through PPTX publication
+
+[0452](changes/0452-pptx-retained-capture.md) removes repeated source capture/verification for prepared images/charts
+while preserving planner rerun, byte identity, source checks and semantic guards.
+Media source work drops 50,366,359→33,589,143 units; publication retains 23 cache
+hits/zero cold loads and makes zero source data reads. Complete simulated-range
+API time improves about 31%; separate bytes confirmation improves about 8%.
+
+The next ownership opportunity is the staged decoded copy still retained beside
+cache and compressed data. Examine shared decoded ownership and tight-budget
+admission before claiming memory improvement; current source reservations grow
+16.8 MB until plan drop. Native breadth, cold I/O, bounded append, repackaging and
+scaling remain open. Whole-process profiles include untimed hashing and corpus
+construction and do not quantify the timed publication CPU reduction.
+
 ## Change 0451: OPC captures and decodes once on a cold cache load
 
 [0451](changes/0451-opc-combined-capture.md) removes a compressed source pass for first-read transfer authorization.

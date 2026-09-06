@@ -1,0 +1,288 @@
+{
+  "change": 452,
+  "profiles": [
+    {
+      "role": "baseline",
+      "sample_blocks": 5768,
+      "missing_callchain_blocks": 7,
+      "missing_callchain_period": 30690171,
+      "total_period": 24383244423,
+      "whole_process_self": [
+        {
+          "symbol": "sha2::sha256::x86_sha::compress",
+          "period": 9316214530,
+          "percent": 38.20744429405091
+        },
+        {
+          "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+          "period": 7136313444,
+          "percent": 29.267284206315566
+        },
+        {
+          "symbol": "zlib_rs::deflate::longest_match::longest_match",
+          "period": 2218292193,
+          "percent": 9.097608810858452
+        },
+        {
+          "symbol": "__memmove_avx512_unaligned_erms",
+          "period": 1602380517,
+          "percent": 6.571646041855371
+        },
+        {
+          "symbol": "__memcmp_evex_movbe",
+          "period": 648572601,
+          "percent": 2.6599110017870324
+        },
+        {
+          "symbol": "crc32fast::specialized::pclmulqdq::calculate",
+          "period": 629679309,
+          "percent": 2.5824262681222274
+        },
+        {
+          "symbol": "<zlib_rs::deflate::Heap>::pqdownheap",
+          "period": 560460722,
+          "percent": 2.2985485945887243
+        },
+        {
+          "symbol": "litchi_perf_baseline::payload_bytes",
+          "period": 503500468,
+          "percent": 2.0649445138033506
+        },
+        {
+          "symbol": "[unknown]",
+          "period": 417375094,
+          "percent": 1.7117291151226057
+        },
+        {
+          "symbol": "__memset_avx512_unaligned_erms",
+          "period": 176735429,
+          "percent": 0.7248232677079292
+        },
+        {
+          "symbol": "<zlib_rs::deflate::Heap>::construct_huffman_tree",
+          "period": 69675294,
+          "percent": 0.2857507097549223
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::IterState>::next",
+          "period": 46640936,
+          "percent": 0.1912827316614395
+        },
+        {
+          "symbol": "zlib_rs::inflate::inflate",
+          "period": 40439518,
+          "percent": 0.16584961910095355
+        },
+        {
+          "symbol": "zlib_rs::deflate::flush_block_only",
+          "period": 38167880,
+          "percent": 0.15653322969603403
+        },
+        {
+          "symbol": "_int_malloc",
+          "period": 37567395,
+          "percent": 0.1540705344550612
+        },
+        {
+          "symbol": "litchi_pptx::presentation::source_cross_copy::validate_xml_with_policy",
+          "period": 35092808,
+          "percent": 0.1439218152892647
+        },
+        {
+          "symbol": "cfree@GLIBC_2.2.5",
+          "period": 30909063,
+          "percent": 0.1267635367295272
+        },
+        {
+          "symbol": "[missing callchain]",
+          "period": 30690171,
+          "percent": 0.12586582190453235
+        },
+        {
+          "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>",
+          "period": 30659383,
+          "percent": 0.12573955486858795
+        },
+        {
+          "symbol": "zlib_rs::deflate::gen_codes",
+          "period": 30592809,
+          "percent": 0.12546652311430181
+        },
+        {
+          "symbol": "<litchi_core::budget::Budget>::reserve",
+          "period": 30556167,
+          "percent": 0.12531624778849063
+        },
+        {
+          "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event",
+          "period": 29216760,
+          "percent": 0.11982310267308269
+        },
+        {
+          "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+          "period": 26263245,
+          "percent": 0.10771021503285531
+        },
+        {
+          "symbol": "<litchi_perf_baseline::pptx_range_source::PptxRangeSource>::checked_add",
+          "period": 26177673,
+          "percent": 0.10735926911886823
+        },
+        {
+          "symbol": "<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write",
+          "period": 25440771,
+          "percent": 0.10433710362187268
+        }
+      ],
+      "run_frame_blocks": 0,
+      "run_frame_period": 0,
+      "run_frame_percent": 0.0,
+      "run_frame_self": [],
+      "run_frame_inclusive": [],
+      "unparsed_lines": [],
+      "scope": "cycles:u weighted self; run-frame subset includes setup/probes/warmups/report work inside the run function, not just elapsed intervals; inclusive rows overlap and must not be added"
+    },
+    {
+      "role": "candidate",
+      "sample_blocks": 5706,
+      "missing_callchain_blocks": 2,
+      "missing_callchain_period": 8775888,
+      "total_period": 24115858503,
+      "whole_process_self": [
+        {
+          "symbol": "sha2::sha256::x86_sha::compress",
+          "period": 9266297207,
+          "percent": 38.424081837465074
+        },
+        {
+          "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+          "period": 7260656189,
+          "percent": 30.107392561192786
+        },
+        {
+          "symbol": "zlib_rs::deflate::longest_match::longest_match",
+          "period": 2325137341,
+          "percent": 9.641528377315508
+        },
+        {
+          "symbol": "__memmove_avx512_unaligned_erms",
+          "period": 1607077088,
+          "percent": 6.663984563518983
+        },
+        {
+          "symbol": "__memcmp_evex_movbe",
+          "period": 579744917,
+          "percent": 2.4039986672167615
+        },
+        {
+          "symbol": "<zlib_rs::deflate::Heap>::pqdownheap",
+          "period": 532299008,
+          "percent": 2.2072571371812546
+        },
+        {
+          "symbol": "[unknown]",
+          "period": 505527802,
+          "percent": 2.096246343198243
+        },
+        {
+          "symbol": "litchi_perf_baseline::payload_bytes",
+          "period": 503180877,
+          "percent": 2.0865144690470157
+        },
+        {
+          "symbol": "crc32fast::specialized::pclmulqdq::calculate",
+          "period": 421149223,
+          "percent": 1.7463579948754853
+        },
+        {
+          "symbol": "__memset_avx512_unaligned_erms",
+          "period": 115330070,
+          "percent": 0.4782333168261582
+        },
+        {
+          "symbol": "zlib_rs::deflate::flush_block_only",
+          "period": 60161011,
+          "percent": 0.24946659474103317
+        },
+        {
+          "symbol": "zlib_rs::inflate::inflate",
+          "period": 36607043,
+          "percent": 0.1517965574206952
+        },
+        {
+          "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event",
+          "period": 30693778,
+          "percent": 0.12727632315549417
+        },
+        {
+          "symbol": "litchi_pptx::presentation::source_cross_copy::validate_xml_with_policy",
+          "period": 30641787,
+          "percent": 0.12706073472851143
+        },
+        {
+          "symbol": "zlib_rs::deflate::gen_codes",
+          "period": 30623673,
+          "percent": 0.12698562232893526
+        },
+        {
+          "symbol": "zlib_rs::deflate::slide_hash::avx2::slide_hash_chain",
+          "period": 30545294,
+          "percent": 0.12666061212873753
+        },
+        {
+          "symbol": "zlib_rs::inflate::inflate_fast_help_avx2",
+          "period": 28972366,
+          "percent": 0.12013823184605206
+        },
+        {
+          "symbol": "<zlib_rs::deflate::Heap>::construct_huffman_tree",
+          "period": 26164606,
+          "percent": 0.1084954367133359
+        },
+        {
+          "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event",
+          "period": 24607327,
+          "percent": 0.10203794734049738
+        },
+        {
+          "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix",
+          "period": 24325098,
+          "percent": 0.10086764274626164
+        },
+        {
+          "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>",
+          "period": 21845226,
+          "percent": 0.09058448405343922
+        },
+        {
+          "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2",
+          "period": 21682972,
+          "percent": 0.0899116736702641
+        },
+        {
+          "symbol": "core::str::converts::from_utf8",
+          "period": 20492389,
+          "percent": 0.08497474389083332
+        },
+        {
+          "symbol": "soapberry_zip::office::normalize_str_fallibly",
+          "period": 18400281,
+          "percent": 0.07629950639207397
+        },
+        {
+          "symbol": "litchi_pptx::opened::cross_copy_plan::dialect_namespace_flags",
+          "period": 17539275,
+          "percent": 0.07272921674265971
+        }
+      ],
+      "run_frame_blocks": 0,
+      "run_frame_period": 0,
+      "run_frame_percent": 0.0,
+      "run_frame_self": [],
+      "run_frame_inclusive": [],
+      "unparsed_lines": [],
+      "scope": "cycles:u weighted self; run-frame subset includes setup/probes/warmups/report work inside the run function, not just elapsed intervals; inclusive rows overlap and must not be added"
+    }
+  ],
+  "scope": "whole-process diagnostic CPU attribution includes untimed corpus construction and output hashing; no exact timed-region CPU claim"
+}

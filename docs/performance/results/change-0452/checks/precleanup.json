@@ -1,0 +1,14 @@
+{
+  "status": "pass",
+  "change": 452,
+  "opc_tests": 471,
+  "pptx_tests": 848,
+  "harness_tests": 381,
+  "formal_reports": 16,
+  "formal_samples": 480,
+  "confirmation_samples": 120,
+  "profiles": 4,
+  "fuzz_runs": 1000,
+  "sealed": true,
+  "cleanup": false
+}

@@ -1,0 +1,33 @@
+{
+  "change": 452,
+  "decision": "retain PPTX capture reuse",
+  "goal_complete": false,
+  "native_coverage_promoted": false,
+  "primary_reports": 16,
+  "primary_samples": 480,
+  "confirmation_reports": 4,
+  "confirmation_samples": 120,
+  "range_media_api_p50_reduction_percent": [
+    31.324,
+    31.048
+  ],
+  "cpu_claim": "About 8% bytes/media API improvement in separate ABBA confirmation; original baseline drift unresolved.",
+  "retained_source_memory_increase_bytes": 16815144,
+  "tests": {
+    "opc": 471,
+    "pptx": 848,
+    "harness": 381,
+    "fuzz_runs": 1000
+  },
+  "limitations": [
+    "Simulated range provider; no actual network or cold I/O.",
+    "Existing staged decoded copies remain; no timed allocator-peak claim.",
+    "No native/default coverage promotion or complete-goal claim.",
+    "Public PPTX editor remains consuming and lineage-bound."
+  ],
+  "next_steps": [
+    "Remove duplicate staged decoded ownership with bounded fallback.",
+    "Broaden native application lifecycle and cold/scaling evidence.",
+    "Continue bounded existing append, repackaging and broader CRUD."
+  ]
+}
