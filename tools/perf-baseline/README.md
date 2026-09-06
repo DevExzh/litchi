@@ -2546,6 +2546,26 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/streaming-create.json
 ```
 
+## Opt-in ODS buffered scalar creation baseline
+
+`ods_buffered_create` is an opt-in fresh-authoring baseline for the public ODS
+`Builder` path. It uses one `Sheet1` with four scalar columns per row: number,
+text, boolean, and blank. The ODS-specific row counts are 64 (`tiny`), 8,192
+(`medium`), and 32,768 (`large`); the large count stays below the existing
+package XML audit ceiling. A 131,072-row attempt is retained as a refusal gate
+and does not weaken that production limit.
+
+Corpus setup runs once before warmups and verifies the exact three-member ODS
+package (`mimetype`, `content.xml`, and `META-INF/manifest.xml`), the manifest
+root/content bindings, and a normalized semantic digest after ordinary ODS
+facade reopen. Each measured iteration constructs the scalar row model, calls
+`Builder::add_sheet` and `Builder::build`, and writes the result to the hashing
+discard sink. The output is dropped before the clock stops; sink finalization,
+semantic checks, and digest diagnostics are outside the clock. The source
+record carries the semantic digest and row/column contract, while the sink
+reports `retained_authoring_window_bytes: null`: this buffered role is a
+baseline and makes no fixed-window or throughput claim.
+
 ## Opt-in DOCX/PPTX semantic corpus matrix
 
 `--semantic-shape` creates complete public-API packages in memory. Text names,

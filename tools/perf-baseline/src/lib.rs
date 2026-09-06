@@ -186,6 +186,9 @@ const ODT_MEDIA_APPEND_HYPERLINK_HREF: &str = "https://example.invalid/performan
 const ODT_MEDIA_APPEND_HYPERLINK_TEXT: &str = " performance link";
 const ODT_MEDIA_INSERT_PARAGRAPH_TEXT: &str = "Inserted performance paragraph";
 const SEMANTIC_ODS_CORPUS_GENERATOR: &str = "litchi-ods-semantic-v1";
+const ODS_BUFFERED_CORPUS_GENERATOR: &str = "litchi-ods-buffered-scalar-rows-v1";
+const ODS_BUFFERED_SHEET_NAME: &str = "Sheet1";
+const ODS_BUFFERED_COLUMN_COUNT: usize = 4;
 const ODS_MEDIA_CORPUS_GENERATOR: &str = "litchi-ods-media-publication-v1";
 const SEMANTIC_ODP_CORPUS_GENERATOR: &str = "litchi-odp-semantic-v1";
 const ODP_MEDIA_CORPUS_GENERATOR: &str = "litchi-odp-media-textbox-publication-v1";
@@ -1438,6 +1441,7 @@ enum Case {
     OdsSemanticFullCellText,
     OdsSemanticTextToSink,
     OdsSemanticCreateSmall,
+    OdsBufferedCreate,
     OdsSemanticNoopEditSave,
     OdsSemanticOneEditSave,
     OdsSemanticOnePercentEditSave,
@@ -2017,6 +2021,7 @@ impl Case {
             Self::OdsSemanticFullCellText => "ods_semantic_full_cell_text",
             Self::OdsSemanticTextToSink => "ods_semantic_text_to_sink",
             Self::OdsSemanticCreateSmall => "ods_semantic_create_small",
+            Self::OdsBufferedCreate => "ods_buffered_create",
             Self::OdsSemanticNoopEditSave => "ods_semantic_noop_edit_save",
             Self::OdsSemanticOneEditSave => "ods_semantic_one_edit_save",
             Self::OdsSemanticOnePercentEditSave => "ods_semantic_one_percent_edit_save",
@@ -2595,6 +2600,10 @@ impl Case {
                 | Self::OdsSemanticOneEditSave
                 | Self::OdsSemanticOnePercentEditSave
         )
+    }
+
+    const fn uses_ods_buffered_creation(self) -> bool {
+        matches!(self, Self::OdsBufferedCreate)
     }
 
     const fn is_ods_source_cell_edit_save(self) -> bool {
@@ -4251,6 +4260,21 @@ struct PptxCrossCopySummary {
     lifecycle_ns: Option<Vec<u64>>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+struct OdsScalarRowsSummary {
+    role: &'static str,
+    implementation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    semantic_sha256: String,
+    archive_member_set_verified: bool,
+    semantic_reopen_verified: bool,
+    sheet_count: usize,
+    rows_per_sheet: usize,
+    columns_per_sheet: usize,
+    scalar_columns: [&'static str; ODS_BUFFERED_COLUMN_COUNT],
+}
+
 #[derive(Clone, Debug, Default, Serialize)]
 struct SourceSummary {
     read_calls: Vec<u64>,
@@ -4338,6 +4362,8 @@ struct SourceSummary {
     ods_source_cell: Option<OdsSourceCellSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ods_source_repeated_edit: Option<OdsSourceRepeatedEditSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ods_scalar_rows: Option<OdsScalarRowsSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odf_content_cow: Option<OdfContentCowSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -8879,6 +8905,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_xlsx_cell_values()
                     && !case.is_xlsx_row_visibility_edit_save()
                     && !case.uses_streaming_creation()
+                    && !case.uses_ods_buffered_creation()
                     && !case.uses_semantic_rtf()
                     && !case.is_rtf_picture_crud()
                     && !case.uses_semantic_docx()
@@ -10150,6 +10177,29 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     options.warmup_iterations,
                     options.samples,
                     options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_ods_buffered_creation())
+    {
+        for shape in &options.semantic_shapes {
+            let corpus = build_ods_buffered_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_ods_buffered_creation())
+            {
+                results.push(run_ods_buffered_creation(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
                 )?);
             }
         }
@@ -11509,6 +11559,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_semantic_full_cell_text" => Some(Case::OdsSemanticFullCellText),
         "ods_semantic_text_to_sink" => Some(Case::OdsSemanticTextToSink),
         "ods_semantic_create_small" => Some(Case::OdsSemanticCreateSmall),
+        "ods_buffered_create" => Some(Case::OdsBufferedCreate),
         "ods_semantic_noop_edit_save" => Some(Case::OdsSemanticNoopEditSave),
         "ods_semantic_one_edit_save" => Some(Case::OdsSemanticOneEditSave),
         "ods_semantic_one_percent_edit_save" => Some(Case::OdsSemanticOnePercentEditSave),
@@ -11944,6 +11995,7 @@ fn usage_text() -> String {
                                        ods_semantic_cell_sweep,\n\
                                        ods_semantic_full_cell_text,ods_semantic_text_to_sink,\n\
                                        ods_semantic_create_small,\n\
+                                       ods_buffered_create,\n\
                                        ods_semantic_noop_edit_save,ods_semantic_one_edit_save,\n\
                                        ods_semantic_one_percent_edit_save,\n\
                                        ods_source_eager_one_edit_save,\n\
@@ -18042,6 +18094,237 @@ fn semantic_ods_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(builder.build()?)
 }
 
+/// ODS uses a format-owned row matrix for the matched fresh-authoring cases.
+/// The large count stays below the existing Builder XML-audit ceilings while
+/// retaining the same scalar-row workload shape for the bounded writer.
+const fn ods_scalar_row_count(shape: SemanticShape) -> usize {
+    match shape {
+        SemanticShape::Tiny => 64,
+        SemanticShape::Medium => 8_192,
+        SemanticShape::Large => 32_768,
+    }
+}
+
+fn ods_scalar_row_text(ordinal: usize) -> String {
+    format!("litchi-perf-ods-scalar-row-{ordinal:05}-café-<&>")
+}
+
+fn ods_scalar_row(ordinal: usize) -> Result<litchi_ods::Row, Box<dyn Error>> {
+    let ordinal_u32 = u32::try_from(ordinal)
+        .map_err(|_error| "buffered ODS scalar ordinal exceeds f64-safe fixture range")?;
+    let text = ods_scalar_row_text(ordinal);
+    let boolean = ordinal % 2 == 0;
+    let cells = vec![
+        litchi_ods::Cell::new(litchi_ods::CellValue::Number(f64::from(ordinal_u32)), ""),
+        litchi_ods::Cell::new(litchi_ods::CellValue::Text(text.clone()), text),
+        litchi_ods::Cell::new(litchi_ods::CellValue::Boolean(boolean), ""),
+        litchi_ods::Cell::empty(),
+    ];
+    Ok(litchi_ods::Row {
+        cells,
+        style_name: None,
+        default_cell_style_name: None,
+        repeat: NonZeroUsize::MIN,
+    })
+}
+
+fn ods_scalar_projection_push(projection: &mut String, ordinal: usize, text: &str, boolean: bool) {
+    use std::fmt::Write as _;
+
+    let _ = writeln!(
+        projection,
+        "number={ordinal}\ttext={text}\tboolean={boolean}\tempty=",
+    );
+}
+
+fn ods_scalar_expected_projection(shape: SemanticShape) -> String {
+    let mut projection = String::new();
+    for row in 1..=ods_scalar_row_count(shape) {
+        ods_scalar_projection_push(
+            &mut projection,
+            row,
+            &ods_scalar_row_text(row),
+            row % 2 == 0,
+        );
+    }
+    projection
+}
+
+fn ods_scalar_expected_semantic_sha256(shape: SemanticShape) -> String {
+    sha256_hex(ods_scalar_expected_projection(shape).as_bytes())
+}
+
+fn ods_scalar_semantic_sha256(
+    spreadsheet: &litchi_ods::Spreadsheet,
+    shape: SemanticShape,
+) -> Result<String, Box<dyn Error>> {
+    let rows = ods_scalar_row_count(shape);
+    if spreadsheet.sheets().len() != 1 {
+        return Err("buffered ODS scalar corpus must contain exactly one sheet".into());
+    }
+    let sheet = spreadsheet
+        .sheet(ODS_BUFFERED_SHEET_NAME)
+        .ok_or("buffered ODS scalar sheet is missing")?;
+    if sheet.logical_row_count() != rows
+        || sheet.logical_column_count() != ODS_BUFFERED_COLUMN_COUNT
+    {
+        return Err("buffered ODS scalar sheet dimensions differ from specification".into());
+    }
+    let mut projection = String::new();
+    for row in 0..rows {
+        let ordinal = row
+            .checked_add(1)
+            .ok_or("buffered ODS scalar row ordinal overflows usize")?;
+        let physical_row = sheet.row(row).ok_or("buffered ODS scalar row is missing")?;
+        if physical_row.repeat() != 1
+            || physical_row.cells().len() != ODS_BUFFERED_COLUMN_COUNT
+            || physical_row.cells().iter().any(|cell| cell.repeat() != 1)
+        {
+            return Err("buffered ODS scalar row is not four ordinary cells".into());
+        }
+        let expected_text = ods_scalar_row_text(ordinal);
+        let expected_boolean = ordinal % 2 == 0;
+        let ordinal_u32 = u32::try_from(ordinal)?;
+        let number = physical_row
+            .cell(0)
+            .ok_or("buffered ODS scalar number cell is missing")?;
+        if !number.text.is_empty()
+            || !matches!(
+                &number.value,
+                litchi_ods::CellValue::Number(value) if *value == f64::from(ordinal_u32)
+            )
+        {
+            return Err("buffered ODS scalar number cell differs from specification".into());
+        }
+        let text = physical_row
+            .cell(1)
+            .ok_or("buffered ODS scalar text cell is missing")?;
+        if text.text != expected_text
+            || !matches!(&text.value, litchi_ods::CellValue::Text(value) if value == &expected_text)
+        {
+            return Err("buffered ODS scalar text cell differs from specification".into());
+        }
+        let boolean = physical_row
+            .cell(2)
+            .ok_or("buffered ODS scalar boolean cell is missing")?;
+        if !boolean.text.is_empty()
+            || !matches!(
+                &boolean.value,
+                litchi_ods::CellValue::Boolean(value) if *value == expected_boolean
+            )
+        {
+            return Err("buffered ODS scalar boolean cell differs from specification".into());
+        }
+        let empty = physical_row
+            .cell(3)
+            .ok_or("buffered ODS scalar empty cell is missing")?;
+        if !empty.text.is_empty() || !matches!(&empty.value, litchi_ods::CellValue::Empty) {
+            return Err("buffered ODS scalar empty cell differs from specification".into());
+        }
+        ods_scalar_projection_push(&mut projection, ordinal, &expected_text, expected_boolean);
+    }
+    Ok(sha256_hex(projection.as_bytes()))
+}
+
+fn verify_ods_buffered_archive(
+    bytes: &[u8],
+    shape: SemanticShape,
+    expected_semantic_sha256: &str,
+) -> Result<(), Box<dyn Error>> {
+    let archive = ArchiveReader::new(bytes)?;
+    let names = archive.file_names().collect::<Vec<_>>();
+    let expected_names = ["mimetype", "content.xml", "META-INF/manifest.xml"];
+    let actual_set = names.iter().copied().collect::<BTreeSet<_>>();
+    let expected_set = expected_names.iter().copied().collect::<BTreeSet<_>>();
+    if names.len() != expected_names.len() || actual_set != expected_set {
+        return Err(format!(
+            "buffered ODS archive member set differs: actual={names:?}, expected={expected_names:?}"
+        )
+        .into());
+    }
+    if archive.read("mimetype")? != b"application/vnd.oasis.opendocument.spreadsheet" {
+        return Err("buffered ODS mimetype member differs from the ODS spreadsheet MIME".into());
+    }
+    let manifest_xml = String::from_utf8(archive.read("META-INF/manifest.xml")?)?;
+    let manifest = litchi_odf_common::core::Manifest::parse(&manifest_xml)?;
+    let root = manifest
+        .get_entry("/")
+        .ok_or("buffered ODS manifest root entry is missing")?;
+    let content = manifest
+        .get_entry("content.xml")
+        .ok_or("buffered ODS manifest content.xml entry is missing")?;
+    if manifest.entries.len() != 2
+        || manifest.mimetype != "application/vnd.oasis.opendocument.spreadsheet"
+        || root.media_type != "application/vnd.oasis.opendocument.spreadsheet"
+        || root.size.is_some()
+        || root.encryption.is_some()
+        || content.media_type != "text/xml"
+        || content.size.is_some()
+        || content.encryption.is_some()
+    {
+        return Err("buffered ODS manifest root/content entries differ from specification".into());
+    }
+    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(bytes.to_vec())?;
+    let actual_semantic_sha256 = ods_scalar_semantic_sha256(&spreadsheet, shape)?;
+    if actual_semantic_sha256 != expected_semantic_sha256 {
+        return Err("buffered ODS normalized semantic digest differs from specification".into());
+    }
+    Ok(())
+}
+
+fn ods_buffered_bytes_for_rows(row_count: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut rows = Vec::with_capacity(row_count);
+    for ordinal in 1..=row_count {
+        rows.push(ods_scalar_row(ordinal)?);
+    }
+    let mut sheet = litchi_ods::Sheet::new(ODS_BUFFERED_SHEET_NAME)?;
+    sheet.rows = rows;
+    let mut builder = litchi_ods::Builder::new();
+    builder.add_sheet(sheet)?;
+    Ok(builder.build()?)
+}
+
+fn ods_buffered_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
+    ods_buffered_bytes_for_rows(ods_scalar_row_count(shape))
+}
+
+fn build_ods_buffered_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let archive = ods_buffered_bytes(shape)?;
+    let expected_semantic_sha256 = ods_scalar_expected_semantic_sha256(shape);
+    let semantic_projection_bytes = ods_scalar_expected_projection(shape).len();
+    verify_ods_buffered_archive(&archive, shape, &expected_semantic_sha256)?;
+    let target_payload = ArchiveReader::new(&archive)?.read("content.xml")?;
+    let row_count = ods_scalar_row_count(shape);
+    let entry_count = row_count
+        .checked_mul(ODS_BUFFERED_COLUMN_COUNT)
+        .ok_or("buffered ODS scalar entry count overflows usize")?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("ods-buffered-scalar-rows-{}", shape.name()),
+            generator: ODS_BUFFERED_CORPUS_GENERATOR,
+            package_format: "ODS/ODF/ZIP",
+            shape: shape.name(),
+            payload_kind: "deterministic-scalar-rows-number-text-boolean-empty",
+            compression: "deflate",
+            entry_count,
+            archive_member_count: 3,
+            entry_bytes: ods_scalar_row_text(1).len(),
+            uncompressed_payload_bytes: semantic_projection_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "content.xml".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "content.xml".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
 fn ods_media_path(index: usize) -> String {
     format!("Pictures/litchi-perf-media-{index:02}.bin")
 }
@@ -22578,6 +22861,9 @@ fn run_case_with_config(
         | Case::OdsSemanticOneEditSave
         | Case::OdsSemanticOnePercentEditSave => {
             run_semantic_ods(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdsBufferedCreate => {
+            run_ods_buffered_creation(case, corpus, warmup_iterations, samples)
         },
         Case::OdsSourceEagerOneEditSave
         | Case::OdsSourceBackedOneEditSave
@@ -56056,6 +56342,125 @@ fn run_streaming_creation(
     })
 }
 
+fn run_ods_buffered_creation(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if case != Case::OdsBufferedCreate || corpus.manifest.generator != ODS_BUFFERED_CORPUS_GENERATOR
+    {
+        return Err("non-buffered ODS case passed to buffered creation runner".into());
+    }
+    let shape = semantic_shape(corpus)?;
+    let rows = ods_scalar_row_count(shape);
+    let cells = rows
+        .checked_mul(ODS_BUFFERED_COLUMN_COUNT)
+        .ok_or("buffered ODS scalar cell count overflows usize")?;
+    let expected_semantic_sha256 = ods_scalar_expected_semantic_sha256(shape);
+    let expected_input_bytes = ods_scalar_expected_projection(shape).len();
+    let maximum = u64::try_from(corpus.manifest.archive_bytes)?
+        .checked_add(64 * 1024)
+        .ok_or("buffered ODS sink ceiling overflows")?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summaries = Vec::with_capacity(samples);
+    let mut digests = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Sink reservation is setup. The timed region intentionally includes
+        // row-model construction, Builder publication, and the hashing sink
+        // write so this baseline has the same publication boundary as a
+        // future row-stream implementation.
+        let mut sink = HashingDiscardSink::without_authoring_window(maximum);
+        let process_before = process_metrics::Snapshot::read().ok();
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        let output = ods_buffered_bytes(shape)?;
+        sink.write_all(&output)?;
+        std::hint::black_box(output.len());
+        drop(output);
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        let process_after = process_metrics::Snapshot::read().ok();
+        let process_metrics = process_before
+            .zip(process_after)
+            .map(|(before, after)| after.delta(before));
+        let (mut summary, digest) = sink.finish();
+        if digest != corpus.manifest.archive_sha256
+            || summary.accepted_bytes != u64::try_from(corpus.manifest.archive_bytes)?
+        {
+            return Err("buffered ODS creation digest or sink length differs from corpus".into());
+        }
+        if iteration >= warmup_iterations {
+            summary.rows = Some(u64::try_from(rows)?);
+            summary.cells = Some(u64::try_from(cells)?);
+            summary.input_bytes = Some(u64::try_from(expected_input_bytes)?);
+            summary.authored_part_bytes =
+                Some(u64::try_from(corpus.manifest.target_payload_bytes)?);
+            summaries.push(summary);
+            digests.push(digest);
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns: elapsed_ns(duration)?,
+                process_metrics,
+                allocation_metrics,
+            });
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let sink = deterministic_sink_summary(&summaries, "buffered ODS creation")?;
+    if sink.retained_output_bytes != Some(0) || sink.retained_authoring_window_bytes.is_some() {
+        return Err("buffered ODS creation reported a fixed retained authoring window".into());
+    }
+    if digests
+        .iter()
+        .any(|digest| digest != &corpus.manifest.archive_sha256)
+    {
+        return Err("buffered ODS creation output digest changed across samples".into());
+    }
+    let sink_observation = operation_metrics::SinkObservation {
+        accepted_bytes: sink.accepted_bytes,
+        write_calls: sink.write_calls,
+        largest_write: sink.largest_write,
+        bytes_0: sink.write_size_buckets.bytes_0,
+        bytes_1_to_512: sink.write_size_buckets.bytes_1_to_512,
+        bytes_513_to_4096: sink.write_size_buckets.bytes_513_to_4096,
+        bytes_4097_to_16384: sink.write_size_buckets.bytes_4097_to_16384,
+        bytes_16385_to_65536: sink.write_size_buckets.bytes_16385_to_65536,
+        bytes_over_65536: sink.write_size_buckets.bytes_over_65536,
+    };
+    let operation_metrics = Some(operation_metrics::from_in_process_observations(
+        &observations,
+        sink_observation,
+    )?);
+    let source = SourceSummary {
+        ods_scalar_rows: Some(OdsScalarRowsSummary {
+            role: "buffered",
+            implementation: "litchi_ods::Builder",
+            timing_scope: "fresh scalar row model construction, Builder::add_sheet/build, and HashingDiscardSink write; output Vec release occurs before the clock stops and allocator/process endpoint snapshots; corpus setup, reopen, digest, and semantic/package gates are outside",
+            performance_claim: "baseline timing and process/RSS/allocator evidence only; no fixed retained-window or throughput claim",
+            semantic_sha256: expected_semantic_sha256,
+            archive_member_set_verified: true,
+            semantic_reopen_verified: true,
+            sheet_count: 1,
+            rows_per_sheet: rows,
+            columns_per_sheet: ODS_BUFFERED_COLUMN_COUNT,
+            scalar_columns: ["number", "text", "boolean", "blank"],
+        }),
+        ..SourceSummary::default()
+    };
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(Box::new(source)),
+        execution: None,
+        output_sha256: Some(corpus.manifest.archive_sha256.clone()),
+        operation_metrics,
+    })
+}
+
 fn run_fresh_writer(
     case: Case,
     corpus: &Corpus,
@@ -59538,6 +59943,118 @@ mod tests {
             assert_eq!(json["sink"]["write_status"], "measured");
             assert!(json["process"].get("status").is_some());
         }
+    }
+
+    #[test]
+    fn ods_buffered_creation_accepts_tiny_and_large_scalar_corpora() {
+        for shape in [SemanticShape::Tiny, SemanticShape::Large] {
+            let corpus = super::build_ods_buffered_corpus(shape).unwrap();
+            assert_eq!(corpus.manifest.archive_member_count, 3);
+            assert_eq!(
+                corpus.manifest.entry_count,
+                super::ods_scalar_row_count(shape) * 4
+            );
+            assert_eq!(corpus.target_name, "content.xml");
+
+            let measured =
+                super::run_ods_buffered_creation(Case::OdsBufferedCreate, &corpus, 0, 1).unwrap();
+            assert_eq!(measured.case, Case::OdsBufferedCreate.name());
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert_eq!(
+                measured.output_sha256.as_deref(),
+                Some(corpus.manifest.archive_sha256.as_str())
+            );
+            let sink = measured.sink.as_ref().unwrap();
+            assert_eq!(sink.accepted_bytes, corpus.manifest.archive_bytes as u64);
+            assert_eq!(sink.retained_output_bytes, Some(0));
+            assert!(sink.retained_authoring_window_bytes.is_none());
+            let source = measured.source.as_ref().unwrap();
+            let scalar_rows = source.ods_scalar_rows.as_ref().unwrap();
+            assert_eq!(scalar_rows.role, "buffered");
+            assert_eq!(scalar_rows.sheet_count, 1);
+            assert_eq!(
+                scalar_rows.rows_per_sheet,
+                super::ods_scalar_row_count(shape)
+            );
+            assert_eq!(scalar_rows.columns_per_sheet, 4);
+            assert!(scalar_rows.archive_member_set_verified);
+            assert!(scalar_rows.semantic_reopen_verified);
+            assert_eq!(
+                scalar_rows.semantic_sha256,
+                super::ods_scalar_expected_semantic_sha256(shape)
+            );
+            assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
+        }
+    }
+
+    #[test]
+    fn ods_buffered_creation_preserves_the_existing_xml_audit_ceiling() {
+        let error = super::ods_buffered_bytes_for_rows(131_072)
+            .expect_err("131072 physical scalar rows must exceed the existing XML audit budget")
+            .to_string();
+        assert!(
+            error.contains("limit") || error.contains("audit"),
+            "unexpected XML audit refusal: {error}"
+        );
+    }
+
+    #[test]
+    fn ods_buffered_oracle_rejects_mutated_content_and_extra_members() {
+        let archive = super::ods_buffered_bytes(SemanticShape::Tiny).unwrap();
+        let reader = super::ArchiveReader::new(&archive).unwrap();
+        let expected_semantic_sha256 =
+            super::ods_scalar_expected_semantic_sha256(SemanticShape::Tiny);
+        let content = reader.read("content.xml").unwrap();
+        let marker = b"Sheet1";
+        let marker_start = content
+            .windows(marker.len())
+            .position(|window| window == marker)
+            .expect("buffered ODS content has its declared sheet name");
+        let mut mutated_content = content.clone();
+        mutated_content[marker_start + marker.len() - 1] = b"X"[0];
+
+        let mut writer = super::StreamingArchiveWriter::new();
+        for name in reader.file_names() {
+            if name == "content.xml" {
+                writer.write_stored(name, &mutated_content).unwrap();
+            } else {
+                let payload = reader.read(name).unwrap();
+                writer.write_stored(name, &payload).unwrap();
+            }
+        }
+        let mutated = writer.finish_to_bytes().unwrap();
+        let error = super::verify_ods_buffered_archive(
+            &mutated,
+            SemanticShape::Tiny,
+            &expected_semantic_sha256,
+        )
+        .expect_err("buffered ODS oracle accepted a mutated sheet name")
+        .to_string();
+        assert!(
+            error.contains("sheet is missing") || error.contains("semantic digest"),
+            "mutated content failed for the wrong reason: {error}"
+        );
+
+        let mut writer = super::StreamingArchiveWriter::new();
+        for name in reader.file_names() {
+            let payload = reader.read(name).unwrap();
+            writer.write_stored(name, &payload).unwrap();
+        }
+        writer
+            .write_stored("unexpected.xml", b"unexpected")
+            .unwrap();
+        let extra_member = writer.finish_to_bytes().unwrap();
+        let error = super::verify_ods_buffered_archive(
+            &extra_member,
+            SemanticShape::Tiny,
+            &expected_semantic_sha256,
+        )
+        .expect_err("buffered ODS oracle accepted an extra archive member")
+        .to_string();
+        assert!(
+            error.contains("member set"),
+            "extra member failed for the wrong reason: {error}"
+        );
     }
 
     #[test]
