@@ -1,0 +1,121 @@
+{
+  "checks/candidate-opc-check.log.gz": {
+    "original_bytes": 1593,
+    "original_path": "checks/candidate-opc-check.log",
+    "original_sha256": "13eb111a7ff1e508c9c2e1b8fae03cf5a38e2e8ae5cdfd7391c85280de70da5e",
+    "stored_bytes": 581,
+    "stored_sha256": "f231554ef3f21b78820609037834eedadf6bbfc647a86fc4a2a2a969bd2010fb"
+  },
+  "checks/candidate-opc-clippy.log.gz": {
+    "original_bytes": 2903,
+    "original_path": "checks/candidate-opc-clippy.log",
+    "original_sha256": "221a072d401735ec0ef47259b0978a870657855d50ffd62c8cc7f5fe51666ecf",
+    "stored_bytes": 936,
+    "stored_sha256": "e0542fde9b819e76813d42f50f5727c13ac4d59cec44355baafd932d3168c23a"
+  },
+  "checks/candidate-opc-tests.log.gz": {
+    "original_bytes": 47198,
+    "original_path": "checks/candidate-opc-tests.log",
+    "original_sha256": "f784ccd275fc55d6b2c86e7003092686c267162efc15087d532d7c7a9496958a",
+    "stored_bytes": 10323,
+    "stored_sha256": "c3ba63eb7eced378dde4aa4f69d693f8b1a1d3f4c94d3ef371b3e841dbfd9f5f"
+  },
+  "checks/final-boundaries.log.gz": {
+    "original_bytes": 684,
+    "original_path": "checks/final-boundaries.log",
+    "original_sha256": "b6f38b040ac7308af6ec280e204ed817e3c708cdde84d2566f0b5d74758aeeaf",
+    "stored_bytes": 255,
+    "stored_sha256": "47bc24b362c2d527d2550fd6efef22751d4d4a4efba50b0b2f6d8f7b0fc8b443"
+  },
+  "checks/final-format.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/final-format.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/final-fuzz-format.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/final-fuzz-format.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/final-fuzz-strict.log.gz": {
+    "original_bytes": 2408,
+    "original_path": "checks/final-fuzz-strict.log",
+    "original_sha256": "153bf796a4496a0a458c24c36e86ee4409a3dfe68ead8b05a022d98e63112d8b",
+    "stored_bytes": 839,
+    "stored_sha256": "def9ac5e47e7b342a800b807d33d6715a723bf88889685c4dbc13ca971668113"
+  },
+  "checks/final-harness-feature-bins.log.gz": {
+    "original_bytes": 2334,
+    "original_path": "checks/final-harness-feature-bins.log",
+    "original_sha256": "fd15b09bda38a7c25e56198f6372bca0dd95c855fcabd117928f92c74cf90814",
+    "stored_bytes": 848,
+    "stored_sha256": "2684a0babe7c41f766d58ebfca2d7240421a4ed97ec20005d86a667ebf5b4e28"
+  },
+  "checks/final-harness-tests.log.gz": {
+    "original_bytes": 34267,
+    "original_path": "checks/final-harness-tests.log",
+    "original_sha256": "1acb6cbc65ab897e0916497a4c080b55c7d1906172501fc890d230c83e2e5650",
+    "stored_bytes": 7744,
+    "stored_sha256": "810ab1fd5e502e89be371bdc60066bd1e0ab8b845f1e7d7f1b8db2f0a55f5b23"
+  },
+  "checks/final-opc-clippy.log.gz": {
+    "original_bytes": 137,
+    "original_path": "checks/final-opc-clippy.log",
+    "original_sha256": "69ffec0cfc253ec4876a7565d6591011cd0e41189b01c54a34160efd506ba531",
+    "stored_bytes": 134,
+    "stored_sha256": "27f71196b1f964605377976882a1612346a29916a892ce501262930cbece94c9"
+  },
+  "checks/final-opc-doc.log.gz": {
+    "original_bytes": 207,
+    "original_path": "checks/final-opc-doc.log",
+    "original_sha256": "41283e111674901cb42f53caccfbb582b080cdb6a2e4bb7c32d190d316dc3d86",
+    "stored_bytes": 161,
+    "stored_sha256": "fbf7144a41bbc27b0a0f145b7af38a3df3bbf3760151d20eeed64b939e9f6097"
+  },
+  "checks/final-opc-tests.log.gz": {
+    "original_bytes": 47198,
+    "original_path": "checks/final-opc-tests.log",
+    "original_sha256": "6afca147625b815c12271a2cb23144f8b7358494d84b905d2f4d020603a12e9f",
+    "stored_bytes": 10321,
+    "stored_sha256": "636e145834daafacbbb973617f4515c5ee18c51b74e5c6e0407aba44af7f6259"
+  },
+  "checks/final-pptx-cross-copy-tests.log.gz": {
+    "original_bytes": 5717,
+    "original_path": "checks/final-pptx-cross-copy-tests.log",
+    "original_sha256": "2d020c6537a93e4cca602c98e806e17793ba59da760bbe021099d00a89e20a06",
+    "stored_bytes": 1465,
+    "stored_sha256": "8fab9af5b0109bc1e7779c2eaf6274a85197fa08ab15fbf48f65b048cb796272"
+  },
+  "checks/final-workspace-check.log.gz": {
+    "original_bytes": 950,
+    "original_path": "checks/final-workspace-check.log",
+    "original_sha256": "acd322b805538be360d60dc7c130a5648acedbaabe8b91cbf8718edf8f741dba",
+    "stored_bytes": 230,
+    "stored_sha256": "144f2747e24e81f497466b16613c250a88b5d9988211ebfca62f969b99c1f0b5"
+  },
+  "checks/fuzz-build.log.gz": {
+    "original_bytes": 2408,
+    "original_path": "checks/fuzz-build.log",
+    "original_sha256": "e20d63d0ec4d96325cdf30d0e828091df2e8558279dfc042798b0b10e919202b",
+    "stored_bytes": 818,
+    "stored_sha256": "f32a0baa45f507384bf81111da600fd30063cc762b3b311cac0ec0c59662db7f"
+  },
+  "checks/fuzz-lock.log.gz": {
+    "original_bytes": 67,
+    "original_path": "checks/fuzz-lock.log",
+    "original_sha256": "83b82fbe3227aff694caed6820ecc39d8d41c320a65ac5b12bcef39db4b676fd",
+    "stored_bytes": 84,
+    "stored_sha256": "876640f55ee7d139cb56ec697e8c5aff4ee52266c72bd6b8c00c74ed533bc6c8"
+  },
+  "checks/fuzz-smoke.log.gz": {
+    "original_bytes": 24007,
+    "original_path": "checks/fuzz-smoke.log",
+    "original_sha256": "30af0f071761ee510e6ebfd727480b094a0db6cff45a804841358014530b9429",
+    "stored_bytes": 4270,
+    "stored_sha256": "5ff1c5262c648465f3841fde3f9ee143a6fc628cdad8aa195b9e0740c93ecc80"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "artifact_manifest_sha256": "c3c552ebab881784e65ec1415bdcc2627bca6846f56c7b7b8f18d76b5b5b04df",
+  "bytes_removed": 1013943146,
+  "files_removed": 1674,
+  "status": "pass",
+  "task": "/tmp/litchi-goal-0451-opc-fuzz",
+  "temporary_directory_absent": true
+}

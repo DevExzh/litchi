@@ -1,6 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0450
+## Current evidence through 0451
+
+[0451](changes/0451-opc-combined-capture.md) implements combined OPC read/authorization under cache, source identity,
+work and memory/object budgets. Eight deterministic I/O cases preserve whole
+publication output with a compressed source pass removed. Tests cover ordinary
+and combined loader coordination, rollback, short reads, budget boundaries and
+native-input compressed transfer after package/data drop. The API is opt-in;
+semantic PPTX plans have not adopted it and no complete latency gain is claimed.
+
+Registry/default counts remain 438/36; representative coverage remains 15
+categories/33 mappings/10 measured/23 correctness-only. Reusable PPTX publication
+reservations, matched timing, native breadth, cold I/O, bounded existing append,
+repackaging and scaling remain required. The full non-iWork goal remains active.
+
+## Earlier evidence through 0450
 
 [0450](changes/0450-zip-combined-capture-decode.md) adds the low-level combined ZIP capture/decode primitive needed for OPC
 first-read transfer authorization. Deterministic I/O evidence removes a compressed

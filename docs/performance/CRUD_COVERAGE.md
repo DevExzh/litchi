@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0451 integrates the category 9/15 OPC prerequisite
+
+[0451](changes/0451-opc-combined-capture.md) adds cache-aware decoded reading and compressed transfer authorization.
+Synthetic output equality and an existing native POI image transfer test cover
+OPC publication after package/data drop. This is native-input substrate evidence,
+not a new Office-application roundtrip or semantic PPTX adoption. Registry/default
+counts remain 438/36; representative coverage remains 15 categories/33 mappings,
+10 measured/23 correctness-only. No timing or native/default contract is promoted.
+
 ## 2026-09-06: change 0450 adds a ZIP transfer prerequisite
 
 [0450](changes/0450-zip-combined-capture-decode.md) enables combined decoded materialization and verified compressed capture

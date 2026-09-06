@@ -1,0 +1,79 @@
+{
+  "change": 451,
+  "kind": "deterministic positional I/O assertions",
+  "latency_samples": 0,
+  "rows": [
+    {
+      "deflated": false,
+      "decoded_bytes": 0,
+      "compressed_bytes": 0,
+      "control_calls": 10,
+      "control_bytes": 214,
+      "combined_calls": 8,
+      "combined_bytes": 184
+    },
+    {
+      "deflated": false,
+      "decoded_bytes": 1,
+      "compressed_bytes": 1,
+      "control_calls": 12,
+      "control_bytes": 216,
+      "combined_calls": 9,
+      "combined_bytes": 185
+    },
+    {
+      "deflated": false,
+      "decoded_bytes": 65536,
+      "compressed_bytes": 65536,
+      "control_calls": 15,
+      "control_bytes": 131286,
+      "combined_calls": 9,
+      "combined_bytes": 65720
+    },
+    {
+      "deflated": false,
+      "decoded_bytes": 262181,
+      "compressed_bytes": 262181,
+      "control_calls": 22,
+      "control_bytes": 524576,
+      "combined_calls": 13,
+      "combined_bytes": 262365
+    },
+    {
+      "deflated": true,
+      "decoded_bytes": 0,
+      "compressed_bytes": 7,
+      "control_calls": 14,
+      "control_bytes": 276,
+      "combined_calls": 11,
+      "combined_bytes": 223
+    },
+    {
+      "deflated": true,
+      "decoded_bytes": 1,
+      "compressed_bytes": 9,
+      "control_calls": 16,
+      "control_bytes": 296,
+      "combined_calls": 11,
+      "combined_bytes": 225
+    },
+    {
+      "deflated": true,
+      "decoded_bytes": 65536,
+      "compressed_bytes": 65558,
+      "control_calls": 19,
+      "control_bytes": 131394,
+      "combined_calls": 12,
+      "combined_bytes": 65774
+    },
+    {
+      "deflated": true,
+      "decoded_bytes": 262181,
+      "compressed_bytes": 262266,
+      "control_calls": 28,
+      "control_bytes": 524810,
+      "combined_calls": 15,
+      "combined_bytes": 262482
+    }
+  ]
+}

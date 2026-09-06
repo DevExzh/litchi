@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0451: combined OPC read and transfer authorization
+
+[0451](changes/0451-opc-combined-capture.md) adopts the ZIP primitive through OPC's existing cache and single-flight
+loader, with compressed/writer staging and decoded memory/object reservations
+retained through token publication. Eight independently opened Store/Deflate
+cases preserve whole output. At 262,181 decoded bytes, Store source bytes fall
+524,576→262,365 and Deflate 524,810→262,482. These are deterministic I/O
+assertions, not latency or peak-memory measurements. See [all cases](results/change-0451/measurements.md).
+PPTX plan adoption and matched end-to-end measurements remain required.
+
 ## Change 0450: one ZIP source capture returns decoded bytes and transfer token
 
 [0450](changes/0450-zip-combined-capture-decode.md) adds an explicit combined capture/decode primitive. Ten independently
