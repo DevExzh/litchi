@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0439/lifecycle.py",
+    "--stage",
+    "precleanup"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-06T13:35:33.827958+00:00",
+  "finished_utc": "2026-09-06T13:35:34.933836+00:00",
+  "log": {
+    "path": "checks/lifecycle-refined-initial.log",
+    "bytes": 1161,
+    "sha256": "baf8c22520edd09e403461c88d70d7c214d7d26875079fb98f511e5ab9018fb6"
+  }
+}

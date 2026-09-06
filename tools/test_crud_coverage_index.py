@@ -145,7 +145,7 @@ class CrudCoverageIndexTests(unittest.TestCase):
         }
 
     def test_checked_index_has_all_fifteen_categories_and_real_selectors(self) -> None:
-        self.assertEqual(self.validate(self.index), (15, 32))
+        self.assertEqual(self.validate(self.index), (15, 33))
 
     def test_checked_catalog_hash_matches_regenerated_catalog(self) -> None:
         checked_catalog = self.index["checked_catalog"]
@@ -334,7 +334,7 @@ class CrudCoverageIndexTests(unittest.TestCase):
             'Self::XlsxFullCellScan => "xlsx_full_cell_scan",\n            Self::FutureIworkCase => "future_iwork_case",',
             1,
         )
-        self.assertEqual(self.validate(self.index, selector_source=selector_source), (15, 32))
+        self.assertEqual(self.validate(self.index, selector_source=selector_source), (15, 33))
 
     def test_referenced_iwork_selector_is_rejected(self) -> None:
         marker = "\n}\n\nimpl Case"
@@ -408,7 +408,7 @@ class CrudCoverageIndexTests(unittest.TestCase):
 
     def test_representative_report_binds_every_measured_row(self) -> None:
         report = self.measured_report()
-        self.assertEqual(self.validate(self.index, report=report), (15, 32))
+        self.assertEqual(self.validate(self.index, report=report), (15, 33))
 
     def test_validate_paths_binds_report_to_a_separate_run_catalog(self) -> None:
         report = self.measured_report()
@@ -427,7 +427,7 @@ class CrudCoverageIndexTests(unittest.TestCase):
                     repo_root=ROOT,
                     report_path=report_path,
                 ),
-                (15, 32),
+                (15, 33),
             )
 
     def test_report_missing_measured_row_is_rejected(self) -> None:

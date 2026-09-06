@@ -1,0 +1,41 @@
+{
+  "schema": "litchi-0439-lifecycle-contract-v1",
+  "change": 439,
+  "status": "draft",
+  "protocol_path": "protocol.json",
+  "protocol_sha256": null,
+  "formal_receipts": null,
+  "formal_profiles": [
+    "profiles/after/stat/formal/receipt.json",
+    "profiles/after/record/formal/receipt.json"
+  ],
+  "required_checks": [
+    "checks/after-build.json"
+  ],
+  "expected_checks": {},
+  "drivers": [
+    "capture.py",
+    "profile.py",
+    "lifecycle.py",
+    "seal.py",
+    "replay.py",
+    "portable-probes.py",
+    "cleanup.py",
+    "lifecycle-contract.json"
+  ],
+  "cleanup": {
+    "prefix": "litchi-goal-0439-",
+    "paths": [],
+    "preserved_paths": [],
+    "precleanup_receipt": "checks/precleanup-lifecycle.json",
+    "cleanup_inventory": "checks/cleanup-inventory.json",
+    "goal_path": null,
+    "goal_sha256": null
+  },
+  "seal": {
+    "inventory": "SHA256SUMS",
+    "compression": "compression.json"
+  },
+  "probe_minimum": 8,
+  "notes": "Populate protocol_sha256, cleanup paths, preserved paths, GOAL identity, and any exact receipt lists only after the single-role capture/profile matrix is complete. This draft does not authorize a pending or before/after claim."
+}

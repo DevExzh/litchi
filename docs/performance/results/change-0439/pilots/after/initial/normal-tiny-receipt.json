@@ -1,0 +1,72 @@
+{
+  "change": 439,
+  "phase": "preparatory-pilot",
+  "role": "after",
+  "mode": "normal",
+  "shape": "tiny",
+  "samples": 3,
+  "warmups": 1,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0439/pilots/after/initial/normal-tiny-resource.log",
+    "/tmp/litchi-goal-0439-binaries/after/normal",
+    "--case",
+    "odp_existing_append_lifecycle",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "3",
+    "--warmup",
+    "1",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0439/pilots/after/initial/normal-tiny.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0439/pilots/after/initial/normal-tiny-catalog.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "binary": {
+    "path": "/tmp/litchi-goal-0439-binaries/after/normal",
+    "bytes": 457888624,
+    "sha256": "1d2a93bbf5e88ae33afd1938bc5772e9204fca47d859379fdbfd62d93d63a77e"
+  },
+  "driver_sha256": "f705fb996d609872b08e0753f1384baf4db964c830994aa4dbaede4e8abe9faf",
+  "oracle_sha256": "f09b58fd498cc1fd874af49767db75bbda818fcbd1188368fc79b7e9af17f584",
+  "protocol_sha256": "e476b2e661e2832e711ea6c4c9f41838b3366c6327b2b532d3e256723731044c",
+  "oracle_path": "oracle/verify-report.py",
+  "protocol_path": "oracle/protocol.json",
+  "build_receipt": "checks/after-build.json",
+  "build_receipt_sha256": "44a8caea0a572e856f2be3188f9fec05875834155078ce483f93cd8f1681f629",
+  "source_before": {
+    "path": "sources/88fe8c275d016b6be219e2752d2bb8691a7d4c48b83a0134e793211c8f83f5a3.json",
+    "sha256": "88fe8c275d016b6be219e2752d2bb8691a7d4c48b83a0134e793211c8f83f5a3",
+    "files": 6657
+  },
+  "started_utc": "2026-09-06T13:02:27.636250+00:00",
+  "status": "failed",
+  "exit_code": 1,
+  "error": "AssertionError('pilot workload failed')",
+  "source_after": {
+    "path": "sources/88fe8c275d016b6be219e2752d2bb8691a7d4c48b83a0134e793211c8f83f5a3.json",
+    "sha256": "88fe8c275d016b6be219e2752d2bb8691a7d4c48b83a0134e793211c8f83f5a3",
+    "files": 6657
+  },
+  "source_unchanged": true,
+  "finished_utc": "2026-09-06T13:02:27.776488+00:00",
+  "artifacts": {
+    "pilots/after/initial/normal-tiny-resource.log": {
+      "bytes": 1118,
+      "sha256": "8e6b9afb1da6ae12e57fa8ee6bca40882d2a5a1018ae507e282da7364f419325"
+    },
+    "pilots/after/initial/normal-tiny.log": {
+      "bytes": 46,
+      "sha256": "8b56ebf23567128038a847e8a3c3372440d5c486d47cc6533388838cb4058a87"
+    }
+  }
+}

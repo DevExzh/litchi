@@ -1,0 +1,20 @@
+{
+  "status": "pass",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0439/lifecycle.py",
+    "--stage",
+    "precleanup"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-06T13:38:57.583344+00:00",
+  "finished_utc": "2026-09-06T13:38:58.747714+00:00",
+  "lifecycle_driver_sha256": "3e78c3810e86518f9884d47569f240328d4ce0f83aa934a9da2ca6fd151dcdb2",
+  "protocol_sha256": "d5adeef91f70d65cfb0fc6940e5423d9bedec040a36667dd643f364a921bfca1",
+  "log": {
+    "path": "checks/precleanup-lifecycle.log",
+    "bytes": 1161,
+    "sha256": "baf8c22520edd09e403461c88d70d7c214d7d26875079fb98f511e5ab9018fb6"
+  }
+}

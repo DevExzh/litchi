@@ -1,0 +1,188 @@
+{
+  "schema": "litchi-0439-odp-existing-append-baseline-v1",
+  "change": 439,
+  "status": "frozen",
+  "purpose": "single current-revision ODP existing-document append baseline; no before/after claim",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "repeats": 2,
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "shapes": {
+    "tiny": 64,
+    "medium": 4096,
+    "large": 8192
+  },
+  "roles": {
+    "after": {
+      "build_directory": "after",
+      "build_receipt": "checks/routing-build.json",
+      "selector": "odp_existing_append_lifecycle",
+      "source_field": "odp_append",
+      "oracle_role": "after"
+    }
+  },
+  "order": [
+    {
+      "phase": "R1",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R2",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R2"
+    }
+  ],
+  "matrix": {
+    "reports": 12,
+    "retained_samples": 360,
+    "reports_per_phase": 6,
+    "samples_per_report": 30
+  },
+  "workload_cli": {
+    "case_flag": "--case",
+    "shape_flag": "--semantic-shape",
+    "workers_flag": "--workers",
+    "samples_flag": "--samples",
+    "warmup_flag": "--warmup",
+    "report_flag": "--json",
+    "catalog_flag": "--corpus-manifest"
+  },
+  "timing_scope": {
+    "inside": [
+      "Snapshot::from_bytes of the precloned owned input",
+      "Snapshot::transaction, one add, commit including internal validation",
+      "write_all of the materialized committed snapshot bytes to the hashing discard sink"
+    ],
+    "outside": [
+      "source fixture and expected output construction",
+      "owned input clone, appended title/body construction, and sink setup",
+      "endpoint process observations, independent semantic/member/patch oracles, digest finalization, destruction, and report serialization"
+    ],
+    "note": "The provider oracle must state the exact public lifecycle boundary in each report. Do not infer an append speedup from this baseline."
+  },
+  "profiles": {
+    "shape": "large",
+    "mode": "normal",
+    "kinds": [
+      "stat",
+      "record"
+    ],
+    "events": [
+      "cycles:u",
+      "instructions:u",
+      "branches:u",
+      "branch-misses:u",
+      "L1-dcache-load-misses:u"
+    ],
+    "record_frequency_hz": 999,
+    "call_graph": "fp,127",
+    "scope": "whole fresh process including setup, workload corpus generation, warmups, samples, hashing, and workload checks; Python oracle is afterward"
+  },
+  "oracle": {
+    "verifier_path": "oracle/verify-report.py",
+    "argv": [
+      "{python}",
+      "-B",
+      "{verifier}",
+      "--report",
+      "{report}",
+      "--mode",
+      "{mode}",
+      "--shape",
+      "{shape}"
+    ],
+    "role_map": {
+      "after": "after"
+    },
+    "contract": "provider_harness-owned ODP append report schema; copied verifier must print exactly VALID on success and reject identity, source, semantic, output, and sample mutations",
+    "verifier_sha256": "e4bca2715391cfb31637b86507c98f121df24b96405cb64df29902c09ef0aa4b",
+    "protocol_path": "oracle/protocol.json",
+    "protocol_sha256": "bf02fa26a18a849657c9f7d87cd72334f81ef706d4618a93ba14cc848fac3858"
+  },
+  "claims": {
+    "allowed": [
+      "current-revision baseline timing, allocation, process-RSS, and CPU-counter observations for the named selector and scope"
+    ],
+    "withheld": [
+      "before/after speedup or regression",
+      "causal hotspot attribution from whole-process profiles",
+      "fixed-memory, cache-miss, or scaling claim"
+    ]
+  },
+  "frozen_utc": "2026-09-06T13:18:27.052611+00:00",
+  "analysis": {
+    "p50": "arithmetic midpoint of the two central observations",
+    "p95_p99": "nearest rank",
+    "bootstrap_95": "2000 deterministic nonparametric resamples per report",
+    "repeat_review_trigger_percent": 5,
+    "scope": "descriptive single-baseline observations; allocator elapsed time is not a latency claim"
+  }
+}

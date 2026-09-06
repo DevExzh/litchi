@@ -1,5 +1,23 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0439 measures logical append to an existing ODP
+
+[0439](changes/0439-odp-existing-append-lifecycle.md) adds
+`odp_existing_append_lifecycle` for taxonomy category 6. It times owned open,
+one title/body append, commit and sequential output of materialized snapshot
+bytes. The 64/4,096/8,192-slide fixtures retain an opaque member and exact
+source/patch/no-op gates. Twelve reports retain 360 samples and two accepted
+profiles; large normal p50 is 170.742/175.416 ms, with a 39,890,548-byte
+operation peak above entry and 8,074,341-byte retained live delta.
+
+The registry has 436 selectors; the default 36 are unchanged. The index now
+has 15 categories and 33 representative mappings (10 measured and 23
+correctness-only under its default-baseline status contract). The new mapping
+stays correctness-only in that index despite its separately retained opt-in
+measurements. This closes one owned logical-append baseline slice. Fresh
+creation, Part addition, arbitrary repackaging, native producer breadth,
+source-backed/cold/range I/O and scaling are separate coverage obligations.
+
 ## 2026-09-06: change 0437 measures fresh plain ODP slide streams
 
 [0437](changes/0437-odp-bounded-plain-slides.md) adds `odp_buffered_create` and

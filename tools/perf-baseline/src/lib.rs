@@ -13,6 +13,7 @@ mod docx_story_hyperlink_publication;
 mod docx_story_hyperlinks;
 mod filesystem;
 mod odp_buffered_create;
+mod odp_existing_append;
 mod odp_streaming_create;
 mod odt_streaming_create;
 mod operation_metrics;
@@ -1472,6 +1473,7 @@ enum Case {
     OdpSemanticCreateSmall,
     OdpBufferedCreate,
     OdpStreamingCreate,
+    OdpExistingAppendLifecycle,
     OdpSemanticNoopEditSave,
     OdpSemanticOneEditSave,
     OdpMediaTextBoxEditSave,
@@ -2057,6 +2059,7 @@ impl Case {
             Self::OdpSemanticCreateSmall => "odp_semantic_create_small",
             Self::OdpBufferedCreate => "odp_buffered_create",
             Self::OdpStreamingCreate => "odp_streaming_create",
+            Self::OdpExistingAppendLifecycle => "odp_existing_append_lifecycle",
             Self::OdpSemanticNoopEditSave => "odp_semantic_noop_edit_save",
             Self::OdpSemanticOneEditSave => "odp_semantic_one_edit_save",
             Self::OdpMediaTextBoxEditSave => "odp_media_textbox_edit_save",
@@ -2666,6 +2669,10 @@ impl Case {
 
     const fn uses_odp_streaming_creation(self) -> bool {
         matches!(self, Self::OdpStreamingCreate)
+    }
+
+    const fn uses_odp_existing_append(self) -> bool {
+        matches!(self, Self::OdpExistingAppendLifecycle)
     }
 
     const fn uses_odp_media(self) -> bool {
@@ -4360,6 +4367,8 @@ struct SourceSummary {
     odt_paragraphs: Option<odt_streaming_create::OdtParagraphsSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_slides: Option<odp_buffered_create::OdpSlidesSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    odp_append: Option<odp_existing_append::OdpExistingAppendSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ppt_pictures: Option<PptPicturesSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -8947,6 +8956,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_odt_streaming_creation()
                     && !case.uses_odp_buffered_creation()
                     && !case.uses_odp_streaming_creation()
+                    && !case.uses_odp_existing_append()
                     && !case.uses_ods_buffered_creation()
                     && !case.uses_ods_streaming_creation()
                     && !case.uses_semantic_rtf()
@@ -10547,6 +10557,29 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_odp_existing_append())
+    {
+        for shape in &options.semantic_shapes {
+            let corpus = odp_existing_append::build_odp_existing_append_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_odp_existing_append())
+            {
+                results.push(odp_existing_append::run_odp_existing_append_lifecycle(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
+        }
+    }
+
     if options.cases.iter().any(|case| case.uses_odp_media()) {
         let corpus = build_odp_media_corpus()?;
         for case in options.cases.iter().filter(|case| case.uses_odp_media()) {
@@ -11744,6 +11777,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_semantic_create_small" => Some(Case::OdpSemanticCreateSmall),
         "odp_buffered_create" => Some(Case::OdpBufferedCreate),
         "odp_streaming_create" => Some(Case::OdpStreamingCreate),
+        "odp_existing_append_lifecycle" => Some(Case::OdpExistingAppendLifecycle),
         "odp_semantic_noop_edit_save" => Some(Case::OdpSemanticNoopEditSave),
         "odp_semantic_one_edit_save" => Some(Case::OdpSemanticOneEditSave),
         "odp_media_textbox_edit_save" => Some(Case::OdpMediaTextBoxEditSave),
@@ -12177,7 +12211,7 @@ fn usage_text() -> String {
                                        odp_semantic_one_slide,odp_semantic_full_text,\n\
                                        odp_semantic_text_to_sink,\n\
                                        odp_semantic_create_small,odp_buffered_create,\n\
-                                       odp_streaming_create,\n\
+                                       odp_streaming_create, odp_existing_append_lifecycle,\n\
                                        odp_semantic_noop_edit_save,\n\
                                        odp_semantic_one_edit_save,odp_media_textbox_edit_save,\n\
                                        odp_media_textbox_scalar_replace_save,\n\
@@ -23148,6 +23182,9 @@ fn run_case_with_config(
         },
         Case::OdpStreamingCreate => {
             Err("streaming ODP creation cases use their dedicated corpus runner".into())
+        },
+        Case::OdpExistingAppendLifecycle => {
+            Err("existing ODP append cases use their dedicated corpus runner".into())
         },
         Case::OdpMediaTextBoxEditSave => {
             run_odp_media_textbox_edit_save(corpus, warmup_iterations, samples)
@@ -58606,7 +58643,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 435);
+        assert_eq!(selectable_count, 436);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 

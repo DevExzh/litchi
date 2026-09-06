@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+"""Run at least eight fail-closed mutation probes on copied sealed evidence."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+from typing import Any, Callable
+
+ROOT = Path(__file__).resolve().parent
+CHANGE = 439
+STAGES = ("precleanup", "aftercleanup", "final")
+
+
+class ProbeError(RuntimeError):
+    pass
+
+
+def load(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ProbeError(f"{path}: invalid JSON: {error}") from error
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def sha(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def relative(bundle: Path, path: Path) -> str:
+    return path.relative_to(bundle).as_posix()
+
+
+def refresh_inventory(bundle: Path) -> None:
+    inventory = bundle / "SHA256SUMS"
+    if not inventory.is_file():
+        raise ProbeError("sealed copy has no SHA256SUMS")
+    paths = sorted(
+        path for path in bundle.rglob("*")
+        if path.is_file() and path.name != "SHA256SUMS"
+    )
+    inventory.write_text(
+        "".join(f"{sha(path)}  {relative(bundle, path)}\n" for path in paths),
+        encoding="utf-8",
+    )
+
+
+def run_lifecycle(bundle: Path, stage: str) -> dict[str, Any]:
+    result = subprocess.run(
+        [sys.executable, "-B", str(bundle / "lifecycle.py"), "--stage", stage],
+        cwd=bundle.parent,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
+    return {"exit_code": result.returncode, "output": result.stdout}
+
+
+def formal_receipts(bundle: Path) -> list[Path]:
+    return sorted((bundle / "runs").glob("*/formal/*-receipt.json"))
+
+
+def first_formal_receipt(bundle: Path) -> Path:
+    values = formal_receipts(bundle)
+    if not values:
+        raise ProbeError("no formal receipt is available for mutation")
+    return values[0]
+
+
+def report_for_receipt(receipt: Path) -> Path:
+    row = load(receipt)
+    artifacts = row.get("artifacts")
+    if not isinstance(artifacts, dict) or not isinstance(artifacts.get("report"), dict):
+        raise ProbeError(f"{receipt}: report artifact is missing")
+    path = artifacts["report"].get("path")
+    if not isinstance(path, str) or not path:
+        raise ProbeError(f"{receipt}: malformed report path")
+    report = (ROOT / path) if receipt.is_relative_to(ROOT) else receipt.parent / path
+    # The copied call site passes a receipt under the copied bundle.  Resolve
+    # against that bundle instead of trusting any absolute path in a receipt.
+    bundle = receipt
+    while bundle.name != "bundle" and bundle != bundle.parent:
+        bundle = bundle.parent
+    if bundle.name == "bundle":
+        report = bundle / path
+    if not report.is_file():
+        raise ProbeError(f"{path}: report is missing")
+    return report
+
+
+def mutate_protocol_cpu(bundle: Path) -> tuple[Path, Callable[[Path], None], str]:
+    path = bundle / "protocol.json"
+    def apply(target: Path) -> None:
+        row = load(target); row["cpu"] = int(row.get("cpu", 2)) + 1; write_json(target, row)
+    return path, apply, "protocol cpu binding"
+
+
+def mutate_protocol_matrix(bundle: Path) -> tuple[Path, Callable[[Path], None], str]:
+    path = bundle / "protocol.json"
+    def apply(target: Path) -> None:
+        row = load(target); row["matrix"]["retained_samples"] += 1; write_json(target, row)
+    return path, apply, "matrix sample binding"
+
+
+def mutate_lane(bundle: Path) -> tuple[Path, Callable[[Path], None], str]:
+    path = first_formal_receipt(bundle)
+    def apply(target: Path) -> None:
+        row = load(target); row["lane"]["shape"] = "medium" if row["lane"].get("shape") != "medium" else "tiny"; write_json(target, row)
+    return path, apply, "lane identity"
+
+
+def mutate_receipt_protocol(bundle: Path) -> tuple[Path, Callable[[Path], None], str]:
+    path = first_formal_receipt(bundle)
+    def apply(target: Path) -> None:
+        row = load(target); row["protocol_sha256"] = "0" * 64; write_json(target, row)
+    return path, apply, "receipt protocol hash"
+
+
+def mutate_report(bundle: Path) -> tuple[Path, Callable[[Path], None], str]:
+    receipt = first_formal_receipt(bundle)
+    path = report_for_receipt(receipt)
+    def apply(target: Path) -> None:
+        raw = target.read_bytes()
+        if not raw:
+            raise ProbeError("report is empty")
+        target.write_bytes((b"[" if raw[:1] != b"[" else b"{") + raw[1:])
+    return path, apply, "report oracle"
+
+
+def mutate_profile_event(bundle: Path) -> tuple[Path, Callable[[Path], None], str]:
+    path = bundle / "profiles" / "after" / "record" / "formal" / "receipt.json"
+    def apply(target: Path) -> None:
+        row = load(target); row["record_event"] = "instructions:u"; write_json(target, row)
+    return path, apply, "record profile event"
+
+
+def mutate_build_protocol(bundle: Path) -> tuple[Path, Callable[[Path], None], str]:
+    path = bundle / "after" / "build.json"
+    def apply(target: Path) -> None:
+        row = load(target); row["protocol_sha256"] = "0" * 64; write_json(target, row)
+    return path, apply, "build protocol hash"
+
+
+def mutate_missing_receipt(bundle: Path) -> tuple[Path, Callable[[Path], None], str]:
+    path = first_formal_receipt(bundle)
+    def apply(target: Path) -> None:
+        target.unlink()
+    return path, apply, "formal receipt count"
+
+
+def cases(bundle: Path) -> list[tuple[str, Path, Callable[[Path], None], str]]:
+    values = [
+        ("protocol_cpu", mutate_protocol_cpu),
+        ("protocol_matrix", mutate_protocol_matrix),
+        ("receipt_lane", mutate_lane),
+        ("receipt_protocol", mutate_receipt_protocol),
+        ("report_payload", mutate_report),
+        ("profile_event", mutate_profile_event),
+        ("build_protocol", mutate_build_protocol),
+        ("missing_receipt", mutate_missing_receipt),
+    ]
+    result = []
+    for name, factory in values:
+        path, apply, reason = factory(bundle)
+        if not path.is_file():
+            raise ProbeError(f"{name}: mutation target is missing: {relative(bundle, path)}")
+        result.append((name, path, apply, reason))
+    return result
+
+
+def run_probes(stage: str = "final") -> dict[str, Any]:
+    inventory = ROOT / "SHA256SUMS"
+    if not inventory.is_file():
+        raise ProbeError("portable probes require a sealed bundle")
+    baseline = run_lifecycle(ROOT, stage)
+    if baseline["exit_code"] != 0:
+        raise ProbeError("baseline lifecycle does not pass: " + baseline["output"][-2000:])
+    records: list[dict[str, Any]] = []
+    with tempfile.TemporaryDirectory(prefix="litchi-0439-probes-") as temporary:
+        for name, original, apply, reason in cases(ROOT):
+            copy_root = Path(temporary) / name
+            shutil.copytree(ROOT, copy_root)
+            target = copy_root / original.relative_to(ROOT)
+            apply(target)
+            # The mutation must not be rejected merely by a stale inventory;
+            # the lifecycle must identify the changed protocol/receipt/report.
+            refresh_inventory(copy_root)
+            result = run_lifecycle(copy_root, stage)
+            if result["exit_code"] == 0:
+                raise ProbeError(f"{name}: lifecycle accepted an adversarial mutation")
+            records.append({
+                "name": name,
+                "target": original.relative_to(ROOT).as_posix(),
+                "reason": reason,
+                "status": "rejected",
+                "exit_code": result["exit_code"],
+                "evidence": result["output"][-2000:],
+            })
+    restored = run_lifecycle(ROOT, stage)
+    if restored["exit_code"] != 0:
+        raise ProbeError("source bundle changed or failed after copied probes")
+    if len(records) < 8:
+        raise ProbeError("fewer than eight mutation probes were retained")
+    return {
+        "status": "pass",
+        "change": CHANGE,
+        "stage": stage,
+        "probes": records,
+        "count": len(records),
+        "scope": "independent temporary copies; source bundle and sealed inventory are untouched",
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--stage", choices=STAGES, default="final")
+    args = parser.parse_args()
+    try:
+        print(json.dumps(run_probes(args.stage), indent=2, sort_keys=True))
+    except (OSError, KeyError, TypeError, ValueError, ProbeError) as error:
+        print(f"PROBES INVALID: {error}")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,49 @@
+{
+  "change": 439,
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0439/portable-probes.py",
+    "--stage",
+    "final"
+  ],
+  "driver_hashes": {
+    "capture.py": "79bdccdb197f1286e955b74a25921f9567821cdf4aea04ef4fe4b9f091b9a516",
+    "cleanup.py": "2b0c48196641c5ea107caa442feae14a24da7a0f755f4535a8eb05778759d50a",
+    "lifecycle-contract.json": "3dd310e39c2ad7351650b9794f8201f4109dd6879ff657cc27da9381578f11b1",
+    "lifecycle.py": "3e78c3810e86518f9884d47569f240328d4ce0f83aa934a9da2ca6fd151dcdb2",
+    "portable-probes.py": "9342542572608b2f5aa109576074a5e90b50095a88846b2fddcae1ace3a3e441",
+    "profile-refined.py": "e3d60fb364ed159b5fa85dc73f7d154fd42b3cb10179443c14f3fe9cb3a4929a",
+    "profile.py": "13f9aa255727c8904858727f2aaf0403944ba76928736241fc9fe48642352ccc",
+    "replay.py": "7fef87af8a8537a7ea325612f051291ef5f048c5335d593103c321a913aa6fa5",
+    "seal.py": "c1aff766019209e5ec64d872a804faa32ea70b10fc00bb22a8c2f76baaf6111a"
+  },
+  "driver_hashes_after": {
+    "capture.py": "79bdccdb197f1286e955b74a25921f9567821cdf4aea04ef4fe4b9f091b9a516",
+    "cleanup.py": "2b0c48196641c5ea107caa442feae14a24da7a0f755f4535a8eb05778759d50a",
+    "lifecycle-contract.json": "3dd310e39c2ad7351650b9794f8201f4109dd6879ff657cc27da9381578f11b1",
+    "lifecycle.py": "3e78c3810e86518f9884d47569f240328d4ce0f83aa934a9da2ca6fd151dcdb2",
+    "portable-probes.py": "9342542572608b2f5aa109576074a5e90b50095a88846b2fddcae1ace3a3e441",
+    "profile-refined.py": "e3d60fb364ed159b5fa85dc73f7d154fd42b3cb10179443c14f3fe9cb3a4929a",
+    "profile.py": "13f9aa255727c8904858727f2aaf0403944ba76928736241fc9fe48642352ccc",
+    "replay.py": "7fef87af8a8537a7ea325612f051291ef5f048c5335d593103c321a913aa6fa5",
+    "seal.py": "c1aff766019209e5ec64d872a804faa32ea70b10fc00bb22a8c2f76baaf6111a"
+  },
+  "drivers_unchanged": true,
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T13:39:30.450626+00:00",
+  "inventory_unchanged": true,
+  "log": {
+    "bytes": 5989,
+    "path": "checks/replay-aftercleanup.log",
+    "sha256": "594068ea59f00c3c9e17706db301b1fb4fb50c800e550219f3872ae241740222"
+  },
+  "output": "{\n  \"change\": 439,\n  \"copied_control\": {\n    \"exit_code\": 0,\n    \"output\": \"{\\n  \\\"before_after_claim\\\": false,\\n  \\\"change\\\": 439,\\n  \\\"cleanup\\\": {\\n    \\\"preserved\\\": 2,\\n    \\\"removed\\\": 7,\\n    \\\"stage\\\": \\\"final\\\",\\n    \\\"status\\\": \\\"pass\\\"\\n  },\\n  \\\"order\\\": [\\n    [\\n      \\\"R1\\\",\\n      \\\"normal\\\",\\n      \\\"tiny\\\",\\n      \\\"R1\\\"\\n    ],\\n    [\\n      \\\"R1\\\",\\n      \\\"normal\\\",\\n      \\\"medium\\\",\\n      \\\"R1\\\"\\n    ],\\n    [\\n      \\\"R1\\\",\\n      \\\"normal\\\",\\n      \\\"large\\\",\\n      \\\"R1\\\"\\n    ],\\n    [\\n      \\\"R1\\\",\\n      \\\"allocator\\\",\\n      \\\"tiny\\\",\\n      \\\"R1\\\"\\n    ],\\n    [\\n      \\\"R1\\\",\\n      \\\"allocator\\\",\\n      \\\"medium\\\",\\n      \\\"R1\\\"\\n    ],\\n    [\\n      \\\"R1\\\",\\n      \\\"allocator\\\",\\n      \\\"large\\\",\\n      \\\"R1\\\"\\n    ],\\n    [\\n      \\\"R2\\\",\\n      \\\"allocator\\\",\\n      \\\"large\\\",\\n      \\\"R2\\\"\\n    ],\\n    [\\n      \\\"R2\\\",\\n      \\\"allocator\\\",\\n      \\\"medium\\\",\\n      \\\"R2\\\"\\n    ],\\n    [\\n      \\\"R2\\\",\\n      \\\"allocator\\\",\\n      \\\"tiny\\\",\\n      \\\"R2\\\"\\n    ],\\n    [\\n      \\\"R2\\\",\\n      \\\"normal\\\",\\n      \\\"large\\\",\\n      \\\"R2\\\"\\n    ],\\n    [\\n      \\\"R2\\\",\\n      \\\"normal\\\",\\n      \\\"medium\\\",\\n      \\\"R2\\\"\\n    ],\\n    [\\n      \\\"R2\\\",\\n      \\\"normal\\\",\\n      \\\"tiny\\\",\\n      \\\"R2\\\"\\n    ]\\n  ],\\n  \\\"profiles\\\": 2,\\n  \\\"protocol_sha256\\\": \\\"d5adeef91f70d65cfb0fc6940e5423d9bedec040a36667dd643f364a921bfca1\\\",\\n  \\\"reports\\\": 12,\\n  \\\"retained_samples\\\": 360,\\n  \\\"stage\\\": \\\"final\\\",\\n  \\\"status\\\": \\\"pass\\\"\\n}\\n\"\n  },\n  \"count\": 13,\n  \"probes\": [\n    {\n      \"evidence\": \"INVALID: lifecycle-contract.json.protocol_sha256: protocol binding is stale\\n\",\n      \"exit_code\": 1,\n      \"name\": \"protocol_cpu\",\n      \"reason\": \"protocol cpu binding\",\n      \"status\": \"rejected\",\n      \"target\": \"protocol.json\"\n    },\n    {\n      \"evidence\": \"INVALID: lifecycle-contract.json.protocol_sha256: protocol binding is stale\\n\",\n      \"exit_code\": 1,\n      \"name\": \"protocol_matrix\",\n      \"reason\": \"matrix sample binding\",\n      \"status\": \"rejected\",\n      \"target\": \"protocol.json\"\n    },\n    {\n      \"evidence\": \"INVALID: /tmp/litchi-0439-probes-tg1hge2a/receipt_lane/runs/R1/formal/R1-allocator-large-r1-receipt.json: lane is duplicated or outside the fixed matrix\\n\",\n      \"exit_code\": 1,\n      \"name\": \"receipt_lane\",\n      \"reason\": \"lane identity\",\n      \"status\": \"rejected\",\n      \"target\": \"runs/R1/formal/R1-allocator-large-r1-receipt.json\"\n    },\n    {\n      \"evidence\": \"INVALID: /tmp/litchi-0439-probes-tg1hge2a/receipt_protocol/runs/R1/formal/R1-allocator-large-r1-receipt.json: receipt protocol binding is stale\\n\",\n      \"exit_code\": 1,\n      \"name\": \"receipt_protocol\",\n      \"reason\": \"receipt protocol hash\",\n      \"status\": \"rejected\",\n      \"target\": \"runs/R1/formal/R1-allocator-large-r1-receipt.json\"\n    },\n    {\n      \"evidence\": \"INVALID: /tmp/litchi-0439-probes-tg1hge2a/report_payload/runs/R1/formal/R1-allocator-large-r1-receipt.json.artifacts.report: artifact bytes or digest differ\\n\",\n      \"exit_code\": 1,\n      \"name\": \"report_payload\",\n      \"reason\": \"report oracle\",\n      \"status\": \"rejected\",\n      \"target\": \"runs/R1/formal/R1-allocator-large-r1.json\"\n    },\n    {\n      \"evidence\": \"INVALID: /tmp/litchi-0439-probes-tg1hge2a/profile_event/profiles/after/record/formal/receipt.json: perf record binding differs\\n\",\n      \"exit_code\": 1,\n      \"name\": \"profile_event\",\n      \"reason\": \"record profile event\",\n      \"status\": \"rejected\",\n      \"target\": \"profiles/after/record/formal/receipt.json\"\n    },\n    {\n      \"evidence\": \"INVALID: /tmp/litchi-0439-probes-tg1hge2a/build_protocol/after/build.json: build descriptor protocol binding is stale\\n\",\n      \"exit_code\": 1,\n      \"name\": \"build_protocol\",\n      \"reason\": \"build protocol hash\",\n      \"status\": \"rejected\",\n      \"target\": \"after/build.json\"\n    },\n    {\n      \"evidence\": \"INVALID: /tmp/litchi-0439-probes-tg1hge2a/missing_receipt/runs/R1/formal/R1-allocator-large-r1-receipt.json: formal receipt is missing\\n\",\n      \"exit_code\": 1,\n      \"name\": \"missing_receipt\",\n      \"reason\": \"formal receipt count\",\n      \"status\": \"rejected\",\n      \"target\": \"runs/R1/formal/R1-allocator-large-r1-receipt.json\"\n    },\n    {\n      \"evidence\": \"INVALID: protocol.oracle.verifier_sha256: copied verifier is missing or differs from its frozen hash\\n\",\n      \"exit_code\": 1,\n      \"name\": \"oracle_verifier\",\n      \"reason\": \"frozen verifier hash\",\n      \"status\": \"rejected\",\n      \"target\": \"oracle/verify-report.py\"\n    },\n    {\n      \"evidence\": \"INVALID: protocol.oracle.protocol_sha256: copied oracle protocol is missing or differs from its frozen hash\\n\",\n      \"exit_code\": 1,\n      \"name\": \"oracle_protocol\",\n      \"reason\": \"frozen oracle protocol hash\",\n      \"status\": \"rejected\",\n      \"target\": \"oracle/protocol.json\"\n    },\n    {\n      \"evidence\": \"INVALID: profile.argv: record token 2 differs from the protocol-derived command\\n\",\n      \"exit_code\": 1,\n      \"name\": \"profile_argv\",\n      \"reason\": \"protocol-derived profiler argv\",\n      \"status\": \"rejected\",\n      \"target\": \"profiles/after/record/formal/receipt.json\"\n    },\n    {\n      \"evidence\": \"INVALID: /tmp/litchi-0439-probes-tg1hge2a/capture_index_order/runs/R2/formal/capture-index.json: capture index does not match the phase receipts\\n\",\n      \"exit_code\": 1,\n      \"name\": \"capture_index_order\",\n      \"reason\": \"ordered capture index\",\n      \"status\": \"rejected\",\n      \"target\": \"runs/R2/formal/capture-index.json\"\n    },\n    {\n      \"evidence\": \"INVALID: /tmp/litchi-0439-probes-tg1hge2a/profile_chronology/profiles/after/record/formal/receipt.json: profile starts before the preceding capture/profile finished\\n\",\n      \"exit_code\": 1,\n      \"name\": \"profile_chronology\",\n      \"reason\": \"capture/profile chronology\",\n      \"status\": \"rejected\",\n      \"target\": \"profiles/after/record/formal/receipt.json\"\n    }\n  ],\n  \"scope\": \"independent temporary copies; source bundle and sealed inventory are untouched\",\n  \"stage\": \"final\",\n  \"status\": \"pass\"\n}\n",
+  "probe_count": 13,
+  "schema": "litchi-0439-replay-receipt-v1",
+  "scope": "portable mutation probes run only in independent temporary copies",
+  "stage": "final",
+  "started_utc": "2026-09-06T13:39:20.194091+00:00",
+  "status": "pass",
+  "tag": "aftercleanup"
+}

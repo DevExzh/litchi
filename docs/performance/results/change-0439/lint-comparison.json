@@ -1,0 +1,182 @@
+{
+  "change": 439,
+  "status": "pass",
+  "before_rendered_diagnostics": 29,
+  "after_rendered_diagnostics": 29,
+  "new_diagnostics": 0,
+  "before": [
+    {
+      "path": "src/docx_story_hyperlinks.rs",
+      "message": "error: field assignment outside of initializer for an instance created with Default::default()",
+      "count": 1
+    },
+    {
+      "path": "src/docx_story_hyperlinks.rs",
+      "message": "error: manual implementation of `.is_multiple_of()`",
+      "count": 4
+    },
+    {
+      "path": "src/filesystem.rs",
+      "message": "error: redundant field names in struct initialization",
+      "count": 1
+    },
+    {
+      "path": "src/filesystem.rs",
+      "message": "error: the following explicit lifetimes could be elided: 'a",
+      "count": 1
+    },
+    {
+      "path": "src/filesystem.rs",
+      "message": "error: this `if` statement can be collapsed",
+      "count": 3
+    },
+    {
+      "path": "src/filesystem.rs",
+      "message": "error: using `contains()` instead of `iter().any()` is more efficient",
+      "count": 1
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: a `Vec` of `Range` that is only one element",
+      "count": 1
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: manual implementation of `.is_multiple_of()`",
+      "count": 3
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: the loop variable `repetition` is only used to index `outcomes`",
+      "count": 2
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: this `if` statement can be collapsed",
+      "count": 3
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: this `map_or` can be simplified",
+      "count": 1
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: this method chain can be written more clearly with `if .. else ..`",
+      "count": 1
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: useless conversion to the same type: `std::io::Error`",
+      "count": 1
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: useless conversion to the same type: `u64`",
+      "count": 1
+    },
+    {
+      "path": "src/operation_metrics.rs",
+      "message": "error: struct update has no effect, all the fields in the struct have already been specified",
+      "count": 1
+    },
+    {
+      "path": "src/parallel_metrics.rs",
+      "message": "error: this `if` statement can be collapsed",
+      "count": 2
+    },
+    {
+      "path": "src/xls_numeric.rs",
+      "message": "error: this method chain can be written more clearly with `if .. else ..`",
+      "count": 2
+    }
+  ],
+  "after": [
+    {
+      "path": "src/docx_story_hyperlinks.rs",
+      "message": "error: field assignment outside of initializer for an instance created with Default::default()",
+      "count": 1
+    },
+    {
+      "path": "src/docx_story_hyperlinks.rs",
+      "message": "error: manual implementation of `.is_multiple_of()`",
+      "count": 4
+    },
+    {
+      "path": "src/filesystem.rs",
+      "message": "error: redundant field names in struct initialization",
+      "count": 1
+    },
+    {
+      "path": "src/filesystem.rs",
+      "message": "error: the following explicit lifetimes could be elided: 'a",
+      "count": 1
+    },
+    {
+      "path": "src/filesystem.rs",
+      "message": "error: this `if` statement can be collapsed",
+      "count": 3
+    },
+    {
+      "path": "src/filesystem.rs",
+      "message": "error: using `contains()` instead of `iter().any()` is more efficient",
+      "count": 1
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: a `Vec` of `Range` that is only one element",
+      "count": 1
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: manual implementation of `.is_multiple_of()`",
+      "count": 3
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: the loop variable `repetition` is only used to index `outcomes`",
+      "count": 2
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: this `if` statement can be collapsed",
+      "count": 3
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: this `map_or` can be simplified",
+      "count": 1
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: this method chain can be written more clearly with `if .. else ..`",
+      "count": 1
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: useless conversion to the same type: `std::io::Error`",
+      "count": 1
+    },
+    {
+      "path": "src/lib.rs",
+      "message": "error: useless conversion to the same type: `u64`",
+      "count": 1
+    },
+    {
+      "path": "src/operation_metrics.rs",
+      "message": "error: struct update has no effect, all the fields in the struct have already been specified",
+      "count": 1
+    },
+    {
+      "path": "src/parallel_metrics.rs",
+      "message": "error: this `if` statement can be collapsed",
+      "count": 2
+    },
+    {
+      "path": "src/xls_numeric.rs",
+      "message": "error: this method chain can be written more clearly with `if .. else ..`",
+      "count": 2
+    }
+  ],
+  "scope": "existing standalone harness Clippy debt; no diagnostic admitted in the new append module; numeric function-line counts normalized while diagnostic multiplicities remain checked"
+}

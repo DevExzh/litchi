@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0439: existing ODP append lifecycle
+
+[0439](changes/0439-odp-existing-append-lifecycle.md) adds an opt-in owned
+open/append/commit/output baseline with 12 reports, 360 samples, and two
+accepted profiles. Normal p50 is 2.075/2.081 ms for 64 source slides,
+85.178/85.979 ms for 4,096, and 170.742/175.416 ms for 8,192 (R1/R2).
+Large operation allocation peak is 39,890,548 bytes above entry; 8,074,341
+bytes remain live at the endpoint. Full source/result retention is intentional.
+One allocator p99 repeat flag is retained; normal timing has no 5% repeat flag.
+This is baseline evidence, with no production optimization or speedup claim.
+See [measurements](results/change-0439/measurements.md) for uncertainty and
+counter scope. The default 36-case selection remains unchanged.
+
 ## Change 0438: ODP markup candidate rejected
 
 [0438](changes/0438-odp-markup-batching-negative.md) retains a negative result:

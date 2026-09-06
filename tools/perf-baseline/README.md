@@ -1,5 +1,17 @@
 # OPC, CFB, OLE2 Office, OOXML, RTF, and ODF performance baseline
 
+The opt-in `odp_existing_append_lifecycle` selector measures owned ODP opening,
+one public slide append, commit, and sequential output of the committed bytes.
+The source has 64/4,096/8,192 titled slides and a deterministic 64 KiB opaque
+package member. Input cloning and sink construction precede the timer;
+semantic/member/patch checks and destruction follow it. Source and commit
+remain alive at the allocator endpoint, so retained live bytes are reported.
+This is a materialized existing-document append baseline; fresh streaming
+creation, Part addition, and arbitrary repackaging are separate scenarios.
+The default 36-case selection is unchanged; the selector registry now has 436
+names. [Change 0439](../../docs/performance/changes/0439-odp-existing-append-lifecycle.md)
+retains the 12-report, 360-sample baseline and two profiles.
+
 Operation-region evidence: [change 0422](../../docs/performance/changes/0422-operation-region-allocator-peak.md)
 adds `region_peak_live_bytes` and identifies allocator reports as
 `serialized_region_peak_v3`. The observer serializes callbacks and region
