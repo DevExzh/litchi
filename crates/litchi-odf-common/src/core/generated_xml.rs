@@ -20,6 +20,59 @@ use std::io::{self, Read, Write};
 /// xml-minifier merely to configure the common writer seam.
 pub type GeneratedXmlLimits = xml_minifier::audit::Limits;
 
+/// XML resource attributed by a generated-member limit failure.
+pub type GeneratedXmlLimitResource = xml_minifier::audit::Resource;
+
+/// Typed lexical or composed-document XML limit attribution.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct GeneratedXmlLimitExceeded {
+    resource: GeneratedXmlLimitResource,
+    actual: usize,
+    maximum: usize,
+}
+
+impl GeneratedXmlLimitExceeded {
+    /// The exhausted XML resource.
+    #[must_use]
+    pub const fn resource(self) -> GeneratedXmlLimitResource {
+        self.resource
+    }
+
+    /// First observed value exceeding the configured inclusive ceiling.
+    #[must_use]
+    pub const fn actual(self) -> usize {
+        self.actual
+    }
+
+    /// Configured inclusive ceiling.
+    #[must_use]
+    pub const fn maximum(self) -> usize {
+        self.maximum
+    }
+}
+
+impl fmt::Display for GeneratedXmlLimitExceeded {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "generated XML {:?} limit exceeded: {} > {}",
+            self.resource, self.actual, self.maximum
+        )
+    }
+}
+
+impl std::error::Error for GeneratedXmlLimitExceeded {}
+
+fn xml_limit(resource: GeneratedXmlLimitResource, actual: usize, maximum: usize) -> Error {
+    // The reader callback uses the core Result contract. Preserve attribution
+    // through that boundary and std::io::Read without parsing diagnostics.
+    Error::Io(io::Error::other(GeneratedXmlLimitExceeded {
+        resource,
+        actual,
+        maximum,
+    }))
+}
+
 /// A checked XML shell with one insertion point between its prefix and suffix.
 ///
 /// The prefix and suffix are owned after construction. The constructor checks
@@ -376,8 +429,10 @@ impl GeneratedXmlEnvelope {
             .checked_add(self.suffix.len())
             .ok_or_else(|| invalid_generated_xml("generated XML shell byte count overflow"))?;
         if bytes > limits.max_bytes() {
-            return Err(invalid_generated_xml(
-                "generated XML shell exceeds byte limit",
+            return Err(xml_limit(
+                GeneratedXmlLimitResource::Bytes,
+                bytes,
+                limits.max_bytes(),
             ));
         }
         let shell = concatenate(
@@ -814,24 +869,50 @@ fn validate_limits(limits: GeneratedXmlLimits, max_fragment_bytes: usize) -> Res
 
 fn check_report_limits(report: GeneratedXmlReport, limits: GeneratedXmlLimits) -> Result<()> {
     let checks = [
-        ("bytes", report.bytes, limits.max_bytes()),
-        ("depth", report.max_depth, limits.max_depth()),
-        ("events", report.events, limits.max_events()),
-        ("attributes", report.attributes, limits.max_attributes()),
-        ("text bytes", report.text_bytes, limits.max_text_bytes()),
+        (
+            GeneratedXmlLimitResource::Bytes,
+            report.bytes,
+            limits.max_bytes(),
+        ),
+        (
+            GeneratedXmlLimitResource::Depth,
+            report.max_depth,
+            limits.max_depth(),
+        ),
+        (
+            GeneratedXmlLimitResource::Events,
+            report.events,
+            limits.max_events(),
+        ),
+        (
+            GeneratedXmlLimitResource::Attributes,
+            report.attributes,
+            limits.max_attributes(),
+        ),
+        (
+            GeneratedXmlLimitResource::TextBytes,
+            report.text_bytes,
+            limits.max_text_bytes(),
+        ),
     ];
     for (resource, actual, maximum) in checks {
         if actual > maximum {
-            return Err(invalid_generated_xml(format!(
-                "generated XML {resource} limit exceeded: {actual} > {maximum}"
-            )));
+            return Err(xml_limit(resource, actual, maximum));
         }
     }
     Ok(())
 }
 
 fn audit_error(error: xml_minifier::audit::Error) -> Error {
-    invalid_generated_xml(format!("XML audit failed: {error}"))
+    match error {
+        xml_minifier::audit::Error::Limit {
+            resource,
+            limit,
+            actual,
+            ..
+        } => xml_limit(resource, actual, limit),
+        other => invalid_generated_xml(format!("XML audit failed: {other}")),
+    }
 }
 
 fn invalid_generated_xml(message: impl Into<String>) -> Error {

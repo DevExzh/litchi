@@ -96,7 +96,10 @@ pub mod private {
 
 pub use encryption::{Cipher, Kdf, Profile, StartKey};
 pub use family::{Package, PreparedPackage, validate_content_document_part, validate_content_part};
-pub use generated_xml::{GeneratedXmlEnvelope, GeneratedXmlLimits, GeneratedXmlReport};
+pub use generated_xml::{
+    GeneratedXmlEnvelope, GeneratedXmlLimitExceeded, GeneratedXmlLimitResource, GeneratedXmlLimits,
+    GeneratedXmlReport,
+};
 #[allow(
     unused_imports,
     reason = "The manifest descriptors are intentionally re-exported as the core public API."

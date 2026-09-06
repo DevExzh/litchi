@@ -1411,6 +1411,7 @@ enum Case {
     OdtSemanticTextToSink,
     OdtSemanticCreateSmall,
     OdtBufferedCreate,
+    OdtStreamingCreate,
     OdtSemanticNoopEditSave,
     OdtSemanticOneEditSave,
     OdtSemanticOnePercentEditSave,
@@ -1991,6 +1992,7 @@ impl Case {
             Self::OdtSemanticTextToSink => "odt_semantic_text_to_sink",
             Self::OdtSemanticCreateSmall => "odt_semantic_create_small",
             Self::OdtBufferedCreate => "odt_buffered_create",
+            Self::OdtStreamingCreate => "odt_streaming_create",
             Self::OdtSemanticNoopEditSave => "odt_semantic_noop_edit_save",
             Self::OdtSemanticOneEditSave => "odt_semantic_one_edit_save",
             Self::OdtSemanticOnePercentEditSave => "odt_semantic_one_percent_edit_save",
@@ -2542,6 +2544,10 @@ impl Case {
 
     const fn uses_odt_buffered_creation(self) -> bool {
         matches!(self, Self::OdtBufferedCreate)
+    }
+
+    const fn uses_odt_streaming_creation(self) -> bool {
+        matches!(self, Self::OdtStreamingCreate)
     }
 
     const fn uses_odt_media(self) -> bool {
@@ -8922,6 +8928,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_row_visibility_edit_save()
                     && !case.uses_streaming_creation()
                     && !case.uses_odt_buffered_creation()
+                    && !case.uses_odt_streaming_creation()
                     && !case.uses_ods_buffered_creation()
                     && !case.uses_ods_streaming_creation()
                     && !case.uses_semantic_rtf()
@@ -10214,6 +10221,29 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 .filter(|case| case.uses_odt_buffered_creation())
             {
                 results.push(odt_streaming_create::run_odt_buffered_creation(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_odt_streaming_creation())
+    {
+        for shape in &options.semantic_shapes {
+            let corpus = odt_streaming_create::build_odt_streaming_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_odt_streaming_creation())
+            {
+                results.push(odt_streaming_create::run_odt_streaming_creation(
                     case,
                     &corpus,
                     options.warmup_iterations,
@@ -11583,6 +11613,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_semantic_text_to_sink" => Some(Case::OdtSemanticTextToSink),
         "odt_semantic_create_small" => Some(Case::OdtSemanticCreateSmall),
         "odt_buffered_create" => Some(Case::OdtBufferedCreate),
+        "odt_streaming_create" => Some(Case::OdtStreamingCreate),
         "odt_semantic_noop_edit_save" => Some(Case::OdtSemanticNoopEditSave),
         "odt_semantic_one_edit_save" => Some(Case::OdtSemanticOneEditSave),
         "odt_semantic_one_percent_edit_save" => Some(Case::OdtSemanticOnePercentEditSave),
@@ -12039,6 +12070,7 @@ fn usage_text() -> String {
                                        odt_semantic_text_to_sink,\n\
                                        odt_semantic_create_small,odt_semantic_noop_edit_save,\n\
                                        odt_buffered_create,\n\
+                                       odt_streaming_create,\n\
                                        odt_semantic_one_edit_save,odt_semantic_one_percent_edit_save,\n\
                                        odt_mixed_model_content_scalar_edit_save,\n\
                                        odt_mixed_model_content_batch_edit_save,\n\
@@ -22946,6 +22978,9 @@ fn run_case_with_config(
         },
         Case::OdtBufferedCreate => {
             Err("buffered ODT creation cases use their dedicated corpus runner".into())
+        },
+        Case::OdtStreamingCreate => {
+            Err("streaming ODT creation cases use their dedicated corpus runner".into())
         },
         Case::OdtMixedModelContentScalarEditSave | Case::OdtMixedModelContentBatchEditSave => {
             run_odt_mixed_model_content(case, corpus, warmup_iterations, samples)
@@ -58497,7 +58532,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 432);
+        assert_eq!(selectable_count, 433);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -60454,6 +60489,43 @@ mod tests {
             assert!(odt.meta_xml_sha256.len() == 64);
             assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
         }
+    }
+
+    #[test]
+    fn odt_streaming_creation_is_opt_in_and_reports_provider_window_evidence() {
+        let case = parse_case("odt_streaming_create").expect("streaming ODT selector parses");
+        assert_eq!(case, Case::OdtStreamingCreate);
+        assert!(!Case::DEFAULT.contains(&case));
+        let corpus =
+            super::odt_streaming_create::build_odt_streaming_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(corpus.manifest.archive_member_count, 5);
+        assert_eq!(corpus.manifest.entry_count, 64);
+        let measured =
+            super::odt_streaming_create::run_odt_streaming_creation(case, &corpus, 0, 1).unwrap();
+        assert_eq!(measured.elapsed_ns.samples.len(), 1);
+        assert_eq!(
+            measured.output_sha256.as_deref(),
+            Some(corpus.manifest.archive_sha256.as_str())
+        );
+        let sink = measured.sink.as_ref().unwrap();
+        assert_eq!(sink.accepted_bytes, corpus.manifest.archive_bytes as u64);
+        assert_eq!(sink.retained_output_bytes, Some(0));
+        assert_eq!(sink.retained_authoring_window_bytes, Some(4_096));
+        assert_eq!(
+            sink.input_bytes,
+            Some(corpus.manifest.uncompressed_payload_bytes as u64)
+        );
+        let source = measured.source.as_ref().unwrap();
+        let odt = source.odt_paragraphs.as_ref().unwrap();
+        assert_eq!(odt.role, "streaming");
+        assert_eq!(odt.paragraph_count, corpus.manifest.entry_count);
+        assert_eq!(odt.run_count, corpus.manifest.entry_count);
+        assert!(odt.archive_member_set_verified);
+        assert!(odt.manifest_bindings_verified);
+        assert!(odt.semantic_reopen_verified);
+        assert!(odt.immutable_styles_meta_verified);
+        assert!(!odt.timing_scope.is_empty());
+        assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
     }
 
     #[test]

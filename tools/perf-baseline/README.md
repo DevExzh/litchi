@@ -2600,6 +2600,23 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/odt-buffered-create.json
 ```
 
+## Opt-in ODT streaming paragraph creation
+
+`odt_streaming_create` publishes the same 64/8,192/32,768 paragraph fixture
+through `litchi_odt::streaming::stream_plain_paragraphs_to`, with a 4,096-byte
+paragraph XML window and explicit finite input, output, memory, and work
+limits. Its lazy iterator creates each paragraph string inside the operation
+timer. Sink/context/limit setup occurs before timing; context destruction and
+report/digest checks follow the allocator and process endpoint snapshots.
+
+Both ODT roles require identical supported paragraph semantics and complete
+default styles/meta bytes. Their content XML and ZIP framing may differ, so
+byte determinism is checked within each role. Provider input byte counts exclude
+the separators in the canonical joined-text projection; both are checked, and
+the sink summary uses the same joined-text metric as the buffered role. The
+4,096-byte fragment window is not a total allocator or RSS bound. Neither
+selector changes the default benchmark suite.
+
 ## Opt-in ODS streaming scalar creation
 
 `ods_streaming_create` uses the public `litchi_ods::streaming` forward-only
