@@ -25,3 +25,11 @@ compile and lint failures remain in the command receipts.
 A source-only independent reviewer confirmed the missing-byte calculation,
 exact-buffer boundary, typed truncation error, and ZIP64 end-position behavior.
 This is a correctness enabler for caller short reads, with no performance claim.
+
+The existing ZIP fuzz target also passes a bounded 1,000-run smoke with seed
+429, a 1 MiB input cap, and AddressSanitizer under Rust 1.98.1. Thirteen retained
+ZIP32/ZIP64 seeds and exact copied crate/fuzz sources are hash-bound in
+`checks/fuzz-source-custody.json`. The isolated build and generated lock stay
+outside the workspace; the lock bytes are retained as `.lock.txt` evidence.
+Cleanup verifies copied inputs and removes only the exact task directory.
+This bounded fuzz smoke is not an exhaustive adversarial-input proof.

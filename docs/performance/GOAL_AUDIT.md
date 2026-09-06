@@ -1,6 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0428
+## Current evidence through 0429
+
+[0429](changes/0429-pptx-provider-native-baselines.md) completes the 32-process/960-sample provider and native selected-
+image baseline. It adds a bounded ZIP short-read correctness fix, not a measured
+speedup. All final managed gauges are zero, and non-RSS phase observations match
+exactly across samples and repeats. All 27 repeat flags are RSS points already
+different at entry; comparative RSS conclusions remain withheld. Files are warm,
+ranges are explicit simulations, and native selected-image ownership does not
+establish native cross-copy. The 100-sample CPU-profile validator correction is
+explicitly amended with original validators and unchanged captures retained.
+Broader producer/size and CRUD coverage, true cold I/O, allocator/physical-copy
+attribution, semantic streaming and explicit scaling remain open. The global
+goal is still active; see [batch scope](results/change-0429/goal-scope.md).
+
+## Prior evidence through 0428
 
 [0428](changes/0428-managed-pptx-cache-lifetimes.md) completes the fixed synthetic
 managed-cache/budget matrix: 16 processes, 480 samples, exact admission and

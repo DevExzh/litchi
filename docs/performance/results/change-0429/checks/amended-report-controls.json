@@ -1,0 +1,39 @@
+{
+  "change": 429,
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import json,subprocess; from pathlib import Path; r=Path(\"docs/performance/results/change-0429\"); [subprocess.run([\"python3\",\"-B\",str(r/\"verify-report.py\"),str(r/\"capture\"/(json.loads((r/p).read_text())[\"name\"]+\".json\"))],check=True) for p in json.loads((r/\"capture-index.json\").read_text())]; subprocess.run([\"python3\",\"-B\",str(r/\"probe-report.py\"),str(r/\"profiles/media-rich-bytes.json\")],check=True)"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+  "driver_sha256": "fe045dd9f3e4128911a377dc44313bcd7ff33c8baf8ed0fb7b45cfcd43c9be9d",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-05T23:44:06.118799+00:00",
+  "source_before": {
+    "path": "sources/1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122.json",
+    "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+    "files": 6634
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T23:44:11.540197+00:00",
+  "source_after": {
+    "path": "sources/1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122.json",
+    "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+    "files": 6634
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/amended-report-controls.log",
+    "bytes": 7078,
+    "sha256": "749e415b42a6bbafc0f6ce0feb78f512e3041c19a70255deea4e29543f7b25e9"
+  }
+}

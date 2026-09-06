@@ -28,6 +28,32 @@ WARMUPS = 3
 PROCESSES = 32
 RETAINED_SAMPLES = 960
 FULL_SOURCE_SCOPE = "workspace and standalone tools"
+AMENDMENT_CHANGED_BUILD_FIELDS = (
+    "verifier_sha256",
+    "replay_verifier_sha256",
+    "planned_checks_sha256",
+    "additional_artifact_sha256",
+    "validation_amendment",
+)
+AMENDMENT_ORIGINAL_ARTIFACTS = {
+    "validation-amendment-original/build.json",
+    "validation-amendment-original/verify.py",
+    "validation-amendment-original/verify-report.py",
+    "validation-amendment-original/planned-checks.json",
+}
+ADDITIONAL_ARTIFACTS = {
+    "check.py",
+    "profiles.py",
+    "profile-audit.py",
+    "resume-profiles.py",
+    "native-oracles.py",
+    "native-image-oracles.json",
+    "native-inputs/original.pptx",
+    "native-inputs/libreoffice.pptx",
+    "native-inputs/poi-slide.pptx",
+    "native-inputs/poi-video.pptx",
+    "shapes-static-oracles.json",
+}
 
 
 def sha(raw: bytes) -> str:
@@ -92,6 +118,45 @@ def artifact(root: Path, name: str) -> bytes:
     raise AssertionError(f"missing artifact: {name}")
 
 
+def verify_artifact_custody(
+    root: Path,
+    value: Any,
+    expected_paths: set[str],
+    label: str,
+) -> None:
+    custody = require_object(value, label)
+    assert set(custody) == expected_paths, f"{label} paths differ from the frozen set"
+    for path in sorted(expected_paths):
+        row = require_object(custody[path], f"{label} {path}")
+        assert set(row) == {"sha256", "bytes"}, f"{label} {path} fields differ"
+        digest = require_text(row.get("sha256"), f"{label} {path} digest")
+        size = require_uint(row.get("bytes"), f"{label} {path} bytes")
+        raw = artifact(root, path)
+        assert sha(raw) == digest and len(raw) == size, f"{label} {path} custody mismatch"
+
+
+def unchanged_capture_artifacts(protocol: dict[str, Any]) -> set[str]:
+    paths: set[str] = set()
+    for role in protocol["order"]:
+        name = role["command"] + "-" + role["selector"] + "-" + role["provider_label"] + "-" + role["repeat"].lower()
+        paths.update({
+            f"capture/{name}.json",
+            f"capture/{name}-receipt.json",
+            f"capture/{name}.log",
+            f"capture/{name}-resource.log",
+        })
+    # The first supplementary recording completed before the profile wrapper
+    # stopped.  Its raw recording, report, and perf log are retained as
+    # recovery inputs; the resume driver creates the receipt and postprocessing
+    # logs later.
+    paths.update({
+        "profiles/media-rich-bytes.data",
+        "profiles/media-rich-bytes.json",
+        "profiles/media-rich-bytes.log",
+    })
+    return paths
+
+
 def require_object(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise AssertionError(f"{label} is not an object")
@@ -140,6 +205,106 @@ def verify_source_manifest(root: Path, manifest: dict[str, Any]) -> None:
     assert isinstance(parsed, dict) and len(parsed) == files
 
 
+def verify_validation_amendment(
+    root: Path,
+    protocol: dict[str, Any],
+    build: dict[str, Any],
+) -> None:
+    amendment_raw = artifact(root, "validation-amendment.json")
+    amendment = require_object(
+        load_json_bytes(amendment_raw), "validation amendment"
+    )
+    assert set(amendment) == {
+        "reason",
+        "original_artifacts",
+        "unchanged_capture_artifacts",
+        "changed_build_fields",
+        "source_revision",
+        "binary_sha256",
+    }
+    require_text(amendment.get("reason"), "validation amendment reason")
+    assert amendment["changed_build_fields"] == list(AMENDMENT_CHANGED_BUILD_FIELDS)
+    build_revision = require_text(build.get("revision"), "build revision")
+    binary_digest = require_text(build.get("binary_sha256"), "build binary digest")
+    assert amendment["source_revision"] == build_revision
+    assert amendment["binary_sha256"] == binary_digest
+
+    verify_artifact_custody(
+        root,
+        amendment["original_artifacts"],
+        AMENDMENT_ORIGINAL_ARTIFACTS,
+        "validation amendment original artifacts",
+    )
+    unchanged = unchanged_capture_artifacts(protocol)
+    assert len(unchanged) == PROCESSES * 4 + 3
+    verify_artifact_custody(
+        root,
+        amendment["unchanged_capture_artifacts"],
+        unchanged,
+        "validation amendment unchanged capture artifacts",
+    )
+
+    original_build_raw = artifact(
+        root, "validation-amendment-original/build.json"
+    )
+    original_build = require_object(
+        load_json_bytes(original_build_raw), "original build"
+    )
+    original_verify_raw = artifact(
+        root, "validation-amendment-original/verify.py"
+    )
+    original_report_verifier_raw = artifact(
+        root, "validation-amendment-original/verify-report.py"
+    )
+    original_planned_checks_raw = artifact(
+        root, "validation-amendment-original/planned-checks.json"
+    )
+    assert original_build["replay_verifier_sha256"] == sha(original_verify_raw)
+    assert original_build["verifier_sha256"] == sha(original_report_verifier_raw)
+    assert original_build["planned_checks_sha256"] == sha(original_planned_checks_raw)
+
+    original_revision = require_text(original_build.get("revision"), "original build revision")
+    original_binary_digest = require_text(
+        original_build.get("binary_sha256"), "original build binary digest"
+    )
+    assert original_revision == amendment["source_revision"] == build_revision
+    assert original_binary_digest == amendment["binary_sha256"] == binary_digest
+    assert original_build["protocol_sha256"] == build["protocol_sha256"]
+    assert original_build["source_manifest"] == build["source_manifest"]
+
+    missing = object()
+    fields = set(original_build) | set(build)
+    changed = sorted(
+        field
+        for field in fields
+        if original_build.get(field, missing) != build.get(field, missing)
+    )
+    assert changed == sorted(AMENDMENT_CHANGED_BUILD_FIELDS)
+
+    original_additional = require_object(
+        original_build.get("additional_artifact_sha256"),
+        "original additional artifact hashes",
+    )
+    current_additional = require_object(
+        build.get("additional_artifact_sha256"),
+        "current additional artifact hashes",
+    )
+    assert set(original_additional) == ADDITIONAL_ARTIFACTS - {"resume-profiles.py"}
+    assert set(current_additional) == ADDITIONAL_ARTIFACTS
+    for name, digest in original_additional.items():
+        assert current_additional[name] == digest, name
+    assert current_additional["resume-profiles.py"] == sha(
+        safe_path(root, "resume-profiles.py").read_bytes()
+    )
+
+    current_amendment = require_object(
+        build.get("validation_amendment"), "current validation amendment binding"
+    )
+    assert set(current_amendment) == {"path", "sha256"}
+    assert current_amendment["path"] == "validation-amendment.json"
+    assert current_amendment["sha256"] == sha(amendment_raw)
+
+
 def verify_build(root: Path, protocol: dict[str, Any], build: dict[str, Any]) -> dict[str, Any]:
     assert build.get("baseline_revision") == protocol.get("baseline_revision")
     build_revision = require_text(build.get("revision"), "build revision")
@@ -162,9 +327,10 @@ def verify_build(root: Path, protocol: dict[str, Any], build: dict[str, Any]) ->
 
     for name, digest in build["additional_artifact_sha256"].items():
         assert sha(safe_path(root, name).read_bytes()) == digest, name
-    assert set(build["additional_artifact_sha256"]) == {"check.py", "profiles.py", "profile-audit.py", "native-oracles.py", "native-image-oracles.json", "native-inputs/original.pptx", "native-inputs/libreoffice.pptx", "native-inputs/poi-slide.pptx", "native-inputs/poi-video.pptx", "shapes-static-oracles.json"}
+    assert set(build["additional_artifact_sha256"]) == ADDITIONAL_ARTIFACTS
     run_quiet([sys.executable, "-B", str(root / "native-oracles.py"), "--check"])
     run_quiet([sys.executable, "-B", str(root / "native-oracles.py"), "--check", "--shapes"])
+    verify_validation_amendment(root, protocol, build)
 
     receipt_name = require_text(build.get("build_receipt"), "build receipt")
     receipt_raw = artifact(root, receipt_name)
@@ -472,8 +638,12 @@ def portable_mutations(root: Path, result: dict[str, Any]) -> dict[str, str]:
         # only the same-role R1/R2 identity should reject it.
         report = exported / "capture/provider-lifecycle-plain-bytes-r2.json"
         receipt_path = exported / "capture/provider-lifecycle-plain-bytes-r2-receipt.json"
+        amendment_path = exported / "validation-amendment.json"
+        build_path = exported / "build.json"
         original_report = report.read_bytes()
         original_receipt = receipt_path.read_bytes()
+        original_amendment = amendment_path.read_bytes()
+        original_build = build_path.read_bytes()
         changed = require_object(load_json(report), "portable report")
         digest = changed["expected_output_sha256"]
         changed["expected_output_sha256"] = "0" * 64 if digest != "0" * 64 else "1" * 64
@@ -486,17 +656,36 @@ def portable_mutations(root: Path, result: dict[str, Any]) -> dict[str, str]:
             "sha256": sha(report.read_bytes()), "bytes": report.stat().st_size,
         }
         receipt_path.write_text(json.dumps(custody, indent=2) + "\n")
+        amendment = require_object(load_json(amendment_path), "portable amendment")
+        unchanged = require_object(
+            amendment["unchanged_capture_artifacts"], "portable unchanged artifacts"
+        )
+        for path in [
+            "capture/provider-lifecycle-plain-bytes-r2.json",
+            "capture/provider-lifecycle-plain-bytes-r2-receipt.json",
+        ]:
+            retained = exported / path
+            unchanged[path] = {"sha256": sha(retained.read_bytes()), "bytes": retained.stat().st_size}
+        amendment_path.write_text(json.dumps(amendment, indent=2) + "\n")
+        amended_build = require_object(load_json(build_path), "portable build")
+        binding = require_object(
+            amended_build["validation_amendment"], "portable amendment binding"
+        )
+        binding["sha256"] = sha(amendment_path.read_bytes())
+        build_path.write_text(json.dumps(amended_build, indent=2) + "\n")
         rejected = subprocess.run(
             [sys.executable, "-B", str(exported / "verify.py")],
             capture_output=True,
         )
         assert rejected.returncode != 0, "same-role output mutation was accepted"
         rejection = (rejected.stdout + rejected.stderr).decode("utf-8", "replace").upper()
-        assert (
-            "INVALID" in rejection or "SAME-ROLE OUTPUT DIFFERS" in rejection
-        ), "same-role output mutation did not produce a meaningful rejection"
+        assert "SAME-ROLE OUTPUT OR CORPUS DIFFERS" in rejection, (
+            "same-role output mutation did not produce the cross-repeat rejection"
+        )
         report.write_bytes(original_report)
         receipt_path.write_bytes(original_receipt)
+        amendment_path.write_bytes(original_amendment)
+        build_path.write_bytes(original_build)
 
         validator = exported / "verify-report.py"
         validator.write_text(validator.read_text() + "\n# pinned-validator mutation\n")

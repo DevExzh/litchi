@@ -1,0 +1,55 @@
+{
+  "name": "native-image-lifecycle-poi-video-file-r2",
+  "command": "native-image-lifecycle",
+  "selector_key": "fixture",
+  "selector": "poi-video",
+  "provider_label": "file",
+  "provider": "file",
+  "max_range": null,
+  "delay_us": null,
+  "repeat": "R2",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/capture/native-image-lifecycle-poi-video-file-r2-resource.log",
+    "/tmp/litchi-goal-0429-binaries/litchi-perf-baseline",
+    "native-image-lifecycle",
+    "--fixture",
+    "poi-video",
+    "--provider",
+    "file",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0429/capture/native-image-lifecycle-poi-video-file-r2.json"
+  ],
+  "revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+  "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969",
+  "protocol_sha256": "f4da6b83b5d90ab521a11cae1be14e22b6d1599cf0c8d1e9cd1b42ea8c8f4971",
+  "started_utc": "2026-09-05T23:37:37.207969+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T23:37:37.475525+00:00",
+  "artifacts": {
+    "capture/native-image-lifecycle-poi-video-file-r2.json": {
+      "sha256": "aab7d2fc0ac641dd9f3638407d8f1e70ce65944e9c73f562e60acb5bf582d8b0",
+      "bytes": 816083
+    },
+    "capture/native-image-lifecycle-poi-video-file-r2.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "capture/native-image-lifecycle-poi-video-file-r2-resource.log": {
+      "sha256": "2a250c1dbcbba9cb785d637c09bb3ac1763834409aac26c231ed91cc06aa2d50",
+      "bytes": 1036
+    }
+  }
+}

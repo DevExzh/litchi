@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0429: PPTX providers and native selected images
+
+[0429](changes/0429-pptx-provider-native-baselines.md) records 32 fresh release processes, 960 samples and 8,160 phase
+points for synthetic plain/media cross-copy and two unmodified native selected
+images across bytes, warm files and capped/delayed caller ranges. The per-lane
+API-only medians, tail distributions, derived rates and bootstrap intervals are
+retained. All final managed gauges are zero; non-RSS numeric phase observations
+match exactly across samples/repeats. All 27 repeat flags are RSS points in
+three media-rich lanes already different at entry. No comparative RSS or
+causal performance claim is made. A bounded ZIP fixed-header refill correction
+enables valid short reads and rejects truncated directory tails.
+
 ## Change 0428: managed PPTX cache and budget lifetimes
 
 [0428](changes/0428-managed-pptx-cache-lifetimes.md) adds fallible diagnostics on

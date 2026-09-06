@@ -1,0 +1,27 @@
+{
+  "status": "pass",
+  "argv": [
+    "python3",
+    "-B",
+    "verify.py",
+    "--portable"
+  ],
+  "exit_code": 0,
+  "completed_utc": "2026-09-06T00:03:27.463048+00:00",
+  "input_inventory_sha256": "423966a4822bf9a15e1209d35d9dbc574461fd4c87c3f58ef9e9c960013cc904",
+  "result": {
+    "cleanup": "before-cleanup; copied binary checked",
+    "command_receipts": 51,
+    "inventory_files": 383,
+    "performance_claim": null,
+    "pinned_validator_mutation": "rejected",
+    "portable_export": "pass; copied executable not needed",
+    "processes": 32,
+    "required_pass": 32,
+    "required_review": 2,
+    "samples": 960,
+    "status": "pass",
+    "supplementary_profiles": 2,
+    "valid_digest_repeat_output_mutation": "rejected"
+  }
+}

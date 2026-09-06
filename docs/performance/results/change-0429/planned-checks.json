@@ -20,11 +20,22 @@
     "release-build",
     "release-capture",
     "release-summary",
-    "release-profiles",
-    "probe-controls"
+    "release-profiles-resumed",
+    "probe-controls",
+    "profile-policy-controls",
+    "amended-report-controls",
+    "profile-policy-negative",
+    "zip-fuzz-prepare",
+    "zip-fuzz-lock",
+    "zip-fuzz-build",
+    "zip-fuzz-smoke",
+    "zip-fuzz-cleanup",
+    "amendment-chain",
+    "python-syntax-amended"
   ],
   "required_review": [
-    "harness-strict-final"
+    "harness-strict-final",
+    "release-profiles"
   ],
   "review_policy": "Strict harness diagnostics must match retained 0428 baseline exactly by message/source file multiset, with zero findings in new or visibility-modified modules. All failed attempts are retained."
 }
