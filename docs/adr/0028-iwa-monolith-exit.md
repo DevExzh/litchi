@@ -8969,3 +8969,49 @@ explicit debt items. Workspace formatting and lint pass. Normal commit hooks
 enforce workspace library/integration and documentation tests. Chart creation,
 duplication, and removal remain host-owned; this slice does not complete
 monolith retirement.
+
+## 2026-09-06 follow-up: focused image-adjustment retirement across Numbers, Pages, and Keynote
+
+Six raw-ID host sheet-image adjustment read/set methods and three dead writers
+are removed. Unused focused hidden write bridges are removed as well. Required
+decode bridges remain for graph reads, while host graph CRUD and info paths are
+preserved. The obsolete image-creator examples
+`create_numbers_image.rs`, `create_pages_image.rs`, and
+`create_keynote_image.rs` are deleted. The focused surface includes three
+public semantic CLI examples,
+and Numbers includes default-feature native integration coverage in
+`crates/litchi-numbers/tests/sheet_image_adjustments_native.rs`.
+
+The existing
+[`image-adjustments-direct-resaved.numbers`](../../test-data/iwork/numbers/image-adjustments-direct-resaved.numbers)
+fixture remains the confirmed Numbers baseline: exposure `50%`, saturation
+`-40%`, Enhance off, Advanced sharpness `25%`, and the direct-saved B2 marker.
+The retirement candidates for Numbers, Pages, and Keynote set exposure `-0.2`,
+saturation `+0.35`, and `EnhanceEnabled`. Each application opened in version
+14.4 after a forced native description edit, save, close, and exact-path
+reopen; the controls persisted. Numbers and Pages confirmed Advanced
+sharpness `25%`, and the original B2, body, and slide-title markers persisted.
+Numbers retained `Focused Numbers image adjustment retirement saved`; Keynote
+and Pages retained the corresponding focused retirement descriptions, with
+Pages retaining its literal trailing tab.
+
+The copied native resaved fixtures are:
+
+- [`image-adjustments-retirement-resaved.numbers`](../../test-data/iwork/numbers/image-adjustments-retirement-resaved.numbers) — SHA-256 `4da809196887120afe3e12cddc65234c76f1a7098bda9bc284a91dde8489d1ef`.
+- [`image-adjustments-retirement-resaved.pages`](../../test-data/iwork/pages/image-adjustments-retirement-resaved.pages) — SHA-256 `b3f6a7f281433732f7f9ec490d3d4bc684038d74235b203f2ae20d5f3b21b7bd`.
+- [`image-adjustments-retirement-resaved.key`](../../test-data/iwork/keynote/image-adjustments-retirement-resaved.key) — SHA-256 `254ea31b758362dd292dcb79e659879f8ac2c2cab38e2a0b2e5090ce243da877`.
+
+Focused Numbers validation covers the payload-only parent-ownership contract:
+the exact rooted sheet owns the payload, any declared parent attribution is
+validated, duplicates, wrong paths, and cross-kind references are rejected,
+and a parent backlink is not required in aggregate or field metadata. The
+data reference occurs exactly once in aggregate metadata; path 11 is optional.
+Native fixtures show parent reference `904475` absent from metadata while data
+reference `16` appears once. Selected merge/diff validation preserves
+aggregate-only metadata. Scoped validation passes in the three focused native
+integration files: Keynote 5 tests, Numbers 8 tests, and Pages 12 tests (25
+tests across those files). The Numbers default-feature
+`sheet_image_adjustments_native` suite passes 4 tests, and the focused Numbers
+`image_adjustments` library suite passes 12 tests. Boundary verification
+passes 921 tests; the scanner passes with 64 packages, 238 internal
+dependency declarations, and 11 explicit debt items.

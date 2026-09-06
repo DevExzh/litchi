@@ -350,6 +350,20 @@ def add_iwa_shared_image_adjustments_scaffold(
         )
         semantic_types = boundaries.IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES[ecosystem]
         semantic_error = semantic_types[0]
+        rewrite_bridge = ""
+        if (
+            boundaries.IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM
+            in boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS_BY_ECOSYSTEM[ecosystem]
+        ):
+            rewrite_bridge = (
+                '#[cfg(feature = "internal-iwork-source")]\n'
+                "#[doc(hidden)]\n"
+                "pub fn __rewrite_image_adjustments_payload(source: &[u8], adjustments: ImageAdjustments, limits: WireLimits) "
+                "-> Result<Vec<u8>, ImageAdjustmentsError> {\n"
+                "    let _ = (adjustments, limits);\n"
+                "    codec::rewrite_image_adjustments(source, write, limits)\n"
+                "}\n"
+            )
         source = (
             f"pub enum {semantic_error} {{ Error }}\n"
             f"pub struct {semantic_types[1]}<'a> {{ source: &'a Package }}\n"
@@ -378,14 +392,8 @@ def add_iwa_shared_image_adjustments_scaffold(
             "    let _ = codec::DecodeOptions::new(source, limits);\n"
             "    codec::decode_image_adjustments(source, limits)\n"
             "}\n"
-            "#[cfg(feature = \"internal-iwork-source\")]\n"
-            "#[doc(hidden)]\n"
-            "pub fn __rewrite_image_adjustments_payload(source: &[u8], adjustments: ImageAdjustments, limits: WireLimits) "
-            "-> Result<Vec<u8>, ImageAdjustmentsError> {\n"
-            "    let _ = (adjustments, limits);\n"
-            "    codec::rewrite_image_adjustments(source, write, limits)\n"
-            "}\n"
-            "use litchi_iwa_protos::image_adjustments_codec as codec;\n"
+            + rewrite_bridge
+            + "use litchi_iwa_protos::image_adjustments_codec as codec;\n"
             "use litchi_iwa_common::{WireLimits, shape::image::{ImageAdjustment, ImageAdjustments}};\n"
         )
         if missing_hidden_gate:
@@ -416,6 +424,13 @@ def add_iwa_shared_image_adjustments_scaffold(
 
         package = root / boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES[ecosystem]
         package.parent.mkdir(parents=True, exist_ok=True)
+        hidden_bridge_exports = ["__decode_image_adjustments_payload"]
+        if (
+            boundaries.IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM
+            in boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS_BY_ECOSYSTEM[ecosystem]
+        ):
+            hidden_bridge_exports.append("__rewrite_image_adjustments_payload")
+        hidden_bridge_exports.append("ImageAdjustmentsError")
         package.write_text(
             ("#[cfg(feature = \"internal-iwork-source\")]\n" if semantic_module_gate else "")
             + "mod image_adjustments;\n"
@@ -424,8 +439,9 @@ def add_iwa_shared_image_adjustments_scaffold(
             + "};\n"
             + ("" if missing_hidden_gate else '#[cfg(feature = "internal-iwork-source")]\n')
             + ("" if missing_hidden_gate else "#[doc(hidden)]\n")
-            + "pub use image_adjustments::{__decode_image_adjustments_payload, "
-            "__rewrite_image_adjustments_payload, ImageAdjustmentsError};\n",
+            + "pub use image_adjustments::{"
+            + ", ".join(hidden_bridge_exports)
+            + "};\n",
             encoding="utf-8",
         )
         export = root / boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[ecosystem]
@@ -436,8 +452,9 @@ def add_iwa_shared_image_adjustments_scaffold(
             + "};\n"
             + ("" if missing_hidden_gate else '#[cfg(feature = "internal-iwork-source")]\n')
             + ("" if missing_hidden_gate else "#[doc(hidden)]\n")
-            + "pub use package::{__decode_image_adjustments_payload, "
-            "__rewrite_image_adjustments_payload, ImageAdjustmentsError};\n",
+            + "pub use package::{"
+            + ", ".join(hidden_bridge_exports)
+            + "};\n",
             encoding="utf-8",
         )
 
@@ -447,8 +464,14 @@ def add_iwa_shared_image_adjustments_scaffold(
         crate_name = ecosystem.lower()
         source = (
             f"fn read() {{ litchi_{crate_name}::__decode_image_adjustments_payload(source, limits); }}\n"
-            f"fn write() {{ litchi_{crate_name}::__rewrite_image_adjustments_payload(source, adjustments, limits); }}\n"
         )
+        if (
+            boundaries.IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM
+            in boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS_BY_ECOSYSTEM[ecosystem]
+        ):
+            source += (
+                f"fn write() {{ litchi_{crate_name}::__rewrite_image_adjustments_payload(source, adjustments, limits); }}\n"
+            )
         if host_legacy_helper and ecosystem == "Pages":
             source += "use crate::image_adjustments::replace_image_adjustments;\n"
         if host_legacy_helper and ecosystem == "Numbers":
@@ -14589,6 +14612,141 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_iwa_numbers_names_source_topology(root), []
             )
+
+    def test_retired_iwa_numbers_image_adjustments_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_IMAGE_ADJUSTMENTS_METHODS,
+            ("sheet_image_adjustments", "set_sheet_image_adjustments"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_IMAGE_ADJUSTMENTS_EXAMPLE,
+            Path("crates/litchi-iwa/examples/create_numbers_image.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_IMAGE_ADJUSTMENTS_HOST_METHODS,
+            {
+                "Keynote": ("slide_image_adjustments", "set_slide_image_adjustments"),
+                "Pages": ("body_image_adjustments", "set_body_image_adjustments"),
+                "Numbers": ("sheet_image_adjustments", "set_sheet_image_adjustments"),
+            },
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_IMAGE_ADJUSTMENTS_HOST_EXAMPLES,
+            {
+                "Keynote": Path("crates/litchi-iwa/examples/create_keynote_image.rs"),
+                "Pages": Path("crates/litchi-iwa/examples/create_pages_image.rs"),
+                "Numbers": Path("crates/litchi-iwa/examples/create_numbers_image.rs"),
+            },
+        )
+
+    def test_retired_iwa_numbers_image_adjustments_host_surface_cannot_return(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/sheet_images.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "pub fn sheet_image_adjustments() {}\n"
+                "pub fn r#set_sheet_image_adjustments() {}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.RETIRED_IWA_NUMBERS_IMAGE_ADJUSTMENTS_EXAMPLE
+            example.parent.mkdir(parents=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_image_adjustments_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Numbers image-adjustments method "
+                        "set_sheet_image_adjustments: "
+                        "crates/litchi-iwa/src/numbers/editor/sheet_images.rs:2",
+                        "retired litchi-iwa Numbers image-adjustments method "
+                        "sheet_image_adjustments: "
+                        "crates/litchi-iwa/src/numbers/editor/sheet_images.rs:1",
+                        "retired litchi-iwa Numbers image-adjustments example returned: "
+                        "crates/litchi-iwa/examples/create_numbers_image.rs",
+                    ]
+                ),
+            )
+
+    def test_iwa_numbers_image_adjustments_policy_preserves_read_graph_and_creation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/sheet_images.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "// pub fn sheet_image_adjustments() {}\n"
+                'const NOTE: &str = "pub fn set_sheet_image_adjustments() {}";\n'
+                "pub struct NumbersSheetImageInfo {\n"
+                "    pub image_adjustments: ImageAdjustments,\n"
+                "}\n"
+                "pub fn sheet_images() {}\n"
+                "pub fn add_sheet_image() {}\n"
+                "fn image_adjustments_from_payload() {}\n"
+                "fn replace_image_adjustments() {}\n"
+                "#[cfg(test)]\n"
+                "fn set_sheet_image_adjustments() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_image_adjustments_source_topology(root),
+                [],
+            )
+
+    def test_iwa_image_adjustments_host_tombstones_cover_all_formats(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for ecosystem, methods in (
+                boundaries.RETIRED_IWA_IMAGE_ADJUSTMENTS_HOST_METHODS.items()
+            ):
+                host = root / boundaries.IWA_IMAGE_ADJUSTMENTS_HOST_ROOTS[ecosystem] / (
+                    "image_adjustments.rs"
+                )
+                host.parent.mkdir(parents=True, exist_ok=True)
+                host.write_text(
+                    "\n".join(f"pub fn {method}() {{}}" for method in methods) + "\n",
+                    encoding="utf-8",
+                )
+                example = root / boundaries.RETIRED_IWA_IMAGE_ADJUSTMENTS_HOST_EXAMPLES[
+                    ecosystem
+                ]
+                example.parent.mkdir(parents=True, exist_ok=True)
+                example.write_text("fn main() {}\n", encoding="utf-8")
+
+            violations = boundaries.audit_iwa_numbers_image_adjustments_source_topology(
+                root
+            )
+            for ecosystem, methods in (
+                boundaries.RETIRED_IWA_IMAGE_ADJUSTMENTS_HOST_METHODS.items()
+            ):
+                for method in methods:
+                    self.assertTrue(
+                        any(
+                            f"retired litchi-iwa {ecosystem} image-adjustments method {method}"
+                            in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+                self.assertTrue(
+                    any(
+                        f"retired litchi-iwa {ecosystem} image-adjustments example returned"
+                        in item
+                        for item in violations
+                    ),
+                    violations,
+                )
+
+    def test_iwa_numbers_image_adjustments_policy_is_in_main_dispatch(self) -> None:
+        main_source = Path(boundaries.__file__).read_text(encoding="utf-8")
+        self.assertIn(
+            "+ audit_iwa_numbers_image_adjustments_source_topology()", main_source
+        )
 
     def test_focused_numbers_names_public_api_rejects_physical_leaks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -40614,6 +40772,76 @@ fn rewrite_movie_title_operation(
                 any("internal-iwork-source" in item for item in violations),
                 violations,
             )
+
+    def test_iwa_shared_image_adjustments_boundary_retires_all_write_bridges(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_shared_image_adjustments_scaffold(root)
+
+            for ecosystem in boundaries.IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_ECOSYSTEMS:
+                owner = root / boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]
+                with owner.open("a", encoding="utf-8") as stream:
+                    stream.write(
+                        "#[cfg(feature = \"internal-iwork-source\")]\n"
+                        "#[doc(hidden)]\n"
+                        "pub fn __rewrite_image_adjustments_payload() {}\n"
+                    )
+                package = root / boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES[
+                    ecosystem
+                ]
+                with package.open("a", encoding="utf-8") as stream:
+                    stream.write(
+                        "pub use image_adjustments::__rewrite_image_adjustments_payload;\n"
+                    )
+                export = root / boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[
+                    ecosystem
+                ]
+                with export.open("a", encoding="utf-8") as stream:
+                    stream.write(
+                        "pub use package::__rewrite_image_adjustments_payload;\n"
+                    )
+                host = root / boundaries.IWA_IMAGE_ADJUSTMENTS_HOST_ROOTS[ecosystem] / (
+                    "image_adjustments.rs"
+                )
+                with host.open("a", encoding="utf-8") as stream:
+                    stream.write(
+                        "fn write() {\n"
+                        f"    litchi_{ecosystem.lower()}::__rewrite_image_adjustments_payload(source, adjustments, limits);\n"
+                        "}\n"
+                    )
+
+            violations = boundaries.audit_iwa_shared_image_adjustments_source_topology(
+                root
+            )
+
+            for ecosystem in boundaries.IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_ECOSYSTEMS:
+                prefix = f"focused litchi-{ecosystem.lower()}"
+                self.assertTrue(
+                    any(
+                        f"{prefix} image-adjustments write bridge is retired" in item
+                        for item in violations
+                    ),
+                    violations,
+                )
+                self.assertTrue(
+                    any(
+                        f"{prefix} image-adjustments write bridge re-export is retired"
+                        in item
+                        for item in violations
+                    ),
+                    violations,
+                )
+                self.assertTrue(
+                    any(
+                        f"litchi-{ecosystem.lower()} image-adjustments host retains "
+                        "the retired write bridge"
+                        in item
+                        for item in violations
+                    ),
+                    violations,
+                )
 
     def test_iwa_shared_image_adjustments_boundary_rejects_feature_gated_semantic_module(
         self,

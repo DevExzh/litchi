@@ -19,11 +19,8 @@ use litchi_iwa_common::{
     wire::{WireView, append_length_delimited_field, append_varint_field},
 };
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
-use litchi_iwa_protos::{tsd, tswp};
-use litchi_pages::{
-    __decode_image_adjustments_payload, __rewrite_image_adjustments_payload,
-    BodyImageAdjustmentsError, ImageAdjustmentsError, ImageSelector, Package, PackageError,
-};
+use litchi_iwa_protos::{image_adjustments_codec, tsd, tswp};
+use litchi_pages::{BodyImageAdjustmentsError, ImageSelector, Package, PackageError};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -50,6 +47,11 @@ fn resaved_fixture_path() -> PathBuf {
 fn direct_resaved_fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/pages/image-adjustments-direct-resaved.pages")
+}
+
+fn retirement_resaved_fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/pages/image-adjustments-retirement-resaved.pages")
 }
 
 #[derive(Debug, Clone)]
@@ -492,6 +494,48 @@ fn sharpness_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
         .collect())
 }
 
+fn decode_image_adjustments(source: &[u8], _limits: WireLimits) -> TestResult<ImageAdjustments> {
+    let snapshot = image_adjustments_codec::decode_image_adjustments(
+        source,
+        image_adjustments_codec::DecodeOptions::for_source(source),
+    )?;
+    Ok(ImageAdjustments::new()
+        .with_exposure(snapshot.exposure().map(ImageAdjustment::new).transpose()?)
+        .with_saturation(
+            snapshot
+                .saturation()
+                .map(ImageAdjustment::new)
+                .transpose()?,
+        )
+        .with_enhancement(snapshot.enhance().map(|value| {
+            if value {
+                ImageEnhancement::Enabled
+            } else {
+                ImageEnhancement::Disabled
+            }
+        })))
+}
+
+fn rewrite_image_adjustments(
+    source: &[u8],
+    adjustments: ImageAdjustments,
+    _limits: WireLimits,
+) -> TestResult<Vec<u8>> {
+    let write = image_adjustments_codec::ImageAdjustmentsWrite::from_values(
+        adjustments.exposure().map(ImageAdjustment::value),
+        adjustments.saturation().map(ImageAdjustment::value),
+        adjustments
+            .enhancement()
+            .map(|value| matches!(value, ImageEnhancement::Enabled)),
+    );
+    Ok(image_adjustments_codec::rewrite_image_adjustments(
+        source,
+        write,
+        image_adjustments_codec::DecodeOptions::for_source(source)
+            .with_max_output_bytes(source.len().saturating_mul(4).max(1024)),
+    )?)
+}
+
 fn native_source_adjustments() -> ImageAdjustments {
     ImageAdjustments::new()
         // Pages omits the neutral scalar controls in a freshly-created image;
@@ -527,11 +571,11 @@ fn native_image_source_reads_typed_adjustments_and_has_exact_noop() -> TestResul
     assert_eq!(exact_bytes(&package)?, source);
 
     let location = image_payload(&source)?;
-    let baseline = __decode_image_adjustments_payload(&location.bytes, WireLimits::default())?;
+    let baseline = decode_image_adjustments(&location.bytes, WireLimits::default())?;
     assert_eq!(baseline, native_source_adjustments());
     assert!(!sharpness_wire(&location.bytes)?.is_empty());
     assert_eq!(
-        __rewrite_image_adjustments_payload(&location.bytes, baseline, WireLimits::default())?,
+        rewrite_image_adjustments(&location.bytes, baseline, WireLimits::default())?,
         location.bytes
     );
     Ok(())
@@ -743,15 +787,15 @@ fn native_image_source_rewrite_preserves_advanced_wire_marker_locality_and_inver
     let source = std::fs::read(fixture_path())?;
     let source_marker = marker(&Package::from_bytes(&source)?)?;
     let location = image_payload(&source)?;
-    let baseline = __decode_image_adjustments_payload(&location.bytes, WireLimits::default())?;
+    let baseline = decode_image_adjustments(&location.bytes, WireLimits::default())?;
     assert_eq!(baseline, native_source_adjustments());
     let expected = replacement_adjustments(baseline)?;
     let changed_payload =
-        __rewrite_image_adjustments_payload(&location.bytes, expected, WireLimits::default())?;
+        rewrite_image_adjustments(&location.bytes, expected, WireLimits::default())?;
 
     assert_ne!(changed_payload, location.bytes);
     assert_eq!(
-        __decode_image_adjustments_payload(&changed_payload, WireLimits::default())?,
+        decode_image_adjustments(&changed_payload, WireLimits::default())?,
         expected
     );
     assert_eq!(
@@ -774,7 +818,7 @@ fn native_image_source_rewrite_preserves_advanced_wire_marker_locality_and_inver
     assert_member_locality(&source, &changed_package, &location.member)?;
 
     let restored_payload =
-        __rewrite_image_adjustments_payload(&changed_payload, baseline, WireLimits::default())?;
+        rewrite_image_adjustments(&changed_payload, baseline, WireLimits::default())?;
     assert_eq!(restored_payload, location.bytes);
     let restored_package =
         rewrite_image_payload(&changed_package, &changed_location, &restored_payload)?;
@@ -795,17 +839,17 @@ fn native_image_resaved_fixture_reads_changed_adjustments_and_roundtrips() -> Te
     let source_marker = marker(&package)?;
 
     let location = image_payload(&source)?;
-    let baseline = __decode_image_adjustments_payload(&location.bytes, WireLimits::default())?;
+    let baseline = decode_image_adjustments(&location.bytes, WireLimits::default())?;
     assert_eq!(baseline, native_resaved_adjustments()?);
     assert!(!sharpness_wire(&location.bytes)?.is_empty());
     assert_eq!(
-        __rewrite_image_adjustments_payload(&location.bytes, baseline, WireLimits::default())?,
+        rewrite_image_adjustments(&location.bytes, baseline, WireLimits::default())?,
         location.bytes
     );
 
     let changed = alternate_adjustments(baseline)?;
     let changed_payload =
-        __rewrite_image_adjustments_payload(&location.bytes, changed, WireLimits::default())?;
+        rewrite_image_adjustments(&location.bytes, changed, WireLimits::default())?;
     assert_ne!(changed_payload, location.bytes);
     let changed_package = rewrite_image_payload(&source, &location, &changed_payload)?;
     assert_eq!(
@@ -816,7 +860,7 @@ fn native_image_resaved_fixture_reads_changed_adjustments_and_roundtrips() -> Te
     assert_member_locality(&source, &changed_package, &location.member)?;
 
     let restored_payload =
-        __rewrite_image_adjustments_payload(&changed_payload, baseline, WireLimits::default())?;
+        rewrite_image_adjustments(&changed_payload, baseline, WireLimits::default())?;
     assert_eq!(restored_payload, location.bytes);
     let restored_package = rewrite_image_payload(
         &changed_package,
@@ -833,18 +877,43 @@ fn native_image_resaved_fixture_reads_changed_adjustments_and_roundtrips() -> Te
 }
 
 #[test]
+fn native_image_retirement_resaved_fixture_reads_and_exactly_noops() -> TestResult {
+    let source = std::fs::read(retirement_resaved_fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+    let expected = ImageAdjustments::new()
+        .with_exposure(Some(ImageAdjustment::new(-0.2)?))
+        .with_saturation(Some(ImageAdjustment::new(0.35)?))
+        .with_enhancement(Some(ImageEnhancement::Enabled));
+
+    assert_eq!(
+        package.body_image_adjustments(ImageSelector::index(0))?,
+        expected
+    );
+    let noop = package
+        .edit_body_image_adjustments(ImageSelector::index(0))?
+        .set(expected)?
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    assert!(!noop.diagnostics().changed());
+    let mut bytes = Vec::new();
+    noop.package().write_to(&mut bytes)?;
+    assert_eq!(bytes, source);
+    Ok(())
+}
+
+#[test]
 fn native_image_adjustments_reject_truncated_payload_with_typed_errors() -> TestResult {
     let source = std::fs::read(fixture_path())?;
     let location = image_payload(&source)?;
     let truncated = &location.bytes[..location.bytes.len().saturating_sub(1)];
-    let error = __decode_image_adjustments_payload(truncated, WireLimits::default()).unwrap_err();
-    assert!(matches!(error, ImageAdjustmentsError::Codec(_)));
-    let error = __rewrite_image_adjustments_payload(
-        truncated,
-        ImageAdjustments::default(),
-        WireLimits::default(),
-    )
-    .unwrap_err();
-    assert!(matches!(error, ImageAdjustmentsError::Codec(_)));
+    assert!(decode_image_adjustments(truncated, WireLimits::default()).is_err());
+    assert!(
+        rewrite_image_adjustments(
+            truncated,
+            ImageAdjustments::default(),
+            WireLimits::default(),
+        )
+        .is_err()
+    );
     Ok(())
 }

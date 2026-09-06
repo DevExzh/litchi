@@ -900,17 +900,6 @@ pub fn __decode_image_adjustments_payload(
     decode_image_adjustments_payload(source, wire_limits)
 }
 
-/// Rewrite one borrowed complete `TSD.ImageArchive` payload for the legacy host.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub fn __rewrite_image_adjustments_payload(
-    source: &[u8],
-    adjustments: ImageAdjustments,
-    wire_limits: WireLimits,
-) -> Result<Vec<u8>, ImageAdjustmentsError> {
-    rewrite_image_adjustments_payload(source, adjustments, wire_limits)
-}
-
 #[cfg(feature = "internal-iwork-source")]
 fn decode_image_adjustments_payload(
     source: &[u8],
@@ -935,34 +924,6 @@ fn decode_image_adjustments_snapshot(
     let (snapshot, report) =
         image_adjustments_codec::decode_image_adjustments_with_report(source, options)?;
     Ok((adjustments_from_snapshot(snapshot)?, report))
-}
-
-#[cfg(feature = "internal-iwork-source")]
-fn rewrite_image_adjustments_payload(
-    source: &[u8],
-    adjustments: ImageAdjustments,
-    wire_limits: WireLimits,
-) -> Result<Vec<u8>, ImageAdjustmentsError> {
-    let options = codec_options_for_limits(source, wire_limits);
-    let write = image_adjustments_write(adjustments);
-    Ok(image_adjustments_codec::rewrite_image_adjustments(
-        source, write, options,
-    )?)
-}
-
-#[cfg(feature = "internal-iwork-source")]
-fn codec_options_for_limits(
-    source: &[u8],
-    wire_limits: WireLimits,
-) -> image_adjustments_codec::DecodeOptions {
-    let recursion_limit = u32::try_from(wire_limits.max_nesting()).unwrap_or(u32::MAX);
-    image_adjustments_codec::DecodeOptions::new(
-        wire_limits.max_input_bytes().min(source.len().max(1)),
-        wire_limits.max_fields(),
-        wire_limits.max_rewrite_work(),
-        recursion_limit,
-    )
-    .with_max_output_bytes(wire_limits.max_output_bytes())
 }
 
 fn image_adjustments_write(adjustments: ImageAdjustments) -> ImageAdjustmentsWrite {

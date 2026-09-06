@@ -115,9 +115,7 @@ use sheet::DecodedSheet;
 
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
-pub use image_adjustments::{
-    __decode_image_adjustments_payload, __rewrite_image_adjustments_payload, ImageAdjustmentsError,
-};
+pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustmentsError};
 pub use image_adjustments::{
     SheetImageAdjustmentsCommit, SheetImageAdjustmentsDiagnostics, SheetImageAdjustmentsEdit,
     SheetImageAdjustmentsError, SheetImageAdjustmentsLimitKind, SheetImageAdjustmentsPatch,

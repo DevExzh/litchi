@@ -96,9 +96,7 @@ pub use catalog_table_appearance::{
 };
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
-pub use image_adjustments::{
-    __decode_image_adjustments_payload, __rewrite_image_adjustments_payload, ImageAdjustmentsError,
-};
+pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustmentsError};
 #[cfg(feature = "internal-iwork-source")]
 pub use slide_movie_playback::__decode_movie_playback_payload;
 #[cfg(feature = "internal-iwork-source")]

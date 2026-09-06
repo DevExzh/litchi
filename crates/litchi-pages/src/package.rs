@@ -114,9 +114,7 @@ pub use header_footer_text::{
     HeaderFooterTextError, HeaderFooterTextLimitKind, HeaderFooterTextPatch,
 };
 #[cfg(feature = "internal-iwork-source")]
-pub use image_adjustments::{
-    __decode_image_adjustments_payload, __rewrite_image_adjustments_payload, ImageAdjustmentsError,
-};
+pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustmentsError};
 pub use image_adjustments::{
     BodyImageAdjustmentsCommit, BodyImageAdjustmentsDiagnostics, BodyImageAdjustmentsEdit,
     BodyImageAdjustmentsError, BodyImageAdjustmentsLimitKind, BodyImageAdjustmentsPatch,
