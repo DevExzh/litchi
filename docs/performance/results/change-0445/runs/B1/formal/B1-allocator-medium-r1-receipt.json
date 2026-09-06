@@ -1,0 +1,119 @@
+{
+  "ambient_source_manifest": {
+    "files": 6661,
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0445/runs/B1/formal/B1-allocator-medium-r1-resource.log",
+    "/tmp/litchi-goal-0445-binaries/after/allocator",
+    "--case",
+    "opc_part_add_plain_lifecycle",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0445/runs/B1/formal/B1-allocator-medium-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0445/runs/B1/formal/B1-allocator-medium-r1-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4823,
+      "path": "runs/B1/formal/B1-allocator-medium-r1-catalog.json",
+      "sha256": "dad971401415aefd00f69a4616450aa5ceea7ebd57261d5aaeb88321f0669142"
+    },
+    "oracle_log": {
+      "bytes": 322,
+      "path": "runs/B1/formal/B1-allocator-medium-r1-oracle.log",
+      "sha256": "0faef49dbb18dc365c3703d546b649bea43763c2210acf5f6fbc37717432ea8a"
+    },
+    "report": {
+      "bytes": 46676,
+      "path": "runs/B1/formal/B1-allocator-medium-r1.json",
+      "sha256": "8e98b7d55f5045bbf9d608ad3728990f5262a8b7d1d4a3d020255702f154c1f2"
+    },
+    "resource_log": {
+      "bytes": 1102,
+      "path": "runs/B1/formal/B1-allocator-medium-r1-resource.log",
+      "sha256": "aada25fbc793d80ff9f92c9ec70c7ce9c886db5f14c2b468e4ccb97d948b30af"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/B1/formal/B1-allocator-medium-r1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 458065256,
+    "path": "/tmp/litchi-goal-0445-binaries/after/allocator",
+    "sha256": "1a41c08d336981404ba76ecd7ddca9bcb7d821af72c8bf9a2a0a23e639cba322"
+  },
+  "build_directory": "plain",
+  "change": 445,
+  "custody_driver": "/home/zhuhe/code/litchi/docs/performance/results/change-0445/check.py",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "214a35693a6a657daed45e87877e59a3216ca0d9eed6ce62ded659dd1dbe56b0",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T19:02:36.512307+00:00",
+  "lane": {
+    "mode": "allocator",
+    "phase": "B1",
+    "repeat": "R1",
+    "shape": "medium"
+  },
+  "name": "B1-allocator-medium-r1",
+  "oracle_exit_code": 0,
+  "oracle_role": "plain",
+  "oracle_stdout_sha256": "0faef49dbb18dc365c3703d546b649bea43763c2210acf5f6fbc37717432ea8a",
+  "outside_bundle_status_unchanged": true,
+  "phase": "B1",
+  "protocol_sha256": "1ab209b8d2b9543d0cb206600e0c99909637705aa679e6acd87951f9c3b4bc99",
+  "revision": "adf1ca69aa6ed21cc45e2dcdc01c6d5a81abb10c",
+  "role": "plain",
+  "schema": "litchi-0445-capture-receipt-v1",
+  "selector": "opc_part_add_plain_lifecycle",
+  "source_after": {
+    "files": 6661,
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0"
+  },
+  "source_before": {
+    "files": 6661,
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0"
+  },
+  "source_field": "opc_part_add",
+  "source_manifest": {
+    "files": 6661,
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T19:02:35.755044+00:00",
+  "status": "pass",
+  "status_after": [
+    " M tools/perf-baseline/src/lib.rs",
+    " M tools/perf-baseline/src/opc_part_add.rs",
+    " M tools/perf-baseline/src/operation_metrics.rs",
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    " M tools/perf-baseline/src/lib.rs",
+    " M tools/perf-baseline/src/opc_part_add.rs",
+    " M tools/perf-baseline/src/operation_metrics.rs",
+    "?? docs/GOAL.md"
+  ]
+}

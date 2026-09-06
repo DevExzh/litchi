@@ -1,0 +1,5 @@
+[
+  "tools/perf-baseline/src/lib.rs",
+  "tools/perf-baseline/src/opc_part_add.rs",
+  "tools/perf-baseline/src/operation_metrics.rs"
+]

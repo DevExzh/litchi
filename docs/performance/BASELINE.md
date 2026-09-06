@@ -1,5 +1,19 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0445: matched plain-source Part addition
+
+[0445](changes/0445-opc-part-add-plain-source.md) adds `opc_part_add_plain_lifecycle` beside the observed case.
+A single-build 24-report/720-sample observed/plain ABBA capture uses identical
+fixtures, timed publication and hashing sink. Plain normal p50 is 1.074–1.079 /
+5.230–5.280 / 18.869–18.886 ms at 64/1024/4096 Parts. Relative to observed mode,
+medium is 34.970–35.524% lower and large 69.576–69.635% lower. This quantifies
+observer overhead, not production improvement. Allocation calls/requested bytes
+and above-entry peaks match both modes; plain reads are explicitly unavailable.
+One observed-allocator tiny p99 repeat flag (-7.928%) is disclosed in
+[all measurements](results/change-0445/measurements.md). Four profiles expose
+content-type map parsing at 29.291% inclusive within the plain run-frame subset;
+that subset includes setup/probes and is not the exact timed interval.
+
 ## Change 0444: OPC Part-addition observed baseline
 
 [0444](changes/0444-opc-part-add-baseline.md) adds opt-in `opc_part_add_lifecycle`: open a source-backed OPC

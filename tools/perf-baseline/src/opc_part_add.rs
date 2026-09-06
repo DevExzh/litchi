@@ -30,6 +30,7 @@ const PAYLOAD_SEED: usize = 444;
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct Summary {
     pub(crate) role: &'static str,
+    pub(crate) source_mode: &'static str,
     pub(crate) implementation: &'static str,
     pub(crate) timing_scope: &'static str,
     pub(crate) performance_claim: &'static str,
@@ -401,6 +402,7 @@ pub(crate) fn build(shape: SemanticShape) -> Result<Fixture, Box<dyn Error>> {
     let gates = verify_gates(&corpus, &output, &added)?;
     let summary = Summary {
         role: "part_addition",
+        source_mode: "instrumented_read_at_v1",
         implementation: "SourceBackedPackage::from_read_at_with_cache_limits + SourceTopologyPlan + write_topology_to_stream",
         timing_scope: "caller source wrapper/input bytes, prepared payload and discard sink exist before entry; clock/allocation region include catalog open, plan construction and consuming sequential publication; catalog is dropped by the endpoint; input/payload remain live; source counter snapshots, digest finalization and full artifact oracles are outside",
         performance_claim: "current-revision low-level OPC Part-addition baseline only; no optimization, semantic Office owner, patch/merge, native, cold, remote, or bounded-total-memory claim",
@@ -433,9 +435,15 @@ pub(crate) fn build(shape: SemanticShape) -> Result<Fixture, Box<dyn Error>> {
 
 pub(crate) fn run(
     fixture: &Fixture,
+    case: Case,
     warmups: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
+    let plain = match case {
+        Case::OpcPartAddLifecycle => false,
+        Case::OpcPartAddPlainLifecycle => true,
+        _ => return Err("Part addition requires its dedicated lifecycle selector".into()),
+    };
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     let mut source_observations = Vec::with_capacity(samples);
@@ -444,7 +452,16 @@ pub(crate) fn run(
     let mut source_summary = SourceSummary::default();
     let limits = super::opc_source_cache_limits(&fixture.corpus)?;
     for iteration in 0..iteration_count(warmups, samples)? {
-        let (source, _) = super::opc_instrumented_source(&fixture.corpus)?;
+        let (source, observer): (Arc<dyn ReadAt>, Option<Arc<super::InstrumentedSource>>) = if plain
+        {
+            (
+                Arc::new(OwnedSource::new(fixture.corpus.archive.clone())),
+                None,
+            )
+        } else {
+            let (observed, _) = super::opc_instrumented_source(&fixture.corpus)?;
+            (observed.clone(), Some(observed))
+        };
         let payload = fixture.added.clone();
         let mut sink =
             HashingDiscardSink::without_authoring_window(u64::try_from(fixture.output.len())?);
@@ -457,7 +474,7 @@ pub(crate) fn run(
         let duration = start.elapsed();
         let allocation = region.finish();
         let process_after = process_metrics::Snapshot::read().ok();
-        let source_metrics = source.snapshot();
+        let source_metrics = observer.as_ref().map(|source| source.snapshot());
         let (summary, digest) = sink.finish();
         if digest != fixture.summary.output_archive_sha256
             || summary.accepted_bytes != u64::try_from(fixture.output.len())?
@@ -469,13 +486,15 @@ pub(crate) fn run(
             );
         }
         if iteration >= warmups {
-            source_observations.push(operation_metrics::InProcessSourceObservation {
-                read_calls: source_metrics.read_calls,
-                read_bytes: source_metrics.read_bytes,
-                max_concurrent_reads: source_metrics.max_in_flight_reads,
-            });
+            if let Some(source_metrics) = source_metrics {
+                source_observations.push(operation_metrics::InProcessSourceObservation {
+                    read_calls: source_metrics.read_calls,
+                    read_bytes: source_metrics.read_bytes,
+                    max_concurrent_reads: source_metrics.max_in_flight_reads,
+                });
+                source_summary.record(source_metrics);
+            }
             output_digests.push(digest);
-            source_summary.record(source_metrics);
             sinks.push(summary);
             observations.push(operation_metrics::InProcessObservation {
                 elapsed_ns: elapsed_ns(duration)?,
@@ -500,11 +519,16 @@ pub(crate) fn run(
         bytes_over_65536: sink.write_size_buckets.bytes_over_65536,
     };
     let mut evidence = fixture.summary.clone();
+    evidence.source_mode = if plain {
+        "plain_owned_source"
+    } else {
+        "instrumented_read_at_v1"
+    };
     evidence.lifecycle_ns = observations.iter().map(|value| value.elapsed_ns).collect();
     evidence.output_sha256 = output_digests;
     source_summary.opc_part_add = Some(evidence);
     Ok(CaseResult {
-        case: Case::OpcPartAddLifecycle.name(),
+        case: case.name(),
         cache_state: None,
         corpus: fixture.corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
@@ -512,13 +536,18 @@ pub(crate) fn run(
         source: Some(Box::new(source_summary)),
         execution: None,
         output_sha256: Some(fixture.summary.output_archive_sha256.clone()),
-        operation_metrics: Some(
+        operation_metrics: Some(if plain {
+            operation_metrics::from_in_process_unobserved_source_and_sink_observations(
+                &observations,
+                observation,
+            )?
+        } else {
             operation_metrics::from_in_process_source_and_sink_observations(
                 &observations,
                 &source_observations,
                 observation,
-            )?,
-        ),
+            )?
+        }),
     })
 }
 
@@ -582,7 +611,7 @@ mod tests {
     #[test]
     fn opc_part_add_lifecycle_reports_observed_source_and_discard_sink() {
         let fixture = build(SemanticShape::Tiny).unwrap();
-        let result = run(&fixture, 1, 2).unwrap();
+        let result = run(&fixture, Case::OpcPartAddLifecycle, 1, 2).unwrap();
         assert_eq!(result.case, "opc_part_add_lifecycle");
         assert_eq!(result.elapsed_ns.samples.len(), 2);
         let source = result.source.unwrap();
@@ -591,5 +620,38 @@ mod tests {
         assert!(source.ordinary_payload_materializations.is_none());
         assert_eq!(result.sink.unwrap().retained_output_bytes, Some(0));
         assert!(!Case::DEFAULT.contains(&Case::OpcPartAddLifecycle));
+    }
+    #[test]
+    fn plain_and_observed_lifecycles_match_without_fabricating_plain_reads() {
+        let fixture = build(SemanticShape::Tiny).unwrap();
+        let observed = run(&fixture, Case::OpcPartAddLifecycle, 1, 2).unwrap();
+        let plain = run(&fixture, Case::OpcPartAddPlainLifecycle, 1, 2).unwrap();
+        assert_eq!(plain.output_sha256, observed.output_sha256);
+        assert_eq!(
+            serde_json::to_value(plain.sink).unwrap(),
+            serde_json::to_value(observed.sink).unwrap()
+        );
+        let source = plain.source.as_ref().unwrap();
+        assert!(source.read_calls.is_empty() && source.read_bytes.is_empty());
+        assert!(
+            source.ordinary_payload_read_calls.is_empty()
+                && source.ordinary_payload_read_bytes.is_empty()
+        );
+        assert!(source.max_in_flight_reads.is_empty());
+        assert_eq!(
+            source.opc_part_add.as_ref().unwrap().source_mode,
+            "plain_owned_source"
+        );
+        let metrics = serde_json::to_value(&plain.operation_metrics).unwrap();
+        assert_eq!(metrics["source"]["status"], "unavailable");
+        for (key, value) in metrics["source"].as_object().unwrap() {
+            if !["status", "counter_scope"].contains(&key.as_str()) {
+                assert_eq!(value["status"], "unavailable", "{key}");
+                assert!(value.get("values").is_none(), "{key}");
+            }
+        }
+        assert_eq!(metrics["sink"]["accepted_bytes"]["status"], "measured");
+        assert!(!Case::DEFAULT.contains(&Case::OpcPartAddPlainLifecycle));
+        assert!(run(&fixture, Case::DEFAULT[0], 0, 1).is_err());
     }
 }

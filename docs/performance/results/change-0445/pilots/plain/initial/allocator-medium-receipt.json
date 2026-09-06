@@ -1,0 +1,101 @@
+{
+  "change": 445,
+  "phase": "preparatory-pilot",
+  "role": "plain",
+  "mode": "allocator",
+  "shape": "medium",
+  "samples": 3,
+  "warmups": 1,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0445/pilots/plain/initial/allocator-medium-resource.log",
+    "/tmp/litchi-goal-0445-binaries/after/allocator",
+    "--case",
+    "opc_part_add_plain_lifecycle",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--samples",
+    "3",
+    "--warmup",
+    "1",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0445/pilots/plain/initial/allocator-medium.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0445/pilots/plain/initial/allocator-medium-catalog.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "binary": {
+    "path": "/tmp/litchi-goal-0445-binaries/after/allocator",
+    "bytes": 458065256,
+    "sha256": "1a41c08d336981404ba76ecd7ddca9bcb7d821af72c8bf9a2a0a23e639cba322"
+  },
+  "driver_sha256": "91356a1285216df2462f34a773cd3d1b1c69b02de3a8fbf9910b98a57c14bad2",
+  "oracle_sha256": "ad8ad13c12e2e7591b2c5e0edd159513e0fd0808ba6e83d24cd6dbb700d9f246",
+  "protocol_sha256": "ffb5d7a06170648c76bc9c9d7965b7e84da95cd8d299710fada76622c67a0a67",
+  "oracle_path": "oracle/verify-report.py",
+  "protocol_path": "oracle/protocol.json",
+  "build_receipt": "checks/after-build.json",
+  "build_receipt_sha256": "156e4b01845ca348dd0f06b5a89141574d6cbb39926eb6f81ea0991e46647a64",
+  "source_before": {
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0",
+    "files": 6661
+  },
+  "started_utc": "2026-09-06T18:58:02.373649+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0445/oracle/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0445/pilots/plain/initial/allocator-medium.json",
+    "--mode",
+    "allocator",
+    "--shape",
+    "medium",
+    "--role",
+    "plain",
+    "--samples",
+    "3",
+    "--warmups",
+    "1"
+  ],
+  "oracle_exit_code": 0,
+  "source_after": {
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0",
+    "files": 6661
+  },
+  "source_unchanged": true,
+  "finished_utc": "2026-09-06T18:58:03.098848+00:00",
+  "artifacts": {
+    "pilots/plain/initial/allocator-medium.json": {
+      "bytes": 23550,
+      "sha256": "915d8fd6add0a3c9a18633747885ad654c17b17ffa46a30429eb68c31fb75be1"
+    },
+    "pilots/plain/initial/allocator-medium-catalog.json": {
+      "bytes": 4823,
+      "sha256": "dad971401415aefd00f69a4616450aa5ceea7ebd57261d5aaeb88321f0669142"
+    },
+    "pilots/plain/initial/allocator-medium-resource.log": {
+      "bytes": 1100,
+      "sha256": "65d4daf18e48feac0bcd35caa6a56b47a4eba885226e33069644959a6726459a"
+    },
+    "pilots/plain/initial/allocator-medium.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pilots/plain/initial/allocator-medium-oracle.log": {
+      "bytes": 6,
+      "sha256": "de545cc7e7ff8eaacefae8fcb4a954555a1224f24fe7ce8ff62b9874c54f3fe2"
+    }
+  }
+}

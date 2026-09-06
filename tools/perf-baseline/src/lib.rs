@@ -1091,6 +1091,7 @@ enum Case {
     OpcSourceCacheControlContention,
     OpcSourceCacheManagedContention,
     OpcPartAddLifecycle,
+    OpcPartAddPlainLifecycle,
     OpcSourceOverlayOnePartSave,
     OpcSourceOverlayMultiPartChanged,
     OpcSourceOverlayMultiPartNoop,
@@ -1572,6 +1573,7 @@ impl Case {
             Self::OpcSourceCacheControlContention => "opc_source_cache_control_contention",
             Self::OpcSourceCacheManagedContention => "opc_source_cache_managed_contention",
             Self::OpcPartAddLifecycle => "opc_part_add_lifecycle",
+            Self::OpcPartAddPlainLifecycle => "opc_part_add_plain_lifecycle",
             Self::OpcSourceOverlayOnePartSave => "opc_source_overlay_one_part_save",
             Self::OpcSourceOverlayMultiPartChanged => "opc_source_overlay_multi_part_changed",
             Self::OpcSourceOverlayMultiPartNoop => "opc_source_overlay_multi_part_noop",
@@ -2675,7 +2677,10 @@ impl Case {
     }
 
     const fn uses_opc_part_add(self) -> bool {
-        matches!(self, Self::OpcPartAddLifecycle)
+        matches!(
+            self,
+            Self::OpcPartAddLifecycle | Self::OpcPartAddPlainLifecycle
+        )
     }
 
     const fn uses_odp_existing_append(self) -> bool {
@@ -10580,11 +10585,14 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     if options.cases.iter().any(|case| case.uses_opc_part_add()) {
         for shape in &options.semantic_shapes {
             let fixture = opc_part_add::build(*shape)?;
-            results.push(opc_part_add::run(
-                &fixture,
-                options.warmup_iterations,
-                options.samples,
-            )?);
+            for case in options.cases.iter().filter(|case| case.uses_opc_part_add()) {
+                results.push(opc_part_add::run(
+                    &fixture,
+                    *case,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
         }
     }
 
@@ -11291,6 +11299,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_source_cache_control_contention" => Some(Case::OpcSourceCacheControlContention),
         "opc_source_cache_managed_contention" => Some(Case::OpcSourceCacheManagedContention),
         "opc_part_add_lifecycle" => Some(Case::OpcPartAddLifecycle),
+        "opc_part_add_plain_lifecycle" => Some(Case::OpcPartAddPlainLifecycle),
         "opc_source_overlay_one_part_save" => Some(Case::OpcSourceOverlayOnePartSave),
         "opc_source_overlay_multi_part_changed" => Some(Case::OpcSourceOverlayMultiPartChanged),
         "opc_source_overlay_multi_part_noop" => Some(Case::OpcSourceOverlayMultiPartNoop),
@@ -11956,7 +11965,7 @@ fn usage_text() -> String {
                                        opc_source_cache_budget_boundary,\n\
                                        opc_source_cache_control_contention,\n\
                                        opc_source_cache_managed_contention,\n\
-                                       opc_part_add_lifecycle, opc_source_overlay_one_part_save,\n\
+                                       opc_part_add_lifecycle, opc_part_add_plain_lifecycle, opc_source_overlay_one_part_save,\n\
                                        opc_source_overlay_multi_part_changed,\n\
                                        opc_source_overlay_multi_part_noop,\n\
                                        opc_source_overlay_multi_part_mixed,\n\
@@ -22637,7 +22646,7 @@ fn run_case_with_config(
         | Case::OpcSourceCacheManagedContention => {
             Err("OPC source-cache evidence uses its fixed matrix runner".into())
         },
-        Case::OpcPartAddLifecycle => {
+        Case::OpcPartAddLifecycle | Case::OpcPartAddPlainLifecycle => {
             Err("OPC Part addition uses its dedicated corpus runner".into())
         },
         Case::OpcSourceOverlayOnePartSave => {
@@ -58678,7 +58687,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 437);
+        assert_eq!(selectable_count, 438);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 

@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## Change 0445: observer separated; content-type allocations next
+
+[0445](changes/0445-opc-part-add-plain-source.md) measures the same Part-addition lifecycle with a plain OwnedSource.
+Large normal p50 drops from about 62.1 ms observed to 18.9 ms plain, while
+allocation calls/requested bytes/above-entry peaks remain identical. The
+instrumented reader accounts for 68.989% of observed run-frame self period.
+Its removal calibrates the benchmark and is not a production optimization.
+
+Plain inclusive run-frame samples attribute 59.290% to publication, 40.552%
+to opening and 29.291% to ContentTypeMap parsing; those rows overlap and include
+setup/probes. [Source review](results/change-0445/hotspot-review.md) identifies
+an owned Part-name String passed by reference to an Into<String> constructor,
+causing a clone during repeated content-type parsing. Measure that ownership
+handoff before broad parser/SIMD changes. Keep freshness, generated-candidate
+validation and managed-memory accounting; a naive manifest cache is not justified.
+
 ## Change 0444: Part-addition observer cost precedes production attribution
 
 [0444](changes/0444-opc-part-add-baseline.md) establishes a low-level OPC one-Part/root-relationship addition

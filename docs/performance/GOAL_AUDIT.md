@@ -1,6 +1,23 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0444
+## Current evidence through 0445
+
+[0445](changes/0445-opc-part-add-plain-source.md) adds a matched plain-source Part-addition lifecycle and a single-build
+24-report/720-sample calibration. Plain large normal p50 is about 18.9 ms versus
+62.1 ms observed; this is observer overhead, not a production speedup. Allocation
+calls/requested bytes/above-entry peaks match. One instrumented p99 repeat flag
+is disclosed. The 373 harness tests, 37 topology tests and 53 corruption probes
+pass; strict harness Clippy retains inherited debt with zero new diagnostics.
+
+Plain stack evidence points to content-type map construction. Source inspection
+finds an avoidable owned-string clone as the next small measured candidate;
+required validation, freshness and memory accounting must remain. The standalone
+selector count is 438, with unchanged defaults and semantic representative
+coverage. Native breadth, repackaging, semantic dependency closures, bounded
+existing append, cold/range and scaling remain open. The full user-owned
+non-iWork goal is active and uncompleted.
+
+## Earlier evidence through 0444
 
 [0444](changes/0444-opc-part-add-baseline.md) adds a low-level source-backed OPC Part-addition baseline:
 12 reports/360 samples, three sizes, normal and allocator repeats, actual

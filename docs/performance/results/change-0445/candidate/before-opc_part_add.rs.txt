@@ -1,0 +1,595 @@
+//! Source-backed OPC Part addition through sequential topology publication.
+//! This measures package topology, not semantic Office owner creation.
+
+use super::{
+    BlobPart, CONTENT_TYPE, Case, CaseResult, Corpus, CorpusManifest, HashingDiscardSink,
+    OpcPackage, PackURI, PackageWriter, PayloadKind, PptxRevisionSource, SemanticShape,
+    SourceSummary, TargetMode, allocation_metrics, deterministic_sink_summary, elapsed_ns,
+    entry_name, iteration_count, operation_metrics, payload_bytes, process_metrics, raw_zip_layout,
+    raw_zip_members, record_elapsed, relationship_signatures, sha256_hex, statistics,
+};
+use litchi_core::{OwnedSource, ReadAt, SourceVersion};
+use litchi_opc::{OpcError, ReadLimits, ReadResource, SourceBackedPackage, SourceTopologyPlan};
+use serde::Serialize;
+use std::{
+    error::Error,
+    io::{self, Write},
+    path::Path,
+    sync::Arc,
+};
+
+const GENERATOR: &str = "litchi-opc-part-add-lifecycle-v1";
+const ADDED_NAME: &str = "benchmark/added/leaf.bin";
+const ADDED_TYPE: &str = "application/vnd.litchi.perf.added-part";
+const REL_ID: &str = "rIdPartAddition";
+const REL_TYPE: &str = "urn:litchi:perf:relationships:added-part";
+const ENTRY_BYTES: usize = 1024;
+const ADDED_BYTES: usize = 64 * 1024;
+const PAYLOAD_SEED: usize = 444;
+
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct Summary {
+    pub(crate) role: &'static str,
+    pub(crate) implementation: &'static str,
+    pub(crate) timing_scope: &'static str,
+    pub(crate) performance_claim: &'static str,
+    pub(crate) shape: &'static str,
+    pub(crate) source_part_count: usize,
+    pub(crate) output_part_count: usize,
+    pub(crate) source_member_count: usize,
+    pub(crate) output_member_count: usize,
+    pub(crate) source_archive_sha256: String,
+    pub(crate) output_archive_sha256: String,
+    pub(crate) source_archive_bytes: usize,
+    pub(crate) output_archive_bytes: usize,
+    pub(crate) added_member: &'static str,
+    pub(crate) added_content_type: &'static str,
+    pub(crate) added_payload_bytes: usize,
+    pub(crate) added_payload_sha256: String,
+    pub(crate) relationship_id: &'static str,
+    pub(crate) relationship_type: &'static str,
+    pub(crate) gates: Gates,
+    pub(crate) lifecycle_ns: Vec<u64>,
+    pub(crate) output_sha256: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct Gates {
+    pub(crate) payload_and_topology_verified: bool,
+    pub(crate) raw_untouched_members_verified: bool,
+    pub(crate) content_types_lexical_verified: bool,
+    pub(crate) exact_noop_verified: bool,
+    pub(crate) duplicate_part_refusal_verified: bool,
+    pub(crate) missing_target_refusal_verified: bool,
+    pub(crate) stale_source_refusal_verified: bool,
+    pub(crate) short_read_verified: bool,
+    pub(crate) partial_sink_verified: bool,
+    pub(crate) output_limit_verified: bool,
+    pub(crate) part_limit_verified: bool,
+}
+
+pub(crate) struct Fixture {
+    corpus: Corpus,
+    output: Vec<u8>,
+    added: Arc<Vec<u8>>,
+    summary: Summary,
+}
+
+fn count(shape: SemanticShape) -> usize {
+    match shape {
+        SemanticShape::Tiny => 64,
+        SemanticShape::Medium => 1024,
+        SemanticShape::Large => 4096,
+    }
+}
+
+fn ordinary_payload(index: usize) -> Vec<u8> {
+    payload_bytes(
+        if index.is_multiple_of(2) {
+            PayloadKind::Compressible
+        } else {
+            PayloadKind::Incompressible
+        },
+        index,
+        ENTRY_BYTES,
+    )
+}
+
+fn plan(added: Arc<Vec<u8>>) -> Result<SourceTopologyPlan, Box<dyn Error>> {
+    let uri = PackURI::new(format!("/{ADDED_NAME}"))?;
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_add_part_shared(uri.clone(), ADDED_TYPE, added)?;
+    plan.try_add_internal_relationship(PackURI::new("/")?, REL_ID, REL_TYPE, uri)?;
+    Ok(plan)
+}
+
+fn publish(source: &[u8], plan: SourceTopologyPlan) -> Result<Vec<u8>, Box<dyn Error>> {
+    let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source.to_vec())))?;
+    let mut output = Vec::new();
+    package.write_topology_to_stream(&mut output, plan)?;
+    Ok(output)
+}
+
+fn verify(corpus: &Corpus, output: &[u8], added: &[u8]) -> Result<(), Box<dyn Error>> {
+    let source = OpcPackage::from_bytes(&corpus.archive)?;
+    let actual = OpcPackage::from_bytes(output)?;
+    if actual.part_count() != corpus.manifest.entry_count + 1 {
+        return Err("Part addition count differs".into());
+    }
+    let added_uri = PackURI::new(format!("/{ADDED_NAME}"))?;
+    let part = actual.get_part(&added_uri)?;
+    if part.blob() != added || part.content_type() != ADDED_TYPE || !part.rels().is_empty() {
+        return Err("added Part payload/type/relationships differ".into());
+    }
+    let mut expected = source.clone();
+    expected.try_add_part(Box::new(BlobPart::new(
+        added_uri,
+        ADDED_TYPE.to_owned(),
+        added.to_vec(),
+    )))?;
+    expected.rels_mut().try_add_relationship(
+        REL_TYPE.to_owned(),
+        ADDED_NAME.to_owned(),
+        REL_ID.to_owned(),
+        TargetMode::Internal,
+    )?;
+    if relationship_signatures(actual.rels()) != relationship_signatures(expected.rels()) {
+        return Err("Part addition root topology differs from eager construction".into());
+    }
+    for index in 0..corpus.manifest.entry_count {
+        let uri = PackURI::new(format!("/{}", entry_name(index)))?;
+        let original = source.get_part(&uri)?;
+        let candidate = actual.get_part(&uri)?;
+        if original.blob() != ordinary_payload(index)
+            || candidate.blob() != original.blob()
+            || candidate.content_type() != original.content_type()
+            || relationship_signatures(candidate.rels()) != relationship_signatures(original.rels())
+        {
+            return Err("Part addition changed an ordinary source Part".into());
+        }
+    }
+    let source_raw = raw_zip_members(&corpus.archive)?;
+    let output_raw = raw_zip_members(output)?;
+    if output_raw.len() != source_raw.len() + 1 || !output_raw.contains_key(ADDED_NAME) {
+        return Err("Part addition physical member set differs".into());
+    }
+    for (name, original) in &source_raw {
+        if name != "[Content_Types].xml"
+            && name != "_rels/.rels"
+            && output_raw.get(name) != Some(original)
+        {
+            return Err("Part addition altered an untouched ZIP record".into());
+        }
+    }
+    let before_layout = raw_zip_layout(&corpus.archive)?;
+    let after_layout = raw_zip_layout(output)?;
+    let without_added = |names: &[String]| {
+        names
+            .iter()
+            .filter(|name| name.as_str() != ADDED_NAME)
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    if before_layout.0 != without_added(&after_layout.0)
+        || before_layout.1 != without_added(&after_layout.1)
+        || before_layout.2 != after_layout.2
+    {
+        return Err("Part addition changed source member order or archive comment".into());
+    }
+    let source_archive = soapberry_zip::office::ArchiveReader::new(&corpus.archive)?;
+    let output_archive = soapberry_zip::office::ArchiveReader::new(output)?;
+    let mut source_types = Vec::new();
+    source_archive.read_to("[Content_Types].xml", &mut source_types)?;
+    let expected_types = super::pptx_source_backed_expected_content_types(
+        &source_types,
+        &PackURI::new(format!("/{ADDED_NAME}"))?,
+        ADDED_TYPE,
+    )?;
+    let mut actual_types = Vec::new();
+    output_archive.read_to("[Content_Types].xml", &mut actual_types)?;
+    if actual_types != expected_types {
+        return Err("Part addition did not preserve content-types lexical bytes".into());
+    }
+    Ok(())
+}
+
+struct ShortSource(OwnedSource);
+impl ReadAt for ShortSource {
+    fn len(&self) -> io::Result<u64> {
+        self.0.len()
+    }
+    fn version(&self) -> io::Result<SourceVersion> {
+        self.0.version()
+    }
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let limit = output.len().min(7);
+        self.0.read_at(offset, &mut output[..limit])
+    }
+}
+
+struct PartialSink {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+impl Write for PartialSink {
+    fn write(&mut self, input: &[u8]) -> io::Result<usize> {
+        if self.bytes.len() >= self.limit {
+            return Err(io::Error::other("injected Part-add sink failure"));
+        }
+        let count = input.len().min(self.limit - self.bytes.len());
+        self.bytes.extend_from_slice(&input[..count]);
+        Ok(count)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn verify_gates(
+    corpus: &Corpus,
+    output: &[u8],
+    added: &Arc<Vec<u8>>,
+) -> Result<Gates, Box<dyn Error>> {
+    if publish(&corpus.archive, SourceTopologyPlan::new())? != corpus.archive {
+        return Err("topology empty plan is not exact".into());
+    }
+    let mut duplicate = SourceTopologyPlan::new();
+    duplicate.try_add_part(
+        PackURI::new(format!("/{}", corpus.target_name))?,
+        ADDED_TYPE,
+        vec![1],
+    )?;
+    let package =
+        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(corpus.archive.clone())))?;
+    let mut refused = Vec::new();
+    if !matches!(
+        package.write_topology_to_stream(&mut refused, duplicate),
+        Err(OpcError::DuplicatePartName(_))
+    ) || !refused.is_empty()
+    {
+        return Err("duplicate Part did not refuse before output".into());
+    }
+    let mut missing = SourceTopologyPlan::new();
+    missing.try_add_internal_relationship(
+        PackURI::new("/")?,
+        REL_ID,
+        REL_TYPE,
+        PackURI::new("/missing.bin")?,
+    )?;
+    let package =
+        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(corpus.archive.clone())))?;
+    if !matches!(
+        package.write_topology_to_stream(&mut refused, missing),
+        Err(OpcError::PartNotFound(_))
+    ) || !refused.is_empty()
+    {
+        return Err("missing relationship target did not refuse before output".into());
+    }
+    let changing = Arc::new(PptxRevisionSource::new(corpus.archive.clone()));
+    let package = SourceBackedPackage::from_read_at(changing.clone())?;
+    changing.replace(corpus.archive.clone())?;
+    if !matches!(
+        package.write_topology_to_stream(&mut refused, plan(added.clone())?),
+        Err(OpcError::SourceChanged { .. })
+    ) || !refused.is_empty()
+    {
+        return Err("stale topology source did not refuse before output".into());
+    }
+    let package = SourceBackedPackage::from_read_at(Arc::new(ShortSource(OwnedSource::new(
+        corpus.archive.clone(),
+    ))))?;
+    let mut short = Vec::new();
+    package.write_topology_to_stream(&mut short, plan(added.clone())?)?;
+    if short != output {
+        return Err("short-read topology output differs".into());
+    }
+    let package =
+        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(corpus.archive.clone())))?;
+    let mut partial = PartialSink {
+        bytes: Vec::new(),
+        limit: 257,
+    };
+    if package
+        .write_topology_to_stream(&mut partial, plan(added.clone())?)
+        .is_ok()
+        || partial.bytes.is_empty()
+        || partial.bytes.len() > partial.limit
+        || partial.bytes != output[..partial.bytes.len()]
+    {
+        return Err("partial sink failure contract differs".into());
+    }
+    let package =
+        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(corpus.archive.clone())))?;
+    let mut limited =
+        HashingDiscardSink::without_authoring_window(u64::try_from(output.len() - 1)?);
+    if package
+        .write_topology_to_stream(&mut limited, plan(added.clone())?)
+        .is_ok()
+    {
+        return Err("output ceiling was not enforced".into());
+    }
+    let parts = corpus.manifest.entry_count;
+    for maximum in [parts, parts + 1] {
+        let limits = ReadLimits::builder().max_parts(maximum)?.build()?;
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(OwnedSource::new(corpus.archive.clone())),
+            limits,
+        )?;
+        let mut bounded = Vec::new();
+        let result = package.write_topology_to_stream(&mut bounded, plan(added.clone())?);
+        if maximum == parts {
+            if !matches!(result, Err(OpcError::ReadLimit {
+                resource: ReadResource::Parts, actual, maximum
+            }) if actual == (parts + 1) as u64 && maximum == parts as u64)
+                || !bounded.is_empty()
+            {
+                return Err("Part count limit did not refuse before output".into());
+            }
+        } else {
+            result?;
+            if bounded != output {
+                return Err("exact Part count limit changed output".into());
+            }
+        }
+    }
+    Ok(Gates {
+        payload_and_topology_verified: true,
+        raw_untouched_members_verified: true,
+        content_types_lexical_verified: true,
+        exact_noop_verified: true,
+        duplicate_part_refusal_verified: true,
+        missing_target_refusal_verified: true,
+        stale_source_refusal_verified: true,
+        short_read_verified: true,
+        partial_sink_verified: true,
+        output_limit_verified: true,
+        part_limit_verified: true,
+    })
+}
+
+pub(crate) fn build(shape: SemanticShape) -> Result<Fixture, Box<dyn Error>> {
+    let entries = count(shape);
+    let mut package = OpcPackage::new();
+    for index in 0..entries {
+        package.try_add_part(Box::new(BlobPart::new(
+            PackURI::new(format!("/{}", entry_name(index)))?,
+            CONTENT_TYPE.to_owned(),
+            ordinary_payload(index),
+        )))?;
+    }
+    let target_name = entry_name(entries / 2);
+    package.rels_mut().try_add_relationship(
+        super::relationship_type::OFFICE_DOCUMENT.to_owned(),
+        target_name.clone(),
+        "rIdBenchmarkMain".to_owned(),
+        TargetMode::Internal,
+    )?;
+    let archive = PackageWriter::to_bytes(&package)?;
+    let target_payload = ordinary_payload(entries / 2);
+    let corpus = Corpus {
+        manifest: CorpusManifest {
+            name: format!("opc-part-add-{}", shape.name()),
+            generator: GENERATOR,
+            package_format: "OPC/ZIP",
+            shape: shape.name(),
+            payload_kind: "alternating-compressible-incompressible",
+            compression: "deflate",
+            entry_count: entries,
+            archive_member_count: entries + 2,
+            entry_bytes: ENTRY_BYTES,
+            uncompressed_payload_bytes: entries * ENTRY_BYTES,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: target_name.clone(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name,
+        target_payload,
+        xlsx: None,
+    };
+    let added = Arc::new(payload_bytes(
+        PayloadKind::Incompressible,
+        PAYLOAD_SEED,
+        ADDED_BYTES,
+    ));
+    let output = publish(&corpus.archive, plan(added.clone())?)?;
+    verify(&corpus, &output, &added)?;
+    let gates = verify_gates(&corpus, &output, &added)?;
+    let summary = Summary {
+        role: "part_addition",
+        implementation: "SourceBackedPackage::from_read_at_with_cache_limits + SourceTopologyPlan + write_topology_to_stream",
+        timing_scope: "caller source wrapper/input bytes, prepared payload and discard sink exist before entry; clock/allocation region include catalog open, plan construction and consuming sequential publication; catalog is dropped by the endpoint; input/payload remain live; source counter snapshots, digest finalization and full artifact oracles are outside",
+        performance_claim: "current-revision low-level OPC Part-addition baseline only; no optimization, semantic Office owner, patch/merge, native, cold, remote, or bounded-total-memory claim",
+        shape: shape.name(),
+        source_part_count: entries,
+        output_part_count: entries + 1,
+        source_member_count: entries + 2,
+        output_member_count: entries + 3,
+        source_archive_sha256: corpus.manifest.archive_sha256.clone(),
+        output_archive_sha256: sha256_hex(&output),
+        source_archive_bytes: corpus.archive.len(),
+        output_archive_bytes: output.len(),
+        added_member: ADDED_NAME,
+        added_content_type: ADDED_TYPE,
+        added_payload_bytes: added.len(),
+        added_payload_sha256: sha256_hex(&added),
+        relationship_id: REL_ID,
+        relationship_type: REL_TYPE,
+        gates,
+        lifecycle_ns: Vec::new(),
+        output_sha256: Vec::new(),
+    };
+    Ok(Fixture {
+        corpus,
+        output,
+        added,
+        summary,
+    })
+}
+
+pub(crate) fn run(
+    fixture: &Fixture,
+    warmups: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
+    let mut source_observations = Vec::with_capacity(samples);
+    let mut output_digests = Vec::with_capacity(samples);
+    let mut sinks = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let limits = super::opc_source_cache_limits(&fixture.corpus)?;
+    for iteration in 0..iteration_count(warmups, samples)? {
+        let (source, _) = super::opc_instrumented_source(&fixture.corpus)?;
+        let payload = fixture.added.clone();
+        let mut sink =
+            HashingDiscardSink::without_authoring_window(u64::try_from(fixture.output.len())?);
+        let process_before = process_metrics::Snapshot::read().ok();
+        let region = allocation_metrics::begin();
+        let start = std::time::Instant::now();
+        let package = SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), limits)?;
+        let topology = plan(payload.clone())?;
+        package.write_topology_to_stream(&mut sink, topology)?;
+        let duration = start.elapsed();
+        let allocation = region.finish();
+        let process_after = process_metrics::Snapshot::read().ok();
+        let source_metrics = source.snapshot();
+        let (summary, digest) = sink.finish();
+        if digest != fixture.summary.output_archive_sha256
+            || summary.accepted_bytes != u64::try_from(fixture.output.len())?
+            || summary.retained_output_bytes != Some(0)
+            || summary.retained_authoring_window_bytes.is_some()
+        {
+            return Err(
+                "Part addition measured sink differs from independently checked fixture".into(),
+            );
+        }
+        if iteration >= warmups {
+            source_observations.push(operation_metrics::InProcessSourceObservation {
+                read_calls: source_metrics.read_calls,
+                read_bytes: source_metrics.read_bytes,
+                max_concurrent_reads: source_metrics.max_in_flight_reads,
+            });
+            output_digests.push(digest);
+            source_summary.record(source_metrics);
+            sinks.push(summary);
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns: elapsed_ns(duration)?,
+                process_metrics: process_before
+                    .zip(process_after)
+                    .map(|(before, after)| after.delta(before)),
+                allocation_metrics: allocation,
+            });
+        }
+        record_elapsed(&mut elapsed, iteration, warmups, duration)?;
+    }
+    let sink = deterministic_sink_summary(&sinks, "OPC Part addition")?;
+    let observation = operation_metrics::SinkObservation {
+        accepted_bytes: sink.accepted_bytes,
+        write_calls: sink.write_calls,
+        largest_write: sink.largest_write,
+        bytes_0: sink.write_size_buckets.bytes_0,
+        bytes_1_to_512: sink.write_size_buckets.bytes_1_to_512,
+        bytes_513_to_4096: sink.write_size_buckets.bytes_513_to_4096,
+        bytes_4097_to_16384: sink.write_size_buckets.bytes_4097_to_16384,
+        bytes_16385_to_65536: sink.write_size_buckets.bytes_16385_to_65536,
+        bytes_over_65536: sink.write_size_buckets.bytes_over_65536,
+    };
+    let mut evidence = fixture.summary.clone();
+    evidence.lifecycle_ns = observations.iter().map(|value| value.elapsed_ns).collect();
+    evidence.output_sha256 = output_digests;
+    source_summary.opc_part_add = Some(evidence);
+    Ok(CaseResult {
+        case: Case::OpcPartAddLifecycle.name(),
+        cache_state: None,
+        corpus: fixture.corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(Box::new(source_summary)),
+        execution: None,
+        output_sha256: Some(fixture.summary.output_archive_sha256.clone()),
+        operation_metrics: Some(
+            operation_metrics::from_in_process_source_and_sink_observations(
+                &observations,
+                &source_observations,
+                observation,
+            )?,
+        ),
+    })
+}
+
+pub(crate) fn export(directory: &Path) -> Result<(), Box<dyn Error>> {
+    std::fs::create_dir(directory)?;
+    for shape in [
+        SemanticShape::Tiny,
+        SemanticShape::Medium,
+        SemanticShape::Large,
+    ] {
+        let fixture = build(shape)?;
+        let name = shape.name();
+        std::fs::write(
+            directory.join(format!("{name}-source.zip")),
+            &fixture.corpus.archive,
+        )?;
+        std::fs::write(
+            directory.join(format!("{name}-output.zip")),
+            &fixture.output,
+        )?;
+        std::fs::write(
+            directory.join(format!("{name}.json")),
+            serde_json::to_vec_pretty(&fixture.summary)?,
+        )?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn opc_part_add_fixture_and_all_refusal_gates_are_deterministic() {
+        let a = build(SemanticShape::Tiny).unwrap();
+        let b = build(SemanticShape::Tiny).unwrap();
+        assert_eq!(a.corpus.archive, b.corpus.archive);
+        assert_eq!(a.output, b.output);
+        assert_eq!(a.summary.source_part_count, 64);
+        assert_eq!(a.summary.output_part_count, 65);
+        assert_ne!(a.corpus.archive, a.output);
+    }
+    #[test]
+    fn opc_part_add_oracle_rejects_added_payload_and_untouched_part_changes() {
+        let fixture = build(SemanticShape::Tiny).unwrap();
+        for name in [ADDED_NAME.to_owned(), entry_name(0)] {
+            let mut package = OpcPackage::from_bytes(&fixture.output).unwrap();
+            package
+                .get_part_mut(&PackURI::new(format!("/{name}")).unwrap())
+                .unwrap()
+                .set_blob(vec![7]);
+            assert!(
+                verify(
+                    &fixture.corpus,
+                    &PackageWriter::to_bytes(&package).unwrap(),
+                    &fixture.added
+                )
+                .is_err()
+            );
+        }
+    }
+    #[test]
+    fn opc_part_add_lifecycle_reports_observed_source_and_discard_sink() {
+        let fixture = build(SemanticShape::Tiny).unwrap();
+        let result = run(&fixture, 1, 2).unwrap();
+        assert_eq!(result.case, "opc_part_add_lifecycle");
+        assert_eq!(result.elapsed_ns.samples.len(), 2);
+        let source = result.source.unwrap();
+        assert_eq!(source.read_calls.len(), 2);
+        assert!(source.read_calls.iter().all(|value| *value > 0));
+        assert!(source.ordinary_payload_materializations.is_none());
+        assert_eq!(result.sink.unwrap().retained_output_bytes, Some(0));
+        assert!(!Case::DEFAULT.contains(&Case::OpcPartAddLifecycle));
+    }
+}

@@ -886,6 +886,34 @@ pub(crate) fn from_in_process_source_and_sink_observations(
     Ok(metrics)
 }
 
+/// Keep source reads explicitly unavailable for a plain ReadAt lifecycle.
+/// Its sink, process and allocator observations retain their actual status.
+pub(crate) fn from_in_process_unobserved_source_and_sink_observations(
+    observations: &[InProcessObservation],
+    sink: SinkObservation,
+) -> Result<OperationMetrics, Box<dyn Error>> {
+    const SCOPE: &str = "unavailable_plain_read_at_without_source_observer";
+    let mut metrics = from_in_process_observations(observations, sink)?;
+    let source = &mut metrics.source;
+    source.status = MetricStatus::Unavailable;
+    source.counter_scope = SCOPE.to_owned();
+    for vector in [
+        &mut source.logical_read_calls,
+        &mut source.logical_read_requested_bytes,
+        &mut source.logical_read_returned_bytes,
+        &mut source.logical_read_largest_requested_bytes,
+        &mut source.logical_read_largest_returned_bytes,
+        &mut source.compressed_bytes,
+        &mut source.decompressed_bytes,
+        &mut source.recompressed_bytes,
+        &mut source.max_concurrent_reads,
+    ] {
+        *vector = MetricVector::absent(MetricStatus::Unavailable, SCOPE);
+    }
+    source.logical_read_pattern = PatternVector::absent(MetricStatus::Unavailable, SCOPE);
+    Ok(metrics)
+}
+
 fn attach_in_process_sources(
     metrics: &mut OperationMetrics,
     source_observations: &[InProcessSourceObservation],
