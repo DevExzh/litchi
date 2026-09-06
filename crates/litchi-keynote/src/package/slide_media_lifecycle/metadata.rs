@@ -170,6 +170,8 @@ pub(super) type DataMetadataMapWitness<'source> = media_codec::DataMetadataMapSo
 /// vocabulary.
 pub(super) type IdentityAddition<'source> = identity_codec::ObjectUuidAddition<'source>;
 pub(super) type IdentityRemoval<'source> = identity_codec::ObjectUuidRemoval<'source>;
+pub(super) type IdentityExternalRemoval<'source> =
+    identity_codec::ExternalReferenceRemoval<'source>;
 pub(super) type IdentitySaveTokens<'source> = identity_codec::SaveTokenBatch<'source>;
 
 /// Media owner/data-record changes to apply with the UUID transition.
@@ -182,6 +184,7 @@ pub(super) struct IdentityBatch<'source> {
     new_last_identifier: Option<u64>,
     additions: &'source [IdentityAddition<'source>],
     removals: &'source [IdentityRemoval<'source>],
+    external_reference_removals: &'source [IdentityExternalRemoval<'source>],
     save_tokens: Option<IdentitySaveTokens<'source>>,
 }
 
@@ -200,6 +203,7 @@ impl<'source> IdentityBatch<'source> {
             new_last_identifier: Some(new_last_identifier),
             additions,
             removals: &[],
+            external_reference_removals: &[],
             save_tokens: None,
         }
     }
@@ -216,8 +220,22 @@ impl<'source> IdentityBatch<'source> {
             new_last_identifier: None,
             additions: &[],
             removals,
+            external_reference_removals: &[],
             save_tokens: None,
         }
+    }
+
+    /// Attach exact current component-external-reference removals to this
+    /// source-atomic transition.  The requests must be prepared by
+    /// [`MetadataSnapshot::prepare_current_external_dependency_removal`]
+    /// against the same source snapshot supplied to `rewrite_metadata`.
+    #[must_use]
+    pub(super) const fn with_external_reference_removals(
+        mut self,
+        removals: &'source [IdentityExternalRemoval<'source>],
+    ) -> Self {
+        self.external_reference_removals = removals;
+        self
     }
 
     #[must_use]
@@ -238,6 +256,13 @@ impl<'source> IdentityBatch<'source> {
     #[must_use]
     pub(super) const fn uuid_removals(self) -> &'source [IdentityRemoval<'source>] {
         self.removals
+    }
+
+    #[must_use]
+    pub(super) const fn external_reference_removals(
+        self,
+    ) -> &'source [IdentityExternalRemoval<'source>] {
+        self.external_reference_removals
     }
 }
 
@@ -485,7 +510,8 @@ impl<'source> MetadataSnapshot<'source> {
     /// Return the bounded census cost of one external-dependency witness.
     /// The lookup resolves both current selectors and then scans every
     /// retained external record.  Callers should charge this once for each
-    /// distinct dependency before invoking [`Self::require_current_external_dependency`].
+    /// distinct dependency before invoking either external-dependency
+    /// witness method.
     #[must_use]
     pub(super) fn external_dependency_lookup_work(&self) -> usize {
         self.components
@@ -495,24 +521,23 @@ impl<'source> MetadataSnapshot<'source> {
             .max(1)
     }
 
-    /// Require one exact current field-6 external edge from `source` to the
-    /// current component selected by `target_locator` and `author_id`.
+    /// Prepare one exact current field-6 external-edge removal from `source`
+    /// to the current component selected by `target_locator` and `author_id`.
     ///
-    /// Component-external references are component-level owners shared by
-    /// every archive object in the source component.  A clone therefore must
-    /// reuse the existing edge when its author is external; it must not infer
-    /// ownership from a raw object identifier alone.  Versioned records,
-    /// duplicate matching records, and selected records carrying unknown
-    /// fields are rejected as ambiguous so a lifecycle caller cannot publish
-    /// against an uncertain source witness.  Explicitly weak author edges are
-    /// also refused; comment authors require a strong dependency (the native
-    /// representation is either an omitted weakness flag or `false`).
-    pub(super) fn require_current_external_dependency(
+    /// The returned request borrows both selectors from this snapshot and
+    /// preserves the selected edge's explicit weakness representation.  The
+    /// caller must still establish that the author is unused by every
+    /// surviving archive object in the source component before including
+    /// the request in a rewrite.
+    /// Versioned records, duplicate matching records, and selected records
+    /// carrying unknown fields are rejected as ambiguous; no allocation or
+    /// source mutation occurs here.
+    pub(super) fn prepare_current_external_dependency_removal(
         &self,
         source: ComponentIdentity<'source>,
         target_locator: &str,
         author_id: u64,
-    ) -> Result<(), MetadataError> {
+    ) -> Result<IdentityExternalRemoval<'source>, MetadataError> {
         if author_id == 0 {
             return Err(MetadataError::Invalid);
         }
@@ -549,6 +574,7 @@ impl<'source> MetadataSnapshot<'source> {
         let mut versioned_matches = 0usize;
         let mut unknown_match = false;
         let mut weak_match = false;
+        let mut selected_is_weak = None;
         for reference in self.external_references.iter().copied() {
             if reference.source.identifier != selected_source.identifier
                 || reference.source.locator != selected_source.locator
@@ -565,6 +591,9 @@ impl<'source> MetadataSnapshot<'source> {
                 current_matches = current_matches
                     .checked_add(1)
                     .ok_or(MetadataError::Invalid)?;
+                if current_matches == 1 {
+                    selected_is_weak = Some(reference.is_weak);
+                }
             }
             unknown_match |= reference.unknown_fields;
             weak_match |= reference.is_weak == Some(true);
@@ -573,10 +602,35 @@ impl<'source> MetadataSnapshot<'source> {
         if versioned_matches != 0 || unknown_match || current_matches > 1 || weak_match {
             return Err(MetadataError::Ambiguous);
         }
-        if current_matches == 0 {
-            return Err(MetadataError::Missing);
-        }
-        Ok(())
+        let expected_is_weak = selected_is_weak.ok_or(MetadataError::Missing)?;
+        Ok(IdentityExternalRemoval::new(
+            selected_source.selector(),
+            target.selector(),
+            author_id,
+            expected_is_weak,
+        ))
+    }
+
+    /// Require one exact current field-6 external edge from `source` to the
+    /// current component selected by `target_locator` and `author_id`.
+    ///
+    /// Component-external references are component-level owners shared by
+    /// every archive object in the source component.  A clone therefore must
+    /// reuse the existing edge when its author is external; it must not infer
+    /// ownership from a raw object identifier alone.  Versioned records,
+    /// duplicate matching records, and selected records carrying unknown
+    /// fields are rejected as ambiguous so a lifecycle caller cannot publish
+    /// against an uncertain source witness.  Explicitly weak author edges are
+    /// also refused; comment authors require a strong dependency (the native
+    /// representation is either an omitted weakness flag or `false`).
+    pub(super) fn require_current_external_dependency(
+        &self,
+        source: ComponentIdentity<'source>,
+        target_locator: &str,
+        author_id: u64,
+    ) -> Result<(), MetadataError> {
+        self.prepare_current_external_dependency_removal(source, target_locator, author_id)
+            .map(|_| ())
     }
 
     /// Resolve one unique current object UUID in the selected component.
@@ -913,7 +967,10 @@ fn rewrite_identity(
     batch: IdentityBatch<'_>,
     options: identity_codec::RewriteOptions,
 ) -> Result<(Vec<u8>, Option<IdentityRewriteReport>), MetadataError> {
-    if batch.uuid_additions().is_empty() && batch.uuid_removals().is_empty() {
+    let has_additions = !batch.uuid_additions().is_empty();
+    let has_removals =
+        !batch.uuid_removals().is_empty() || !batch.external_reference_removals().is_empty();
+    if !has_additions && !has_removals {
         if let Some(new_last) = batch.new_last_identifier() {
             if new_last < batch.expected_last_identifier() {
                 return Err(MetadataError::Invalid);
@@ -952,10 +1009,7 @@ fn rewrite_identity(
 
     let mut current = clone_source(payload)?;
     let mut report = None;
-    if !batch.uuid_removals().is_empty()
-        && !batch.uuid_additions().is_empty()
-        && batch.save_tokens.is_some()
-    {
+    if has_removals && has_additions && batch.save_tokens.is_some() {
         let new_last = batch.new_last_identifier().ok_or(MetadataError::Invalid)?;
         let transition = identity_codec::CombinedBatch::new(
             batch.expected_last_identifier(),
@@ -963,7 +1017,7 @@ fn rewrite_identity(
             batch.uuid_additions(),
             &[],
             batch.uuid_removals(),
-            &[],
+            batch.external_reference_removals(),
             &[],
         );
         let output = identity_codec::rewrite_package_metadata_combined_additions_and_removals_and_save_tokens(
@@ -979,15 +1033,15 @@ fn rewrite_identity(
         current = output.into_bytes();
         return Ok((current, Some(identity_report(output_report))));
     }
-    if !batch.uuid_removals().is_empty() {
+    if has_removals {
         let removals = identity_codec::RemovalBatch::new(
             batch.expected_last_identifier(),
             batch.uuid_removals(),
-            &[],
+            batch.external_reference_removals(),
             &[],
         );
         let output = match batch.save_tokens {
-            Some(tokens) if batch.uuid_additions().is_empty() => {
+            Some(tokens) if !has_additions => {
                 identity_codec::rewrite_package_metadata_removals_and_save_tokens(
                     &current,
                     identity_codec::RemovalSaveTokenBatch::new(removals, tokens),
@@ -1011,7 +1065,7 @@ fn rewrite_identity(
             &[],
         );
         let output = match batch.save_tokens {
-            Some(tokens) if batch.uuid_removals().is_empty() => {
+            Some(tokens) if !has_removals => {
                 identity_codec::rewrite_package_metadata_additions_and_save_tokens(
                     &current,
                     identity_codec::AdditionSaveTokenBatch::new(additions, tokens),
@@ -1044,7 +1098,8 @@ fn charge_identity_allocations(
     // configured output ceiling.  A combined save-token transition emits one
     // candidate, while a no-token transition stages removal and addition
     // candidates independently.
-    let has_removals = !batch.uuid_removals().is_empty();
+    let has_removals =
+        !batch.uuid_removals().is_empty() || !batch.external_reference_removals().is_empty();
     let has_additions = !batch.uuid_additions().is_empty();
     let combined_save_tokens = has_removals && has_additions && batch.save_tokens.is_some();
     let watermark_only = !has_removals
@@ -1130,8 +1185,11 @@ fn validate_identity_batch(
     if snapshot.last_identifier() != batch.expected_last_identifier() {
         return Err(MetadataError::Invalid);
     }
-    if batch.uuid_additions().is_empty() {
-        if batch.uuid_removals().is_empty() {
+    let has_additions = !batch.uuid_additions().is_empty();
+    let has_removals =
+        !batch.uuid_removals().is_empty() || !batch.external_reference_removals().is_empty();
+    if !has_additions {
+        if !has_removals {
             if batch
                 .new_last_identifier()
                 .is_some_and(|last| last < batch.expected_last_identifier())
@@ -1192,6 +1250,31 @@ fn validate_identity_batch(
             return Err(MetadataError::Ambiguous);
         }
         if snapshot.object_uuid(component, removal.object_identifier())? != removal.expected_uuid()
+        {
+            return Err(MetadataError::Ambiguous);
+        }
+    }
+    for removal in batch.external_reference_removals().iter().copied() {
+        let source_locator = rebind_source_str(snapshot.payload, removal.source().locator())
+            .ok_or(MetadataError::Ambiguous)?;
+        let target_locator = rebind_source_str(snapshot.payload, removal.target().locator())
+            .ok_or(MetadataError::Ambiguous)?;
+        let source = ComponentIdentity {
+            identifier: removal.source().identifier(),
+            locator: source_locator,
+            current: true,
+        };
+        let selected = snapshot.prepare_current_external_dependency_removal(
+            source,
+            target_locator,
+            removal.object_identifier(),
+        )?;
+        if selected.source().identifier() != removal.source().identifier()
+            || selected.source().locator() != removal.source().locator()
+            || selected.target().identifier() != removal.target().identifier()
+            || selected.target().locator() != removal.target().locator()
+            || selected.object_identifier() != removal.object_identifier()
+            || selected.expected_is_weak() != removal.expected_is_weak()
         {
             return Err(MetadataError::Ambiguous);
         }
@@ -1594,18 +1677,26 @@ mod tests {
             let source = package_with_reference(6, weak, false);
             let snapshot = test_snapshot(&source);
             let source_component = test_source_component(&snapshot);
+            let removal = snapshot
+                .prepare_current_external_dependency_removal(source_component, "author", 99)
+                .expect("strong current edge should produce a borrowed removal");
 
             assert!(matches!(
                 snapshot.require_current_external_dependency(source_component, "author", 99),
                 Ok(())
             ));
+            assert_eq!(removal.source(), source_component.selector());
+            assert_eq!(removal.target().identifier(), 20);
+            assert_eq!(removal.target().locator(), "author");
+            assert_eq!(removal.object_identifier(), 99);
+            assert_eq!(removal.expected_is_weak(), weak);
         }
 
         let source = package_with_reference(6, Some(true), false);
         let snapshot = test_snapshot(&source);
         let source_component = test_source_component(&snapshot);
         assert!(matches!(
-            snapshot.require_current_external_dependency(source_component, "author", 99),
+            snapshot.prepare_current_external_dependency_removal(source_component, "author", 99),
             Err(MetadataError::Ambiguous)
         ));
     }
@@ -1755,5 +1846,28 @@ mod tests {
         assert_eq!(snapshot.components.len(), 2);
         assert_eq!(snapshot.external_references.len(), 1);
         assert_eq!(snapshot.external_dependency_lookup_work(), 7);
+    }
+
+    #[test]
+    fn external_only_removal_is_wired_without_uuid_removals() {
+        let source = package_with_reference(6, None, false);
+        let snapshot = test_snapshot(&source);
+        let source_component = test_source_component(&snapshot);
+        let external_removal = snapshot
+            .prepare_current_external_dependency_removal(source_component, "author", 99)
+            .expect("strong current edge should be removable");
+        let external_removals = [external_removal];
+        let batch = super::IdentityBatch::removals(snapshot.last_identifier(), &[])
+            .with_external_reference_removals(&external_removals);
+
+        super::validate_identity_batch(&snapshot, batch)
+            .expect("prepared external edge must validate against its source");
+        let (rewritten, report) =
+            super::rewrite_identity(&source, batch, identity_options(&source))
+                .expect("external-only removal should reach RemovalBatch");
+        let edge = external_reference(20, 99, None, false);
+        assert!(source.windows(edge.len()).any(|window| window == edge));
+        assert!(!rewritten.windows(edge.len()).any(|window| window == edge));
+        assert_eq!(report.expect("codec should report one removal").removals, 1);
     }
 }

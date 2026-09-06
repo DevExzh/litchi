@@ -2980,6 +2980,7 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT = (
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_SOURCES = (
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "comment_graph.rs",
+    KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "comment_removal.rs",
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "graph.rs",
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "metadata.rs",
     KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "budget.rs",
@@ -3000,7 +3001,7 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_MODULE = re.compile(
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_CHILD_MODULE = re.compile(
     r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
-    r"(?:r#)?(?:comment_graph|graph|metadata|budget|clone_payload|node_cache)\b"
+    r"(?:r#)?(?:comment_graph|comment_removal|graph|metadata|budget|clone_payload|node_cache)\b"
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS = frozenset(
     {
@@ -3340,6 +3341,88 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_GRAPH_MARKER_GROUPS = {
         "charge_references",
         "charge_allocations",
         "try_reserve",
+    ),
+}
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_REMOVAL_APIS = (
+    "CommentRemovalPlan",
+    "plan_comment_removal",
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_REMOVAL_MARKER_GROUPS = {
+    "same-component source admission": (
+        "component_name",
+        "selected_object_ids",
+        "comment_graph",
+        "archive_limits",
+        "InvalidSource",
+    ),
+    "strict shared-budget census": (
+        "LifecycleBudget",
+        "reserve_core_header_inspection_work",
+        "strict_reference_census",
+        "budget.charge_entries",
+        ("budget.charge_references", "budget.charge_wire_fields"),
+        "budget.charge_wire_work",
+        "budget.charge_allocations",
+    ),
+    "source-bound comment retention": (
+        "retained_comment_storage_ids",
+        "source_component",
+        "comment_edges",
+        "selected_comment_author_edges",
+        "pending",
+        "processed",
+        "lower_bound_source",
+        "insert_sorted_unique",
+    ),
+    "author retention diagnostics": (
+        "author_dependencies",
+        "external_author_ids",
+        "unused_external_author_ids",
+        "removed_object_ids",
+    ),
+    "known payload admission": (
+        "validate_known_payload_relationships",
+        "reserve_core_header_inspection_work",
+        "strict_reference_census",
+    ),
+    "movie comment payload/header relationship": (
+        "MOVIE_MESSAGE_TYPE",
+        "direct_drawable_comment",
+        "validate_movie_payload_relationship",
+        "object_references",
+        "count",
+        "comment_storage_ids",
+    ),
+    "comment storage payload/header relationship": (
+        "COMMENT_STORAGE_MESSAGE_TYPE",
+        "MessageInfo",
+        "message.data",
+        ("comment_storage_codec", "super::comment_graph"),
+        "author",
+        "validate_comment_storage_payload_relationship",
+    ),
+    "known comment target resolution": (
+        "validate_comment_storage_target",
+        "validate_annotation_author_target",
+        "validate_single_message_type",
+        "object_with_component",
+        "actual_component",
+        "component_name",
+    ),
+    "exact target message shape": (
+        "archive_info.identifier",
+        "messages.len()",
+        "message_infos.len()",
+        "message.type_",
+        "info.type_",
+        "info.length",
+        "message.data.len()",
+    ),
+    "neutral storage facts target closure": (
+        "let facts",
+        "facts.author_identifier",
+        "facts.reply_identifiers",
+        "validate_comment_storage_relationship",
     ),
 }
 
@@ -54707,6 +54790,7 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
     }
     for child in (
         "comment_graph",
+        "comment_removal",
         "graph",
         "metadata",
         "budget",
@@ -55075,14 +55159,15 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
                 "focused Keynote media lifecycle graph must route the shared budget through "
                 f"plan_comment_graph: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
             )
+        private_graph_body = graph_function_body("private_graph")
         if not re.search(
-            r"Some\([^)]*\)[\s\S]{0,260}?\bLifecycleAction::Remove\b[\s\S]{0,260}?"
-            r"\bUnsupportedComment\b",
-            graph_code,
+            r"comment_graph[\s\S]{0,520}?\bUnsupportedComment\b",
+            private_graph_body,
         ):
             violations.append(
-                "focused Keynote media lifecycle graph must refuse selected-comment removal "
-                f"until comment culling is owned: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                "focused Keynote media lifecycle graph must keep unsupported caption/comment "
+                "edges fail-closed: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
             )
         clone_routes = graph_call_records(graph_code, "rewrite_comment_payload")
         if not clone_routes or not any(
@@ -55110,6 +55195,268 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
                 "focused Keynote media lifecycle comment graph is missing source storage UUID "
                 "witness marker: "
                 f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_graph.rs'}"
+            )
+
+    comment_removal_code = child_sources_by_name.get("comment_removal", "")
+    if "comment_removal" in module_names:
+        for name in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_REMOVAL_APIS:
+            kind = "fn" if name.startswith("plan_") else ""
+            pattern = (
+                rf"\b(?:pub(?:\([^()]*\))?\s+)?fn\s+{re.escape(name)}\b"
+                if kind == "fn"
+                else rf"\b(?:pub(?:\([^()]*\))?\s+)?(?:struct|enum|type|trait)\s+{re.escape(name)}\b"
+            )
+            if re.search(pattern, comment_removal_code) is None:
+                violations.append(
+                    "focused Keynote media lifecycle comment removal is missing strict API "
+                    f"{name}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
+                )
+        for label, markers in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_REMOVAL_MARKER_GROUPS.items():
+            if not all(
+                _keynote_lifecycle_marker_present(comment_removal_code, marker)
+                for marker in markers
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle comment removal is missing "
+                    f"{label} marker: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
+                )
+
+        known_payload_call = comment_removal_code.find(
+            "validate_known_payload_relationships("
+        )
+        census_call = comment_removal_code.find("strict_reference_census(")
+        if (
+            known_payload_call < 0
+            or census_call < 0
+            or known_payload_call > census_call
+        ):
+            violations.append(
+                "focused Keynote media lifecycle comment removal must validate known Movie "
+                "and CommentStorage payload/header relationships before its strict census: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
+            )
+
+        def comment_function_body(name: str) -> str:
+            declaration = re.search(
+                rf"(?m)^\s*(?:pub(?:\([^()]*\))?\s+)?"
+                rf"(?:unsafe\s+|async\s+|const\s+)*fn\s+"
+                rf"{re.escape(name)}\b",
+                comment_removal_code,
+            )
+            if declaration is None:
+                return ""
+            opening = comment_removal_code.find("{", declaration.end())
+            if opening < 0:
+                return ""
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(comment_removal_code) and depth:
+                if comment_removal_code[cursor] == "{":
+                    depth += 1
+                elif comment_removal_code[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            return (
+                comment_removal_code[opening + 1 : cursor - 1]
+                if depth == 0
+                else ""
+            )
+
+        def comment_call_arguments(body: str, name: str) -> list[str]:
+            arguments: list[str] = []
+            for call in re.finditer(rf"\b{re.escape(name)}\s*\(", body):
+                opening = body.find("(", call.start(), call.end())
+                if opening < 0:
+                    continue
+                depth = 1
+                cursor = opening + 1
+                while cursor < len(body) and depth:
+                    if body[cursor] == "(":
+                        depth += 1
+                    elif body[cursor] == ")":
+                        depth -= 1
+                    cursor += 1
+                if depth == 0:
+                    arguments.append(body[opening + 1 : cursor - 1])
+            return arguments
+
+        # The payload admission call is source-bound: resolving a numeric
+        # reference without the package and owning component would allow a
+        # same-ID object from another component to satisfy the check.
+        removal_body = comment_function_body("plan_comment_removal")
+        known_payload_arguments = comment_call_arguments(
+            removal_body, "validate_known_payload_relationships"
+        )
+        if not any(
+            re.search(r"\bpackage\b", arguments)
+            and re.search(r"\bcomponent\.name\s*\(\s*\)", arguments)
+            for arguments in known_payload_arguments
+        ):
+            violations.append(
+                "focused Keynote media lifecycle known payload admission must pass the "
+                "package and owning component for target resolution: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
+            )
+
+        movie_body = comment_function_body("validate_movie_payload_relationship")
+        movie_target_arguments = comment_call_arguments(
+            movie_body, "validate_comment_storage_target"
+        )
+        if not any(
+            re.search(r"\bpackage\b", arguments)
+            and re.search(r"\bcomponent_name\b", arguments)
+            and re.search(r"\b(?:identifier|direct_comment)\b", arguments)
+            for arguments in movie_target_arguments
+        ):
+            violations.append(
+                "focused Keynote media lifecycle Movie validation must resolve each comment "
+                "target against its package and owning component: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
+            )
+
+        storage_body = comment_function_body("validate_comment_storage_relationship")
+        storage_target_arguments = comment_call_arguments(
+            storage_body, "validate_comment_storage_target"
+        )
+        author_target_arguments = comment_call_arguments(
+            storage_body, "validate_annotation_author_target"
+        )
+        if not re.search(r"\blet\s+facts\s*=", storage_body):
+            violations.append(
+                "focused Keynote media lifecycle CommentStorage validation must retain the "
+                "neutral StorageFacts result: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
+            )
+        if not re.search(r"\bfacts\.author_identifier\b", storage_body) or not any(
+            re.search(r"\bpackage\b", arguments)
+            and re.search(r"\bauthor_identifier\b", arguments)
+            for arguments in author_target_arguments
+        ):
+            violations.append(
+                "focused Keynote media lifecycle CommentStorage validation must resolve its "
+                "author target through the package: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
+            )
+        if not re.search(r"\bfacts\.reply_identifiers\b", storage_body) or not any(
+            re.search(r"\bpackage\b", arguments)
+            and re.search(r"\bcomponent_name\b", arguments)
+            and re.search(r"\breply_identifier\b", arguments)
+            for arguments in storage_target_arguments
+        ):
+            violations.append(
+                "focused Keynote media lifecycle CommentStorage validation must resolve each "
+                "reply target against its package and owning component: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
+            )
+
+        storage_target_body = comment_function_body("validate_comment_storage_target")
+        if not re.search(
+            r"\bobject_with_component\s*\(", storage_target_body
+        ) or not re.search(
+            r"\bactual_component\s*!=\s*component_name\b", storage_target_body
+        ) or not re.search(
+            r"\bvalidate_single_message_type\s*\(", storage_target_body
+        ) or not re.search(
+            r"\bCOMMENT_STORAGE_MESSAGE_TYPE\b", storage_target_body
+        ):
+            violations.append(
+                "focused Keynote media lifecycle storage target validation must enforce the "
+                "same-component CommentStorage object type: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
+            )
+
+        author_target_body = comment_function_body("validate_annotation_author_target")
+        if not re.search(
+            r"\bobject_with_component\s*\(", author_target_body
+        ) or not re.search(
+            r"\bvalidate_single_message_type\s*\([^)]*\b212\b", author_target_body
+        ):
+            violations.append(
+                "focused Keynote media lifecycle author target validation must resolve an "
+                "exact annotation-author object: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
+            )
+
+        single_target_body = comment_function_body("validate_single_message_type")
+        for marker in (
+            "object.archive_info.identifier",
+            "object.messages.len()",
+            "object.archive_info.message_infos.len()",
+            "message.type_",
+            "info.type_",
+            "info.length",
+            "message.data.len()",
+        ):
+            if marker not in single_target_body:
+                violations.append(
+                    "focused Keynote media lifecycle target validation must verify the exact "
+                    f"singleton MessageInfo/message type and length ({marker}): "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
+                )
+
+        removal_call = re.search(
+            r"\bcomment_removal\s*::\s*plan_comment_removal\s*\(", owner
+        )
+        removal_arguments = ""
+        if removal_call is not None:
+            opening = owner.find("(", removal_call.start(), removal_call.end())
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(owner) and depth:
+                if owner[cursor] == "(":
+                    depth += 1
+                elif owner[cursor] == ")":
+                    depth -= 1
+                cursor += 1
+            if depth == 0:
+                removal_arguments = owner[opening + 1 : cursor - 1]
+        if removal_call is None or not re.search(r"\bbudget\b", removal_arguments):
+            violations.append(
+                "focused Keynote media lifecycle removal must route plan_comment_removal "
+                "through the shared budget: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+        else:
+            removal_window = (
+                owner[max(0, removal_call.start() - 720) : removal_call.start() + 720]
+            )
+            if not re.search(r"\bLifecycleAction::Remove\b", removal_window):
+                violations.append(
+                    "focused Keynote media lifecycle removal plan must be gated by the "
+                    f"remove action: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                )
+            if not re.search(r"\bremoved_object_ids\b", owner):
+                violations.append(
+                    "focused Keynote media lifecycle removal must filter physical source IDs "
+                    f"through CommentRemovalPlan: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                )
+            if not re.search(
+                r"\b(?:unused_external_author_ids|external_author_ids)\b", owner
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle removal must preserve author diagnostics "
+                    f"through the owner: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                )
+            if not re.search(
+                r"\b(?:with_external_reference_removals|external_reference_removals)\b",
+                lifecycle_code,
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle removal must route exact external-edge "
+                    f"removals through metadata: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                )
+
+        # Physical author objects are retained by native Keynote.  A removal
+        # planner may report unused author dependencies, but it must not turn
+        # those diagnostics into the effective object-removal list.
+        if re.search(
+            r"for[^{}\n]*\b(?:external_author_ids|unused_external_author_ids)\b"
+            r"[\s\S]{0,520}?\b(?:push_vec|insert_sorted_unique)\s*\(\s*&mut\s*removed_object_ids",
+            comment_removal_code,
+        ):
+            violations.append(
+                "focused Keynote media lifecycle comment removal must never delete author "
+                f"objects: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'comment_removal.rs'}"
             )
 
     budget_names = {

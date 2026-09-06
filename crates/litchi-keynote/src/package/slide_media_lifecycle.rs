@@ -38,6 +38,7 @@ mod budget;
 mod clone_payload;
 mod comment_clone;
 mod comment_graph;
+mod comment_removal;
 mod graph;
 mod graph_caption_witness;
 mod metadata;
@@ -407,7 +408,8 @@ impl Package {
 
     /// Remove one source-order movie or audio drawable from a slide.
     ///
-    /// Selected comments currently return [`SlideMediaLifecycleError::UnsupportedComment`].
+    /// Shared comment storage survives until its last drawable owner is removed.
+    /// Shared authors remain available after their component dependency is released.
     pub fn remove_slide_media<'slide>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
@@ -540,7 +542,6 @@ fn run_lifecycle(
         source,
         slide_selector,
         movie_selector,
-        action,
         wire_limits,
         &mut budget,
     )?;
@@ -2202,6 +2203,30 @@ fn rewrite_lifecycle(
                 .map_err(map_metadata_error)?;
         }
     }
+    let selected_source_ids = selected_object_ids(&selection, budget)?;
+    let removal_plan = if action == LifecycleAction::Remove {
+        selection
+            .comment_graph
+            .as_ref()
+            .map(|plan| {
+                comment_removal::plan_comment_removal(
+                    source,
+                    selection.component_name.as_ref(),
+                    &selected_source_ids,
+                    plan,
+                    archive_limits,
+                    budget,
+                )
+            })
+            .transpose()?
+    } else {
+        None
+    };
+    let source_ids = removal_plan
+        .as_ref()
+        .map_or(selected_source_ids.as_slice(), |plan| {
+            plan.removed_object_ids.as_slice()
+        });
     let component_archive = source
         .state
         .source
@@ -2216,14 +2241,13 @@ fn rewrite_lifecycle(
     budget.charge_allocations(component_clone_bytes)?;
     let mut edited_component = component_archive.clone();
 
-    let source_ids = selected_object_ids(&selection, budget)?;
     let (remap, new_ids, new_uuids) = match action {
         LifecycleAction::Duplicate => allocate_clone_identities(
             source,
             &edited_component,
             &snapshot,
             component,
-            &source_ids,
+            source_ids,
             wire_limits,
             budget,
         )?,
@@ -2231,6 +2255,47 @@ fn rewrite_lifecycle(
     };
     let mut identity_additions = Vec::new();
     let mut identity_removals = Vec::new();
+    let mut external_removals = Vec::new();
+    if let Some(plan) = removal_plan.as_ref() {
+        let bytes = plan
+            .unused_external_author_ids
+            .len()
+            .checked_mul(size_of::<identity_codec::ExternalReferenceRemoval<'_>>())
+            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        if bytes != 0 {
+            budget.charge_allocations(bytes)?;
+            external_removals
+                .try_reserve_exact(plan.unused_external_author_ids.len())
+                .map_err(|_| SlideMediaLifecycleError::Allocation { amount: bytes })?;
+        }
+        let comment_graph = selection
+            .comment_graph
+            .as_ref()
+            .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        for &author_identifier in &plan.unused_external_author_ids {
+            budget.charge_wire_work(comment_graph.author_dependencies.len().max(1))?;
+            let dependency = comment_graph
+                .author_dependencies
+                .iter()
+                .find(|dependency| dependency.author_identifier == author_identifier)
+                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            let target_locator = dependency
+                .component_name
+                .strip_prefix("Index/")
+                .and_then(|value| value.strip_suffix(".iwa"))
+                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            budget.charge_wire_work(snapshot.external_dependency_lookup_work())?;
+            external_removals.push(
+                snapshot
+                    .prepare_current_external_dependency_removal(
+                        component,
+                        target_locator,
+                        author_identifier,
+                    )
+                    .map_err(map_metadata_error)?,
+            );
+        }
+    }
     let mut owner_additions = Vec::new();
     let mut owner_removals = Vec::new();
     let mut data_removals = Vec::new();
@@ -2281,7 +2346,7 @@ fn rewrite_lifecycle(
                 &mut edited_component,
                 component_archive,
                 &selection,
-                &source_ids,
+                source_ids,
                 &remap,
                 &new_ids,
                 &new_uuids,
@@ -2309,7 +2374,7 @@ fn rewrite_lifecycle(
             )?;
         },
         LifecycleAction::Remove => {
-            for identifier in &source_ids {
+            for identifier in source_ids {
                 match snapshot.object_uuid(component, *identifier) {
                     Ok(uuid) => identity_removals.push(identity_codec::ObjectUuidRemoval::new(
                         component_selector,
@@ -2334,7 +2399,7 @@ fn rewrite_lifecycle(
                 source,
                 catalog,
                 &snapshot,
-                &source_ids,
+                source_ids,
                 &data_removals,
                 budget,
             )?;
@@ -2345,8 +2410,8 @@ fn rewrite_lifecycle(
     let mut appended_chunk_ids = Vec::new();
     let mut slide_remove_ids = Vec::new();
     if matches!(action, LifecycleAction::Duplicate) {
-        appended_build_ids = new_ids_for_builds(&selection, &source_ids, &new_ids, budget)?;
-        appended_chunk_ids = new_ids_for_chunks(&selection, &source_ids, &new_ids, budget)?;
+        appended_build_ids = new_ids_for_builds(&selection, source_ids, &new_ids, budget)?;
+        appended_chunk_ids = new_ids_for_chunks(&selection, source_ids, &new_ids, budget)?;
     } else {
         let remove_capacity = 1usize
             .checked_add(selection.build_ids.len())
@@ -2366,7 +2431,7 @@ fn rewrite_lifecycle(
         slide_remove_ids.extend(selection.chunk_ids.iter().copied());
     }
     let movie_append = if matches!(action, LifecycleAction::Duplicate) {
-        Some(new_ids_for_movie(&selection, &source_ids, &new_ids)?)
+        Some(new_ids_for_movie(&selection, source_ids, &new_ids)?)
     } else {
         None
     };
@@ -2418,6 +2483,7 @@ fn rewrite_lifecycle(
         },
         LifecycleAction::Remove => {
             metadata::IdentityBatch::removals(snapshot.last_identifier(), &identity_removals)
+                .with_external_reference_removals(&external_removals)
         },
     };
     let mut media_batch =
@@ -2566,7 +2632,7 @@ fn rewrite_lifecycle(
         source,
         &candidate,
         &selection,
-        &source_ids,
+        source_ids,
         &new_ids,
         action,
         source_media_count,
@@ -2574,6 +2640,9 @@ fn rewrite_lifecycle(
         wire_limits,
         budget,
     )?;
+    if let Some(plan) = removal_plan.as_ref() {
+        verify_comment_removal_retention(source, &candidate, &selection, plan, budget)?;
+    }
     verify_zip_locality(
         catalog,
         candidate_catalog,
@@ -2606,4 +2675,48 @@ fn rewrite_lifecycle(
             .ok_or(SlideMediaLifecycleError::InvalidSource)?,
     };
     Ok((candidate, patch))
+}
+
+/// Recheck all retained comment nodes and shared authors against the exact source.
+fn verify_comment_removal_retention(
+    source: &Package,
+    candidate: &Package,
+    selection: &MediaGraphSelection,
+    plan: &comment_removal::CommentRemovalPlan,
+    budget: &mut LifecycleBudget,
+) -> Result<(), SlideMediaLifecycleError> {
+    let graph = selection
+        .comment_graph
+        .as_ref()
+        .ok_or(SlideMediaLifecycleError::Verification)?;
+    for &identifier in plan
+        .retained_comment_storage_ids
+        .iter()
+        .chain(&graph.author_ids)
+    {
+        budget.charge_references(1)?;
+        let (before_component, before) = source
+            .object_with_component(identifier)
+            .ok_or(SlideMediaLifecycleError::Verification)?;
+        let (after_component, after) = candidate
+            .object_with_component(identifier)
+            .ok_or(SlideMediaLifecycleError::Verification)?;
+        let bytes = before.messages.iter().try_fold(
+            usize::try_from(before.header_length)
+                .map_err(|_| SlideMediaLifecycleError::Verification)?,
+            |bytes, message| {
+                bytes
+                    .checked_add(message.data.len())
+                    .ok_or(SlideMediaLifecycleError::Verification)
+            },
+        )?;
+        budget.charge_wire_work(bytes.max(1))?;
+        if before_component != after_component
+            || before.archive_info != after.archive_info
+            || before.messages != after.messages
+        {
+            return Err(SlideMediaLifecycleError::Verification);
+        }
+    }
+    Ok(())
 }
