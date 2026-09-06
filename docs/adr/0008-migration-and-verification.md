@@ -17378,8 +17378,10 @@ Targeted verification passed: 27 focused lifecycle integration tests, three
 source-built interoperability tests, 16 neutral lifecycle codec tests, strict
 Keynote/protos Clippy, 942 boundary unit tests, and the full scanner (64
 packages, 238 internal edges, 11 explicit debts). The final cache candidate
-also passed the environment-enabled native-saved strict readback test. Normal
-workspace commit hooks remain the final gate for this slice.
+also passed the environment-enabled native-saved strict readback test. Implementation commit `fe4592c68` passed the normal workspace hooks:
+formatting, lint policy, all-feature library/integration tests, and
+documentation tests. The codec source-tracking guard also covers the
+nested node-cache module path. This follow-up retires no host routes.
 
 The final `focused-materialized-cache-duplicate.key` candidate opened in
 Keynote, saved, closed to the theme chooser, and reopened at its exact path
@@ -17398,3 +17400,9 @@ transaction invalidation and native recomputation are separate verified
 states. Temporary candidates are disposable verification artifacts, not new
 permanent fixture copies. No fresh ASAN result is claimed for this follow-up;
 the earlier lifecycle fuzz receipt remains historical evidence.
+
+This follow-up's temporary candidate directory, inspector script/cache, and
+hook log were removed after the successful commit. No temporary native
+candidate was promoted to a permanent fixture. The earlier 2.1 GiB
+`cargo clean` receipt remains the latest build-cache cleanup; this
+follow-up retained the approximately 9.8 GiB shared build cache.
