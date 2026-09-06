@@ -1,5 +1,13 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0438: rejected private ODP markup experiment
+
+[0438](changes/0438-odp-markup-batching-negative.md) tested bounded private
+markup batching with exact Work/XML fallback and no owner or API changes.
+The candidate passed correctness gates but missed its predeclared practical
+performance threshold, so production was restored. The tested source and
+negative evidence remain retained. See the [batch matrix](results/change-0438/adr-compliance.md).
+
 ## Change 0437: ODP plain-slide grammar over common streaming publication
 
 [0437](changes/0437-odp-bounded-plain-slides.md) keeps slide/page/frame/text

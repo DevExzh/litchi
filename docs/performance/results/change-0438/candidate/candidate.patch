@@ -1,0 +1,583 @@
+--- a/crates/litchi-odp/src/streaming.rs
++++ b/crates/litchi-odp/src/streaming.rs
+@@ -16,7 +16,9 @@
+ //! `Memory` reserves the modeled retained provider window, not every allocator
+ //! allocation. XML depth uses [`XmlAuditLimits`]; execution `Depth` is not
+ //! charged by this sequential provider. Cancellation is cooperative, so an
+-//! already admitted bounded text span may finish before cancellation is seen.
++//! already admitted bounded text or fixed-markup span may finish before
++//! cancellation is seen. Fixed markup uses a 256-byte stack scratch buffer;
++//! this temporary workspace is separate from the retained Memory model.
+ //!
+ //! Raw text limits and report counts differ from escaped lexical XML counts.
+ //! The shared authored-XML audit can reject ambiguous spacing between adjacent
+@@ -60,6 +62,13 @@
+ const COMMON_METADATA_RESERVATION: usize = 64 * 1024;
+ const MAX_MEMBER_NAME_BYTES: u64 = 32;
+ const MAX_PLAIN_TEXT_SPAN_BYTES: usize = 256;
++// Keep fixed markup batches within the same byte bound as borrowed ordinary
++// text spans. A batch is only an optimization for a small set of adjacent
++// lexical pieces; oversized groups use the original per-piece writes.
++const MAX_MARKUP_BATCH_BYTES: usize = MAX_PLAIN_TEXT_SPAN_BYTES;
++
++#[cfg(test)]
++mod markup_tests;
+
+ // This is the exact no-animation root emitted by Builder::generate_content_xml
+ // for a plain titled slide sequence. The prelude includes the balanced dp1
+@@ -1140,9 +1149,10 @@
+         Ok(())
+     }
+
+-    /// Attempt one borrowed ordinary-text span. A resource-limit Work refusal
+-    /// falls back to scalar writes so the first failing scalar and accepted
+-    /// prefix remain observable; cancellation and sink errors remain failures.
++    /// Attempt one borrowed already-lexicalized span. A resource-limit Work
++    /// refusal falls back to the caller's original pieces so the first
++    /// failing piece and accepted prefix remain observable; cancellation and
++    /// sink errors remain failures.
+     fn write_plain_span(&mut self, bytes: &[u8]) -> litchi_core::Result<PlainSpanResult> {
+         self.check()?;
+         let Some(next) = self.bytes.checked_add(bytes.len()) else {
+@@ -1168,6 +1178,48 @@
+         self.bytes = next;
+         Ok(PlainSpanResult::Written)
+     }
++
++    /// Coalesce a small sequence of already-escaped markup pieces into one
++    /// Work charge and one fragment-buffer write. The pieces remain borrowed
++    /// and the scratch window is fixed on the stack. A Work or XML-byte
++    /// refusal is deliberately retried through the old individual writes so
++    /// the first failing piece and accepted prefix are unchanged.
++    fn write_markup_batch(&mut self, pieces: &[&[u8]]) -> litchi_core::Result<()> {
++        if pieces.is_empty() {
++            return Ok(());
++        }
++        let mut length = 0usize;
++        for piece in pieces {
++            let Some(next) = length.checked_add(piece.len()) else {
++                return self.write_markup_pieces(pieces);
++            };
++            if next > MAX_MARKUP_BATCH_BYTES {
++                return self.write_markup_pieces(pieces);
++            }
++            length = next;
++        }
++
++        let mut scratch = [0_u8; MAX_MARKUP_BATCH_BYTES];
++        let mut offset = 0usize;
++        for piece in pieces {
++            let end = offset + piece.len();
++            scratch[offset..end].copy_from_slice(piece);
++            offset = end;
++        }
++        debug_assert_eq!(offset, length);
++
++        match self.write_plain_span(&scratch[..length])? {
++            PlainSpanResult::Written => Ok(()),
++            PlainSpanResult::Fallback => self.write_markup_pieces(pieces),
++        }
++    }
++
++    fn write_markup_pieces(&mut self, pieces: &[&[u8]]) -> litchi_core::Result<()> {
++        for piece in pieces {
++            self.write_bytes(piece)?;
++        }
++        Ok(())
++    }
+ }
+
+ fn emit_slide(
+@@ -1176,15 +1228,22 @@
+     title: Option<&str>,
+     body: &str,
+ ) -> litchi_core::Result<()> {
+-    output.write_bytes(b"<draw:page draw:name=\"page")?;
++    let page_prefix = b"<draw:page draw:name=\"page";
++    let Some(page_number) = index.checked_add(1) else {
++        // Preserve the original failure ordering even for the unreachable
++        // public index overflow: prefix cancellation/limits take precedence.
++        output.write_bytes(page_prefix)?;
++        return Err(Error::InvalidFormat(
++            "slide page name index overflow".to_string(),
++        ));
++    };
+     let mut ordinal = [0_u8; 20];
+-    output.write_bytes(write_usize(
+-        &mut ordinal,
+-        index
+-            .checked_add(1)
+-            .ok_or_else(|| Error::InvalidFormat("slide page name index overflow".to_string()))?,
+-    ))?;
+-    output.write_bytes(b"\" draw:style-name=\"dp1\" draw:master-page-name=\"Default\">")?;
++    let ordinal = write_usize(&mut ordinal, page_number);
++    output.write_markup_batch(&[
++        page_prefix,
++        ordinal,
++        b"\" draw:style-name=\"dp1\" draw:master-page-name=\"Default\">",
++    ])?;
+
+     if let Some(title) = title {
+         output.write_bytes(
+@@ -1196,11 +1255,11 @@
+
+     if !body.is_empty() {
+         let y = if title.is_some() { "5.0cm" } else { "2.0cm" };
+-        output.write_bytes(
++        output.write_markup_batch(&[
+             br#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" presentation:class="object" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y=""#,
+-        )?;
+-        output.write_bytes(y.as_bytes())?;
+-        output.write_bytes(b"\"><draw:text-box>")?;
++            y.as_bytes(),
++            b"\"><draw:text-box>",
++        ])?;
+         emit_text_paragraphs(output, body, "P2")?;
+         output.write_bytes(b"</draw:text-box></draw:frame>")?;
+     }
+@@ -1214,9 +1273,7 @@
+     style: &str,
+ ) -> litchi_core::Result<()> {
+     for paragraph in value.split('\n') {
+-        output.write_bytes(b"<text:p text:style-name=\"")?;
+-        output.write_bytes(style.as_bytes())?;
+-        output.write_bytes(b"\">")?;
++        output.write_markup_batch(&[b"<text:p text:style-name=\"", style.as_bytes(), b"\">"])?;
+         emit_text_content(output, paragraph)?;
+         output.write_bytes(b"</text:p>")?;
+     }
+@@ -1248,10 +1305,12 @@
+                 } else if count == 1 {
+                     output.write_bytes(b"<text:s/>")?;
+                 } else {
+-                    output.write_bytes(b"<text:s text:c=\"")?;
+                     let mut lexical = [0_u8; 20];
+-                    output.write_bytes(write_usize(&mut lexical, count))?;
+-                    output.write_bytes(b"\"/>")?;
++                    output.write_markup_batch(&[
++                        b"<text:s text:c=\"",
++                        write_usize(&mut lexical, count),
++                        b"\"/>",
++                    ])?;
+                 }
+                 emitted = true;
+                 let _ = end;
+--- /dev/null
++++ b/crates/litchi-odp/src/streaming/markup_tests.rs
+@@ -0,0 +1,416 @@
++//! Differential tests for the private ODP markup batching seam.
++//!
++//! These tests deliberately compare against an independent
++//! loop over `write_bytes`; it does not call the production fallback helper.
++
++#![allow(clippy::expect_used, clippy::unwrap_used)]
++
++use std::num::{NonZeroU64, NonZeroUsize};
++
++use litchi_core::{
++    Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, Resource,
++};
++
++use super::*;
++
++const MAX_WORK: u64 = u64::MAX;
++
++struct Observation {
++    result: litchi_core::Result<()>,
++    output: Vec<u8>,
++    writer_bytes: usize,
++    work: u64,
++    limit_error: Option<LocalLimit>,
++    execution_error: Option<ExecutionError>,
++}
++
++fn all_limits(work: u64) -> Limits {
++    Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, work)
++}
++
++fn execution_limits() -> ExecutionLimits {
++    ExecutionLimits::new(
++        NonZeroUsize::new(1).expect("one worker"),
++        NonZeroUsize::new(1).expect("one task"),
++        NonZeroU64::new(u64::MAX).expect("finite in-flight bytes"),
++        0,
++    )
++    .expect("valid execution policy")
++}
++
++fn context_with_work(work: u64) -> (Budget, ExecutionContext) {
++    let budget = Budget::root("odp-markup-test", all_limits(work));
++    let (_cancellation, token) = CancellationSource::pair();
++    (
++        budget.clone(),
++        ExecutionContext::new(budget.clone(), token, execution_limits()),
++    )
++}
++
++fn context_with_parent_child(
++    parent_work: u64,
++    child_work: u64,
++) -> (Budget, Budget, ExecutionContext) {
++    let parent = Budget::root("odp-markup-parent", all_limits(parent_work));
++    let child = parent.child("odp-markup-child", all_limits(child_work));
++    let (_cancellation, token) = CancellationSource::pair();
++    (
++        parent,
++        child.clone(),
++        ExecutionContext::new(child, token, execution_limits()),
++    )
++}
++
++fn cancelled_context() -> (Budget, ExecutionContext) {
++    let budget = Budget::root("odp-markup-cancel", all_limits(MAX_WORK));
++    let (cancellation, token) = CancellationSource::pair();
++    cancellation.cancel();
++    (
++        budget.clone(),
++        ExecutionContext::new(budget, token, execution_limits()),
++    )
++}
++
++fn capture(
++    pieces: &[&[u8]],
++    batched: bool,
++    work: u64,
++    maximum: usize,
++    content_before: usize,
++    content_maximum: usize,
++    initial_bytes: usize,
++) -> (Observation, Budget) {
++    let (budget, context) = context_with_work(work);
++    capture_with_context(
++        pieces,
++        batched,
++        budget,
++        context,
++        maximum,
++        content_before,
++        content_maximum,
++        initial_bytes,
++    )
++}
++
++#[allow(clippy::too_many_arguments)]
++fn capture_with_context(
++    pieces: &[&[u8]],
++    batched: bool,
++    budget: Budget,
++    context: ExecutionContext,
++    maximum: usize,
++    content_before: usize,
++    content_maximum: usize,
++    initial_bytes: usize,
++) -> (Observation, Budget) {
++    let mut output = Vec::new();
++    let (result, writer_bytes, limit_error, execution_error) = {
++        let mut writer = SlideWriter::new(
++            &mut output,
++            &context,
++            maximum,
++            content_before,
++            content_maximum,
++        );
++        writer.bytes = initial_bytes;
++        let result = if batched {
++            writer.write_markup_batch(pieces)
++        } else {
++            legacy_piecewise(&mut writer, pieces)
++        };
++        (
++            result,
++            writer.bytes,
++            writer.limit_error,
++            writer.execution_error.clone(),
++        )
++    };
++    let observation = Observation {
++        result,
++        output,
++        writer_bytes,
++        work: budget.used(Resource::Work),
++        limit_error,
++        execution_error,
++    };
++    (observation, budget)
++}
++
++fn legacy_piecewise(writer: &mut SlideWriter<'_>, pieces: &[&[u8]]) -> litchi_core::Result<()> {
++    for piece in pieces {
++        writer.write_bytes(piece)?;
++    }
++    Ok(())
++}
++
++fn assert_local_limit_equal(left: Option<LocalLimit>, right: Option<LocalLimit>) {
++    match (left, right) {
++        (None, None) => {},
++        (Some(left), Some(right)) => {
++            assert_eq!(left.resource, right.resource);
++            assert_eq!(left.observed, right.observed);
++            assert_eq!(left.limit, right.limit);
++        },
++        _ => panic!("batch and legacy limit state differ"),
++    }
++}
++
++fn assert_observations_match(batch: &Observation, legacy: &Observation) {
++    match (&batch.result, &legacy.result) {
++        (Ok(()), Ok(())) => {},
++        (Err(batch), Err(legacy)) => assert_eq!(batch.to_string(), legacy.to_string()),
++        other => panic!("batch and legacy result classes differ: {other:?}"),
++    }
++    assert_eq!(batch.output, legacy.output);
++    assert_eq!(batch.writer_bytes, legacy.writer_bytes);
++    assert_eq!(batch.work, legacy.work);
++    assert_local_limit_equal(batch.limit_error, legacy.limit_error);
++    assert_eq!(batch.execution_error, legacy.execution_error);
++}
++
++fn representative_markup() -> Vec<Vec<&'static [u8]>> {
++    vec![
++        vec![
++            b"<draw:page draw:name=\"page",
++            b"123456789",
++            b"\" draw:style-name=\"dp1\" draw:master-page-name=\"Default\">",
++        ],
++        vec![
++            br#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" presentation:class="object" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y=""#,
++            b"5.0cm",
++            b"\"><draw:text-box>",
++        ],
++        vec![b"<text:p text:style-name=\"", b"P1", b"\">"] ,
++        vec![b"<text:s text:c=\"", b"42", b"\"/>"] ,
++        vec![b"<text:p>", b"body", b"</text:p>"] ,
++        Vec::new(),
++    ]
++}
++
++#[test]
++fn fixed_markup_batches_match_independent_piecewise_writer() {
++    for pieces in representative_markup() {
++        let (batch, _batch_budget) = capture(&pieces, true, MAX_WORK, usize::MAX, 0, usize::MAX, 0);
++        let (legacy, _legacy_budget) =
++            capture(&pieces, false, MAX_WORK, usize::MAX, 0, usize::MAX, 0);
++        assert_observations_match(&batch, &legacy);
++    }
++}
++
++#[test]
++fn oversized_markup_and_empty_batches_follow_piecewise_accounting() {
++    static EXACT: [u8; 256] = [b'e'; 256];
++    static LARGE: [u8; 257] = [b'x'; 257];
++    let cases: Vec<Vec<&[u8]>> = vec![
++        vec![&EXACT[..]],
++        vec![&LARGE[..]],
++        vec![b"prefix", &LARGE[..], b"suffix"],
++        Vec::new(),
++    ];
++    for pieces in cases {
++        let (batch, _batch_budget) = capture(&pieces, true, MAX_WORK, usize::MAX, 0, usize::MAX, 0);
++        let (legacy, _legacy_budget) =
++            capture(&pieces, false, MAX_WORK, usize::MAX, 0, usize::MAX, 0);
++        assert_observations_match(&batch, &legacy);
++    }
++}
++
++#[test]
++fn every_slide_xml_cutoff_preserves_first_failing_piece() {
++    let pieces = representative_markup()[0].clone();
++    let total = pieces.iter().map(|piece| piece.len()).sum::<usize>();
++    for maximum in 0..=total + 1 {
++        let (batch, _batch_budget) = capture(&pieces, true, MAX_WORK, maximum, 0, usize::MAX, 0);
++        let (legacy, _legacy_budget) = capture(&pieces, false, MAX_WORK, maximum, 0, usize::MAX, 0);
++        assert_observations_match(&batch, &legacy);
++        if maximum < total {
++            let limit = batch.limit_error.expect("slide XML limit is recorded");
++            assert_eq!(limit.resource, "slide XML bytes");
++            assert!(limit.observed > limit.limit);
++        } else {
++            assert!(batch.result.is_ok());
++        }
++    }
++}
++
++#[test]
++fn every_content_xml_cutoff_with_nonzero_prefix_matches_legacy() {
++    let pieces = representative_markup()[2].clone();
++    let content_before = 17;
++    let total = pieces.iter().map(|piece| piece.len()).sum::<usize>();
++    for content_limit in content_before..=content_before + total + 1 {
++        let (batch, _batch_budget) = capture(
++            &pieces,
++            true,
++            MAX_WORK,
++            usize::MAX,
++            content_before,
++            content_limit,
++            0,
++        );
++        let (legacy, _legacy_budget) = capture(
++            &pieces,
++            false,
++            MAX_WORK,
++            usize::MAX,
++            content_before,
++            content_limit,
++            0,
++        );
++        assert_observations_match(&batch, &legacy);
++        if content_limit < content_before + total {
++            let limit = batch.limit_error.expect("content XML limit is recorded");
++            assert_eq!(limit.resource, "content XML bytes");
++            assert!(limit.observed > limit.limit);
++        } else {
++            assert!(batch.result.is_ok());
++        }
++    }
++}
++
++#[test]
++fn every_work_cutoff_matches_legacy_and_rolls_back_hierarchically() {
++    let pieces = representative_markup()[4].clone();
++    let total = pieces.iter().map(|piece| piece.len() as u64).sum::<u64>();
++    for work in 0..=total + 1 {
++        let (batch, _batch_budget) = capture(&pieces, true, work, usize::MAX, 0, usize::MAX, 0);
++        let (legacy, _legacy_budget) = capture(&pieces, false, work, usize::MAX, 0, usize::MAX, 0);
++        assert_observations_match(&batch, &legacy);
++        assert!(batch.work <= work);
++        if work < total {
++            match batch.execution_error.as_ref() {
++                Some(ExecutionError::ResourceLimit(limit)) => {
++                    assert_eq!(limit.resource, Resource::Work);
++                    assert!(limit.observed > limit.limit);
++                },
++                other => panic!("first failing piece must preserve Work refusal: {other:?}"),
++            }
++        }
++
++        let (parent_batch, child_batch, batch_context) = context_with_parent_child(work, MAX_WORK);
++        let mut batch_output = Vec::new();
++        let batch_result = {
++            let mut writer =
++                SlideWriter::new(&mut batch_output, &batch_context, usize::MAX, 0, usize::MAX);
++            writer.write_markup_batch(&pieces)
++        };
++        let (parent_legacy, child_legacy, legacy_context) =
++            context_with_parent_child(work, MAX_WORK);
++        let mut legacy_output = Vec::new();
++        let legacy_result = {
++            let mut writer = SlideWriter::new(
++                &mut legacy_output,
++                &legacy_context,
++                usize::MAX,
++                0,
++                usize::MAX,
++            );
++            legacy_piecewise(&mut writer, &pieces)
++        };
++        match (&batch_result, &legacy_result) {
++            (Ok(()), Ok(())) => {},
++            (Err(batch), Err(legacy)) => assert_eq!(batch.to_string(), legacy.to_string()),
++            other => panic!("hierarchical batch/legacy result differs: {other:?}"),
++        }
++        assert_eq!(batch_output, legacy_output);
++        assert_eq!(
++            parent_batch.used(Resource::Work),
++            parent_legacy.used(Resource::Work)
++        );
++        assert_eq!(
++            child_batch.used(Resource::Work),
++            child_legacy.used(Resource::Work)
++        );
++        assert_eq!(
++            parent_batch.used(Resource::Work),
++            child_batch.used(Resource::Work)
++        );
++    }
++}
++
++#[test]
++fn cancellation_is_not_hidden_by_batch_fallback() {
++    let pieces = representative_markup()[0].clone();
++    let (batch_budget, batch_context) = cancelled_context();
++    let mut batch_output = Vec::new();
++    let batch_result = {
++        let mut writer =
++            SlideWriter::new(&mut batch_output, &batch_context, usize::MAX, 0, usize::MAX);
++        writer.write_markup_batch(&pieces)
++    };
++    let (legacy_budget, legacy_context) = cancelled_context();
++    let mut legacy_output = Vec::new();
++    let legacy_result = {
++        let mut writer = SlideWriter::new(
++            &mut legacy_output,
++            &legacy_context,
++            usize::MAX,
++            0,
++            usize::MAX,
++        );
++        legacy_piecewise(&mut writer, &pieces)
++    };
++    assert_eq!(batch_output, legacy_output);
++    assert_eq!(
++        batch_result.as_ref().map_err(|error| error.to_string()),
++        legacy_result.as_ref().map_err(|error| error.to_string())
++    );
++    assert!(matches!(batch_result, Err(Error::Other(_))));
++    assert_eq!(batch_budget.used(Resource::Work), 0);
++    assert_eq!(legacy_budget.used(Resource::Work), 0);
++}
++
++#[test]
++fn counter_overflow_reports_the_same_first_local_limit() {
++    let pieces = representative_markup()[3].clone();
++    let (batch, _batch_budget) = capture(
++        &pieces,
++        true,
++        MAX_WORK,
++        usize::MAX,
++        0,
++        usize::MAX,
++        usize::MAX,
++    );
++    let (legacy, _legacy_budget) = capture(
++        &pieces,
++        false,
++        MAX_WORK,
++        usize::MAX,
++        0,
++        usize::MAX,
++        usize::MAX,
++    );
++    assert_observations_match(&batch, &legacy);
++    assert!(matches!(batch.result, Err(Error::InvalidFormat(_))));
++    assert_eq!(batch.writer_bytes, usize::MAX);
++    let limit = batch.limit_error.expect("overflow records local limit");
++    assert_eq!(limit.resource, "slide XML bytes");
++    assert_eq!(limit.observed, usize::MAX);
++
++    let (batch, _batch_budget) = capture(
++        &pieces,
++        true,
++        MAX_WORK,
++        usize::MAX,
++        usize::MAX,
++        usize::MAX,
++        1,
++    );
++    let (legacy, _legacy_budget) = capture(
++        &pieces,
++        false,
++        MAX_WORK,
++        usize::MAX,
++        usize::MAX,
++        usize::MAX,
++        1,
++    );
++    assert_observations_match(&batch, &legacy);
++    let limit = batch
++        .limit_error
++        .expect("content overflow records local limit");
++    assert_eq!(limit.resource, "content XML bytes");
++    assert_eq!(limit.observed, usize::MAX);
++}
