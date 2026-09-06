@@ -63,6 +63,12 @@ fn sample_data() -> ChartData {
     .unwrap()
 }
 
+fn focused_bytes(package: &FocusedKeynotePackage) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).unwrap();
+    bytes
+}
+
 fn pie_data() -> ChartData {
     ChartData::new(
         vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
@@ -595,68 +601,125 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
+    let source_bytes = editor.to_bytes().unwrap();
+    let focused = FocusedKeynotePackage::from_bytes(&source_bytes).unwrap();
     assert_eq!(
-        editor
-            .slide_chart_caption_by_selector(0, ChartSelector::index(0))
+        focused
+            .slide_chart_caption(0usize, ChartSelector::index(0))
             .unwrap(),
         None
     );
-    editor
-        .set_slide_chart_caption_by_selector(0, ChartSelector::index(0), "Revenue by region")
+
+    let created = focused
+        .edit_slide_chart_caption(0usize, ChartSelector::index(0))
+        .unwrap()
+        .set("Revenue by region")
+        .unwrap()
+        .commit()
         .unwrap();
     assert_eq!(
-        editor
-            .slide_chart_caption_by_selector(0, ChartSelector::index(0))
+        created
+            .package()
+            .slide_chart_caption(0usize, ChartSelector::index(0))
             .unwrap(),
         Some("Revenue by region".to_owned())
     );
 
+    let mut editor = KeynoteEditor::from_bytes(&focused_bytes(created.package())).unwrap();
     let duplicate = editor
         .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
+    let duplicated = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        editor
-            .slide_chart_caption_by_selector(0, ChartSelector::index(1))
+        duplicated
+            .slide_chart_caption(0usize, ChartSelector::index(1))
             .unwrap(),
         Some("Revenue by region".to_owned())
     );
 
-    editor
-        .set_slide_chart_caption_by_selector(0, ChartSelector::index(0), "Updated source caption")
+    let updated = duplicated
+        .edit_slide_chart_caption(0usize, ChartSelector::index(0))
+        .unwrap()
+        .set("Updated source caption")
+        .unwrap()
+        .commit()
         .unwrap();
-    assert!(
-        editor
-            .remove_slide_chart_caption_by_selector(0, ChartSelector::index(0))
-            .unwrap()
-    );
-    assert!(
-        !editor
-            .remove_slide_chart_caption_by_selector(0, ChartSelector::index(0))
-            .unwrap()
+    assert_eq!(
+        updated
+            .package()
+            .slide_chart_caption(0usize, ChartSelector::index(0))
+            .unwrap(),
+        Some("Updated source caption".to_owned())
     );
     assert_eq!(
-        editor
-            .slide_chart_caption_by_selector(0, ChartSelector::index(0))
+        updated
+            .package()
+            .slide_chart_caption(0usize, ChartSelector::index(1))
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+
+    let cleared = updated
+        .package()
+        .edit_slide_chart_caption(0usize, ChartSelector::index(0))
+        .unwrap()
+        .clear()
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert_eq!(
+        cleared
+            .package()
+            .slide_chart_caption(0usize, ChartSelector::index(0))
             .unwrap(),
         None
     );
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let cleared_bytes = focused_bytes(cleared.package());
+    let no_op = cleared
+        .package()
+        .edit_slide_chart_caption(0usize, ChartSelector::index(0))
+        .unwrap()
+        .clear()
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(no_op.patch().is_noop());
+    assert_eq!(focused_bytes(no_op.package()), cleared_bytes);
+
+    let reopened = FocusedKeynotePackage::from_bytes(&cleared_bytes).unwrap();
     assert_eq!(
         reopened
-            .slide_chart_caption_by_selector(0, ChartSelector::index(1))
+            .slide_chart_caption(0usize, ChartSelector::index(0))
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_caption(0usize, ChartSelector::index(1))
             .unwrap(),
         Some("Revenue by region".to_owned())
     );
-    reopened
-        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
+
+    let mut host_reopened = KeynoteEditor::from_bytes(&cleared_bytes).unwrap();
+    host_reopened
+        .remove_slide_chart(0, chart_selector(&host_reopened, &duplicate))
         .unwrap();
     assert!(
-        reopened
+        host_reopened
             .slide_charts(0)
             .unwrap()
             .iter()
             .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
+    );
+    assert_eq!(
+        host_reopened
+            .slide_charts(0)
+            .unwrap()
+            .iter()
+            .map(|chart| chart.drawable_object_id)
+            .collect::<Vec<_>>(),
+        vec![source.drawable_object_id]
     );
 }
 

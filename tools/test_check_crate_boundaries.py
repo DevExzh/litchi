@@ -17035,47 +17035,42 @@ class BoundaryPolicyTests(unittest.TestCase):
                 ],
             )
 
-    def test_iwa_keynote_chart_caption_requires_selector_ownership_and_masks_tests(
+    def test_iwa_keynote_chart_caption_retirement_masks_tests_and_rejects_resurrection(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            source = root / boundaries.IWA_KEYNOTE_CHART_CAPTION_SOURCE
-            source.parent.mkdir(parents=True)
-            source.write_text(
-                "impl KeynoteEditor {\n"
-                "    pub fn slide_chart_caption_by_selector(&self) {}\n"
-                "    pub fn set_slide_chart_caption_by_selector(&mut self) {\n"
-                "        self.edit_slide_chart_caption().set(\"caption\").commit();\n"
-                "    }\n"
-                "    pub fn remove_slide_chart_caption_by_selector(&mut self) {\n"
-                "        self.edit_slide_chart_caption().clear().commit();\n"
-                "    }\n"
-                "    #[cfg(test)]\n"
-                "    pub fn set_slide_chart_caption(&mut self, id: u64) {}\n"
-                "}\n",
-                encoding="utf-8",
-            )
+            owner = root / boundaries.KEYNOTE_CHART_CAPTION_OWNER_SOURCE
+            owner.parent.mkdir(parents=True)
+            owner.write_text("impl Package {}\n", encoding="utf-8")
 
+            editor = root / boundaries.RETIRED_IWA_KEYNOTE_CHART_CAPTION_MODULE_SOURCE
+            editor.parent.mkdir(parents=True, exist_ok=True)
+            editor.write_text("mod arrangement;\n", encoding="utf-8")
             self.assertEqual(
                 boundaries.audit_iwa_keynote_chart_caption_source_topology(root), []
             )
 
+            source = root / boundaries.IWA_KEYNOTE_CHART_CAPTION_SOURCE
+            source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text(
-                "impl KeynoteEditor {\n"
-                "    pub fn slide_chart_caption_by_selector(&self) {}\n"
-                "    pub fn set_slide_chart_caption_by_selector(&mut self) {\n"
-                "        self.edit_slide_chart_caption().set(\"caption\").commit();\n"
-                "    }\n"
-                "    pub fn remove_slide_chart_caption_by_selector(&mut self) {\n"
-                "        self.edit_slide_chart_caption().clear().commit();\n"
-                "    }\n"
-                "    pub fn set_slide_chart_caption(&mut self, id: u64) {}\n"
-                "}\n",
+                "pub fn set_slide_chart_caption_by_selector() {}\n"
+                "fn focused_chart_caption_package() {}\n",
                 encoding="utf-8",
             )
-            self.assertEqual(
-                len(boundaries.audit_iwa_keynote_chart_caption_source_topology(root)), 2
+            editor.write_text("mod arrangement;\nmod caption;\n", encoding="utf-8")
+            test_source = source.parent / "tests.rs"
+            test_source.write_text(
+                "#[cfg(test)]\n"
+                "fn set_slide_chart_caption_by_selector() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_chart_caption_source_topology(root)
+            self.assertTrue(any("source was restored" in item for item in violations), violations)
+            self.assertTrue(any("module declaration" in item for item in violations), violations)
+            self.assertTrue(any("host wrapper/helper" in item for item in violations), violations)
+            self.assertFalse(
+                any("tests.rs" in item for item in violations), violations
             )
 
             helper = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor/helper.rs"
