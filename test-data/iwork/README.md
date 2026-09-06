@@ -324,3 +324,42 @@ The copied resaved candidates are:
 
 All three focused library suites pass. Native integration remains in progress,
 and full workspace hooks remain pending the root task.
+
+## Direct Numbers and Pages image transactions (2026-09-06)
+
+The focused Numbers package now exposes a selector-first sheet-image
+transaction. Using the existing
+[`numbers/image-adjustments-native.numbers`](numbers/image-adjustments-native.numbers)
+source, the Rust probe set exposure to `0.5`, saturation to `-0.4`, and
+`EnhanceDisabled`, then verified an exact repeated no-op and inverse
+restoration with only `Index/Document.iwa` changed. Numbers saved, closed, and
+reopened the exact path without repair, displaying `50%`, `-40%`, Enhance off,
+and Advanced sharpness `25%`; B2 persisted exactly as
+`Native image adjustment marker direct saved` after the native text edit.
+
+The copied resaved fixture is
+[`numbers/image-adjustments-direct-resaved.numbers`](numbers/image-adjustments-direct-resaved.numbers)
+with SHA-256
+`75f9b78875dd7450f9c1ea89763017d000efc29358f89bd625fa6d976026f7d0`.
+
+Pages now routes body-image mutation through a selector-first transaction. Its
+Rust probe verified an exact no-op and inverse with only `Document.iwa` changed.
+Pages saved, closed, and reopened the exact path without repair at `50%`,
+`-40%`, Enhance off, and Advanced sharpness `25%`; the body retained exactly
+`Direct saved Native Pages image adjustment marker` followed by U+FFFC, with
+one 6.5 × 4.9 inch inline image. The copied resaved fixture is
+[`pages/image-adjustments-direct-resaved.pages`](pages/image-adjustments-direct-resaved.pages)
+with SHA-256
+`0ae76968fd3a73edc50b1f52d84aeba237dd1a05317a1d16b0382607dd2a4452`.
+
+The Keynote preview retirement was deferred under the native verification
+gate. Changing the checked native slide from Title to Title Only crashed
+Keynote 14.4 twice, while an unchanged copy opened successfully. The focused
+preview invalidator reproduced the legacy node payload and metadata bytes;
+the existing layout reassignment path needs a separate native compatibility
+fix before this retirement can proceed.
+
+Native integration passes 8 Numbers and 11 Pages tests (19 total). Focused
+checks pass 7 Numbers and 6 Pages cases (13 total), including inclusive and
+one-under parse and prepared-rewrite limits, archive cloning, and header
+staging.

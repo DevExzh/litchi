@@ -300,6 +300,7 @@ def add_iwa_shared_image_adjustments_scaffold(
     codec_generated_decode: bool = False,
     host_legacy_helper: bool = False,
     missing_hidden_gate: bool = False,
+    semantic_module_gate: bool = False,
 ) -> None:
     """Create the focused image-adjustment owners and thin host ingress."""
 
@@ -337,7 +338,39 @@ def add_iwa_shared_image_adjustments_scaffold(
     for ecosystem, relative in boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES.items():
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
+        read_method, edit_method, apply_method = (
+            boundaries.IWA_IMAGE_ADJUSTMENTS_SEMANTIC_METHODS[ecosystem]
+        )
+        selectors = boundaries.IWA_IMAGE_ADJUSTMENTS_SEMANTIC_SELECTORS[ecosystem]
+        selector_arguments = ", ".join(
+            f"{selector.lower()}_selector: {selector}" for selector in selectors
+        )
+        selector_names = ", ".join(
+            f"{selector.lower()}_selector" for selector in selectors
+        )
+        semantic_types = boundaries.IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES[ecosystem]
+        semantic_error = semantic_types[0]
         source = (
+            f"pub enum {semantic_error} {{ Error }}\n"
+            f"pub struct {semantic_types[1]}<'a> {{ source: &'a Package }}\n"
+            f"pub struct {semantic_types[2]} {{}}\n"
+            f"pub struct {semantic_types[3]} {{}}\n"
+            f"pub struct {semantic_types[4]} {{}}\n"
+            f"impl Package {{\n"
+            f"    pub fn {read_method}(&self, {selector_arguments}) "
+            f"-> Result<ImageAdjustments, {semantic_error}> {{ let _ = ({selector_names}); unimplemented!() }}\n"
+            f"    pub fn {edit_method}(&self, {selector_arguments}) "
+            f"-> Result<{semantic_types[1]}<'_>, {semantic_error}> {{ let _ = ({selector_names}); unimplemented!() }}\n"
+            f"    pub fn {apply_method}(&self, patch: &{semantic_types[3]}) "
+            f"-> Result<{semantic_types[2]}, {semantic_error}> {{ let _ = patch; unimplemented!() }}\n"
+            "}\n"
+            "pub struct Package;\n"
+            "pub struct ImageSelector;\n"
+            "pub struct SheetSelector;\n"
+            "#[cfg(feature = \"internal-iwork-source\")]\n"
+            "#[doc(hidden)]\n"
+            "pub enum ImageAdjustmentsError { Error }\n"
+            "#[cfg(feature = \"internal-iwork-source\")]\n"
             "#[doc(hidden)]\n"
             "pub fn __decode_image_adjustments_payload(source: &[u8], limits: WireLimits) "
             "-> Result<ImageAdjustments, ImageAdjustmentsError> {\n"
@@ -345,6 +378,7 @@ def add_iwa_shared_image_adjustments_scaffold(
             "    let _ = codec::DecodeOptions::new(source, limits);\n"
             "    codec::decode_image_adjustments(source, limits)\n"
             "}\n"
+            "#[cfg(feature = \"internal-iwork-source\")]\n"
             "#[doc(hidden)]\n"
             "pub fn __rewrite_image_adjustments_payload(source: &[u8], adjustments: ImageAdjustments, limits: WireLimits) "
             "-> Result<Vec<u8>, ImageAdjustmentsError> {\n"
@@ -354,10 +388,27 @@ def add_iwa_shared_image_adjustments_scaffold(
             "use litchi_iwa_protos::image_adjustments_codec as codec;\n"
             "use litchi_iwa_common::{WireLimits, shape::image::{ImageAdjustment, ImageAdjustments}};\n"
         )
-        if ecosystem == "Keynote":
+        if missing_hidden_gate:
             source = source.replace(
-                "#[doc(hidden)]",
-                '#[cfg(feature = "internal-iwork-source")]\n#[doc(hidden)]',
+                '#[cfg(feature = "internal-iwork-source")]\n#[doc(hidden)]\n'
+                "pub enum ImageAdjustmentsError",
+                "#[doc(hidden)]\n"
+                "pub enum ImageAdjustmentsError",
+                1,
+            )
+            source = source.replace(
+                '#[cfg(feature = "internal-iwork-source")]\n#[doc(hidden)]\n'
+                "pub fn __decode_image_adjustments_payload",
+                "#[doc(hidden)]\n"
+                "pub fn __decode_image_adjustments_payload",
+                1,
+            )
+            source = source.replace(
+                '#[cfg(feature = "internal-iwork-source")]\n#[doc(hidden)]\n'
+                "pub fn __rewrite_image_adjustments_payload",
+                "#[doc(hidden)]\n"
+                "pub fn __rewrite_image_adjustments_payload",
+                1,
             )
         if owner_generated_decode and ecosystem == "Pages":
             source += "fn legacy(source: &[u8]) { tsd::ImageAdjustmentsArchive::decode(source); }\n"
@@ -365,24 +416,28 @@ def add_iwa_shared_image_adjustments_scaffold(
 
         package = root / boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES[ecosystem]
         package.parent.mkdir(parents=True, exist_ok=True)
-        gate = "" if missing_hidden_gate else '#[cfg(feature = "internal-iwork-source")]\n'
-        hidden = "" if missing_hidden_gate else "#[doc(hidden)]\n"
         package.write_text(
-            gate
+            ("#[cfg(feature = \"internal-iwork-source\")]\n" if semantic_module_gate else "")
             + "mod image_adjustments;\n"
-            + gate
-            + hidden
+            + "pub use image_adjustments::{"
+            + ", ".join(semantic_types)
+            + "};\n"
+            + ("" if missing_hidden_gate else '#[cfg(feature = "internal-iwork-source")]\n')
+            + ("" if missing_hidden_gate else "#[doc(hidden)]\n")
             + "pub use image_adjustments::{__decode_image_adjustments_payload, "
-            "__rewrite_image_adjustments_payload};\n",
+            "__rewrite_image_adjustments_payload, ImageAdjustmentsError};\n",
             encoding="utf-8",
         )
         export = root / boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[ecosystem]
         export.parent.mkdir(parents=True, exist_ok=True)
         export.write_text(
-            gate
-            + hidden
+            "pub use package::{"
+            + ", ".join(semantic_types)
+            + "};\n"
+            + ("" if missing_hidden_gate else '#[cfg(feature = "internal-iwork-source")]\n')
+            + ("" if missing_hidden_gate else "#[doc(hidden)]\n")
             + "pub use package::{__decode_image_adjustments_payload, "
-            "__rewrite_image_adjustments_payload};\n",
+            "__rewrite_image_adjustments_payload, ImageAdjustmentsError};\n",
             encoding="utf-8",
         )
 
@@ -40427,7 +40482,24 @@ fn rewrite_movie_title_operation(
                 any("shared helper" in item for item in violations), violations
             )
             self.assertTrue(
-                any("internal-iwork-source gate" in item for item in violations),
+                any("internal-iwork-source" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_shared_image_adjustments_boundary_rejects_feature_gated_semantic_module(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_shared_image_adjustments_scaffold(
+                root,
+                semantic_module_gate=True,
+            )
+
+            violations = boundaries.audit_iwa_shared_image_adjustments_source_topology(root)
+
+            self.assertTrue(
+                any("semantic module" in item for item in violations),
                 violations,
             )
 
@@ -40437,7 +40509,6 @@ fn rewrite_movie_title_operation(
             "+ audit_iwa_shared_image_adjustments_source_topology()",
             main_source,
         )
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,7 @@
 //! Archive-free options for inserting a body-anchored Pages image.
 
 use litchi_iwa_common::shape::geometry::{Point, Size};
+pub use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 use thiserror::Error;
 
 /// Validation failures for Pages image insertion options.

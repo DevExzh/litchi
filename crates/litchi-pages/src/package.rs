@@ -18,7 +18,6 @@ pub(crate) mod document_settings;
 mod drawable_order;
 mod footnote_text;
 mod header_footer_text;
-#[cfg(feature = "internal-iwork-source")]
 mod image_adjustments;
 #[cfg(feature = "internal-iwork-source")]
 mod movie_playback;
@@ -117,6 +116,10 @@ pub use header_footer_text::{
 #[cfg(feature = "internal-iwork-source")]
 pub use image_adjustments::{
     __decode_image_adjustments_payload, __rewrite_image_adjustments_payload, ImageAdjustmentsError,
+};
+pub use image_adjustments::{
+    BodyImageAdjustmentsCommit, BodyImageAdjustmentsDiagnostics, BodyImageAdjustmentsEdit,
+    BodyImageAdjustmentsError, BodyImageAdjustmentsLimitKind, BodyImageAdjustmentsPatch,
 };
 #[cfg(feature = "internal-iwork-source")]
 pub use movie_playback::{

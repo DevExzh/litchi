@@ -2044,23 +2044,83 @@ IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES = {
     "Numbers": Path("crates/litchi-numbers/src/lib.rs"),
 }
 IWA_IMAGE_ADJUSTMENTS_OWNER_MODULES = {
-    # Keynote owns a selector-first semantic image API in its default package
-    # module.  Only the raw host bridge below is feature-gated.
-    "Keynote": re.compile(r"(?m)^\s*mod\s+(?:r#)?image_adjustments\s*;"),
-    "Pages": re.compile(
-        r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
-        r'"internal-iwork-source"\s*\)\s*\]\s*\n'
-        r"\s*mod\s+(?:r#)?image_adjustments\s*;"
-    ),
-    "Numbers": re.compile(
-        r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
-        r'"internal-iwork-source"\s*\)\s*\]\s*\n'
-        r"\s*mod\s+(?:r#)?image_adjustments\s*;"
-    ),
+    # All three packages expose selector-first semantic image APIs by default.
+    # Only the raw host bridge below is feature-gated; keeping the module
+    # itself behind that feature would make the supported API disappear from
+    # a normal format-crate build.
+    ecosystem: re.compile(r"(?m)^\s*mod\s+(?:r#)?image_adjustments\s*;")
+    for ecosystem in ("Keynote", "Pages", "Numbers")
 }
+IWA_IMAGE_ADJUSTMENTS_FEATURE_GATED_MODULE = re.compile(
+    r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
+    r'"internal-iwork-source"\s*\)\s*\]\s*\n'
+    r"\s*mod\s+(?:r#)?image_adjustments\s*;"
+)
 IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS = (
     "__decode_image_adjustments_payload",
     "__rewrite_image_adjustments_payload",
+)
+IWA_IMAGE_ADJUSTMENTS_SEMANTIC_METHODS = {
+    "Keynote": (
+        "slide_image_adjustments",
+        "edit_slide_image_adjustments",
+        "apply_slide_image_adjustments",
+    ),
+    "Pages": (
+        "body_image_adjustments",
+        "edit_body_image_adjustments",
+        "apply_body_image_adjustments",
+    ),
+    "Numbers": (
+        "sheet_image_adjustments",
+        "edit_sheet_image_adjustments",
+        "apply_sheet_image_adjustments",
+    ),
+}
+IWA_IMAGE_ADJUSTMENTS_SEMANTIC_SELECTORS = {
+    "Keynote": ("SlideSelector", "ImageSelector"),
+    "Pages": ("ImageSelector",),
+    "Numbers": ("SheetSelector", "ImageSelector"),
+}
+IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES = {
+    "Keynote": (
+        "SlideImageAdjustmentsError",
+        "SlideImageAdjustmentsEdit",
+        "SlideImageAdjustmentsCommit",
+        "SlideImageAdjustmentsPatch",
+        "SlideImageAdjustmentsDiagnostics",
+    ),
+    "Pages": (
+        "BodyImageAdjustmentsError",
+        "BodyImageAdjustmentsEdit",
+        "BodyImageAdjustmentsCommit",
+        "BodyImageAdjustmentsPatch",
+        "BodyImageAdjustmentsDiagnostics",
+    ),
+    "Numbers": (
+        "SheetImageAdjustmentsError",
+        "SheetImageAdjustmentsEdit",
+        "SheetImageAdjustmentsCommit",
+        "SheetImageAdjustmentsPatch",
+        "SheetImageAdjustmentsDiagnostics",
+    ),
+}
+IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR = "ImageAdjustmentsError"
+IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE = re.compile(
+    r"#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
+    r'"internal-iwork-source"\s*\)\s*\]'
+)
+IWA_DOC_HIDDEN_ATTRIBUTE = re.compile(
+    r"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\]"
+)
+IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR_DECLARATION = re.compile(
+    r"(?ms)(?P<attributes>(?:\s*#\s*\[[^\]]+\]\s*\n)+)"
+    r"\s*(?:pub\s+)?enum\s+ImageAdjustmentsError\b"
+)
+IWA_IMAGE_ADJUSTMENTS_BRIDGE_MODULE = re.compile(
+    r"(?ms)^(?P<attributes>(?:\s*#\s*\[[^\]]+\]\s*\n)+)"
+    r"\s*(?:pub(?:\([^()]*\))?\s+)?mod\s+"
+    r"(?:r#)?image_adjustments_bridge\s*\{"
 )
 IWA_IMAGE_ADJUSTMENTS_HOST_ROOTS = {
     "Keynote": Path("crates/litchi-iwa/src/keynote/editor"),
@@ -41775,37 +41835,137 @@ def audit_iwa_shared_image_adjustments_source_topology(
         )
         if rewrite:
             arguments += r"(?=[^)]*\bImageAdjustments\b)"
-        gate = (
-            r"#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
-            r'"internal-iwork-source"\s*\)\s*\]\s*\n'
-            if feature_gated
-            else ""
-        )
+        attributes = r"(?P<attributes>(?:\s*#\s*\[[^\]]+\]\s*\n)+)"
         return re.compile(
-            rf"(?ms){gate}#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][^\n]*\n"
-            r"(?:\s*#\s*\[[^\]]+\]\s*\n)*"
+            rf"(?ms)^{attributes}"
             rf"\s*pub\s+fn\s+{re.escape(name)}\s*\({arguments}[^)]*\)"
         )
 
     for ecosystem, owner_path in owner_paths.items():
-        owner_code = code_for(owner_path)
-        owner_declaration_source = (
-            _mask_rust_comments(source_for(owner_path))
-            if ecosystem == "Keynote"
-            else owner_code
+        owner_source = source_for(owner_path)
+        owner_code = _mask_rust_non_code(owner_source)
+        owner_declaration_source = _mask_rust_comments(owner_source)
+        bridge_module = IWA_IMAGE_ADJUSTMENTS_BRIDGE_MODULE.search(
+            owner_declaration_source
         )
+        bridge_module_span: tuple[int, int] | None = None
+        bridge_module_feature_gated = False
+        if bridge_module is not None:
+            bridge_code = _mask_rust_non_code(owner_declaration_source)
+            bridge_opening = bridge_code.rfind("{", bridge_module.start(), bridge_module.end())
+            bridge_end = _rust_balanced_delimited_end(bridge_code, bridge_opening)
+            if bridge_end is not None:
+                bridge_module_span = (bridge_opening, bridge_end)
+                bridge_module_feature_gated = (
+                    IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(
+                        bridge_module.group("attributes")
+                    )
+                    is not None
+                )
+
+        def in_feature_gated_bridge(match: re.Match[str]) -> bool:
+            return bridge_module_feature_gated and bridge_module_span is not None and (
+                bridge_module_span[0] < match.start() < bridge_module_span[1]
+            )
         for index, seam in enumerate(IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS):
-            if (
-                hidden_seam(
-                    seam,
-                    rewrite=index == 1,
-                    feature_gated=ecosystem == "Keynote",
-                ).search(owner_declaration_source)
-                is None
+            seam_match = hidden_seam(
+                seam,
+                rewrite=index == 1,
+                feature_gated=True,
+            ).search(owner_declaration_source)
+            if seam_match is None or not (
+                IWA_DOC_HIDDEN_ATTRIBUTE.search(seam_match.group("attributes"))
+                and (
+                    IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(
+                        seam_match.group("attributes")
+                    )
+                    or in_feature_gated_bridge(seam_match)
+                )
             ):
                 violations.append(
                     f"focused litchi-{ecosystem.lower()} image-adjustments owner is missing "
                     f"hidden source seam {seam}: {IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
+                )
+
+        hidden_error_match = IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR_DECLARATION.search(
+            owner_declaration_source
+        )
+        if hidden_error_match is None or not (
+            IWA_DOC_HIDDEN_ATTRIBUTE.search(hidden_error_match.group("attributes"))
+            and (
+                IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(
+                    hidden_error_match.group("attributes")
+                )
+                or in_feature_gated_bridge(hidden_error_match)
+            )
+        ):
+            violations.append(
+                f"focused litchi-{ecosystem.lower()} image-adjustments hidden error "
+                "must remain behind the internal-iwork-source/doc(hidden) bridge: "
+                f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
+            )
+
+        owner_methods = {
+            name: declaration
+            for name, declaration, _line_number in _rust_public_methods_in_impl(
+                owner_source, "Package"
+            )
+        }
+        methods = IWA_IMAGE_ADJUSTMENTS_SEMANTIC_METHODS[ecosystem]
+        selectors = IWA_IMAGE_ADJUSTMENTS_SEMANTIC_SELECTORS[ecosystem]
+        semantic_error = IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES[ecosystem][0]
+        for method in methods:
+            declaration = owner_methods.get(method)
+            if declaration is None:
+                violations.append(
+                    f"focused litchi-{ecosystem.lower()} image-adjustments public API "
+                    f"is missing Package method {method}: "
+                    f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
+                )
+                continue
+            if method != methods[-1]:
+                for selector in selectors:
+                    if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
+                        violations.append(
+                            f"focused litchi-{ecosystem.lower()} image-adjustments "
+                            f"Package method {method} must use selector-first "
+                            f"{selector}: {IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
+                        )
+            if re.search(rf"\b{re.escape(semantic_error)}\b", declaration) is None:
+                violations.append(
+                    f"focused litchi-{ecosystem.lower()} image-adjustments Package "
+                    f"method {method} must return its semantic error type: "
+                    f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
+                )
+
+        semantic_types = frozenset(IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES[ecosystem])
+        owner_exports = _rust_canonical_exports(owner_source, semantic_types)
+        for type_name in sorted(semantic_types - owner_exports):
+            violations.append(
+                f"focused litchi-{ecosystem.lower()} image-adjustments owner is missing "
+                f"semantic type {type_name}: "
+                f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
+            )
+
+        # The raw source bridge is the sole public declaration allowed to
+        # mention bytes or the hidden bridge error.  Keep generated archive
+        # vocabulary out of the default selector-first API as well.
+        for declaration, line_number in _rust_public_declarations(owner_source):
+            if any(seam in declaration for seam in IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS):
+                continue
+            if IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR in declaration:
+                continue
+            if RUST_BYTE_SLICE.search(declaration) is not None:
+                violations.append(
+                    f"focused litchi-{ecosystem.lower()} image-adjustments public API "
+                    "exposes a raw byte slice: "
+                    f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}:{line_number}"
+                )
+            if re.search(r"\b(?:tsd|tsp)::", declaration):
+                violations.append(
+                    f"focused litchi-{ecosystem.lower()} image-adjustments public API "
+                    "exposes generated types: "
+                    f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}:{line_number}"
                 )
 
         required_owner_markers = (
@@ -41850,7 +42010,13 @@ def audit_iwa_shared_image_adjustments_source_topology(
         if IWA_IMAGE_ADJUSTMENTS_OWNER_MODULES[ecosystem].search(package_code) is None:
             violations.append(
                 f"focused litchi-{ecosystem.lower()} image-adjustments owner module is "
-                "missing its internal-iwork-source gate: "
+                "missing its default semantic declaration: "
+                f"{IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES[ecosystem]}"
+            )
+        elif IWA_IMAGE_ADJUSTMENTS_FEATURE_GATED_MODULE.search(package_code) is not None:
+            violations.append(
+                f"focused litchi-{ecosystem.lower()} image-adjustments semantic module "
+                "must remain available in the default build: "
                 f"{IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES[ecosystem]}"
             )
 
@@ -41859,7 +42025,21 @@ def audit_iwa_shared_image_adjustments_source_topology(
         if export_path.is_file():
             export_sources.append(_mask_rust_comments(source_for(export_path)))
         export_sources[0] = _mask_rust_comments(export_sources[0])
-        for seam in IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS:
+        semantic_types = frozenset(IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES[ecosystem])
+        if not any(
+            IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES[ecosystem][0]
+            in _rust_canonical_exports(source, semantic_types)
+            for source in export_sources
+        ):
+            violations.append(
+                f"focused litchi-{ecosystem.lower()} image-adjustments public facade "
+                "is missing its semantic error export: "
+                f"{IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[ecosystem]}"
+            )
+        for seam in (
+            *IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS,
+            IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR,
+        ):
             hidden_export = re.compile(
                 r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
                 r'"internal-iwork-source"\s*\)\s*\]\s*\n'
