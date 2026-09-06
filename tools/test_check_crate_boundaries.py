@@ -3456,6 +3456,7 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
         "mod comment_graph;\n"
         "mod comment_removal;\n"
         "mod graph;\n"
+        "mod identifier_watermark;\n"
         "mod metadata;\n"
         "mod node_cache;\n"
         "use budget::MediaLifecycleBudget;\n"
@@ -3464,17 +3465,28 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
         "pub enum LifecycleError { InvalidSource, UnsupportedSource }\n"
         "fn typed_kind(expected_kind: MovieKind, actual: MovieKind) { let _ = (KindMismatch, expected_kind, MovieKind, expected, actual); }\n"
         "fn count_slide_media() { let mut count = 0; let _ = MOVIE_MESSAGE_TYPE; let Some(message) = find() else { continue }; let _ = message; count = count.checked_add(1); let _ = (source_media_count, target_media_count, actual_count); }\n"
+        "fn unique_payload() {}\n"
         "fn rewrite_node_cache(budget: &mut MediaLifecycleBudget) { node_cache::prepare_slide_node_build_cache(source, selection, archive, budget); node_cache::validate_candidate_package_node_cache(candidate, selection, budget); }\n"
         "fn select_media() {}\n"
         "fn clone_object() {}\n"
         "fn metadata_transition() {}\n"
         "fn candidate_reopen_verify() {}\n"
+        "fn allocate_clone_identities(package: &Package, snapshot: &metadata::MetadataSnapshot<'_>, budget: &mut MediaLifecycleBudget) {\n"
+        "    let mut global_max = snapshot.last_identifier().max(snapshot.metadata_identifier_maximum());\n"
+        "    let mut object_count = 0usize;\n"
+        "    for component in package.state.source.components().iter() { for object in &component.archive().objects { object_count = object_count.checked_add(1); if let Some(identifier) = object.archive_info.identifier { global_max = global_max.max(identifier); } } }\n"
+        "    budget.charge_entries(object_count);\n"
+        "    let mut remap = Vec::new(); let _ = (&mut remap, global_max);\n"
+        "}\n"
         "fn remove_comment_graph(action: LifecycleAction, budget: &mut MediaLifecycleBudget) {\n"
         "    if action == LifecycleAction::Remove {\n"
         "        let plan = comment_removal::plan_comment_removal(package, component_name, selected_object_ids, comment_graph, archive_limits, budget);\n"
         "        let source_ids = plan.removed_object_ids;\n"
         "        let external_authors = plan.unused_external_author_ids;\n"
         "        metadata::IdentityBatch::removals(last_identifier, &source_ids).with_external_reference_removals(&external_authors);\n"
+        "        let released_watermark = if action == LifecycleAction::Remove { identifier_watermark::plan_release(source, &source_ids, snapshot.last_identifier(), budget) } else { None };\n"
+        "        let identity_batch = match action { LifecycleAction::Remove => { let batch = metadata::IdentityBatch::removals(last_identifier, &source_ids).with_external_reference_removals(&external_authors); match released_watermark { Some(new_last_identifier) => batch.with_new_last_identifier(new_last_identifier), None => batch } }, LifecycleAction::Duplicate => metadata::IdentityBatch::additions(last_identifier, last_identifier + 1, &[]) };\n"
+        "        if let Some(new_last_identifier) = released_watermark { identifier_watermark::verify_release(&candidate, new_last_identifier, budget); }\n"
         "    }\n"
         "}\n"
         "fn exact_source_fingerprint_inverse() { ExactArtifacts; source_fingerprint; inverse; PatchConflict; }\n"
@@ -3585,6 +3597,30 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
         "metadata.rs": (
             "fn metadata() { MetadataSnapshot; IdentityBatch; MediaBatch; "
             "package_metadata; candidate; reopen; readback; verify; }\n"
+            "fn optional_watermark() { if batch.is_removal_transition() { if let Some(new_last) = batch.new_last_identifier() { removals = removals.with_new_last_object_identifier(new_last); } } }\n"
+            "struct IdentityCollector { metadata_identifier_maximum: u64 }\n"
+            "impl IdentityCollector<'_> { fn observe_identifier(&mut self, identifier: u64) { self.metadata_identifier_maximum = self.metadata_identifier_maximum.max(identifier); } }\n"
+            "impl identity_codec::PackageMetadataVisitor for IdentityCollector<'_> {\n"
+            "    fn visit_component(&mut self, component: identity_codec::ComponentDescriptor<'_>) { self.observe_identifier(component.identifier()); }\n"
+            "    fn visit_object_uuid(&mut self, binding: identity_codec::ObjectUuidDescriptor<'_>) { self.observe_identifier(binding.object_identifier()); }\n"
+            "    fn visit_external_reference(&mut self, reference: identity_codec::ExternalReferenceDescriptor<'_>) { if let Some(identifier) = reference.object_identifier() { self.observe_identifier(identifier); } }\n"
+            "    fn visit_data_reference_owner(&mut self, owner: identity_codec::DataReferenceOwnerDescriptor<'_>) { self.observe_identifier(owner.object_identifier()); }\n"
+            "    fn visit_ambiguous_object_identifier(&mut self, _component: identity_codec::ComponentDescriptor<'_>, identifier: u64) { self.observe_identifier(identifier); }\n"
+            "    fn visit_data_metadata_map(&mut self, object_identifier: u64, _has_unknown_fields: bool) { self.observe_identifier(object_identifier); }\n"
+            "}\n"
+            "struct NoopIdentityVisitor;\n"
+            "impl MetadataSnapshot { fn metadata_identifier_maximum(&self) -> u64 { self.metadata_identifier_maximum } }\n"
+        ),
+        "identifier_watermark.rs": (
+            "fn plan_release(source: &Package, removed_ids: &[u64], expected_last_identifier: u64, budget: &mut LifecycleBudget) -> Result<Option<u64>, SlideMediaLifecycleError> {\n"
+            "    budget.charge_entries(1); budget.charge_wire_work(1); if removed_ids.binary_search(&expected_last_identifier).is_err() { return Ok(None); }\n"
+            "    for component in source.state.source.components().iter() { let objects = &component.archive().objects; for object in objects { let identifier = object.archive_info.identifier; if removed_ids.binary_search(&identifier.unwrap_or(0)).is_ok() { continue; } } }\n"
+            "    let maximum_remaining = 0; Ok(Some(maximum_remaining))\n"
+            "}\n"
+            "fn verify_release(candidate: &Package, new_last_identifier: u64, budget: &mut LifecycleBudget) -> Result<(), SlideMediaLifecycleError> {\n"
+            "    let mut maximum_remaining = 0; for component in candidate.state.source.components().iter() { let objects = &component.archive().objects; budget.charge_entries(objects.len()); budget.charge_wire_work(objects.len().max(1)); for object in objects { let identifier = object.archive_info.identifier.unwrap_or(0); maximum_remaining = maximum_remaining.max(identifier); } }\n"
+            "    if maximum_remaining != new_last_identifier { return Err(SlideMediaLifecycleError::Verification); } Ok(())\n"
+            "}\n"
         ),
         "node_cache.rs": (
             "struct NodeCacheComponentEdit;\n"
@@ -19339,6 +19375,100 @@ fn rewrite_movie_title_operation(
             self.assertTrue(any("node_cache child" in item for item in violations), violations)
             owner.write_text(source, encoding="utf-8")
 
+            owner.write_text(source.replace("mod identifier_watermark;\n", "", 1), encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("identifier_watermark child" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            identifier_watermark = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "identifier_watermark.rs"
+            identifier_watermark_source = identifier_watermark.read_text(encoding="utf-8")
+            identifier_watermark.write_text(
+                identifier_watermark_source.replace("fn plan_release", "fn missing_plan_release", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("missing strict API plan_release" in item for item in violations), violations)
+            identifier_watermark.write_text(identifier_watermark_source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    "identifier_watermark::plan_release(source, &source_ids,",
+                    "identifier_watermark::plan_release(source, &selected_source_ids,",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "source_ids, the source watermark" in item
+                    or "effective removed-object set" in item
+                    for item in violations
+                ),
+                violations,
+            )
+            owner.write_text(source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    ".with_new_last_identifier(new_last_identifier)",
+                    ".with_missing_last_identifier(new_last_identifier)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("attach the released watermark" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            metadata = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "metadata.rs"
+            metadata_source = metadata.read_text(encoding="utf-8")
+            metadata.write_text(
+                metadata_source.replace("with_new_last_object_identifier", "with_missing_last_object_identifier", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("optional removal watermark" in item for item in violations), violations)
+            metadata.write_text(metadata_source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    "snapshot.last_identifier().max(snapshot.metadata_identifier_maximum())",
+                    "snapshot.last_identifier()",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("metadata and physical identifier census marker" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            metadata.write_text(
+                metadata_source.replace(
+                    "self.observe_identifier(owner.object_identifier());",
+                    "self.observe_identifier(owner.object_identifier()); self.observe_identifier(data_reference.data_identifier());",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("host object identifiers" in item for item in violations), violations)
+            metadata.write_text(metadata_source, encoding="utf-8")
+
             node_cache = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "node_cache.rs"
             node_cache_source = node_cache.read_text(encoding="utf-8")
             node_cache.write_text(
@@ -19446,7 +19576,7 @@ fn rewrite_movie_title_operation(
                 source.replace(
                     "if action == LifecycleAction::Remove",
                     "if action == LifecycleAction::Duplicate",
-                    1,
+                    2,
                 ),
                 encoding="utf-8",
             )
@@ -19708,7 +19838,10 @@ fn rewrite_movie_title_operation(
             self.assertTrue(any("header helper" in item for item in violations), violations)
             graph.write_text(graph_source, encoding="utf-8")
 
-            owner.write_text(source.replace("checked_add(1)", "checked_add(2)", 1), encoding="utf-8")
+            owner.write_text(
+                source.replace("count = count.checked_add(1)", "count = count.checked_add(2)", 1),
+                encoding="utf-8",
+            )
             violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
                 root
             )

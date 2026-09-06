@@ -85,6 +85,87 @@ fn package_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(bytes)
 }
 
+fn package_watermark(bytes: &[u8]) -> Result<u64, Box<dyn Error>> {
+    use prost::Message as _;
+
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(bytes)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == "Index/Metadata.iwa")
+        .ok_or_else(|| io::Error::other("missing metadata component"))?;
+    let stream = litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data())?.into_bytes();
+    let archive = litchi_iwa_archive::iwa::Archive::parse(&stream)?;
+    let message = archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .find(|message| message.type_ == 11_006)
+        .ok_or_else(|| io::Error::other("missing package metadata"))?;
+    Ok(
+        litchi_iwa_protos::tsp::PackageMetadata::decode(message.data.as_slice())?
+            .last_object_identifier,
+    )
+}
+
+#[test]
+fn focused_suffix_release_matches_host_removal_and_next_allocation() -> TestResult {
+    let fixture = source_fixture()?;
+    for (source_index, is_movie) in [(0, true), (1, false)] {
+        let package = Package::from_bytes(&fixture.bytes)?;
+        let duplicated = package
+            .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(source_index))?;
+        let duplicate_bytes = package_bytes(duplicated.package())?;
+        let mut host = KeynoteEditor::from_bytes(&duplicate_bytes)?;
+        let old_watermark = package_watermark(&duplicate_bytes)?;
+        if is_movie {
+            let clone_id = host.slide_movies(0)?.last().unwrap().drawable_object_id;
+            host.remove_slide_movie(0, clone_id)?;
+        } else {
+            let clone_id = host.slide_audio(0)?.last().unwrap().drawable_object_id;
+            host.remove_slide_audio(0, clone_id)?;
+        }
+        let removed = duplicated
+            .package()
+            .remove_slide_media(SlideSelector::index(0), MovieSelector::index(4))?;
+        let removed_bytes = package_bytes(removed.package())?;
+        let released = package_watermark(&removed_bytes)?;
+        assert!(released < old_watermark);
+        assert_eq!(released, package_watermark(&host.to_bytes()?)?);
+
+        let next_host_id = if is_movie {
+            host.duplicate_slide_movie(0, fixture.movie_a_id)?
+                .drawable_object_id
+        } else {
+            host.duplicate_slide_audio(0, fixture.audio_a_id)?
+                .drawable_object_id
+        };
+        let repeated = removed
+            .package()
+            .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(source_index))?;
+        let repeated_host = KeynoteEditor::from_bytes(&package_bytes(repeated.package())?)?;
+        let next_focused_id = if is_movie {
+            repeated_host
+                .slide_movies(0)?
+                .last()
+                .unwrap()
+                .drawable_object_id
+        } else {
+            repeated_host
+                .slide_audio(0)?
+                .last()
+                .unwrap()
+                .drawable_object_id
+        };
+        assert_eq!(next_focused_id, next_host_id);
+        assert_eq!(package_bytes(&package)?, fixture.bytes);
+        let restored = removed
+            .package()
+            .apply_slide_media_lifecycle(&removed.patch().inverse())?;
+        assert_eq!(package_bytes(restored.package())?, duplicate_bytes);
+    }
+    Ok(())
+}
+
 fn movie_labels(
     package: &Package,
     movie_position: usize,
