@@ -1388,6 +1388,7 @@ pub struct ExternalReferenceDescriptor<'source> {
     object_identifier: Option<u64>,
     is_weak: Option<bool>,
     versioned: bool,
+    unknown_fields: bool,
 }
 
 impl<'source> ExternalReferenceDescriptor<'source> {
@@ -1410,6 +1411,15 @@ impl<'source> ExternalReferenceDescriptor<'source> {
     #[must_use]
     pub const fn is_versioned(self) -> bool {
         self.versioned
+    }
+
+    /// Return whether the selected external-reference payload contained an
+    /// unknown field.  An owner that intends to remove or otherwise claim
+    /// this exact edge must fail closed when this is true; untouched records
+    /// remain byte-preserving during rewrites.
+    #[must_use]
+    pub const fn has_unknown_fields(self) -> bool {
+        self.unknown_fields
     }
 }
 
@@ -1889,7 +1899,7 @@ mod tests {
     struct Facts {
         components: Vec<(u64, String, String, bool)>,
         uuids: Vec<(u64, u64, UuidBits, bool)>,
-        references: Vec<(u64, u64, Option<u64>, Option<bool>, bool)>,
+        references: Vec<(u64, u64, Option<u64>, Option<bool>, bool, bool)>,
         data_references: Vec<(u64, u64, usize, bool, bool)>,
         data_owners: Vec<(u64, u64, u64, u32, bool, bool)>,
         ambiguous: Vec<(u64, u64, bool)>,
@@ -1939,6 +1949,7 @@ mod tests {
                 reference.object_identifier(),
                 reference.is_weak(),
                 reference.is_versioned(),
+                reference.has_unknown_fields(),
             ));
             Ok(())
         }
@@ -2041,8 +2052,8 @@ mod tests {
         assert_eq!(
             facts.references,
             vec![
-                (1, 2, Some(5), Some(false), false),
-                (1, 2, Some(6), Some(true), true)
+                (1, 2, Some(5), Some(false), false, false),
+                (1, 2, Some(6), Some(true), true, false)
             ]
         );
         assert_eq!(
@@ -2115,6 +2126,10 @@ mod tests {
         // records.  The exact count proves each projection branch reports
         // unknown data without treating known component records as unknown.
         assert_eq!(facts.unknown_fields, 7);
+        assert_eq!(
+            facts.references,
+            vec![(1, 2, Some(5), Some(false), false, true)]
+        );
     }
 
     #[test]
@@ -2171,7 +2186,7 @@ mod tests {
         assert!(
             facts
                 .references
-                .contains(&(1, 2, Some(11), Some(false), false))
+                .contains(&(1, 2, Some(11), Some(false), false, false))
         );
     }
 
@@ -4416,18 +4431,16 @@ mod tests {
                     *component == 1 && *object == 11 && *found == uuid && *current
                 })
         );
-        assert!(
-            facts
-                .references
-                .iter()
-                .any(|(component, target, object, weak, versioned)| {
-                    *component == 1
-                        && *target == 2
-                        && *object == Some(12)
-                        && *weak == Some(false)
-                        && !*versioned
-                })
-        );
+        assert!(facts.references.iter().any(
+            |(component, target, object, weak, versioned, unknown)| {
+                *component == 1
+                    && *target == 2
+                    && *object == Some(12)
+                    && *weak == Some(false)
+                    && !*versioned
+                    && !*unknown
+            }
+        ));
         assert_eq!(
             output_allocations() - output_allocations_before,
             1,
@@ -8512,6 +8525,7 @@ fn inspect_component<V: PackageMetadataVisitor>(
                     object_identifier: reference.object,
                     is_weak: reference.is_weak,
                     versioned: field.number == 18,
+                    unknown_fields: reference.unknown_fields,
                 })?;
             },
             11 => {

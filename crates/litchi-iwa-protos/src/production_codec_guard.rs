@@ -704,6 +704,10 @@ mod tests {
         ("hyperlink", include_str!("hyperlink_codec.rs")),
         ("comment_storage", include_str!("comment_storage_codec.rs")),
         (
+            "comment_storage_lifecycle",
+            include_str!("comment_storage_codec/lifecycle.rs"),
+        ),
+        (
             "group_node_category",
             include_str!("group_node_category_codec.rs"),
         ),
@@ -1225,6 +1229,7 @@ mod oracle {
         let build_script = include_str!("../build.rs");
         for (name, _) in FOCUSED_CODECS {
             let source_path = match *name {
+                "comment_storage_lifecycle" => "comment_storage_codec/lifecycle.rs".to_owned(),
                 "keynote_media_lifecycle_node_cache" => {
                     "keynote_media_lifecycle_codec/node_cache.rs".to_owned()
                 },

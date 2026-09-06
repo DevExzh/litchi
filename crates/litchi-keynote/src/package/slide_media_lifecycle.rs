@@ -36,6 +36,8 @@ use crate::{MovieKind, MovieSelector, SlideSelector};
 
 mod budget;
 mod clone_payload;
+mod comment_clone;
+mod comment_graph;
 mod graph;
 mod graph_caption_witness;
 mod metadata;
@@ -45,6 +47,7 @@ use budget::LifecycleBudget;
 use graph::MediaGraphSelection;
 
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 const BUILD_MESSAGE_TYPE: u32 = 8;
 const BUILD_CHUNK_MESSAGE_TYPE: u32 = 153;
 const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
@@ -121,7 +124,7 @@ pub enum SlideMediaLifecycleError {
         expected: MovieKind,
         actual: MovieKind,
     },
-    #[error("Keynote media lifecycle edits do not yet support a selected drawable comment")]
+    #[error("Keynote media lifecycle edit cannot safely own this selected comment graph")]
     UnsupportedComment,
     #[error("an audio drawable has no poster image")]
     AudioPoster,
@@ -385,6 +388,9 @@ impl SlideMediaLifecycleCommit {
 
 impl Package {
     /// Duplicate one source-order movie or audio drawable on a slide.
+    ///
+    /// Direct comments and their replies receive independent storage while
+    /// preserving their text, storage UUIDs, and shared authors.
     pub fn duplicate_slide_media<'slide>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
@@ -400,6 +406,8 @@ impl Package {
     }
 
     /// Remove one source-order movie or audio drawable from a slide.
+    ///
+    /// Selected comments currently return [`SlideMediaLifecycleError::UnsupportedComment`].
     pub fn remove_slide_media<'slide>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
@@ -416,6 +424,7 @@ impl Package {
 
     /// Duplicate a file-backed movie.  The selector remains source-order and
     /// therefore stays stable when native object identifiers change.
+    /// Direct comments follow the cloning policy of [`Self::duplicate_slide_media`].
     pub fn duplicate_slide_movie<'slide>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
@@ -430,7 +439,7 @@ impl Package {
         )
     }
 
-    /// Duplicate an audio drawable.
+    /// Duplicate an audio drawable, including supported direct comment threads.
     pub fn duplicate_slide_audio<'slide>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
@@ -531,6 +540,7 @@ fn run_lifecycle(
         source,
         slide_selector,
         movie_selector,
+        action,
         wire_limits,
         &mut budget,
     )?;
@@ -2000,6 +2010,42 @@ fn verify_candidate_delta(
                     return Err(SlideMediaLifecycleError::Verification);
                 }
             }
+            if let Some(source_plan) = selection.comment_graph.as_ref() {
+                let source_position = source_ids
+                    .binary_search(&source_plan.root_storage_identifier)
+                    .map_err(|_| SlideMediaLifecycleError::Verification)?;
+                let new_root = *new_ids
+                    .get(source_position)
+                    .ok_or(SlideMediaLifecycleError::Verification)?;
+                let cloned_plan = comment_graph::plan_comment_graph(
+                    candidate,
+                    selection.component_name.as_ref(),
+                    new_root,
+                    wire_limits,
+                    budget,
+                )?;
+                if cloned_plan.root_storage_uuid() != source_plan.root_storage_uuid()
+                    || cloned_plan.author_ids != source_plan.author_ids
+                    || cloned_plan.storage_identities.len() != source_plan.storage_identities.len()
+                {
+                    return Err(SlideMediaLifecycleError::Verification);
+                }
+                for (source_identity, cloned_identity) in source_plan
+                    .storage_identities
+                    .iter()
+                    .zip(&cloned_plan.storage_identities)
+                {
+                    budget.charge_wire_work(source_ids.len())?;
+                    let position = source_ids
+                        .binary_search(&source_identity.identifier)
+                        .map_err(|_| SlideMediaLifecycleError::Verification)?;
+                    if new_ids.get(position) != Some(&cloned_identity.identifier)
+                        || source_identity.uuid != cloned_identity.uuid
+                    {
+                        return Err(SlideMediaLifecycleError::Verification);
+                    }
+                }
+            }
         },
         LifecycleAction::Remove => {
             for &identifier in source_ids {
@@ -2135,6 +2181,27 @@ fn rewrite_lifecycle(
     let component = snapshot
         .current_component(locator)
         .map_err(map_metadata_error)?;
+    if let Some(plan) = selection.comment_graph.as_ref() {
+        for dependency in &plan.author_dependencies {
+            budget.charge_references(1)?;
+            if dependency.component_name == selection.component_name {
+                continue;
+            }
+            let target_locator = dependency
+                .component_name
+                .strip_prefix("Index/")
+                .and_then(|value| value.strip_suffix(".iwa"))
+                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            budget.charge_wire_work(snapshot.external_dependency_lookup_work())?;
+            snapshot
+                .require_current_external_dependency(
+                    component,
+                    target_locator,
+                    dependency.author_identifier,
+                )
+                .map_err(map_metadata_error)?;
+        }
+    }
     let component_archive = source
         .state
         .source

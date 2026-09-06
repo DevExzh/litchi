@@ -46,6 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_slide_background_codec.rs");
     println!("cargo:rerun-if-changed=src/hyperlink_codec.rs");
     println!("cargo:rerun-if-changed=src/comment_storage_codec.rs");
+    println!("cargo:rerun-if-changed=src/comment_storage_codec/lifecycle.rs");
     println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
     println!("cargo:rerun-if-changed=src/table_model_discovery_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_sheet_order_codec.rs");
@@ -2102,6 +2103,12 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
                 "src/keynote_media_lifecycle_codec/node_cache.rs",
             )?);
         }
+        if *path == "src/comment_storage_codec.rs" {
+            source.push('\n');
+            source.push_str(&fs::read_to_string(
+                "src/comment_storage_codec/lifecycle.rs",
+            )?);
+        }
         // Some codecs have cfg(test) allocation probes near their imports;
         // the shared source slicer removes every test-only item without
         // truncating production at the first such probe.
@@ -2849,7 +2856,11 @@ optional .LitchiIwaCommentStorageProjection.Uuid storage_uuid = 5;\n\
         .map(str::trim)
         .collect::<Vec<_>>()
         .join("\n");
-    let codec = fs::read_to_string("src/comment_storage_codec.rs")?;
+    let mut codec = fs::read_to_string("src/comment_storage_codec.rs")?;
+    codec.push('\n');
+    codec.push_str(&fs::read_to_string(
+        "src/comment_storage_codec/lifecycle.rs",
+    )?);
     let production_codec = production_codec_source(&codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     if !TSD_FIELDS
@@ -2909,6 +2920,8 @@ fn production_codec_has_forbidden_public_function(
         if matches!(
             name,
             "prepare_comment_storage_reply_rewrite"
+                | "prepare_comment_storage_lifecycle_rewrite"
+                | "rewrite_comment_storage_lifecycle"
                 | "prepare_comment_storage_leaf_text_rewrite"
                 | "prepare_comment_storage_leaf_text_rewrite_with_fingerprint"
                 | "prepare_comment_storage_text_rewrite"

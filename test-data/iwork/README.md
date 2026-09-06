@@ -977,3 +977,75 @@ also passed the environment-enabled native-saved strict readback test. Implement
 formatting, lint policy, all-feature library/integration tests, and
 documentation tests. The codec source-tracking guard also covers the
 nested node-cache module path. This follow-up retires no host routes.
+
+## Keynote comment duplication evidence (2026-09-07)
+
+The focused owner implements selected direct comment/reply duplication through
+the neutral lazy batch codec and a private comment-graph/author dependency
+witness. Before the admission hardening, the focused lifecycle library slice
+passed 28 cases and the integration target passed its 27 existing cases plus
+11 comment-duplication cases. The default integration run does not enable
+native saved-candidate readback, while the explicit native environment run
+passed one strict reread. These counts are pre-hardening; the current final
+rerun remains pending.
+
+The native baseline comment root is on movie `2653286`, with storage
+`2653723`, author `2653721`, and `externalAnnotationAuthorStorage` `2652381`.
+Native Cmd-D produced movie `2653814` and storage `2653826`, kept the storage
+UUID byte-exact, and shared the author records. After native save, actual
+close, and exact-path reopen, the duplicate contained three movies and two
+audio objects with comments on both copies; the baseline contained two movies
+and two audio objects with its original comment.
+
+The temporary native removal oracle culled the comment root while retaining
+the author and author-storage records. It removed only component external edge
+`(2652150, 2652381, 2653721)`, changing the external set from 700 to 699;
+the duplicate external set remained 700. Permanent fixtures:
+
+- [`media-comments-baseline-native.key`](keynote/media-comments-baseline-native.key) — SHA-256 `69d493b183308b6a0f336b6a944b2d78fe8439a40648a0dcb72ff1e171380fff`
+- [`media-comments-duplicate-native.key`](keynote/media-comments-duplicate-native.key) — SHA-256 `8c04282f5877ae671c808cb6a35022a3c41432459fb2bc0e43a22378d3c59cb6`
+
+The temporary removal oracle hash is
+`1d0897ebd1f79b5e5ee3a33ce7f034f69baec9bac05be6cddad73d3dd828d509` and is
+not a permanent fixture.
+
+The exported focused candidate
+`focused-media-comment-duplicate-movie.key` changed from SHA-256
+`d3c839320da017b48e79627d50f48eace995978c2344b3be8fb7739711ae1869` to
+`8c3ed9b005a5bc280d9d9859d4c4b0dae71c958ec04dbc2de486e6d77a0472a8` after
+Keynote Cmd-S, actual close to the theme chooser, and exact-path reopen. It
+opened with three movies and two audio objects, retained two comments, and
+showed no alert. The explicit strict reread verified the new comment IDs and
+preserved storage UUIDs and authors. This focused native duplicate leaf remains
+verified; native reply and comment removal remain unverified.
+
+No native reply was authored because the prototype Keynote reply popover was
+not operable; synthetic and source-built reply graphs remain separate
+evidence. The five host cases pass, covering positive selected movie/audio
+reply cloning plus the legacy host reply-duplicate/remove refusal oracle.
+Comment removal remains `UnsupportedComment` and no host route has been
+retired.
+
+The current extension rejects unknown raw-header references and unknown or
+deprecated direct-comment references before publication. New selected-comment
+admission is fail-closed when opaque unknown fields in the comment root, date,
+or UUID could hide a reference back to the source graph. Admission requires a
+strict known comment envelope and an exact header-edge census. The neutral
+codec still preserves unknown bytes, and untouched or unselected comments
+remain preserved. Full-inspection budgets are shared across graph, author,
+header, codec, and metadata walks. Boundary verification previously passed
+943 unit cases and `litchi-iwa-protos --lib` previously passed 846 cases,
+including corrected mixed-UUID shrink/reply-varint-growth exact raw/Buffa
+parity; those are pre-hardening counts and the current final rerun is pending.
+The full scanner, strict Clippy, and normal hooks remain pending. No cleanup
+result is claimed here. The next goal is author culling plus metadata removal.
+
+Final selected-comment admission verification passes: the complete Keynote
+library has 258 passing tests, with 27 existing media lifecycle and 12 comment
+integration tests also passing. The explicit native-saved readback ran with its
+path supplied. The final generated duplicate has the same SHA-256
+`d3c839320da017b48e79627d50f48eace995978c2344b3be8fb7739711ae1869` as the
+artifact verified in Keynote before native save. Strict Clippy for both changed
+production libraries and workspace formatting pass. Boundary unit verification
+passes 943 cases. Full boundary scanning and normal commit hooks are pending
+the final receipt.

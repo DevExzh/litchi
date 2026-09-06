@@ -10,13 +10,18 @@ use std::mem::size_of;
 
 use litchi_core::Position;
 use litchi_iwa_common::{WireLimits, wire::WireView};
-use litchi_iwa_core::{ArchiveObject, FieldType, Limits as ArchiveObjectLimits, RawMessage};
+use litchi_iwa_core::{
+    ArchiveObject, ArchiveReferenceOccurrence, ArchiveReferencePolicy, ArchiveReferenceVisitor,
+    FieldType, Limits as ArchiveObjectLimits, RawMessage,
+};
 
 use super::budget::LifecycleBudget;
+use super::comment_graph::{CommentGraphPlan, plan_comment_graph};
 use super::{
-    BUILD_CHUNK_MESSAGE_TYPE, BUILD_MESSAGE_TYPE, MOVIE_DATA_FIELD, MOVIE_MESSAGE_TYPE,
-    POSTER_IMAGE_DATA_FIELD, Package, SLIDE_BUILD_CHUNKS_FIELD, SLIDE_BUILDS_FIELD,
-    SLIDE_OWNED_DRAWABLES_FIELD, SlideMediaLifecycleError, SuperUuid,
+    BUILD_CHUNK_MESSAGE_TYPE, BUILD_MESSAGE_TYPE, COMMENT_STORAGE_MESSAGE_TYPE, LifecycleAction,
+    MOVIE_DATA_FIELD, MOVIE_MESSAGE_TYPE, POSTER_IMAGE_DATA_FIELD, Package,
+    SLIDE_BUILD_CHUNKS_FIELD, SLIDE_BUILDS_FIELD, SLIDE_OWNED_DRAWABLES_FIELD,
+    SlideMediaLifecycleError, SuperUuid,
 };
 use crate::{MovieKind, MovieSelector, SlideSelector};
 
@@ -37,6 +42,7 @@ pub(super) struct MediaGraphSelection {
     pub(super) build_ids: Vec<u64>,
     pub(super) chunk_ids: Vec<u64>,
     pub(super) data_references: Vec<(u64, u64)>,
+    pub(super) comment_graph: Option<CommentGraphPlan>,
 }
 
 /// Resolve a checked selector and validate the complete same-component graph.
@@ -44,6 +50,7 @@ pub(super) fn select_media(
     package: &Package,
     slide_selector: SlideSelector<'_>,
     movie_selector: MovieSelector,
+    action: LifecycleAction,
     limits: WireLimits,
     budget: &mut LifecycleBudget,
 ) -> Result<MediaGraphSelection, SlideMediaLifecycleError> {
@@ -121,13 +128,41 @@ pub(super) fn select_media(
     if !matches!(movie_info.kind(), MovieKind::File | MovieKind::Audio) {
         return Err(SlideMediaLifecycleError::InvalidSource);
     }
-    // A direct drawable comment owns a separate comment/reply graph.  The
-    // lifecycle clone/removal path has no comment-owner transaction, so
-    // carrying this edge into a cloned or deleted drawable could leave stale
-    // reply IDs or duplicate generated authors.  Inspect only the selected
-    // MovieArchive's DrawableArchive.super.comment edge; comments attached to
-    // sibling drawables remain outside this operation's closure.
-    reject_direct_drawable_comment(movie_payload, limits, budget)?;
+    let comment_graph = match direct_drawable_comment(movie_payload, limits, budget)? {
+        Some(_) if action == LifecycleAction::Remove => {
+            return Err(SlideMediaLifecycleError::UnsupportedComment);
+        },
+        Some(root) => {
+            let message_index = movie
+                .messages
+                .iter()
+                .position(|message| message.type_ == MOVIE_MESSAGE_TYPE)
+                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            let info = movie
+                .archive_info
+                .message_infos
+                .get(message_index)
+                .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+            budget.charge_references(info.object_references.len())?;
+            if info
+                .object_references
+                .iter()
+                .filter(|identifier| **identifier == root)
+                .count()
+                != 1
+            {
+                return Err(SlideMediaLifecycleError::InvalidSource);
+            }
+            Some(plan_comment_graph(
+                package,
+                component_name,
+                root,
+                limits,
+                budget,
+            )?)
+        },
+        None => None,
+    };
     let parent = drawable_parent(movie_payload, limits, budget)?;
     if parent != slide_record.slide_identifier {
         return Err(SlideMediaLifecycleError::InvalidSource);
@@ -147,8 +182,19 @@ pub(super) fn select_media(
         component_name,
         movie_identifier,
         slide_record.slide_identifier,
+        comment_graph.as_ref(),
         budget,
     )?;
+    if let Some(plan) = comment_graph.as_ref() {
+        budget.charge_references(plan.storage_ids.len())?;
+        if plan
+            .storage_ids
+            .iter()
+            .any(|id| private_object_ids.binary_search(id).is_err())
+        {
+            return Err(SlideMediaLifecycleError::InvalidSource);
+        }
+    }
     let build_ids = selected_builds(
         package,
         component_name,
@@ -187,14 +233,15 @@ pub(super) fn select_media(
         build_ids,
         chunk_ids,
         data_references,
+        comment_graph,
     })
 }
 
-fn reject_direct_drawable_comment(
+fn direct_drawable_comment(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<Option<u64>, SlideMediaLifecycleError> {
     let root = parse_view(payload, limits, budget, 1)?;
     let mut drawable = None;
     for field in root.fields().filter(|field| field.number() == 1) {
@@ -216,12 +263,14 @@ fn reject_direct_drawable_comment(
         field
             .validate_canonical_framing()
             .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
-        comment = Some(reference_identifier(field.payload(), limits, budget, 3)?);
+        comment = Some(strict_reference_identifier(
+            field.payload(),
+            limits,
+            budget,
+            3,
+        )?);
     }
-    if comment.is_some() {
-        return Err(SlideMediaLifecycleError::UnsupportedComment);
-    }
-    Ok(())
+    Ok(comment)
 }
 
 fn resolve_slide_position(
@@ -287,6 +336,31 @@ fn reference_identifier(
     budget: &mut LifecycleBudget,
     nesting: usize,
 ) -> Result<u64, SlideMediaLifecycleError> {
+    reference_identifier_with_policy(payload, limits, budget, nesting, false)
+}
+
+/// Parse the direct `MovieArchive.super.drawable.comment` reference.
+///
+/// The legacy reference envelope is intentionally stricter at this one
+/// lifecycle admission boundary: deprecated fields and unknown fields cannot
+/// silently change comment ownership while the broader compatibility readers
+/// continue to preserve their historical behavior.
+pub(super) fn strict_reference_identifier(
+    payload: &[u8],
+    limits: WireLimits,
+    budget: &mut LifecycleBudget,
+    nesting: usize,
+) -> Result<u64, SlideMediaLifecycleError> {
+    reference_identifier_with_policy(payload, limits, budget, nesting, true)
+}
+
+fn reference_identifier_with_policy(
+    payload: &[u8],
+    limits: WireLimits,
+    budget: &mut LifecycleBudget,
+    nesting: usize,
+    reject_legacy_fields: bool,
+) -> Result<u64, SlideMediaLifecycleError> {
     let view = parse_view(payload, limits, budget, nesting)?;
     let mut identifier = None;
     let mut deprecated_type = None;
@@ -296,6 +370,9 @@ fn reference_identifier(
             .validate_canonical_framing()
             .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
         if !matches!(field.number(), 1..=3) {
+            if reject_legacy_fields {
+                return Err(SlideMediaLifecycleError::InvalidSource);
+            }
             continue;
         }
         if field.wire_type() != 0 {
@@ -314,12 +391,15 @@ fn reference_identifier(
                 }
             },
             2 => {
-                if deprecated_type.replace(value).is_some() || !canonical_int32(value) {
+                if reject_legacy_fields
+                    || deprecated_type.replace(value).is_some()
+                    || !canonical_int32(value)
+                {
                     return Err(SlideMediaLifecycleError::InvalidSource);
                 }
             },
             3 => {
-                if external.replace(value).is_some() || value > 1 {
+                if reject_legacy_fields || external.replace(value).is_some() || value > 1 {
                     return Err(SlideMediaLifecycleError::InvalidSource);
                 }
             },
@@ -386,6 +466,7 @@ fn private_graph(
     component_name: &str,
     root: u64,
     owning_slide: u64,
+    comment_graph: Option<&CommentGraphPlan>,
     budget: &mut LifecycleBudget,
 ) -> Result<Vec<u64>, SlideMediaLifecycleError> {
     let mut pending = Vec::new();
@@ -397,6 +478,14 @@ fn private_graph(
         };
         if component != component_name {
             return Err(SlideMediaLifecycleError::InvalidSource);
+        }
+        if object
+            .messages
+            .iter()
+            .any(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+            && comment_graph.is_none_or(|plan| plan.storage_ids.binary_search(&identifier).is_err())
+        {
+            return Err(SlideMediaLifecycleError::UnsupportedComment);
         }
         insert_sorted_unique(&mut selected, identifier, budget)?;
         budget.charge_entries(1)?;
@@ -410,6 +499,11 @@ fn private_graph(
                 }
                 if reference == owning_slide {
                     return Err(SlideMediaLifecycleError::InvalidSource);
+                }
+                if comment_graph
+                    .is_some_and(|plan| plan.author_ids.binary_search(&reference).is_ok())
+                {
+                    continue;
                 }
                 match package.object_with_component(reference) {
                     Some((reference_component, _)) if reference_component == component_name => {
@@ -430,6 +524,11 @@ fn private_graph(
                     }
                     if reference == owning_slide {
                         return Err(SlideMediaLifecycleError::InvalidSource);
+                    }
+                    if comment_graph
+                        .is_some_and(|plan| plan.author_ids.binary_search(&reference).is_ok())
+                    {
+                        continue;
                     }
                     match package.object_with_component(reference) {
                         Some((reference_component, _)) if reference_component == component_name => {
@@ -607,6 +706,10 @@ pub(super) fn validate_removal_closure(
     if removed_ids.windows(2).any(|window| window[0] >= window[1]) {
         return Err(SlideMediaLifecycleError::InvalidSource);
     }
+    let archive_limits = package
+        .limits()
+        .effective_archive_limits()
+        .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
     for component in package.state.source.components().iter() {
         budget.charge_entries(component.archive().objects.len())?;
         for object in &component.archive().objects {
@@ -619,17 +722,9 @@ pub(super) fn validate_removal_closure(
             if object.archive_info.message_infos.len() != object.messages.len() {
                 return Err(SlideMediaLifecycleError::InvalidSource);
             }
-            let mut metadata_references = 0usize;
-            for info in &object.archive_info.message_infos {
-                metadata_references = metadata_references
-                    .checked_add(info.object_references.len())
-                    .and_then(|total| {
-                        info.field_infos.iter().try_fold(total, |total, field| {
-                            total.checked_add(field.object_references.len())
-                        })
-                    })
-                    .ok_or(SlideMediaLifecycleError::InvalidSource)?;
-            }
+            let header_limits =
+                reserve_core_header_inspection_work(object, archive_limits, budget)?;
+            strict_reference_census(object, header_limits, budget)?;
             let metadata_fields =
                 object
                     .archive_info
@@ -648,7 +743,6 @@ pub(super) fn validate_removal_closure(
                     .checked_add(metadata_fields)
                     .ok_or(SlideMediaLifecycleError::InvalidSource)?,
             )?;
-            budget.charge_references(metadata_references)?;
             for (message, info) in object
                 .messages
                 .iter()
@@ -705,6 +799,9 @@ pub(super) fn clone_object(
     {
         return Err(SlideMediaLifecycleError::InvalidSource);
     }
+    let inspection_limits = reserve_core_header_inspection_work(source, limits, budget)?;
+    strict_reference_census(source, inspection_limits, budget)?;
+    let limits = reserve_core_header_work(source, object_remap.len(), limits, budget)?;
     let mut replacements = Vec::new();
     let replacement_bytes = source
         .messages
@@ -731,7 +828,9 @@ pub(super) fn clone_object(
             .and_then(|value| value.checked_add(256))
             .ok_or(SlideMediaLifecycleError::InvalidSource)?;
         budget.charge_allocations(scratch)?;
-        let mut data = if message.type_ == BUILD_MESSAGE_TYPE {
+        let mut data = if message.type_ == COMMENT_STORAGE_MESSAGE_TYPE {
+            super::comment_clone::rewrite_comment_payload(&message.data, object_remap, budget)?
+        } else if message.type_ == BUILD_MESSAGE_TYPE {
             match rewrite_build_payload(&message.data, object_remap, budget)? {
                 Some(data) => data,
                 None => {
@@ -819,7 +918,6 @@ pub(super) fn clone_object(
     })?;
     budget.charge_allocations(output_bytes)?;
     budget.charge_output(output_bytes)?;
-    let limits = reserve_core_header_work(source, object_remap.len(), limits, budget)?;
     source
         .clone_with_identity_remap_with_limits(new_identifier, object_remap, &replacements, limits)
         .map_err(map_archive_error)
@@ -1764,6 +1862,53 @@ fn transition_reference_ids(
     Ok(output)
 }
 
+struct ReferenceOccurrenceCounter;
+
+impl ArchiveReferenceVisitor for ReferenceOccurrenceCounter {
+    fn visit_reference(
+        &mut self,
+        _occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        Ok(())
+    }
+}
+
+/// Strictly census one source header before a clone or removal closure scan.
+///
+/// The core archive reader rejects unknown reference-bearing header metadata;
+/// charging its returned occurrence count keeps aggregate and field-level
+/// object/data references on the operation-wide lifecycle ledger.
+pub(super) fn strict_reference_census(
+    source: &ArchiveObject,
+    limits: ArchiveObjectLimits,
+    budget: &mut LifecycleBudget,
+) -> Result<usize, SlideMediaLifecycleError> {
+    let mut visitor = ReferenceOccurrenceCounter;
+    let occurrences = source
+        .inspect_references_with_policy_and_limits(
+            &mut visitor,
+            ArchiveReferencePolicy::RejectUnknownMetadata,
+            limits,
+        )
+        .map_err(map_archive_error)?;
+    budget.charge_references(occurrences)?;
+    Ok(occurrences)
+}
+
+/// Reserve the source-sized core header arena needed by a read-only reference
+/// census.  The decoded limits are identical to the mutation reservation, but
+/// the shared lifecycle ledger only admits the canonical source, preflight,
+/// and neutral decode arenas that `inspect_references_with_policy_and_limits`
+/// can hold concurrently.  A removal scan must not consume four rewrite
+/// arenas for every unrelated surviving object.
+pub(super) fn reserve_core_header_inspection_work(
+    source: &ArchiveObject,
+    limits: ArchiveObjectLimits,
+    budget: &mut LifecycleBudget,
+) -> Result<ArchiveObjectLimits, SlideMediaLifecycleError> {
+    reserve_core_header_work_inner(source, 0, limits, budget, false)
+}
+
 /// Reserve a source-sized core header arena before entering its bounded codecs.
 /// The input is an unchanged physical source header; mutations only add known
 /// references or grow identifiers/message lengths to at most ten-byte varints.
@@ -1772,6 +1917,16 @@ pub(super) fn reserve_core_header_work(
     additional_references: usize,
     limits: ArchiveObjectLimits,
     budget: &mut LifecycleBudget,
+) -> Result<ArchiveObjectLimits, SlideMediaLifecycleError> {
+    reserve_core_header_work_inner(source, additional_references, limits, budget, true)
+}
+
+fn reserve_core_header_work_inner(
+    source: &ArchiveObject,
+    additional_references: usize,
+    limits: ArchiveObjectLimits,
+    budget: &mut LifecycleBudget,
+    rewrite: bool,
 ) -> Result<ArchiveObjectLimits, SlideMediaLifecycleError> {
     let source_bytes = usize::try_from(source.header_length)
         .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
@@ -1832,15 +1987,27 @@ pub(super) fn reserve_core_header_work(
         .and_then(|value| value.with_metadata_items(header_bytes.min(limits.max_metadata_items())))
         .and_then(|value| value.with_header_memory_bytes(memory))
         .map_err(map_archive_error)?;
-    // Four arenas cover canonical-before, raw rewrite, decode, and
-    // canonical-after passes, including their temporary vectors and sets.
+    // Mutation owns four arenas: canonical-before, raw rewrite, decode, and
+    // canonical-after.  A read-only reference census only needs the source
+    // canonical bytes plus the preflight/decode projection.  Keep the latter
+    // conservative while avoiding a per-object charge that scales as if a
+    // rewrite had already begun.
+    let (arena_count, header_overhead, event_factor, event_extra) = if rewrite {
+        (4, 16, 64, 32)
+    } else {
+        (2, 8, 2, 4)
+    };
     let bytes = memory
-        .checked_mul(4)
-        .and_then(|n| header_bytes.checked_mul(16).and_then(|h| n.checked_add(h)))
+        .checked_mul(arena_count)
+        .and_then(|n| {
+            header_bytes
+                .checked_mul(header_overhead)
+                .and_then(|h| n.checked_add(h))
+        })
         .ok_or(SlideMediaLifecycleError::InvalidSource)?;
     let events = containers
-        .checked_mul(64)
-        .and_then(|n| n.checked_add(32))
+        .checked_mul(event_factor)
+        .and_then(|n| n.checked_add(event_extra))
         .ok_or(SlideMediaLifecycleError::InvalidSource)?;
     budget.charge_allocation_plan(bytes, events)?;
     budget.charge_wire_work(bytes)?;
