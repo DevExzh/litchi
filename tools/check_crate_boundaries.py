@@ -615,6 +615,13 @@ RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_METHODS = (
 RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_METHOD_SET = frozenset(
     RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_METHODS
 )
+RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_HOST_TYPED_METHODS = (
+    "slide_chart_arrangement_by_selector",
+    "set_slide_chart_arrangement_by_selector",
+)
+RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_HOST_TYPED_METHOD_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_HOST_TYPED_METHODS
+)
 RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_HELPERS = ("chart_selector_for_drawable",)
 RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_HELPER_SET = frozenset(
     RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_HELPERS
@@ -47465,12 +47472,16 @@ def audit_iwa_keynote_chart_arrangement_source_topology(
     function_bodies = _keynote_chart_arrangement_function_bodies(production)
 
     for name, line_number in _rust_function_declarations(production):
-        if name not in RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_METHOD_SET:
-            continue
-        violations.append(
-            "retired litchi-iwa Keynote chart-arrangement raw-ID method "
-            f"{name}: {relative}:{line_number}"
-        )
+        if name in RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_METHOD_SET:
+            violations.append(
+                "retired litchi-iwa Keynote chart-arrangement raw-ID method "
+                f"{name}: {relative}:{line_number}"
+            )
+        elif name in RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_HOST_TYPED_METHOD_SET:
+            violations.append(
+                "retired litchi-iwa Keynote chart-arrangement host wrapper "
+                f"{name}: {relative}:{line_number}"
+            )
     for match in re.finditer(
         r"(?<![A-Za-z0-9_])(?:r#)?(?P<helper>chart_selector_for_drawable)"
         r"(?![A-Za-z0-9_])",

@@ -11,13 +11,17 @@
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use litchi_keynote::{ChartArrangement, ChartSelector, Package, SlideSelector};
+use litchi_keynote::{
+    ChartArrangement, ChartArrangementError, ChartSelector, Package, SlideSelector,
+};
+use tempfile::NamedTempFile;
 
 const USAGE: &str = "usage: edit_chart_arrangement <input.key> <output.key> \
-                     <locked:true|false> <constrain-proportions:true|false> \
-                     [index:N|name:SLIDE] [index:N|name:CHART]";
+                     <locked> <constrain-proportions> \
+                     [index:N|name:SLIDE] [index:N|name:CHART] \
+                     (boolean values: true or false)";
 
 enum SelectedSlide {
     Index(usize),
@@ -108,6 +112,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         ));
     }
 
+    let source_conflict_checked = !commit.patch().is_noop();
+    if source_conflict_checked
+        && !matches!(
+            commit
+                .package()
+                .apply_slide_chart_arrangement(commit.patch()),
+            Err(ChartArrangementError::PatchConflict)
+        )
+    {
+        return Err(invalid_input(
+            "forward chart-arrangement patch was not rejected on its committed target",
+        ));
+    }
+
     // Apply the exact inverse in memory and require both semantic and byte
     // equality with the source package, including when the requested edit is
     // itself a no-op.
@@ -125,7 +143,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ));
     }
 
-    commit.package().save(&output)?;
+    save_new(&output, commit.package())?;
     let reopened = Package::open(&output)?;
     reopened.validate()?;
     let after = reopened.slide_chart_arrangement(slide_selector, chart_selector)?;
@@ -136,7 +154,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!(
-        "chart arrangement: locked_before={}, constrain_proportions_before={}, locked_after={}, constrain_proportions_after={}, changed={}, touched_components={}, full_reparse={}, source_fingerprint={:016x}, target_fingerprint={:016x}",
+        "chart arrangement: locked_before={}, constrain_proportions_before={}, locked_after={}, constrain_proportions_after={}, changed={}, touched_components={}, full_reparse={}, source_conflict_checked={}, source_fingerprint={:016x}, target_fingerprint={:016x}",
         before.locked(),
         before.constrain_proportions(),
         after.locked(),
@@ -144,6 +162,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         commit.diagnostics().changed(),
         commit.diagnostics().touched_components(),
         commit.diagnostics().full_reparse_performed(),
+        source_conflict_checked,
         commit.patch().source_fingerprint(),
         commit.patch().target_fingerprint(),
     );
@@ -210,6 +229,20 @@ fn required_argument(
     message: &'static str,
 ) -> Result<OsString, Box<dyn Error>> {
     arguments.next().ok_or_else(|| invalid_input(message))
+}
+
+fn save_new(path: &Path, package: &Package) -> Result<(), Box<dyn Error>> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let mut temporary = NamedTempFile::new_in(parent)?;
+    package.write_to(temporary.as_file_mut())?;
+    temporary.as_file().sync_all()?;
+    temporary
+        .persist_noclobber(path)
+        .map_err(|error| -> Box<dyn Error> { Box::new(error.error) })?;
+    Ok(())
 }
 
 fn exact_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn Error>> {
