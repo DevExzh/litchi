@@ -1,0 +1,135 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0446/profiles/before/record/formal/resource.log",
+    "perf",
+    "record",
+    "--no-buildid-cache",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0446/profiles/before/record/formal/perf.data",
+    "-F",
+    "999",
+    "-e",
+    "cycles:u",
+    "--call-graph",
+    "fp,127",
+    "--",
+    "/tmp/litchi-goal-0446-binaries/before/normal",
+    "--case",
+    "opc_part_add_plain_lifecycle",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0446/profiles/before/record/formal/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0446/profiles/before/record/formal/report-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4820,
+      "path": "profiles/before/record/formal/report-catalog.json",
+      "sha256": "acaa1ae5881f5a1cbf9a603745da38d06b878a824f26227896081a84bfbe15c5"
+    },
+    "oracle_log": {
+      "bytes": 317,
+      "path": "profiles/before/record/formal/oracle.log",
+      "sha256": "a24034c7e8917720a17cb11e7d98aa7d71d844573603825a49200b273c4119bf"
+    },
+    "perf_data": {
+      "bytes": 266344,
+      "path": "profiles/before/record/formal/perf.data",
+      "sha256": "61e209e928356758ee8f0d51805a3b53b5e94b0e21698a2eff07a15af162b0fa"
+    },
+    "perf_report": {
+      "bytes": 22909,
+      "path": "profiles/before/record/formal/perf-report.txt",
+      "sha256": "9de89f8f4e3422a73014443c55e7bf6cb3b9c65f1077dc304ea26236609aca1f"
+    },
+    "perf_script": {
+      "bytes": 2426789,
+      "path": "profiles/before/record/formal/perf-script.txt",
+      "sha256": "faeb1008a73163b57972cf82b297c3ee31ed10dac6a96560c93c9936d76522a6"
+    },
+    "report": {
+      "bytes": 37419,
+      "path": "profiles/before/record/formal/report.json",
+      "sha256": "05a3284c0de267ce6545038102c2e01d044ef87c684835fcbd92bf53915a1857"
+    },
+    "resource": {
+      "bytes": 1275,
+      "path": "profiles/before/record/formal/resource.log",
+      "sha256": "e81dbd4d10ebfbfd8e72ee32b4f88a63a83e64ec4fbb4365439f40c85564d40f"
+    },
+    "workload_log": {
+      "bytes": 194,
+      "path": "profiles/before/record/formal/workload.log",
+      "sha256": "bcc985baeeb3d45fc2e6bd5d6fb4e8682170afefb1431dc602dbad5df87bd1f8"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 458719080,
+    "path": "/tmp/litchi-goal-0446-binaries/before/normal",
+    "sha256": "7cdc11710478332d3dd4e125aa8678e5e0c8e1aa1474f0332034cf1c6d5116bc"
+  },
+  "build_directory": "before",
+  "call_graph": "fp,127",
+  "capture_helper_sha256": "1c069dcd64027e4b43618208500aa9b491fbfb8401c75f35245413c5f6fd6f1c",
+  "change": 446,
+  "custody_driver": "/home/zhuhe/code/litchi/docs/performance/results/change-0446/check.py",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "0092914fab6207cee4f814cff55a530b3af3bc396ac7c4333ad43507c51beff2",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T19:54:23.380918+00:00",
+  "kind": "record",
+  "oracle_exit_code": 0,
+  "oracle_stdout_sha256": "a24034c7e8917720a17cb11e7d98aa7d71d844573603825a49200b273c4119bf",
+  "outside_bundle_status_unchanged": true,
+  "protocol_path": "protocol.json",
+  "protocol_sha256": "556720f49a4d1f0f66f7e5a433999551cfc2507291524d9a97afae804bfe7321",
+  "record_event": "cycles:u",
+  "record_frequency_hz": 999,
+  "revision": "28330dc99e13add0f7abe9641aa9c29fbbea8d4c",
+  "role": "before",
+  "schema": "litchi-0446-profile-receipt-v1",
+  "scope": "whole fresh process: setup, corpus generation, warmups, timed samples, output hashing, and workload checks; copied Python oracle runs afterward outside the profiled command and GNU-time scope",
+  "selector": "opc_part_add_plain_lifecycle",
+  "shape": "large",
+  "source_after": {
+    "files": 6661,
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0"
+  },
+  "source_before": {
+    "files": 6661,
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0"
+  },
+  "source_field": "opc_part_add",
+  "source_manifest": {
+    "files": 6661,
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T19:54:21.195516+00:00",
+  "stat_events": [],
+  "status": "pass",
+  "status_after": [
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md"
+  ]
+}

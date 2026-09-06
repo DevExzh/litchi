@@ -1,0 +1,6 @@
+{
+  "change": 446,
+  "status": "failed",
+  "error": "freeze.py lacked data-path.md; build descriptor and first A1 preflight consequently lacked protocol.json",
+  "scope": "preflight only; no protocol was written, production source was unchanged, and no workload or retained sample ran"
+}

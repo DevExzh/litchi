@@ -1,0 +1,68 @@
+{
+  "change": 446,
+  "fixtures": {
+    "large-output.zip": {
+      "bytes": 2916848,
+      "sha256": "fdb0bcc41ff1e890c8559f767a0d2629da62f9c94814d08ffdb8d5dffb494b57"
+    },
+    "large-source.zip": {
+      "bytes": 2851063,
+      "sha256": "6cf70a6d836d2eddf9b50f954347cc7c0c86be166fbbe86553b739dcc891b7cb"
+    },
+    "large.json": {
+      "bytes": 1986,
+      "sha256": "0fbd31f512e80ac6f5e46670c4cc5f8f760828036cd743812e5c55dd61874c18"
+    },
+    "medium-output.zip": {
+      "bytes": 779088,
+      "sha256": "72a40b5d494d0664df10ddba567ddbd0856d971f0384537d592ebd8d48f8e2e4"
+    },
+    "medium-source.zip": {
+      "bytes": 713311,
+      "sha256": "eba4eb84cc47280d4de3ff8a09a157923962fdc5af770b99cbd996905dbc4079"
+    },
+    "medium.json": {
+      "bytes": 1985,
+      "sha256": "e38cd769d2bc5462620bcac55f3a48d02d33e85be0bd115043955d9fd493b5f9"
+    },
+    "tiny-output.zip": {
+      "bytes": 111002,
+      "sha256": "f04c7e312624e39aa915f1fbf5b76563318a3d86cff5764e34acc49c9babf2fe"
+    },
+    "tiny-source.zip": {
+      "bytes": 45234,
+      "sha256": "2f8596a10ff5634850c7ecfd07571177f115438bab08918dc9392b4a31d5a165"
+    },
+    "tiny.json": {
+      "bytes": 1974,
+      "sha256": "d9c2239542ac97be3885a3709671aee28b4a1269252d071843875597c5371b5a"
+    }
+  },
+  "prior_0444_identical_archives": {
+    "large-source.zip": {
+      "bytes": 2851063,
+      "sha256": "6cf70a6d836d2eddf9b50f954347cc7c0c86be166fbbe86553b739dcc891b7cb"
+    },
+    "medium-output.zip": {
+      "bytes": 779088,
+      "sha256": "72a40b5d494d0664df10ddba567ddbd0856d971f0384537d592ebd8d48f8e2e4"
+    },
+    "tiny-output.zip": {
+      "bytes": 111002,
+      "sha256": "f04c7e312624e39aa915f1fbf5b76563318a3d86cff5764e34acc49c9babf2fe"
+    },
+    "tiny-source.zip": {
+      "bytes": 45234,
+      "sha256": "2f8596a10ff5634850c7ecfd07571177f115438bab08918dc9392b4a31d5a165"
+    },
+    "medium-source.zip": {
+      "bytes": 713311,
+      "sha256": "eba4eb84cc47280d4de3ff8a09a157923962fdc5af770b99cbd996905dbc4079"
+    },
+    "large-output.zip": {
+      "bytes": 2916848,
+      "sha256": "fdb0bcc41ff1e890c8559f767a0d2629da62f9c94814d08ffdb8d5dffb494b57"
+    }
+  },
+  "scope": "independent archive/payload/XML/raw-record verification; observed and plain must match the same archive identities"
+}

@@ -1,6 +1,22 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0445
+## Current evidence through 0446
+
+[0446](changes/0446-opc-owned-content-type-name.md) retains a one-line ownership optimization in content-type parsing.
+The 720-sample matrix passes the allocation gate: 5.963%/5.990% fewer calls at
+medium/large in both repeats. The separate normal latency gate fails; peak
+memory is unchanged and no paired latency/RSS or repeat trigger crosses 5%.
+All 458 OPC/373 harness tests pass, owner strict lint is clean and harness lint
+adds no diagnostics. Independent oracles and corruption probes remain retained.
+
+This improves the existing synthetic package-addition slice without promoting
+semantic or native coverage. There remain 438 selectors/36 defaults and 15
+categories/33 representative mappings, 10 measured and 23 correctness-only.
+Native breadth, repackaging, semantic dependency closures, bounded existing
+append, cold/range and scaling are incomplete. The full user-owned non-iWork
+goal remains active and uncompleted.
+
+## Earlier evidence through 0445
 
 [0445](changes/0445-opc-part-add-plain-source.md) adds a matched plain-source Part-addition lifecycle and a single-build
 24-report/720-sample calibration. Plain large normal p50 is about 18.9 ms versus

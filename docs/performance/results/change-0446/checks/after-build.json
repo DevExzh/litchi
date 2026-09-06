@@ -1,0 +1,50 @@
+{
+  "change": 446,
+  "argv": [
+    "env",
+    "RUSTFLAGS=-Cforce-frame-pointers=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG=1",
+    "cargo",
+    "build",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline",
+    "--bin",
+    "litchi-perf-baseline-alloc"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "28330dc99e13add0f7abe9641aa9c29fbbea8d4c",
+  "driver_sha256": "e919a75be96fb98afc61226864a433806a0f7f3dbc542586cb972e3cf71deed5",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T19:50:32.388028+00:00",
+  "source_before": {
+    "path": "sources/9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8.json",
+    "sha256": "9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8",
+    "files": 6661
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T19:52:47.081687+00:00",
+  "source_after": {
+    "path": "sources/9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8.json",
+    "sha256": "9892f18099883980279199c6488e67effb14421613d737175b5b3a65c36544a8",
+    "files": 6661
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/after-build.log",
+    "bytes": 974,
+    "sha256": "f4ec3c8bb9406d5ab8dd1d980cc12b347983f32b13b4ba31f4ece056b886d038"
+  }
+}

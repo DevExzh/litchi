@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0446: transfer owned content-type names without skipping validation
+
+[0446](changes/0446-opc-owned-content-type-name.md) moves an already owned String into the existing PackURI constructor.
+Core/format ownership and dependency direction remain unchanged
+(0002/0023/0024). Raw bytes, detached publication and freshness authority remain
+unchanged (0003); attribute limits, URI/content-type validation, duplicate checks
+and error order are retained (0005/0006/0008). All three mandatory manifest
+parses and managed-memory reservations remain. No API, dependency, unsafe code,
+executor or ambient I/O change. The accepted ADR tree is unchanged. See
+[source review](results/change-0446/source-review.md) and
+[validation](results/change-0446/validation-notes.md).
+
 ## Change 0445: matched source calibration in standalone tooling
 
 [0445](changes/0445-opc-part-add-plain-source.md) adds an opt-in plain source selector with a shared timed body.

@@ -1,0 +1,5 @@
+{
+  "origin": "change-0445/checks/candidate-harness-strict-fixed.json",
+  "receipt_sha256": "0e4f1c197ae2cdcbba56d0f1998e62c24f5acbae7fd81fdadc69cf221885e4ac",
+  "scope": "Sealed prior strict harness result; exact source manifest matches the before build."
+}

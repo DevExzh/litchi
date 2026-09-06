@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0446 reduces allocations in package addition
+
+[0446](changes/0446-opc-owned-content-type-name.md) reuses the plain-source category 6/15 OPC Part-addition slice.
+Medium/large allocation calls fall about 6%; the normal latency gate fails.
+There is no semantic or native coverage promotion. Registry/default counts
+remain 438/36; the representative index remains 15 categories, 33 mappings,
+10 measured and 23 correctness-only. Semantic dependency closures, repackaging,
+bounded existing append, native breadth, cold/range and scaling remain open.
+
 ## 2026-09-06: change 0445 calibrates Part-addition timing
 
 [0445](changes/0445-opc-part-add-plain-source.md) adds a matched plain-source version of the low-level OPC Part-addition
