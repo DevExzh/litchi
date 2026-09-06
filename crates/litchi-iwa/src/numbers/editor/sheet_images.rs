@@ -390,44 +390,6 @@ impl NumbersEditor {
         )
     }
 
-    /// Read the basic controls in iWork's Image inspector for one sheet image.
-    pub fn sheet_image_adjustments(
-        &self,
-        sheet_id: u64,
-        drawable_object_id: u64,
-    ) -> Result<ImageAdjustments> {
-        Ok(image_graph(self, sheet_id, drawable_object_id)?
-            .info
-            .image_adjustments)
-    }
-
-    /// Update image exposure, saturation, and automatic enhancement while preserving advanced
-    /// and unknown native adjustment fields.
-    pub fn set_sheet_image_adjustments(
-        &mut self,
-        sheet_id: u64,
-        drawable_object_id: u64,
-        adjustments: ImageAdjustments,
-    ) -> Result<()> {
-        let source = image_graph(self, sheet_id, drawable_object_id)?;
-        let mut staged = self.package.clone();
-        let expected = replace_image_adjustments(
-            &mut staged,
-            &source.archive_name,
-            drawable_object_id,
-            "Numbers image",
-            adjustments,
-        )?;
-        let verified = Self::from_package(staged)?;
-        if verified.sheet_image_adjustments(sheet_id, drawable_object_id)? != expected {
-            return Err(Error::InvalidFormat(
-                "Numbers image adjustment update failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
     /// Duplicate one ordinary sheet image using Numbers' native placement.
     ///
     /// The image and title/caption stand-ins receive fresh identifiers and
@@ -819,6 +781,10 @@ mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
     use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+    use litchi_numbers::{
+        Package as FocusedNumbersPackage, SheetSelector as FocusedSheetSelector,
+        shape::image::ImageSelector,
+    };
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -842,6 +808,40 @@ mod tests {
 
     fn drawable_selector(raw: u64) -> DrawableId {
         DrawableId::from_raw(raw).expect("fixture drawable identifiers are non-zero")
+    }
+
+    fn focused_image_adjustments(
+        editor: &NumbersEditor,
+        image_position: usize,
+    ) -> ImageAdjustments {
+        let package = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        package
+            .sheet_image_adjustments(
+                FocusedSheetSelector::name("Media"),
+                ImageSelector::index(image_position),
+            )
+            .unwrap()
+    }
+
+    fn set_focused_image_adjustments(
+        editor: &mut NumbersEditor,
+        image_position: usize,
+        adjustments: ImageAdjustments,
+    ) {
+        let package = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let commit = package
+            .edit_sheet_image_adjustments(
+                FocusedSheetSelector::name("Media"),
+                ImageSelector::index(image_position),
+            )
+            .unwrap()
+            .set(adjustments)
+            .unwrap()
+            .commit()
+            .unwrap();
+        let mut bytes = Vec::new();
+        commit.package().write_to(&mut bytes).unwrap();
+        *editor = NumbersEditor::from_bytes(&bytes).unwrap();
     }
 
     #[test]
@@ -986,26 +986,11 @@ mod tests {
             .with_exposure(Some(ImageAdjustment::new(0.25).unwrap()))
             .with_saturation(Some(ImageAdjustment::new(-0.5).unwrap()))
             .with_enhancement(Some(ImageEnhancement::Enabled));
-        editor
-            .set_sheet_image_adjustments(sheet_id, created.drawable_object_id, changed_adjustments)
-            .unwrap();
+        set_focused_image_adjustments(&mut editor, 0, changed_adjustments);
+        assert_eq!(focused_image_adjustments(&editor, 0), changed_adjustments);
+        set_focused_image_adjustments(&mut editor, 0, created.image_adjustments);
         assert_eq!(
-            editor
-                .sheet_image_adjustments(sheet_id, created.drawable_object_id)
-                .unwrap(),
-            changed_adjustments
-        );
-        editor
-            .set_sheet_image_adjustments(
-                sheet_id,
-                created.drawable_object_id,
-                created.image_adjustments,
-            )
-            .unwrap();
-        assert_eq!(
-            editor
-                .sheet_image_adjustments(sheet_id, created.drawable_object_id)
-                .unwrap(),
+            focused_image_adjustments(&editor, 0),
             created.image_adjustments
         );
 

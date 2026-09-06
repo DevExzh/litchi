@@ -396,9 +396,7 @@ pub use package::{
 };
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
-pub use package::{
-    __decode_image_adjustments_payload, __rewrite_image_adjustments_payload, ImageAdjustmentsError,
-};
+pub use package::{__decode_image_adjustments_payload, ImageAdjustmentsError};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::{__invalidate_slide_preview, SlidePreviewInvalidationError};

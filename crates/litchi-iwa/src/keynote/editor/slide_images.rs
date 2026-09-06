@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use litchi_iwa_common::media::Type as MediaType;
 
 use super::*;
-use crate::archive::RawMessage;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
@@ -364,43 +363,6 @@ impl KeynoteEditor {
         )
     }
 
-    /// Read the basic controls in iWork's Image inspector for one ordinary slide image.
-    pub fn slide_image_adjustments(
-        &self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<ImageAdjustments> {
-        Ok(require_file_image(self, slide_index, drawable_object_id)?
-            .info
-            .image_adjustments)
-    }
-
-    /// Update image exposure, saturation, and automatic enhancement while preserving advanced
-    /// and unknown native adjustment fields.
-    pub fn set_slide_image_adjustments(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        adjustments: ImageAdjustments,
-    ) -> Result<()> {
-        let source = require_file_image(self, slide_index, drawable_object_id)?;
-        let mut staged = self.package().clone();
-        let expected = replace_image_adjustments_focused(
-            &mut staged,
-            &source.archive_name,
-            drawable_object_id,
-            adjustments,
-        )?;
-        let verified = Self::from_package(staged)?;
-        if verified.slide_image_adjustments(slide_index, drawable_object_id)? != expected {
-            return Err(Error::InvalidFormat(
-                "Keynote image adjustment update failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
     /// Duplicate one ordinary file-backed slide image using Keynote's native
     /// shared-asset behavior.
     ///
@@ -616,80 +578,6 @@ impl KeynoteEditor {
             removed_data_identifiers,
         })
     }
-}
-
-fn replace_image_adjustments_focused(
-    package: &mut IWorkPackage,
-    archive_name: &str,
-    image_id: u64,
-    adjustments: ImageAdjustments,
-) -> Result<ImageAdjustments> {
-    let limits = crate::keynote::editor::slide_movies::movie_playback_wire_limits(package)?;
-    let archive_limits = package.limits().effective_archive_limits()?;
-    let mut verified_adjustments = None;
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(image_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Keynote image object {image_id} is missing"))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter_map(|(index, message)| (message.type_ == 3_005).then_some(index))
-            .collect::<Vec<_>>();
-        let [message_index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote image {image_id} must have exactly one ImageArchive payload"
-            )));
-        };
-        let message_index = *message_index;
-        let original = object.messages[message_index].data.as_slice();
-        let current = litchi_keynote::__decode_image_adjustments_payload(original, limits)
-            .map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "Keynote image {image_id} adjustments are invalid: {error}"
-                ))
-            })?;
-        // The focused reader is deliberately before the equality check: a
-        // malformed source must fail even when the requested value is equal.
-        if current == adjustments {
-            verified_adjustments = Some(current);
-            return Ok(());
-        }
-        let rewritten =
-            litchi_keynote::__rewrite_image_adjustments_payload(original, adjustments, limits)
-                .map_err(|error| {
-                    Error::InvalidFormat(format!(
-                        "Keynote image {image_id} adjustment rewrite failed: {error}"
-                    ))
-                })?;
-        let verified = litchi_keynote::__decode_image_adjustments_payload(&rewritten, limits)
-            .map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "Keynote image {image_id} adjustment readback failed: {error}"
-                ))
-            })?;
-        if verified != adjustments {
-            return Err(Error::InvalidFormat(
-                "Keynote image adjustment patch failed validation".to_owned(),
-            ));
-        }
-        object
-            .replace_message_preserving_header_with_limits(
-                message_index,
-                RawMessage {
-                    type_: 3_005,
-                    data: rewritten,
-                },
-                archive_limits,
-            )
-            .map_err(Error::from)?;
-        verified_adjustments = Some(verified);
-        Ok(())
-    })?;
-    verified_adjustments.ok_or_else(|| {
-        Error::InvalidFormat("Keynote image adjustment update produced no result".to_owned())
-    })
 }
 
 fn set_slide_image_caption(
@@ -945,22 +833,41 @@ mod tests {
             .with_exposure(Some(ImageAdjustment::new(0.25).unwrap()))
             .with_saturation(Some(ImageAdjustment::new(-0.5).unwrap()))
             .with_enhancement(Some(ImageEnhancement::Enabled));
-        editor
-            .set_slide_image_adjustments(0, created.drawable_object_id, changed_adjustments)
+        let focused = litchi_keynote::Package::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let changed = focused
+            .edit_slide_image_adjustments(
+                litchi_keynote::SlideSelector::index(0),
+                litchi_keynote::ImageSelector::index(0),
+            )
+            .unwrap()
+            .set(changed_adjustments)
+            .unwrap()
+            .commit()
             .unwrap();
+        let mut changed_bytes = Vec::new();
+        changed.package().write_to(&mut changed_bytes).unwrap();
+        editor = KeynoteEditor::from_bytes(&changed_bytes).unwrap();
         assert_eq!(
-            editor
-                .slide_image_adjustments(0, created.drawable_object_id)
-                .unwrap(),
+            editor.slide_images(0).unwrap()[0].image_adjustments,
             changed_adjustments
         );
-        editor
-            .set_slide_image_adjustments(0, created.drawable_object_id, created.image_adjustments)
+
+        let focused = litchi_keynote::Package::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let restored = focused
+            .edit_slide_image_adjustments(
+                litchi_keynote::SlideSelector::index(0),
+                litchi_keynote::ImageSelector::index(0),
+            )
+            .unwrap()
+            .set(created.image_adjustments)
+            .unwrap()
+            .commit()
             .unwrap();
+        let mut restored_bytes = Vec::new();
+        restored.package().write_to(&mut restored_bytes).unwrap();
+        editor = KeynoteEditor::from_bytes(&restored_bytes).unwrap();
         assert_eq!(
-            editor
-                .slide_image_adjustments(0, created.drawable_object_id)
-                .unwrap(),
+            editor.slide_images(0).unwrap()[0].image_adjustments,
             created.image_adjustments
         );
 

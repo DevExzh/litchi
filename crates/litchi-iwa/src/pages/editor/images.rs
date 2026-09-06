@@ -351,43 +351,6 @@ impl PagesEditor {
         remove_body_image_caption(self, drawable_object_id, DrawableCaptionKind::Caption)
     }
 
-    /// Read the basic controls in iWork's Image inspector for one body image.
-    pub fn body_image_adjustments(
-        &self,
-        drawable_object_id: DrawableId,
-    ) -> Result<ImageAdjustments> {
-        Ok(body_image_graph(self, drawable_object_id.get())?
-            .info
-            .image_adjustments)
-    }
-
-    /// Update image exposure, saturation, and automatic enhancement while preserving advanced
-    /// and unknown native adjustment fields.
-    pub fn set_body_image_adjustments(
-        &mut self,
-        drawable_object_id: DrawableId,
-        adjustments: ImageAdjustments,
-    ) -> Result<()> {
-        let raw_drawable_object_id = drawable_object_id.get();
-        let source = body_image_graph(self, raw_drawable_object_id)?;
-        let mut staged = self.package().clone();
-        let expected = super::image_adjustments::replace_image_adjustments(
-            &mut staged,
-            &source.archive_name,
-            raw_drawable_object_id,
-            "Pages image",
-            adjustments,
-        )?;
-        let verified = Self::from_package(staged)?;
-        if verified.body_image_adjustments(drawable_object_id)? != expected {
-            return Err(Error::InvalidFormat(
-                "Pages image adjustment update failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
     /// Duplicate one body image at a UTF-16 body position.
     ///
     /// The image, title/caption stand-ins, and body attachment receive fresh
@@ -770,6 +733,29 @@ mod tests {
         DrawableId::from_raw(999).unwrap()
     }
 
+    fn focused_image_adjustments(editor: &PagesEditor) -> ImageAdjustments {
+        let bytes = editor.to_bytes().unwrap();
+        litchi_pages::Package::from_bytes(&bytes)
+            .unwrap()
+            .body_image_adjustments(0usize)
+            .unwrap()
+    }
+
+    fn set_focused_image_adjustments(editor: &mut PagesEditor, adjustments: ImageAdjustments) {
+        let bytes = editor.to_bytes().unwrap();
+        let package = litchi_pages::Package::from_bytes(&bytes).unwrap();
+        let commit = package
+            .edit_body_image_adjustments(0usize)
+            .unwrap()
+            .set(adjustments)
+            .unwrap()
+            .commit()
+            .unwrap();
+        let mut changed = Vec::new();
+        commit.package().write_to(&mut changed).unwrap();
+        *editor = PagesEditor::from_bytes(&changed).unwrap();
+    }
+
     #[test]
     fn image_selectors_use_drawable_object_id() {
         let _: fn(&PagesEditor, DrawableId) -> Result<DrawableGeometry> =
@@ -794,10 +780,6 @@ mod tests {
             PagesEditor::set_body_image_caption;
         let _: fn(&mut PagesEditor, DrawableId) -> Result<bool> =
             PagesEditor::remove_body_image_caption;
-        let _: fn(&PagesEditor, DrawableId) -> Result<ImageAdjustments> =
-            PagesEditor::body_image_adjustments;
-        let _: fn(&mut PagesEditor, DrawableId, ImageAdjustments) -> Result<()> =
-            PagesEditor::set_body_image_adjustments;
         let _: fn(&mut PagesEditor, DrawableId, usize) -> Result<PagesImageInfo> =
             PagesEditor::duplicate_body_image;
         let _: fn(&mut PagesEditor, DrawableId, &[u8]) -> Result<Vec<u8>> =
@@ -912,18 +894,23 @@ mod tests {
             .with_exposure(Some(ImageAdjustment::new(0.25).unwrap()))
             .with_saturation(Some(ImageAdjustment::new(-0.5).unwrap()))
             .with_enhancement(Some(ImageEnhancement::Enabled));
-        editor
-            .set_body_image_adjustments(created_id, changed_adjustments)
-            .unwrap();
         assert_eq!(
-            editor.body_image_adjustments(created_id).unwrap(),
+            focused_image_adjustments(&editor),
+            created.image_adjustments
+        );
+        set_focused_image_adjustments(&mut editor, changed_adjustments);
+        assert_eq!(focused_image_adjustments(&editor), changed_adjustments);
+        assert_eq!(
+            editor.body_images().unwrap()[0].image_adjustments,
             changed_adjustments
         );
-        editor
-            .set_body_image_adjustments(created_id, created.image_adjustments)
-            .unwrap();
+        set_focused_image_adjustments(&mut editor, created.image_adjustments);
         assert_eq!(
-            editor.body_image_adjustments(created_id).unwrap(),
+            focused_image_adjustments(&editor),
+            created.image_adjustments
+        );
+        assert_eq!(
+            editor.body_images().unwrap()[0].image_adjustments,
             created.image_adjustments
         );
 

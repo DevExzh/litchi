@@ -26,6 +26,7 @@ const IMAGE_ASSET_MEMBER: &str = "Data/abstract1-9073.jpg";
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const IMAGE_ASSET_IDENTIFIER: u64 = 9_073;
 const TITLE_MARKER: &[u8] = b"Native image adjustment marker";
+const RETIREMENT_MARKER: &[u8] = b"Focused Keynote image adjustment retirement saved";
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -35,6 +36,11 @@ fn fixture_path() -> PathBuf {
 fn resaved_fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/keynote/image-adjustments-native-resaved.key")
+}
+
+fn retirement_resaved_fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/keynote/image-adjustments-retirement-resaved.key")
 }
 
 fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
@@ -250,6 +256,49 @@ fn native_image_adjustments_resaved_fixture_reopens_with_candidate_values() -> T
     assert_basic_adjustments(&package, expected)?;
     assert_native_image_preserved(&source, &source)?;
     assert_asset_unchanged(&source, &source)?;
+    Ok(())
+}
+
+#[test]
+fn native_image_adjustments_retirement_fixture_reads_profile_and_keeps_exact_noop() -> TestResult {
+    let source = std::fs::read(retirement_resaved_fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+    let expected = ImageAdjustments::new()
+        .with_exposure(Some(ImageAdjustment::new(-0.2)?))
+        .with_saturation(Some(ImageAdjustment::new(0.35)?))
+        .with_enhancement(Some(ImageEnhancement::Enabled));
+
+    assert_basic_adjustments(&package, expected)?;
+    assert!(slide_contains_marker(&source, RETIREMENT_MARKER)?);
+    let source_title = package
+        .show()?
+        .slides()
+        .first()
+        .and_then(|slide| slide.title())
+        .map(str::to_owned);
+    assert!(source_title.is_some(), "native slide title is missing");
+
+    let no_op = package
+        .edit_slide_image_adjustments(SlideSelector::index(0), ImageSelector::index(0))?
+        .set(expected)?
+        .commit()?;
+    assert!(no_op.patch().is_noop());
+    assert!(!no_op.diagnostics().changed());
+    let candidate = exact_bytes(no_op.package())?;
+    assert_eq!(candidate, source);
+
+    let reopened = Package::from_bytes(&candidate)?;
+    assert_basic_adjustments(&reopened, expected)?;
+    assert_eq!(
+        reopened
+            .show()?
+            .slides()
+            .first()
+            .and_then(|slide| slide.title())
+            .map(str::to_owned),
+        source_title
+    );
+    assert!(slide_contains_marker(&candidate, RETIREMENT_MARKER)?);
     Ok(())
 }
 

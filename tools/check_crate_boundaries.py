@@ -2128,6 +2128,20 @@ IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS = (
     "__decode_image_adjustments_payload",
     "__rewrite_image_adjustments_payload",
 )
+IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS_BY_ECOSYSTEM = {
+    # The compatibility hosts use this edge for bounded graph reads only.
+    # Focused package tests exercise the neutral codec directly, so no format
+    # retains a hidden package rewrite bridge here.
+    "Keynote": ("__decode_image_adjustments_payload",),
+    "Pages": ("__decode_image_adjustments_payload",),
+    "Numbers": ("__decode_image_adjustments_payload",),
+}
+IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM = (
+    "__rewrite_image_adjustments_payload"
+)
+IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_ECOSYSTEMS = frozenset(
+    IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS_BY_ECOSYSTEM
+)
 IWA_IMAGE_ADJUSTMENTS_SEMANTIC_METHODS = {
     "Keynote": (
         "slide_image_adjustments",
@@ -2198,16 +2212,20 @@ IWA_IMAGE_ADJUSTMENTS_HOST_ROOTS = {
 IWA_IMAGE_ADJUSTMENTS_HOST_CALLS = {
     "Keynote": re.compile(
         r"\blitchi_keynote\s*::\s*__decode_image_adjustments_payload\s*\("
-        r"|\blitchi_keynote\s*::\s*__rewrite_image_adjustments_payload\s*\("
     ),
     "Pages": re.compile(
         r"\blitchi_pages\s*::\s*__decode_image_adjustments_payload\s*\("
-        r"|\blitchi_pages\s*::\s*__rewrite_image_adjustments_payload\s*\("
     ),
     "Numbers": re.compile(
         r"\blitchi_numbers\s*::\s*__decode_image_adjustments_payload\s*\("
-        r"|\blitchi_numbers\s*::\s*__rewrite_image_adjustments_payload\s*\("
     ),
+}
+IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_CALLS = {
+    ecosystem: re.compile(
+        rf"\blitchi_{ecosystem.lower()}\s*::\s*"
+        rf"{re.escape(IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM)}\s*\("
+    )
+    for ecosystem in IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_ECOSYSTEMS
 }
 IWA_IMAGE_ADJUSTMENTS_CODEC_REQUIRED_MARKERS = (
     "DecodeOptions",
@@ -6031,6 +6049,26 @@ RETIRED_IWA_NUMBERS_NAMES_EXAMPLE = Path(
     "crates/litchi-iwa/examples/rename_numbers_items.rs"
 )
 IWA_NUMBERS_README = Path("crates/litchi-iwa/README.md")
+RETIRED_IWA_NUMBERS_IMAGE_ADJUSTMENTS_METHODS = (
+    "sheet_image_adjustments",
+    "set_sheet_image_adjustments",
+)
+RETIRED_IWA_NUMBERS_IMAGE_ADJUSTMENTS_METHOD_SET = frozenset(
+    RETIRED_IWA_NUMBERS_IMAGE_ADJUSTMENTS_METHODS
+)
+RETIRED_IWA_NUMBERS_IMAGE_ADJUSTMENTS_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/create_numbers_image.rs"
+)
+RETIRED_IWA_IMAGE_ADJUSTMENTS_HOST_METHODS = {
+    "Keynote": ("slide_image_adjustments", "set_slide_image_adjustments"),
+    "Pages": ("body_image_adjustments", "set_body_image_adjustments"),
+    "Numbers": RETIRED_IWA_NUMBERS_IMAGE_ADJUSTMENTS_METHODS,
+}
+RETIRED_IWA_IMAGE_ADJUSTMENTS_HOST_EXAMPLES = {
+    "Keynote": Path("crates/litchi-iwa/examples/create_keynote_image.rs"),
+    "Pages": Path("crates/litchi-iwa/examples/create_pages_image.rs"),
+    "Numbers": RETIRED_IWA_NUMBERS_IMAGE_ADJUSTMENTS_EXAMPLE,
+}
 NUMBERS_NAMES_IMPLEMENTATION_SOURCES = (
     Path("crates/litchi-numbers/src/names.rs"),
     Path("crates/litchi-numbers/src/package/names.rs"),
@@ -22574,6 +22612,41 @@ def audit_iwa_numbers_names_source_topology(root: Path = ROOT) -> list[str]:
                 "retired litchi-iwa Numbers names README example reference "
                 f"{match.group('example')}: {IWA_NUMBERS_README}:{line_number}"
             )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_numbers_image_adjustments_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep raw-ID image-adjustment mutations out of all compatibility hosts."""
+
+    violations: list[str] = []
+    for ecosystem, example in RETIRED_IWA_IMAGE_ADJUSTMENTS_HOST_EXAMPLES.items():
+        example_path = root / example
+        if example_path.is_file():
+            violations.append(
+                f"retired litchi-iwa {ecosystem} image-adjustments example returned: "
+                + str(example)
+            )
+
+        source_root = root / IWA_IMAGE_ADJUSTMENTS_HOST_ROOTS[ecosystem]
+        if not source_root.is_dir():
+            continue
+        retired_methods = frozenset(
+            RETIRED_IWA_IMAGE_ADJUSTMENTS_HOST_METHODS[ecosystem]
+        )
+        for path in sorted(source_root.rglob("*.rs")):
+            production_source = _mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+            for name, line_number in _rust_function_declarations(production_source):
+                if name not in retired_methods:
+                    continue
+                violations.append(
+                    f"retired litchi-iwa {ecosystem} image-adjustments method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
 
     return sorted(set(violations))
 
@@ -42096,10 +42169,11 @@ def audit_iwa_shared_image_adjustments_source_topology(
             return bridge_module_feature_gated and bridge_module_span is not None and (
                 bridge_module_span[0] < match.start() < bridge_module_span[1]
             )
-        for index, seam in enumerate(IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS):
+        owner_seams = IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS_BY_ECOSYSTEM[ecosystem]
+        for seam in owner_seams:
             seam_match = hidden_seam(
                 seam,
-                rewrite=index == 1,
+                rewrite=seam == IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM,
                 feature_gated=True,
             ).search(owner_declaration_source)
             if seam_match is None or not (
@@ -42180,7 +42254,7 @@ def audit_iwa_shared_image_adjustments_source_topology(
         # mention bytes or the hidden bridge error.  Keep generated archive
         # vocabulary out of the default selector-first API as well.
         for declaration, line_number in _rust_public_declarations(owner_source):
-            if any(seam in declaration for seam in IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS):
+            if any(seam in declaration for seam in owner_seams):
                 continue
             if IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR in declaration:
                 continue
@@ -42210,10 +42284,14 @@ def audit_iwa_shared_image_adjustments_source_topology(
                     f"bounded codec/semantic marker {marker}: "
                     f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
                 )
-        for marker, pattern in (
-            ("decode_image_adjustments", IWA_IMAGE_ADJUSTMENTS_CODEC_DECODE_CALL),
-            ("rewrite_image_adjustments", IWA_IMAGE_ADJUSTMENTS_CODEC_REWRITE_CALL),
-        ):
+        required_codec_calls = [
+            ("decode_image_adjustments", IWA_IMAGE_ADJUSTMENTS_CODEC_DECODE_CALL)
+        ]
+        if IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM in owner_seams:
+            required_codec_calls.append(
+                ("rewrite_image_adjustments", IWA_IMAGE_ADJUSTMENTS_CODEC_REWRITE_CALL)
+            )
+        for marker, pattern in required_codec_calls:
             if pattern.search(owner_code) is None:
                 violations.append(
                     f"focused litchi-{ecosystem.lower()} image-adjustments owner is missing "
@@ -42265,10 +42343,7 @@ def audit_iwa_shared_image_adjustments_source_topology(
                 "is missing its semantic error export: "
                 f"{IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[ecosystem]}"
             )
-        for seam in (
-            *IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS,
-            IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR,
-        ):
+        for seam in (*owner_seams, IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR):
             hidden_export = re.compile(
                 r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
                 r'"internal-iwork-source"\s*\)\s*\]\s*\n'
@@ -42281,6 +42356,33 @@ def audit_iwa_shared_image_adjustments_source_topology(
                     "must use the hidden internal-iwork-source export: "
                     f"{IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[ecosystem]}"
                 )
+
+        if ecosystem in IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_ECOSYSTEMS:
+            retired_write = IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM
+            for name, line_number in _rust_function_declarations(owner_source):
+                if name == retired_write:
+                    violations.append(
+                        f"focused litchi-{ecosystem.lower()} image-adjustments "
+                        "write bridge is retired: "
+                        f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}:{line_number}"
+                    )
+            for export_path, export_source in (
+                (package_path, package_source),
+                (
+                    export_path,
+                    _mask_rust_comments(source_for(export_path)),
+                ),
+            ):
+                for match in re.finditer(
+                    rf"(?m)^\s*pub\s+use[^;\n]*\b{re.escape(retired_write)}\b",
+                    _mask_rust_non_code(export_source),
+                ):
+                    line_number = export_source.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        f"focused litchi-{ecosystem.lower()} image-adjustments "
+                        "write bridge re-export is retired: "
+                        f"{export_path}:{line_number}"
+                    )
 
     codec_path = root / IWA_IMAGE_ADJUSTMENTS_CODEC_SOURCE
     codec_code = code_for(codec_path)
@@ -42337,6 +42439,9 @@ def audit_iwa_shared_image_adjustments_source_topology(
             continue
         decode_seen = False
         rewrite_seen = False
+        requires_rewrite = IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM in (
+            IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS_BY_ECOSYSTEM[ecosystem]
+        )
         for host_path in host_sources:
             source = source_for(host_path)
             code = _mask_rust_non_code(source)
@@ -42347,6 +42452,16 @@ def audit_iwa_shared_image_adjustments_source_topology(
                     f"shared helper {match.group(0).strip()}: "
                     f"{host_path.relative_to(root)}:{line_number}"
                 )
+            if ecosystem in IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_ECOSYSTEMS:
+                for match in IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_CALLS[ecosystem].finditer(
+                    code
+                ):
+                    line_number = code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        f"litchi-{ecosystem.lower()} image-adjustments host retains "
+                        "the retired write bridge: "
+                        f"{host_path.relative_to(root)}:{line_number}"
+                    )
 
             if IWA_IMAGE_ADJUSTMENTS_HOST_CALLS[ecosystem].search(code) is not None:
                 decode_seen |= re.search(
@@ -42377,7 +42492,7 @@ def audit_iwa_shared_image_adjustments_source_topology(
                 f"litchi-{ecosystem.lower()} image-adjustments host is missing its "
                 f"focused decode seam call: {relative_root}"
             )
-        if not rewrite_seen:
+        if requires_rewrite and not rewrite_seen:
             violations.append(
                 f"litchi-{ecosystem.lower()} image-adjustments host is missing its "
                 f"focused rewrite seam call: {relative_root}"
@@ -59041,6 +59156,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_model_storage_source_topology()
         + audit_iwa_shared_media_playback_source_topology()
         + audit_iwa_shared_image_adjustments_source_topology()
+        + audit_iwa_numbers_image_adjustments_source_topology()
         + audit_iwa_keynote_slide_preview_source_topology()
         + audit_iwa_keynote_slide_table_discovery_source_topology()
         + audit_iwa_keynote_slide_table_listing_appearance_source_topology()

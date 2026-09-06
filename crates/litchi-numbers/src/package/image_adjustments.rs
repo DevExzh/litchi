@@ -167,23 +167,6 @@ pub fn __decode_image_adjustments_payload(
     adjustments_from_snapshot(snapshot).map_err(ImageAdjustmentsError::Semantic)
 }
 
-/// Rewrite one borrowed Numbers ImageArchive payload while preserving every
-/// unknown field and the source's optional-field presence shape.
-#[doc(hidden)]
-#[cfg(feature = "internal-iwork-source")]
-pub fn __rewrite_image_adjustments_payload(
-    source: &[u8],
-    adjustments: ImageAdjustments,
-    limits: WireLimits,
-) -> Result<Vec<u8>, ImageAdjustmentsError> {
-    let write = write_from_adjustments(adjustments);
-    Ok(codec::rewrite_image_adjustments(
-        source,
-        write,
-        codec_options(source, limits),
-    )?)
-}
-
 fn adjustments_from_snapshot(
     snapshot: ImageAdjustmentsSnapshot<'_>,
 ) -> Result<ImageAdjustments, litchi_iwa_common::shape::image::Error> {
@@ -589,6 +572,12 @@ struct ImageEntry {
     component_index: usize,
     object_index: usize,
     message_index: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ImageMetadata {
+    parent_identifier: u64,
+    data_identifier: u64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1177,8 +1166,12 @@ fn select_image_with_budget(
         if require_editable && resolved.component_index != resolved_sheet.component_index {
             return Err(SheetImageAdjustmentsError::UnsupportedDependency);
         }
-        let parent = image_metadata(message.data.as_slice(), budget)?;
-        if parent != sheet_identifier {
+        let info = validate_selected_image_metadata(object, message_index, budget)?;
+        let metadata = image_metadata(message.data.as_slice(), budget)?;
+        if !image_parent_metadata_is_owned(info, metadata.parent_identifier)
+            || !image_data_metadata_is_owned(info, metadata.data_identifier)
+            || metadata.parent_identifier != sheet_identifier
+        {
             return Err(SheetImageAdjustmentsError::InvalidSource);
         }
         if image_count == requested.get() {
@@ -1326,14 +1319,186 @@ fn validate_message_metadata(
     Ok(())
 }
 
+fn validate_selected_image_metadata<'a>(
+    object: &'a litchi_iwa_core::ArchiveObject,
+    message_index: usize,
+    budget: &mut ImageBudget,
+) -> Result<&'a litchi_iwa_core::MessageInfo, SheetImageAdjustmentsError> {
+    let info = object
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+    let message = object
+        .messages
+        .get(message_index)
+        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+    budget.work(image_metadata_work(info)?)?;
+    if info.type_ != message.type_
+        || object.archive_info.should_merge == Some(true)
+        || info.base_message_index.is_some()
+        || !info.diff_merge_version.is_empty()
+        || info.diff_field_path.is_some()
+        || !info.fields_to_remove.is_empty()
+        || !info.diff_read_version.is_empty()
+    {
+        return Err(SheetImageAdjustmentsError::InvalidSource);
+    }
+    Ok(info)
+}
+
+fn image_metadata_work(
+    info: &litchi_iwa_core::MessageInfo,
+) -> Result<usize, SheetImageAdjustmentsError> {
+    let aggregate_data_work = info
+        .data_references
+        .len()
+        .checked_mul(3)
+        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+    let field_list_work = info
+        .field_infos
+        .len()
+        .checked_mul(4)
+        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+    let aggregate_object_work = info
+        .object_references
+        .len()
+        .checked_mul(2)
+        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+    let mut work = 1usize
+        // The selected image proof scans aggregate data references once for
+        // data ownership and once for the parent/data cross-kind exclusion;
+        // this sizing pass is the third traversal.
+        .checked_add(aggregate_data_work)
+        // FieldInfo is traversed while sizing, for data ownership, for the
+        // parent/data cross-kind exclusion, and for parent ownership.
+        .and_then(|amount| amount.checked_add(field_list_work))
+        // Parent ownership scans aggregate object references once in addition
+        // to this sizing pass.
+        .and_then(|amount| amount.checked_add(aggregate_object_work))
+        .and_then(|amount| amount.checked_add(info.diff_merge_version.len()))
+        .and_then(|amount| amount.checked_add(info.diff_read_version.len()))
+        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+    if let Some(path) = info.diff_field_path.as_ref() {
+        work = work
+            .checked_add(path.path.len())
+            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+    }
+    for path in &info.fields_to_remove {
+        work = work
+            .checked_add(path.path.len())
+            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+    }
+    for field_info in &info.field_infos {
+        let path_work = field_info
+            .path
+            .path
+            .len()
+            .checked_mul(3)
+            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        let object_work = field_info
+            .object_references
+            .len()
+            .checked_mul(2)
+            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        let data_work = field_info
+            .data_references
+            .len()
+            .checked_mul(3)
+            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        work = work
+            // The path is compared by both ownership proofs in addition to
+            // this sizing walk.
+            .checked_add(path_work)
+            .and_then(|amount| amount.checked_add(object_work))
+            .and_then(|amount| amount.checked_add(data_work))
+            .and_then(|amount| amount.checked_add(field_info.known_field_version.len()))
+            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        if let Some(identifier) = field_info.known_field_feature_identifier.as_ref() {
+            work = work
+                .checked_add(identifier.len())
+                .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        }
+    }
+    Ok(work)
+}
+
+fn image_data_metadata_is_owned(info: &litchi_iwa_core::MessageInfo, identifier: u64) -> bool {
+    if identifier == 0 {
+        return false;
+    }
+    let aggregate = info
+        .data_references
+        .iter()
+        .filter(|candidate| **candidate == identifier)
+        .count();
+    if aggregate != 1 {
+        return false;
+    }
+    let mut field_occurrence = 0usize;
+    for field_info in &info.field_infos {
+        let occurrences = field_info
+            .data_references
+            .iter()
+            .filter(|candidate| **candidate == identifier)
+            .count();
+        if occurrences == 0 {
+            continue;
+        }
+        if field_info.path.as_slice() != [IMAGE_DATA_FIELD] || occurrences != 1 {
+            return false;
+        }
+        field_occurrence = field_occurrence.saturating_add(occurrences);
+    }
+    field_occurrence <= 1
+}
+
+fn image_parent_metadata_is_owned(info: &litchi_iwa_core::MessageInfo, identifier: u64) -> bool {
+    if identifier == 0 {
+        return false;
+    }
+    if info.data_references.contains(&identifier)
+        || info
+            .field_infos
+            .iter()
+            .any(|field_info| field_info.data_references.contains(&identifier))
+    {
+        return false;
+    }
+    let aggregate = info
+        .object_references
+        .iter()
+        .filter(|candidate| **candidate == identifier)
+        .count();
+    let mut field_occurrence = 0usize;
+    for field_info in &info.field_infos {
+        let occurrences = field_info
+            .object_references
+            .iter()
+            .filter(|candidate| **candidate == identifier)
+            .count();
+        if occurrences == 0 {
+            continue;
+        }
+        if field_info.path.as_slice() != [IMAGE_SUPER_FIELD, DRAWABLE_PARENT_FIELD]
+            || occurrences != 1
+        {
+            return false;
+        }
+        field_occurrence = field_occurrence.saturating_add(occurrences);
+    }
+    matches!((aggregate, field_occurrence), (0, 0) | (1, 0 | 1))
+}
+
 fn image_metadata(
     payload: &[u8],
     budget: &mut ImageBudget,
-) -> Result<u64, SheetImageAdjustmentsError> {
+) -> Result<ImageMetadata, SheetImageAdjustmentsError> {
     let fields = WireView::parse_with_limits(payload, budget.residual_wire_limits()?)
         .map_err(map_wire_error)?;
     budget.scan(payload, fields.len(), 1)?;
     let mut parent = None;
+    let mut data_identifier = None;
     let mut seen_super = false;
     let mut seen_data = false;
     for field in fields.fields() {
@@ -1368,7 +1533,11 @@ fn image_metadata(
                 }
                 field.validate_canonical_framing().map_err(map_wire_error)?;
                 seen_data = true;
-                let _ = strict_reference_payload(field.payload(), budget, ReferenceKind::Data)?;
+                data_identifier = Some(strict_reference_payload(
+                    field.payload(),
+                    budget,
+                    ReferenceKind::Data,
+                )?);
             },
             _ => {},
         }
@@ -1377,7 +1546,10 @@ fn image_metadata(
     if !seen_super || !seen_data {
         return Err(SheetImageAdjustmentsError::InvalidSource);
     }
-    parent.ok_or(SheetImageAdjustmentsError::InvalidSource)
+    Ok(ImageMetadata {
+        parent_identifier: parent.ok_or(SheetImageAdjustmentsError::InvalidSource)?,
+        data_identifier: data_identifier.ok_or(SheetImageAdjustmentsError::InvalidSource)?,
+    })
 }
 
 fn strict_reference_payload(
@@ -1526,12 +1698,17 @@ fn ensure_unique_image_owner(
                 .objects
                 .get(resolved_image.object_index)
                 .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
-            let Some((_message_index, image_message)) =
+            let Some((message_index, image_message)) =
                 unique_typed_message(image_object, IMAGE_MESSAGE_TYPE)?
             else {
                 continue;
             };
-            if image_metadata(image_message.data.as_slice(), budget)? != identifier {
+            let info = validate_selected_image_metadata(image_object, message_index, budget)?;
+            let metadata = image_metadata(image_message.data.as_slice(), budget)?;
+            if !image_parent_metadata_is_owned(info, metadata.parent_identifier)
+                || !image_data_metadata_is_owned(info, metadata.data_identifier)
+                || metadata.parent_identifier != identifier
+            {
                 return Err(SheetImageAdjustmentsError::InvalidSource);
             }
             occurrences = occurrences
@@ -1697,6 +1874,7 @@ fn rewrite_image(
     if message_index != selection.message_index {
         return Err(SheetImageAdjustmentsError::InvalidSource);
     }
+    let _ = validate_selected_image_metadata(object, message_index, budget)?;
     let original = message.data.as_slice();
     let before = decode_with_budget(original, budget)?;
     if before != selection.before {
@@ -2473,7 +2651,18 @@ mod tests {
     use litchi_iwa_common::WireLimits;
     use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
-    use super::{__decode_image_adjustments_payload, __rewrite_image_adjustments_payload};
+    use super::{__decode_image_adjustments_payload, codec, codec_options, write_from_adjustments};
+
+    fn rewrite_image_adjustments_payload(
+        source: &[u8],
+        adjustments: ImageAdjustments,
+    ) -> Result<Vec<u8>, codec::DecodeError> {
+        Ok(codec::rewrite_image_adjustments(
+            source,
+            write_from_adjustments(adjustments),
+            codec_options(source, WireLimits::default()),
+        )?)
+    }
 
     #[test]
     fn focused_bridge_maps_native_controls_and_preserves_unknown_bytes() {
@@ -2495,9 +2684,7 @@ mod tests {
             .with_exposure(Some(ImageAdjustment::new(0.25).unwrap()))
             .with_saturation(Some(ImageAdjustment::new(-0.5).unwrap()))
             .with_enhancement(Some(ImageEnhancement::Enabled));
-        let changed =
-            __rewrite_image_adjustments_payload(&source, replacement, WireLimits::default())
-                .unwrap();
+        let changed = rewrite_image_adjustments_payload(&source, replacement).unwrap();
         assert_eq!(
             __decode_image_adjustments_payload(&changed, WireLimits::default()).unwrap(),
             replacement
@@ -2513,8 +2700,7 @@ mod tests {
                 .any(|window| window == [0xa0, 0x06, 0xe8, 0x07])
         );
 
-        let restored =
-            __rewrite_image_adjustments_payload(&changed, baseline, WireLimits::default()).unwrap();
+        let restored = rewrite_image_adjustments_payload(&changed, baseline).unwrap();
         assert_eq!(restored, source);
     }
 
@@ -2527,18 +2713,13 @@ mod tests {
             .with_exposure(Some(ImageAdjustment::NEUTRAL))
             .with_saturation(Some(ImageAdjustment::NEUTRAL))
             .with_enhancement(Some(ImageEnhancement::Disabled));
-        let changed =
-            __rewrite_image_adjustments_payload(&source, explicit, WireLimits::default()).unwrap();
+        let changed = rewrite_image_adjustments_payload(&source, explicit).unwrap();
         assert_eq!(
             __decode_image_adjustments_payload(&changed, WireLimits::default()).unwrap(),
             explicit
         );
-        let reset = __rewrite_image_adjustments_payload(
-            &changed,
-            ImageAdjustments::default(),
-            WireLimits::default(),
-        )
-        .unwrap();
+        let reset =
+            rewrite_image_adjustments_payload(&changed, ImageAdjustments::default()).unwrap();
         assert_eq!(reset, source);
     }
 
@@ -2553,11 +2734,13 @@ mod tests {
 #[cfg(test)]
 mod graph_tests {
     use litchi_iwa_common::WireLimits;
-    use litchi_iwa_core::{Archive, ArchiveObject, RawMessage};
+    use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, MessageInfo, RawMessage};
 
     use super::{
         ImageAdjustment, ImageAdjustments, ImageBudget, SheetImageAdjustmentsError, codec,
-        image_metadata, sheet_drawable_identifiers, sheet_message_type_for, write_from_adjustments,
+        image_data_metadata_is_owned, image_metadata, image_parent_metadata_is_owned,
+        sheet_drawable_identifiers, sheet_message_type_for, validate_selected_image_metadata,
+        write_from_adjustments,
     };
 
     fn test_budget() -> ImageBudget {
@@ -2583,6 +2766,36 @@ mod graph_tests {
         }
     }
 
+    fn valid_image_payload() -> Vec<u8> {
+        vec![
+            0x0a, 0x04, // ImageArchive.super
+            0x12, 0x02, // Drawable.parent
+            0x08, 0x07, // parent identifier = 7
+            0x5a, 0x02, // ImageArchive.data
+            0x08, 0x63, // data identifier = 99
+        ]
+    }
+
+    fn image_object_with_metadata(
+        data_references: Vec<u64>,
+        field_infos: Vec<FieldInfo>,
+    ) -> ArchiveObject {
+        let payload = valid_image_payload();
+        let mut object = ArchiveObject::new(
+            7,
+            vec![RawMessage {
+                type_: super::IMAGE_MESSAGE_TYPE,
+                data: payload.clone(),
+            }],
+        )
+        .unwrap();
+        let mut info = MessageInfo::new(super::IMAGE_MESSAGE_TYPE, payload.len() as u32);
+        info.data_references = data_references;
+        info.field_infos = field_infos;
+        object.archive_info.message_infos[0] = info;
+        object
+    }
+
     #[test]
     fn graph_keeps_unknown_data_and_image_fields_opaque() {
         // The parent is a TSP.Reference with its deprecated fields present.
@@ -2603,7 +2816,180 @@ mod graph_tests {
             0xa2, 0x81, 0x00, 0x01, 0xff, // unknown outer field 20, overlong key
         ];
         let mut budget = test_budget();
-        assert_eq!(image_metadata(&source, &mut budget).unwrap(), 7);
+        let metadata = image_metadata(&source, &mut budget).unwrap();
+        assert_eq!(metadata.parent_identifier, 7);
+        assert_eq!(metadata.data_identifier, 99);
+    }
+
+    #[test]
+    fn image_data_metadata_accepts_aggregate_only_and_path_eleven() {
+        let aggregate_only = image_object_with_metadata(vec![99], Vec::new());
+        let mut budget = test_budget();
+        let info = validate_selected_image_metadata(&aggregate_only, 0, &mut budget).unwrap();
+        let metadata = image_metadata(&valid_image_payload(), &mut budget).unwrap();
+        assert!(image_data_metadata_is_owned(info, metadata.data_identifier));
+
+        let mut field = FieldInfo::new(vec![super::IMAGE_DATA_FIELD]);
+        field.data_references = vec![99];
+        let with_field = image_object_with_metadata(vec![99], vec![field]);
+        let info = validate_selected_image_metadata(&with_field, 0, &mut budget).unwrap();
+        assert!(image_data_metadata_is_owned(info, metadata.data_identifier));
+    }
+
+    #[test]
+    fn image_data_metadata_rejects_wrong_or_duplicate_field_attribution() {
+        let mut wrong_path = FieldInfo::new(vec![super::IMAGE_DATA_FIELD + 1]);
+        wrong_path.data_references = vec![99];
+        let wrong_path = image_object_with_metadata(vec![99], vec![wrong_path]);
+        let mut budget = test_budget();
+        let info = validate_selected_image_metadata(&wrong_path, 0, &mut budget).unwrap();
+        assert!(!image_data_metadata_is_owned(info, 99));
+
+        let mut duplicate_field = FieldInfo::new(vec![super::IMAGE_DATA_FIELD]);
+        duplicate_field.data_references = vec![99, 99];
+        let duplicate_field = image_object_with_metadata(vec![99], vec![duplicate_field]);
+        let info = validate_selected_image_metadata(&duplicate_field, 0, &mut budget).unwrap();
+        assert!(!image_data_metadata_is_owned(info, 99));
+
+        let duplicate_aggregate = image_object_with_metadata(vec![99, 99], Vec::new());
+        let info = validate_selected_image_metadata(&duplicate_aggregate, 0, &mut budget).unwrap();
+        assert!(!image_data_metadata_is_owned(info, 99));
+
+        let wrong_identifier = image_object_with_metadata(vec![100], Vec::new());
+        let info = validate_selected_image_metadata(&wrong_identifier, 0, &mut budget).unwrap();
+        assert!(!image_data_metadata_is_owned(info, 99));
+
+        let mut first = FieldInfo::new(vec![super::IMAGE_DATA_FIELD]);
+        first.data_references = vec![99];
+        let mut second = FieldInfo::new(vec![super::IMAGE_DATA_FIELD]);
+        second.data_references = vec![99];
+        let duplicate_fields = image_object_with_metadata(vec![99], vec![first, second]);
+        let info = validate_selected_image_metadata(&duplicate_fields, 0, &mut budget).unwrap();
+        assert!(!image_data_metadata_is_owned(info, 99));
+    }
+
+    #[test]
+    fn image_parent_metadata_accepts_native_absent_aggregate_only_and_path_one_two() {
+        let native_absent = image_object_with_metadata(vec![99], Vec::new());
+        let mut budget = test_budget();
+        let info = validate_selected_image_metadata(&native_absent, 0, &mut budget).unwrap();
+        assert!(image_parent_metadata_is_owned(info, 7));
+
+        let mut aggregate_only = image_object_with_metadata(vec![99], Vec::new());
+        aggregate_only.archive_info.message_infos[0].object_references = vec![7];
+        let info = validate_selected_image_metadata(&aggregate_only, 0, &mut budget).unwrap();
+        let metadata = image_metadata(&valid_image_payload(), &mut budget).unwrap();
+        assert!(image_parent_metadata_is_owned(
+            info,
+            metadata.parent_identifier
+        ));
+
+        let mut field =
+            FieldInfo::new(vec![super::IMAGE_SUPER_FIELD, super::DRAWABLE_PARENT_FIELD]);
+        field.object_references = vec![7];
+        let mut with_field = image_object_with_metadata(vec![99], vec![field]);
+        with_field.archive_info.message_infos[0].object_references = vec![7];
+        let info = validate_selected_image_metadata(&with_field, 0, &mut budget).unwrap();
+        assert!(image_parent_metadata_is_owned(
+            info,
+            metadata.parent_identifier
+        ));
+    }
+
+    #[test]
+    fn image_parent_metadata_rejects_duplicate_and_wrong_attribution() {
+        let mut absent = image_object_with_metadata(vec![99], Vec::new());
+        let mut budget = test_budget();
+        let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
+        assert!(image_parent_metadata_is_owned(info, 7));
+
+        absent.archive_info.message_infos[0].object_references = vec![7, 7];
+        let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
+        assert!(!image_parent_metadata_is_owned(info, 7));
+
+        // Unrelated style/caption references do not declare the parent.
+        absent.archive_info.message_infos[0].object_references = vec![8];
+        let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
+        assert!(image_parent_metadata_is_owned(info, 7));
+
+        let mut field_only =
+            FieldInfo::new(vec![super::IMAGE_SUPER_FIELD, super::DRAWABLE_PARENT_FIELD]);
+        field_only.object_references = vec![7];
+        absent.archive_info.message_infos[0].field_infos = vec![field_only];
+        let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
+        assert!(!image_parent_metadata_is_owned(info, 7));
+
+        let mut wrong_path = FieldInfo::new(vec![super::IMAGE_SUPER_FIELD, 3]);
+        wrong_path.object_references = vec![7];
+        absent.archive_info.message_infos[0].object_references = vec![7];
+        absent.archive_info.message_infos[0].field_infos = vec![wrong_path];
+        let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
+        assert!(!image_parent_metadata_is_owned(info, 7));
+
+        let mut duplicate_field =
+            FieldInfo::new(vec![super::IMAGE_SUPER_FIELD, super::DRAWABLE_PARENT_FIELD]);
+        duplicate_field.object_references = vec![7, 7];
+        absent.archive_info.message_infos[0].field_infos = vec![duplicate_field];
+        let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
+        assert!(!image_parent_metadata_is_owned(info, 7));
+
+        absent.archive_info.message_infos[0].field_infos = Vec::new();
+        absent.archive_info.message_infos[0].object_references = vec![7];
+        absent.archive_info.message_infos[0].data_references = vec![7];
+        let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
+        assert!(!image_parent_metadata_is_owned(info, 7));
+
+        let mut data_collision =
+            FieldInfo::new(vec![super::IMAGE_SUPER_FIELD, super::DRAWABLE_PARENT_FIELD]);
+        data_collision.object_references = vec![7];
+        data_collision.data_references = vec![7];
+        absent.archive_info.message_infos[0].data_references = Vec::new();
+        absent.archive_info.message_infos[0].field_infos = vec![data_collision];
+        let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
+        assert!(!image_parent_metadata_is_owned(info, 7));
+    }
+
+    #[test]
+    fn selected_image_metadata_rejects_merge_headers_atomically() {
+        let cases = [
+            "should_merge",
+            "base_message_index",
+            "diff_merge_version",
+            "diff_field_path",
+            "fields_to_remove",
+            "diff_read_version",
+        ];
+        for case in cases {
+            let mut object = image_object_with_metadata(vec![99], Vec::new());
+            match case {
+                "should_merge" => object.archive_info.should_merge = Some(true),
+                "base_message_index" => {
+                    object.archive_info.message_infos[0].base_message_index = Some(0)
+                },
+                "diff_merge_version" => {
+                    object.archive_info.message_infos[0].diff_merge_version = vec![1]
+                },
+                "diff_field_path" => {
+                    object.archive_info.message_infos[0].diff_field_path =
+                        Some(vec![super::IMAGE_DATA_FIELD].into())
+                },
+                "fields_to_remove" => {
+                    object.archive_info.message_infos[0].fields_to_remove =
+                        vec![vec![super::IMAGE_DATA_FIELD].into()]
+                },
+                "diff_read_version" => {
+                    object.archive_info.message_infos[0].diff_read_version = vec![1]
+                },
+                _ => unreachable!(),
+            }
+            let before = object.clone();
+            let mut budget = test_budget();
+            assert!(matches!(
+                validate_selected_image_metadata(&object, 0, &mut budget),
+                Err(SheetImageAdjustmentsError::InvalidSource)
+            ));
+            assert_eq!(object, before);
+        }
     }
 
     #[test]

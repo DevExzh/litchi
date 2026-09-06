@@ -2524,9 +2524,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> BodyImageAdjustmentsError {
 
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
-pub use image_adjustments_bridge::{
-    __decode_image_adjustments_payload, __rewrite_image_adjustments_payload, ImageAdjustmentsError,
-};
+pub use image_adjustments_bridge::{__decode_image_adjustments_payload, ImageAdjustmentsError};
 
 #[cfg(feature = "internal-iwork-source")]
 mod image_adjustments_bridge {
@@ -2554,20 +2552,6 @@ mod image_adjustments_bridge {
             codec_options(source, limits),
         )?;
         Ok(adjustments_from_snapshot(snapshot)?)
-    }
-
-    #[doc(hidden)]
-    pub fn __rewrite_image_adjustments_payload(
-        source: &[u8],
-        adjustments: ImageAdjustments,
-        limits: WireLimits,
-    ) -> Result<Vec<u8>, ImageAdjustmentsError> {
-        image_adjustments_codec::rewrite_image_adjustments(
-            source,
-            image_adjustments_write(adjustments),
-            codec_options(source, limits),
-        )
-        .map_err(ImageAdjustmentsError::Codec)
     }
 }
 
