@@ -1,0 +1,10 @@
+{
+  "change": 451,
+  "decision": "retain OPC combined capture",
+  "goal_complete": false,
+  "pptx_adopted": false,
+  "latency_claim": false,
+  "memory_peak_claim": false,
+  "acceptance": "Eight deterministic source-work cases preserve whole publication output with one compressed pass removed; cache, budgets, source fences and rollback retain their contracts.",
+  "next_step": "Integrate with reusable immutable PPTX plans using explicit per-publication writer reservations, then measure matched complete planning/publication and existing expected-byte controls."
+}

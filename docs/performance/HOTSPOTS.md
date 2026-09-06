@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## Change 0451: OPC captures and decodes once on a cold cache load
+
+[0451](changes/0451-opc-combined-capture.md) removes a compressed source pass for first-read transfer authorization.
+The elected loader uses the combined ZIP primitive; warm hits and waiters reuse
+the decoded allocation and verify a fresh compressed capture. Tokens pin decoded
+memory/object reservations after package/data drop. Eight I/O cases preserve
+exact output while returning roughly half the source bytes for larger payloads.
+
+Next, integrate with immutable reusable PPTX plans and explicit per-publication
+writer reservations. Cloning the existing token would share a reservation sized
+for one writer. Complete old/new planning/publication timings, expected-byte
+controls, native breadth, cold I/O, bounded append and scaling remain open.
+
 ## Change 0450: ZIP primitive for first-read compressed transfer
 
 [0450](changes/0450-zip-combined-capture-decode.md) implements the prerequisite identified in 0449: a checked compressed

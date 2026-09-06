@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0451: OPC-owned authorization and managed payload lifetime
+
+[0451](changes/0451-opc-combined-capture.md) keeps the combined ZIP token private behind OPC Part/source authority
+(0002/0010/0011/0024). Compressed/writer staging is reserved before cache entry;
+the token pins decoded memory and object reservations. Existing cache/flight
+publication and rollback remain shared, including source-change precedence,
+cancellation, leaf/signature/encryption refusals and source-checked publication
+(0003/0005/0006). Eight new tests include deterministic loader races and exact
+budget boundaries. No dependency, unsafe policy or ambient provider changes.
+Accepted ADRs remain unchanged; see [source review](results/change-0451/source-review.md).
+
 ## Change 0450: ZIP-owned combined capture and physical verification
 
 [0450](changes/0450-zip-combined-capture-decode.md) adds an explicit ZIP API without moving physical types into a semantic

@@ -8031,7 +8031,7 @@ impl SourceBackedPackage {
         flight: Option<Arc<LoadFlight>>,
         bypass_resources: Option<LoadResources>,
         mut accounting: Option<&mut OpcOperationAccounting>,
-        session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
+        mut session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
         observer: &mut O,
         capture: Option<&mut Option<soapberry_zip::office::VerifiedPrecompressedEntry>>,
     ) -> Result<PartData>
@@ -8059,7 +8059,7 @@ impl SourceBackedPackage {
                 *capture = Some(physical);
                 bytes
             } else {
-                let bytes = match (accounting.as_deref_mut(), session) {
+                let bytes = match (accounting.as_deref_mut(), session.as_deref_mut()) {
                     (Some(_), Some(session)) => {
                         session.read_entry_with_accounting(part.entry_id, &mut zip_accounting)
                     },
@@ -8069,7 +8069,7 @@ impl SourceBackedPackage {
                     (None, Some(session)) => session.read_entry(part.entry_id),
                     (None, None) => self.archive.read_entry(part.entry_id),
                 };
-                match bytes {
+                let bytes = match bytes {
                     Ok(bytes) => bytes,
                     Err(error) => {
                         // A failed archive read can race with source mutation or
@@ -8080,7 +8080,8 @@ impl SourceBackedPackage {
                         self.cache.check_context().map_err(map_execution_error)?;
                         return Err(map_preservation_error(error));
                     },
-                }
+                };
+                bytes
             };
             // The decompressor has finished and no payload has been
             // published yet. Source freshness has precedence over

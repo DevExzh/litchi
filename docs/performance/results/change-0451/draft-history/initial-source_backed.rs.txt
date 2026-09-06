@@ -168,7 +168,7 @@ enum TopologyPartPayload {
 ///
 /// This value has no public constructor. It can only be issued by a
 /// [`PartView`] after strict ZIP verification against the exact decoded
-/// allocation supplied by or returned to the semantic caller. The source lineage, revision,
+/// allocation supplied by the semantic caller. The source lineage, revision,
 /// Part URI, content type, and managed reservation remain attached until the
 /// topology publication has finished.
 pub struct AuthorizedPrecompressedPart {
@@ -2241,9 +2241,7 @@ impl<'package> PartView<'package> {
     pub fn data_and_authorize_precompressed(
         &self,
     ) -> Result<(PartData, AuthorizedPrecompressedPart)> {
-        let (data, token) = self
-            .package
-            .authorize_precompressed_inner(self.index, None)?;
+        let (data, token) = self.package.authorize_precompressed_inner(self.index, None)?;
         data.map(|data| (data, token)).ok_or_else(|| {
             overlay_unavailable("combined Part capture did not return its decoded payload")
         })
@@ -4752,11 +4750,7 @@ impl SourceBackedPackage {
         if let Some(context) = self.source.context.as_ref() {
             let work = metadata
                 .compressed_size()
-                .checked_add(if expected_decoded.is_some() {
-                    metadata.uncompressed_size()
-                } else {
-                    0
-                })
+                .checked_add(if expected_decoded.is_some() { metadata.uncompressed_size() } else { 0 })
                 .ok_or_else(|| overlay_unavailable("precompressed verification work overflows"))?;
             context
                 .consume(Resource::Work, work)
@@ -4771,19 +4765,13 @@ impl SourceBackedPackage {
             None => {
                 let mut observer = NoopDiagnosticObserver;
                 let data = self.read_part_with_observer_and_capture(
-                    index,
-                    None,
-                    None,
-                    &mut observer,
-                    Some(&mut captured),
+                    index, None, None, &mut observer, Some(&mut captured),
                 )?;
                 // Cache admission charges decoded work for elected loaders.
                 // Hits/waiters require a fresh verification decode instead.
                 if captured.is_none() {
                     if let Some(context) = self.source.context.as_ref() {
-                        context
-                            .consume(Resource::Work, logical_size)
-                            .map_err(map_execution_error)?;
+                        context.consume(Resource::Work, logical_size).map_err(map_execution_error)?;
                     }
                 }
                 let bytes = Arc::clone(&data.payload.bytes);
@@ -8031,7 +8019,7 @@ impl SourceBackedPackage {
         flight: Option<Arc<LoadFlight>>,
         bypass_resources: Option<LoadResources>,
         mut accounting: Option<&mut OpcOperationAccounting>,
-        session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
+        mut session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
         observer: &mut O,
         capture: Option<&mut Option<soapberry_zip::office::VerifiedPrecompressedEntry>>,
     ) -> Result<PartData>
@@ -8045,12 +8033,13 @@ impl SourceBackedPackage {
                 .get(index)
                 .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
             let bytes = if let Some(capture) = capture {
-                let result = self
-                    .archive
-                    .read_entry_precompressed_and_decoded_with_progress(entry_id, |_| {
+                let result = self.archive.read_entry_precompressed_and_decoded_with_progress(
+                    entry_id,
+                    |_| {
                         self.source.ensure_current()?;
                         self.cache.check_context().map_err(map_execution_error)
-                    });
+                    },
+                );
                 // Preserve the same post-read source/execution precedence
                 // as ordinary cold loads before exposing any ZIP failure.
                 self.source.ensure_current()?;
@@ -8059,28 +8048,29 @@ impl SourceBackedPackage {
                 *capture = Some(physical);
                 bytes
             } else {
-                let bytes = match (accounting.as_deref_mut(), session) {
-                    (Some(_), Some(session)) => {
-                        session.read_entry_with_accounting(part.entry_id, &mut zip_accounting)
-                    },
-                    (Some(_), None) => self
-                        .archive
-                        .read_entry_with_accounting(part.entry_id, &mut zip_accounting),
-                    (None, Some(session)) => session.read_entry(part.entry_id),
-                    (None, None) => self.archive.read_entry(part.entry_id),
-                };
-                match bytes {
-                    Ok(bytes) => bytes,
-                    Err(error) => {
-                        // A failed archive read can race with source mutation or
-                        // cooperative cancellation. Apply the same post-read
-                        // fences used by successful cold loads before exposing
-                        // the lower-level archive error.
-                        self.source.ensure_current()?;
-                        self.cache.check_context().map_err(map_execution_error)?;
-                        return Err(map_preservation_error(error));
-                    },
-                }
+            let bytes = match (accounting.as_deref_mut(), session.as_deref_mut()) {
+                (Some(_), Some(session)) => {
+                    session.read_entry_with_accounting(part.entry_id, &mut zip_accounting)
+                },
+                (Some(_), None) => self
+                    .archive
+                    .read_entry_with_accounting(part.entry_id, &mut zip_accounting),
+                (None, Some(session)) => session.read_entry(part.entry_id),
+                (None, None) => self.archive.read_entry(part.entry_id),
+            };
+            let bytes = match bytes {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    // A failed archive read can race with source mutation or
+                    // cooperative cancellation. Apply the same post-read
+                    // fences used by successful cold loads before exposing
+                    // the lower-level archive error.
+                    self.source.ensure_current()?;
+                    self.cache.check_context().map_err(map_execution_error)?;
+                    return Err(map_preservation_error(error));
+                },
+            };
+                bytes
             };
             // The decompressor has finished and no payload has been
             // published yet. Source freshness has precedence over
@@ -12259,7 +12249,6 @@ mod tests {
                 None,
                 None,
                 &mut observer,
-                None,
             )
             .unwrap_err();
         assert!(matches!(error, OpcError::Cancelled));
@@ -13047,126 +13036,6 @@ mod tests {
         assert_eq!(diagnostics.successful_loads, 1);
         assert_eq!(diagnostics.retained_entries, 1);
         assert_eq!(diagnostics.in_flight_loads, 0);
-    }
-
-    #[test]
-    fn combined_capture_and_ordinary_read_share_the_exact_loader_payload() {
-        const DOCUMENT: &[u8] = b"shared combined-capture loader payload";
-        for first_combined in [false, true] {
-            let source = Arc::new(CountingSource::new(archive_bytes(
-                root_relationships(),
-                DOCUMENT,
-                false,
-            )));
-            let (budget, context) = managed_context(65536);
-            let package = SourceBackedPackage::from_read_at_with_execution_context(
-                source,
-                ReadLimits::default(),
-                context,
-            )
-            .unwrap();
-            let hook = Arc::new(TestPublicationHook::new());
-            let hook_guard = package
-                .cache
-                .install_test_publication_hook(Arc::clone(&hook));
-            let work_before = budget.used(Resource::Work);
-            let read = |combined: bool| {
-                let view = package.main_document_part().unwrap();
-                if combined {
-                    view.data_and_authorize_precompressed()
-                        .map(|(data, token)| (data, Some(token)))
-                } else {
-                    view.data().map(|data| (data, None))
-                }
-            };
-            let (first, second) = std::thread::scope(|scope| {
-                let first_task = scope.spawn(|| read(first_combined));
-                hook.wait_until_entered();
-                let second_task = scope.spawn(|| read(!first_combined));
-                hook.wait_until_waiter_joined();
-                let diagnostics = package.cache_diagnostics();
-                assert_eq!(diagnostics.cold_loads, 1);
-                assert_eq!(diagnostics.waiter_joins, 1);
-                assert_eq!(diagnostics.in_flight_loads, 1);
-                hook.release();
-                (
-                    first_task.join().unwrap().unwrap(),
-                    second_task.join().unwrap().unwrap(),
-                )
-            });
-            assert_eq!(first.0.as_bytes(), DOCUMENT);
-            assert!(first.0.shares_allocation_with(&second.0));
-            let token = first.1.as_ref().or(second.1.as_ref()).unwrap();
-            assert!(Arc::ptr_eq(&token.expected_decoded, &first.0.payload.bytes));
-            let diagnostics = package.cache_diagnostics();
-            assert_eq!(diagnostics.cold_loads, 1);
-            assert_eq!(diagnostics.successful_loads, 1);
-            assert_eq!(diagnostics.in_flight_loads, 0);
-            let passes = if first_combined { 2 } else { 3 };
-            assert_eq!(
-                budget.used(Resource::Work) - work_before,
-                DOCUMENT.len() as u64 * passes
-            );
-            drop(first);
-            drop(second);
-            drop(hook_guard);
-            drop(package);
-            assert_eq!(budget.used(Resource::Memory), 0);
-            assert_eq!(budget.used(Resource::Objects), 0);
-        }
-    }
-
-    #[test]
-    fn combined_capture_provisional_failure_releases_cache_and_capture_reservations() {
-        const DOCUMENT: &[u8] = b"combined capture rolls back before token publication";
-        for change_source in [false, true] {
-            let source = Arc::new(CountingSource::new(archive_bytes(
-                root_relationships(),
-                DOCUMENT,
-                false,
-            )));
-            let (budget, cancellation, context) = managed_context_with_cancellation(65536);
-            let package = SourceBackedPackage::from_read_at_with_execution_context(
-                source.clone(),
-                ReadLimits::default(),
-                context,
-            )
-            .unwrap();
-            let hook = Arc::new(TestPublicationHook::new());
-            let _hook_guard = package
-                .cache
-                .install_test_publication_hook(Arc::clone(&hook));
-            let result = std::thread::scope(|scope| {
-                let task = scope.spawn(|| {
-                    package
-                        .main_document_part()
-                        .unwrap()
-                        .data_and_authorize_precompressed()
-                });
-                hook.wait_until_entered();
-                assert_eq!(package.cache_diagnostics().retained_entries, 1);
-                assert!(budget.used(Resource::Memory) > DOCUMENT.len() as u64);
-                if change_source {
-                    source.changed();
-                } else {
-                    cancellation.cancel();
-                }
-                hook.release();
-                task.join().unwrap()
-            });
-            if change_source {
-                assert!(matches!(result, Err(OpcError::SourceChanged { .. })));
-            } else {
-                assert!(matches!(result, Err(OpcError::Cancelled)));
-            }
-            let diagnostics = package.cache_diagnostics();
-            assert_eq!(diagnostics.retained_entries, 0);
-            assert_eq!(diagnostics.in_flight_loads, 0);
-            assert_eq!(diagnostics.failed_loads, 1);
-            assert_eq!(diagnostics.budget_cache_reserved_bytes, 0);
-            assert_eq!(diagnostics.budget_cache_reserved_objects, 0);
-            assert_eq!(budget.used(Resource::Memory), 0);
-        }
     }
 
     #[test]
