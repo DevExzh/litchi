@@ -2566,6 +2566,40 @@ record carries the semantic digest and row/column contract, while the sink
  reports `retained_authoring_window_bytes: null`: this buffered role is a
  baseline and makes no fixed-window or throughput claim.
 
+## Opt-in ODT buffered paragraph creation baseline
+
+`odt_buffered_create` is an opt-in fresh-authoring baseline for the public
+`litchi_odt::Builder` path. It creates one paragraph per logical entry using a
+fixed four-value text cycle: plain UTF-8, non-ASCII Unicode, XML-significant
+characters, and a mixed Unicode/entity value. Each value has single interior
+spaces and no edge, tab, CR, or LF whitespace, so ODF 1.3 whitespace folding is
+outside this corpus contract. The selector uses 64 (`tiny`), 8,192 (`medium`),
+and 32,768 (`large`) paragraphs.
+
+Corpus setup runs once before warmups and reopens the generated artifact through
+the ordinary ODT facade. It verifies exactly five ZIP members (`mimetype`,
+`content.xml`, `styles.xml`, `meta.xml`, and `META-INF/manifest.xml`), the
+manifest MIME/content/style/meta bindings, the immutable default styles and
+metadata, every paragraph, and the full-text projection. The source record
+retains the normalized semantic SHA-256 plus the content/styles/meta member
+hashes.
+
+Each measured iteration constructs all paragraph models, calls
+`Builder::add_paragraph`/`build`, and writes the complete archive to a hashing
+discard sink. The output is released before the elapsed clock and allocator /
+process endpoint snapshots stop; sink finalization, digest comparison, and all
+reopen/package gates remain outside timing. This buffered baseline reports no
+retained authoring window or throughput claim. It is generated in process and
+does not claim physical-I/O behavior or lexical archive equality with any
+future streaming role.
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 --semantic-shape tiny,medium,large \
+  --case odt_buffered_create \
+  --json target/perf/odt-buffered-create.json
+```
+
 ## Opt-in ODS streaming scalar creation
 
 `ods_streaming_create` uses the public `litchi_ods::streaming` forward-only
