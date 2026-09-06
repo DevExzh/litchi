@@ -53,6 +53,9 @@ const DEFAULT_MAX_CONTENT_XML_BYTES: usize = 32 << 20;
 const DEFAULT_MAX_OUTPUT_BYTES: u64 = 512 << 20;
 const COMMON_METADATA_RESERVATION: usize = 64 * 1024;
 const MAX_MEMBER_NAME_BYTES: u64 = 32;
+// Poll cancellation for each scalar admitted to a span, and bound each
+// already-safe text write and its Work charge to this many UTF-8 bytes.
+const MAX_PLAIN_TEXT_SPAN_BYTES: usize = 256;
 
 // The common generated-XML envelope accepts declaration/start events in its
 // prefix and only matching end events in its suffix.  The Builder's optional
@@ -937,6 +940,47 @@ impl<'a> ParagraphWriter<'a> {
         self.bytes = next;
         Ok(())
     }
+
+    /// Attempts the borrowed-span path for one already-safe UTF-8 span.
+    ///
+    /// `Fallback` deliberately leaves all failure state untouched. The caller
+    /// then uses the scalar path so a paragraph/content limit or aggregate
+    /// `Resource::Work` refusal reports the same first failing scalar write
+    /// and cumulative usage as the original encoder. Cancellation is returned
+    /// directly because it is an execution-policy failure rather than a
+    /// batching boundary. `write_all` still copies into the common generated
+    /// XML staging window; this is a borrowed-span path, not a no-copy promise.
+    fn write_plain_span(&mut self, bytes: &[u8]) -> litchi_core::Result<PlainSpanResult> {
+        self.check()?;
+        let Some(next) = self.bytes.checked_add(bytes.len()) else {
+            return Ok(PlainSpanResult::Fallback);
+        };
+        let Some(content_next) = self.content_before.checked_add(next) else {
+            return Ok(PlainSpanResult::Fallback);
+        };
+        if content_next > self.content_maximum || next > self.maximum {
+            return Ok(PlainSpanResult::Fallback);
+        }
+        let Ok(amount) = u64::try_from(bytes.len()) else {
+            return Ok(PlainSpanResult::Fallback);
+        };
+        if let Err(error) = self.context.consume(Resource::Work, amount) {
+            if matches!(&error, ExecutionError::ResourceLimit(_)) {
+                return Ok(PlainSpanResult::Fallback);
+            }
+            self.execution_error = Some(error.clone());
+            return Err(Error::Other(error.to_string()));
+        }
+        self.output.write_all(bytes)?;
+        self.bytes = next;
+        Ok(PlainSpanResult::Written)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PlainSpanResult {
+    Written,
+    Fallback,
 }
 
 fn emit_paragraph(output: &mut ParagraphWriter<'_>, value: &str) -> litchi_core::Result<()> {
@@ -984,12 +1028,58 @@ fn emit_paragraph(output: &mut ParagraphWriter<'_>, value: &str) -> litchi_core:
             '"' => output.write_bytes(b"&quot;")?,
             '\'' => output.write_bytes(b"&apos;")?,
             character => {
-                let mut encoded = [0_u8; 4];
-                output.write_bytes(character.encode_utf8(&mut encoded).as_bytes())?;
+                if !is_plain_text_character(character) {
+                    let mut encoded = [0_u8; 4];
+                    output.write_bytes(character.encode_utf8(&mut encoded).as_bytes())?;
+                    continue;
+                }
+                let mut end = start + character.len_utf8();
+                while let Some(&(next, next_character)) = chars.peek() {
+                    if !is_plain_text_character(next_character) {
+                        break;
+                    }
+                    let next_length = next_character.len_utf8();
+                    let span_length = next - start;
+                    if span_length > MAX_PLAIN_TEXT_SPAN_BYTES.saturating_sub(next_length) {
+                        break;
+                    }
+                    output.check()?;
+                    chars.next();
+                    end = next + next_length;
+                    if end - start == MAX_PLAIN_TEXT_SPAN_BYTES {
+                        break;
+                    }
+                }
+                write_plain_span_or_scalars(output, &value[start..end])?;
             },
         }
     }
     output.write_bytes(b"</text:p>")
+}
+
+fn write_plain_span_or_scalars(
+    output: &mut ParagraphWriter<'_>,
+    bytes: &str,
+) -> litchi_core::Result<()> {
+    match output.write_plain_span(bytes.as_bytes())? {
+        PlainSpanResult::Written => Ok(()),
+        PlainSpanResult::Fallback => write_plain_scalars(output, bytes),
+    }
+}
+
+fn write_plain_scalars(output: &mut ParagraphWriter<'_>, value: &str) -> litchi_core::Result<()> {
+    for character in value.chars() {
+        let mut encoded = [0_u8; 4];
+        output.write_bytes(character.encode_utf8(&mut encoded).as_bytes())?;
+    }
+    Ok(())
+}
+
+const fn is_plain_text_character(character: char) -> bool {
+    !matches!(
+        character,
+        ' ' | '\t' | '\n' | '\r' | '&' | '<' | '>' | '"' | '\''
+    )
 }
 
 fn write_space_controls(
@@ -1231,3 +1321,7 @@ fn map_package_error<W: ?Sized>(
         source: Box::new(error),
     })
 }
+
+#[cfg(test)]
+#[path = "streaming_span_tests.rs"]
+mod span_tests;
