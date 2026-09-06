@@ -1,0 +1,30 @@
+{
+  "status": "pass",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0440-binaries/before/allocator",
+    "--case",
+    "odp_existing_append_lifecycle",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--samples",
+    "3",
+    "--warmup",
+    "1",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0440/pilots/before/aligned/allocator-medium.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0440/pilots/before/aligned/allocator-medium-catalog.json"
+  ],
+  "binary": {
+    "path": "/tmp/litchi-goal-0440-binaries/before/allocator",
+    "bytes": 457237080,
+    "sha256": "a93357033e07b52f77bdf4c24b6845971917c5c09d23b25e19b1d0d4dcc7455e"
+  },
+  "revision": "dd0681cf884163fc16953ac2a95e4da81ace5d46",
+  "oracle_sha256": "e4bca2715391cfb31637b86507c98f121df24b96405cb64df29902c09ef0aa4b"
+}

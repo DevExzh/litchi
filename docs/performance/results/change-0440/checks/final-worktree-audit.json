@@ -1,0 +1,28 @@
+{
+  "status": "pass",
+  "candidate_matches_after_build": true,
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "prior_bundle_unchanged": true,
+  "cleanup_paths_absent": [
+    "/tmp/litchi-goal-0440-binaries",
+    "/tmp/litchi-goal-0440-parser",
+    "/tmp/litchi-goal-0440-review",
+    "/tmp/litchi-goal-0440-evidence"
+  ],
+  "markdown_paths_checked": [
+    "docs/performance/results/change-0440/adr-compliance.md",
+    "docs/performance/results/change-0440/validation-notes.md",
+    "docs/performance/results/change-0440/parser-design.md",
+    "docs/performance/results/change-0440/parser-review.md",
+    "docs/performance/results/change-0440/README.md",
+    "docs/performance/results/change-0440/design.md",
+    "docs/performance/results/change-0440/measurements.md",
+    "docs/performance/BASELINE.md",
+    "docs/performance/HOTSPOTS.md",
+    "docs/performance/GOAL_AUDIT.md",
+    "docs/performance/ADR_COMPLIANCE.md",
+    "docs/performance/CRUD_COVERAGE.md",
+    "docs/performance/changes/0440-odp-borrowed-attribute-namespaces.md"
+  ]
+}

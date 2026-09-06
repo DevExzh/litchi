@@ -1,0 +1,109 @@
+{
+  "change": 440,
+  "expected_status": {
+    "before-odp-clippy.json": "failed",
+    "before-pilots.json": "failed",
+    "candidate-attribute-tests.json": "failed"
+  },
+  "required": {
+    "before-build.json": {
+      "role": "before"
+    },
+    "before-odp-tests.json": {
+      "role": "before",
+      "tests": 349
+    },
+    "before-odp-clippy-no-deps.json": {
+      "role": "before"
+    },
+    "before-pilots-aligned.json": {
+      "role": "before"
+    },
+    "candidate-attribute-tests-fixed.json": {
+      "role": "after",
+      "tests": 18
+    },
+    "candidate-odp-tests.json": {
+      "role": "after",
+      "tests": 352
+    },
+    "candidate-odp-clippy.json": {
+      "role": "after"
+    },
+    "candidate-build.json": {
+      "role": "after"
+    },
+    "candidate-pilots.json": {
+      "role": "after"
+    },
+    "candidate-harness-tests.json": {
+      "role": "after",
+      "tests": 330
+    },
+    "candidate-harness-bin-tests.json": {
+      "role": "after",
+      "tests": 34
+    },
+    "candidate-harness-integration-tests.json": {
+      "role": "after",
+      "tests": 4
+    },
+    "candidate-odp-doc.json": {
+      "role": "after"
+    },
+    "final-format.json": {
+      "role": "after"
+    },
+    "final-boundaries.json": {
+      "role": "after"
+    },
+    "formal-a1.json": {
+      "role": "before"
+    },
+    "formal-b1.json": {
+      "role": "after"
+    },
+    "formal-b2.json": {
+      "role": "after"
+    },
+    "formal-a2.json": {
+      "role": "before"
+    },
+    "before-stat.json": {
+      "role": "before"
+    },
+    "before-record-recapture.json": {
+      "role": "before"
+    },
+    "after-stat.json": {
+      "role": "after"
+    },
+    "after-record.json": {
+      "role": "after"
+    },
+    "confirm-c1-recapture.json": {
+      "role": "before"
+    },
+    "confirm-c2.json": {
+      "role": "after"
+    },
+    "confirm-c3.json": {
+      "role": "after"
+    },
+    "confirm-c4.json": {
+      "role": "before"
+    },
+    "formal-summary-reviewed.json": {
+      "role": "after"
+    },
+    "confirmation-profile-summary.json": {
+      "role": "after"
+    }
+  },
+  "cleanup_paths": [
+    "/tmp/litchi-goal-0440-binaries",
+    "/tmp/litchi-goal-0440-parser",
+    "/tmp/litchi-goal-0440-review",
+    "/tmp/litchi-goal-0440-evidence"
+  ]
+}

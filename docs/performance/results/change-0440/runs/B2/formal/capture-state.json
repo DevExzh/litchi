@@ -1,0 +1,38 @@
+{
+  "attempt": "formal",
+  "change": 440,
+  "completed_lanes": 6,
+  "driver_sha256": "a16aa2176bfb882b338086c01f8baecd068583b212c2f3075155ef87789de908",
+  "finished_utc": "2026-09-06T15:23:05.569317+00:00",
+  "index": [
+    "runs/B2/formal/B2-after-allocator-large-r2-receipt.json",
+    "runs/B2/formal/B2-after-allocator-medium-r2-receipt.json",
+    "runs/B2/formal/B2-after-allocator-tiny-r2-receipt.json",
+    "runs/B2/formal/B2-after-normal-large-r2-receipt.json",
+    "runs/B2/formal/B2-after-normal-medium-r2-receipt.json",
+    "runs/B2/formal/B2-after-normal-tiny-r2-receipt.json"
+  ],
+  "phase": "B2",
+  "protocol_sha256": "4cf3f297d440d48fe56ee0f5072d96f882e8866bb07ab826227da9d0df1d0d3e",
+  "role": "after",
+  "schema": "litchi-0440-capture-state-v1",
+  "source_after": {
+    "files": 6657,
+    "path": "sources/67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1.json",
+    "sha256": "67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1"
+  },
+  "source_before": {
+    "files": 6657,
+    "path": "sources/67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1.json",
+    "sha256": "67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1"
+  },
+  "status": "pass",
+  "status_after": [
+    " M crates/litchi-odp/src/codec/parser/codec/xml/validation.rs",
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    " M crates/litchi-odp/src/codec/parser/codec/xml/validation.rs",
+    "?? docs/GOAL.md"
+  ]
+}

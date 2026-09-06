@@ -1,5 +1,16 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0440 reduces existing ODP append allocations
+
+[0440](changes/0440-odp-borrowed-attribute-namespaces.md) reuses the opt-in
+`odp_existing_append_lifecycle` fixtures for a matched namespace-ownership
+experiment. Medium/large allocation calls fall about 20%; requested bytes
+fall 6.3–6.6%. Peak and retained live bytes are unchanged. The registry remains
+436 selectors, the default matrix 36 cases, and the index 15 categories with
+33 mappings (10 measured and 23 correctness-only under its default-baseline
+contract). No coverage status is promoted. Bounded existing append, Part
+addition, repackaging, native breadth, cold/range and scaling remain open.
+
 ## 2026-09-06: change 0439 measures logical append to an existing ODP
 
 [0439](changes/0439-odp-existing-append-lifecycle.md) adds

@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0440: reader-scoped namespace ownership in ODP
+
+[0440](changes/0440-odp-borrowed-attribute-namespaces.md) keeps XML attribute
+semantics inside the ODP owner and borrows resolved namespaces with explicit
+reader lifetimes. Shared scanning, namespace matching, lazy decoding, error
+order and publication/preservation contracts are unchanged. No public API,
+unsafe code, dependency, ambient I/O or executor is introduced. The one-shot
+lookup implementation is unchanged. The [batch matrix](results/change-0440/adr-compliance.md)
+records the applicable obligations and differential scope tests.
+
 ## Change 0438: rejected private ODP markup experiment
 
 [0438](changes/0438-odp-markup-batching-negative.md) tested bounded private

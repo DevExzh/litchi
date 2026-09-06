@@ -1,0 +1,24 @@
+{
+  "change": 440,
+  "reason": "Root launched confirmation C1 before the confirmed-live baseline profile conversion had terminated. Both affected attempts are excluded, even though their command/oracle receipts passed. Main formal 24-report matrix is unchanged.",
+  "excluded": [
+    "profiles/before/record/formal/receipt.json",
+    "confirmation/C1/receipt.json"
+  ],
+  "profile_interval": [
+    "2026-09-06T15:26:52.757933+00:00",
+    "2026-09-06T15:29:32.558737+00:00"
+  ],
+  "confirmation_interval": [
+    "2026-09-06T15:28:21.891258+00:00",
+    "2026-09-06T15:28:28.770147+00:00"
+  ],
+  "replacement_profile": "profiles/before/record/recapture/receipt.json",
+  "replacement_confirmation": "confirmation/C1-recapture/receipt.json",
+  "original_profile_driver_sha256": "2ead1c1acaaf334a169f35a8510b64b2c8e686853fdbdb953c87988d11b60a3d",
+  "recapture_profile_driver_sha256": "9501c5fd48754062cddeed5cf9a4465f42c1577325a76451039b10d63cd20e4b",
+  "recapture_change": "Only output directory formal -> recapture; command, binaries, source, frozen protocol and oracle unchanged.",
+  "protocol_sha256": "4cf3f297d440d48fe56ee0f5072d96f882e8866bb07ab826227da9d0df1d0d3e",
+  "confirmation_plan_sha256": "bb85b0fa7d87bc8d826b712bb3b964e99628e00b14eda30f6d7df66404d8d1cf",
+  "recorded_utc": "2026-09-06T15:30:20.869668+00:00"
+}

@@ -1,0 +1,1052 @@
+{
+  "checks/after-record.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/after-record.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/after-stat.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/after-stat.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/before-build.log.gz": {
+    "original_bytes": 74,
+    "original_path": "checks/before-build.log",
+    "original_sha256": "a6f71f1d718ee6323cd368bc18713c1eb14f6c04dc4f03578259c30deb35e84a",
+    "stored_bytes": 93,
+    "stored_sha256": "c1419ef251f240302bdd60779d4cea9bcf09308663917f925a0ef91d296ec2f5"
+  },
+  "checks/before-odp-clippy-no-deps.log.gz": {
+    "original_bytes": 556,
+    "original_path": "checks/before-odp-clippy-no-deps.log",
+    "original_sha256": "43c48e23fa583bdb2f0b21c42243565866eefa045a456ca6122aa712105bfac4",
+    "stored_bytes": 206,
+    "stored_sha256": "3f086e85446e06dc09395dbbfccba044640529e9e7274defd4f95004ffa9c9f3"
+  },
+  "checks/before-odp-clippy.log.gz": {
+    "original_bytes": 1622,
+    "original_path": "checks/before-odp-clippy.log",
+    "original_sha256": "af0863b69585906fadf7415089c23b1f15dfbf4b55420dbf145734462fef7147",
+    "stored_bytes": 660,
+    "stored_sha256": "00979cfbe25da6dd065b8eeb9cf51f0b5add80b75cfcb61c8a98d0fffacf0739"
+  },
+  "checks/before-odp-tests.log.gz": {
+    "original_bytes": 33332,
+    "original_path": "checks/before-odp-tests.log",
+    "original_sha256": "233baf7ca04192e5ecf5a3d65b002927e9ea9327aef3b9881545e2940ffe940f",
+    "stored_bytes": 7509,
+    "stored_sha256": "cb0eb6bb913d29dc65a9d450bf0b49df3084a541954d28a4ce937607dec64d5d"
+  },
+  "checks/before-pilots-aligned.log.gz": {
+    "original_bytes": 18,
+    "original_path": "checks/before-pilots-aligned.log",
+    "original_sha256": "6ebbd0a0e43e45c8cd4eb608495b9fb4d5b94216fc47e942667e88f0fd4d3866",
+    "stored_bytes": 38,
+    "stored_sha256": "108391fc6497545d97962b7a709fe4a4d669e16e2f5b385622382353ef71976c"
+  },
+  "checks/before-pilots.log.gz": {
+    "original_bytes": 421,
+    "original_path": "checks/before-pilots.log",
+    "original_sha256": "38aed001e757f85e87c5667c70da59f1b980bcd445a0840089de00d563f57a32",
+    "stored_bytes": 255,
+    "stored_sha256": "3069d5fff6acbdbf382b7acc37638df82c38d1361c73ad0290477e5c79025cdb"
+  },
+  "checks/before-record-recapture.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/before-record-recapture.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/before-record.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/before-record.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/before-stat.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/before-stat.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/candidate-attribute-tests-fixed.log.gz": {
+    "original_bytes": 2325,
+    "original_path": "checks/candidate-attribute-tests-fixed.log",
+    "original_sha256": "194dcf3499551a7c7d14c8f9ad362d24ec39eade83e305a1b06935d2ddc6a4d9",
+    "stored_bytes": 709,
+    "stored_sha256": "f1996b7f0ea25701a5fe8395ed606b7a1a4e614b730f04a90dd149004fa527e6"
+  },
+  "checks/candidate-attribute-tests.log.gz": {
+    "original_bytes": 900,
+    "original_path": "checks/candidate-attribute-tests.log",
+    "original_sha256": "a0038072e856153b4d383a23b40ad88171477adbf5e922bffea3fb60731450ce",
+    "stored_bytes": 408,
+    "stored_sha256": "7e898d700fa1f9bd8bd17732c861ccec98574accf64a1dafb7eab320d928d65f"
+  },
+  "checks/candidate-build.log.gz": {
+    "original_bytes": 304,
+    "original_path": "checks/candidate-build.log",
+    "original_sha256": "e57757da87aa69debc4df6b5bbba0a3bbf07a9384928a6bb506f6c426b36d559",
+    "stored_bytes": 173,
+    "stored_sha256": "ef444568b230b5780761d8f11b3baa431b5220742c364053ad6eab374e6c07b0"
+  },
+  "checks/candidate-harness-bin-tests.log.gz": {
+    "original_bytes": 4226,
+    "original_path": "checks/candidate-harness-bin-tests.log",
+    "original_sha256": "70a8325d8a9f0201bfca3327548d36784e914178d28bc7fccdfeee8a361302fe",
+    "stored_bytes": 1299,
+    "stored_sha256": "3c017909d286428d0eaeb2b6b9e1860962289fd7c239a4195e7863c96083c49b"
+  },
+  "checks/candidate-harness-integration-tests.log.gz": {
+    "original_bytes": 687,
+    "original_path": "checks/candidate-harness-integration-tests.log",
+    "original_sha256": "6607388ef334d89925d2e00ec335ab8b7e2165972243ca095167eed85d5dbedd",
+    "stored_bytes": 393,
+    "stored_sha256": "5fc2b3efe0f5487b751ed68d7fdfd52f7006a9901d622d7b11f6e2e5c02425bc"
+  },
+  "checks/candidate-harness-tests.log.gz": {
+    "original_bytes": 29216,
+    "original_path": "checks/candidate-harness-tests.log",
+    "original_sha256": "f3e726877fe2de4a48f5dd16c3710ab8f5afab467149cc1615ee2fec5b39114d",
+    "stored_bytes": 6759,
+    "stored_sha256": "38119dc4cd6dc5900c66d8ba6d18a5335b2b62bfcb14e590ccc46c68750cdb91"
+  },
+  "checks/candidate-odp-clippy.log.gz": {
+    "original_bytes": 137,
+    "original_path": "checks/candidate-odp-clippy.log",
+    "original_sha256": "26f41675c6cf16682a5c48819b046020b9567a25cb8a382b971dff834b6624f9",
+    "stored_bytes": 132,
+    "stored_sha256": "5146aaf2c80567aa46df0e7edcb01c2d01bcbda4820b44080ac28ae77b92a3ed"
+  },
+  "checks/candidate-odp-doc.log.gz": {
+    "original_bytes": 207,
+    "original_path": "checks/candidate-odp-doc.log",
+    "original_sha256": "7bac9ac75ad43a9003842f87a8d6fcf016764500c44412984894e36614114ef8",
+    "stored_bytes": 161,
+    "stored_sha256": "2f182cb09789c281c5ab9c0592480003897e302c903d3153ced19a4cd1ef1fea"
+  },
+  "checks/candidate-odp-tests.log.gz": {
+    "original_bytes": 33733,
+    "original_path": "checks/candidate-odp-tests.log",
+    "original_sha256": "fc937abe49f09c1fcc0516f831fb543af979d2735791b999b61f07adfd53c510",
+    "stored_bytes": 7615,
+    "stored_sha256": "5bc496621c29f827db1c53a6c0381445bb99a5efa4c777e98a5469e30058f4c7"
+  },
+  "checks/candidate-pilots.log.gz": {
+    "original_bytes": 18,
+    "original_path": "checks/candidate-pilots.log",
+    "original_sha256": "6ebbd0a0e43e45c8cd4eb608495b9fb4d5b94216fc47e942667e88f0fd4d3866",
+    "stored_bytes": 38,
+    "stored_sha256": "108391fc6497545d97962b7a709fe4a4d669e16e2f5b385622382353ef71976c"
+  },
+  "checks/confirm-c1-recapture.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/confirm-c1-recapture.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/confirm-c1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/confirm-c1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/confirm-c2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/confirm-c2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/confirm-c3.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/confirm-c3.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/confirm-c4.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/confirm-c4.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/confirmation-profile-summary.log.gz": {
+    "original_bytes": 33,
+    "original_path": "checks/confirmation-profile-summary.log",
+    "original_sha256": "d1f95d98f05346e0489148fc1a4c288d700bd1c48ca75292cf5aef1b71be6e02",
+    "stored_bytes": 53,
+    "stored_sha256": "bbf0d6565d4a49a4837ab01f1761fd9e6f0a186208ccb486b7f2ca85fb726df4"
+  },
+  "checks/final-boundaries.log.gz": {
+    "original_bytes": 684,
+    "original_path": "checks/final-boundaries.log",
+    "original_sha256": "b6f38b040ac7308af6ec280e204ed817e3c708cdde84d2566f0b5d74758aeeaf",
+    "stored_bytes": 255,
+    "stored_sha256": "47bc24b362c2d527d2550fd6efef22751d4d4a4efba50b0b2f6d8f7b0fc8b443"
+  },
+  "checks/final-format.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/final-format.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/formal-a1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/formal-a1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/formal-a2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/formal-a2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/formal-b1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/formal-b1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/formal-b2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/formal-b2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/formal-summary-reviewed.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/formal-summary-reviewed.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/formal-summary.log.gz": {
+    "original_bytes": 0,
+    "original_path": "checks/formal-summary.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/precleanup.log.gz": {
+    "original_bytes": 156,
+    "original_path": "checks/precleanup.log",
+    "original_sha256": "43f1153a7448c3fa3ac57067986a26aecbaed4d928f70f700475644dbadd33bb",
+    "stored_bytes": 117,
+    "stored_sha256": "d91309ec256792c719c322c989c53129ce869c3714f0e54c29bb891fa36a731c"
+  },
+  "checks/prior-profile-attribution.log.gz": {
+    "original_bytes": 1316,
+    "original_path": "checks/prior-profile-attribution.log",
+    "original_sha256": "09b842b513f329cb64f6b5d6b5c564d995c31618f4e39efaa93c06937999c140",
+    "stored_bytes": 688,
+    "stored_sha256": "35ffd01f7defdd14c24232060dbc39004803c4a40729519a509aa6c021821165"
+  },
+  "confirmation/C1-recapture/oracle.log.gz": {
+    "original_bytes": 6,
+    "original_path": "confirmation/C1-recapture/oracle.log",
+    "original_sha256": "de545cc7e7ff8eaacefae8fcb4a954555a1224f24fe7ce8ff62b9874c54f3fe2",
+    "stored_bytes": 26,
+    "stored_sha256": "2d8454ee1c99656c9cc5b5603108d4a01d445d3c26335948707a94f152534bb4"
+  },
+  "confirmation/C1-recapture/resource.log.gz": {
+    "original_bytes": 1085,
+    "original_path": "confirmation/C1-recapture/resource.log",
+    "original_sha256": "1cb3aae00e8c2be049e05d1ee354b8ce0b2d9708e351906b8fb570bf6b3e5e05",
+    "stored_bytes": 556,
+    "stored_sha256": "a814e96dd53185852f0baef6d1fb8730cda5fb92f464c86188070f3f48f3d498"
+  },
+  "confirmation/C1-recapture/workload.log.gz": {
+    "original_bytes": 0,
+    "original_path": "confirmation/C1-recapture/workload.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "confirmation/C1/oracle.log.gz": {
+    "original_bytes": 6,
+    "original_path": "confirmation/C1/oracle.log",
+    "original_sha256": "de545cc7e7ff8eaacefae8fcb4a954555a1224f24fe7ce8ff62b9874c54f3fe2",
+    "stored_bytes": 26,
+    "stored_sha256": "2d8454ee1c99656c9cc5b5603108d4a01d445d3c26335948707a94f152534bb4"
+  },
+  "confirmation/C1/resource.log.gz": {
+    "original_bytes": 1064,
+    "original_path": "confirmation/C1/resource.log",
+    "original_sha256": "25eb9e6f1774a2d8826ca302a2c97c96761c149dba4495279fb6848391682064",
+    "stored_bytes": 548,
+    "stored_sha256": "350687176d197dc2eed2dc70a0b5f05bc04902b68fba1a92dc3597951b82b709"
+  },
+  "confirmation/C1/workload.log.gz": {
+    "original_bytes": 0,
+    "original_path": "confirmation/C1/workload.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "confirmation/C2/oracle.log.gz": {
+    "original_bytes": 6,
+    "original_path": "confirmation/C2/oracle.log",
+    "original_sha256": "de545cc7e7ff8eaacefae8fcb4a954555a1224f24fe7ce8ff62b9874c54f3fe2",
+    "stored_bytes": 26,
+    "stored_sha256": "2d8454ee1c99656c9cc5b5603108d4a01d445d3c26335948707a94f152534bb4"
+  },
+  "confirmation/C2/resource.log.gz": {
+    "original_bytes": 1064,
+    "original_path": "confirmation/C2/resource.log",
+    "original_sha256": "c3071c684b3d1f9e446b70ea9825339c7c290c81352834825b082643117f1329",
+    "stored_bytes": 548,
+    "stored_sha256": "e68ba8aa9c082db9e40048dee78e40b8b2d98409634b610e8f99ca5c00ccd6c3"
+  },
+  "confirmation/C2/workload.log.gz": {
+    "original_bytes": 0,
+    "original_path": "confirmation/C2/workload.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "confirmation/C3/oracle.log.gz": {
+    "original_bytes": 6,
+    "original_path": "confirmation/C3/oracle.log",
+    "original_sha256": "de545cc7e7ff8eaacefae8fcb4a954555a1224f24fe7ce8ff62b9874c54f3fe2",
+    "stored_bytes": 26,
+    "stored_sha256": "2d8454ee1c99656c9cc5b5603108d4a01d445d3c26335948707a94f152534bb4"
+  },
+  "confirmation/C3/resource.log.gz": {
+    "original_bytes": 1064,
+    "original_path": "confirmation/C3/resource.log",
+    "original_sha256": "02d31b67232b49b0671f49b7138701c0caf2843a5a9ceec804cbbfe043b2725f",
+    "stored_bytes": 546,
+    "stored_sha256": "fe79e20c3661ad08fc54038a80eb8b4b724c8b49d6f1fc4b67900cfb237cc230"
+  },
+  "confirmation/C3/workload.log.gz": {
+    "original_bytes": 0,
+    "original_path": "confirmation/C3/workload.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "confirmation/C4/oracle.log.gz": {
+    "original_bytes": 6,
+    "original_path": "confirmation/C4/oracle.log",
+    "original_sha256": "de545cc7e7ff8eaacefae8fcb4a954555a1224f24fe7ce8ff62b9874c54f3fe2",
+    "stored_bytes": 26,
+    "stored_sha256": "2d8454ee1c99656c9cc5b5603108d4a01d445d3c26335948707a94f152534bb4"
+  },
+  "confirmation/C4/resource.log.gz": {
+    "original_bytes": 1066,
+    "original_path": "confirmation/C4/resource.log",
+    "original_sha256": "ca26e42d2441789c3466d5fbc635da9ba98330c8641d9f20693b31dc85ead45f",
+    "stored_bytes": 550,
+    "stored_sha256": "9801da8d4b7926219bce60be0574c174e575a4bba0d8385bc35adf6224510147"
+  },
+  "confirmation/C4/workload.log.gz": {
+    "original_bytes": 0,
+    "original_path": "confirmation/C4/workload.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "profiles/after/record/formal/oracle.log.gz": {
+    "original_bytes": 297,
+    "original_path": "profiles/after/record/formal/oracle.log",
+    "original_sha256": "cacc297307c602010dee14889d8ffaa458b9b120c8fb1885b0ba6578c44c138f",
+    "stored_bytes": 190,
+    "stored_sha256": "2704582b9e0651bde03c7b82b7ffd220d5f957b9a2b06591c1b595c0275bed34"
+  },
+  "profiles/after/record/formal/perf-report.txt.gz": {
+    "original_bytes": 6315353,
+    "original_path": "profiles/after/record/formal/perf-report.txt",
+    "original_sha256": "aa624cb811be34cf00f9dd4dfb2164c85355e113ac086578c325435aa4a39764",
+    "stored_bytes": 230880,
+    "stored_sha256": "01143f239e99eea3766f11deb3e54f70b91c9b9140feae2c81ab33269c58dfcc"
+  },
+  "profiles/after/record/formal/perf-script.txt.gz": {
+    "original_bytes": 20492521,
+    "original_path": "profiles/after/record/formal/perf-script.txt",
+    "original_sha256": "3c54549fd0d326497a8166d548a438472836d3c95b69320cb9f859ac2888d0e3",
+    "stored_bytes": 734443,
+    "stored_sha256": "08bc46005d474527b85c746198b4248e3c8a1480db6c76aa1fc629dc026c6a53"
+  },
+  "profiles/after/record/formal/perf.data.gz": {
+    "original_bytes": 1305696,
+    "original_path": "profiles/after/record/formal/perf.data",
+    "original_sha256": "733317c7a0730b942625c8cd27aba8ccef31b7c0206aeabcd2e2a551a6715eca",
+    "stored_bytes": 133061,
+    "stored_sha256": "b67123d32cccfe120795979f88c56ac39eb127bf4b831bb45101fb265254691b"
+  },
+  "profiles/after/record/formal/resource.log.gz": {
+    "original_bytes": 1274,
+    "original_path": "profiles/after/record/formal/resource.log",
+    "original_sha256": "cf12548c06969a3e221385e0029589fe5685b8007c7d3ddc15b5d739c8bf297c",
+    "stored_bytes": 607,
+    "stored_sha256": "880ffd1fc67cd3e45ff1efb931aa78468702f7d1afe75d1be7e9ae0074769423"
+  },
+  "profiles/after/record/formal/workload.log.gz": {
+    "original_bytes": 193,
+    "original_path": "profiles/after/record/formal/workload.log",
+    "original_sha256": "a8998bc44ffc2eb2276b9b0dca1b3e404120be994426dd349c2b65e226e456e9",
+    "stored_bytes": 161,
+    "stored_sha256": "14c4d409b1bd566f8fb8909fc7747582b1291aa038382c7b2a395d2247f4b6d8"
+  },
+  "profiles/after/stat/formal/oracle.log.gz": {
+    "original_bytes": 295,
+    "original_path": "profiles/after/stat/formal/oracle.log",
+    "original_sha256": "33e231d3a5e08f38c716cda841a7ce557efd1124d8774b850b007c2344972f02",
+    "stored_bytes": 190,
+    "stored_sha256": "7bef70d8c799c4d574522214f35cb0e2982e917afed36bf8a802abfa055e2938"
+  },
+  "profiles/after/stat/formal/perf-stat.txt.gz": {
+    "original_bytes": 267,
+    "original_path": "profiles/after/stat/formal/perf-stat.txt",
+    "original_sha256": "8cd5017e9528706fa33579559c539d66bef218e34bf9c46b3feeebc5f7d4d9f4",
+    "stored_bytes": 163,
+    "stored_sha256": "f1e2732681faa60dbcbd701b32876f87e169e2b787c04cf85676684688e6e5b6"
+  },
+  "profiles/after/stat/formal/resource.log.gz": {
+    "original_bytes": 1306,
+    "original_path": "profiles/after/stat/formal/resource.log",
+    "original_sha256": "e54b923bfaa81a1567bcff04f57dcedc3bd9d7567a527907521f4fec6e05e806",
+    "stored_bytes": 621,
+    "stored_sha256": "ab5da16106fdb4b0bb347fd237726fd8398cb5f7d13f3c7eb493e4a12976c621"
+  },
+  "profiles/after/stat/formal/workload.log.gz": {
+    "original_bytes": 0,
+    "original_path": "profiles/after/stat/formal/workload.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "profiles/before/record/formal/oracle.log.gz": {
+    "original_bytes": 298,
+    "original_path": "profiles/before/record/formal/oracle.log",
+    "original_sha256": "f6603c33b74eeda533a2b5bb89b72c8cb250c5201131c215d45a44b2cba55c18",
+    "stored_bytes": 190,
+    "stored_sha256": "c1e8da4808180df90e2392df83593adebf948b888a731d7dba80fc65ceaaeddd"
+  },
+  "profiles/before/record/formal/perf-report.txt.gz": {
+    "original_bytes": 6574781,
+    "original_path": "profiles/before/record/formal/perf-report.txt",
+    "original_sha256": "c5329474b5821e45015749aab940db67e5e77eb630f0f103445cba502d893326",
+    "stored_bytes": 241254,
+    "stored_sha256": "17c20f4341702e0ef4ffdd17cc4690163aeb29f47563564ab60dc21937baaf35"
+  },
+  "profiles/before/record/formal/perf-script.txt.gz": {
+    "original_bytes": 20694805,
+    "original_path": "profiles/before/record/formal/perf-script.txt",
+    "original_sha256": "95993573af72395461a4fb4c5b3526b0dd8aae8169ec7e6b8bcfc628af771fd7",
+    "stored_bytes": 734693,
+    "stored_sha256": "ab3e780d397aa4ca61d965c96072ad122b819dab126bed0fc23bcd8d11cebb5b"
+  },
+  "profiles/before/record/formal/perf.data.gz": {
+    "original_bytes": 1317808,
+    "original_path": "profiles/before/record/formal/perf.data",
+    "original_sha256": "cac62515e477dd886be3c964eab67f9e6aec2d642ecf41a7c009e26efd6c6436",
+    "stored_bytes": 136128,
+    "stored_sha256": "51ec60b899c083966b67411449b7c495197477474cad0fda59dd3f4375effa4e"
+  },
+  "profiles/before/record/formal/resource.log.gz": {
+    "original_bytes": 1278,
+    "original_path": "profiles/before/record/formal/resource.log",
+    "original_sha256": "dc9f78a86c05d4f536e01dc74f4817c1cdb65734b18d9c5853652d25e9825c4d",
+    "stored_bytes": 608,
+    "stored_sha256": "a33cf15b95a499080cf6f73cd94bd9c2c7f2ac3192dab1b02778551bc2e6b6b4"
+  },
+  "profiles/before/record/formal/workload.log.gz": {
+    "original_bytes": 194,
+    "original_path": "profiles/before/record/formal/workload.log",
+    "original_sha256": "e3919df56bbeeddc09ddbec13139eb3625cc710a1ac595321c208048adcb0802",
+    "stored_bytes": 162,
+    "stored_sha256": "77b2ec57c085eed1eb9805ce0008b96d9d0bbaf348e6cf54de9e78607c6224ce"
+  },
+  "profiles/before/record/recapture/oracle.log.gz": {
+    "original_bytes": 301,
+    "original_path": "profiles/before/record/recapture/oracle.log",
+    "original_sha256": "4bd49176f6f24002b1edf22f0a8bf0a9a5230a0206e653c767532f513c9e4afd",
+    "stored_bytes": 192,
+    "stored_sha256": "d1511f2cf80b9e1d8567a9f48cd7d6da2d590d1f4a28125d11199f58a33cfedb"
+  },
+  "profiles/before/record/recapture/perf-report.txt.gz": {
+    "original_bytes": 6701478,
+    "original_path": "profiles/before/record/recapture/perf-report.txt",
+    "original_sha256": "c06cd054382124270e4d172df771cf6d0c9b187cc109ee5119e0edfaa58f3952",
+    "stored_bytes": 243808,
+    "stored_sha256": "d133f1b61ac7f7e343354913a1d77e2e61f5ec214c09b7ae811a626b1464f21c"
+  },
+  "profiles/before/record/recapture/perf-script.txt.gz": {
+    "original_bytes": 21049762,
+    "original_path": "profiles/before/record/recapture/perf-script.txt",
+    "original_sha256": "2d4b9594fcab289098dd5a5df2afc3320da76ea7485487f2b9764d976f96fd3e",
+    "stored_bytes": 767979,
+    "stored_sha256": "31d53979834bb75e560e13488194fa4d74b8980cd696369c5b1ae0e9845617c7"
+  },
+  "profiles/before/record/recapture/perf.data.gz": {
+    "original_bytes": 1336680,
+    "original_path": "profiles/before/record/recapture/perf.data",
+    "original_sha256": "6e322dfd6578e53e291e4488fd6c4040a6b4f0db2d414118a6689d35906520ba",
+    "stored_bytes": 140738,
+    "stored_sha256": "4481235af232f8dd753489562492342bb907ba13a688cc78cb93c9d12e449df6"
+  },
+  "profiles/before/record/recapture/resource.log.gz": {
+    "original_bytes": 1288,
+    "original_path": "profiles/before/record/recapture/resource.log",
+    "original_sha256": "dea32b0d3e34ace2ad5ad1a45f377caa2de318a7173d88811de35824f6139185",
+    "stored_bytes": 611,
+    "stored_sha256": "7d227b31d4e4dc0d119a6b4ecc6882126628d49acdfe5216d56b338d5785d1d5"
+  },
+  "profiles/before/record/recapture/workload.log.gz": {
+    "original_bytes": 197,
+    "original_path": "profiles/before/record/recapture/workload.log",
+    "original_sha256": "4c4e4df52338cad1d14a9bbdb98be817a039cb973c04753e3e7686b4b7e01be1",
+    "stored_bytes": 164,
+    "stored_sha256": "a0d8e5b96c6d19249c5ebde8d4e5d4247c53251481cc4423c463b9f3aad34d17"
+  },
+  "profiles/before/stat/formal/oracle.log.gz": {
+    "original_bytes": 296,
+    "original_path": "profiles/before/stat/formal/oracle.log",
+    "original_sha256": "89dc51d5d9b80ac473feb6d3e8126f39715d8eebd5f14da2828edfe93fc6d83e",
+    "stored_bytes": 189,
+    "stored_sha256": "b6b2b5e9dfdcc1ae692ac627fe370e581611eeb21de4b1e91fbd136140befd07"
+  },
+  "profiles/before/stat/formal/perf-stat.txt.gz": {
+    "original_bytes": 267,
+    "original_path": "profiles/before/stat/formal/perf-stat.txt",
+    "original_sha256": "fee30a706999d804774f5508b8e78453cb930c7c7bacd813153e01ed16df077e",
+    "stored_bytes": 161,
+    "stored_sha256": "e74e4f70a37ba94d160e54af64cf4c7d59dfb234e754d1b9092ac424f2968a5e"
+  },
+  "profiles/before/stat/formal/resource.log.gz": {
+    "original_bytes": 1310,
+    "original_path": "profiles/before/stat/formal/resource.log",
+    "original_sha256": "1d0c94720294389d6c90e05330116ca30014663b75b5090aa563baccb670ddeb",
+    "stored_bytes": 621,
+    "stored_sha256": "e85737c805d1cb190a40bfaa44a2dd7b01709bc6f2ba7b8b999fd5f7cc0872bd"
+  },
+  "profiles/before/stat/formal/workload.log.gz": {
+    "original_bytes": 0,
+    "original_path": "profiles/before/stat/formal/workload.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/A1/formal/A1-before-allocator-large-r1-oracle.log.gz": {
+    "original_bytes": 308,
+    "original_path": "runs/A1/formal/A1-before-allocator-large-r1-oracle.log",
+    "original_sha256": "5140e09fb154e0e802a74d2c54a9609f949752a240acbc62fcb4e6037254f827",
+    "stored_bytes": 197,
+    "stored_sha256": "6e9741d1d108c7aa0616b0c845135898f720ea2f7ab399de62c80162025ef844"
+  },
+  "runs/A1/formal/A1-before-allocator-large-r1-resource.log.gz": {
+    "original_bytes": 1117,
+    "original_path": "runs/A1/formal/A1-before-allocator-large-r1-resource.log",
+    "original_sha256": "b1a44e4250a2fbef87c23a8535f713081098b09a1350e42d34515a8189541402",
+    "stored_bytes": 559,
+    "stored_sha256": "5c32f37fb7cccc8a99ffac0314f994fd2ab032fcd445611f9294b3292fb21251"
+  },
+  "runs/A1/formal/A1-before-allocator-large-r1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/A1/formal/A1-before-allocator-large-r1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/A1/formal/A1-before-allocator-medium-r1-oracle.log.gz": {
+    "original_bytes": 310,
+    "original_path": "runs/A1/formal/A1-before-allocator-medium-r1-oracle.log",
+    "original_sha256": "5f3ab294f71cc27feaf896dda3c4965caf9216982f9cd407b7894001810fbf87",
+    "stored_bytes": 198,
+    "stored_sha256": "b3a6da45901a3711bb0e26f377d9aa16014851d175e3b3692dae88873f07b85b"
+  },
+  "runs/A1/formal/A1-before-allocator-medium-r1-resource.log.gz": {
+    "original_bytes": 1119,
+    "original_path": "runs/A1/formal/A1-before-allocator-medium-r1-resource.log",
+    "original_sha256": "bb8d7a5d62ab7354f6e3f1778dd1041ab1252a952d68affa249551dc0e348f2b",
+    "stored_bytes": 558,
+    "stored_sha256": "a88596f39415f47227e72f1a612dc359c06c6bc70e200484b57ff802a8667be6"
+  },
+  "runs/A1/formal/A1-before-allocator-medium-r1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/A1/formal/A1-before-allocator-medium-r1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/A1/formal/A1-before-allocator-tiny-r1-oracle.log.gz": {
+    "original_bytes": 306,
+    "original_path": "runs/A1/formal/A1-before-allocator-tiny-r1-oracle.log",
+    "original_sha256": "6f222102393c92bffb6858a9265fe41411cc3e64ad423096ff761f3075004ef3",
+    "stored_bytes": 197,
+    "stored_sha256": "a588cadc58fecc5884d539d9f1696496798b6b6b20715cc9d6eaf477a8393260"
+  },
+  "runs/A1/formal/A1-before-allocator-tiny-r1-resource.log.gz": {
+    "original_bytes": 1112,
+    "original_path": "runs/A1/formal/A1-before-allocator-tiny-r1-resource.log",
+    "original_sha256": "075f55503346ec1f88b11e060f0efbe0b9a39fce5955d38566806cbdfdbc2011",
+    "stored_bytes": 556,
+    "stored_sha256": "ed0de83df7288c1c58591c85acdb8512ff11dae620f4bdede88d294b94130d2c"
+  },
+  "runs/A1/formal/A1-before-allocator-tiny-r1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/A1/formal/A1-before-allocator-tiny-r1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/A1/formal/A1-before-normal-large-r1-oracle.log.gz": {
+    "original_bytes": 302,
+    "original_path": "runs/A1/formal/A1-before-normal-large-r1-oracle.log",
+    "original_sha256": "2e4d69ac06e002f6e32904931eef26c621dedcbe9e5e5dbe9b48ca01b6a74b6b",
+    "stored_bytes": 192,
+    "stored_sha256": "985fcf2177bbb55f9c0c52dc4b2ad00de317665d1555f1c12d9fbeb280874aeb"
+  },
+  "runs/A1/formal/A1-before-normal-large-r1-resource.log.gz": {
+    "original_bytes": 1109,
+    "original_path": "runs/A1/formal/A1-before-normal-large-r1-resource.log",
+    "original_sha256": "086677af3f8ecdca2f04511fdd269181c19e6a6968fb3e4a297159affa8b153e",
+    "stored_bytes": 559,
+    "stored_sha256": "5f313d0ced875c3f081a5efd10f5d7309d931f48281cd1aee0cfdcd5c3703838"
+  },
+  "runs/A1/formal/A1-before-normal-large-r1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/A1/formal/A1-before-normal-large-r1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/A1/formal/A1-before-normal-medium-r1-oracle.log.gz": {
+    "original_bytes": 304,
+    "original_path": "runs/A1/formal/A1-before-normal-medium-r1-oracle.log",
+    "original_sha256": "8dc34811d3caa0aa2b723ad4b766fb23a12f83426c760d0831134ac693fd1cfd",
+    "stored_bytes": 194,
+    "stored_sha256": "bc0ba14ecc5f7f4a5d19a85fa2c8f434a1c35746ebaff7f5626e27b23fc1033c"
+  },
+  "runs/A1/formal/A1-before-normal-medium-r1-resource.log.gz": {
+    "original_bytes": 1110,
+    "original_path": "runs/A1/formal/A1-before-normal-medium-r1-resource.log",
+    "original_sha256": "d675eebb37eb664d9a278a8356b48b52ceabfbac386cf88d3a901222b349c809",
+    "stored_bytes": 559,
+    "stored_sha256": "96bbb3df2aa616c6716c2956cfb05dc268639c228a9f9404d3ced43d129c9608"
+  },
+  "runs/A1/formal/A1-before-normal-medium-r1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/A1/formal/A1-before-normal-medium-r1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/A1/formal/A1-before-normal-tiny-r1-oracle.log.gz": {
+    "original_bytes": 300,
+    "original_path": "runs/A1/formal/A1-before-normal-tiny-r1-oracle.log",
+    "original_sha256": "638d60852ae7f00de691dccc11b30dc7821fb141fd9532ef23dfef319b192a15",
+    "stored_bytes": 192,
+    "stored_sha256": "d21b16108530a5f7a41808198f27035c43cf627bcc0bf2e92bee5a48a989ae2f"
+  },
+  "runs/A1/formal/A1-before-normal-tiny-r1-resource.log.gz": {
+    "original_bytes": 1103,
+    "original_path": "runs/A1/formal/A1-before-normal-tiny-r1-resource.log",
+    "original_sha256": "cf5094d1639af72fd4902903ecd3ff11e4893b87128652631a4eb2208e137f2b",
+    "stored_bytes": 552,
+    "stored_sha256": "01911a96aaa1d9fa68945b1977cf15ae6356195addb1df47c94620a095ee31e8"
+  },
+  "runs/A1/formal/A1-before-normal-tiny-r1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/A1/formal/A1-before-normal-tiny-r1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/A2/formal/A2-before-allocator-large-r2-oracle.log.gz": {
+    "original_bytes": 308,
+    "original_path": "runs/A2/formal/A2-before-allocator-large-r2-oracle.log",
+    "original_sha256": "3be34590e5aaaeb13fc2fa2a39b04503b1f539eab95b58811ac042a7e8f82cdb",
+    "stored_bytes": 197,
+    "stored_sha256": "18ee72b65be751400f1a59244c2b9ff8d312fb2c71518f91a532e7c056806f6f"
+  },
+  "runs/A2/formal/A2-before-allocator-large-r2-resource.log.gz": {
+    "original_bytes": 1117,
+    "original_path": "runs/A2/formal/A2-before-allocator-large-r2-resource.log",
+    "original_sha256": "7e2118165c0a0e14381556ec483b7c0c2dcd228b14804e7ec96b3010cdd77cae",
+    "stored_bytes": 558,
+    "stored_sha256": "970c5346685a1f83dd4b8b95c30e9e7f56296cce7346227e84de3f3dfe690a9b"
+  },
+  "runs/A2/formal/A2-before-allocator-large-r2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/A2/formal/A2-before-allocator-large-r2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/A2/formal/A2-before-allocator-medium-r2-oracle.log.gz": {
+    "original_bytes": 310,
+    "original_path": "runs/A2/formal/A2-before-allocator-medium-r2-oracle.log",
+    "original_sha256": "f64ceb656e500e21c69727046ac038cacfc76e28414a41c9398209776abbabd2",
+    "stored_bytes": 198,
+    "stored_sha256": "f6567db4351440f9eb1a1069bcfe5fa276485b696162a6279b317dc9e4b5934c"
+  },
+  "runs/A2/formal/A2-before-allocator-medium-r2-resource.log.gz": {
+    "original_bytes": 1119,
+    "original_path": "runs/A2/formal/A2-before-allocator-medium-r2-resource.log",
+    "original_sha256": "e4ed6fb1ae1e390df981b22ac9bb1b913f9725a456e23f5d8adce94a76b891fc",
+    "stored_bytes": 560,
+    "stored_sha256": "dc4417d83f79c7eb80a9537a508871de025dff93a6e33392d025b5bc9d5d8acd"
+  },
+  "runs/A2/formal/A2-before-allocator-medium-r2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/A2/formal/A2-before-allocator-medium-r2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/A2/formal/A2-before-allocator-tiny-r2-oracle.log.gz": {
+    "original_bytes": 306,
+    "original_path": "runs/A2/formal/A2-before-allocator-tiny-r2-oracle.log",
+    "original_sha256": "1c031f7906b18f8b0c1286b7b3a2cb9368a8555f1001a33e698dac898abb6133",
+    "stored_bytes": 197,
+    "stored_sha256": "6b8585233925a9c92f108fda972f8f6d4f02be0b83be6c67e15c089e4ca3ad5f"
+  },
+  "runs/A2/formal/A2-before-allocator-tiny-r2-resource.log.gz": {
+    "original_bytes": 1112,
+    "original_path": "runs/A2/formal/A2-before-allocator-tiny-r2-resource.log",
+    "original_sha256": "57f2c6efc28f155403c7751668f54d97cf5e371edf7b4fef336b8db1cb7f736e",
+    "stored_bytes": 557,
+    "stored_sha256": "7b45fe1108555ceacaf3ae315a25a1f5c12af393e676fa10a50018d6c02727ac"
+  },
+  "runs/A2/formal/A2-before-allocator-tiny-r2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/A2/formal/A2-before-allocator-tiny-r2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/A2/formal/A2-before-normal-large-r2-oracle.log.gz": {
+    "original_bytes": 302,
+    "original_path": "runs/A2/formal/A2-before-normal-large-r2-oracle.log",
+    "original_sha256": "6c60a974941c36e53b83487e7336f9b970974d06a500a3c96e4bd5d3555afcb4",
+    "stored_bytes": 192,
+    "stored_sha256": "61cd36aa85bbbff4b7020d8d1a16f9475fcf8a2f2b9a8e36b66753beaf4bbe9a"
+  },
+  "runs/A2/formal/A2-before-normal-large-r2-resource.log.gz": {
+    "original_bytes": 1108,
+    "original_path": "runs/A2/formal/A2-before-normal-large-r2-resource.log",
+    "original_sha256": "6a766ea57683a67ee4b3aed700e76efa2b43b9bf61e544f797d877b91fade510",
+    "stored_bytes": 556,
+    "stored_sha256": "29951312173dfaea92bed247e3647487f053bddb6a43ec5af7f9ce56d22ed958"
+  },
+  "runs/A2/formal/A2-before-normal-large-r2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/A2/formal/A2-before-normal-large-r2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/A2/formal/A2-before-normal-medium-r2-oracle.log.gz": {
+    "original_bytes": 304,
+    "original_path": "runs/A2/formal/A2-before-normal-medium-r2-oracle.log",
+    "original_sha256": "28db4c6a0c69c497ad76811f9abd8d1624a426f3815e16dffaa52b82676352cf",
+    "stored_bytes": 194,
+    "stored_sha256": "922c0d5f031466da50a4b6dff601170d074ef804a61a76201491a8ec9634d591"
+  },
+  "runs/A2/formal/A2-before-normal-medium-r2-resource.log.gz": {
+    "original_bytes": 1110,
+    "original_path": "runs/A2/formal/A2-before-normal-medium-r2-resource.log",
+    "original_sha256": "a6c2a61ba5f4e39a5eabcffc8a9813d9bb2cfae76334a31ddf5d4249f96a2658",
+    "stored_bytes": 557,
+    "stored_sha256": "8d5f91ae6e289daa2a79389f5dc57222087f744682c76c0b79ea58d52ef382fa"
+  },
+  "runs/A2/formal/A2-before-normal-medium-r2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/A2/formal/A2-before-normal-medium-r2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/A2/formal/A2-before-normal-tiny-r2-oracle.log.gz": {
+    "original_bytes": 300,
+    "original_path": "runs/A2/formal/A2-before-normal-tiny-r2-oracle.log",
+    "original_sha256": "ffc4c65653e14d20370e89d04a70ce7700764dc3ebdb4ea75ca1f29b00091ac7",
+    "stored_bytes": 192,
+    "stored_sha256": "91fb5ea6d4073c8107487cee414d3601d98e411f07e0562084db9473f6e250bf"
+  },
+  "runs/A2/formal/A2-before-normal-tiny-r2-resource.log.gz": {
+    "original_bytes": 1103,
+    "original_path": "runs/A2/formal/A2-before-normal-tiny-r2-resource.log",
+    "original_sha256": "7735a5dcaa5cd3085a872ec8f35745f4d953d8e4e01aa08232547ac5d74936f5",
+    "stored_bytes": 549,
+    "stored_sha256": "b629f9597e09dbd2b8f8a66d9d77f12464f95118d75a36a40a47edf545a28eb8"
+  },
+  "runs/A2/formal/A2-before-normal-tiny-r2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/A2/formal/A2-before-normal-tiny-r2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/B1/formal/B1-after-allocator-large-r1-oracle.log.gz": {
+    "original_bytes": 307,
+    "original_path": "runs/B1/formal/B1-after-allocator-large-r1-oracle.log",
+    "original_sha256": "77922106be9d3b84138faa15873dc6a10e91f5ee0c0948fa825d9db434d819d9",
+    "stored_bytes": 196,
+    "stored_sha256": "8f93f7d5f6b6449bf808bb1f41bfe500e801fb4bcf8b2cc1053680388e43a4f2"
+  },
+  "runs/B1/formal/B1-after-allocator-large-r1-resource.log.gz": {
+    "original_bytes": 1114,
+    "original_path": "runs/B1/formal/B1-after-allocator-large-r1-resource.log",
+    "original_sha256": "c0d8a7ff0bf669961d47ea7b4e2861e6a1d8dbdbc64973af7c645886de5f7249",
+    "stored_bytes": 559,
+    "stored_sha256": "91156b1975d0fba6bf98e775f99d9e6f35bd41ed2fa895b5ca7da35e4bd2d044"
+  },
+  "runs/B1/formal/B1-after-allocator-large-r1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/B1/formal/B1-after-allocator-large-r1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/B1/formal/B1-after-allocator-medium-r1-oracle.log.gz": {
+    "original_bytes": 309,
+    "original_path": "runs/B1/formal/B1-after-allocator-medium-r1-oracle.log",
+    "original_sha256": "310eb86cab1e481dda350e8491481da4d23e7be2f712e9c1aa2484691b57f7e1",
+    "stored_bytes": 198,
+    "stored_sha256": "3a43784a8ff2a3c28c1fc87f111b96000c4c971ce25a8e9583aba4a2833ada11"
+  },
+  "runs/B1/formal/B1-after-allocator-medium-r1-resource.log.gz": {
+    "original_bytes": 1116,
+    "original_path": "runs/B1/formal/B1-after-allocator-medium-r1-resource.log",
+    "original_sha256": "3ba316ba6690c733fd8b7ff027fdaae96960b97b04047b6f781fcc76568dade1",
+    "stored_bytes": 561,
+    "stored_sha256": "44ff251ef449b0451d3eb1e2192bd722d247bbaa3dfacfa1bae71f08eca86bbc"
+  },
+  "runs/B1/formal/B1-after-allocator-medium-r1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/B1/formal/B1-after-allocator-medium-r1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/B1/formal/B1-after-allocator-tiny-r1-oracle.log.gz": {
+    "original_bytes": 305,
+    "original_path": "runs/B1/formal/B1-after-allocator-tiny-r1-oracle.log",
+    "original_sha256": "6ea77f450472e4af9f8ef0f8216bed265d189a57d367d89ecbee7df097de30db",
+    "stored_bytes": 196,
+    "stored_sha256": "d20f2a3803c3728f1355d11b9290fb5a8ecf697282d219bd56d7c94dab2bc5fd"
+  },
+  "runs/B1/formal/B1-after-allocator-tiny-r1-resource.log.gz": {
+    "original_bytes": 1110,
+    "original_path": "runs/B1/formal/B1-after-allocator-tiny-r1-resource.log",
+    "original_sha256": "a66883720f93911226159463e4d205db1794ad1cdb399d459631b28cc931c60f",
+    "stored_bytes": 555,
+    "stored_sha256": "eef8a320b0823bb06ceec17928d95188b0de3d01c17a4d120ca1420d60913762"
+  },
+  "runs/B1/formal/B1-after-allocator-tiny-r1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/B1/formal/B1-after-allocator-tiny-r1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/B1/formal/B1-after-normal-large-r1-oracle.log.gz": {
+    "original_bytes": 301,
+    "original_path": "runs/B1/formal/B1-after-normal-large-r1-oracle.log",
+    "original_sha256": "b3dcf00e8d4899bfed262c8681e5cf53b0c57be3439034291f9be05d1901cc9e",
+    "stored_bytes": 192,
+    "stored_sha256": "c3c00e9257dcd1797b7a2fb259e4b4b1f1061e3cf2f3b374ad624548209e5ce4"
+  },
+  "runs/B1/formal/B1-after-normal-large-r1-resource.log.gz": {
+    "original_bytes": 1105,
+    "original_path": "runs/B1/formal/B1-after-normal-large-r1-resource.log",
+    "original_sha256": "32bdfa544f7c5deb146585d4e45e172797cb83b05a91f6209d1e83f0f4d045d1",
+    "stored_bytes": 554,
+    "stored_sha256": "2e133c69cd71bdad5f931d97bd52b201eb8b65dca83640ea93589b28d1490fa1"
+  },
+  "runs/B1/formal/B1-after-normal-large-r1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/B1/formal/B1-after-normal-large-r1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/B1/formal/B1-after-normal-medium-r1-oracle.log.gz": {
+    "original_bytes": 303,
+    "original_path": "runs/B1/formal/B1-after-normal-medium-r1-oracle.log",
+    "original_sha256": "2f75e1641fec97fc32c851632afcf358b0f38dd7dc55196f4af41337c9769952",
+    "stored_bytes": 194,
+    "stored_sha256": "5c53a505c305b91e4a5ee685de0dbbea95b88ae6a5b46118d1d458f64c1efa30"
+  },
+  "runs/B1/formal/B1-after-normal-medium-r1-resource.log.gz": {
+    "original_bytes": 1107,
+    "original_path": "runs/B1/formal/B1-after-normal-medium-r1-resource.log",
+    "original_sha256": "ef5c68d07b13f6287b453bc64de147049ee9380fb16b1fb82ec7f1e7fe0f5ff5",
+    "stored_bytes": 556,
+    "stored_sha256": "85be3682d3a7b598d130dd2522a46ad55880f32752536fb77157c617c66fd817"
+  },
+  "runs/B1/formal/B1-after-normal-medium-r1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/B1/formal/B1-after-normal-medium-r1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/B1/formal/B1-after-normal-tiny-r1-oracle.log.gz": {
+    "original_bytes": 299,
+    "original_path": "runs/B1/formal/B1-after-normal-tiny-r1-oracle.log",
+    "original_sha256": "345aed73021de8fb96b2f6c41daa33131a083ac824b8d6d83671acd214726295",
+    "stored_bytes": 192,
+    "stored_sha256": "94a684c72530190f187380efd3838978368a82987aef44e62ea46806d7386a8f"
+  },
+  "runs/B1/formal/B1-after-normal-tiny-r1-resource.log.gz": {
+    "original_bytes": 1100,
+    "original_path": "runs/B1/formal/B1-after-normal-tiny-r1-resource.log",
+    "original_sha256": "3badb3fe1182f63317fc8ca99e13848d082504c88ebad11b4f7edf7959d2dbb7",
+    "stored_bytes": 549,
+    "stored_sha256": "b71f57949a96b7749c7d24a40d40e253df38b6e8b7b14a2c922efae2e2ed29b6"
+  },
+  "runs/B1/formal/B1-after-normal-tiny-r1.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/B1/formal/B1-after-normal-tiny-r1.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/B2/formal/B2-after-allocator-large-r2-oracle.log.gz": {
+    "original_bytes": 307,
+    "original_path": "runs/B2/formal/B2-after-allocator-large-r2-oracle.log",
+    "original_sha256": "f46f321e3bb6412d1c509b4fa29c0cda37104b9eefa8fddc0adfa256e91ddf67",
+    "stored_bytes": 196,
+    "stored_sha256": "4d7ed60918961cc89379ef8f2335aa65c976b46035c000f493450aa8ca209acf"
+  },
+  "runs/B2/formal/B2-after-allocator-large-r2-resource.log.gz": {
+    "original_bytes": 1114,
+    "original_path": "runs/B2/formal/B2-after-allocator-large-r2-resource.log",
+    "original_sha256": "37a7bd7c1b93f590eeebcf0a32052ec685c797a8ef0df3a8d6d5c85ae7d8c8e2",
+    "stored_bytes": 558,
+    "stored_sha256": "85728c4431651f09b80aeff1864caf758e797fa0870fa91ca4320036fb88e24b"
+  },
+  "runs/B2/formal/B2-after-allocator-large-r2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/B2/formal/B2-after-allocator-large-r2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/B2/formal/B2-after-allocator-medium-r2-oracle.log.gz": {
+    "original_bytes": 309,
+    "original_path": "runs/B2/formal/B2-after-allocator-medium-r2-oracle.log",
+    "original_sha256": "4363601e31617df44786b6eb582593482699b692c50243a64d32cd086ccf0ac1",
+    "stored_bytes": 198,
+    "stored_sha256": "1b47749881af3d150c8a1f0695c8867887d6e1412f62b18511c483c0019093dd"
+  },
+  "runs/B2/formal/B2-after-allocator-medium-r2-resource.log.gz": {
+    "original_bytes": 1117,
+    "original_path": "runs/B2/formal/B2-after-allocator-medium-r2-resource.log",
+    "original_sha256": "2e2734b1d3ddb66477b9314d423649be7c85e8d0f53a15701cff042c3fd738e0",
+    "stored_bytes": 558,
+    "stored_sha256": "1a9419dbedbc35c7e5e22515b261df06819a72735d76a6991d740c7e519d5a75"
+  },
+  "runs/B2/formal/B2-after-allocator-medium-r2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/B2/formal/B2-after-allocator-medium-r2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/B2/formal/B2-after-allocator-tiny-r2-oracle.log.gz": {
+    "original_bytes": 305,
+    "original_path": "runs/B2/formal/B2-after-allocator-tiny-r2-oracle.log",
+    "original_sha256": "29b8c8ecabb63b8d623108e9c05aa8b19a4422a005d81f72d4b003d270df6ebc",
+    "stored_bytes": 196,
+    "stored_sha256": "1ff947214c93e9b83622b456879aa660d17cab94b7a146c38ce5e73a59564dae"
+  },
+  "runs/B2/formal/B2-after-allocator-tiny-r2-resource.log.gz": {
+    "original_bytes": 1109,
+    "original_path": "runs/B2/formal/B2-after-allocator-tiny-r2-resource.log",
+    "original_sha256": "589496ef5d64994fa9932e9173f07c892d6ca2441136f871e8c1b86112560abb",
+    "stored_bytes": 553,
+    "stored_sha256": "f09d6fa83183dd3478a244ee75c31d1db6d2f6106c7d37eddfc0e7e1b86aca73"
+  },
+  "runs/B2/formal/B2-after-allocator-tiny-r2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/B2/formal/B2-after-allocator-tiny-r2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/B2/formal/B2-after-normal-large-r2-oracle.log.gz": {
+    "original_bytes": 301,
+    "original_path": "runs/B2/formal/B2-after-normal-large-r2-oracle.log",
+    "original_sha256": "8b2cfcc8e12d1702a01f7810916a5426c3655f0812c021550213ced6142127de",
+    "stored_bytes": 192,
+    "stored_sha256": "cd874b0fa7637d6d4a0978685c38129a97497c2dc29fa327b72a1f6b9f705fd3"
+  },
+  "runs/B2/formal/B2-after-normal-large-r2-resource.log.gz": {
+    "original_bytes": 1105,
+    "original_path": "runs/B2/formal/B2-after-normal-large-r2-resource.log",
+    "original_sha256": "baf87e926e9e7bd0d2c0247f9197a5c3baec63c2e2d596ab4abcd995bc3e4c3e",
+    "stored_bytes": 557,
+    "stored_sha256": "95d36eb03af6ddc47e5a2d5a393a1fe814da4a2167dfeada6ff560f77441cae2"
+  },
+  "runs/B2/formal/B2-after-normal-large-r2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/B2/formal/B2-after-normal-large-r2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/B2/formal/B2-after-normal-medium-r2-oracle.log.gz": {
+    "original_bytes": 303,
+    "original_path": "runs/B2/formal/B2-after-normal-medium-r2-oracle.log",
+    "original_sha256": "ad2b22ab07dfb53f2e297487ba4e55033b729fd2a6b0982a10f73f3d3922cbe8",
+    "stored_bytes": 194,
+    "stored_sha256": "0aced779ab785d0b39901be8d343db405992385300b7da9d0b169e2ad5618f25"
+  },
+  "runs/B2/formal/B2-after-normal-medium-r2-resource.log.gz": {
+    "original_bytes": 1107,
+    "original_path": "runs/B2/formal/B2-after-normal-medium-r2-resource.log",
+    "original_sha256": "0104a73de60c25bb0842b1ab3d5ce93dd87733daceb36028e9cb56042006d5c5",
+    "stored_bytes": 557,
+    "stored_sha256": "12d2d003cea6198578b338596c8098371f125bc5483f04d9433d10e7d8d8b605"
+  },
+  "runs/B2/formal/B2-after-normal-medium-r2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/B2/formal/B2-after-normal-medium-r2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "runs/B2/formal/B2-after-normal-tiny-r2-oracle.log.gz": {
+    "original_bytes": 299,
+    "original_path": "runs/B2/formal/B2-after-normal-tiny-r2-oracle.log",
+    "original_sha256": "29cdf413aa824b557bbe4e616ae7b07e8f3d3e4968816533ed2cba440d4887ed",
+    "stored_bytes": 192,
+    "stored_sha256": "e4a72e9a353247944e5a35877f960d74e96f16409ad085cc3639d42334b8afc4"
+  },
+  "runs/B2/formal/B2-after-normal-tiny-r2-resource.log.gz": {
+    "original_bytes": 1100,
+    "original_path": "runs/B2/formal/B2-after-normal-tiny-r2-resource.log",
+    "original_sha256": "db88e0affe06b17b48e44b11117138e775d3ce72d591579d6704022a5d3f0a92",
+    "stored_bytes": 553,
+    "stored_sha256": "0c4ad918245bac3cf5f3e2c7a0784243b2f65e98f523f46c5e180b302b8c6a29"
+  },
+  "runs/B2/formal/B2-after-normal-tiny-r2.log.gz": {
+    "original_bytes": 0,
+    "original_path": "runs/B2/formal/B2-after-normal-tiny-r2.log",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  }
+}

@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0440: fewer ODP namespace allocations
+
+[0440](changes/0440-odp-borrowed-attribute-namespaces.md) borrows cached XML
+namespace URIs from the reader. The owned append ABBA comparison retains 24
+reports/720 samples plus a fixed 120-sample large-normal confirmation and four
+selected profiles. Medium/large allocation calls fall 20.101%/20.163%, and
+requested bytes fall 6.322%/6.562% in both repeats. Peak and retained live bytes
+are unchanged. Main large R2 p95/p99 increase 8.353%/8.138%; neither additional
+confirmation pair reproduces those adverse tails. All timing/RSS repeat flags
+remain retained. No normal latency or RSS improvement is claimed. See the
+[measurements](results/change-0440/measurements.md) for scope and exclusions.
+
 ## Change 0439: existing ODP append lifecycle
 
 [0439](changes/0439-odp-existing-append-lifecycle.md) adds an opt-in owned

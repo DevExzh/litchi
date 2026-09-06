@@ -1,0 +1,14 @@
+{
+  "status": "pass",
+  "role": "before",
+  "file": "crates/litchi-odp/src/codec/parser/codec/xml/validation.rs",
+  "previous_sha256": "0cbf4993e1516a633c63bcce8136dc7265f4fd00583684f993312562bfc26e29",
+  "restored_sha256": "188d04ec1ee844a25468d1269f5184842b760fe58d35e18a9d59a1511c032f24",
+  "source_manifest": {
+    "path": "sources/8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6.json",
+    "sha256": "8c8326b20b02490db13feaa390ca827e649492d3e0f2cd6c310ed8f56cde95a6",
+    "files": 6657
+  },
+  "utc": "2026-09-06T15:24:01.340243+00:00",
+  "scope": "root-owned source switch between terminal CPU jobs for matched ABBA capture"
+}

@@ -1,0 +1,40 @@
+{
+  "change": 440,
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0440/pilot.py",
+    "--role",
+    "after"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "dd0681cf884163fc16953ac2a95e4da81ace5d46",
+  "driver_sha256": "6cb6d241c219d880a9746248d1331ed981ec5042ac439ce758d103cf55a2696d",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T15:21:30.845329+00:00",
+  "source_before": {
+    "path": "sources/67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1.json",
+    "sha256": "67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1",
+    "files": 6657
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T15:21:38.520447+00:00",
+  "source_after": {
+    "path": "sources/67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1.json",
+    "sha256": "67269cff70c1d9d10514a8a870973e40aa5abe491591e4f1b30458301e5031d1",
+    "files": 6657
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/candidate-pilots.log",
+    "bytes": 18,
+    "sha256": "6ebbd0a0e43e45c8cd4eb608495b9fb4d5b94216fc47e942667e88f0fd4d3866"
+  }
+}

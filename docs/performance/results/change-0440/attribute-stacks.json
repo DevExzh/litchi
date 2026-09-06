@@ -1,0 +1,29 @@
+{
+  "source": "change-0439/profiles/after/record/formal/perf-script.txt.gz",
+  "stored_sha256": "7734b95ff65b29ef93f2cdd23b25199ddb2bb81bb248584dcba08f5c928494b0",
+  "raw_sha256": "5ab2817ffad535e5d146b14d4653276b7d2ed886c802730aace35d50dab7a803",
+  "sample_count": 6850,
+  "sample_counts": {
+    "outside_runner": 1111,
+    "open_stack": 1397,
+    "transaction_stack": 1859,
+    "runner_other": 121,
+    "commit_stack": 2362
+  },
+  "sampled_period_sums": {
+    "outside_runner": 4611341965,
+    "open_stack": 6126951848,
+    "transaction_stack": 8171413940,
+    "runner_other": 531433641,
+    "commit_stack": 10369868418
+  },
+  "sampled_period_percent": {
+    "outside_runner": 15.46858692168076,
+    "open_stack": 20.552647785630136,
+    "transaction_stack": 27.410725069469848,
+    "runner_other": 1.7826757441342322,
+    "commit_stack": 34.785364479085025
+  },
+  "scope": "Exclusive observed call-chain groups within the existing-append runner, including warmups. Other runner stacks include untimed checks/destruction. Outside-runner samples include fixture setup. Missing or ambiguous frames remain outside named groups. These are sampled CPU attribution, not phase wall times or allocations.",
+  "diagnostics": "The retained perf script includes 13 addr2line warnings; no symbolization completeness claim."
+}
