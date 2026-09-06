@@ -728,3 +728,75 @@ evidence. Generic source-built or cross-format `DataFormat::Custom`
 compatibility and private attached Pages/Keynote table adapters remain
 host-owned; broader Custom-format authoring and monolith exit gates remain
 open.
+
+## Keynote slide-media replacement baseline and assets (2026-09-06)
+
+[`keynote/media-replacement-native.key`](keynote/media-replacement-native.key)
+is a native Keynote 14.4 source for the focused existing slide-media data
+owner. The closed artifact is 752,060 bytes with SHA-256
+`f5763984974612f078486cb2310f408cbcb7cd06ef6adca494aae19eaf62609d`.
+Computer Use saved it, actually closed the document, and reopened the exact
+path without an error. The selected slide retains the title
+`Keynote media replacement native` and body marker
+`Media ownership marker — 北区`. Its source-order media are Audio, Audio,
+File, File.
+
+The two audio controls share one 192,044-byte WAV materialized record (the
+source record is SHA-256
+`8cee734c146cbe9dbbd961a44aa577eaaa4170dab46de0bf60eb8d3f1cb46c70`)
+and the two file movies share one 34,651-byte self-authored MJPEG MOV record
+and one 4,408-byte native poster record. The MOV SHA-256 is
+`470ea8ba876c8ee4f7d50fda3e482b0ee5da7211be5eab52f37809b7f5c2e7dc`; the
+poster SHA-256 is
+`5b38397c34eb2e9cf810f7269306b17da3ec6298f8c1b2e9f20eab65fc56a6d5`.
+Both movie captions are `Shared native movie caption`, and their 320×180
+frames are positioned at (200,700) and (700,700). Native playback retains a
+0–2 second trim, volume 1, loop disabled, start on click, and play across
+slides.
+
+The replacement inputs are locally authored and checked in under
+[`keynote/media-replacement-assets/`](keynote/media-replacement-assets/):
+
+| Asset | Bytes | SHA-256 | Role |
+| --- | ---: | --- | --- |
+| [`striped.mov`](keynote/media-replacement-assets/striped.mov) | 87,997 | `e4b92ec504d372e2330b37d4dcd0441d2990096f41f880343795c45508a0c997` | File-movie content candidate |
+| [`tone.wav`](keynote/media-replacement-assets/tone.wav) | 192,044 | `27f1b6add1bd884455da7a36244d92fc26b81b622ce1671d5cb77bebffeb135a` | Audio content candidate |
+| [`poster.png`](keynote/media-replacement-assets/poster.png) | 1,698 | `d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8` | Movie poster candidate |
+
+The MOV was authored locally from CoreGraphics/ImageIO JPEG frames and
+QuickTime atoms, the WAV is local PCM, and the poster is local PNG. No vendor
+video resource is retained in this baseline or replacement set.
+
+The combined pre-native candidate applied `tone.wav` to audio position 0,
+`striped.mov` to file-movie content position 2, and `poster.png` to that
+movie's poster. It is 742,670 bytes with SHA-256
+`3d6cae99029d0e32ed090576b3a1df3a73885e75066975c234157467a22af600`.
+The shared audio and movie records remained shared across their two source
+occurrences, and all three selected ZIP payloads matched the replacement
+assets byte-for-byte.
+
+Keynote 14.4 opened the candidate without repair or error. After playback, the
+body marker was changed to `Saved media ownership marker — 北区`; native save,
+actual close, and exact-path reopen succeeded. The native-resaved artifact is
+[`keynote/media-replacement-retirement-resaved.key`](keynote/media-replacement-retirement-resaved.key),
+807,293 bytes with SHA-256
+`31524a79cdb6e5c421fd59953225490f4f0a51bf15d879ad84676dc57dbdc152`.
+All four media objects, both shared captions, both 320×180 movie geometries,
+and the 0–2 second, volume-1, loop-off, click-start, across-slides playback
+settings survived without repair or error.
+
+Keynote displayed the video-derived first frame for the replacement movie.
+The arbitrary `poster.png` bytes were retained byte-for-byte as the selected
+poster record, so this verifies poster storage and metadata preservation rather
+than a visual match for an arbitrary PNG preview. Strict Litchi reread of the
+native-resaved artifact passed six shared-record reads and six exact no-op
+writes, establishing operation-specific E4 for the three replacement paths.
+The focused suite reports 21 owner cases plus 2 budget cases (23 total), while
+neutral metadata validation reports 15 module and 18 integration cases (33
+total); full boundary verification reports 933 policy units across 64 crates,
+238 internal edges, and 11 explicit debt items. A bounded 256-run ASAN smoke
+passed with harness assertions covering all three changed paths and their exact
+inverses; this is bounded E1 fuzz evidence, not exhaustive coverage. Workspace
+hooks remain a separate pending check. The separate caption mutation owner
+refuses this profile, so this record does not claim native geometry or caption
+mutation parity.

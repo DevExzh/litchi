@@ -17082,3 +17082,121 @@ monolithic `litchi-iwa` exit gates; no workspace package, dependency edge,
 ordered debt, migration-host count, or ADR 0028 deletion gate changes here.
 
 Validation for this retirement passes 37 focused Custom integration tests (19 owner, 7 native Number, 6 native Text, and 5 native Date & Time), 28 host tests filtered by `custom`, and the additional source-built/reopened cross-family compatibility regression. That regression covers admitted mutations and byte-exact refusal of numeric-to-Text conversion. The boundary suite passes 927 tests; the scanner reports 64 workspace packages, 238 internal dependency declarations, and 11 explicit debt items.
+
+## 2026-09-06 follow-up: bounded Keynote slide-media data ownership and native baseline
+
+The focused Keynote package now owns a selector-first transaction for the
+materialized content of an existing slide movie/audio drawable and the poster
+of an existing file movie. `Package::slide_media_data` returns borrowed bytes;
+`edit_slide_media_data` stages a bounded replacement selected by
+`SlideSelector`, source-order `MovieSelector`, and `MediaPart`; and
+`apply_slide_media_data` replays an exact-source patch or inverse. Native
+object IDs, `DataInfo` identifiers, component paths, and ZIP member names stay
+inside the package owner.
+
+The owner resolves and validates the rooted slide-to-drawable-to-movie graph,
+the selected media closure, component ownership, and the selected
+`PackageMetadata` record before any rewrite. Its neutral Buffa metadata codec
+checks the old SHA-1 and materialized-length witnesses before allocation, then
+changes only the selected materialized member plus the matching digest and
+length fields. Shared content or poster records are replaced once, so every
+selected drawable that refers to the same record observes the replacement;
+the transaction does not create a copy-on-write asset. Captions, title,
+geometry, playback, graph references, unknown fields, and unrelated ZIP
+members remain source-authoritative. Changed writes invalidate only the
+focused root previews according to the existing rendering policy, and the
+reopened candidate must reproduce the selected bytes and preview disposition.
+
+Empty input, bounded-size violations, known media-family changes, malformed
+or multiply owned closures, stale source witnesses, and patch identity
+conflicts fail before publication. Unknown media signatures remain eligible
+for the physical replacement path when the graph and metadata closure are
+otherwise proven; the focused owner does not claim media decoding. Exact
+no-ops retain the original artifact, inverse patches restore the source, and
+operation-local limits cover archive input/output, selected entries, media
+bytes, references, wire fields/depth/work, and semantic allocation.
+
+The three narrow raw-ID Keynote host conveniences
+`replace_slide_movie_data`, `replace_slide_movie_poster`, and
+`replace_slide_audio_data` are removed. The generic host `replace_media`
+route remains for the broader compatibility and asset lifecycle surface.
+Creation, duplication, removal, drawable properties, and generic media asset
+insertion/deletion remain host-owned until their own focused owners and native
+gates are complete. This is a bounded ownership advance, not completion of
+ADR 0028's monolith deletion gate.
+
+Computer Use established the checked-in native baseline
+[`media-replacement-native.key`](../../test-data/iwork/keynote/media-replacement-native.key)
+with Keynote 14.4. The closed artifact is 752,060 bytes with SHA-256
+`f5763984974612f078486cb2310f408cbcb7cd06ef6adca494aae19eaf62609d`.
+The slide's source-order media are Audio, Audio, File, File. Both audio
+controls share the 192,044-byte WAV record (DataInfo 9075, SHA-256
+`8cee734c146cbe9dbbd961a44aa577eaaa4170dab46de0bf60eb8d3f1cb46c70`). Both
+file movies share the 34,651-byte self-authored MJPEG MOV record (DataInfo
+9085, SHA-256
+`470ea8ba876c8ee4f7d50fda3e482b0ee5da7211be5eab52f37809b7f5c2e7dc`) and its
+4,408-byte native poster record (DataInfo 9086, SHA-256
+`5b38397c34eb2e9cf810f7269306b17da3ec6298f8c1b2e9f20eab65fc56a6d5`). The
+source was saved, actually closed, and reopened from the exact path without an
+error. It retains the title `Keynote media replacement native`, body marker
+`Media ownership marker — 北区`, shared movie caption `Shared native movie
+caption`, and movie geometry 320×180 at (200,700) and (700,700). Native
+playback controls retain a 0–2 second trim, volume 1, loop disabled, start on
+click, and play across slides.
+
+Replacement assets are checked in under
+[`test-data/iwork/keynote/media-replacement-assets/`](../../test-data/iwork/keynote/media-replacement-assets/):
+the locally authored `striped.mov` is 87,997 bytes with SHA-256
+`e4b92ec504d372e2330b37d4dcd0441d2990096f41f880343795c45508a0c997`,
+`tone.wav` is 192,044 bytes with SHA-256
+`27f1b6add1bd884455da7a36244d92fc26b81b622ce1671d5cb77bebffeb135a`, and
+`poster.png` is 1,698 bytes with SHA-256
+`d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8`.
+The MOV uses locally authored CoreGraphics/ImageIO JPEG frames and QuickTime
+atoms; the WAV is local PCM; and the poster is local PNG. No vendor video
+resource is part of this replacement asset set or the checked-in baseline.
+
+The combined pre-native candidate applies three source-bound replacements:
+audio content at media position 0 uses `tone.wav`, file-movie content at media
+position 2 uses `striped.mov`, and the same file movie's poster uses
+`poster.png`. Its size is 742,670 bytes with SHA-256
+`3d6cae99029d0e32ed090576b3a1df3a73885e75066975c234157467a22af600`.
+The shared audio record is visible through both audio controls and the shared
+movie content and poster records are visible through both file movies. The
+three selected ZIP payloads equal the checked-in replacement assets byte for
+byte and retain their documented SHA-256 values.
+
+Keynote 14.4 opened that candidate without a repair or error. The candidate
+was then played and the body marker was changed to
+`Saved media ownership marker — 北区`; native save, actual close, and
+exact-path reopen succeeded. The native-resaved artifact is
+[`media-replacement-retirement-resaved.key`](../../test-data/iwork/keynote/media-replacement-retirement-resaved.key),
+807,293 bytes with SHA-256
+`31524a79cdb6e5c421fd59953225490f4f0a51bf15d879ad84676dc57dbdc152`.
+After reopen, all four media objects remained present, both shared captions
+remained `Shared native movie caption`, both movie geometries remained 320×180
+at (200,700) and (700,700), and the audio/movie controls retained start 0,
+end 2 seconds, volume 1, loop disabled, start-on-click, and play-across-slides
+settings. No repair UI or native error was observed.
+
+The native application displayed the video-derived first frame for the
+replacement movie. The arbitrary `poster.png` bytes were nevertheless retained
+as the selected poster record and match the replacement asset exactly; this
+gate therefore certifies poster storage and metadata preservation, not that
+Keynote renders an arbitrary replacement PNG as its visible poster preview.
+
+This establishes operation-specific E4 evidence for the three selected
+replacement paths: native Keynote save/actual-close/exact-reopen followed by
+strict Litchi reread passed six shared-record reads and six exact no-op writes
+on the native-resaved artifact. Focused validation passes 21 owner cases plus
+2 budget cases (23 total); neutral metadata validation passes 15 module and
+18 integration cases (33 total); and full boundary verification passes 933
+policy units across 64 crates, 238 internal edges, and 11 explicit debt items.
+A bounded 256-run ASAN smoke passed with harness assertions covering all three
+changed paths and their exact inverses; this is bounded E1 fuzz evidence, not
+exhaustive coverage. Workspace hooks remain a separate pending check and are
+not included in this E4 claim. This does not promote native geometry or caption
+mutation parity:
+the separate caption mutation owner refuses this profile. The three-wrapper
+host cutover remains bounded to these content/poster paths; generic
+`replace_media` and broad media lifecycle remain host-owned.

@@ -348,6 +348,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "keynote_slide_media_data"
+path = "fuzz_targets/keynote_slide_media_data.rs"
+test = false
+doc = false
+bench = false
+
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi = { path = "..", default-features = false, features = ["iwork"] }
@@ -357,6 +364,7 @@ litchi-iwa-core = { path = "../../litchi-iwa-core" }
 litchi-iwa-protos = { path = "../../litchi-iwa-protos" }
 litchi-numbers-wire = { path = "../../litchi-numbers-wire" }
 prost = "0.14"
+sha1 = "0.11"
 
 [profile.release]
 debug = 1

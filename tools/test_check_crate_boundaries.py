@@ -3277,6 +3277,146 @@ def add_keynote_movie_geometry_completion_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_slide_media_data_canonical_scaffold(root: Path) -> None:
+    """Create the focused selector-first slide-media replacement fixture."""
+
+    owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "mod budget;\n"
+        "mod closure;\n"
+        "use budget::MediaBudget;\n"
+        "pub enum MediaPart { Content, Poster }\n"
+        "pub type SlideMediaData<'a> = &'a [u8];\n"
+        + "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CANONICAL_TYPES
+        )
+        + "fn select_media() {}\n"
+        + "fn strict_media_metadata_closure() { keynote_media_codec; package_metadata_media_codec; DataInfo; digest; materialized_length; owner; }\n"
+        + "fn bounded_candidate_publication() { WireLimits; preflight; candidate; reopen; Verification; locality; }\n"
+        + "fn exact_reversible_artifacts() { ExactArtifacts; PatchConflict; inverse; source_fingerprint; }\n"
+        + "fn invalidate_previews() { preview; deleted_previews; root_previews_absent; }\n"
+        + "fn select_media(budget: &mut MediaBudget) { let _ = budget; }\n"
+        + "fn read_selected_media(budget: &mut MediaBudget) { let _ = budget; }\n"
+        + "fn validate_media_closure(budget: &mut MediaBudget) { validate_selected_media_closure(budget); }\n"
+        + "fn rewrite_metadata_entry(budget: &mut MediaBudget) { let prepared = prepare_package_metadata_media_rewrite(); let requirements = prepared.execution_requirements(); budget.metadata_requirements(requirements); let output = prepared.execute(requirements); let _ = output; }\n"
+        + "fn rewrite_media(budget: &mut MediaBudget) { rewrite_metadata_entry(budget); }\n"
+        + "fn commit_edit(budget: &mut MediaBudget) { rewrite_media(budget); }\n"
+        + "impl Package {\n"
+        + "    pub fn slide_media_data<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, part: MediaPart) -> Result<SlideMediaData<'_>, SlideMediaDataError> { let mut budget = MediaBudget::for_package(self)?; select_media(&mut budget); read_selected_media(&mut budget); let _ = (slide, movie, part); todo!() }\n"
+        + "    pub fn edit_slide_media_data<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, part: MediaPart) -> Result<SlideMediaDataEdit<'_>, SlideMediaDataError> { let mut budget = MediaBudget::for_package(self)?; SlideMediaDataEdit::new(&mut budget); let _ = (slide, movie, part); todo!() }\n"
+        + "    pub fn apply_slide_media_data(&self, patch: &SlideMediaDataPatch) -> Result<SlideMediaDataCommit, SlideMediaDataError> { let mut budget = MediaBudget::for_package(self)?; select_media(&mut budget); read_selected_media(&mut budget); let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideMediaDataEdit {\n"
+        + "    pub const fn before(&self) -> &[u8] { &[] }\n"
+        + "    pub const fn after(&self) -> Option<&[u8]> { None }\n"
+        + "    pub const fn part(&self) -> MediaPart { MediaPart::Content }\n"
+        + "    pub fn set(self, replacement: &[u8]) -> Result<Self, SlideMediaDataError> { let mut budget = MediaBudget::for_package(self.source)?; budget.entry_bytes(replacement.len()); let _ = replacement; Ok(self) }\n"
+        + "    pub fn commit(self) -> Result<SlideMediaDataCommit, SlideMediaDataError> { let mut budget = MediaBudget::for_package(self.source)?; commit_edit(&mut budget); todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+
+    budget = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_SOURCE
+    budget.parent.mkdir(parents=True, exist_ok=True)
+    budget.write_text(
+        "pub(super) struct MediaBudget;\n"
+        "impl MediaBudget {\n"
+        "    pub(super) fn for_package(package: &Package) -> Result<Self, Error> { let _ = package; todo!() }\n"
+        "    fn charges() {\n"
+        + "        "
+        + "; ".join(
+            f"SlideMediaDataLimitKind::{variant}"
+            for variant in sorted(boundaries.KEYNOTE_SLIDE_MEDIA_DATA_LIMIT_VARIANTS)
+        )
+        + ";\n"
+        "}\n}\n",
+        encoding="utf-8",
+    )
+    closure = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE
+    closure.parent.mkdir(parents=True, exist_ok=True)
+    closure.write_text(
+        "pub(super) fn validate_selected_media_closure(\n"
+        "    budget: &mut MediaBudget,\n"
+        ") -> Result<(), Error> { let _ = budget; Ok(()) }\n",
+        encoding="utf-8",
+    )
+
+    package = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES[0]
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text(
+        "mod slide_media_replacement;\n"
+        "pub use slide_media_replacement::{"
+        + ", ".join(
+            sorted(
+                boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CANONICAL_TYPES
+                | boundaries.KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_TYPES
+            )
+        )
+        + "};\n",
+        encoding="utf-8",
+    )
+    library = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES[1]
+    library.parent.mkdir(parents=True, exist_ok=True)
+    library.write_text(
+        "pub use package::{"
+        + ", ".join(
+            sorted(
+                boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CANONICAL_TYPES
+                | boundaries.KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_TYPES
+            )
+        )
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::movie::MovieSelector;\n",
+        encoding="utf-8",
+    )
+    semantic = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub enum MediaPart { Content, Poster }\n"
+        "pub type SlideMediaData<'a> = &'a [u8];\n",
+        encoding="utf-8",
+    )
+
+    keynote_codec = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES[0]
+    keynote_codec.parent.mkdir(parents=True, exist_ok=True)
+    keynote_codec.write_text(
+        "pub struct DecodeOptions;\n"
+        "pub struct DecodeReport;\n"
+        "pub struct DataReferenceSnapshot;\n"
+        "pub fn decode_data_reference() {}\n"
+        "pub fn decode_data_reference_with_report() {}\n"
+        "struct DataReferenceLazyView;\n"
+        "fn decode_lazy_view() {}\n"
+        "// private Buffa lazy ingress; unknown fields; max_message_bytes; max_fields; max_work_bytes; try_reserve\n",
+        encoding="utf-8",
+    )
+    metadata_codec = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES[1]
+    metadata_codec.parent.mkdir(parents=True, exist_ok=True)
+    metadata_codec.write_text(
+        "pub struct MediaRewriteBatch;\n"
+        "pub struct DataInfoContentReplacement;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub fn visit_package_metadata_media() {}\n"
+        "pub fn prepare_package_metadata_media_rewrite() {}\n"
+        "pub fn rewrite_package_metadata_media() {}\n"
+        "fn decode_lazy_view() {}\n"
+        "struct PackageMetadataMedia;\n"
+        "fn prepared_rewrite() { unknown; raw; extend_from_slice; }\n"
+        "fn bounded_resources() { max_message_bytes; max_fields; max_work_bytes; try_reserve; }\n",
+        encoding="utf-8",
+    )
+    proto_lib = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CODEC_PUBLIC_SOURCE
+    proto_lib.parent.mkdir(parents=True, exist_ok=True)
+    proto_lib.write_text(
+        "pub mod keynote_media_codec;\n"
+        "pub mod package_metadata_media_codec;\n",
+        encoding="utf-8",
+    )
+
+
 def add_keynote_chart_axis_title_canonical_scaffold(root: Path) -> None:
     """Install a complete Wave112 axis-title boundary fixture."""
 
@@ -18466,6 +18606,200 @@ fn rewrite_movie_title_operation(
             "+ audit_keynote_movie_geometry_facade_source_topology()",
             "+ audit_keynote_movie_geometry_resource_source_topology()",
             "+ audit_keynote_movie_geometry_completion_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_slide_media_data_audits_are_dormant_until_owner_activation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            audits = (
+                boundaries.audit_keynote_slide_media_data_facade_source_topology,
+                boundaries.audit_keynote_slide_media_data_codec_source_topology,
+                boundaries.audit_keynote_slide_media_data_resource_source_topology,
+                boundaries.audit_keynote_slide_media_data_transaction_source_topology,
+                boundaries.audit_iwa_keynote_slide_media_data_source_topology,
+            )
+            for audit in audits:
+                self.assertEqual(audit(root), [])
+
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            for audit in audits:
+                self.assertEqual(audit(root), [], audit.__name__)
+
+    def test_keynote_slide_media_data_facade_rejects_physical_ids_and_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_media(bytes: &[u8], movie_id: u64, archive: Archive, wire: WireView) { let _ = (bytes, movie_id, archive, wire); }\n"
+                + "#[cfg(test)]\npub fn decoy(movie_id: u64) {}\n"
+                + "pub use self::SlideMediaDataEdit as MediaDataEdit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("wire type" in item for item in violations), violations)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_slide_media_data_transaction_requires_one_budget_and_prepared_closure(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_transaction_source_topology(root),
+                [],
+            )
+
+            owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE
+            owner_source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                owner_source.replace("MediaBudget::for_package(self)?;", "budget_placeholder;", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("(slide_media_data)" in item for item in violations), violations
+            )
+
+            owner_source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                owner_source
+                + "fn reset_helper(budget: &mut MediaBudget) { let mut nested = MediaBudget::for_package(package)?; let _ = (budget, nested); }\n"
+                + "fn reset_decode() { DecodeOptions::for_source(payload); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("must not reset" in item for item in violations), violations)
+            self.assertTrue(any("must not reset codec limits" in item for item in violations), violations)
+
+            closure = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE
+            closure.write_text(
+                closure.read_text(encoding="utf-8").replace("&mut MediaBudget", "&MediaBudget"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("closure helper must thread" in item for item in violations), violations)
+
+            owner_source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                owner_source.replace("prepare_package_metadata_media_rewrite", "removed_metadata_rewrite"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("must prepare metadata rewrite" in item for item in violations), violations)
+
+    def test_keynote_slide_media_data_codecs_and_owner_require_lazy_bounded_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_codec_source_topology(root), []
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_resource_source_topology(root),
+                [],
+            )
+
+            metadata = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES[1]
+            metadata_source = metadata.read_text(encoding="utf-8")
+            for marker in ("max_message_bytes", "max_fields", "max_work_bytes", "try_reserve"):
+                metadata_source = metadata_source.replace(marker, "")
+            metadata.write_text(metadata_source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_data_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("finite media resource accounting" in item for item in violations),
+                violations,
+            )
+
+            owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE
+            owner_source = owner.read_text(encoding="utf-8")
+            for marker in boundaries.KEYNOTE_SLIDE_MEDIA_DATA_OWNER_MARKER_GROUPS[
+                "preview invalidation"
+            ]:
+                owner_source = owner_source.replace(marker, "")
+            owner.write_text(owner_source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_data_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("preview invalidation" in item for item in violations), violations)
+
+    def test_keynote_slide_media_data_host_retires_only_raw_wrappers_and_calls(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            host = root / "crates/litchi-iwa/src/keynote/editor.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn replace_slide_movie_data(&mut self, slide_index: usize, movie_id: u64, data: &[u8]) {}\n"
+                "    pub fn replace_slide_movie_poster(&mut self, slide_index: usize, movie_id: u64, data: &[u8]) {}\n"
+                "    pub fn replace_slide_audio_data(&mut self, slide_index: usize, audio_id: u64, data: &[u8]) {}\n"
+                "    pub fn replace_media(&mut self, data: &[u8]) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_media_data_source_topology(root)
+            for method in boundaries.IWA_KEYNOTE_SLIDE_MEDIA_DATA_RETIRED_METHODS:
+                self.assertTrue(any(method in item for item in violations), violations)
+            self.assertFalse(any("replace_media" in item for item in violations), violations)
+
+            host.write_text(
+                "fn keep_generic() { editor.replace_media(bytes); }\n",
+                encoding="utf-8",
+            )
+            stale_call = root / "crates/litchi-iwa/src/keynote/editor/media.rs"
+            stale_call.parent.mkdir(parents=True, exist_ok=True)
+            stale_call.write_text(
+                "fn stale() { editor.replace_slide_audio_data(slide, audio, data); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_media_data_source_topology(root)
+            self.assertTrue(any("replace_slide_audio_data" in item for item in violations), violations)
+
+            stale_call.write_text(
+                "#[cfg(test)]\nfn decoy() { editor.replace_slide_movie_data(slide, movie, data); }\n"
+                "// editor.replace_slide_movie_poster(slide, movie, data)\n"
+                "fn keep_generic() { editor.replace_media(bytes); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_media_data_source_topology(root), []
+            )
+
+    def test_keynote_slide_media_data_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_iwa_keynote_slide_media_data_source_topology()",
+            "+ audit_keynote_slide_media_data_facade_source_topology()",
+            "+ audit_keynote_slide_media_data_codec_source_topology()",
+            "+ audit_keynote_slide_media_data_resource_source_topology()",
+            "+ audit_keynote_slide_media_data_transaction_source_topology()",
         ):
             self.assertIn(expression, main_source)
 

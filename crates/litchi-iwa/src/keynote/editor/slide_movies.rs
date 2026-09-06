@@ -295,41 +295,6 @@ impl KeynoteEditor {
         Ok(())
     }
 
-    /// Replace the video bytes referenced by one ordinary slide movie.
-    ///
-    /// Keynote duplicates share their media identifiers, so every movie sharing
-    /// this identifier observes the replacement, matching native Keynote behavior.
-    pub fn replace_slide_movie_data(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        replacement: &[u8],
-    ) -> Result<Vec<u8>> {
-        let source = self.require_file_movie(slide_index, drawable_object_id)?;
-        let identifier = source.info.movie_data_identifier.ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Keynote movie {drawable_object_id} has no materialized video data"
-            ))
-        })?;
-        self.replace_media(identifier, replacement)
-    }
-
-    /// Replace the poster image referenced by one ordinary slide movie.
-    pub fn replace_slide_movie_poster(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        replacement: &[u8],
-    ) -> Result<Vec<u8>> {
-        let source = self.require_file_movie(slide_index, drawable_object_id)?;
-        let identifier = source.info.poster_image_data_identifier.ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Keynote movie {drawable_object_id} has no materialized poster image"
-            ))
-        })?;
-        self.replace_media(identifier, replacement)
-    }
-
     /// Duplicate an ordinary file-backed movie using native shared-asset semantics.
     ///
     /// The movie, stand-in title/caption objects, and automatic playback builds
@@ -1190,13 +1155,13 @@ mod tests {
         let source_geometry = editor.slide_movies(0).unwrap()[0].geometry;
         assert_eq!(
             editor
-                .replace_slide_movie_data(0, created.drawable_object_id, REPLACEMENT_MOVIE)
+                .replace_media(movie_data_identifier, REPLACEMENT_MOVIE)
                 .unwrap(),
             MOVIE
         );
         assert_eq!(
             editor
-                .replace_slide_movie_poster(0, created.drawable_object_id, REPLACEMENT_POSTER)
+                .replace_media(poster_data_identifier, REPLACEMENT_POSTER)
                 .unwrap(),
             POSTER
         );

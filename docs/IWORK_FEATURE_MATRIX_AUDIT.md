@@ -1,7 +1,8 @@
 # iWork Feature-Matrix Audit
 
 > Source audit starting at committed `d33f30f41` (2026-09-01) and including the focused
-> Scientific-, Fraction-, Text-, Date & Time-, Duration-, and Custom-format owner work, the current Keynote physical `Sort Now` owner
+> Scientific-, Fraction-, Text-, Date & Time-, Duration-, and Custom-format owner work, the current Keynote physical `Sort Now` owner,
+> and the bounded Keynote existing slide-media content/poster owner
 > work, and the bounded Pages body-table hidden-axis owner work from that baseline. This document records the rationale and cross-suite gaps behind the three
 > authoritative app matrices and does not replace them.
 
@@ -230,9 +231,10 @@ Primary references: [focused hidden-axis package owner](../crates/litchi-pages/s
 | Physical table row sorting (“Sort Now”) | 🟡 | 🟡 | 🟡 | Selector-first `Package::{execute_slide_table_sort_order,execute_slide_table_sort_order_to_rows}` over existing tables; no public row/value reader. Admission is limited to the canonical type-6001 table-model route and explicitly proven tile, data-list, header, UID, and empty pre-BNC sentinel shapes. Scalar text/number/boolean/date/duration keys use Rust lexical text ordering, `f64::total_cmp`-based deterministic ordering for numeric-like values, ordinary boolean ordering, and stable source-row ordering for duplicates. Body-relative ranges isolate headers/footers; admitted tile-row envelopes, sparse row headers, and UID mappings move together. Strict wire preflight precedes borrowed lazy Buffa views; formula/error, rich-text, comment, merge, filter/group/category/pivot/spill/conditional, hidden/non-positional, imported/provenance, non-empty stroke, cross-tile/cross-bucket, unknown mutable, and other unproven row-affine dependencies fail closed atomically. Exact-source patch/inverse, candidate reopen/readback, locality, and preview invalidation are source-level contracts. A disposable Computer Use run opened a pre-hardening candidate in Keynote 14.4, but the current strict owner rejects that app-authored source because it contains unproven model field 39; the run is external exploratory evidence rather than current-owner E3/E4 promotion. The checked-in native fixture has no table and the checked-in evidence test records hashes without launching Keynote, so native acceptance remains pending ([owner](../crates/litchi-keynote/src/package/slide_table_physical_sort.rs#L1), [semantic surface](../crates/litchi-keynote/src/slide/table/physical_sort.rs#L1), [tests](../crates/litchi-keynote/tests/slide_table_physical_sort.rs#L1), [ADR 0008](adr/0008-migration-and-verification.md#2026-09-02-amendment-keynote-physical-sort-now-evidence-status)) |
 | Table cells/formulas/formats/comments/topology | ❌ | ❌ | ❌ | No public focused cell model or general structural table owner; physical row sorting above is not cell CRUD |
 | Charts | 🟡 | 🟡 | 🟡 | Catalog/title/caption/axis-title/primary value-axis settings only; no data, series, type, legend, styles, or CRUD |
-| Movies and soundtrack settings/order | 🟡 | 🟡 | 🟡 | Existing metadata, geometry, playback, title/caption, settings/order; item lifecycle is tracked separately and current soundtrack-order tests remain a distinct verification concern |
+| Movies and soundtrack settings/order | 🟡 | 🟡 | 🟡 | Existing metadata, geometry, playback, title/caption, settings/order, and bounded media-data access/replacement; item lifecycle is tracked separately and current soundtrack-order tests remain a distinct verification concern |
 | Soundtrack audio item lifecycle | 🟡 | ✅ | 🟡 | The focused `soundtrack::items` owner provides bounded read/add/insert/replace/remove with opaque source-bound handles. Focused lifecycle, closure, malformed-reference, aggregate-only, exact apply/inverse, conflict, and fuzz gates pass, and the duplicate legacy item API is retired behind a boundary ratchet. One genuine replacement candidate passed Keynote save/close/reopen without repair; operation-wide native certification, soundtrack creation, general media-asset CRUD, and every whole-monolith deletion gate remain open. |
-| Image/audio/movie bytes and asset CRUD | ❌ | ❌ | ❌ | Detached option values do not constitute package media support |
+| Existing slide-media content and movie posters | 🟡 | ✅ | 🟡 | Selector-first `Package::{slide_media_data, edit_slide_media_data, apply_slide_media_data}` reads borrowed bytes and replaces content for an existing movie/audio drawable or the poster of an existing file movie. Rooted ownership, strict SHA-1/length witnesses, shared-record propagation, finite limits, exact no-op/inverse/stale-patch behavior, candidate reread, locality, and preview invalidation are source-level contracts; native IDs, `DataInfo` records, and ZIP paths remain private. The checked-in [`media-replacement-native.key`](../test-data/iwork/keynote/media-replacement-native.key) is a 752,060-byte Keynote 14.4 Audio/Audio/File/File baseline (SHA-256 `f5763984974612f078486cb2310f408cbcb7cd06ef6adca494aae19eaf62609d`) reopened without error. The combined content/poster candidate opened without repair and survived native save/actual-close/exact-reopen with all four objects and exact replacement payloads intact. Strict reread of the native-resaved artifact passed six shared-record reads and six exact no-op writes, establishing operation-specific E4; the poster result certifies byte-preserved storage/metadata, not an arbitrary visual preview match. A bounded 256-run ASAN smoke passed with harness assertions covering all three changed paths and exact inverses; this is bounded E1 fuzz evidence, not exhaustive coverage. |
+| Generic image/audio/movie bytes and asset CRUD | ❌ | ❌ | ❌ | The focused owner above replaces selected existing records only. General insertion, duplication, removal, drawable properties, resource lifecycle, and media decoding remain outside the focused package owner; detached option values do not constitute generic package media support |
 | Builds/animations | 🟡 | 🟡 | ❌ | Reduced build/effect summaries; unknown effects preserved, no edit transaction |
 | Shapes/groups/lines/z-order | ❌ | ❌ | ❌ | No focused semantic/package surface |
 | Masters/themes/layouts/guides | ❌ | ❌ | ❌ | No focused semantic/package surface |
@@ -247,6 +249,21 @@ table. A separate checked-in [`table-discovery.key`](../test-data/iwork/keynote/
 sample contains a native Plain 5-by-4 table for the bounded migration-host
 name/dimension discovery regression. It does not promote physical sorting,
 Litchi table mutation, native byte parity, or broader table support.
+
+The separate [`media-replacement-native.key`](../test-data/iwork/keynote/media-replacement-native.key)
+fixture covers the focused existing slide-media owner. It is a native Keynote
+14.4 Audio/Audio/File/File source with shared audio and movie records, a
+752,060-byte closed artifact, and SHA-256
+`f5763984974612f078486cb2310f408cbcb7cd06ef6adca494aae19eaf62609d`. It was
+saved, actually closed, and reopened from the exact path without error. The
+combined replacement candidate opened without repair and survived native
+save/actual-close/exact-reopen with all four objects and exact replacement
+payloads intact. Strict post-native reread passed six shared-record reads and
+six exact no-op writes, establishing operation-specific E4; the poster result
+certifies byte-preserved storage/metadata, not an arbitrary visual preview
+match. A bounded 256-run ASAN smoke passed with harness assertions covering all
+three changed paths and exact inverses; this is bounded E1 fuzz evidence, not
+exhaustive coverage. The focused owner does not claim general media asset CRUD.
 
 ## Numbers focused owner
 

@@ -2626,6 +2626,306 @@ IWA_KEYNOTE_MOVIE_GEOMETRY_EXAMPLES = (
     Path("crates/litchi-iwa/examples/edit_keynote_movie_geometry.rs"),
 )
 
+# Wave122 moves replacement of already-materialized Keynote slide movie/audio
+# data into one selector-first package owner.  The owner deliberately covers
+# the shared media payload edge (movie content, movie poster, and audio
+# content) without owning movie/audio creation, duplication, deletion,
+# playback, geometry, title/caption, or generic ``KeynoteEditor::replace_media``
+# compatibility.  Keep this inventory independent from the playback and
+# geometry ratchets: a payload replacement must prove both the nested
+# ``TSP.DataReference`` edge and the PackageMetadata digest/length closure.
+KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_media_replacement.rs"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "media.rs"
+KEYNOTE_SLIDE_MEDIA_DATA_PACKAGE_MODULE = re.compile(
+    r"(?m)^[ \t]*mod[ \t]+(?:r#)?slide_media_replacement\s*;"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_PUBLIC_MODULE = re.compile(
+    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?:r#)?slide_media_replacement\b"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_CANONICAL_TYPES = frozenset(
+    {
+        "SlideMediaDataCommit",
+        "SlideMediaDataDiagnostics",
+        "SlideMediaDataEdit",
+        "SlideMediaDataError",
+        "SlideMediaDataLimitKind",
+        "SlideMediaDataPatch",
+    }
+)
+KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_TYPES = frozenset(
+    {"MediaPart", "SlideMediaData"}
+)
+KEYNOTE_SLIDE_MEDIA_DATA_SELECTOR_TYPES = frozenset(
+    {"SlideSelector", "MovieSelector"}
+)
+KEYNOTE_SLIDE_MEDIA_DATA_PACKAGE_METHODS = frozenset(
+    {
+        "slide_media_data",
+        "edit_slide_media_data",
+        "apply_slide_media_data",
+    }
+)
+KEYNOTE_SLIDE_MEDIA_DATA_EDIT_METHODS = frozenset(
+    {"before", "after", "part", "set", "commit"}
+)
+KEYNOTE_SLIDE_MEDIA_DATA_FLAT_ALIASES = frozenset(
+    {
+        "MediaData",
+        "MediaDataCommit",
+        "MediaDataDiagnostics",
+        "MediaDataEdit",
+        "MediaDataError",
+        "MediaDataLimitKind",
+        "MediaDataPatch",
+        "SlideMediaReplacement",
+        "SlideMediaReplacementCommit",
+        "SlideMediaReplacementDiagnostics",
+        "SlideMediaReplacementEdit",
+        "SlideMediaReplacementError",
+        "SlideMediaReplacementLimitKind",
+        "SlideMediaReplacementPatch",
+    }
+)
+KEYNOTE_SLIDE_MEDIA_DATA_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "MediaRecord",
+        "MetadataVisitor",
+        "OwnerRecord",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+KEYNOTE_SLIDE_MEDIA_DATA_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "DecodeReport",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "RewriteError",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_SLIDE_MEDIA_DATA_PROTO_ORIGINS = frozenset(
+    {
+        "buffa",
+        "prost",
+        "prost_types",
+        "kn",
+        "tsa",
+        "tsd",
+        "tsp",
+        "litchi_iwa_protos",
+    }
+)
+KEYNOTE_SLIDE_MEDIA_DATA_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|movie|media|data|poster|audio|component|"
+    r"archive|message|resource|entry|metadata|package|uuid)[A-Za-z_]*"
+    r"(?:id|identifier))[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u64|u32|usize|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES = (
+    Path("crates/litchi-iwa-protos/src/keynote_media_codec.rs"),
+    Path("crates/litchi-iwa-protos/src/package_metadata_media_codec.rs"),
+)
+KEYNOTE_SLIDE_MEDIA_DATA_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_CODEC_APIS = {
+    "keynote_media_codec": (
+        "decode_data_reference",
+        "decode_data_reference_with_report",
+        "DataReferenceSnapshot",
+        "DecodeOptions",
+        "DecodeReport",
+    ),
+    "package_metadata_media_codec": (
+        "visit_package_metadata_media",
+        "prepare_package_metadata_media_rewrite",
+        "rewrite_package_metadata_media",
+        "MediaRewriteBatch",
+        "DataInfoContentReplacement",
+        "RewriteExecutionRequirements",
+    ),
+}
+KEYNOTE_SLIDE_MEDIA_DATA_CODEC_MARKERS = {
+    "keynote media lazy Buffa ingress": (
+        "buffa",
+        "decode_lazy_view",
+        "DataReferenceLazyView",
+    ),
+    "metadata media lazy Buffa ingress": (
+        "buffa",
+        "decode_lazy_view",
+        "PackageMetadataMedia",
+    ),
+    "metadata source-preserving rewrite": (
+        "unknown",
+        "raw",
+        "extend_from_slice",
+        "prepared",
+    ),
+    "finite media resource accounting": (
+        "max_message_bytes",
+        "max_fields",
+        "max_work_bytes",
+        "try_reserve",
+    ),
+}
+KEYNOTE_SLIDE_MEDIA_DATA_OWNER_MARKER_GROUPS = {
+    "selector resolution": ("SlideSelector", "MovieSelector", "select_media"),
+    "media and metadata closure": (
+        "keynote_media_codec",
+        "package_metadata_media_codec",
+        "DataInfo",
+        "digest",
+        "materialized_length",
+        "owner",
+    ),
+    "bounded candidate publication": (
+        "WireLimits",
+        "preflight",
+        "candidate",
+        "reopen",
+        "Verification",
+        "locality",
+    ),
+    "exact reversible artifacts": (
+        "ExactArtifacts",
+        "PatchConflict",
+        "inverse",
+        "source_fingerprint",
+    ),
+    "preview invalidation": (
+        "preview",
+        "deleted_previews",
+        "root_previews_absent",
+    ),
+}
+# The focused owner keeps its transaction ledger and physical-closure proof in
+# private child modules. Keep these paths explicit so a flat owner cannot
+# silently absorb the budget/closure implementation again as the migration
+# settles.
+KEYNOTE_SLIDE_MEDIA_DATA_CHILD_ROOT = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_media_replacement"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_SOURCE = (
+    KEYNOTE_SLIDE_MEDIA_DATA_CHILD_ROOT / "budget.rs"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE = (
+    KEYNOTE_SLIDE_MEDIA_DATA_CHILD_ROOT / "closure.rs"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?budget[ \t]*;"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?closure[ \t]*;"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_PUBLIC_CHILD_MODULE = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+mod[ \t]+"
+    r"(?:r#)?(?:budget|closure)\b"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_TYPE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?struct[ \t]+"
+    r"(?:r#)?MediaBudget\b"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_PUBLIC_BUDGET_TYPE = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+struct[ \t]+(?:r#)?MediaBudget\b"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_FACTORY = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+"
+    r"(?:r#)?for_package\b[^{};]*\([^{};]*\bpackage\b[^{};]*\)"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_ROOT_CALL = re.compile(
+    r"\b(?:[A-Za-z_][A-Za-z0-9_]*[ \t]*::[ \t]*)?"
+    r"MediaBudget[ \t]*::[ \t]*for_package[ \t\r\n]*\("
+)
+KEYNOTE_SLIDE_MEDIA_DATA_MUTABLE_BUDGET_PARAMETER = re.compile(
+    r"&[ \t]*mut[ \t]+(?:[A-Za-z_][A-Za-z0-9_]*[ \t]*::[ \t]*)?"
+    r"MediaBudget\b"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_PREPARE_METADATA = re.compile(
+    r"\bprepare_package_metadata_media_(?:rewrite|content_replacements?)[ \t\r\n]*\("
+)
+KEYNOTE_SLIDE_MEDIA_DATA_METADATA_EXECUTION_REQUIREMENTS = re.compile(
+    r"\bexecution_requirements[ \t\r\n]*\("
+)
+KEYNOTE_SLIDE_MEDIA_DATA_PREPARED_EXECUTE = re.compile(
+    r"\.[ \t\r\n]*execute[ \t\r\n]*\("
+)
+KEYNOTE_SLIDE_MEDIA_DATA_FOR_SOURCE_RESET = re.compile(
+    r"\b(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)?"
+    r"DecodeOptions[ \t\r\n]*::[ \t\r\n]*for_source[ \t\r\n]*\("
+)
+KEYNOTE_SLIDE_MEDIA_DATA_DIRECT_METADATA_REWRITE = re.compile(
+    r"\b(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)?"
+    r"rewrite_package_metadata_media_content_replacement[ \t\r\n]*\("
+)
+KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_HELPER = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t]+"
+    r"(?:r#)?validate_selected_media_closure\b"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_LIMIT_VARIANTS = frozenset(
+    {
+        "InputBytes",
+        "OutputBytes",
+        "Entries",
+        "EntryBytes",
+        "TotalBytes",
+        "Slides",
+        "References",
+        "MediaBytes",
+        "WireFields",
+        "WireNesting",
+        "WireWork",
+        "Allocations",
+    }
+)
+# ``KeynoteEditor`` itself lives at ``keynote/editor.rs`` while focused
+# compatibility helpers live below ``keynote/editor/``.  Scan the whole
+# Keynote source root, but keep the lexical inventory exact to the three
+# retired replacement wrappers so unrelated editor APIs remain untouched.
+IWA_KEYNOTE_SLIDE_MEDIA_DATA_SOURCE_ROOT = IWA_KEYNOTE_SOURCE_ROOT
+IWA_KEYNOTE_SLIDE_MEDIA_DATA_RETIRED_METHODS = frozenset(
+    {
+        "replace_slide_movie_data",
+        "replace_slide_movie_poster",
+        "replace_slide_audio_data",
+    }
+)
+IWA_KEYNOTE_SLIDE_MEDIA_DATA_RETIRED_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>replace_slide_movie_data|"
+    r"replace_slide_movie_poster|replace_slide_audio_data)"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+
 # Wave98 moves existing canonical Keynote slide-table title settings behind a
 # selector-first package facade.  The strict Buffa projections remain shared
 # iWork codecs; this ratchet owns only the semantic facade and the bounded
@@ -52437,6 +52737,681 @@ def audit_iwa_keynote_movie_playback_source_topology(root: Path = ROOT) -> list[
     return sorted(set(violations))
 
 
+def _keynote_slide_media_data_owner_present(root: Path) -> bool:
+    """Return whether the slide-media replacement owner is wired and active."""
+
+    owner_path = root / KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE
+    package_path = root / KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES[0]
+    if not owner_path.is_file() or not package_path.is_file():
+        return False
+    package = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+    )
+    return KEYNOTE_SLIDE_MEDIA_DATA_PACKAGE_MODULE.search(package) is not None
+
+
+def audit_keynote_slide_media_data_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free slide-media data facade.
+
+    This audit stays dormant until the focused module is wired into
+    ``Package``.  It then checks the public semantic transaction surface and
+    scans its declarations for native identifiers, archive objects, generated
+    messages, and wire values.  Borrowed media bytes are intentional semantic
+    payloads for this operation and are therefore not treated as physical
+    archive leakage.
+    """
+
+    if not _keynote_slide_media_data_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_SOURCE
+    package_path = root / KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES[0]
+    lib_path = root / KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES[1]
+    owner = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    semantic = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    package = _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+    library = _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+    owner_code = _mask_rust_non_code(owner)
+    semantic_code = _mask_rust_non_code(semantic)
+    package_code = _mask_rust_non_code(package)
+    library_code = _mask_rust_non_code(library)
+    package_library_code = _mask_rust_non_code(package + library)
+    violations: list[str] = []
+
+    if KEYNOTE_SLIDE_MEDIA_DATA_PUBLIC_MODULE.search(package_library_code):
+        violations.append(
+            "focused litchi-keynote slide-media data owner module must remain private: "
+            f"{KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES[0]}"
+        )
+    if KEYNOTE_SLIDE_MEDIA_DATA_PACKAGE_MODULE.search(package_code) is None:
+        violations.append(
+            "focused litchi-keynote slide-media data owner module is missing: "
+            f"{KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES[0]}"
+        )
+
+    for name in sorted(KEYNOTE_SLIDE_MEDIA_DATA_CANONICAL_TYPES):
+        for source, path in (
+            (owner, owner_path),
+            (package, package_path),
+            (library, lib_path),
+        ):
+            if name not in _rust_canonical_exports(
+                source, KEYNOTE_SLIDE_MEDIA_DATA_CANONICAL_TYPES
+            ):
+                violations.append(
+                    "focused litchi-keynote slide-media data public API is missing "
+                    f"canonical type {name}: {path.relative_to(root)}"
+                )
+
+    semantic_exports = _rust_canonical_exports(
+        owner + semantic + package + library,
+        KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_TYPES,
+    )
+    for name in sorted(KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_TYPES - semantic_exports):
+        violations.append(
+            "focused litchi-keynote slide-media data semantic API is missing "
+            f"{name}: {KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_SOURCE}"
+        )
+
+    selector_exports = _rust_canonical_exports(
+        semantic + package + library,
+        KEYNOTE_SLIDE_MEDIA_DATA_SELECTOR_TYPES,
+    )
+    for name in sorted(KEYNOTE_SLIDE_MEDIA_DATA_SELECTOR_TYPES - selector_exports):
+        violations.append(
+            "focused litchi-keynote slide-media data public API is missing selector "
+            f"{name}: {KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES[1]}"
+        )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line in _rust_public_methods_in_impl(owner, "Package")
+    }
+    for name in sorted(KEYNOTE_SLIDE_MEDIA_DATA_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote slide-media data Package method is missing "
+                f"{name}: {KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+            )
+            continue
+        if name != "apply_slide_media_data":
+            for selector in ("SlideSelector", "MovieSelector"):
+                if not re.search(rf"\b{selector}\b", declaration):
+                    violations.append(
+                        "focused litchi-keynote slide-media data Package method "
+                        f"{name} must accept selector-first {selector}: "
+                        f"{KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+                    )
+        if name == "slide_media_data" and "MediaPart" not in declaration:
+            violations.append(
+                "focused litchi-keynote slide-media data read must select a typed "
+                f"MediaPart: {KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+            )
+
+    edit_impl = re.search(
+        r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
+        r"(?:'[^ ]+[ \t\r\n]+)?SlideMediaDataEdit\b",
+        owner_code,
+    )
+    edit_body = owner_code if edit_impl is None else owner_code[edit_impl.end() :]
+    for name in sorted(KEYNOTE_SLIDE_MEDIA_DATA_EDIT_METHODS):
+        if not re.search(
+            rf"\bpub[ \t]+(?:const[ \t]+)?fn[ \t]+{re.escape(name)}\b",
+            edit_body,
+        ):
+            violations.append(
+                "focused litchi-keynote slide-media data edit is missing "
+                f"{name}: {KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+            )
+
+    facade_names = (
+        KEYNOTE_SLIDE_MEDIA_DATA_CANONICAL_TYPES
+        | KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_TYPES
+        | KEYNOTE_SLIDE_MEDIA_DATA_SELECTOR_TYPES
+        | KEYNOTE_SLIDE_MEDIA_DATA_PACKAGE_METHODS
+        | KEYNOTE_SLIDE_MEDIA_DATA_FLAT_ALIASES
+        | {"SlideMediaDataEdit", "MediaPart"}
+    )
+    for source, source_path in (
+        (owner, owner_path),
+        (semantic, semantic_path),
+        (package, package_path),
+        (library, lib_path),
+    ):
+        if not source:
+            continue
+        dedicated = source_path in {owner_path, semantic_path}
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated and not (identifiers & facade_names):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier in KEYNOTE_SLIDE_MEDIA_DATA_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_SLIDE_MEDIA_DATA_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif identifier == "wire" or identifier in KEYNOTE_SLIDE_MEDIA_DATA_WIRE_TYPES:
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote slide-media data public API exposes "
+                        f"{reason} {identifier}: {source_path.relative_to(root)}:{line_number}"
+                    )
+                if identifier in KEYNOTE_SLIDE_MEDIA_DATA_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-keynote slide-media data public API retains flat alias "
+                        f"{identifier}: {source_path.relative_to(root)}:{line_number}"
+                    )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote slide-media data public API retains a glob re-export: "
+                    f"{source_path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_SLIDE_MEDIA_DATA_RAW_ID_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-keynote slide-media data public API exposes raw identifier "
+                    f"{match.group(0).strip()}: {source_path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_media_data_codec_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the neutral lazy Buffa media and metadata codec seams."""
+
+    if not _keynote_slide_media_data_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    for codec_name, required in KEYNOTE_SLIDE_MEDIA_DATA_CODEC_APIS.items():
+        codec_path = root / Path("crates/litchi-iwa-protos/src") / f"{codec_name}.rs"
+        if not codec_path.is_file():
+            violations.append(
+                "focused litchi-keynote slide-media data codec is missing: "
+                f"{codec_path.relative_to(root)}"
+            )
+            continue
+        source = _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+        code = _mask_rust_non_code(source)
+        for name in required:
+            if re.search(
+                rf"\b(?:pub[ \t]+)?(?:fn|struct|enum|type|trait)[ \t]+"
+                rf"{re.escape(name)}\b",
+                code,
+            ) is None:
+                violations.append(
+                    "focused litchi-keynote slide-media data codec is missing "
+                    f"{codec_name} API {name}: {codec_path.relative_to(root)}"
+                )
+
+    for label, markers in KEYNOTE_SLIDE_MEDIA_DATA_CODEC_MARKERS.items():
+        if label.startswith("keynote"):
+            codec_path = root / KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES[0]
+        elif label.startswith("metadata"):
+            codec_path = root / KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES[1]
+        else:
+            codec_path = root / KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES[1]
+        if not codec_path.is_file():
+            continue
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+        )
+        if not any(marker in source for marker in markers):
+            violations.append(
+                "focused litchi-keynote slide-media data codec is missing "
+                f"{label} marker: {codec_path.relative_to(root)}"
+            )
+
+    public_source_path = root / KEYNOTE_SLIDE_MEDIA_DATA_CODEC_PUBLIC_SOURCE
+    if public_source_path.is_file():
+        public_source = _mask_rust_cfg_test_items(
+            public_source_path.read_text(encoding="utf-8")
+        )
+        for codec_name in KEYNOTE_SLIDE_MEDIA_DATA_CODEC_APIS:
+            if re.search(
+                rf"(?m)^\s*pub\s+mod\s+{re.escape(codec_name)}\s*;",
+                public_source,
+            ) is None:
+                violations.append(
+                    "focused litchi-keynote slide-media data codec is not exposed through "
+                    f"the neutral proto crate: {codec_name}: "
+                    f"{KEYNOTE_SLIDE_MEDIA_DATA_CODEC_PUBLIC_SOURCE}"
+                )
+
+    generated_decode = re.compile(
+        r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?"
+        r"(?:DataReference|PackageMetadata|DataInfo|ComponentInfo)"
+        r"\s*::\s*decode\s*\(|\b(?:prost|buffa)\s*::\s*Message\b"
+    )
+    for codec_path in KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES:
+        absolute = root / codec_path
+        if not absolute.is_file():
+            continue
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(absolute.read_text(encoding="utf-8"))
+        )
+        for match in generated_decode.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-keynote slide-media data codec eagerly decodes a generated "
+                f"message {match.group(0).strip()}: {codec_path}:{line_number}"
+            )
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_media_data_resource_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require bounded metadata closure and exact publication markers."""
+
+    if not _keynote_slide_media_data_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    violations: list[str] = []
+    for label, markers in KEYNOTE_SLIDE_MEDIA_DATA_OWNER_MARKER_GROUPS.items():
+        if not any(marker in owner for marker in markers):
+            violations.append(
+                "focused litchi-keynote slide-media data owner is missing "
+                f"{label} marker: {KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+            )
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_media_data_transaction_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require one bounded ledger through the slide-media transaction graph.
+
+    The facade/resource audits prove vocabulary and marker coverage. This
+    companion ratchet protects the implementation seam that makes those
+    claims true: one private MediaBudget is created at each public operation
+    root, mutable budget state is threaded through physical and closure
+    helpers, metadata uses the prepared rewrite contract, and the dedicated
+    closure child is actually reachable. The checks intentionally inspect
+    function shape and call flow rather than requiring incidental helper names
+    beyond the two explicit child seams.
+    """
+
+    if not _keynote_slide_media_data_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE
+    budget_path = root / KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_SOURCE
+    closure_path = root / KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE
+    owner_source = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    owner_code = _mask_rust_non_code(owner_source)
+    violations: list[str] = []
+
+    def masked_file(path: Path) -> str:
+        if not path.is_file():
+            return ""
+        return _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+
+    budget_code = masked_file(budget_path)
+    closure_code = masked_file(closure_path)
+
+    if not budget_path.is_file():
+        violations.append(
+            "focused litchi-keynote slide-media transaction is missing private budget child: "
+            f"{KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_SOURCE}"
+        )
+    if not closure_path.is_file():
+        violations.append(
+            "focused litchi-keynote slide-media transaction is missing private closure child: "
+            f"{KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE}"
+        )
+    if KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_MODULE.search(owner_code) is None:
+        violations.append(
+            "focused litchi-keynote slide-media owner must wire private budget child: "
+            f"{KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+        )
+    if KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_MODULE.search(owner_code) is None:
+        violations.append(
+            "focused litchi-keynote slide-media owner must wire private closure child: "
+            f"{KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+        )
+    if KEYNOTE_SLIDE_MEDIA_DATA_PUBLIC_CHILD_MODULE.search(owner_code):
+        violations.append(
+            "focused litchi-keynote slide-media budget/closure children must remain private: "
+            f"{KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+        )
+
+    if budget_code:
+        if KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_TYPE.search(budget_code) is None:
+            violations.append(
+                "focused litchi-keynote slide-media budget child is missing private MediaBudget: "
+                f"{KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_SOURCE}"
+            )
+        if KEYNOTE_SLIDE_MEDIA_DATA_PUBLIC_BUDGET_TYPE.search(budget_code):
+            violations.append(
+                "focused litchi-keynote slide-media MediaBudget must remain private: "
+                f"{KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_SOURCE}"
+            )
+        if KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_FACTORY.search(budget_code) is None:
+            violations.append(
+                "focused litchi-keynote slide-media budget child is missing the "
+                "root for_package factory: "
+                f"{KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_SOURCE}"
+            )
+        for variant in sorted(KEYNOTE_SLIDE_MEDIA_DATA_LIMIT_VARIANTS):
+            if not re.search(
+                rf"\bSlideMediaDataLimitKind\s*::\s*{re.escape(variant)}\b",
+                budget_code,
+            ):
+                violations.append(
+                    "focused litchi-keynote slide-media budget child leaves limit "
+                    f"variant unused {variant}: {KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_SOURCE}"
+                )
+
+    # Small source-shape parser used only for this owner graph. It preserves
+    # signatures and bodies while avoiding assumptions about helper names.
+    function_declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+
+    def function_records(code: str) -> list[tuple[str, str, str]]:
+        records: list[tuple[str, str, str]] = []
+        for match in function_declaration.finditer(code):
+            opening = code.find("{", match.end())
+            if opening < 0:
+                continue
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(code) and depth:
+                if code[cursor] == "{":
+                    depth += 1
+                elif code[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            if depth:
+                continue
+            records.append(
+                (
+                    match.group("name"),
+                    code[match.start() : opening],
+                    code[opening + 1 : cursor - 1],
+                )
+            )
+        return records
+
+    owner_functions = function_records(owner_code)
+    closure_functions = function_records(closure_code)
+    owner_by_name: dict[str, tuple[str, str]] = {
+        name: (signature, body) for name, signature, body in owner_functions
+    }
+
+    function_call = re.compile(
+        r"(?<![A-Za-z0-9_])(?P<qualifier>(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*)"
+        r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\("
+    )
+
+    def called_functions(body: str) -> set[str]:
+        called: set[str] = set()
+        for match in function_call.finditer(body):
+            name = match.group("name")
+            if name not in owner_by_name:
+                continue
+            qualifier = match.group("qualifier").replace(" ", "").replace("\t", "")
+            if qualifier:
+                qualifier_type = qualifier.rstrip(":").split("::")[-1]
+                if qualifier_type not in {"Self", "SlideMediaDataEdit"}:
+                    continue
+            called.add(name)
+        return called
+
+    def reachable_functions(seed: str) -> dict[str, tuple[str, str]]:
+        reachable: dict[str, tuple[str, str]] = {}
+        pending = [seed]
+        while pending:
+            name = pending.pop()
+            if name in reachable or name not in owner_by_name:
+                continue
+            signature, body = owner_by_name[name]
+            reachable[name] = (signature, body)
+            pending.extend(called_functions(body) - reachable.keys())
+        return reachable
+
+    # Each public operation root owns exactly one ledger. A public method may
+    # delegate its root construction to one immediate private operation helper
+    # (for example edit -> SlideMediaDataEdit::new); the reachable call graph
+    # must still contain exactly one factory call. set is also a public staging
+    # root because it bounds a caller-provided allocation.
+    budget_roots = set(KEYNOTE_SLIDE_MEDIA_DATA_PACKAGE_METHODS) | {"commit", "set"}
+    factory_owner_names: set[str] = set()
+    for name in sorted(budget_roots):
+        record = owner_by_name.get(name)
+        if record is None:
+            continue
+        _signature, body = record
+        reachable = reachable_functions(name)
+        factory_owners = {
+            helper_name
+            for helper_name, (_helper_signature, helper_body) in reachable.items()
+            if KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_ROOT_CALL.search(helper_body)
+        }
+        factory_count = sum(
+            len(KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_ROOT_CALL.findall(helper_body))
+            for _helper_name, (_helper_signature, helper_body) in reachable.items()
+        )
+        if factory_count != 1:
+            violations.append(
+                "focused litchi-keynote slide-media transaction root must create exactly one "
+                f"MediaBudget::for_package ledger ({name}): {KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+            )
+        factory_owner_names.update(factory_owners)
+        ledger_owner = next(iter(factory_owners), None)
+        if ledger_owner is not None and name != "set":
+            _ledger_signature, ledger_body = reachable[ledger_owner]
+            if not re.search(r"&[ \t]*mut[ \t]+budget\b", ledger_body):
+                violations.append(
+                    "focused litchi-keynote slide-media transaction root must thread its mutable "
+                    f"budget ledger ({name} via {ledger_owner}): {KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+                )
+        elif ledger_owner is None and name != "set":
+            violations.append(
+                "focused litchi-keynote slide-media transaction root must thread its mutable "
+                f"budget ledger ({name}): {KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+            )
+
+    # A helper that touches the ledger must receive the same mutable instance;
+    # a second factory call inside the graph would reset aggregate limits.
+    for source_label, records in (
+        (KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE, owner_functions),
+        (KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE, closure_functions),
+    ):
+        for name, signature, body in records:
+            if name in budget_roots:
+                continue
+            if name in factory_owner_names:
+                continue
+            # Buffa's visitor callback receives the ledger through its
+            # MetadataVisitor receiver; Rust's trait signature cannot add a
+            # second budget parameter. The visitor itself is private and its
+            # nested calls remain covered by the receiver's ledger field.
+            if name.startswith("visit_") and re.search(
+                r"&[ \t]*mut[ \t]+self\b", signature
+            ):
+                continue
+            uses_budget = bool(
+                re.search(r"\bMediaBudget\b|\bbudget\b", signature + "\n" + body)
+            )
+            if not uses_budget:
+                continue
+            if KEYNOTE_SLIDE_MEDIA_DATA_BUDGET_ROOT_CALL.search(body):
+                violations.append(
+                    "focused litchi-keynote slide-media helper must not reset the "
+                    f"root MediaBudget ({name}): {source_label}"
+                )
+            if KEYNOTE_SLIDE_MEDIA_DATA_MUTABLE_BUDGET_PARAMETER.search(signature) is None:
+                violations.append(
+                    "focused litchi-keynote slide-media helper must thread &mut MediaBudget "
+                    f"({name}): {source_label}"
+                )
+
+    # A prepared metadata rewrite is required to charge and execute the exact
+    # planned allocation. The old one-shot content-replacement helper would
+    # silently recreate codec limits and is therefore a tombstoned edge.
+    prepared_bodies = [
+        body
+        for _name, _signature, body in owner_functions
+        if KEYNOTE_SLIDE_MEDIA_DATA_PREPARE_METADATA.search(body)
+    ]
+    if not prepared_bodies:
+        violations.append(
+            "focused litchi-keynote slide-media transaction must prepare metadata rewrite: "
+            f"{KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+        )
+    else:
+        prepared_body = "\n".join(prepared_bodies)
+        if KEYNOTE_SLIDE_MEDIA_DATA_METADATA_EXECUTION_REQUIREMENTS.search(
+            prepared_body
+        ) is None:
+            violations.append(
+                "focused litchi-keynote slide-media metadata rewrite must consume "
+                "execution_requirements: "
+                f"{KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+            )
+        if KEYNOTE_SLIDE_MEDIA_DATA_PREPARED_EXECUTE.search(prepared_body) is None:
+            violations.append(
+                "focused litchi-keynote slide-media metadata rewrite must execute the "
+                "prepared plan: "
+                f"{KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+            )
+        if not re.search(r"\bmetadata_requirements\b", prepared_body):
+            violations.append(
+                "focused litchi-keynote slide-media metadata rewrite must charge prepared "
+                "requirements through MediaBudget: "
+                f"{KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+            )
+    direct_rewrite = KEYNOTE_SLIDE_MEDIA_DATA_DIRECT_METADATA_REWRITE.search(owner_code)
+    if direct_rewrite is not None:
+        line_number = owner_code.count("\n", 0, direct_rewrite.start()) + 1
+        violations.append(
+            "focused litchi-keynote slide-media owner must retire one-shot metadata "
+            f"rewrite: {KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}:{line_number}"
+        )
+
+    reset = KEYNOTE_SLIDE_MEDIA_DATA_FOR_SOURCE_RESET.search(
+        owner_code + "\n" + closure_code
+    )
+    if reset is not None:
+        violations.append(
+            "focused litchi-keynote slide-media transaction must not reset codec limits "
+            "with DecodeOptions::for_source: "
+            f"{KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+        )
+
+    # The closure child must be reachable from the owner, and it receives the
+    # same ledger as the selector/metadata path.
+    if KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_HELPER.search(closure_code) is None:
+        violations.append(
+            "focused litchi-keynote slide-media closure child is missing its validation helper: "
+            f"{KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE}"
+        )
+    closure_record = next(
+        (
+            (signature, body)
+            for name, signature, body in closure_functions
+            if name == "validate_selected_media_closure"
+        ),
+        None,
+    )
+    if closure_record is not None and KEYNOTE_SLIDE_MEDIA_DATA_MUTABLE_BUDGET_PARAMETER.search(
+        closure_record[0]
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-media closure helper must thread &mut MediaBudget: "
+            f"{KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE}"
+        )
+    if not any(
+        re.search(r"\bvalidate_selected_media_closure[ \t\r\n]*\(", body)
+        for _name, _signature, body in owner_functions
+    ):
+        violations.append(
+            "focused litchi-keynote slide-media owner must wire the private closure helper: "
+            f"{KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE}"
+        )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_slide_media_data_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire only the three raw-ID slide-media replacement wrappers.
+
+    The generic ``replace_media`` asset operation and movie/audio lifecycle
+    methods are intentionally outside this inventory.  Calls are checked on
+    masked production source so comments, literals, and ``cfg(test)`` decoys
+    cannot either satisfy or evade the lexical retirement ratchet.
+    """
+
+    if not _keynote_slide_media_data_owner_present(root):
+        return []
+    source_roots = [root / IWA_KEYNOTE_SLIDE_MEDIA_DATA_SOURCE_ROOT]
+    examples = root / IWA_CORE_EXAMPLE_SOURCE_ROOT
+    if examples.is_dir():
+        source_roots.append(examples)
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    violations: list[str] = []
+    for source_root in source_roots:
+        if not source_root.is_dir():
+            continue
+        for path in sorted(source_root.rglob("*.rs")):
+            raw = path.read_text(encoding="utf-8")
+            source = _mask_rust_non_code(_mask_rust_cfg_test_items(raw))
+            for match in declaration.finditer(source):
+                name = match.group(1)
+                if name not in IWA_KEYNOTE_SLIDE_MEDIA_DATA_RETIRED_METHODS:
+                    continue
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote slide-media data method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in IWA_KEYNOTE_SLIDE_MEDIA_DATA_RETIRED_CALL.finditer(source):
+                line_start = source.rfind("\n", 0, match.start()) + 1
+                line_end = source.find("\n", match.end())
+                line_end = len(source) if line_end < 0 else line_end
+                line = source[line_start:line_end]
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                    line,
+                ):
+                    continue
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote slide-media data call "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+    return sorted(set(violations))
+
+
 def _keynote_movie_geometry_owner_present(root: Path) -> bool:
     """Return whether the Wave87 geometry owner has crossed its activation seam."""
 
@@ -59562,6 +60537,11 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_movie_geometry_facade_source_topology()
         + audit_keynote_movie_geometry_resource_source_topology()
         + audit_keynote_movie_geometry_completion_source_topology()
+        + audit_iwa_keynote_slide_media_data_source_topology()
+        + audit_keynote_slide_media_data_facade_source_topology()
+        + audit_keynote_slide_media_data_codec_source_topology()
+        + audit_keynote_slide_media_data_resource_source_topology()
+        + audit_keynote_slide_media_data_transaction_source_topology()
         + audit_iwa_keynote_slide_table_number_format_source_topology()
         + audit_keynote_slide_table_title_facade_source_topology()
         + audit_keynote_slide_table_title_resource_source_topology()
