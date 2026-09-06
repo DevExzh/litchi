@@ -2489,12 +2489,14 @@ XLSX and RTF streaming results also publish aligned, per-retained-sample
 deltas whose scope includes the after-snapshot probe overhead; unsupported
 platforms report them as unavailable. The allocator target reports checked
 operation regions for both writers, while the ordinary binary leaves
-allocation metrics absent. For XLSX, `region_peak_live_bytes` is the
-allocator's callback-order region peak, including entry live bytes and
-callbacks inside the timed writer region; it is not total process heap or an
-RSS peak. Allocator live/high-water values are absolute before/after process
-counters, and `peak_rss_bytes` is the process-lifetime high-water mark, not an
-operation-local peak. Corpus setup, artifact generation, reopen, and oracle
+allocation metrics absent. For both writers, `region_peak_live_bytes` is the absolute requested-live-byte
+high-water observed through wrapped global System allocator callbacks during
+the active region. It includes entry live bytes and callbacks from other
+threads; it excludes allocator metadata, allocator-internal realloc overlap,
+unwrapped allocators and physical RSS. Subtract the same sample's
+`live_bytes_before` to derive the incremental region peak. The
+`peak_rss_bytes` field remains the process-lifetime high-water mark.
+Corpus setup, artifact generation, reopen, and oracle
 validation are outside the timed samples; resource probes, digest finalization,
 and correctness checks remain outside the elapsed-time interval.
 

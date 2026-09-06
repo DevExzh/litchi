@@ -1,5 +1,15 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0432 observes XLSX streaming allocations
+
+[0432](changes/0432-xlsx-streaming-operation-memory.md) keeps the existing
+`xlsx_streaming_create` selector and deterministic four-cell rows. It adds
+aligned operation-resource evidence and an exact-member/all-stored-cell
+oracle. Twelve normal/allocator processes retain 360 samples at three row
+counts. This adds evidence for creation from scratch; it does not add logical
+append, package-Part append or arbitrary repackaging coverage. Bounded ODS
+semantic creation remains a named gap in the [next-work record](results/change-0432/next-work.md).
+
 ## 2026-09-05: change 0423 adds source-backed PPTX lifecycles
 
 The opt-in `pptx_source_backed_cross_copy_plain_lifecycle` and

@@ -1,0 +1,176 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "33bbd27ddcd1b38ec4a2e0d211d5bce400d92071d7c6ba314f8bcf8f456fce42",
+  "content_set_sha256": "0dbdbac687be097ec0d875b355fc034706a71a855479a4a086d1849f49ee900f",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "4c9cfd1fc9dd9df1a0f53a086bce274a8cf687ae",
+    "git_worktree_dirty": true,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "xlsx:sha256:c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+      "name": "xlsx-streaming-create-medium",
+      "legacy_v1": {
+        "name": "xlsx-streaming-create-medium",
+        "generator": "litchi-xlsx-streaming-create-v1",
+        "package_format": "xlsx",
+        "shape": "medium",
+        "payload_kind": "deterministic-scalar-text",
+        "compression": "deflate",
+        "entry_count": 32768,
+        "archive_member_count": 6,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 385024,
+        "archive_bytes": 167418,
+        "archive_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+        "target_entry": "xl/worksheets/sheet1.xml",
+        "target_payload_bytes": 1795765,
+        "target_payload_sha256": "539f28638970fa5f207bd9686e0d0c7372e9cc9df0aec30e296ae9bdb4b3e226",
+        "xlsx": {
+          "sheet_count": 1,
+          "rows_per_sheet": 8192,
+          "columns_per_sheet": 4,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "format": "xlsx",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-xlsx-streaming-create-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "deterministic-scalar-text",
+          "legacy_shape": "medium"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 167418,
+        "archive_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+        "logical_payload_bytes": 385024,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "columns_per_sheet": 4,
+        "entry_bytes": 0,
+        "entry_count": 32768,
+        "rows_per_sheet": 8192,
+        "sheet_count": 1
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 167418,
+          "members": 6,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "xl/worksheets/sheet1.xml",
+          "logical_bytes": 1795765,
+          "sha256": "539f28638970fa5f207bd9686e0d0c7372e9cc9df0aec30e296ae9bdb4b3e226"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "xlsx_streaming_create"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "xlsx_streaming_create",
+      "corpus_id": "xlsx:sha256:c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+      "legacy_name": "xlsx-streaming-create-medium",
+      "legacy_archive_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+      "role": "timed"
+    }
+  ]
+}

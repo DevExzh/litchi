@@ -1,0 +1,69 @@
+{
+  "change": 432,
+  "name": "normal-large-r2",
+  "lane": {
+    "repeat": "R2",
+    "mode": "normal",
+    "shape": "large"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0432/captures/normal-large-r2-resource.log",
+    "/tmp/litchi-goal-0432-binaries/normal",
+    "--case",
+    "xlsx_streaming_create",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0432/captures/normal-large-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0432/captures/normal-large-r2-catalog.json"
+  ],
+  "revision": "4c9cfd1fc9dd9df1a0f53a086bce274a8cf687ae",
+  "source_manifest": {
+    "path": "sources/9001116ab186cafcd7a0dbb415d0fcfe094af7ed1df8f3a09a12598513db1015.json",
+    "sha256": "9001116ab186cafcd7a0dbb415d0fcfe094af7ed1df8f3a09a12598513db1015",
+    "files": 6635
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0432-binaries/normal",
+    "sha256": "21f9860398991329ed798e7c1341281cff335da7f74dea5cb2946bf70aef1479",
+    "bytes": 452877688
+  },
+  "protocol_sha256": "b15ca7b87d3abb4ad9ffdbb37b13a89ea90aeb9a61451724988e52f2a43251f8",
+  "driver_sha256": "bc75cf229fe6bd37302ee79c5ac3d0775049db9056f2b4a7ebb1a321133925dc",
+  "verifier_sha256": "346105527a749dc6af8fa228bd38b10aa7b24e77d29b004aac0c82d1be3278b0",
+  "started_utc": "2026-09-06T03:02:36.503812+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T03:02:43.866581+00:00",
+  "artifacts": {
+    "captures/normal-large-r2.json": {
+      "sha256": "b6e483fda0e90a19695b1d49badc097d33c0f07764cf228904976ca9dc0f68fb",
+      "bytes": 32136
+    },
+    "captures/normal-large-r2-catalog.json": {
+      "sha256": "348954a882fda3a83fb32f97734ed2c8e241f0435b0b94351fdcd2df368a9d64",
+      "bytes": 5270
+    },
+    "captures/normal-large-r2.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "captures/normal-large-r2-resource.log": {
+      "sha256": "d821f230fd09b069cb303f9286e5bb2093ae005f6d3a1fc68d9de4d2d9b81b79",
+      "bytes": 1061
+    }
+  }
+}

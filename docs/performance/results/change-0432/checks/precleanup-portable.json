@@ -1,0 +1,33 @@
+{
+  "change": 432,
+  "status": "pass",
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0432/verify.py",
+    "--portable-check"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-09-06T03:12:12.403800+00:00",
+  "finished_utc": "2026-09-06T03:12:14.433187+00:00",
+  "driver_hashes": {
+    "replay.py": "5f8dac06ba365d3f40f550cdc194ee2a772e2a81a74488c2585d6344e9e98402",
+    "derive.py": "fd4374cbd1fe1900c66e02cef6d7aa2403aa6c64efd3da91f8406173117f1f90",
+    "compare-strict.py": "5224fcf11d7b95c9a17af00149b0ad9aa38eabef9f56798d70f00f05c125d3da",
+    "verify.py": "b958af0c39995715c28d2d101b3147e0cef6f838a6aeccc0b799d0e1d9f57cd0",
+    "check.py": "9eccb63789d46f120dd792d91c93e895ef70093397438dec8b048d97fc8ba039",
+    "capture.py": "bc75cf229fe6bd37302ee79c5ac3d0775049db9056f2b4a7ebb1a321133925dc",
+    "verify-report.py": "346105527a749dc6af8fa228bd38b10aa7b24e77d29b004aac0c82d1be3278b0",
+    "seal.py": "13a85bde197019f6a1ebb816fe50e7452595147cbc473bb5115b9b8457f6a845",
+    "protocol.json": "b15ca7b87d3abb4ad9ffdbb37b13a89ea90aeb9a61451724988e52f2a43251f8"
+  },
+  "drivers_unchanged": true,
+  "replayed_inventory_sha256": "e95076591b9cf04e506defe7861cdbbf8ca07bdfcec6e8e73898f7269ba28a84",
+  "inventory_unchanged": true,
+  "log": {
+    "path": "checks/precleanup-portable.log",
+    "bytes": 273,
+    "sha256": "858bc7cebafecb8c4e2bc4a7705aecc9d5b4a662cb769c1cff411085899ce888"
+  },
+  "scope": "Terminal external replay receipt; reseal after adding this receipt and log."
+}

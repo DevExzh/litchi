@@ -1,0 +1,31 @@
+{
+  "status": "reviewed",
+  "scope": "Initial full standalone fmt found one batch-owned lib.rs formatting change, corrected with Rust1.98.1. Other files below are unchanged preexisting formatting debt.",
+  "files": [
+    {
+      "path": "tools/perf-baseline/src/bin/xlsx_cell_values_abba.rs",
+      "sha256": "9e90afcc259d0c6906d5967ba81c058059eb9d243ef3f107e6f88d7e8833671c",
+      "unchanged_from_head": true
+    },
+    {
+      "path": "tools/perf-baseline/src/filesystem.rs",
+      "sha256": "35a560bf657a63e1db81d9ec580003459858a6e52afe1e1fb394dd947122d210",
+      "unchanged_from_head": true
+    },
+    {
+      "path": "tools/perf-baseline/src/pptx_slide_boundaries.rs",
+      "sha256": "79f976af3c719ddf751c873f42404b6d182faa4e59a64600783cf9d95bc16420",
+      "unchanged_from_head": true
+    },
+    {
+      "path": "tools/perf-baseline/src/xls_numeric.rs",
+      "sha256": "2cc7ed96ce7e7fbf49de5a8a6ee13d6f19a768a1fe3401595d875056a7f74366",
+      "unchanged_from_head": true
+    },
+    {
+      "path": "tools/perf-baseline/tests/xlsx_filesystem.rs",
+      "sha256": "43d24388187e146deb3968c03101f4b88480094ef521a926d39dd0e91a054647",
+      "unchanged_from_head": true
+    }
+  ]
+}

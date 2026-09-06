@@ -1,0 +1,14 @@
+[
+  "captures/normal-tiny-r1-receipt.json",
+  "captures/normal-medium-r1-receipt.json",
+  "captures/normal-large-r1-receipt.json",
+  "captures/allocator-tiny-r1-receipt.json",
+  "captures/allocator-medium-r1-receipt.json",
+  "captures/allocator-large-r1-receipt.json",
+  "captures/allocator-large-r2-receipt.json",
+  "captures/allocator-medium-r2-receipt.json",
+  "captures/allocator-tiny-r2-receipt.json",
+  "captures/normal-large-r2-receipt.json",
+  "captures/normal-medium-r2-receipt.json",
+  "captures/normal-tiny-r2-receipt.json"
+]

@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "tracked_tree_clean_before_and_after": true,
+  "status_before": [
+    "?? docs/GOAL.md",
+    "?? docs/performance/results/change-0432/"
+  ],
+  "status_after": [
+    "?? docs/GOAL.md",
+    "?? docs/performance/results/change-0432/"
+  ],
+  "scope": "Harness git_worktree_dirty=true includes untracked user goal and this evidence bundle; committed sources are clean and full code manifests stay equal."
+}
