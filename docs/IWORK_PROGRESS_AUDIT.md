@@ -8,7 +8,7 @@ The iWork implementation is substantial but is **not suite-complete or release-c
 
 - Pages, Keynote, and Numbers have credible bounded semantic readers.
 - The focused owner crates have strong exact-source, fail-closed transactions for selected existing objects.
-- Broad fresh creation, structural editing, rich formatting, charts, shapes, and general media asset lifecycle remain largely in the legacy `litchi-iwa` migration host; Keynote now has a bounded focused owner for replacing bytes on selected existing slide media records.
+- Broad fresh creation, structural editing, rich formatting, charts, shapes, and general media asset lifecycle remain largely in the legacy `litchi-iwa` migration host; Keynote now has bounded focused owners for replacing bytes and for selector-first duplication/removal of selected existing slide media records.
 - Three authoritative Pages, Keynote, and Numbers matrices now report focused-owner, legacy-host, preservation, and evidence boundaries; the existing implementation review still explicitly excludes iWork.
 - Native fixtures establish basic parse/no-op fidelity, but there is no suite-wide automated proof that Litchi-modified files are accepted, saved, closed, and reopened by all three native applications.
 - The focused Percentage owner and codec checks are green at the synthetic/source level. The focused Currency codec filter passes 4/4, the `litchi-numbers-wire` library passes 32/32, and the package target passes 22/22 after native BNC flag handling became shape-dependent. ADR 0008 records operation-specific native Currency E3/E4 evidence with exact candidate/native-resaved hashes, inverse restoration, and strict no-op reread. Percentage remains below formal E3/E4 promotion; Currency native evidence remains limited to its stated existing-cell operation.
@@ -61,8 +61,95 @@ native-oracle integration cases (26 total), and boundary verification passes
 targets pass 256 AddressSanitizer runs. The full boundary scanner passes (64 packages, 238 internal dependency
 declarations, 11 explicit debts). Commit `55499d9c5` passed normal formatting,
 manifest sorting, strict workspace lint, all-feature workspace library and
-integration tests, and documentation tests. The selector-level lifecycle
-owner and further host-route retirement remain pending.
+integration tests, and documentation tests. At this Sep 6 snapshot the
+selector-level lifecycle owner and further host-route retirement remained
+pending; the Sep 7 follow-up below supersedes that status.
+
+## Keynote audio lifecycle native-oracle follow-up (2026-09-06)
+
+The native matrix now includes dedicated audio duplicate/removal oracles.
+[`media-lifecycle-audio-duplicate-native.key`](../test-data/iwork/keynote/media-lifecycle-audio-duplicate-native.key)
+is 752,241 bytes with SHA-256
+`4613f7a275388a1d053407f849a3845de2789acdfe5c36139892d20a17e57c3c`; it
+contains three audio objects and two captioned movie objects, retaining the
+WAV, movie-content, and poster records. [`media-lifecycle-audio-remove-native.key`](../test-data/iwork/keynote/media-lifecycle-audio-remove-native.key)
+is 559,085 bytes with SHA-256
+`052e6389af8719e2e6ffadf2d5fbae0c5275983b94c5ce9efd811f59cf1c1bfb`; it
+contains no audio objects, retains the two captioned movies, removes WAV
+`DataInfo` 9075, and retains movie-content/poster `DataInfo` 9085 and 9086.
+Both permanent artifacts were authored, saved, actually closed, and reopened
+from their exact paths in Keynote 14.4.
+
+The first-audio-removal intermediate snapshot retained the shared WAV through
+the remaining audio occurrence. It is a temporary, uncommitted 751,692-byte
+diagnostic artifact with SHA-256
+`7e39344f54222786ae3241ef4f14ebcefdfc96bb0c54a7c8401348a71318f36e`; it did
+not receive the native close/reopen gate. These are native-authored
+expected-behavior oracles only, with no Litchi-mutated candidate or focused
+lifecycle E3/E4 claim. At this Sep 6 snapshot the selector-level lifecycle
+owner and its wire, clone-payload, and metadata-adapter pieces remained under
+implementation; the Sep 7 owner and E4 section below supersedes that pending
+status.
+
+## Keynote focused media lifecycle owner and native E4 follow-up (2026-09-07)
+
+The focused `litchi-keynote` owner now provides
+`Package::{duplicate_slide_media, remove_slide_media}` plus typed movie/audio
+aliases. `SlideSelector` and source-order `MovieSelector` are the public
+selection surface; native IDs, UUIDs, component paths, `DataInfo` keys, and ZIP
+members remain private. `SlideMediaLifecyclePatch` is authorized to its exact
+source, supports `inverse()` and `is_noop()`, and is replayed through
+`Package::apply_slide_media_lifecycle` only after bounded candidate readback.
+The owner clones or removes the selected slide/build/build-chunk closure,
+preserves shared data until the final owner, and uses one `LifecycleBudget`
+across graph, clone-payload, metadata, lazy wire, archive, ZIP, and readback
+work. The five-message
+[`KNMediaLifecycleArchive.proto`](../crates/litchi-iwa-protos/src/buffa-projections/KNMediaLifecycleArchive.proto)
+projection is 957 bytes and keeps borrowed snapshots and source-preserving
+rewrites out of generated repeated views.
+
+Computer Use verified six operation-specific Keynote 14.4 native E4 profiles.
+The source candidates were under
+`/private/tmp/litchi-media-lifecycle-20260906r/candidates`, and the
+native-saved receipts were under
+`/private/tmp/litchi-media-lifecycle-20260906r/native-saved`. Each temporary
+source candidate was opened at its exact path, saved with
+Cmd-S, actually closed until the theme chooser appeared, reopened at its exact
+path, checked for expected counts, text, and captions without alerts, and
+closed. The native-saved receipts are temporary and were not copied into the
+permanent fixture set:
+
+| Receipt | Expected profile | Bytes | SHA-256 |
+| --- | --- | ---: | --- |
+| `focused-native-duplicate-movie.key` | 3 movies, 2 audio | 752,707 | `bb2f3d0318a311ba0cfdf4fa1d8b88488f8e0172ba02fda73d689ea15ae0344a` |
+| `focused-native-duplicate-audio.key` | 2 movies, 3 audio | 752,189 | `39eb5ba491acbdf2bc7295a2c549520ed538e1ca73f5b5e109b0cb74d587be38` |
+| `focused-native-remove-movie-shared.key` | 1 movie, 2 audio | 745,166 | `16d1241c50fb4ad093e10c2befebac1303a9442e4efda22ef6355c6d2b933c91` |
+| `focused-native-remove-audio-shared.key` | 2 movies, 1 audio | 751,698 | `452af453a6b453aa454319e1033a1b5be0389a8954c245d2b789bee310c97170` |
+| `focused-native-remove-movie-final.key` | 0 movies, 2 audio | 698,799 | `9e3b40157610ded1f618d64112c4e964c6f03089a5ceabb9fb7899eca5320b99` |
+| `focused-native-remove-audio-final.key` | 2 movies, 0 audio | 559,060 | `1477986335aca0e093b404a259bba9d866d7083a101aeeb1b2b1509982f03ece` |
+
+The lifecycle integration target passes 21 cases: the original 18 plus three
+header-reference refusal regressions. With
+`LITCHI_KEYNOTE_MEDIA_LIFECYCLE_NATIVE_SAVED_DIR` enabled, the direct
+`native_saved_candidates_are_read_back_without_rewriting_them` integration test
+strictly rereads all six native-saved candidates without rewriting them. Four
+focused native lifecycle tests pass for the six exports, establishing
+operation-specific lifecycle E4 only.
+
+The neutral identity codec passes 45 unit cases, including the versioned
+component accounting regression; the new lazy lifecycle codec passes 10 cases;
+and strict protobuf and Keynote Clippy pass. The private lifecycle unit slice
+passes 11 cases, while existing replacement validation passes 28 cases (22
+replacement, 2 budget, and 4 native-oracle cases). The hardening fixes cover
+the actual `ShapeInfoArchive` reference edge, exact versioned-component work
+charging, source-relative core-header precharge with atomic byte/event
+accounting, and serialization precharge before candidate allocation.
+Regenerating all six focused candidate inputs produces bytes exactly equal to
+the native-verified originals. Fresh-export equality and strict native-saved
+readback both pass. The bounded lifecycle AddressSanitizer campaign passed 256 runs with no
+findings (244 MiB peak RSS); boundary verification passes 942 unit tests.
+Normal repository hooks remain pending; no host
+lifecycle route was retired.
 
 ## Current maturity
 
@@ -70,7 +157,7 @@ owner and further host-route retirement remain pending.
 |---|---|---|---|
 | Root `litchi::iwork` facade | Immutable, bounded Pages/Keynote/Numbers projection; host-free dependency path | Read-only and text-oriented; no package/edit, metadata, media, chart, or formula editing/recalculation surface | 🟡 focused read facade |
 | `litchi-pages` | ZIP/directory semantic read; exact retained-package output; selected text, layout, footnote, header/footer, table-property, and existing-owner user-hidden-axis transactions | Fresh package creation, section/table structural CRUD, table cells/formulas, rich formatting, drawings, charts, media, collaboration, export, nonempty absent-owner hidden-axis requests, and successful native hidden-axis validation | 🟡 bounded reader/editor |
-| `litchi-keynote` | Show/slide read; existing-slide state, text, notes, settings, background, transition, selected chart/movie/table properties, bounded existing slide-media content/poster replacement, a source-level physical table-sort owner, and bounded soundtrack-item read/add/insert/replace/remove | Slide creation/duplication, public table row/value reads, native-certified physical sort or operation-wide soundtrack-item lifecycle, soundtrack creation, full table data, chart data/series/CRUD, generic media asset insertion/duplication/removal/CRUD, full build/animation editing, shapes/groups, masters/themes, collaboration, rendering/export | 🟡 bounded reader/editor |
+| `litchi-keynote` | Show/slide read; existing-slide state, text, notes, settings, background, transition, selected chart/movie/table properties, bounded existing slide-media content/poster replacement, selector-first existing slide-media duplication/removal with exact-source patches and native E4 receipts, native-authored media lifecycle oracle fixtures, a source-level physical table-sort owner, and bounded soundtrack-item read/add/insert/replace/remove | Slide creation/duplication, public table row/value reads, broader generic asset lifecycle, native-certified physical sort or operation-wide soundtrack-item lifecycle, soundtrack creation, full table data, chart data/series/CRUD, generic media asset insertion/duplication/removal/CRUD beyond the focused owner, full build/animation editing, shapes/groups, masters/themes, collaboration, rendering/export; bounded lifecycle ASAN passed 256 runs and boundary units passed 942; normal hooks are pending | 🟡 bounded reader/editor |
 | `litchi-numbers` | Rooted workbook read; selected scalar cells, formulas, controls, table settings, names/order, comments/replies, and bounded existing-cell Number/Percentage/Currency/Scientific/Fraction/Text/Date & Time/Duration/Custom display-format transactions | Sheet/table lifecycle, row/column topology, full formula engine, other generic formats/rich styles, generic Custom-format authoring, package merge editing, charts/media/drawables, filters/pivots/categories, print/page setup and workbook export | 🟡 bounded reader/editor |
 | `litchi-iwa` | Broad source-free authoring and native mutation across all three applications; extensive tests/examples | It is explicitly a compatibility/migration host, exposes native/raw seams, and still owns most rich/structural authoring | 🟡 broad but non-canonical |
 | Shared IWA crates | Bounded Snappy/wire/archive parsing, package preservation, detection, focused codecs, exact artifacts, COW state, and archive-owned durable publication | Concrete-owner index adoption, aggregate graph/memory budgets, directory write parity, durable patch serialization/history, encryption/signatures | 🟡 mature substrate with open boundaries |
@@ -85,6 +172,7 @@ Positive progress:
 
 - The root facade depends on the three concrete owners rather than `litchi-iwa` ([feature wiring](../crates/litchi/Cargo.toml#L60), [facade](../crates/litchi/src/iwork/mod.rs#L1)).
 - Recent waves moved narrow Pages table/text/hidden-axis owners, Numbers cells/settings/comments/display-format owners, and Keynote chart/movie/table owners into focused crates.
+- The Keynote lifecycle wave now owns selector-first existing slide-media duplication/removal, exact-source inverse patches, shared-data final-owner reclamation, and operation-wide resource accounting; generic host lifecycle routes remain until their own gates close.
 - `litchi-iwa-index` is a neutral leaf consistent with ADR 0029.
 - No `TODO`, `FIXME`, `todo!`, or `unimplemented!` stubs were found across the iWork crates; incomplete work is represented by typed refusal paths and migration debt.
 
@@ -100,6 +188,8 @@ Open migration facts:
 | Area | Evidence present | Gap before a strong completion claim |
 |---|---|---|
 | Native fixtures | One checked-in basic native fixture per app plus package-directory fixtures and a bounded Keynote slide-media source; native provenance and hashes are documented in [`test-data/iwork`](../test-data/iwork/README.md) | The basic fixtures remain intentionally narrow, and the Keynote media source covers one existing Audio/Audio/File/File graph only. Rich tables, formulas, charts, comments, builds, themes, and malformed/edge producer variants are not represented broadly; the changed media candidate has operation-specific E4 evidence from native open/save/close/reopen plus strict post-native reread, while the remaining native matrix is not suite-wide |
+| Keynote media lifecycle native oracles | The permanent duplicate/removal fixtures cover both movie-final-removal and audio-final-removal expectations in Keynote 14.4, including shared WAV retention while another audio occurrence remains and final WAV `DataInfo` reclamation when no audio object remains; both new audio artifacts were saved, actually closed, and reopened from their exact paths | These are native-authored expected-behavior oracles, not Litchi-mutated candidates. The intermediate first-audio-removal snapshot has no close/reopen gate. The owner-pending wording in this historical Sep 6 row is superseded by the Sep 7 owner and E4 rows below |
+| Keynote selector-first lifecycle E4 receipts | The focused owner now provides exact-source selector transactions with graph closure, shared-data retention/final-owner GC, the shared `LifecycleBudget`, and a five-message, 957-byte lazy projection. The lifecycle integration target passes 21 cases (18 existing plus 3 header-reference refusal regressions); four native-focused tests cover six temporary native-saved outputs, and strict direct reread passes all six without rewriting them | This is operation-specific lifecycle E4 evidence. Neutral identity passes 45 units including versioned accounting, the new lazy codec passes 10, and strict protobuf and Keynote Clippy pass. The private lifecycle unit slice passes 11 and existing replacement validation passes 28 (22 replacement, 2 budget, 4 native-oracle); the actual `ShapeInfoArchive` reference fix, exact versioned work charge, source-relative core-header precharge, atomic bytes/events, and serialization precharge are recorded. Regenerated candidate bytes equal the native-verified originals; bounded lifecycle ASAN passed 256 runs and boundary units passed 942; normal hooks remain pending |
 | Package fidelity | Native parse, semantic parity, exact no-op output, inverse/locality tests, and substantial synthetic transaction suites | Self-roundtrip does not prove native acceptance of changed output; native verification for generated packages is explicitly external/opt-in |
 | Pages body-table hidden axes | Focused selector/value/transaction, identity/COW, and concurrent snapshot coverage exercise existing role-qualified type-6000/type-6001 owners, canonical type-6267/type-4008 ownership, UID/extents, unknown-field/member preservation, exact patches, locality, preview invalidation, malformed/budget/lock/pivot/dependency refusals, absent-owner empty reads/no-ops, and nonempty absent-owner refusal; current Pages and protobuf suites plus scoped all-target strict Clippy are green, and the registered `pages_body_table_hidden_axes` fuzz target has bounded descriptors with checked-in valid/malformed/ownership/limit seeds | The checked-in [`body-table-visible.pages`](../test-data/iwork/pages/body-table-visible.pages) is a native Pages 14.4 visible 5-by-4 baseline with a body marker; its native hidden-state envelope has one owner with empty row and column state lists. Disposable UI copies were saved, closed, and reopened without repair, and the focused package exact `Package` no-op verification succeeds. It has no user-hidden axes, so there is no positive hidden-axis E2 or E3/E4 mutation evidence. Workspace/all-features lint now passes under the unchanged strict policy; current native-profile admission remains separately scoped. The older generated-candidate Pages 14.4 attempt remains historical negative evidence; current fuzz verification is tracked in ADR 0008. The raw-ID Pages host route remains until creation parity and native mutation gates pass, with no focused-route fallback |
 | CI | Ubuntu workspace all-feature lib/integration/doc tests; all targets compile | iWork is absent from macOS/Windows test matrices; no leaf-feature isolation, native-app runner, fuzz/sanitizer, Miri, or coverage gate; iWork fixture paths do not trigger Rust CI |
@@ -157,6 +247,8 @@ exploratory-native diagnostics; they do not certify current-owner native interop
 | Keynote physical `Sort Now` native probe | 🟡 A disposable pre-hardening candidate opened and round-tripped in Keynote 14.4, but the current strict owner rejects the app-authored source because model field 39 identifies an unowned conditional-style CalculationEngine dependency graph. The run and hashes are recorded in ADR 0008 as exploratory evidence only; no current-owner E3/E4 promotion follows. The canonical `basic.key` fixture has no table; the separate `table-discovery.key` fixture is reserved for the bounded migration-host name/dimension discovery regression and does not certify physical sorting. |
 | Keynote soundtrack-item lifecycle | ✅ Focused owner tests cover bounded read/add/insert/replace/remove, shared occurrences, malformed references, aggregate-only preservation, atomic errors, exact apply/inverse, and stale-source conflicts; the focused fuzz target and corpus are present. The duplicate legacy item API is retired behind a boundary ratchet. One genuine replacement candidate passed Keynote save/close/reopen without repair; operation-wide native certification, soundtrack creation, general asset CRUD, and all whole-monolith deletion gates remain open. |
 | Keynote existing slide-media content/poster owner | 🟡 Selector-first `Package::{slide_media_data, edit_slide_media_data, apply_slide_media_data}` reads borrowed content/poster bytes and replaces one selected existing record after rooted graph, owner, digest/length, media-family, and finite-limit checks. Shared records remain shared; exact no-op/inverse/stale-patch, candidate reread, locality, unrelated-member preservation, and preview invalidation are bounded source-level contracts. The native [`media-replacement-native.key`](../test-data/iwork/keynote/media-replacement-native.key) source is 752,060 bytes with SHA-256 `f5763984974612f078486cb2310f408cbcb7cd06ef6adca494aae19eaf62609d`; it was saved, actually closed, and reopened in Keynote 14.4 with Audio/Audio/File/File source order and shared movie geometry/caption/playback intact. The combined content/poster candidate opened without repair and survived native save/actual-close/exact-reopen with all four objects and exact replacement payloads intact. Strict reread of the native-resaved artifact passed six shared-record reads and six exact no-op writes, establishing operation-specific E4; the poster result is byte-preserved storage evidence, not a visual-preview match. The three narrow host wrappers are removed, while generic `replace_media` and broad asset lifecycle remain host-owned. |
+| Keynote media lifecycle native-oracle pass | 🟡 Permanent Keynote 14.4 audio duplicate/removal fixtures record three-audio/two-movie retention, final WAV removal, and movie/poster retention; both permanent artifacts passed native save, actual close, and exact-path reopen. The earlier movie duplicate/removal fixtures remain recorded above | These artifacts are native-authored expected-behavior evidence only. No Litchi-mutated lifecycle candidate, focused lifecycle E3/E4, candidate test count, or host-route retirement follows; the first-audio-removal intermediate snapshot is temporary and ungated |
+| Keynote selector-first media lifecycle owner and native E4 | 🟡 `Package::{duplicate_slide_media, remove_slide_media}` plus typed movie/audio aliases now keep selectors, exact-source patches, graph closure, shared-data retention/final-owner GC, and one operation-wide budget behind the focused owner. The lifecycle integration target passes 21 cases (18 existing plus 3 header-reference refusal regressions); four native-focused tests cover six temporary native-saved outputs, and strict direct readback passes without rewriting all six outputs; sizes and hashes are recorded in the Sep 7 ADR/fixture receipt | Operation-specific native E4 only. Neutral identity passes 45 units including versioned accounting, the new lazy codec passes 10, and strict protobuf and Keynote Clippy pass. The private lifecycle unit slice passes 11 and existing replacement validation passes 28; regenerated candidate bytes equal the native-verified originals. bounded lifecycle ASAN passed 256 runs and boundary units passed 942; normal hooks remain pending; no host lifecycle route was retired and no generic media CRUD claim follows |
 | Numbers persisted-sort/relocation physical compatibility | 🟡 Exact package snapshots stay on semantic focused transactions with terminal refusals; only historical source-built snapshots may use the private physical bridges for field 44 or table relocation. No public physical owner or ADR 0028 gate impact follows. |
 | Broad Numbers baseline snapshot (2026-09-01; stale) | ❌ 405 unit tests passed/4 ignored; all integration targets passed except `table_data_list_reader_integration`, where 19 passed and 6 pre-existing comment/reply cases returned `InvalidSource` while validating synthetic comment metadata. This is a historical baseline snapshot, not a current-worktree result. |
 | Numbers 14.4 Percentage probe | ✅ Rust candidate opened without repair; native save/close/reopen retained `4,200.000%`, three decimals, red-parentheses negatives, thousands separator, and Actual value `42`; strict Rust reread emitted an exact semantic no-op with zero touched components and the native-resaved SHA-256 unchanged |

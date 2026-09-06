@@ -458,6 +458,10 @@ pub use package::{
     SlideMediaDataError, SlideMediaDataLimitKind, SlideMediaDataPatch,
 };
 pub use package::{
+    SlideMediaLifecycleCommit, SlideMediaLifecycleDiagnostics, SlideMediaLifecycleError,
+    SlideMediaLifecycleLimitKind, SlideMediaLifecyclePatch,
+};
+pub use package::{
     SlideTableCellNumberFormatCommit, SlideTableCellNumberFormatDiagnostics,
     SlideTableCellNumberFormatEdit, SlideTableCellNumberFormatError,
     SlideTableCellNumberFormatLimitKind, SlideTableCellNumberFormatPatch,

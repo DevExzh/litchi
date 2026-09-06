@@ -460,6 +460,42 @@ mod buffa_keynote_movie_geometry_generated {
     ));
 }
 
+/// Private scalar Buffa views for bounded media lifecycle wire parity.
+#[doc(hidden)]
+mod buffa_keynote_media_lifecycle_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated views are private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-media-lifecycle/iwa_keynote_media_lifecycle_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for the selected Keynote chart-title
 /// generated extension fields.
 ///
@@ -1895,6 +1931,11 @@ pub mod keynote_soundtrack_settings_codec;
 /// values remain private and caller-owned source bytes remain authoritative.
 #[doc(hidden)]
 pub mod keynote_media_codec;
+
+/// Internal bounded Keynote media lifecycle wire operations. Generated views
+/// remain private; callers retain the exact source and graph ownership.
+#[doc(hidden)]
+pub mod keynote_media_lifecycle_codec;
 
 /// Internal Numbers TableInfo model-reference projection implemented by a
 /// private strict Buffa lazy-view sidecar. Generated types remain inaccessible

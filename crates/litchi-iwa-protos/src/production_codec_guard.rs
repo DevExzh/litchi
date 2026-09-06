@@ -762,6 +762,10 @@ mod tests {
         ),
         ("keynote_media", include_str!("keynote_media_codec.rs")),
         (
+            "keynote_media_lifecycle",
+            include_str!("keynote_media_lifecycle_codec.rs"),
+        ),
+        (
             "keynote_slide_transition",
             include_str!("keynote_slide_transition_codec.rs"),
         ),

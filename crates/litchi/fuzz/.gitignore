@@ -92,6 +92,9 @@ coverage
 !/corpus/keynote_slide_media_data/
 /corpus/keynote_slide_media_data/*
 !/corpus/keynote_slide_media_data/*.seed
+!/corpus/keynote_slide_media_lifecycle/
+/corpus/keynote_slide_media_lifecycle/*
+!/corpus/keynote_slide_media_lifecycle/*.seed
 !/corpus/archive_object_identity_remap/
 /corpus/archive_object_identity_remap/*
 !/corpus/archive_object_identity_remap/*.seed

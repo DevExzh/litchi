@@ -356,6 +356,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_slide_media_lifecycle"
+path = "fuzz_targets/keynote_slide_media_lifecycle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "archive_object_identity_remap"
 path = "fuzz_targets/archive_object_identity_remap.rs"
 test = false

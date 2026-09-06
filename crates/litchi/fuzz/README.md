@@ -44,6 +44,35 @@ larger input, and it uses fresh package parses for each deterministic
 operation so a static fixture is never mutated or reused as transaction
 state.
 
+`keynote_slide_media_lifecycle` is the focused selector-first duplicate/remove
+target for Keynote movies and audio. Arbitrary inputs first exercise bounded
+Keynote ingress; the same bounded command bytes then select the synthetic
+`Fuzz media` slide by position or name, choose one of its two file movies or
+independent audio drawable, and request duplication or removal. The target
+checks source immutability, exact-source forward application, deterministic
+reapplication, inverse byte restoration, stale post-state rejection, and
+preservation of the sentinel and non-final-owner media members. The tiny
+command corpus currently contains `corpus/keynote_slide_media_lifecycle/
+duplicate-movie.seed` and `remove-audio.seed`; it contains no native package
+bytes or raw archive identifiers.
+
+Run the bounded sanitizer campaign with those command seeds using explicit
+input, time, memory, and iteration ceilings:
+
+```sh
+cargo +nightly fuzz run keynote_slide_media_lifecycle \
+  corpus/keynote_slide_media_lifecycle -- \
+  -runs=256 -max_total_time=60 -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+On 2026-09-07 the AddressSanitizer campaign passed all 256 runs with no
+findings and 244 MiB peak RSS. It used a temporary copy of the two command
+seeds and an isolated target directory; generated corpus mutations and build
+artifacts were disposable. Seed-contract assertions require successful movie
+and audio duplication/removal through both selector forms, and double-inverse
+replay is compared by resulting artifact bytes. This bounded smoke is E1
+robustness evidence, not exhaustive coverage or a broader native feature claim.
+
 `keynote_slide_text` is the focused title/body robustness target. It first
 offers arbitrary bytes to the bounded Keynote package ingress, then uses those
 same bytes as commands against the repository's native `basic.key` seed. This

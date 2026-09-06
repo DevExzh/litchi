@@ -22,6 +22,7 @@ mod slide_chart_legend;
 mod slide_chart_title;
 mod slide_chart_value_axis;
 pub(crate) mod slide_delete;
+mod slide_media_lifecycle;
 mod slide_media_replacement;
 mod slide_movie_caption;
 mod slide_movie_geometry;
@@ -145,6 +146,10 @@ pub use slide_chart_title::{
 pub use slide_chart_value_axis::{
     ChartValueAxisCommit, ChartValueAxisDiagnostics, ChartValueAxisEdit, ChartValueAxisError,
     ChartValueAxisLimitKind, ChartValueAxisPatch,
+};
+pub use slide_media_lifecycle::{
+    SlideMediaLifecycleCommit, SlideMediaLifecycleDiagnostics, SlideMediaLifecycleError,
+    SlideMediaLifecycleLimitKind, SlideMediaLifecyclePatch,
 };
 pub use slide_media_replacement::{
     MediaPart, SlideMediaData, SlideMediaDataCommit, SlideMediaDataDiagnostics, SlideMediaDataEdit,

@@ -9284,6 +9284,105 @@ verification passes 936 units. Workspace strict linting passes, and both clone/r
 targets pass 256 AddressSanitizer runs. The full boundary scanner passes (64 packages, 238 internal dependency
 declarations, 11 explicit debts). Commit `55499d9c5` passed normal formatting,
 manifest sorting, strict workspace lint, all-feature workspace library and
-integration tests, and documentation tests. The
-selector-level lifecycle owner and further host-route retirement remain
-pending, so no ADR 0028 deletion-gate status changes.
+integration tests, and documentation tests. At this Sep 6 snapshot the
+selector-level lifecycle owner and further host-route retirement remained
+pending, so no ADR 0028 deletion-gate status changed; the Sep 7 section below
+supersedes that status.
+
+## 2026-09-06 follow-up: Keynote audio lifecycle native oracles
+
+Computer Use completed a second native-authoring pass for the audio branches of
+the Keynote media lifecycle. The duplicate oracle
+[`media-lifecycle-audio-duplicate-native.key`](../../test-data/iwork/keynote/media-lifecycle-audio-duplicate-native.key)
+is 752,241 bytes with SHA-256
+`4613f7a275388a1d053407f849a3845de2789acdfe5c36139892d20a17e57c3c`; it
+contains three audio objects and two captioned movie objects, with the WAV,
+movie-content, and poster data records all retained. The removal oracle
+[`media-lifecycle-audio-remove-native.key`](../../test-data/iwork/keynote/media-lifecycle-audio-remove-native.key)
+is 559,085 bytes with SHA-256
+`052e6389af8719e2e6ffadf2d5fbae0c5275983b94c5ce9efd811f59cf1c1bfb`; it
+contains no audio objects while retaining the two captioned movies, removes
+the WAV record (`DataInfo` 9075), and retains the movie-content and poster
+records (`DataInfo` 9085 and 9086). Both permanent artifacts were authored,
+saved, actually closed, and reopened from their exact paths in Keynote 14.4.
+
+The first-audio-removal intermediate snapshot retained the shared WAV through
+the remaining audio occurrence. It is a temporary diagnostic artifact, 751,692
+bytes with SHA-256
+`7e39344f54222786ae3241ef4f14ebcefdfc96bb0c54a7c8401348a71318f36e`, and is
+not a checked-in fixture because it did not receive the native close/reopen
+gate. These artifacts are native-authored expected-behavior oracles only; they
+are not Litchi-mutated candidates and do not establish focused mutation E3/E4.
+
+At this Sep 6 oracle snapshot the selector-level lifecycle owner, lazy wire
+codec, clone-payload path, and metadata adapter were under implementation.
+Candidate verification and focused test counts were intentionally deferred;
+the Sep 7 owner and E4 section below supersedes that pending status. This
+oracle pass itself made no ADR 0028 deletion-gate change.
+
+## 2026-09-07 follow-up: selector-first Keynote media lifecycle owner and native E4
+
+The focused `litchi-keynote` owner now exposes selector-first lifecycle
+transactions through
+`Package::{duplicate_slide_media, remove_slide_media}` and the typed movie and
+audio aliases `duplicate_slide_movie`, `duplicate_slide_audio`,
+`remove_slide_movie`, and `remove_slide_audio`. Callers select a slide with
+`SlideSelector` and a source-order drawable with `MovieSelector`; native object
+identifiers, UUIDs, component paths, `DataInfo` keys, and ZIP members remain
+private. The returned `SlideMediaLifecyclePatch` authorizes an exact source,
+provides `inverse()` and `is_noop()`, and can be replayed through
+`Package::apply_slide_media_lifecycle` after bounded candidate verification.
+
+The owner closes the selected slide/build/build-chunk graph, clones or removes
+the private graph, preserves shared materialized data until its final owner,
+and reclaims final data records only after the package-wide ownership census.
+One `LifecycleBudget` is shared by graph selection, raw payload cloning,
+metadata transition, lazy wire work, archive encoding, ZIP reassembly, and
+candidate readback. The neutral
+[`KNMediaLifecycleArchive.proto`](../../crates/litchi-iwa-protos/src/buffa-projections/KNMediaLifecycleArchive.proto)
+projection is 957 bytes and contains five messages; borrowed slide/build and
+build-chunk snapshots and source-preserving rewrites keep generated repeated
+views out of the lifecycle owner.
+
+Computer Use verified six operation-specific native E4 profiles from temporary
+source candidates under
+`/private/tmp/litchi-media-lifecycle-20260906r/candidates`. Each candidate was
+opened at its exact path in Keynote 14.4, saved with Cmd-S, actually closed
+until the theme chooser appeared, reopened at its exact path, checked for the
+expected media counts, text, and captions without alerts, and closed again.
+The native-saved receipts are temporary copies under
+`/private/tmp/litchi-media-lifecycle-20260906r/native-saved`; none were copied
+into the permanent `test-data` fixtures:
+
+| Native-saved receipt | Expected profile | Bytes | SHA-256 |
+| --- | --- | ---: | --- |
+| `focused-native-duplicate-movie.key` | 3 movies, 2 audio | 752,707 | `bb2f3d0318a311ba0cfdf4fa1d8b88488f8e0172ba02fda73d689ea15ae0344a` |
+| `focused-native-duplicate-audio.key` | 2 movies, 3 audio | 752,189 | `39eb5ba491acbdf2bc7295a2c549520ed538e1ca73f5b5e109b0cb74d587be38` |
+| `focused-native-remove-movie-shared.key` | 1 movie, 2 audio | 745,166 | `16d1241c50fb4ad093e10c2befebac1303a9442e4efda22ef6355c6d2b933c91` |
+| `focused-native-remove-audio-shared.key` | 2 movies, 1 audio | 751,698 | `452af453a6b453aa454319e1033a1b5be0389a8954c245d2b789bee310c97170` |
+| `focused-native-remove-movie-final.key` | 0 movies, 2 audio | 698,799 | `9e3b40157610ded1f618d64112c4e964c6f03089a5ceabb9fb7899eca5320b99` |
+| `focused-native-remove-audio-final.key` | 2 movies, 0 audio | 559,060 | `1477986335aca0e093b404a259bba9d866d7083a101aeeb1b2b1509982f03ece` |
+
+The lifecycle integration target now passes 21 cases: the original 18 cases
+plus three header-reference refusal regressions. With
+`LITCHI_KEYNOTE_MEDIA_LIFECYCLE_NATIVE_SAVED_DIR` enabled, the direct
+`native_saved_candidates_are_read_back_without_rewriting_them` integration test
+strictly rereads all six native-saved candidates without rewriting them. The
+four focused native lifecycle tests pass for the six exports, establishing
+operation-specific lifecycle E4 evidence rather than broad Keynote
+certification.
+
+The neutral identity codec passes 45 unit cases, including the versioned
+component accounting regression; the new lazy lifecycle codec passes 10 cases;
+and strict protobuf and Keynote Clippy pass. The private lifecycle unit slice
+passes 11 cases, while existing replacement validation passes 28 cases (22
+replacement, 2 budget, and 4 native-oracle cases). The hardening fixes cover
+the actual `ShapeInfoArchive` reference edge, exact versioned-component work
+charging, source-relative core-header precharge with atomic byte/event
+accounting, and serialization precharge before candidate allocation.
+Regenerating all six focused candidate inputs produces bytes exactly equal to
+the native-verified originals. Fresh-export equality and strict native-saved
+readback both pass. The bounded lifecycle AddressSanitizer campaign passed 256 runs with no
+findings (244 MiB peak RSS); boundary verification passes 942 unit tests.
+Normal repository hooks remain pending, and no host lifecycle routes were retired or ADR 0028 deletion-gate
+status changed.
