@@ -3445,6 +3445,151 @@ def add_keynote_slide_media_data_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
+    """Create the focused Keynote duplicate/remove boundary fixture."""
+
+    owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "mod budget;\n"
+        "mod clone_payload;\n"
+        "mod graph;\n"
+        "mod metadata;\n"
+        "use budget::MediaLifecycleBudget;\n"
+        "pub struct LifecycleCommit;\n"
+        "pub struct LifecyclePatch;\n"
+        "pub enum LifecycleError { InvalidSource }\n"
+        "fn select_media() {}\n"
+        "fn clone_object() {}\n"
+        "fn metadata_transition() {}\n"
+        "fn candidate_reopen_verify() {}\n"
+        "fn exact_source_fingerprint_inverse() { ExactArtifacts; source_fingerprint; inverse; PatchConflict; }\n"
+        "impl Package {\n"
+        "    pub fn duplicate_slide_media(&self, slide: SlideSelector, movie: MovieSelector) -> Result<LifecycleCommit, LifecycleError> { let mut budget = MediaLifecycleBudget::for_package(self); select_media(&mut budget); clone_object(&mut budget); replace_slide_message_with_lifecycle_refs(&mut budget); metadata_transition(); candidate_reopen_verify(); let _ = (slide, movie, budget); todo!() }\n"
+        "    pub fn remove_slide_media(&self, slide: SlideSelector, movie: MovieSelector) -> Result<LifecycleCommit, LifecycleError> { let mut budget = MediaLifecycleBudget::for_package(self); select_media(&mut budget); replace_slide_message_with_lifecycle_refs(&mut budget); metadata_transition(); candidate_reopen_verify(); let _ = (slide, movie, budget); todo!() }\n"
+        "    pub fn apply_slide_media_lifecycle(&self, patch: &LifecyclePatch) -> Result<LifecycleCommit, LifecycleError> { let mut budget = MediaLifecycleBudget::for_package(self); replace_slide_message_with_lifecycle_refs(&mut budget); metadata_transition(); candidate_reopen_verify(); let _ = (patch, budget); todo!() }\n"
+        "}\n"
+        "impl LifecyclePatch { pub fn inverse(&self) -> Self { Self } }\n"
+        "fn bounded_allocations() { try_reserve(); checked_add(); checked_mul(); allocation(); }\n",
+        encoding="utf-8",
+    )
+    for child, source in {
+        "budget.rs": (
+            "struct MediaLifecycleBudget { allocation_bytes: u64, allocations: usize }\n"
+            "impl MediaLifecycleBudget {\n"
+            "    fn for_package(package: &Package) -> Self { let _ = package; Self { allocation_bytes: 0, allocations: 0 } }\n"
+            "    fn charge_allocations(&mut self, amount: usize) { self.charge_allocation_plan(amount, 1); }\n"
+            "    fn charge_allocation_plan(&mut self, amount: usize, events: usize) {\n"
+            "        let observed_bytes = self.allocation_bytes + amount as u64;\n"
+            "        let observed_events = self.allocations + events;\n"
+            "        if observed_bytes > max_output || observed_events > max_allocations { return; }\n"
+            "        self.allocation_bytes = observed_bytes;\n"
+            "        self.allocations = observed_events;\n"
+            "    }\n"
+            "}\n"
+            "fn bounded_allocations() { try_reserve(); checked_add(); checked_mul(); allocation(); }\n"
+        ),
+        "clone_payload.rs": (
+            "fn clone_payload() { clone_with_identity_remap(); candidate; reopen; verify; }\n"
+        ),
+        "graph.rs": (
+            "fn graph() { SlideSelector; MovieSelector; select_media(); "
+            "let mut charge = |amount| budget.charge_allocations(amount); "
+            "remap_clone_payload_with_budget(source, &mut charge); "
+            "IdentifierRewrite; UuidRewrite; replace_slide_message_with_lifecycle_refs(); "
+            "rewrite_slide_lifecycle(); rewrite_build(); rewrite_build_chunk(); }\n"
+            "fn clone_object() { let limits = reserve_core_header_work(source, object_remap.len(), limits, budget)?; source.clone_with_identity_remap_with_limits(new_identifier, object_remap, replacements, limits); }\n"
+            "fn replace_slide_message_with_lifecycle_refs() { let limits = reserve_core_header_work(object, removed.len(), limits, budget)?; object.replace_message_pruning_object_references_preserving_header_with_limits(limits); let limits = reserve_core_header_work(object, growth, limits, budget)?; object.replace_message_transitioning_object_references_preserving_header_with_limits(limits); }\n"
+            "fn reserve_core_header_work(source: ArchiveObject, additional_references: usize, limits: ArchiveObjectLimits, budget: &mut MediaLifecycleBudget) { let bytes = source.header_length; let events = additional_references; budget.charge_allocation_plan(bytes, events); budget.charge_wire_work(bytes); }\n"
+        ),
+        "metadata.rs": (
+            "fn metadata() { MetadataSnapshot; IdentityBatch; MediaBatch; "
+            "package_metadata; candidate; reopen; readback; verify; }\n"
+        ),
+    }.items():
+        path = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / child
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(source, encoding="utf-8")
+
+    package = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_EXPORT_SOURCES[0]
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text(
+        "mod slide_media_lifecycle;\n"
+        "pub use slide_media_lifecycle::{LifecycleCommit, LifecycleError, LifecyclePatch};\n",
+        encoding="utf-8",
+    )
+    library = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_EXPORT_SOURCES[1]
+    library.parent.mkdir(parents=True, exist_ok=True)
+    library.write_text(
+        "pub use package::{LifecycleCommit, LifecycleError, LifecyclePatch};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::movie::MovieSelector;\n",
+        encoding="utf-8",
+    )
+
+    codec = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::DecodeOptions as BuffaDecodeOptions;\n"
+        "use crate::buffa_keynote_media_lifecycle_generated::LitchiIwaProjection;\n"
+        "pub struct DecodeError; pub enum DecodeLimit { Work } pub struct DecodeOptions;\n"
+        "pub struct Uuid; pub struct Reference<'a> { raw: &'a [u8] } pub struct UuidSnapshot<'a> { raw: &'a [u8] }\n"
+        "pub struct DecodeReport; pub struct SlideLifecycleSnapshot<'a> { source: &'a [u8] }\n"
+        "pub struct BuildLifecycleSnapshot<'a> { source: &'a [u8] }\n"
+        "pub struct BuildChunkLifecycleSnapshot<'a> { source: &'a [u8] }\n"
+        "pub struct IdentifierRewrite; pub struct UuidRewrite; pub struct SlideLifecycleEdit<'a> { source: &'a [u8] }\n"
+        "pub struct BuildLifecycleEdit; pub struct BuildChunkLifecycleEdit; pub struct RewriteReport;\n"
+        "pub struct PreparedSlideLifecycleRewrite<'a> { source: &'a [u8] }\n"
+        "pub fn decode_slide_lifecycle() {} pub fn decode_slide_lifecycle_with_report() {}\n"
+        "pub fn decode_build() {} pub fn decode_build_with_report() {}\n"
+        "pub fn decode_build_chunk() {} pub fn decode_build_chunk_with_report() {}\n"
+        "pub fn prepare_slide_lifecycle_rewrite() {} pub fn rewrite_slide_lifecycle() {}\n"
+        "pub fn rewrite_slide_lifecycle_with_report() {}\n"
+        "pub fn rewrite_build() {} pub fn rewrite_build_with_report() {}\n"
+        "pub fn rewrite_build_chunk() {} pub fn rewrite_build_chunk_with_report() {}\n"
+        "fn bounded() { DecodeOptions; max_message_bytes; max_output_bytes; max_fields; max_work_bytes; try_reserve(); }\n"
+        "fn strict() { validate_input(); canonical; unknown; raw; decode_lazy_view(); source; output_bytes; readback; }\n",
+        encoding="utf-8",
+    )
+    projection = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_SOURCE
+    projection.parent.mkdir(parents=True, exist_ok=True)
+    projection.write_text(
+        'syntax = "proto2";\npackage LitchiIwaProjection;\n'
+        "message Reference { required uint64 identifier = 1; optional int32 deprecated_type = 2; optional bool deprecated_is_external = 3; }\n"
+        "message UUID { required uint64 lower = 1; required uint64 upper = 2; }\n"
+        "message BuildChunkIdentifierArchive { optional UUID build_id = 1; optional int32 build_chunk_id = 2; }\n"
+        "message BuildArchive { optional Reference drawable = 1; }\n"
+        "message BuildChunkArchive { optional Reference build = 1; optional BuildChunkIdentifierArchive build_chunk_identifier = 7; optional UUID build_id = 8; }\n",
+        encoding="utf-8",
+    )
+    proto_lib = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_PUBLIC_SOURCE
+    proto_lib.parent.mkdir(parents=True, exist_ok=True)
+    proto_lib.write_text(
+        "#[doc(hidden)]\nmod buffa_keynote_media_lifecycle_generated {\n"
+        'include!(concat!(env!("OUT_DIR"), "/buffa-keynote-media-lifecycle/iwa_keynote_media_lifecycle_buffa_protos.rs"));\n}\n'
+        "#[doc(hidden)]\npub mod keynote_media_lifecycle_codec;\n",
+        encoding="utf-8",
+    )
+    build = root / "crates/litchi-iwa-protos/build.rs"
+    build.parent.mkdir(parents=True, exist_ok=True)
+    build.write_text(
+        "let buffa_keynote_media_lifecycle_out_directory = out_dir.join("
+        '"buffa-keynote-media-lifecycle");\n'
+        "buffa_build::Config::new().files(&["
+        '"KNMediaLifecycleArchive.proto"]).out_dir(&buffa_keynote_media_lifecycle_out_directory) '
+        '.include_file("iwa_keynote_media_lifecycle_buffa_protos.rs") '
+        ".generate_views(true).lazy_views(true).preserve_unknown_fields(false).compile()?;\n"
+        "enforce_keynote_media_lifecycle_projection_budget("
+        "&buffa_keynote_media_lifecycle_out_directory,);\n"
+        "fn enforce_keynote_media_lifecycle_projection_budget() {\n"
+        "const EXPECTED_FILES: usize = 5; const MAX_GENERATED_BYTES: u64 = 180 * 1024;\n"
+        "let repeated_views = 0; let lazy_repeated_views = 0;\n"
+        "if repeated_views != 0 || lazy_repeated_views != 0 { RepeatedView LazyRepeatedView }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def add_keynote_chart_axis_title_canonical_scaffold(root: Path) -> None:
     """Install a complete Wave112 axis-title boundary fixture."""
 
@@ -18977,6 +19122,306 @@ fn rewrite_movie_title_operation(
             "+ audit_keynote_slide_media_data_metadata_boundary_source_topology()",
             "+ audit_keynote_slide_media_data_resource_source_topology()",
             "+ audit_keynote_slide_media_data_transaction_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_slide_media_lifecycle_audits_are_dormant_until_owner_activation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            audits = (
+                boundaries.audit_keynote_slide_media_lifecycle_facade_source_topology,
+                boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology,
+                boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology,
+            )
+            for audit in audits:
+                self.assertEqual(audit(root), [], audit.__name__)
+
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            for audit in audits:
+                self.assertEqual(audit(root), [], audit.__name__)
+
+    def test_keynote_slide_media_lifecycle_facade_rejects_raw_graph_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_lifecycle(bytes: &[u8], movie_object_id: u64, archive: Archive, wire: WireView) {}\n"
+                + "pub use self::LifecyclePatch as LifecycleAlias;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("wire type" in item for item in violations), violations)
+            self.assertTrue(any("raw bytes" in item for item in violations), violations)
+
+            package = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_EXPORT_SOURCES[0]
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "mod slide_media_lifecycle;", "pub mod slide_media_lifecycle;"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+
+    def test_keynote_slide_media_lifecycle_transaction_requires_one_budget_and_children(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            owner.write_text(source.replace("mod graph;\n", "", 1), encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("graph child" in item for item in violations), violations)
+
+            owner.write_text(source.replace("mod budget;\n", "", 1), encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("budget child" in item for item in violations), violations)
+
+            owner.write_text(
+                source.replace("mod clone_payload;\n", "pub mod clone_payload;\n", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("child modules must remain private" in item for item in violations), violations)
+
+            owner.write_text(
+                source.replace("select_media(&mut budget)", "select_media()", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("route its shared budget through select_media" in item for item in violations), violations)
+
+            owner.write_text(
+                source.replace("clone_object(&mut budget)", "clone_object()", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("route its shared budget through clone_object" in item for item in violations), violations)
+
+            owner.write_text(
+                source.replace(
+                    "replace_slide_message_with_lifecycle_refs(&mut budget)",
+                    "replace_slide_message_with_lifecycle_refs()",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "route its shared budget through replace_slide_message_with_lifecycle_refs"
+                    in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+            graph = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "graph.rs"
+            graph_source = graph.read_text(encoding="utf-8")
+            graph.write_text(
+                graph_source.replace(
+                    "remap_clone_payload_with_budget", "remap_clone_payload", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("cfg(test) clone payload wrapper" in item for item in violations),
+                violations,
+            )
+
+            graph.write_text(
+                graph_source.replace("&mut charge", "&mut budget", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("charge callback" in item for item in violations), violations
+            )
+
+            graph.write_text(
+                graph_source.replace(
+                    "replace_slide_message_with_lifecycle_refs", "legacy_slide_rewrite"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("header helper" in item for item in violations), violations)
+            graph.write_text(graph_source, encoding="utf-8")
+
+            owner.write_text(
+                source + "struct SecondLifecycleBudget;\n", encoding="utf-8"
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("exactly one private aggregate budget" in item for item in violations), violations)
+
+            owner.write_text(
+                source.replace(
+                    "select_media(&mut budget); clone_object(&mut budget); replace_slide_message_with_lifecycle_refs(&mut budget); metadata_transition();",
+                    "let _nested = MediaLifecycleBudget::for_package(self); select_media(&mut budget); clone_object(&mut budget); replace_slide_message_with_lifecycle_refs(&mut budget); metadata_transition();",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("exactly one aggregate budget" in item for item in violations), violations)
+
+    def test_keynote_media_lifecycle_codec_and_projection_remain_lazy_and_bounded(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(root),
+                [],
+            )
+
+            codec = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8") + "fn eager() { prost::Message::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("eager generated operation" in item for item in violations), violations)
+
+            projection = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_SOURCE
+            projection.write_text(
+                projection.read_text(encoding="utf-8").replace(
+                    "message BuildArchive", "message Bad { repeated Reference values = 1; }\nmessage BuildArchive"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("repeated views" in item for item in violations), violations)
+
+            build = root / "crates/litchi-iwa-protos/build.rs"
+            build.write_text(
+                build.read_text(encoding="utf-8").replace(".lazy_views(true)", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("lazy_views" in item for item in violations), violations)
+
+    def test_keynote_media_lifecycle_reserves_core_header_work_and_bulk_budget_atomically(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            graph = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "graph.rs"
+            graph_source = graph.read_text(encoding="utf-8")
+            budget = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "budget.rs"
+            budget_source = budget.read_text(encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            graph.write_text(
+                graph_source.replace(
+                    "reserve_core_header_work(source, object_remap.len(), limits, budget)?;",
+                    "limits;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("clone core publication" in item for item in violations), violations)
+
+            graph.write_text(
+                graph_source.replace(
+                    "reserve_core_header_work(object, removed.len(), limits, budget)?;",
+                    "limits;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("prune core publication" in item for item in violations), violations)
+
+            graph.write_text(
+                graph_source.replace(
+                    "reserve_core_header_work(object, growth, limits, budget)?;",
+                    "limits;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("transition core publication" in item for item in violations), violations)
+
+            graph.write_text(graph_source, encoding="utf-8")
+            budget.write_text(
+                budget_source.replace("charge_allocation_plan", "charge_allocation_batch"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("atomic allocation plan" in item for item in violations), violations)
+
+    def test_keynote_slide_media_lifecycle_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_media_lifecycle_facade_source_topology()",
+            "+ audit_keynote_slide_media_lifecycle_codec_source_topology()",
+            "+ audit_keynote_slide_media_lifecycle_transaction_source_topology()",
         ):
             self.assertIn(expression, main_source)
 

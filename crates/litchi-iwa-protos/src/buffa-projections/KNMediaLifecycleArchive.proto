@@ -1,0 +1,35 @@
+// Focused lazy Buffa sidecar for the Keynote media lifecycle graph.
+//
+// The native KN archives contain many more fields than this projection.  The
+// handwritten codec validates the complete source and keeps it as the
+// preservation authority; Buffa is used only to cross-check the selected
+// references and UUID halves without materialising repeated fields.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message UUID {
+  required uint64 lower = 1;
+  required uint64 upper = 2;
+}
+
+message BuildChunkIdentifierArchive {
+  optional UUID build_id = 1;
+  optional int32 build_chunk_id = 2;
+}
+
+message BuildArchive {
+  optional Reference drawable = 1;
+}
+
+message BuildChunkArchive {
+  optional Reference build = 1;
+  optional BuildChunkIdentifierArchive build_chunk_identifier = 7;
+  optional UUID build_id = 8;
+}

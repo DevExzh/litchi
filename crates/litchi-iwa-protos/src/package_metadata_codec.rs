@@ -2175,6 +2175,62 @@ mod tests {
         );
     }
 
+    #[test]
+    fn rewrite_exact_work_excludes_current_additions_from_versioned_components() {
+        let selector = ComponentSelector::new(1, "document.iwa");
+        let current = component(1, "document.iwa", None, &[], &[]);
+        // A versioned component may carry the same identity as the current
+        // component.  It remains source-authoritative while the current
+        // component receives the new registry entry.
+        let versioned = component(
+            1,
+            "document.iwa",
+            None,
+            &[(901, UuidBits::new(90, 91))],
+            &[],
+        );
+        let source = metadata(1_000, &[current], &[versioned.clone()]);
+        let additions = [ObjectUuidAddition::new(
+            selector,
+            1_001,
+            UuidBits::new(100, 101),
+        )];
+
+        reset_work_charges();
+        let output = rewrite_package_metadata(
+            &source,
+            Batch::new(1_000, 1_001, &additions, &[]),
+            options(&source),
+        )
+        .expect("current-only additions must verify with a versioned twin");
+        assert_eq!(work_charges(), output.report().work_bytes());
+        assert!(
+            output
+                .bytes()
+                .windows(versioned.len())
+                .any(|window| window == versioned)
+        );
+
+        let report = output.report();
+        let exact = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.additions(),
+        );
+        reset_work_charges();
+        let replay =
+            rewrite_package_metadata(&source, Batch::new(1_000, 1_001, &additions, &[]), exact)
+                .expect("the exact aggregate work report must be replayable");
+        assert_eq!(replay.bytes(), output.bytes());
+        assert_eq!(replay.report(), report);
+        assert_eq!(work_charges(), report.work_bytes());
+    }
+
     fn reason(error: RewriteError) -> InvalidReason {
         error.invalid_reason().unwrap()
     }
@@ -10882,7 +10938,15 @@ fn precharge_candidate_component(
     } else {
         0
     };
-    let append = component_append_len(identifier, locator, batch)?;
+    // Registry additions belong to the current component only.  Versioned
+    // records are source-authoritative and are deliberately copied without
+    // additions; charging their candidate length as if they had the current
+    // component's appended records overestimates the verification work.
+    let append = if current {
+        component_append_len(identifier, locator, batch)?
+    } else {
+        0
+    };
     let candidate_len = checked_add(source.len(), append)?;
 
     // Header pass and Buffa parity pass.

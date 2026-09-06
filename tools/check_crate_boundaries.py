@@ -2966,6 +2966,201 @@ IWA_KEYNOTE_SLIDE_MEDIA_DATA_RETIRED_CALL = re.compile(
     r"(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
 
+# The next lifecycle seam owns movie/audio duplication and removal in the
+# focused Keynote package.  Keep this inventory separate from the existing
+# replacement owner: replacement already crossed its host-retirement gate,
+# while lifecycle graph mutation must remain dormant until its own package
+# module is wired.  The codec/projection checks are independent because their
+# neutral source can be reviewed before the package owner is activated.
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_media_lifecycle.rs"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_media_lifecycle"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_SOURCES = (
+    KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "graph.rs",
+    KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "metadata.rs",
+    KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "budget.rs",
+    KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "clone_payload.rs",
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?slide_media_lifecycle[ \t]*;"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_MODULE = re.compile(
+    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?:r#)?slide_media_lifecycle\b"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_CHILD_MODULE = re.compile(
+    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?:r#)?(?:graph|metadata|budget|clone_payload)\b"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS = frozenset(
+    {"duplicate_slide_media", "remove_slide_media", "apply_slide_media_lifecycle"}
+)
+# These names are intentionally accepted in both the short and prefixed
+# forms.  Existing Keynote owners use the prefixed form, while the lifecycle
+# module may keep a concise internal semantic spelling before re-exporting it.
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CANONICAL_TYPE_ALTERNATIVES = {
+    "commit": frozenset({"LifecycleCommit", "SlideMediaLifecycleCommit"}),
+    "patch": frozenset({"LifecyclePatch", "SlideMediaLifecyclePatch"}),
+    "error": frozenset({"LifecycleError", "SlideMediaLifecycleError"}),
+}
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SELECTOR_TYPES = frozenset(
+    {"SlideSelector", "MovieSelector"}
+)
+# These are semantic counters on the committed patch/diagnostics facade.  The
+# generic vocabulary classifier quite reasonably treats ``objects`` as a
+# native graph noun, but these accessors report counts and never expose an
+# object or identifier value.
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SEMANTIC_IDENTIFIERS = frozenset(
+    {"created_objects", "removed_objects"}
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "RawMessage",
+        "SourceCatalog",
+        "WireView",
+    }
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_WIRE_TYPES = frozenset(
+    {
+        "BuildChunkLifecycleEdit",
+        "BuildLifecycleEdit",
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "IdentifierRewrite",
+        "Reference",
+        "RewriteReport",
+        "SlideLifecycleEdit",
+        "SlideLifecycleSnapshot",
+        "Uuid",
+        "UuidRewrite",
+    }
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|movie|media|data|poster|audio|component|"
+    r"archive|message|resource|entry|metadata|package|build|chunk)[A-Za-z_]*"
+    r"(?:id|identifier))[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u64|u32|usize|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/keynote_media_lifecycle_codec.rs"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_MODULE = "keynote_media_lifecycle_codec"
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/buffa-projections/KNMediaLifecycleArchive.proto"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_APIS = (
+    "DecodeError",
+    "DecodeLimit",
+    "DecodeOptions",
+    "DecodeReport",
+    "Uuid",
+    "Reference",
+    "UuidSnapshot",
+    "SlideLifecycleSnapshot",
+    "BuildLifecycleSnapshot",
+    "BuildChunkLifecycleSnapshot",
+    "IdentifierRewrite",
+    "UuidRewrite",
+    "SlideLifecycleEdit",
+    "BuildLifecycleEdit",
+    "BuildChunkLifecycleEdit",
+    "RewriteReport",
+    "PreparedSlideLifecycleRewrite",
+    "decode_slide_lifecycle",
+    "decode_slide_lifecycle_with_report",
+    "decode_build",
+    "decode_build_with_report",
+    "decode_build_chunk",
+    "decode_build_chunk_with_report",
+    "prepare_slide_lifecycle_rewrite",
+    "rewrite_slide_lifecycle",
+    "rewrite_slide_lifecycle_with_report",
+    "rewrite_build",
+    "rewrite_build_with_report",
+    "rewrite_build_chunk",
+    "rewrite_build_chunk_with_report",
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_MARKER_GROUPS = {
+    "lazy Buffa ingress": (
+        "buffa::DecodeOptions",
+        "decode_lazy_view",
+        "buffa_keynote_media_lifecycle_generated",
+    ),
+    "strict source walk": (
+        "validate_input",
+        ("canonical", "noncanonical"),
+        ("unknown", "raw"),
+    ),
+    "finite resource accounting": (
+        "max_message_bytes",
+        "max_output_bytes",
+        "max_fields",
+        "max_work_bytes",
+        "try_reserve",
+    ),
+    "source-preserving rewrite": (
+        "prepare_slide_lifecycle_rewrite",
+        "output_bytes",
+        "readback",
+        "source",
+    ),
+}
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_MESSAGES = {
+    "Reference": {"identifier": 1, "deprecated_type": 2, "deprecated_is_external": 3},
+    "UUID": {"lower": 1, "upper": 2},
+    "BuildChunkIdentifierArchive": {"build_id": 1, "build_chunk_id": 2},
+    "BuildArchive": {"drawable": 1},
+    "BuildChunkArchive": {"build": 1, "build_chunk_identifier": 7, "build_id": 8},
+}
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_BUDGET_MARKERS = (
+    ("aggregate budget", re.compile(r"\b(?:Media|Lifecycle|Package|Transaction)[A-Za-z0-9_]*Budget\b")),
+    ("budget factory", re.compile(r"\b(?:for_package|for_source|new)[ \t\r\n]*\(")),
+    ("fallible allocation", re.compile(r"\b(?:try_reserve|checked_add|checked_mul|allocation)\b")),
+    ("candidate validation", re.compile(r"\b(?:candidate|reopen|readback|verify|verification|locality)(?:\b|_)")),
+    ("exact inverse", re.compile(r"\b(?:ExactArtifacts|source_fingerprint|inverse|PatchConflict)\b")),
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_BUDGET_FACTORY_CALL = re.compile(
+    r"\b[A-Za-z_][A-Za-z0-9_]*Budget\s*::\s*"
+    r"(?:for_package|for_source|new)\s*\("
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CLONE_PAYLOAD_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:[A-Za-z_][A-Za-z0-9_]*\s*::\s*)*"
+    r"remap_clone_payload_with_budget\s*\("
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_LEGACY_CLONE_PAYLOAD_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:[A-Za-z_][A-Za-z0-9_]*\s*::\s*)*"
+    r"remap_clone_payload\s*\("
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_HEADER_REWRITE_HELPER = re.compile(
+    r"\breplace_slide_message_with_lifecycle_refs\b"
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CORE_HEADER_RESERVATION = re.compile(
+    r"\breserve_core_header_work\s*\("
+)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_ALLOCATION_PLAN = re.compile(
+    r"\bcharge_allocation_plan\s*\("
+)
+
 # Wave98 moves existing canonical Keynote slide-table title settings behind a
 # selector-first package facade.  The strict Buffa projections remain shared
 # iWork codecs; this ratchet owns only the semantic facade and the bounded
@@ -53755,6 +53950,807 @@ def audit_keynote_slide_media_data_transaction_source_topology(
     return sorted(set(violations))
 
 
+def _keynote_slide_media_lifecycle_owner_present(root: Path) -> bool:
+    """Return whether the focused duplicate/remove owner crossed its seam."""
+
+    owner = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE
+    package = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_EXPORT_SOURCES[0]
+    if not owner.is_file() or not package.is_file():
+        return False
+    source = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(package.read_text(encoding="utf-8"))
+    )
+    return KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_MODULE.search(source) is not None
+
+
+def _keynote_lifecycle_marker_present(
+    source: str, marker: str | re.Pattern[str] | tuple[str, ...]
+) -> bool:
+    """Match one marker or one of a tuple of spelling alternatives."""
+
+    if isinstance(marker, tuple):
+        return any(_keynote_lifecycle_marker_present(source, item) for item in marker)
+    if isinstance(marker, re.Pattern):
+        return marker.search(source) is not None
+    return marker in source
+
+
+def audit_keynote_slide_media_lifecycle_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the focused lifecycle facade semantic and selector-first.
+
+    The check activates only after ``Package`` wires the private owner.  Its
+    declarations may then expose selectors, package values, and exact patches,
+    but they may not expose archive objects, generated wire values, raw bytes,
+    or native numeric identifiers.
+    """
+
+    if not _keynote_slide_media_lifecycle_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE
+    package_path, lib_path = (
+        root / path for path in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_EXPORT_SOURCES
+    )
+    owner = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    package = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    library = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    owner_code = _mask_rust_non_code(owner)
+    package_code = _mask_rust_non_code(package)
+    library_code = _mask_rust_non_code(library)
+    violations: list[str] = []
+
+    if KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_MODULE.search(package + library):
+        violations.append(
+            "focused litchi-keynote slide-media lifecycle owner module must remain private: "
+            f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_EXPORT_SOURCES[0]}"
+        )
+
+    declarations = dict(
+        (name, declaration)
+        for name, declaration, _line in _rust_public_methods_in_impl(owner, "Package")
+    )
+    for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS):
+        declaration = declarations.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote slide-media lifecycle Package method is missing "
+                f"{name}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+            continue
+        if name in {"duplicate_slide_media", "remove_slide_media"}:
+            for selector in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SELECTOR_TYPES):
+                if not re.search(rf"\b{re.escape(selector)}\b", declaration):
+                    violations.append(
+                        "focused litchi-keynote slide-media lifecycle Package method must "
+                        f"accept selector {selector} ({name}): "
+                        f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                    )
+        if re.search(r"\b(?:u64|u32|usize)\b|&\s*\[\s*u8\s*\]|Vec\s*<\s*u8\s*>", declaration):
+            violations.append(
+                "focused litchi-keynote slide-media lifecycle Package method exposes a raw "
+                f"wire value: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+        for match in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RAW_ID_PARAMETER.finditer(declaration):
+            violations.append(
+                "focused litchi-keynote slide-media lifecycle Package method exposes raw "
+                f"identifier {match.group(0).strip()}: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+
+    all_public = owner + "\n" + package + "\n" + library
+    exported_code = owner_code + "\n" + package_code + "\n" + library_code
+    for role, alternatives in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CANONICAL_TYPE_ALTERNATIVES.items():
+        if not any(
+            re.search(
+                rf"\b(?:pub(?:\([^()]*\))?\s+)?(?:struct|enum|type)\s+"
+                rf"{re.escape(name)}\b",
+                _mask_rust_non_code(all_public),
+            )
+            for name in alternatives
+        ):
+            violations.append(
+                "focused litchi-keynote slide-media lifecycle public API is missing "
+                f"canonical {role} type: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+
+    facade_names = (
+        set(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS)
+        | KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SELECTOR_TYPES
+        | set().union(*KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CANONICAL_TYPE_ALTERNATIVES.values())
+    )
+    physical = KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PHYSICAL_TYPES
+    wire = KEYNOTE_SLIDE_MEDIA_LIFECYCLE_WIRE_TYPES
+    for source, source_path in (
+        (owner, owner_path),
+        (package, package_path),
+        (library, lib_path),
+    ):
+        if not source:
+            continue
+        dedicated = source_path == owner_path
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated and not (identifiers & facade_names):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SEMANTIC_IDENTIFIERS:
+                    continue
+                if identifier in physical:
+                    reason = "archive/IWA type"
+                elif identifier in wire or identifier == "wire":
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote slide-media lifecycle public API exposes "
+                        f"{reason} {identifier}: {source_path.relative_to(root)}:{line_number}"
+                    )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote slide-media lifecycle public API retains a glob "
+                    f"re-export: {source_path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RAW_ID_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-keynote slide-media lifecycle public API exposes raw "
+                    f"identifier {match.group(0).strip()}: "
+                    f"{source_path.relative_to(root)}:{line_number}"
+                )
+            if re.search(r"&\s*\[\s*u8\s*\]|Vec\s*<\s*u8\s*>", declaration):
+                violations.append(
+                    "focused litchi-keynote slide-media lifecycle public API exposes raw "
+                    f"bytes: {source_path.relative_to(root)}:{line_number}"
+                )
+
+    # The owner may use low-level types privately, but public declarations
+    # must still route through the exact source-bound patch contract.
+    if not re.search(r"\b(?:patch|source_fingerprint|ExactArtifacts|inverse)\b", exported_code):
+        violations.append(
+            "focused litchi-keynote slide-media lifecycle facade is missing an exact-source "
+            f"patch/inverse marker: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_media_lifecycle_codec_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the neutral bounded lazy lifecycle codec and private projection."""
+
+    codec_path = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_SOURCE
+    if not codec_path.is_file():
+        return []
+    raw = codec_path.read_text(encoding="utf-8")
+    source = _mask_rust_cfg_test_items(raw)
+    code = _mask_rust_non_code(source)
+    violations: list[str] = []
+    for name in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_APIS:
+        kind = "fn" if name.startswith(("decode_", "prepare_", "rewrite_")) else ""
+        pattern = (
+            rf"\b(?:pub\s+)?fn\s+{re.escape(name)}\b"
+            if kind == "fn"
+            else rf"\b(?:pub\s+)?(?:struct|enum|type|trait)\s+{re.escape(name)}\b"
+        )
+        if re.search(pattern, code) is None:
+            violations.append(
+                "focused Keynote media lifecycle codec is missing strict API "
+                f"{name}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_SOURCE}"
+            )
+
+    for label, markers in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_MARKER_GROUPS.items():
+        if not all(_keynote_lifecycle_marker_present(code, marker) for marker in markers):
+            violations.append(
+                "focused Keynote media lifecycle codec is missing "
+                f"{label} marker: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_SOURCE}"
+            )
+
+    eager_patterns = (
+        re.compile(r"\bprost(?:_types)?\b"),
+        re.compile(r"\bMessage\s*::\s*(?:decode|encode)\s*\("),
+        re.compile(r"\b(?:to_owned_message|try_encode_to_vec|encode_to_vec)\s*\("),
+    )
+    for pattern in eager_patterns:
+        for match in pattern.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused Keynote media lifecycle codec must remain lazy/source-preserving; "
+                f"eager generated operation {match.group(0).strip()}: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_SOURCE}:{line_number}"
+            )
+    for marker in ("IWorkPackage", "ArchiveObject", "SourceCatalog"):
+        if re.search(rf"\b{re.escape(marker)}\b", code):
+            violations.append(
+                "focused Keynote media lifecycle codec must remain neutral and archive-free "
+                f"({marker}): {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_SOURCE}"
+            )
+
+    public_path = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_PUBLIC_SOURCE
+    public_source = (
+        _mask_rust_cfg_test_items(public_path.read_text(encoding="utf-8"))
+        if public_path.is_file()
+        else ""
+    )
+    if re.search(
+        rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\S]{{0,240}}?"
+        rf"^\s*pub\s+mod\s+{re.escape(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_MODULE)}\s*;",
+        public_source,
+        re.MULTILINE,
+    ) is None:
+        violations.append(
+            "focused Keynote media lifecycle codec is missing hidden public module "
+            f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_MODULE}: "
+            f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_PUBLIC_SOURCE}"
+        )
+    projection = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_SOURCE
+    violations.extend(_audit_keynote_media_lifecycle_projection(root, projection))
+    return sorted(set(violations))
+
+
+def _audit_keynote_media_lifecycle_projection(
+    root: Path, projection_path: Path
+) -> list[str]:
+    """Check native field numbers and the private Buffa build seam."""
+
+    violations: list[str] = []
+    raw = projection_path.read_text(encoding="utf-8") if projection_path.is_file() else ""
+    projection = re.sub(r"//[^\n]*|/\*.*?\*/", "", raw, flags=re.DOTALL)
+    if not projection:
+        return [
+            "focused Keynote media lifecycle codec is missing private Buffa projection: "
+            f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_SOURCE}"
+        ]
+    for marker in ("syntax = \"proto2\"", "package LitchiIwaProjection"):
+        if marker not in projection:
+            violations.append(
+                "focused Keynote media lifecycle private projection is missing marker "
+                f"{marker}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_SOURCE}"
+            )
+    repeated = re.search(r"\brepeated\b", projection)
+    if repeated is not None:
+        line_number = projection.count("\n", 0, repeated.start()) + 1
+        violations.append(
+            "focused Keynote media lifecycle private projection must not expose generated "
+            f"repeated views: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_SOURCE}:{line_number}"
+        )
+    for message, fields in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_MESSAGES.items():
+        if re.search(rf"\bmessage\s+{re.escape(message)}\s*\{{", projection) is None:
+            violations.append(
+                "focused Keynote media lifecycle private projection is missing message "
+                f"{message}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_SOURCE}"
+            )
+            continue
+        for field, number in fields.items():
+            if re.search(
+                rf"\b(?:optional|repeated|required)\s+[A-Za-z_][A-Za-z0-9_.]*\s+"
+                rf"{re.escape(field)}\s*=\s*{number}\b",
+                projection,
+            ) is None:
+                violations.append(
+                    "focused Keynote media lifecycle private projection has incorrect or "
+                    f"missing field {message}.{field}={number}: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_SOURCE}"
+                )
+
+    build_path = root / Path("crates/litchi-iwa-protos/build.rs")
+    build = build_path.read_text(encoding="utf-8") if build_path.is_file() else ""
+    build_route = re.search(
+        r"(?s)\blet\s+buffa_keynote_media_lifecycle_out_directory\b.*?"
+        r"\benforce_keynote_media_lifecycle_projection_budget\s*\(\s*"
+        r"&\s*buffa_keynote_media_lifecycle_out_directory\s*,?\s*\)",
+        build,
+    )
+    if build_route is None:
+        violations.append(
+            "focused Keynote media lifecycle Buffa build is missing its dedicated route: "
+            "crates/litchi-iwa-protos/build.rs"
+        )
+        build_focus = ""
+    else:
+        build_focus = build_route.group(0)
+    build_markers = (
+        "KNMediaLifecycleArchive.proto",
+        "buffa-keynote-media-lifecycle",
+        "iwa_keynote_media_lifecycle_buffa_protos.rs",
+        ".generate_views(true)",
+        ".lazy_views(true)",
+        ".preserve_unknown_fields(false)",
+        "enforce_keynote_media_lifecycle_projection_budget",
+    )
+    for marker in build_markers:
+        if marker not in build_focus:
+            violations.append(
+                "focused Keynote media lifecycle Buffa build is missing marker "
+                f"{marker}: crates/litchi-iwa-protos/build.rs"
+            )
+    budget_function = re.search(
+        r"(?s)\bfn\s+enforce_keynote_media_lifecycle_projection_budget\b.*?"
+        r"(?=\nfn\s|\Z)",
+        build,
+    )
+    budget_source = budget_function.group(0) if budget_function is not None else ""
+    for marker in (
+        "RepeatedView",
+        "LazyRepeatedView",
+        "const EXPECTED_FILES: usize = 5",
+        "const MAX_GENERATED_BYTES: u64 = 180 * 1024",
+        "repeated_views != 0",
+        "lazy_repeated_views != 0",
+    ):
+        if marker not in budget_source:
+            violations.append(
+                "focused Keynote media lifecycle Buffa budget is missing marker "
+                f"{marker}: crates/litchi-iwa-protos/build.rs"
+            )
+    public_path = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_PUBLIC_SOURCE
+    public = public_path.read_text(encoding="utf-8") if public_path.is_file() else ""
+    if re.search(
+        r"(?ms)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\].{0,260}?"
+        r"^\s*mod\s+buffa_keynote_media_lifecycle_generated\b",
+        public,
+    ) is None:
+        violations.append(
+            "focused Keynote media lifecycle generated Buffa projection must remain private: "
+            f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_PUBLIC_SOURCE}"
+        )
+    if (
+        "buffa-keynote-media-lifecycle" not in public
+        or "iwa_keynote_media_lifecycle_buffa_protos.rs" not in public
+    ):
+        violations.append(
+            "focused Keynote media lifecycle generated projection include is missing: "
+            f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_PUBLIC_SOURCE}"
+        )
+    return violations
+
+
+def audit_keynote_slide_media_lifecycle_transaction_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require one bounded, source-authoritative lifecycle transaction."""
+
+    if not _keynote_slide_media_lifecycle_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE
+    owner_raw = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    owner = _mask_rust_non_code(owner_raw)
+    violations: list[str] = []
+    child_sources_by_name: dict[str, str] = {}
+    for relative in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_SOURCES:
+        path = root / relative
+        if path.is_file():
+            child_sources_by_name[path.stem] = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            )
+    child_sources = list(child_sources_by_name.values())
+    lifecycle_code = owner + "\n" + "\n".join(child_sources)
+
+    module_names = {
+        match.group(1)
+        for match in re.finditer(
+            r"(?m)^\s*(?:pub(?:\([^()]*\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;",
+            owner,
+        )
+    }
+    for child in ("graph", "metadata", "budget", "clone_payload"):
+        if child not in module_names:
+            violations.append(
+                "focused Keynote media lifecycle owner must wire private "
+                f"{child} child: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+        child_path = root / KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / f"{child}.rs"
+        if not child_path.is_file():
+            violations.append(
+                "focused Keynote media lifecycle owner is missing private child "
+                f"{child}: {child_path.relative_to(root)}"
+            )
+    if KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_MODULE.search(owner):
+        violations.append(
+            "focused Keynote media lifecycle child module must remain private: "
+            f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+        )
+    if KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_CHILD_MODULE.search(owner):
+        violations.append(
+            "focused Keynote media lifecycle child modules must remain private: "
+            f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+        )
+
+    # The graph owns source-preserving slide-header replacement and the
+    # production payload remapper.  The latter accepts the operation's
+    # charging callback; keeping the old cfg(test) convenience wrapper out of
+    # this production seam prevents a clone from escaping the transaction's
+    # aggregate ledger.
+    graph_code = child_sources_by_name.get("graph", "")
+    if graph_code:
+        def graph_function_body(name: str) -> str:
+            declaration = re.search(
+                rf"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
+                rf"(?:unsafe[ \t]+|async[ \t]+|const[ \t]+)*fn[ \t]+"
+                rf"{re.escape(name)}\b",
+                graph_code,
+            )
+            if declaration is None:
+                return ""
+            opening = graph_code.find("{", declaration.end())
+            if opening < 0:
+                return ""
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(graph_code) and depth:
+                if graph_code[cursor] == "{":
+                    depth += 1
+                elif graph_code[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            return graph_code[opening + 1 : cursor - 1] if depth == 0 else ""
+
+        def graph_call_records(
+            body: str, name: str
+        ) -> list[tuple[re.Match[str], str]]:
+            records: list[tuple[re.Match[str], str]] = []
+            for call in re.finditer(rf"\b{re.escape(name)}\s*\(", body):
+                opening = body.find("(", call.start(), call.end())
+                depth = 1
+                cursor = opening + 1
+                while cursor < len(body) and depth:
+                    if body[cursor] == "(":
+                        depth += 1
+                    elif body[cursor] == ")":
+                        depth -= 1
+                    cursor += 1
+                arguments = body[opening + 1 : cursor - 1] if depth == 0 else ""
+                records.append((call, arguments))
+            return records
+
+        if KEYNOTE_SLIDE_MEDIA_LIFECYCLE_HEADER_REWRITE_HELPER.search(graph_code) is None:
+            violations.append(
+                "focused Keynote media lifecycle graph is missing its source-preserving "
+                "slide-header helper: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+            )
+        if KEYNOTE_SLIDE_MEDIA_LIFECYCLE_LEGACY_CLONE_PAYLOAD_CALL.search(graph_code):
+            violations.append(
+                "focused Keynote media lifecycle graph must not call the cfg(test) clone "
+                "payload wrapper: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+            )
+        clone_call = KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CLONE_PAYLOAD_CALL.search(graph_code)
+        if clone_call is None:
+            violations.append(
+                "focused Keynote media lifecycle graph is missing its budgeted clone "
+                "payload route: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+            )
+        else:
+            opening = graph_code.find("(", clone_call.start(), clone_call.end())
+            arguments = ""
+            if opening >= 0:
+                depth = 1
+                cursor = opening + 1
+                while cursor < len(graph_code) and depth:
+                    if graph_code[cursor] == "(":
+                        depth += 1
+                    elif graph_code[cursor] == ")":
+                        depth -= 1
+                    cursor += 1
+                if depth == 0:
+                    arguments = graph_code[opening + 1 : cursor - 1]
+            if not re.search(r"&\s*mut\s+charge\b", arguments):
+                violations.append(
+                    "focused Keynote media lifecycle graph must pass its shared budget "
+                    "charge callback to the clone payload route: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                )
+            charge_closure = re.search(
+                r"\blet\s+mut\s+charge\b(?P<body>[\s\S]{0,900})",
+                graph_code,
+            )
+            if charge_closure is None or not re.search(
+                r"\bbudget\s*\.\s*charge_[A-Za-z0-9_]*\s*\(",
+                charge_closure.group("body"),
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle graph must charge clone payload "
+                    "allocations through the operation budget: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                )
+
+        reservation_body = graph_function_body("reserve_core_header_work")
+        if not reservation_body:
+            violations.append(
+                "focused Keynote media lifecycle graph is missing its bounded core-header "
+                "reservation helper: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+            )
+        else:
+            reservation_calls = graph_call_records(
+                reservation_body, "charge_allocation_plan"
+            )
+            if not any(
+                re.search(r"\bbytes\b\s*,\s*\bevents\b", arguments)
+                and re.search(r"\bbudget\b", reservation_body)
+                for _call, arguments in reservation_calls
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle core-header reservation must charge "
+                    "one atomic byte/event allocation plan: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                )
+            if not re.search(
+                r"\bbudget\s*\.\s*charge_wire_work\s*\(\s*bytes\s*\)",
+                reservation_body,
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle core-header reservation must charge "
+                    "its bounded wire work through the shared budget: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                )
+
+        def require_core_reservation(
+            body: str, operation: str, core_call: str
+        ) -> None:
+            reservations = graph_call_records(body, "reserve_core_header_work")
+            core_calls = graph_call_records(body, core_call)
+            if len(core_calls) != 1 or not reservations:
+                violations.append(
+                    "focused Keynote media lifecycle graph must reserve core-header "
+                    f"work before {operation}: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                )
+                return
+            all_core_calls = [
+                (call, name)
+                for name in (
+                    "clone_with_identity_remap_with_limits",
+                    "replace_message_pruning_object_references_preserving_header_with_limits",
+                    "replace_message_transitioning_object_references_preserving_header_with_limits",
+                )
+                for call, _arguments in graph_call_records(body, name)
+            ]
+            if len(reservations) != len(all_core_calls):
+                violations.append(
+                    "focused Keynote media lifecycle graph must reserve core-header work "
+                    f"once before every core publication ({operation}): "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                )
+                return
+            preceding = [
+                arguments
+                for call, arguments in reservations
+                if call.start() < core_calls[0][0].start()
+            ]
+            last_reservation = next(
+                (
+                    call
+                    for call, _arguments in reversed(reservations)
+                    if call.start() < core_calls[0][0].start()
+                ),
+                None,
+            )
+            intervening_core_call = last_reservation is not None and any(
+                last_reservation.start() < call.start() < core_calls[0][0].start()
+                for call, _name in all_core_calls
+            )
+            if (
+                not preceding
+                or not re.search(r"\bbudget\b", preceding[-1])
+                or intervening_core_call
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle graph must route the core-header "
+                    f"reservation budget before {operation}: "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'graph.rs'}"
+                )
+
+        require_core_reservation(
+            graph_function_body("clone_object"),
+            "clone core publication",
+            "clone_with_identity_remap_with_limits",
+        )
+        header_body = graph_function_body("replace_slide_message_with_lifecycle_refs")
+        require_core_reservation(
+            header_body,
+            "prune core publication",
+            "replace_message_pruning_object_references_preserving_header_with_limits",
+        )
+        require_core_reservation(
+            header_body,
+            "transition core publication",
+            "replace_message_transitioning_object_references_preserving_header_with_limits",
+        )
+
+    budget_code = child_sources_by_name.get("budget", "")
+    if budget_code:
+        if not re.search(r"\bfn\s+charge_allocation_plan\b", budget_code):
+            violations.append(
+                "focused Keynote media lifecycle budget is missing its atomic allocation "
+                "plan method: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'budget.rs'}"
+            )
+        for marker in (
+            "observed_bytes",
+            "observed_events",
+            "self.allocation_bytes = observed_bytes",
+            "self.allocations = observed_events",
+        ):
+            if marker not in budget_code:
+                violations.append(
+                    "focused Keynote media lifecycle budget must atomically check and commit "
+                    f"allocation bytes/events ({marker}): "
+                    f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'budget.rs'}"
+                )
+        if not re.search(
+            r"\bcharge_allocations\b[\s\S]{0,320}?"
+            r"\bcharge_allocation_plan\s*\(\s*amount\s*,\s*1\s*\)",
+            budget_code,
+        ):
+            violations.append(
+                "focused Keynote media lifecycle budget must route single allocation charges "
+                "through its atomic allocation plan: "
+                f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / 'budget.rs'}"
+            )
+
+    budget_names = {
+        match.group(1)
+        for match in re.finditer(
+            r"(?m)^\s*(?:pub\s*\([^)]*\)\s+)?struct\s+"
+            r"([A-Za-z_][A-Za-z0-9_]*Budget)\b",
+            lifecycle_code,
+        )
+    }
+    if len(budget_names) != 1:
+        violations.append(
+            "focused Keynote media lifecycle owner must define exactly one private aggregate "
+            f"budget: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+        )
+    for label, marker in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_BUDGET_MARKERS:
+        if marker.search(lifecycle_code) is None:
+            violations.append(
+                "focused Keynote media lifecycle transaction is missing "
+                f"{label} marker: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+
+    function_declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+
+    def function_records(code: str) -> dict[str, tuple[str, str]]:
+        records: dict[str, tuple[str, str]] = {}
+        for match in function_declaration.finditer(code):
+            opening = code.find("{", match.end())
+            if opening < 0:
+                continue
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(code) and depth:
+                if code[cursor] == "{":
+                    depth += 1
+                elif code[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            if depth == 0:
+                records[match.group("name")] = (
+                    code[match.start() : opening],
+                    code[opening + 1 : cursor - 1],
+                )
+        return records
+
+    functions = function_records(owner)
+
+    def reachable_functions(root_name: str) -> dict[str, tuple[str, str]]:
+        """Follow private owner helpers so one root ledger may be delegated."""
+
+        reachable: dict[str, tuple[str, str]] = {}
+        pending = [root_name]
+        while pending:
+            name = pending.pop()
+            if name in reachable:
+                continue
+            record = functions.get(name)
+            if record is None:
+                continue
+            reachable[name] = record
+            _signature, body = record
+            pending.extend(
+                helper
+                for helper in functions
+                if helper not in reachable
+                and re.search(rf"\b(?:r#)?{re.escape(helper)}\s*\(", body)
+            )
+        return reachable
+
+    for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS):
+        signature_body = functions.get(name)
+        if signature_body is None:
+            continue
+        signature, body = signature_body
+        reachable = reachable_functions(name)
+        reachable_source = "\n".join(
+            signature_item + "\n" + body_item
+            for signature_item, body_item in reachable.values()
+        )
+        if not re.search(r"\b(?:budget|ledger)\b", reachable_source):
+            violations.append(
+                "focused Keynote media lifecycle operation must thread its aggregate budget "
+                f"({name}): {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+        if sum(
+            len(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_BUDGET_FACTORY_CALL.findall(helper_body))
+            for _helper_signature, helper_body in reachable.values()
+        ) != 1:
+            violations.append(
+                "focused Keynote media lifecycle operation must create exactly one aggregate "
+                f"budget ({name}): {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+        for route in (
+            "select_media",
+            "rewrite_lifecycle",
+            "verify_candidate_selection",
+            "clone_object",
+            "replace_slide_message_with_lifecycle_refs",
+        ):
+            route_call = re.search(
+                rf"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?{route}\s*\((?P<arguments>[^;{{}}]*)\)",
+                reachable_source,
+            )
+            if route_call is not None and not re.search(
+                r"\b(?:&\s*mut\s+)?budget\b", route_call.group("arguments")
+            ):
+                violations.append(
+                    "focused Keynote media lifecycle operation must route its shared budget "
+                    f"through {route} ({name}): {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+                )
+        if not re.search(
+            r"\b(?:select_media|private_graph|clone_object|rewrite_slide|"
+            r"rewrite_build|rewrite_build_chunk|replace_slide_message|metadata|"
+            r"uuid|UUID)(?:\b|_)",
+            reachable_source,
+            re.IGNORECASE,
+        ) and not re.search(
+            r"\b(?:verify_candidate_selection|verify_zip_locality|candidate)(?:\b|_)",
+            reachable_source,
+            re.IGNORECASE,
+        ):
+            violations.append(
+                "focused Keynote media lifecycle operation must traverse its graph/metadata "
+                f"closure ({name}): {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+
+    lifecycle_blob = lifecycle_code
+    for label, marker in (
+        ("selector resolution", re.compile(r"\b(?:SlideSelector|MovieSelector|select_media)\b")),
+        (
+            "identity remapping",
+            re.compile(
+                r"\b(?:clone_with_identity_remap|remap_clone_payload_with_budget|"
+                r"IdentifierRewrite|UuidRewrite)(?:\b|_)"
+            ),
+        ),
+        ("metadata transition", re.compile(r"\b(?:MetadataSnapshot|IdentityBatch|MediaBatch|package_metadata)\b")),
+        ("atomic publication", re.compile(r"\b(?:candidate|reopen|write_to|reassembly|readback|verify)\b")),
+    ):
+        if marker.search(lifecycle_blob) is None:
+            violations.append(
+                "focused Keynote media lifecycle transaction is missing "
+                f"{label} marker: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
+            )
+    return sorted(set(violations))
+
+
 def audit_iwa_keynote_slide_media_data_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -60943,6 +61939,9 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_slide_media_data_metadata_boundary_source_topology()
         + audit_keynote_slide_media_data_resource_source_topology()
         + audit_keynote_slide_media_data_transaction_source_topology()
+        + audit_keynote_slide_media_lifecycle_facade_source_topology()
+        + audit_keynote_slide_media_lifecycle_codec_source_topology()
+        + audit_keynote_slide_media_lifecycle_transaction_source_topology()
         + audit_iwa_keynote_slide_table_number_format_source_topology()
         + audit_keynote_slide_table_title_facade_source_topology()
         + audit_keynote_slide_table_title_resource_source_topology()
