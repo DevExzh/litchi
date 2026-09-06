@@ -1,0 +1,43 @@
+{
+  "change": 433,
+  "status": "pass",
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/verify.py",
+    "--portable-check",
+    "--require-inventory",
+    "--stage",
+    "aftercleanup"
+  ],
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results",
+  "portable_flag": "--portable-check",
+  "require_inventory": true,
+  "stage": "aftercleanup",
+  "exit_code": 0,
+  "started_utc": "2026-09-06T05:37:30.278449+00:00",
+  "finished_utc": "2026-09-06T05:37:38.707558+00:00",
+  "driver_hashes": {
+    "replay.py": "ebe052f6bf9373f867ced5fe50dec6456487c7a97a8afb1370f679380c4a2d1e",
+    "capture.py": "c64493fc7d6682e228dee70d4de4ff51522a5371c31302e4c51256efb7af72c3",
+    "check.py": "e04a06a4e561d0ce860f3992d22edbaf8377cca8d25931b9cb0eb6290c5f5378",
+    "derive.py": "d40b7f9de740a6ad7ec30ea6c16026e288474ec611a9f86c210a7a9fdcb0f75d",
+    "verify.py": "daf4aaee897696635d053c1d9ef37bb9994ee289e3f52cc193eedc52ca6754fe",
+    "verify-report.py": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+    "seal.py": "d7604908c400e023b0612c8e1e4efc84bd550faa2595f234d6bd1d507f26d899",
+    "protocol.json": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+    "planned-checks.json": "6c4a9f3e05c0dd57dfd2710c1bb4206c3f2e3ba434c8f994d30d625aee64408a",
+    "profile/capture.py": "c24036a0c4f224001f150088a396a7d06625496395ef326de4100983f97ae1f0",
+    "profile/report.py": "ac41dca338a5e937e0a5f6d64e772711df17baeb5757602b1e02842222d483a1"
+  },
+  "drivers_unchanged": true,
+  "replayed_inventory_sha256": "70502386b1d95db84f95de18f3c1adc3576523f80991e4d9fedb547dd3b6d86c",
+  "inventory_unchanged": true,
+  "inventory_rewritten": false,
+  "log": {
+    "path": "checks/aftercleanup-portable.log",
+    "bytes": 568,
+    "sha256": "ca9471bfffa47659da658a3c07569add782b1ca8d6a822731109150776644cab"
+  },
+  "scope": "Terminal external portable replay receipt; the new receipt/log are outside the prior seal and require resealing."
+}

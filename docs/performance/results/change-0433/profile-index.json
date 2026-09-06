@@ -1,0 +1,8 @@
+[
+  "before/profiles/before-buffered/stat/receipt.json",
+  "before/profiles/before-buffered/record/receipt.json",
+  "after/profiles/after-buffered/stat/receipt.json",
+  "after/profiles/after-buffered/record/receipt.json",
+  "after/profiles/after-streaming/stat/receipt.json",
+  "after/profiles/after-streaming/record/receipt.json"
+]

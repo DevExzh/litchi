@@ -1,0 +1,71 @@
+{
+  "change": 433,
+  "role": "after-streaming",
+  "selector": "ods_streaming_create",
+  "name": "after-streaming-normal-large-r2",
+  "lane": {
+    "mode": "normal",
+    "shape": "large",
+    "repeat": "R2"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/captures/after-streaming-normal-large-r2-resource.log",
+    "/tmp/litchi-goal-0433-binaries/after/normal",
+    "--case",
+    "ods_streaming_create",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/captures/after-streaming-normal-large-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/captures/after-streaming-normal-large-r2-catalog.json"
+  ],
+  "revision": "f5bf1696192f0007db56554aa5b16719cdf1950b",
+  "source_manifest": {
+    "path": "sources/7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e.json",
+    "sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e",
+    "files": 6642
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0433-binaries/after/normal",
+    "sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4",
+    "bytes": 454475192
+  },
+  "protocol_sha256": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+  "driver_sha256": "c64493fc7d6682e228dee70d4de4ff51522a5371c31302e4c51256efb7af72c3",
+  "verifier_sha256": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+  "started_utc": "2026-09-06T05:26:12.129475+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T05:26:15.801783+00:00",
+  "artifacts": {
+    "after/captures/after-streaming-normal-large-r2.json": {
+      "sha256": "981ab713ccb67e20ab5bd8522425f93b0fc5f4ea25e9c0c036da3f56fa03269f",
+      "bytes": 32963
+    },
+    "after/captures/after-streaming-normal-large-r2-catalog.json": {
+      "sha256": "7ddb80fb6b773ed7b61209ce8f0741b1a13e6c9aec2c28e7c17b00221ce261d1",
+      "bytes": 4860
+    },
+    "after/captures/after-streaming-normal-large-r2.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "after/captures/after-streaming-normal-large-r2-resource.log": {
+      "sha256": "0c80410ecfbcba222f4abd9e96bef46b16dce41d9cfd537159eaa5b80877ec46",
+      "bytes": 1108
+    }
+  }
+}

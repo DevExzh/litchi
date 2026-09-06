@@ -1,5 +1,22 @@
 # Performance program phase report
 
+## Change 0433: bounded ODS scalar creation
+
+[0433](changes/0433-ods-bounded-fresh-scalar-creation.md) retains 36 formal
+reports and 1,080 samples across before-buffered, after-buffered, and
+after-streaming roles, normal and allocator modes, and 64/8,192/32,768 rows.
+Streaming normal p50 is 59.017–62.137% below the before-buffered role in the
+retained comparisons. The matched after-buffered control retains one +7.037%
+tiny R1 normal p99 regression flag. Operation-scoped requested-allocation
+observations range from 71,050,076 to 419,347 bytes at the large-shape
+regional peak comparison. Timing excludes artifact construction/reopen,
+procfs, sink construction, and digest extraction; allocator vectors, process
+RSS, and sampled CPU profiles have separate scopes. No production speedup,
+general memory, RSS, or scaling claim is registered. The [bundle](results/change-0433/README.md)
+retains source custody and passing portable replay receipts before and after
+task cleanup; fresh creation,
+append, package-Part, and repackaging evidence remain separate.
+
 ## Change 0432: streaming requested-heap observations
 
 [0432](changes/0432-xlsx-streaming-operation-memory.md) records a fixed

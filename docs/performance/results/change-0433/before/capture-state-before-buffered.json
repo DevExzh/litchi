@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "role": "before-buffered",
+  "status_before": [
+    "?? docs/GOAL.md",
+    "?? docs/performance/results/change-0433/"
+  ],
+  "status_after": [
+    "?? docs/GOAL.md",
+    "?? docs/performance/results/change-0433/"
+  ],
+  "tracked_tree_clean_before_and_after": true,
+  "report_dirty_field_expected": true,
+  "source_manifest": {
+    "path": "sources/5ebf43666112953e459f60c56488de5950b49a2313f31e2e2ca70b3309878fea.json",
+    "sha256": "5ebf43666112953e459f60c56488de5950b49a2313f31e2e2ca70b3309878fea",
+    "files": 6637
+  }
+}

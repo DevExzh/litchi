@@ -1,0 +1,54 @@
+{
+  "change": 433,
+  "argv": [
+    "rustup",
+    "run",
+    "1.98.1",
+    "rustfmt",
+    "--check",
+    "--edition",
+    "2024",
+    "--config",
+    "skip_children=true",
+    "crates/litchi-odf-common/src/core/generated_xml.rs",
+    "crates/litchi-odf-common/src/core/generated_xml_tests.rs",
+    "crates/litchi-odf-common/src/core/writer_generated_xml_tests.rs",
+    "crates/litchi-odf-common/src/core/writer.rs",
+    "crates/litchi-odf-common/src/core/mod.rs",
+    "crates/litchi-odf-common/src/lib.rs",
+    "crates/litchi-ods/src/streaming.rs",
+    "crates/litchi-ods/src/lib.rs",
+    "crates/litchi-ods/tests/streaming_creation.rs",
+    "tools/perf-baseline/src/lib.rs"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "be82ef53dc191a64bc3c3365502bf44599528577",
+  "driver_sha256": "e04a06a4e561d0ce860f3992d22edbaf8377cca8d25931b9cb0eb6290c5f5378",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T05:01:40.014550+00:00",
+  "source_before": {
+    "path": "sources/6f90c88d4200c9fd9c374f55c320b2eeefb1f58d8ab48cb02ced396502d877b3.json",
+    "sha256": "6f90c88d4200c9fd9c374f55c320b2eeefb1f58d8ab48cb02ced396502d877b3",
+    "files": 6642
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T05:01:40.587697+00:00",
+  "source_after": {
+    "path": "sources/6f90c88d4200c9fd9c374f55c320b2eeefb1f58d8ab48cb02ced396502d877b3.json",
+    "sha256": "6f90c88d4200c9fd9c374f55c320b2eeefb1f58d8ab48cb02ced396502d877b3",
+    "files": 6642
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/owned-format-final.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

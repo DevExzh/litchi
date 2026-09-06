@@ -1,0 +1,54 @@
+{
+  "change": 433,
+  "role": "before",
+  "revision": "be82ef53dc191a64bc3c3365502bf44599528577",
+  "created_utc": "2026-09-06T04:21:31.196099+00:00",
+  "source_manifest": {
+    "path": "sources/5ebf43666112953e459f60c56488de5950b49a2313f31e2e2ca70b3309878fea.json",
+    "sha256": "5ebf43666112953e459f60c56488de5950b49a2313f31e2e2ca70b3309878fea",
+    "files": 6637
+  },
+  "protocol_sha256": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+  "verifier_sha256": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+  "planned_checks_sha256": "6c4a9f3e05c0dd57dfd2710c1bb4206c3f2e3ba434c8f994d30d625aee64408a",
+  "capture_driver_sha256": "c64493fc7d6682e228dee70d4de4ff51522a5371c31302e4c51256efb7af72c3",
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0433-binaries/before/normal",
+      "sha256": "37b8cef07ca3bef7ed2fc385ceb5a154d50e3035fed78616957e19a7666f7be3",
+      "bytes": 453014336
+    },
+    "allocator": {
+      "path": "/tmp/litchi-goal-0433-binaries/before/allocator",
+      "sha256": "f1917863cef737eb4afa3c04a8f66bf3bf46de671809b392491be66df2408a3e",
+      "bytes": 452349928
+    }
+  },
+  "build_receipt": "checks/before-build.json",
+  "build_argv": [
+    "env",
+    "RUSTFLAGS=-Cforce-frame-pointers=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG=1",
+    "cargo",
+    "build",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline",
+    "--bin",
+    "litchi-perf-baseline-alloc"
+  ],
+  "build_environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "rustflags": "-Cforce-frame-pointers=yes",
+  "release_debug": 1,
+  "capture_script_frozen": true
+}

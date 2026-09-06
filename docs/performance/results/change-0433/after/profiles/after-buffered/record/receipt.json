@@ -1,0 +1,175 @@
+{
+  "artifacts": {
+    "after/profiles/after-buffered/record/perf-report.stderr.log": {
+      "bytes": 1056,
+      "sha256": "db2905c00214371a9d6e570c6f650720f0d039fa84eaf486ed21c379f1d4e18a"
+    },
+    "after/profiles/after-buffered/record/perf-report.txt": {
+      "bytes": 4343853,
+      "sha256": "cf2acc12474d6f2264eeb8208f8df17767cffc9e5ea6978b03a7c276f7554ec4"
+    },
+    "after/profiles/after-buffered/record/perf.data": {
+      "bytes": 1549632,
+      "sha256": "30a6f2cb8ddc9f868c0a70b8f5ccef5e1fdd36e187f044ee8f5330fc56797bd2"
+    },
+    "after/profiles/after-buffered/record/process.stderr.log": {
+      "bytes": 201,
+      "sha256": "54d80a3f710320f523e58f3da813c62bf591745131cd0206ee05aa689b98a4a2"
+    },
+    "after/profiles/after-buffered/record/process.stdout.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "after/profiles/after-buffered/record/resource.log": {
+      "bytes": 1292,
+      "sha256": "96cc2ec79a8cb5bfc6d25e9e85685ec7a9426622a4c3cf16f8a78bd8286b9829"
+    },
+    "after/profiles/after-buffered/record/workload-catalog.json": {
+      "bytes": 4853,
+      "sha256": "978f590c6f8dd4b542cebff4e66835de52e2fedc5e7573d57ec23d2943c1db1e"
+    },
+    "after/profiles/after-buffered/record/workload-verify.json": {
+      "bytes": 6,
+      "sha256": "de545cc7e7ff8eaacefae8fcb4a954555a1224f24fe7ce8ff62b9874c54f3fe2"
+    },
+    "after/profiles/after-buffered/record/workload-verify.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "after/profiles/after-buffered/record/workload.json": {
+      "bytes": 32748,
+      "sha256": "ccde24089c9c183f91d7a38d18de9de726ce19f73e01c63e178b07a5509e549d"
+    }
+  },
+  "binary": {
+    "bytes": 454475192,
+    "path": "/tmp/litchi-goal-0433-binaries/after/normal",
+    "sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4"
+  },
+  "build_directory": "after",
+  "call_graph": "fp,127",
+  "change": 433,
+  "environment_overrides": {
+    "DEBUGINFOD_URLS": "",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "finished_utc": "2026-09-06T05:28:42.760494+00:00",
+  "kind": "record",
+  "mode": "normal",
+  "profile_argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/profiles/after-buffered/record/resource.log",
+    "perf",
+    "record",
+    "--no-buildid-cache",
+    "-e",
+    "cycles:u",
+    "-F",
+    "999",
+    "--call-graph",
+    "fp,127",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/profiles/after-buffered/record/perf.data",
+    "--",
+    "/tmp/litchi-goal-0433-binaries/after/normal",
+    "--case",
+    "ods_buffered_create",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/profiles/after-buffered/record/workload.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/profiles/after-buffered/record/workload-catalog.json"
+  ],
+  "profile_driver_sha256": "c24036a0c4f224001f150088a396a7d06625496395ef326de4100983f97ae1f0",
+  "profile_exit_code": 0,
+  "protocol_profile_scope": "Separate perf process measurements include harness setup, oracle, samples and executable hashing. They are excluded from the formal latency matrix and are not operation-scoped IPC or cache evidence.",
+  "protocol_sha256": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+  "record_event": "cycles:u",
+  "record_frequency_hz": 999,
+  "report_argv": [
+    "perf",
+    "report",
+    "--stdio",
+    "--no-children",
+    "--percent-limit",
+    "0",
+    "-i",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/profiles/after-buffered/record/perf.data"
+  ],
+  "report_exit_code": 0,
+  "revision": "f5bf1696192f0007db56554aa5b16719cdf1950b",
+  "role": "after-buffered",
+  "samples": 30,
+  "schema": "ods_process_profile_v1",
+  "scope": "whole process including setup/corpus generation, warmups, measured samples, output hashing, and the harness oracle/report; excludes perf postprocessing and the external report verifier",
+  "selector": "ods_buffered_create",
+  "shape": "large",
+  "source_manifest": {
+    "files": 6642,
+    "path": "sources/7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e.json",
+    "sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e"
+  },
+  "source_status_after": [
+    "?? docs/GOAL.md",
+    "?? docs/performance/results/change-0433/"
+  ],
+  "source_status_before": [
+    "?? docs/GOAL.md",
+    "?? docs/performance/results/change-0433/"
+  ],
+  "started_utc": "2026-09-06T05:27:28.854547+00:00",
+  "stat_events": [],
+  "status": "pass",
+  "tool_versions": {
+    "perf": "perf version 7.0.14",
+    "python": "3.14.4",
+    "time": "time (GNU Time) UNKNOWN"
+  },
+  "tracked_tree_clean_before_and_after": true,
+  "verifier_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/profiles/after-buffered/record/workload.json",
+    "--mode",
+    "normal",
+    "--shape",
+    "large",
+    "--role",
+    "after-buffered"
+  ],
+  "verifier_exit_code": 0,
+  "verifier_sha256": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+  "warmups": 3,
+  "workers": 1,
+  "workload_argv": [
+    "/tmp/litchi-goal-0433-binaries/after/normal",
+    "--case",
+    "ods_buffered_create",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/profiles/after-buffered/record/workload.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/profiles/after-buffered/record/workload-catalog.json"
+  ]
+}

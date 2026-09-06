@@ -1,0 +1,51 @@
+{
+  "change": 433,
+  "argv": [
+    "rustup",
+    "run",
+    "1.98.1",
+    "rustfmt",
+    "--check",
+    "--edition",
+    "2024",
+    "--config",
+    "skip_children=true",
+    "crates/litchi-ods/src/lib.rs",
+    "crates/litchi-ods/src/authoring/builder.rs",
+    "crates/litchi-ods/src/worksheet/codec.rs",
+    "crates/litchi-ods/src/xml_reference.rs",
+    "crates/litchi-ods/tests/xml_references.rs",
+    "crates/litchi-ods/tests/sequential_text.rs",
+    "tools/perf-baseline/src/lib.rs"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "d1b18749dfc73407abcd116f172d0954529cc7d0",
+  "driver_sha256": "e04a06a4e561d0ce860f3992d22edbaf8377cca8d25931b9cb0eb6290c5f5378",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T04:00:53.479409+00:00",
+  "source_before": {
+    "path": "sources/7df8b7cd91076a154411768c1ce173a36aae83c346d006826edfa6e9a8f19765.json",
+    "sha256": "7df8b7cd91076a154411768c1ce173a36aae83c346d006826edfa6e9a8f19765",
+    "files": 6637
+  },
+  "status": "failed",
+  "exit_code": 1,
+  "finished_utc": "2026-09-06T04:00:54.043595+00:00",
+  "source_after": {
+    "path": "sources/7df8b7cd91076a154411768c1ce173a36aae83c346d006826edfa6e9a8f19765.json",
+    "sha256": "7df8b7cd91076a154411768c1ce173a36aae83c346d006826edfa6e9a8f19765",
+    "files": 6637
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/before-owned-format.log",
+    "bytes": 927,
+    "sha256": "e2e4a78a8d5028930d0f2d52a8476ac1ff1aaaa95df88b310709e5e89ce07fff"
+  }
+}

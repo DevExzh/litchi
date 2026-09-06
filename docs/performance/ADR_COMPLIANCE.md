@@ -1,5 +1,25 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0433: bounded ODS fresh scalar creation
+
+[0433](changes/0433-ods-bounded-fresh-scalar-creation.md) keeps the ODS
+grammar in `litchi-ods` and the neutral generated-XML, ZIP, manifest, and
+sequential-output substrate in `litchi-odf-common`, preserving the dependency
+direction and public ownership boundaries required by ADRs 0001, 0002, 0010,
+0023, and 0024. The new API creates a fresh one-sheet scalar document; it does
+not extend snapshot/edit/patch or logical append semantics under ADR 0003.
+
+The operation retains typed cells, finite row/XML/output/work/cancellation
+limits, checked XML envelope and fragment audits, deterministic semantic
+readback, caller-owned non-seeking output, and typed partial-output errors
+under ADRs 0004–0006. The 4,096-byte row window and allocator-region vectors
+are separate observations; ZIP/compression/parser allocations, process RSS,
+and profile work are not folded into that number. The [bundle ADR record](results/change-0433/adr-compliance.md)
+and [protocol](results/change-0433/protocol.json) preserve the exact timing,
+oracle, provenance, and failure boundaries. Its `claims` array remains empty;
+no broad performance or memory claim follows. Portable replay finalization is
+pending root evidence.
+
 ## Change 0432: streaming resource observation and oracle checks
 
 [0432](changes/0432-xlsx-streaming-operation-memory.md) changes only the

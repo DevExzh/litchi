@@ -1,0 +1,71 @@
+{
+  "change": 433,
+  "role": "after-buffered",
+  "selector": "ods_buffered_create",
+  "name": "after-buffered-normal-medium-r1",
+  "lane": {
+    "mode": "normal",
+    "shape": "medium",
+    "repeat": "R1"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/captures/after-buffered-normal-medium-r1-resource.log",
+    "/tmp/litchi-goal-0433-binaries/after/normal",
+    "--case",
+    "ods_buffered_create",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/captures/after-buffered-normal-medium-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/captures/after-buffered-normal-medium-r1-catalog.json"
+  ],
+  "revision": "f5bf1696192f0007db56554aa5b16719cdf1950b",
+  "source_manifest": {
+    "path": "sources/7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e.json",
+    "sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e",
+    "files": 6642
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0433-binaries/after/normal",
+    "sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4",
+    "bytes": 454475192
+  },
+  "protocol_sha256": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+  "driver_sha256": "c64493fc7d6682e228dee70d4de4ff51522a5371c31302e4c51256efb7af72c3",
+  "verifier_sha256": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+  "started_utc": "2026-09-06T05:24:14.947001+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T05:24:17.154880+00:00",
+  "artifacts": {
+    "after/captures/after-buffered-normal-medium-r1.json": {
+      "sha256": "09057eb91c3b39c1ee8fd2c7f9c956267b3336456a9fb08bbe817e799b25dd00",
+      "bytes": 32614
+    },
+    "after/captures/after-buffered-normal-medium-r1-catalog.json": {
+      "sha256": "a54b9ec6da0b75742606efe73a5516e9f2af60d63f390cb1c64e1cdaa128b9c2",
+      "bytes": 4850
+    },
+    "after/captures/after-buffered-normal-medium-r1.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "after/captures/after-buffered-normal-medium-r1-resource.log": {
+      "sha256": "523cf3d8810762815c8bcf2d2bda7508f6bf6823dbff2d6bd5ac9f7b690e8816",
+      "bytes": 1108
+    }
+  }
+}

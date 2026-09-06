@@ -1,0 +1,71 @@
+{
+  "change": 433,
+  "role": "after-streaming",
+  "selector": "ods_streaming_create",
+  "name": "after-streaming-normal-tiny-r2",
+  "lane": {
+    "mode": "normal",
+    "shape": "tiny",
+    "repeat": "R2"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/captures/after-streaming-normal-tiny-r2-resource.log",
+    "/tmp/litchi-goal-0433-binaries/after/normal",
+    "--case",
+    "ods_streaming_create",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/captures/after-streaming-normal-tiny-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0433/after/captures/after-streaming-normal-tiny-r2-catalog.json"
+  ],
+  "revision": "f5bf1696192f0007db56554aa5b16719cdf1950b",
+  "source_manifest": {
+    "path": "sources/7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e.json",
+    "sha256": "7d958294aca2d636f18f506eb4039d628eaf4e5fe07a355f0f633414792b9f8e",
+    "files": 6642
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0433-binaries/after/normal",
+    "sha256": "f71138359e054e88e36326ff865e15f7d91192cbbf119561ada76142ab20bac4",
+    "bytes": 454475192
+  },
+  "protocol_sha256": "35f6f4b7baee6a44586e6330324a524d1dcf7530fbf12db2f6a1b1bb3026037a",
+  "driver_sha256": "c64493fc7d6682e228dee70d4de4ff51522a5371c31302e4c51256efb7af72c3",
+  "verifier_sha256": "927cce87411d15dc220ca21a7d9b38e8d5e4d8fdb9ccb7be1b05b98fa2188bb9",
+  "started_utc": "2026-09-06T05:26:17.565215+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T05:26:17.902095+00:00",
+  "artifacts": {
+    "after/captures/after-streaming-normal-tiny-r2.json": {
+      "sha256": "6d83273b87b56ca8cee10aaa8bbfa2a9d1e0c671caa3d711c020bd2c25b5f568",
+      "bytes": 32747
+    },
+    "after/captures/after-streaming-normal-tiny-r2-catalog.json": {
+      "sha256": "77e82decfc37b44c795aef47df768bda5730eb7792bd24a3b0f727487c2b66f8",
+      "bytes": 4830
+    },
+    "after/captures/after-streaming-normal-tiny-r2.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "after/captures/after-streaming-normal-tiny-r2-resource.log": {
+      "sha256": "a3fc507c47604da9a88c75f31097746c787fb7422cbce7a5455a878b4f76f819",
+      "bytes": 1104
+    }
+  }
+}

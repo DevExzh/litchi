@@ -1,0 +1,14 @@
+[
+  "captures/after-streaming-normal-tiny-r1-receipt.json",
+  "captures/after-streaming-normal-medium-r1-receipt.json",
+  "captures/after-streaming-normal-large-r1-receipt.json",
+  "captures/after-streaming-allocator-tiny-r1-receipt.json",
+  "captures/after-streaming-allocator-medium-r1-receipt.json",
+  "captures/after-streaming-allocator-large-r1-receipt.json",
+  "captures/after-streaming-allocator-large-r2-receipt.json",
+  "captures/after-streaming-allocator-medium-r2-receipt.json",
+  "captures/after-streaming-allocator-tiny-r2-receipt.json",
+  "captures/after-streaming-normal-large-r2-receipt.json",
+  "captures/after-streaming-normal-medium-r2-receipt.json",
+  "captures/after-streaming-normal-tiny-r2-receipt.json"
+]
