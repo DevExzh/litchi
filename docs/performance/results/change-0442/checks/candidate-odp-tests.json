@@ -1,0 +1,46 @@
+{
+  "change": 442,
+  "argv": [
+    "cargo",
+    "test",
+    "--locked",
+    "--release",
+    "-p",
+    "litchi-odp",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "a4a6f7df437123d166d8b901ada573a44b7aadd9",
+  "driver_sha256": "66a442f9b2f41963bff7ea4fd1f7969111988b4dd0a94456d4903ec2f9efe201",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T16:51:39.509936+00:00",
+  "source_before": {
+    "path": "sources/442951d71495608359f82baa5b6f7eabd225b5a5fabf7e5122df668b2dc91c36.json",
+    "sha256": "442951d71495608359f82baa5b6f7eabd225b5a5fabf7e5122df668b2dc91c36",
+    "files": 6658
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T16:54:08.736614+00:00",
+  "source_after": {
+    "path": "sources/442951d71495608359f82baa5b6f7eabd225b5a5fabf7e5122df668b2dc91c36.json",
+    "sha256": "442951d71495608359f82baa5b6f7eabd225b5a5fabf7e5122df668b2dc91c36",
+    "files": 6658
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/candidate-odp-tests.log",
+    "bytes": 34005,
+    "sha256": "787e2a1bb18f4480503262e3631149c84d3fc08f325acd51c20b6c4565d8704b"
+  },
+  "passed_tests": 355,
+  "failed_tests": 0,
+  "ignored_tests": 0
+}

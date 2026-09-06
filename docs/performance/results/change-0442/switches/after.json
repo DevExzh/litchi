@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "role": "after",
+  "files": [
+    "crates/litchi-odp/src/model/settings.rs",
+    "crates/litchi-odp/src/model/declaration.rs",
+    "crates/litchi-odp/src/model/page_metadata.rs",
+    "crates/litchi-odp/src/model/mod.rs",
+    "crates/litchi-odp/src/model/staging.rs",
+    "crates/litchi-odp/src/package/presentation.rs",
+    "crates/litchi-odp/src/authoring/mutable.rs"
+  ],
+  "source_manifest": {
+    "path": "sources/442951d71495608359f82baa5b6f7eabd225b5a5fabf7e5122df668b2dc91c36.json",
+    "sha256": "442951d71495608359f82baa5b6f7eabd225b5a5fabf7e5122df668b2dc91c36",
+    "files": 6658
+  },
+  "utc": "2026-09-06T17:09:24.196912+00:00"
+}

@@ -246,6 +246,23 @@ struct OpenDeclaration {
 /// # Errors
 /// Returns an error when the input is malformed or a configured limit is exceeded.
 pub fn parse(xml: &str) -> Result<Collection> {
+    let mut scanner = Scanner::new(xml.len())?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    loop {
+        let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
+        if matches!(event, Event::Eof) {
+            break;
+        }
+        scanner.step(&reader, &event)?;
+        buffer.clear();
+    }
+    scanner.finish()
+}
+
+#[cfg(test)]
+pub(super) fn parse_reference(xml: &str) -> Result<Collection> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("presentation declaration XML exceeds 8 MiB"));
     }
@@ -423,6 +440,212 @@ pub fn parse(xml: &str) -> Result<Collection> {
     }
     result.validate_for_slides(page_count)?;
     Ok(result)
+}
+
+/// Event state shared by the individual parser and the staging traversal.
+pub(super) struct Scanner {
+    depth: usize,
+    presentation_depth: Option<usize>,
+    page_depth: Option<usize>,
+    notes_depth: Option<usize>,
+    page_count: usize,
+    found_presentation: bool,
+    open_declaration: Option<OpenDeclaration>,
+    result: Collection,
+}
+
+impl Scanner {
+    pub(super) fn new(xml_bytes: usize) -> Result<Self> {
+        if xml_bytes > MAX_XML_BYTES {
+            return Err(invalid("presentation declaration XML exceeds 8 MiB"));
+        }
+        Ok(Self {
+            depth: 0usize,
+            presentation_depth: None,
+            page_depth: None,
+            notes_depth: None,
+            page_count: 0usize,
+            found_presentation: false,
+            open_declaration: None,
+            result: Collection::default(),
+        })
+    }
+
+    pub(super) fn step(&mut self, reader: &NsReader<&[u8]>, event: &Event<'_>) -> Result<()> {
+        match event {
+            Event::Start(element) => {
+                self.depth = self
+                    .depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("XML nesting overflow"))?;
+                if element_is(reader, element, OFFICE_NAMESPACE, b"presentation") {
+                    if self.found_presentation {
+                        return Err(invalid("duplicate office:presentation element"));
+                    }
+                    self.found_presentation = true;
+                    self.presentation_depth = Some(self.depth);
+                } else if let Some(kind) = declaration_kind(reader, element) {
+                    if self.presentation_depth != Some(self.depth - 1)
+                        || self.open_declaration.is_some()
+                    {
+                        return Err(invalid(
+                            "presentation declarations must be direct office:presentation children",
+                        ));
+                    }
+                    self.open_declaration =
+                        Some(parse_declaration_start(reader, element, kind, self.depth)?);
+                } else if self.open_declaration.is_some() {
+                    return Err(invalid("presentation declarations may contain text only"));
+                } else if element_is(reader, element, DRAW_NAMESPACE, b"page")
+                    && self.presentation_depth == Some(self.depth - 1)
+                {
+                    let slide_index = self.page_count;
+                    self.page_count = self
+                        .page_count
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("slide count overflow"))?;
+                    if let Some(binding) =
+                        parse_binding(reader, element, slide_index, Target::Slide)?
+                    {
+                        self.result.bindings.push(binding);
+                    }
+                    self.page_depth = Some(self.depth);
+                } else if element_is(reader, element, PRESENTATION_NAMESPACE, b"notes")
+                    && self.page_depth.is_some()
+                {
+                    if self.notes_depth.is_some() {
+                        return Err(invalid("nested presentation:notes element"));
+                    }
+                    if let Some(binding) =
+                        parse_binding(reader, element, self.page_count - 1, Target::Notes)?
+                    {
+                        self.result.bindings.push(binding);
+                    }
+                    self.notes_depth = Some(self.depth);
+                }
+            },
+            Event::Empty(element) => {
+                if let Some(kind) = declaration_kind(reader, element) {
+                    if self.presentation_depth != Some(self.depth)
+                        || self.open_declaration.is_some()
+                    {
+                        return Err(invalid(
+                            "presentation declarations must be direct office:presentation children",
+                        ));
+                    }
+                    let value = parse_declaration_start(reader, element, kind, self.depth + 1)?;
+                    finish_declaration(value, &mut self.result)?;
+                } else if element_is(reader, element, PRESENTATION_NAMESPACE, b"notes")
+                    && self.page_depth.is_some()
+                {
+                    if let Some(binding) =
+                        parse_binding(reader, element, self.page_count - 1, Target::Notes)?
+                    {
+                        self.result.bindings.push(binding);
+                    }
+                } else if element_is(reader, element, DRAW_NAMESPACE, b"page")
+                    && self.presentation_depth == Some(self.depth)
+                {
+                    let slide_index = self.page_count;
+                    self.page_count = self
+                        .page_count
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("slide count overflow"))?;
+                    if let Some(binding) =
+                        parse_binding(reader, element, slide_index, Target::Slide)?
+                    {
+                        self.result.bindings.push(binding);
+                    }
+                } else if self.open_declaration.is_some() {
+                    return Err(invalid("presentation declarations may contain text only"));
+                }
+            },
+            Event::Text(text) => {
+                if let Some(declaration) = self.open_declaration.as_mut() {
+                    let decoded = text
+                        .xml_content(XmlVersion::Implicit1_0)
+                        .map_err(xml_error)?;
+                    if declaration.text.len().saturating_add(decoded.len()) > MAX_TEXT_BYTES {
+                        return Err(invalid("presentation declaration text exceeds 1 MiB"));
+                    }
+                    declaration.text.push_str(&decoded);
+                }
+            },
+            Event::GeneralRef(reference) => {
+                if let Some(declaration) = self.open_declaration.as_mut() {
+                    let name: &[u8] = reference.as_ref();
+                    let replacement = match name {
+                        b"amp" => "&",
+                        b"lt" => "<",
+                        b"gt" => ">",
+                        b"apos" => "'",
+                        b"quot" => "\"",
+                        _ => {
+                            return Err(invalid(
+                                "unsupported entity in presentation declaration text",
+                            ));
+                        },
+                    };
+                    declaration.text.push_str(replacement);
+                }
+            },
+            Event::CData(text) => {
+                if let Some(declaration) = self.open_declaration.as_mut() {
+                    let decoded = reader.decoder().decode(text.as_ref()).map_err(xml_error)?;
+                    if declaration.text.len().saturating_add(decoded.len()) > MAX_TEXT_BYTES {
+                        return Err(invalid("presentation declaration text exceeds 1 MiB"));
+                    }
+                    declaration.text.push_str(&decoded);
+                }
+            },
+            Event::End(element) => {
+                if let Some(declaration) =
+                    take_finished_declaration(&mut self.open_declaration, self.depth)
+                {
+                    let expected = match declaration.kind {
+                        DeclarationKind::Header => b"header-decl".as_slice(),
+                        DeclarationKind::Footer => b"footer-decl".as_slice(),
+                        DeclarationKind::DateTime => b"date-time-decl".as_slice(),
+                    };
+                    if !end_is(reader, element, PRESENTATION_NAMESPACE, expected) {
+                        return Err(invalid("unexpected presentation declaration end element"));
+                    }
+                    finish_declaration(declaration, &mut self.result)?;
+                } else if self.notes_depth == Some(self.depth)
+                    && end_is(reader, element, PRESENTATION_NAMESPACE, b"notes")
+                {
+                    self.notes_depth = None;
+                } else if self.page_depth == Some(self.depth)
+                    && end_is(reader, element, DRAW_NAMESPACE, b"page")
+                {
+                    self.page_depth = None;
+                    self.notes_depth = None;
+                } else if self.presentation_depth == Some(self.depth)
+                    && end_is(reader, element, OFFICE_NAMESPACE, b"presentation")
+                {
+                    self.presentation_depth = None;
+                }
+                self.depth = self
+                    .depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("unbalanced XML end element"))?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("active XML declarations are prohibited"));
+            },
+            Event::Eof => {},
+            Event::Comment(_) | Event::Decl(_) => {},
+        }
+        Ok(())
+    }
+
+    pub(super) fn finish(self) -> Result<Collection> {
+        if self.open_declaration.is_some() {
+            return Err(invalid("unterminated presentation declaration"));
+        }
+        self.result.validate_for_slides(self.page_count)?;
+        Ok(self.result)
+    }
 }
 
 pub(crate) fn write_declaration_elements(

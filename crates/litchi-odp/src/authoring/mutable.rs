@@ -197,9 +197,10 @@ impl MutablePresentation {
         // isolated by cloning it into the draft, but do not parse every slide
         // a second time solely to obtain the same semantic values.
         let slides = validated_slides.to_vec();
-        let settings = presentation.settings()?;
-        let parsed_declarations = presentation.declarations()?;
-        let parsed_page_metadata = presentation.pages()?;
+        let metadata = presentation.staging_metadata()?;
+        let settings = metadata.settings;
+        let parsed_declarations = metadata.declarations;
+        let parsed_page_metadata = metadata.pages;
         let mimetype = presentation.owned_package().mimetype()?;
 
         let styles_xml = presentation.styles_xml().map(str::to_owned);

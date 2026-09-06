@@ -1,6 +1,19 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0441
+## Current evidence through 0442
+
+[0442](changes/0442-odp-shared-staging-traversal.md) combines three ODP staging XML traversals while
+preserving complete-pass error priority. The 720-sample matrix passes the frozen
+normal p50 gate: medium/large improve 9.830–13.307% across both repeats.
+All five repeat flags remain disclosed. Peak and retained bytes are unchanged;
+no general tail, RSS or bounded-append benefit is claimed.
+
+The three auxiliary scans are consolidated. Source-fragment scanning, one-shot
+cache costs, Part addition, repackaging, bounded existing append, native breadth,
+cold/range and scaling remain open. This batch does not complete or narrow the
+user-owned non-iWork goal.
+
+## Earlier evidence through 0441
 
 [0441](changes/0441-odp-shared-preservation-projection.md) shares the immutable
 ODP preservation comparison projection and keeps the mutable draft detached.

@@ -1,0 +1,9 @@
+[
+  "crates/litchi-odp/src/model/settings.rs",
+  "crates/litchi-odp/src/model/declaration.rs",
+  "crates/litchi-odp/src/model/page_metadata.rs",
+  "crates/litchi-odp/src/model/mod.rs",
+  "crates/litchi-odp/src/model/staging.rs",
+  "crates/litchi-odp/src/package/presentation.rs",
+  "crates/litchi-odp/src/authoring/mutable.rs"
+]

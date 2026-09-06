@@ -217,6 +217,23 @@ pub(crate) fn settings_reference_page(settings: Option<&Settings>, page_name: &s
 /// # Errors
 /// Returns an error when the input is malformed or a configured limit is exceeded.
 pub fn parse(xml: &str) -> Result<Option<Settings>> {
+    let mut scanner = Scanner::new(xml.len())?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    loop {
+        let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
+        if matches!(event, Event::Eof) {
+            break;
+        }
+        scanner.step(&reader, &event)?;
+        buffer.clear();
+    }
+    scanner.finish()
+}
+
+#[cfg(test)]
+pub(super) fn parse_reference(xml: &str) -> Result<Option<Settings>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("presentation settings XML exceeds 8 MiB"));
     }
@@ -345,6 +362,153 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
     }
     settings.validate()?;
     Ok(Some(settings))
+}
+
+/// Event state shared by the individual parser and the staging traversal.
+pub(super) struct Scanner {
+    depth: usize,
+    presentation_depth: Option<usize>,
+    settings_depth: Option<usize>,
+    show_depth: Option<usize>,
+    found_presentation: bool,
+    found_settings: bool,
+    settings: Settings,
+}
+
+impl Scanner {
+    pub(super) fn new(xml_bytes: usize) -> Result<Self> {
+        if xml_bytes > MAX_XML_BYTES {
+            return Err(invalid("presentation settings XML exceeds 8 MiB"));
+        }
+        Ok(Self {
+            depth: 0usize,
+            presentation_depth: None,
+            settings_depth: None,
+            show_depth: None,
+            found_presentation: false,
+            found_settings: false,
+            settings: Settings::default(),
+        })
+    }
+
+    pub(super) fn step(&mut self, reader: &NsReader<&[u8]>, event: &Event<'_>) -> Result<()> {
+        match event {
+            Event::Start(element) => {
+                self.depth = self
+                    .depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("XML nesting overflow"))?;
+                if element_is(reader, element, OFFICE_NAMESPACE, b"presentation") {
+                    if self.found_presentation {
+                        return Err(invalid("duplicate office:presentation element"));
+                    }
+                    self.found_presentation = true;
+                    self.presentation_depth = Some(self.depth);
+                } else if element_is(reader, element, PRESENTATION_NAMESPACE, b"settings") {
+                    if self.presentation_depth != Some(self.depth - 1) {
+                        return Err(invalid(
+                            "presentation:settings must be a direct office:presentation child",
+                        ));
+                    }
+                    if self.found_settings {
+                        return Err(invalid("duplicate presentation:settings element"));
+                    }
+                    self.found_settings = true;
+                    parse_settings_attributes(reader, element, &mut self.settings)?;
+                    self.settings_depth = Some(self.depth);
+                } else if self.settings_depth == Some(self.depth - 1)
+                    && element_is(reader, element, PRESENTATION_NAMESPACE, b"show")
+                {
+                    self.settings
+                        .custom_shows
+                        .push(parse_custom_show(reader, element)?);
+                    self.show_depth = Some(self.depth);
+                } else if self.settings_depth.is_some() {
+                    return Err(invalid(
+                        "presentation:settings may contain only presentation:show elements",
+                    ));
+                }
+            },
+            Event::Empty(element) => {
+                if element_is(reader, element, PRESENTATION_NAMESPACE, b"settings") {
+                    if self.presentation_depth != Some(self.depth) {
+                        return Err(invalid(
+                            "presentation:settings must be a direct office:presentation child",
+                        ));
+                    }
+                    if self.found_settings {
+                        return Err(invalid("duplicate presentation:settings element"));
+                    }
+                    self.found_settings = true;
+                    parse_settings_attributes(reader, element, &mut self.settings)?;
+                } else if self.settings_depth == Some(self.depth)
+                    && element_is(reader, element, PRESENTATION_NAMESPACE, b"show")
+                {
+                    self.settings
+                        .custom_shows
+                        .push(parse_custom_show(reader, element)?);
+                } else if self.settings_depth.is_some() {
+                    return Err(invalid(
+                        "presentation:settings may contain only presentation:show elements",
+                    ));
+                }
+            },
+            Event::End(element) => {
+                if self.show_depth == Some(self.depth) {
+                    if !end_is(reader, element, PRESENTATION_NAMESPACE, b"show") {
+                        return Err(invalid("unexpected element inside presentation:show"));
+                    }
+                    self.show_depth = None;
+                } else if self.settings_depth == Some(self.depth) {
+                    if !end_is(reader, element, PRESENTATION_NAMESPACE, b"settings") {
+                        return Err(invalid("unexpected presentation settings end element"));
+                    }
+                    self.settings_depth = None;
+                } else if self.presentation_depth == Some(self.depth)
+                    && end_is(reader, element, OFFICE_NAMESPACE, b"presentation")
+                {
+                    self.presentation_depth = None;
+                }
+                self.depth = self
+                    .depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("unbalanced XML end element"))?;
+            },
+            Event::Text(text) if self.settings_depth.is_some() => {
+                let bytes: &[u8] = text.as_ref();
+                if bytes.iter().any(|byte| !byte.is_ascii_whitespace()) {
+                    return Err(invalid("presentation settings cannot contain text"));
+                }
+            },
+            Event::CData(cdata) if self.settings_depth.is_some() => {
+                let bytes: &[u8] = cdata.as_ref();
+                if bytes.iter().any(|byte| !byte.is_ascii_whitespace()) {
+                    return Err(invalid("presentation settings cannot contain CDATA"));
+                }
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("active XML declarations are prohibited"));
+            },
+            Event::Eof => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
+        }
+        Ok(())
+    }
+
+    pub(super) fn finish(self) -> Result<Option<Settings>> {
+        if self.settings_depth.is_some() || self.show_depth.is_some() {
+            return Err(invalid("unterminated presentation settings"));
+        }
+        if !self.found_settings {
+            return Ok(None);
+        }
+        self.settings.validate()?;
+        Ok(Some(self.settings))
+    }
 }
 
 /// Serialize validated presentation settings in schema order.
@@ -690,7 +854,7 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-fn xml_error(error: impl std::fmt::Display) -> Error {
+pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {
     invalid(format!("presentation settings XML parsing error: {error}"))
 }
 

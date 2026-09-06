@@ -7,6 +7,7 @@ pub mod page_layout;
 pub mod page_metadata;
 pub mod settings;
 pub mod slide;
+pub(crate) mod staging;
 pub mod transition;
 
 pub use action::{

@@ -452,6 +452,23 @@ fn fallback_page_name(slide_index: usize) -> Result<String> {
 /// # Errors
 /// Returns an error when the input is malformed or a configured limit is exceeded.
 pub fn parse(xml: &str) -> Result<Collection> {
+    let mut scanner = Scanner::new(xml.len())?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    loop {
+        let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
+        if matches!(event, Event::Eof) {
+            break;
+        }
+        scanner.step(&reader, &event)?;
+        buffer.clear();
+    }
+    scanner.finish()
+}
+
+#[cfg(test)]
+pub(super) fn parse_reference(xml: &str) -> Result<Collection> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("presentation page metadata XML exceeds 8 MiB"));
     }
@@ -516,6 +533,90 @@ pub fn parse(xml: &str) -> Result<Collection> {
         buffer.clear();
     }
     Collection::new(pages)
+}
+
+/// Event state shared by the individual parser and the staging traversal.
+pub(super) struct Scanner {
+    depth: usize,
+    presentation_depth: Option<usize>,
+    found_presentation: bool,
+    pages: Vec<Page>,
+}
+
+impl Scanner {
+    pub(super) fn new(xml_bytes: usize) -> Result<Self> {
+        if xml_bytes > MAX_XML_BYTES {
+            return Err(invalid("presentation page metadata XML exceeds 8 MiB"));
+        }
+        Ok(Self {
+            depth: 0usize,
+            presentation_depth: None,
+            found_presentation: false,
+            pages: Vec::new(),
+        })
+    }
+
+    pub(super) fn step(&mut self, reader: &NsReader<&[u8]>, event: &Event<'_>) -> Result<()> {
+        match event {
+            Event::Start(element) => {
+                self.depth = self
+                    .depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("XML nesting overflow"))?;
+                if element_is(reader, element, OFFICE_NAMESPACE, b"presentation") {
+                    if self.found_presentation {
+                        return Err(invalid("duplicate office:presentation element"));
+                    }
+                    self.found_presentation = true;
+                    self.presentation_depth = Some(self.depth);
+                } else if element_is(reader, element, DRAW_NAMESPACE, b"page")
+                    && self.presentation_depth == Some(self.depth - 1)
+                {
+                    if self.pages.len() >= MAX_PAGES {
+                        return Err(invalid("presentation page metadata exceeds 65536 pages"));
+                    }
+                    self.pages
+                        .push(parse_page(reader, element, self.pages.len())?);
+                }
+            },
+            Event::Empty(element)
+                if element_is(reader, element, DRAW_NAMESPACE, b"page")
+                    && self.presentation_depth == Some(self.depth) =>
+            {
+                if self.pages.len() >= MAX_PAGES {
+                    return Err(invalid("presentation page metadata exceeds 65536 pages"));
+                }
+                self.pages
+                    .push(parse_page(reader, element, self.pages.len())?);
+            },
+            Event::End(element) => {
+                if self.presentation_depth == Some(self.depth)
+                    && end_is(reader, element, OFFICE_NAMESPACE, b"presentation")
+                {
+                    self.presentation_depth = None;
+                }
+                self.depth = self
+                    .depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("unbalanced XML end element"))?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("active XML declarations are prohibited"));
+            },
+            Event::Eof => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
+        }
+        Ok(())
+    }
+
+    pub(super) fn finish(self) -> Result<Collection> {
+        Collection::new(self.pages)
+    }
 }
 
 #[allow(

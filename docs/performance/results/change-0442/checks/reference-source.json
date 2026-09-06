@@ -1,0 +1,24 @@
+{
+  "status": "pass",
+  "oracles": [
+    {
+      "module": "settings",
+      "original_body_sha256": "542b8729909997cce359517f23a6815da188c2c370ca7affc226d474020bb13c",
+      "reference_body_sha256": "542b8729909997cce359517f23a6815da188c2c370ca7affc226d474020bb13c",
+      "byte_identical": true
+    },
+    {
+      "module": "declaration",
+      "original_body_sha256": "0f201a7522d2035fe39bb1564fa704b06bddd22b21f4b9a2971964437e397822",
+      "reference_body_sha256": "0f201a7522d2035fe39bb1564fa704b06bddd22b21f4b9a2971964437e397822",
+      "byte_identical": true
+    },
+    {
+      "module": "page_metadata",
+      "original_body_sha256": "ca53403a014c69df800c0dcaadcd8e26722587e4f6f3cf6feb8c1868784af0ce",
+      "reference_body_sha256": "ca53403a014c69df800c0dcaadcd8e26722587e4f6f3cf6feb8c1868784af0ce",
+      "byte_identical": true
+    }
+  ],
+  "scope": "Original complete parser function bodies retained byte-for-byte as test-only references; helper semantics unchanged."
+}

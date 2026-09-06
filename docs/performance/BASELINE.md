@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0442: faster owned ODP append through shared staging scans
+
+[0442](changes/0442-odp-shared-staging-traversal.md) consolidates settings, declaration and page-metadata
+XML traversal while preserving full-pass error priority. The frozen ABBA matrix
+retains 24 reports/720 samples and four profiles. Normal medium/large p50
+improves 9.830–13.307% in both repeats, passing the predeclared practical gate.
+Peak and retained bytes are unchanged; allocator gains are immaterial.
+All five repeat flags remain, including +7.091% candidate large p99 repeat
+variation (paired R2 p99 still falls 2.268%). No general tail, RSS, bounded
+append, native or scaling benefit is claimed. See the complete
+[measurements](results/change-0442/measurements.md).
+
 ## Change 0441: lower ODP staging peak with a failed initial gate
 
 [0441](changes/0441-odp-shared-preservation-projection.md) shares the immutable

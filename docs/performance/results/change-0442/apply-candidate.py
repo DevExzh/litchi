@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""Extract unchanged event machines and retain the original loops as test oracles."""
+from pathlib import Path
+import re
+
+ROOT = Path(__file__).resolve().parent
+REPO = ROOT.parents[3]
+LEX = re.compile(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*[\s\S]*?\*/|[A-Za-z_][A-Za-z_0-9]*|[{}]')
+
+
+def closing(text, opening):
+    depth = 0
+    for match in LEX.finditer(text, opening):
+        if match[0] == '{':
+            depth += 1
+        elif match[0] == '}':
+            depth -= 1
+            if depth == 0:
+                return match.end()
+    raise ValueError('unbalanced source')
+
+
+def fields(text, names):
+    return LEX.sub(lambda m: 'self.' + m[0] if m[0] in names else m[0], text)
+
+
+def transform(name, types):
+    path = REPO / 'crates/litchi-odp/src/model' / (name + '.rs')
+    original = path.read_text()
+    assert original == (ROOT / 'candidate' / ('before-' + path.name + '.txt')).read_text()
+    start = original.index('pub fn parse(xml: &str)')
+    opening = original.index('{', start)
+    end = closing(original, opening)
+    function = original[start:end]
+    signature = original[start:opening].strip()
+    result_type = signature.split(' -> ', 1)[1]
+    reader_start = function.index('    let mut reader =')
+    preflight = function[function.index('{') + 1:reader_start].replace('xml.len()', 'xml_bytes')
+    state_start = function.index('    let mut buffer = Vec::new();') + len('    let mut buffer = Vec::new();')
+    loop_start = function.index('    loop {', state_start)
+    initializers = re.findall(r'let mut (\w+)(?:: [^=]+)? = ([^;]+);', function[state_start:loop_start])
+    assert [name for name, _ in initializers] == list(types), initializers
+    match_start = function.index('        match reader.read_event_into', loop_start)
+    match_open = function.index('{', match_start)
+    match_end = closing(function, match_open)
+    body = function[match_start:match_end].replace('match reader.read_event_into(&mut buffer).map_err(xml_error)?', 'match event')
+    body = fields(body, types).replace('&reader', 'reader').replace('&element', 'element').replace('Event::Eof => break,', 'Event::Eof => {},')
+    loop_end = closing(function, function.index('{', loop_start))
+    finish = fields(function[loop_end:-1].strip('\n'), types)
+    finish = '\n'.join('    ' + line for line in finish.splitlines())
+    wrapper = signature + ' {\n' + '''    let mut scanner = Scanner::new(xml.len())?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    loop {
+        let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
+        if matches!(event, Event::Eof) {
+            break;
+        }
+        scanner.step(&reader, &event)?;
+        buffer.clear();
+    }
+    scanner.finish()
+}'''
+    oracle = '#[cfg(test)]\n' + function.replace('pub fn parse(', 'pub(super) fn parse_reference(', 1)
+    definition = '\n'.join(f'    {field}: {kind},' for field, kind in types.items())
+    init = '\n'.join(f'            {field}: {value},' for field, value in initializers)
+    preflight = '\n'.join('    ' + line for line in preflight.strip('\n').splitlines())
+    scanner = f'''/// Event state shared by the individual parser and the staging traversal.
+pub(super) struct Scanner {{
+{definition}
+}}
+
+impl Scanner {{
+    pub(super) fn new(xml_bytes: usize) -> Result<Self> {{
+{preflight}
+        Ok(Self {{
+{init}
+        }})
+    }}
+
+    pub(super) fn step(&mut self, reader: &NsReader<&[u8]>, event: &Event<'_>) -> Result<()> {{
+{body}
+        Ok(())
+    }}
+
+    pub(super) fn finish(self) -> {result_type} {{
+{finish}
+    }}
+}}'''
+    result = original[:start] + wrapper + '\n\n' + oracle + '\n\n' + scanner + original[end:]
+    if name == 'settings':
+        result = result.replace('fn xml_error(error:', 'pub(super) fn xml_error(error:', 1)
+    return path, result
+
+
+def main():
+    states = {
+        'settings': {'depth':'usize','presentation_depth':'Option<usize>','settings_depth':'Option<usize>','show_depth':'Option<usize>','found_presentation':'bool','found_settings':'bool','settings':'Settings'},
+        'declaration': {'depth':'usize','presentation_depth':'Option<usize>','page_depth':'Option<usize>','notes_depth':'Option<usize>','page_count':'usize','found_presentation':'bool','open_declaration':'Option<OpenDeclaration>','result':'Collection'},
+        'page_metadata': {'depth':'usize','presentation_depth':'Option<usize>','found_presentation':'bool','pages':'Vec<Page>'},
+    }
+    changes = dict(transform(name, state) for name, state in states.items())
+    for relative in ('model/mod.rs', 'package/presentation.rs', 'authoring/mutable.rs'):
+        path = REPO / 'crates/litchi-odp/src' / relative
+        original = path.read_text()
+        assert original == (ROOT / 'candidate' / ('before-' + path.name + '.txt')).read_text()
+        if relative == 'model/mod.rs':
+            updated = original.replace('pub mod slide;','pub mod slide;\npub(crate) mod staging;')
+        elif relative == 'package/presentation.rs':
+            marker = '    /// Inspect inert header, footer, date-time, and page-binding declarations.'
+            updated = original.replace(marker, '''    /// Read the auxiliary projections required to stage an edit in one traversal.
+    pub(crate) fn staging_metadata(&self) -> Result<crate::model::staging::Metadata> {
+        crate::model::staging::parse(self.package.content_xml())
+    }
+
+''' + marker)
+        else:
+            updated = original.replace('''        let settings = presentation.settings()?;
+        let parsed_declarations = presentation.declarations()?;
+        let parsed_page_metadata = presentation.pages()?;''', '''        let metadata = presentation.staging_metadata()?;
+        let settings = metadata.settings;
+        let parsed_declarations = metadata.declarations;
+        let parsed_page_metadata = metadata.pages;''')
+        assert updated != original
+        changes[path] = updated
+    staging = REPO / 'crates/litchi-odp/src/model/staging.rs'
+    assert not staging.exists()
+    changes[staging] = (ROOT / 'candidate/staging-proposed.rs.txt').read_text()
+    for path, content in changes.items():
+        path.write_text(content)
+    print('Applied seven-file candidate; original loops retained under cfg(test)')
+
+
+if __name__ == '__main__':
+    main()

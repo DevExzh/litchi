@@ -1,0 +1,170 @@
+//! Auxiliary projections collected by one staging traversal.
+//!
+//! Errors retain the historical complete-pass order: settings, declarations,
+//! then page metadata. A lower-priority error never preempts a later settings
+//! error or a settings XML read failure.
+
+use super::{declaration, page_metadata, settings};
+use litchi_core::Result;
+use quick_xml::{events::Event, reader::NsReader};
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct Metadata {
+    pub(crate) settings: Option<settings::Settings>,
+    pub(crate) declarations: declaration::Collection,
+    pub(crate) pages: page_metadata::Collection,
+}
+
+pub(crate) fn parse(xml: &str) -> Result<Metadata> {
+    let mut settings = settings::Scanner::new(xml.len())?;
+    let mut declarations = declaration::Scanner::new(xml.len());
+    let mut pages = page_metadata::Scanner::new(xml.len());
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    loop {
+        // Settings historically owns the first complete XML traversal.
+        let event = reader
+            .read_event_into(&mut buffer)
+            .map_err(settings::xml_error)?;
+        if matches!(event, Event::Eof) {
+            break;
+        }
+        settings.step(&reader, &event)?;
+        if let Ok(scanner) = declarations.as_mut()
+            && let Err(error) = scanner.step(&reader, &event)
+        {
+            declarations = Err(error);
+        }
+        if declarations.is_ok()
+            && let Ok(scanner) = pages.as_mut()
+            && let Err(error) = scanner.step(&reader, &event)
+        {
+            pages = Err(error);
+        }
+        buffer.clear();
+    }
+    let settings = settings.finish()?;
+    let declarations = declarations?.finish()?;
+    let pages = pages?.finish()?;
+    Ok(Metadata {
+        settings,
+        declarations,
+        pages,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Metadata, declaration, page_metadata, parse, settings};
+    use litchi_core::Result;
+
+    fn reference(xml: &str) -> Result<Metadata> {
+        let settings = settings::parse_reference(xml)?;
+        let declarations = declaration::parse_reference(xml)?;
+        let pages = page_metadata::parse_reference(xml)?;
+        Ok(Metadata {
+            settings,
+            declarations,
+            pages,
+        })
+    }
+
+    fn compare(xml: &str) {
+        let normalize = |value: Result<Metadata>| value.map_err(|error| format!("{error:?}"));
+        assert_eq!(
+            normalize(parse(xml)),
+            normalize(reference(xml)),
+            "{xml:.200}"
+        );
+        assert_eq!(
+            settings::parse(xml).map_err(|error| format!("{error:?}")),
+            settings::parse_reference(xml).map_err(|error| format!("{error:?}")),
+        );
+        assert_eq!(
+            declaration::parse(xml).map_err(|error| format!("{error:?}")),
+            declaration::parse_reference(xml).map_err(|error| format!("{error:?}")),
+        );
+        assert_eq!(
+            page_metadata::parse(xml).map_err(|error| format!("{error:?}")),
+            page_metadata::parse_reference(xml).map_err(|error| format!("{error:?}")),
+        );
+    }
+
+    fn wrap(body: &str) -> String {
+        format!(
+            "<o:document-content xmlns:o=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:p=\"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0\" xmlns:d=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" xmlns:x=\"urn:foreign\"><o:body><o:presentation>{body}</o:presentation></o:body></o:document-content>"
+        )
+    }
+
+    #[test]
+    fn shared_traversal_matches_independent_loops_and_namespace_scopes() {
+        let fragments = [
+            "",
+            "<d:page d:name=\"one\"/>",
+            "<d:page d:name=\"one\"><p:notes/></d:page>",
+            "<p:settings p:mouse-visible=\"true\"><p:show p:name=\"custom\" p:pages=\"one,two\"/></p:settings>",
+            "<p:header-decl p:name=\"header\">A &amp; B<![CDATA[<>]]></p:header-decl><d:page p:use-header-name=\"header\"/>",
+            "<p:footer-decl p:name=\"footer\"/><p:date-time-decl p:name=\"date\">Today</p:date-time-decl>",
+            "<x:foreign><d:page d:name=\"nested\"/></x:foreign>",
+            "<d:page xmlns:d=\"urn:foreign\" d:name=\"foreign\"/><d:page d:name=\"real\"/>",
+            "<page xmlns=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" name=\"unqualified\"/>",
+            "<!-- comment --><d:page d:name=\"Unicode 中文 &amp; &quot;\"/>",
+        ];
+        for left in fragments {
+            for right in fragments {
+                let xml = wrap(&format!("{left}{right}"));
+                compare(&xml);
+                compare(
+                    &xml.replace("o:", "office:")
+                        .replace("xmlns:o=", "xmlns:office="),
+                );
+            }
+        }
+        for xml in ["", " ", "<", "<root>", "<root/>", "<root></wrong>"] {
+            compare(xml);
+        }
+    }
+
+    #[test]
+    fn shared_traversal_preserves_complete_pass_error_priority() {
+        let failures = [
+            "<p:header-decl/>",
+            "<p:header-decl p:name=\"h\"><x:child/></p:header-decl>",
+            "<p:header-decl p:name=\"h\">&unknown;</p:header-decl>",
+            "<d:page d:id=\"one\" xml:id=\"two\"/>",
+            "<d:page xml:id=\"same\"/><d:page xml:id=\"same\"/>",
+            "<p:settings p:mouse-visible=\"invalid\"/>",
+            "<p:settings/><p:settings/>",
+            "<p:settings><x:child/></p:settings>",
+            "<p:settings><p:show p:name=\"x\" p:pages=\"one\"/><p:show p:name=\"x\" p:pages=\"two\"/></p:settings>",
+            "<?active instruction?>",
+            "<d:page broken=\"unterminated></d:page>",
+            "<x:open></x:wrong>",
+        ];
+        for first in failures {
+            for second in failures {
+                let xml = wrap(&format!("{first}{second}"));
+                assert!(reference(&xml).is_err());
+                compare(&xml);
+            }
+        }
+        let xml = wrap("<d:page d:id=\"one\" xml:id=\"two\"/><p:header-decl/>");
+        let expected = declaration::parse_reference(&xml).unwrap_err().to_string();
+        assert_eq!(parse(&xml).unwrap_err().to_string(), expected);
+        let xml = wrap("<p:header-decl/><p:settings p:mouse-visible=\"invalid\"/>");
+        let expected = settings::parse_reference(&xml).unwrap_err().to_string();
+        assert_eq!(parse(&xml).unwrap_err().to_string(), expected);
+    }
+
+    #[test]
+    fn shared_traversal_preserves_xml_and_page_limits() {
+        compare(&" ".repeat(8 * 1024 * 1024));
+        let oversized = " ".repeat(8 * 1024 * 1024 + 1);
+        assert!(parse(&oversized).is_err());
+        compare(&oversized);
+        let pages = wrap(&"<d:page/>".repeat(65_537));
+        assert!(parse(&pages).is_err());
+        compare(&pages);
+    }
+}

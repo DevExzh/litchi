@@ -263,6 +263,11 @@ impl Presentation {
         settings::parse(self.package.content_xml())
     }
 
+    /// Read the auxiliary projections required to stage an edit in one traversal.
+    pub(crate) fn staging_metadata(&self) -> Result<crate::model::staging::Metadata> {
+        crate::model::staging::parse(self.package.content_xml())
+    }
+
     /// Inspect inert header, footer, date-time, and page-binding declarations.
     ///
     /// # Errors
