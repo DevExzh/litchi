@@ -12,6 +12,7 @@ mod corpus_manifest;
 mod docx_story_hyperlink_publication;
 mod docx_story_hyperlinks;
 mod filesystem;
+mod odt_streaming_create;
 mod operation_metrics;
 mod parallel_metrics;
 pub mod pptx_cache_retention;
@@ -1409,6 +1410,7 @@ enum Case {
     OdtSemanticFullText,
     OdtSemanticTextToSink,
     OdtSemanticCreateSmall,
+    OdtBufferedCreate,
     OdtSemanticNoopEditSave,
     OdtSemanticOneEditSave,
     OdtSemanticOnePercentEditSave,
@@ -1988,6 +1990,7 @@ impl Case {
             Self::OdtSemanticFullText => "odt_semantic_full_text",
             Self::OdtSemanticTextToSink => "odt_semantic_text_to_sink",
             Self::OdtSemanticCreateSmall => "odt_semantic_create_small",
+            Self::OdtBufferedCreate => "odt_buffered_create",
             Self::OdtSemanticNoopEditSave => "odt_semantic_noop_edit_save",
             Self::OdtSemanticOneEditSave => "odt_semantic_one_edit_save",
             Self::OdtSemanticOnePercentEditSave => "odt_semantic_one_percent_edit_save",
@@ -2535,6 +2538,10 @@ impl Case {
                 | Self::OdtMixedModelContentScalarEditSave
                 | Self::OdtMixedModelContentBatchEditSave
         )
+    }
+
+    const fn uses_odt_buffered_creation(self) -> bool {
+        matches!(self, Self::OdtBufferedCreate)
     }
 
     const fn uses_odt_media(self) -> bool {
@@ -4329,6 +4336,8 @@ struct SourceSummary {
     cfb_open_stream: Option<CfbOpenStreamEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odt_mixed: Option<OdtMixedPublicationSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    odt_paragraphs: Option<odt_streaming_create::OdtParagraphsSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ppt_pictures: Option<PptPicturesSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -8912,6 +8921,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_xlsx_cell_values()
                     && !case.is_xlsx_row_visibility_edit_save()
                     && !case.uses_streaming_creation()
+                    && !case.uses_odt_buffered_creation()
                     && !case.uses_ods_buffered_creation()
                     && !case.uses_ods_streaming_creation()
                     && !case.uses_semantic_rtf()
@@ -10185,6 +10195,29 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     options.warmup_iterations,
                     options.samples,
                     options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_odt_buffered_creation())
+    {
+        for shape in &options.semantic_shapes {
+            let corpus = odt_streaming_create::build_odt_buffered_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_odt_buffered_creation())
+            {
+                results.push(odt_streaming_create::run_odt_buffered_creation(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
                 )?);
             }
         }
@@ -11549,6 +11582,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_semantic_full_text" => Some(Case::OdtSemanticFullText),
         "odt_semantic_text_to_sink" => Some(Case::OdtSemanticTextToSink),
         "odt_semantic_create_small" => Some(Case::OdtSemanticCreateSmall),
+        "odt_buffered_create" => Some(Case::OdtBufferedCreate),
         "odt_semantic_noop_edit_save" => Some(Case::OdtSemanticNoopEditSave),
         "odt_semantic_one_edit_save" => Some(Case::OdtSemanticOneEditSave),
         "odt_semantic_one_percent_edit_save" => Some(Case::OdtSemanticOnePercentEditSave),
@@ -12004,6 +12038,7 @@ fn usage_text() -> String {
                                        odt_semantic_one_paragraph,odt_semantic_full_text,\n\
                                        odt_semantic_text_to_sink,\n\
                                        odt_semantic_create_small,odt_semantic_noop_edit_save,\n\
+                                       odt_buffered_create,\n\
                                        odt_semantic_one_edit_save,odt_semantic_one_percent_edit_save,\n\
                                        odt_mixed_model_content_scalar_edit_save,\n\
                                        odt_mixed_model_content_batch_edit_save,\n\
@@ -22908,6 +22943,9 @@ fn run_case_with_config(
         | Case::OdtSemanticOneEditSave
         | Case::OdtSemanticOnePercentEditSave => {
             run_semantic_odt(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdtBufferedCreate => {
+            Err("buffered ODT creation cases use their dedicated corpus runner".into())
         },
         Case::OdtMixedModelContentScalarEditSave | Case::OdtMixedModelContentBatchEditSave => {
             run_odt_mixed_model_content(case, corpus, warmup_iterations, samples)
@@ -58459,7 +58497,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 431);
+        assert_eq!(selectable_count, 432);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -60373,6 +60411,49 @@ mod tests {
             error.contains("member set"),
             "extra member failed for the wrong reason: {error}"
         );
+    }
+
+    #[test]
+    fn odt_buffered_creation_is_opt_in_and_reports_semantic_scaling_evidence() {
+        let case = parse_case("odt_buffered_create").expect("buffered ODT selector parses");
+        assert_eq!(case, Case::OdtBufferedCreate);
+        assert!(!Case::DEFAULT.contains(&case));
+        for shape in [SemanticShape::Tiny, SemanticShape::Large] {
+            let corpus = super::odt_streaming_create::build_odt_buffered_corpus(shape).unwrap();
+            assert_eq!(corpus.manifest.archive_member_count, 5);
+            assert_eq!(
+                corpus.manifest.entry_count,
+                match shape {
+                    SemanticShape::Tiny => 64,
+                    SemanticShape::Large => 32_768,
+                    SemanticShape::Medium => unreachable!(),
+                }
+            );
+            let measured =
+                super::odt_streaming_create::run_odt_buffered_creation(case, &corpus, 0, 1)
+                    .unwrap();
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert_eq!(
+                measured.output_sha256.as_deref(),
+                Some(corpus.manifest.archive_sha256.as_str())
+            );
+            let sink = measured.sink.as_ref().unwrap();
+            assert_eq!(sink.accepted_bytes, corpus.manifest.archive_bytes as u64);
+            assert_eq!(sink.retained_output_bytes, Some(0));
+            assert!(sink.retained_authoring_window_bytes.is_none());
+            let source = measured.source.as_ref().unwrap();
+            let odt = source.odt_paragraphs.as_ref().unwrap();
+            assert_eq!(odt.role, "buffered");
+            assert_eq!(odt.paragraph_count, corpus.manifest.entry_count);
+            assert!(odt.archive_member_set_verified);
+            assert!(odt.manifest_bindings_verified);
+            assert!(odt.semantic_reopen_verified);
+            assert!(odt.immutable_styles_meta_verified);
+            assert!(odt.content_xml_sha256.len() == 64);
+            assert!(odt.styles_xml_sha256.len() == 64);
+            assert!(odt.meta_xml_sha256.len() == 64);
+            assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
+        }
     }
 
     #[test]
