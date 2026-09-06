@@ -1,0 +1,99 @@
+{
+  "change": 436,
+  "phase": "preparatory-pilot",
+  "role": "before",
+  "mode": "normal",
+  "shape": "large",
+  "samples": 3,
+  "warmups": 1,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/pilots/before/initial/normal-large-resource.log",
+    "/tmp/litchi-goal-0436-binaries/before/normal",
+    "--case",
+    "odt_streaming_create",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "3",
+    "--warmup",
+    "1",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/pilots/before/initial/normal-large.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/pilots/before/initial/normal-large-catalog.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "binary": {
+    "path": "/tmp/litchi-goal-0436-binaries/before/normal",
+    "bytes": 455987480,
+    "sha256": "5e75ca3927ba274bfba86af2637c22b5a2985972d81caf6e7578ebed6ac3d97a"
+  },
+  "driver_sha256": "721def40460ba46d846933f7c2840949ab29853483b3bd8f9d8362acbce52174",
+  "oracle_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+  "protocol_sha256": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+  "build_receipt": "checks/before-build.json",
+  "build_receipt_sha256": "8d7a73047e9f4a94bfa8ba50db0b9f40948bcfb51ec7aa77de6b854fa7c1c8b6",
+  "source_before": {
+    "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+    "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f",
+    "files": 6649
+  },
+  "started_utc": "2026-09-06T08:56:39.456610+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/oracle/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/pilots/before/initial/normal-large.json",
+    "--mode",
+    "normal",
+    "--shape",
+    "large",
+    "--role",
+    "after-streaming",
+    "--samples",
+    "3",
+    "--warmups",
+    "1"
+  ],
+  "oracle_exit_code": 0,
+  "source_after": {
+    "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+    "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f",
+    "files": 6649
+  },
+  "source_unchanged": true,
+  "finished_utc": "2026-09-06T08:56:40.329652+00:00",
+  "artifacts": {
+    "pilots/before/initial/normal-large.json": {
+      "bytes": 19636,
+      "sha256": "59acde23e57ca444f0f525255a883df805a45ccb5e451ec302af98db9153bd98"
+    },
+    "pilots/before/initial/normal-large-catalog.json": {
+      "bytes": 4872,
+      "sha256": "5de44259f4da25e9e3cc99301ec1fcfbf45ea3c05dbd2ea6c604b1afccecd4db"
+    },
+    "pilots/before/initial/normal-large-resource.log": {
+      "bytes": 1084,
+      "sha256": "94080ed7aa3128a83f2fff8f61f751811c03cb87d8e635fd3e362f012aff50d4"
+    },
+    "pilots/before/initial/normal-large.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pilots/before/initial/normal-large-oracle.log": {
+      "bytes": 6,
+      "sha256": "de545cc7e7ff8eaacefae8fcb4a954555a1224f24fe7ce8ff62b9874c54f3fe2"
+    }
+  }
+}

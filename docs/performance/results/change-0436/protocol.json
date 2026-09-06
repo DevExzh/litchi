@@ -1,0 +1,217 @@
+{
+  "change": 436,
+  "status": "frozen",
+  "selector_family": "odt_streaming_create",
+  "classification": "Matched ODT streaming creation evidence across before and after builds; descriptive latency, allocator, and process observations only.",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "repeats": 2,
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "shapes": {
+    "tiny": 64,
+    "medium": 8192,
+    "large": 32768
+  },
+  "roles": {
+    "before-streaming": {
+      "build_directory": "before",
+      "selector": "odt_streaming_create",
+      "source_field": "odt_paragraphs",
+      "source_role": "streaming",
+      "implementation": "litchi_odt::streaming::stream_plain_paragraphs_to",
+      "retention": "fixed_explicit_window",
+      "retained_authoring_window_bytes": 4096,
+      "oracle_role": "after-streaming"
+    },
+    "after-streaming": {
+      "build_directory": "after",
+      "selector": "odt_streaming_create",
+      "source_field": "odt_paragraphs",
+      "source_role": "streaming",
+      "implementation": "litchi_odt::streaming::stream_plain_paragraphs_to",
+      "retention": "fixed_explicit_window",
+      "retained_authoring_window_bytes": 4096,
+      "oracle_role": "after-streaming"
+    }
+  },
+  "order": [
+    {"mode": "normal", "shape": "tiny", "repeat": "R1"},
+    {"mode": "normal", "shape": "medium", "repeat": "R1"},
+    {"mode": "normal", "shape": "large", "repeat": "R1"},
+    {"mode": "allocator", "shape": "tiny", "repeat": "R1"},
+    {"mode": "allocator", "shape": "medium", "repeat": "R1"},
+    {"mode": "allocator", "shape": "large", "repeat": "R1"},
+    {"mode": "allocator", "shape": "large", "repeat": "R2"},
+    {"mode": "allocator", "shape": "medium", "repeat": "R2"},
+    {"mode": "allocator", "shape": "tiny", "repeat": "R2"},
+    {"mode": "normal", "shape": "large", "repeat": "R2"},
+    {"mode": "normal", "shape": "medium", "repeat": "R2"},
+    {"mode": "normal", "shape": "tiny", "repeat": "R2"}
+  ],
+  "corpus": {
+    "package_format": "ODT/ODF/ZIP",
+    "compression": "mimetype=stored;xml=deflate",
+    "payload_kind": "deterministic-mixed-unicode-entities-plain-paragraphs",
+    "mimetype": "application/vnd.oasis.opendocument.text",
+    "member_names": [
+      "mimetype",
+      "content.xml",
+      "styles.xml",
+      "meta.xml",
+      "META-INF/manifest.xml"
+    ],
+    "manifest_entry_count": 4,
+    "target_entry": "content.xml",
+    "default_styles_xml_sha256": "4d1dfc46e4c369722193548ff59269167f3e838a4b61bf1ddca1ecafe5092277",
+    "default_meta_xml_sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719",
+    "paragraph_fixture": {
+      "prefix": "litchi-perf-odt-buffered-",
+      "index_format": "{index:05}",
+      "variants": [
+        "plain paragraph",
+        "Unicode café Δ 中",
+        "entities <&> \"quoted\"",
+        "mixed façade Ω <&> value"
+      ],
+      "cycle": 4,
+      "separator": "\\n",
+      "text_contract": "four-cycle plain/Unicode/XML-significant UTF-8 text with single interior spaces; one logical text run per paragraph"
+    },
+    "semantic_hash": {
+      "domain": "litchi-odt-buffered-semantic-v1\\0",
+      "count_encoding": "u64le",
+      "length_encoding": "u64le",
+      "payload_encoding": "UTF-8",
+      "separator_is_hashed": false
+    }
+  },
+  "source_contract": {
+    "required_fields": [
+      "role",
+      "implementation",
+      "timing_scope",
+      "performance_claim",
+      "semantic_sha256",
+      "content_xml_sha256",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "archive_member_set_verified",
+      "manifest_bindings_verified",
+      "semantic_reopen_verified",
+      "immutable_styles_meta_verified",
+      "paragraph_count",
+      "run_count",
+      "text_contract"
+    ],
+    "all_boolean_gates_required_true": true,
+    "same_role_content_identity_required": true
+  },
+  "timing_scope": "Fresh paragraph input/model construction, streaming ODT authoring and publication, and HashingDiscardSink writes are inside the operation timer. Corpus construction, archive reopen, XML/semantic/package gates, sink construction/finalization, and digest extraction are outside it.",
+  "preservation_scope": "Fresh deterministic ODT paragraph creation only; no existing source or unknown content is modified.",
+  "comparison_scope": "Before and after use the same odt_streaming_create API and deterministic paragraph corpus. Exact archive, content, style, metadata, semantic, topology, output, and sink identities are required before any descriptive comparison.",
+  "identity_scope": {
+    "same_role_required": [
+      "archive_bytes",
+      "archive_sha256",
+      "target_payload_bytes",
+      "target_payload_sha256",
+      "content_xml_sha256",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "paragraph_count",
+      "member_names",
+      "mimetype",
+      "manifest_entry_count",
+      "semantic_sha256",
+      "output_sha256",
+      "sink_accepted_bytes",
+      "sink_write_calls"
+    ],
+    "cross_role_required": [
+      "archive_bytes",
+      "archive_sha256",
+      "target_payload_bytes",
+      "target_payload_sha256",
+      "content_xml_sha256",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "paragraph_count",
+      "member_names",
+      "mimetype",
+      "manifest_entry_count",
+      "semantic_sha256",
+      "output_sha256",
+      "sink_accepted_bytes",
+      "sink_write_calls"
+    ],
+    "cross_role_scope": "same shape, mode, and repeat across before-streaming and after-streaming",
+    "on_mismatch": "correctness failure; withhold performance comparison"
+  },
+  "operation_metrics": {
+    "sample_alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+    "normal_allocator_elapsed": "allocator elapsed values are retained for process context only; no allocator latency claim",
+    "allocation_scope": "operation_global_system_allocator",
+    "required_region_peak": true
+  },
+  "report_contract": {
+    "schema_version": 1,
+    "required_reports": 24,
+    "reports_per_role": 12,
+    "retained_samples": 720,
+    "cross_role_comparison": "outer capture verifier; copied 0435 oracle validates each report with role after-streaming"
+  },
+  "matrix": {
+    "reports_per_role": 12,
+    "reports_total": 24,
+    "retained_samples_per_report": 30,
+    "retained_samples_total": 720,
+    "role_order": [
+      "before-streaming-R1",
+      "after-streaming-R1",
+      "after-streaming-R2",
+      "before-streaming-R2"
+    ]
+  },
+  "oracle": {
+    "path": "oracle/protocol.json",
+    "sha256": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+    "verifier_path": "oracle/verify-report.py",
+    "verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+    "role": "after-streaming",
+    "note": "The copied 0435 ODT semantic verifier and protocol are immutable per-report oracle inputs; the outer 0436 verifier owns revision, build, custody, phase, and cross-role identity."
+  },
+  "profile_scope": {
+    "required": true,
+    "roles": [
+      "before-streaming",
+      "after-streaming"
+    ],
+    "mode": "normal",
+    "shape": "large",
+    "captures": [
+      "perf-stat",
+      "perf-record"
+    ],
+    "events": [
+      "cycles:u",
+      "instructions:u",
+      "branches:u",
+      "branch-misses:u",
+      "L1-dcache-load-misses:u"
+    ],
+    "call_graph": "fp",
+    "scope": "whole fresh process including setup, corpus generation, warmups, measured samples, output hashing, and copied oracle; diagnostic only and not operation-local evidence.",
+    "retained_raw": [
+      "perf.data",
+      "perf.stat.txt",
+      "perf.script.txt",
+      "perf.report.txt"
+    ],
+    "p50_uncertainty": "Use descriptive within-report samples and fixed-seed bootstrap intervals; profiles do not establish a speedup claim."
+  }
+}

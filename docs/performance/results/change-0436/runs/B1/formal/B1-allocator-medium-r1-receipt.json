@@ -1,0 +1,112 @@
+{
+  "ambient_source_manifest": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/runs/B1/formal/B1-allocator-medium-r1-resource.log",
+    "/tmp/litchi-goal-0436-binaries/after/allocator",
+    "--case",
+    "odt_streaming_create",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/runs/B1/formal/B1-allocator-medium-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/runs/B1/formal/B1-allocator-medium-r1-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4872,
+      "path": "runs/B1/formal/B1-allocator-medium-r1-catalog.json",
+      "sha256": "b84b0149a682b1a9ea7b0d8cc366a6832ee70892a3c89a782f6482509c81b7d7"
+    },
+    "oracle_log": {
+      "bytes": 332,
+      "path": "runs/B1/formal/B1-allocator-medium-r1-oracle.log",
+      "sha256": "f57230d3d80296329ee4c98144b4be4d5ba3d057efa51cf0f906cff777c05264"
+    },
+    "report": {
+      "bytes": 42723,
+      "path": "runs/B1/formal/B1-allocator-medium-r1.json",
+      "sha256": "214574dd3cc0a62c39aa25c4c7593ef3a04b96339dec03e4bea0394690c73736"
+    },
+    "resource_log": {
+      "bytes": 1094,
+      "path": "runs/B1/formal/B1-allocator-medium-r1-resource.log",
+      "sha256": "cf23d2b02a81729ae12007a2a57fda0d4599e5b37af3c2867446d1f0b2520eda"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/B1/formal/B1-allocator-medium-r1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 455269608,
+    "path": "/tmp/litchi-goal-0436-binaries/after/allocator",
+    "sha256": "68bbc2abbd636cc06772cde3e51bb31d83baca6de50542025ea5a08116d124cf"
+  },
+  "build_directory": "after",
+  "change": 436,
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "249f5bcdc2836911ad0ad879a0be09a89a9e4bac3622db9d209adc2fd728b3ac",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T09:17:33.210221+00:00",
+  "lane": {
+    "mode": "allocator",
+    "repeat": "R1",
+    "shape": "medium"
+  },
+  "name": "B1-allocator-medium-r1",
+  "oracle_exit_code": 0,
+  "oracle_protocol_sha256": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+  "oracle_stdout_sha256": "f57230d3d80296329ee4c98144b4be4d5ba3d057efa51cf0f906cff777c05264",
+  "oracle_verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+  "outside_bundle_status_unchanged": true,
+  "phase": "B1",
+  "protocol_sha256": "79a5cbd7ca212a256e51514ec47dff76b883bb2305bd0651f73a906e640d4bf2",
+  "revision": "524db2696efc77d85f0abdfd5c21f39a6d5ec18a",
+  "role": "after-streaming",
+  "schema": "litchi-0436-capture-receipt-v1",
+  "selector": "odt_streaming_create",
+  "source_after": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "source_before": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "source_manifest": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T09:17:32.498513+00:00",
+  "status": "pass",
+  "status_after": [
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md"
+  ],
+  "verifier_sha256": "409851684c1e68dd43e3950fc9f57797a56260afee71742effa391b460e4b838"
+}

@@ -1,0 +1,42 @@
+{
+  "required_pass": [
+    "checks/before-odt-tests.json",
+    "checks/before-build.json",
+    "checks/before-save-binaries.json",
+    "checks/before-pilots.json",
+    "checks/baseline-hypothesis.json",
+    "checks/production-minimal.json",
+    "checks/span-focused-v2.json",
+    "checks/production-release.json",
+    "checks/production-strict.json",
+    "checks/production-doc.json",
+    "checks/boundaries.json",
+    "checks/owned-format.json",
+    "checks/after-build.json",
+    "checks/after-save-binaries.json",
+    "checks/after-pilots.json",
+    "checks/drivers-syntax.json",
+    "checks/protocol-freeze.json",
+    "checks/build-descriptors.json",
+    "checks/formal-a1.json",
+    "checks/formal-b1.json",
+    "checks/formal-b2.json",
+    "checks/formal-a2.json",
+    "checks/formal-before-stat.json",
+    "checks/formal-before-record.json",
+    "checks/formal-after-stat.json",
+    "checks/formal-after-record.json",
+    "checks/formal-matrix-verify.json",
+    "checks/formal-summary.json",
+    "checks/replay-driver-syntax.json",
+    "checks/replay-matrix-verify.json",
+    "checks/retention-decision.json",
+    "checks/terminal-driver-syntax.json"
+  ],
+  "required_review": [
+    "checks/span-focused.json"
+  ],
+  "review_notes": {
+    "checks/span-focused.json": "First private test compile hit eight denied unnecessary qualifications from super::* imports; remove those qualifications and rerun the focused and full suites."
+  }
+}

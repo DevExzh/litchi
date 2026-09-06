@@ -1,0 +1,99 @@
+{
+  "change": 436,
+  "phase": "preparatory-pilot",
+  "role": "before",
+  "mode": "allocator",
+  "shape": "tiny",
+  "samples": 3,
+  "warmups": 1,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/pilots/before/initial/allocator-tiny-resource.log",
+    "/tmp/litchi-goal-0436-binaries/before/allocator",
+    "--case",
+    "odt_streaming_create",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "3",
+    "--warmup",
+    "1",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/pilots/before/initial/allocator-tiny.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/pilots/before/initial/allocator-tiny-catalog.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "binary": {
+    "path": "/tmp/litchi-goal-0436-binaries/before/allocator",
+    "bytes": 455327872,
+    "sha256": "ac28180dee6d87f34bd26ab66105b1e2e98e91c79e655ccfb3fbd987bfdf4d63"
+  },
+  "driver_sha256": "721def40460ba46d846933f7c2840949ab29853483b3bd8f9d8362acbce52174",
+  "oracle_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+  "protocol_sha256": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+  "build_receipt": "checks/before-build.json",
+  "build_receipt_sha256": "8d7a73047e9f4a94bfa8ba50db0b9f40948bcfb51ec7aa77de6b854fa7c1c8b6",
+  "source_before": {
+    "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+    "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f",
+    "files": 6649
+  },
+  "started_utc": "2026-09-06T08:56:40.709440+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/oracle/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/pilots/before/initial/allocator-tiny.json",
+    "--mode",
+    "allocator",
+    "--shape",
+    "tiny",
+    "--role",
+    "after-streaming",
+    "--samples",
+    "3",
+    "--warmups",
+    "1"
+  ],
+  "oracle_exit_code": 0,
+  "source_after": {
+    "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+    "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f",
+    "files": 6649
+  },
+  "source_unchanged": true,
+  "finished_utc": "2026-09-06T08:56:41.180480+00:00",
+  "artifacts": {
+    "pilots/before/initial/allocator-tiny.json": {
+      "bytes": 22451,
+      "sha256": "07bcfd51610da9d8b4f7dbe72f40a1c49170951724378da9f47f41ad916aca56"
+    },
+    "pilots/before/initial/allocator-tiny-catalog.json": {
+      "bytes": 4845,
+      "sha256": "54872c90b85dc1dd844e8b4dfa25add8102caee9e34c1c561c06d490b753d9bc"
+    },
+    "pilots/before/initial/allocator-tiny-resource.log": {
+      "bytes": 1090,
+      "sha256": "6b4fd24d34fc04902d260fecdaa02904a36f69836b9b759e1d0f1b05a1b292e6"
+    },
+    "pilots/before/initial/allocator-tiny.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pilots/before/initial/allocator-tiny-oracle.log": {
+      "bytes": 6,
+      "sha256": "de545cc7e7ff8eaacefae8fcb4a954555a1224f24fe7ce8ff62b9874c54f3fe2"
+    }
+  }
+}

@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0436: private ODT ordinary-text spans
+
+[0436](changes/0436-odt-bounded-text-spans.md) keeps ODT grammar and batching
+inside the format owner. Spans are borrowed, at most 256 UTF-8 bytes, with
+per-scalar cancellation polling and exact scalar fallback at XML/Work limits.
+An already charged span may complete before the next cooperative cancellation
+check; deterministic tests pin the batch boundary and public failure semantics.
+No API, dependency, unsafe path, allocation strategy or common owner changes.
+Exact bytes, hierarchy rollback and content-first refusal attribution pass
+differential gates. See the [batch matrix](results/change-0436/adr-compliance.md).
+
 ## Change 0435: ODT grammar over typed common XML publication
 
 [0435](changes/0435-odt-bounded-plain-paragraphs.md) keeps plaintext/whitespace

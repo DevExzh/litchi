@@ -1,0 +1,112 @@
+{
+  "ambient_source_manifest": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/runs/B1/formal/B1-allocator-tiny-r1-resource.log",
+    "/tmp/litchi-goal-0436-binaries/after/allocator",
+    "--case",
+    "odt_streaming_create",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/runs/B1/formal/B1-allocator-tiny-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/runs/B1/formal/B1-allocator-tiny-r1-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4845,
+      "path": "runs/B1/formal/B1-allocator-tiny-r1-catalog.json",
+      "sha256": "acc5b6fb5e4c6d3951c15bd33a4393a5f6d86bc235b171ce9d963c9dc93c7e8c"
+    },
+    "oracle_log": {
+      "bytes": 328,
+      "path": "runs/B1/formal/B1-allocator-tiny-r1-oracle.log",
+      "sha256": "95e65b4dee0ebf49f26c9d8cf62b977c3e0fa0c3a390cc0b1f1a3a5458d7b08f"
+    },
+    "report": {
+      "bytes": 42137,
+      "path": "runs/B1/formal/B1-allocator-tiny-r1.json",
+      "sha256": "ed2b19ed30bf771a00eab60c9a40368454a505366cb5917f9e141c1f46277a9e"
+    },
+    "resource_log": {
+      "bytes": 1088,
+      "path": "runs/B1/formal/B1-allocator-tiny-r1-resource.log",
+      "sha256": "7ed667d8e2cd948b123cf111d793c3f245844431e7cf1e561f81f6c8a12aa680"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/B1/formal/B1-allocator-tiny-r1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 455269608,
+    "path": "/tmp/litchi-goal-0436-binaries/after/allocator",
+    "sha256": "68bbc2abbd636cc06772cde3e51bb31d83baca6de50542025ea5a08116d124cf"
+  },
+  "build_directory": "after",
+  "change": 436,
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "249f5bcdc2836911ad0ad879a0be09a89a9e4bac3622db9d209adc2fd728b3ac",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T09:17:32.341809+00:00",
+  "lane": {
+    "mode": "allocator",
+    "repeat": "R1",
+    "shape": "tiny"
+  },
+  "name": "B1-allocator-tiny-r1",
+  "oracle_exit_code": 0,
+  "oracle_protocol_sha256": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+  "oracle_stdout_sha256": "95e65b4dee0ebf49f26c9d8cf62b977c3e0fa0c3a390cc0b1f1a3a5458d7b08f",
+  "oracle_verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+  "outside_bundle_status_unchanged": true,
+  "phase": "B1",
+  "protocol_sha256": "79a5cbd7ca212a256e51514ec47dff76b883bb2305bd0651f73a906e640d4bf2",
+  "revision": "524db2696efc77d85f0abdfd5c21f39a6d5ec18a",
+  "role": "after-streaming",
+  "schema": "litchi-0436-capture-receipt-v1",
+  "selector": "odt_streaming_create",
+  "source_after": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "source_before": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "source_manifest": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T09:17:32.004877+00:00",
+  "status": "pass",
+  "status_after": [
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md"
+  ],
+  "verifier_sha256": "409851684c1e68dd43e3950fc9f57797a56260afee71742effa391b460e4b838"
+}
