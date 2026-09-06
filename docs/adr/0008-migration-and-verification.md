@@ -17577,3 +17577,20 @@ header IDs agree. The full Keynote library passes 265 tests (including 36
 lifecycle cases), alongside 21 comment and 27 lifecycle integration tests.
 Both explicit native-saved readbacks pass after this hardening, and regenerated
 shared/final candidates retain the before-save hashes recorded above.
+
+### Final removal verification and cleanup receipt (2026-09-07)
+
+Commit `b278aef8f` completed the focused direct-media comment removal slice.
+Normal hooks passed Rust formatting, workspace all-feature library lint,
+workspace all-feature library/integration tests, and workspace documentation
+tests. The final boundary suite passes 943 tests; its full scanner reports
+64 packages, 238 internal dependency declarations, and 11 explicit migration
+debt items. These results supersede the pending hook/scanner notes above.
+
+The owned `/private/tmp/litchi-media-comment-removal-20260907u` directory was
+removed after verification: 31 temporary files totaling 11,979,409 bytes. The
+two permanent native removal fixtures remain tracked. The rebuilt 9.3 GiB
+Cargo cache is retained for the next slice, with approximately 53 GiB free;
+the preceding turn's 9.8 GiB `cargo clean` remains the latest full-clean receipt.
+The caption, native commented-audio, unknown-reference, and identifier-watermark
+compatibility gates remain open; no additional host API was retired.
