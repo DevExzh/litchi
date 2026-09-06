@@ -355,6 +355,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "archive_object_identity_remap"
+path = "fuzz_targets/archive_object_identity_remap.rs"
+test = false
+doc = false
+bench = false
+
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi = { path = "..", default-features = false, features = ["iwork"] }

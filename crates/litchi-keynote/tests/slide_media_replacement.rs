@@ -602,6 +602,77 @@ fn invalid_data_metadata_map_edge_is_rejected_before_media_access() -> TestResul
 }
 
 #[test]
+fn neutral_map_reader_preserves_unselected_extensions_during_replacement() -> TestResult {
+    use litchi_iwa_common::wire::append_varint_field;
+    use litchi_iwa_core::{Archive, ArchiveObject, RawMessage};
+
+    for extension_depth in 0..3 {
+        let source = synthetic_package()?;
+        let mut metadata = tsp::PackageMetadata::decode(metadata_stream(&source)?.as_slice())?;
+        metadata.data_metadata_map = Some(tsp::Reference {
+            identifier: 500,
+            ..Default::default()
+        });
+        let source = replace_metadata_payload(&source, metadata.encode_to_vec())?;
+        let mut reference = tsp::Reference {
+            identifier: 501,
+            ..Default::default()
+        }
+        .encode_to_vec();
+        if extension_depth == 2 {
+            append_length_delimited_field(&mut reference, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+        }
+        let mut entry = Vec::new();
+        append_varint_field(&mut entry, 1, POSTER_DATA)?;
+        append_length_delimited_field(&mut entry, 2, &reference)?;
+        if extension_depth == 1 {
+            append_length_delimited_field(&mut entry, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+        }
+        let mut map = Vec::new();
+        append_length_delimited_field(&mut map, 1, &entry)?;
+        if extension_depth == 0 {
+            append_length_delimited_field(&mut map, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+        }
+        let mut archive = Archive::parse(&document_stream(&source)?)?;
+        archive.insert_object(ArchiveObject::new(
+            500,
+            vec![RawMessage {
+                type_: 11_015,
+                data: map,
+            }],
+        )?)?;
+        archive.insert_object(ArchiveObject::new(
+            501,
+            vec![RawMessage {
+                type_: 11_014,
+                data: Vec::new(),
+            }],
+        )?)?;
+        let source = replace_document_archive(&source, archive)?;
+        let package = Package::from_bytes(&source)?;
+        assert_media(&package, 0, MediaPart::Content, MOVIE_BYTES)?;
+        let edit = package.edit_slide_media_data(
+            SlideSelector::index(0),
+            MovieSelector::index(0),
+            MediaPart::Content,
+        )?;
+        let commit = edit.set(REPLACED_MOVIE_BYTES)?.commit()?;
+        assert_media(
+            commit.package(),
+            1,
+            MediaPart::Content,
+            REPLACED_MOVIE_BYTES,
+        )?;
+        assert_eq!(
+            member_bytes(&source, DOCUMENT_MEMBER)?,
+            member_bytes(&exact_bytes(commit.package())?, DOCUMENT_MEMBER)?,
+            "map extension depth {extension_depth}",
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn authored_native_assets_replace_shared_pairs_with_exact_inverse() -> TestResult {
     let package = Package::from_bytes(NATIVE_SOURCE)?;
     let steps: [(usize, MediaPart, &[u8]); 3] = [

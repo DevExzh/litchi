@@ -40,6 +40,17 @@ use litchi_iwa_protos::archive_codec;
 
 use crate::{Error, HeaderKind, HeaderOperation, LimitKind, Limits, Result};
 
+mod identity_clone;
+
+use identity_clone::{
+    checked_replacement_lengths, clone_archive_info_with_identity_remap,
+    clone_raw_messages_with_limits, preflight_clone_archive_info_header_length,
+    prepare_identity_remap, retained_clone_source_header, rewrite_clone_archive_info_header,
+    validate_clone_arguments, validate_clone_header_scratch, validate_clone_input_scratch,
+    validate_clone_metadata_semantics, validate_clone_object_size,
+    validate_clone_self_reference_mapping,
+};
+
 const MAX_VARINT_BYTES: usize = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -787,6 +798,161 @@ impl ArchiveObject {
         };
         object.validate_with_limits(limits)?;
         Ok(object)
+    }
+
+    /// Clone an object while changing its identity and remapping its known
+    /// archive-object references.
+    ///
+    /// This is the physical primitive used by format owners when they copy a
+    /// graph node into a new component. `object_remap` is a strict, finite
+    /// old-to-new map. Its entries are applied to aggregate and nested
+    /// [`FieldInfo`] object references; data references and payload bytes are
+    /// intentionally left untouched. The source object identifier may appear
+    /// in the map, but when it does its target must equal `new_identifier`.
+    ///
+    /// Replacement messages must have the same arity and message types as the
+    /// source. Their bytes are copied into independently owned buffers and
+    /// their lengths are reflected in the cloned metadata. Header rewriting
+    /// operates on validated raw spans, so unknown fields, duplicate
+    /// occurrences, non-canonical keys, and length encodings remain intact.
+    /// Package-wide identifier collisions, opaque reference ownership, payload
+    /// wire references, and component-registry updates remain the format
+    /// owner's responsibility; this method only rewrites the known metadata
+    /// projection described above.
+    ///
+    /// The source is never mutated. A failed validation or allocation leaves
+    /// it unchanged because all output state is assembled before publication.
+    pub fn clone_with_identity_remap(
+        &self,
+        new_identifier: u64,
+        object_remap: &[(u64, u64)],
+        replacement_messages: &[RawMessage],
+    ) -> Result<Self> {
+        self.clone_with_identity_remap_with_limits(
+            new_identifier,
+            object_remap,
+            replacement_messages,
+            Limits::default(),
+        )
+    }
+
+    /// Clone an object with identity/reference remapping under explicit
+    /// physical resource limits.
+    pub fn clone_with_identity_remap_with_limits(
+        &self,
+        new_identifier: u64,
+        object_remap: &[(u64, u64)],
+        replacement_messages: &[RawMessage],
+        limits: Limits,
+    ) -> Result<Self> {
+        let limits = limits.validate()?;
+        self.validate_with_limits(limits)?;
+        let source_identifier = self
+            .archive_info
+            .identifier
+            .ok_or_else(|| Error::invalid_archive(0, "object is missing its archive identifier"))?;
+        validate_clone_arguments(
+            source_identifier,
+            new_identifier,
+            object_remap,
+            replacement_messages,
+            &self.messages,
+            limits,
+        )?;
+        validate_clone_metadata_semantics(&self.archive_info, source_identifier, new_identifier)?;
+        let canonical_before = encode_archive_info(&self.archive_info, limits)?;
+        let source_header =
+            retained_clone_source_header(self, canonical_before.as_slice(), limits)?;
+        let source_preflight = preflight_header(source_header, HeaderKind::ArchiveInfo, limits)?;
+        validate_clone_input_scratch(
+            object_remap.len(),
+            replacement_messages.len(),
+            source_preflight.fields(),
+            limits,
+        )?;
+        let remap =
+            prepare_identity_remap(source_identifier, new_identifier, object_remap, limits)?;
+        validate_clone_self_reference_mapping(
+            &self.archive_info,
+            source_identifier,
+            new_identifier,
+            &remap,
+        )?;
+        let replacement_lengths = checked_replacement_lengths(replacement_messages, limits)?;
+
+        let rewritten_header_length = preflight_clone_archive_info_header_length(
+            source_header,
+            &self.archive_info,
+            &self.messages,
+            replacement_messages,
+            new_identifier,
+            &replacement_lengths,
+            &remap,
+            limits,
+        )?;
+        validate_clone_object_size(rewritten_header_length, replacement_messages, limits)?;
+        validate_clone_header_scratch(
+            canonical_before.len(),
+            source_header.len(),
+            rewritten_header_length,
+            &self.archive_info,
+            remap.len(),
+            replacement_lengths.len(),
+            source_preflight.fields(),
+            limits,
+        )?;
+        let rewritten_header = rewrite_clone_archive_info_header(
+            source_header,
+            &self.archive_info,
+            &self.messages,
+            replacement_messages,
+            new_identifier,
+            &replacement_lengths,
+            &remap,
+            limits,
+        )?;
+        if rewritten_header.len() != rewritten_header_length {
+            return Err(Error::invalid_archive(
+                0,
+                "clone ArchiveInfo rewrite length differs from preflight",
+            ));
+        }
+        let archive_info = clone_archive_info_with_identity_remap(
+            &self.archive_info,
+            new_identifier,
+            &remap,
+            &replacement_lengths,
+            limits,
+        )?;
+        let messages = clone_raw_messages_with_limits(replacement_messages, limits)?;
+        let decoded = ArchiveInfo::decode_with_limits(&rewritten_header, limits)?;
+        if decoded != archive_info {
+            return Err(Error::invalid_archive(
+                0,
+                "cloned ArchiveInfo raw rewrite differs from its neutral projection",
+            ));
+        }
+        let canonical_after = encode_archive_info(&archive_info, limits)?;
+        let retained_header = if rewritten_header == canonical_after {
+            None
+        } else {
+            Some(rewritten_header.into_boxed_slice())
+        };
+        let retained_canonical = retained_header
+            .as_ref()
+            .map(|_| canonical_after.into_boxed_slice());
+        let cloned = Self {
+            archive_info,
+            messages,
+            header_offset: 0,
+            header_length: 0,
+            data_offset: 0,
+            data_length: 0,
+            original_header: retained_header,
+            original_canonical_header: retained_canonical,
+        };
+        cloned.validate_with_limits(limits)?;
+        Ok(cloned)
     }
 
     /// Validate object metadata, payload sizes, and encoded header size.

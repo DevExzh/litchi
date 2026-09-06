@@ -11,18 +11,18 @@ use litchi_iwa_common::{
     wire::{WireFieldView, WireView},
 };
 use litchi_iwa_core::{ArchiveObject, FieldType};
+use litchi_iwa_protos::package_metadata_media_codec::{
+    DataMetadataMapEntry, DataMetadataMapSource, DataMetadataMapVisitor, DecodeError,
+};
 
 use super::{
     MOVIE_MESSAGE_TYPE, MediaBudget, MediaSelection, OwnedMetadataFacts, Package,
-    SlideMediaDataError,
+    SlideMediaDataError, map_metadata_decode_error,
 };
 
 const DATA_METADATA_MAP_FIELD: u32 = 10;
 const DATA_METADATA_MAP_MESSAGE_TYPE: u32 = 11_015;
 const DATA_METADATA_MESSAGE_TYPE: u32 = 11_014;
-const DATA_METADATA_MAP_ENTRY_FIELD: u32 = 1;
-const DATA_METADATA_MAP_ENTRY_DATA_FIELD: u32 = 1;
-const DATA_METADATA_MAP_ENTRY_METADATA_FIELD: u32 = 2;
 const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;
 const REFERENCE_EXTERNAL_FIELD: u32 = 3;
@@ -334,7 +334,7 @@ fn validate_data_metadata_map(
         }
     }
     let map_payload = map_payload.ok_or(SlideMediaDataError::InvalidSource)?;
-    validate_data_metadata_map_payload(package, facts, map_payload, limits, budget)
+    validate_data_metadata_map_payload(package, facts, map_identifier, map_payload, budget)
 }
 
 fn validate_archive_object_shape(
@@ -378,86 +378,69 @@ fn validate_archive_object_shape(
 fn validate_data_metadata_map_payload(
     package: &Package,
     facts: &OwnedMetadataFacts,
+    map_identifier: u64,
     payload: &[u8],
-    limits: WireLimits,
     budget: &mut MediaBudget,
 ) -> Result<(), SlideMediaDataError> {
+    // Each top-level entry needs at least a key and length byte. Reserve a
+    // conservative bound for the neutral codec's temporary sorted key vector
+    // before it allocates; the returned witness retains only borrowed bytes.
+    let scratch_bound = (payload.len() / 2)
+        .checked_mul(size_of::<u64>())
+        .ok_or(SlideMediaDataError::InvalidSource)?;
+    budget.allocation(scratch_bound)?;
+    let options = budget.metadata_options(payload)?;
+    let map = DataMetadataMapSource::from_source(map_identifier, payload, options)
+        .map_err(map_metadata_decode_error)?;
     budget.input_bytes(payload.len())?;
-    budget.wire_work(payload.len())?;
-    budget.wire_nesting(1)?;
-    let map = WireView::parse_with_limits(payload, limits)
-        .map_err(|_| SlideMediaDataError::InvalidSource)?;
-    budget.wire_fields(map.len())?;
-    budget.allocation(
-        map.len()
-            .checked_mul(size_of::<u64>())
-            .ok_or(SlideMediaDataError::InvalidSource)?,
-    )?;
-    let mut data_identifiers = Vec::new();
-    data_identifiers
-        .try_reserve_exact(map.len())
-        .map_err(|_| SlideMediaDataError::Allocation { amount: map.len() })?;
-    for field in map.fields() {
-        if field.number() != DATA_METADATA_MAP_ENTRY_FIELD {
-            continue;
-        }
-        field
-            .validate_canonical_framing()
-            .map_err(|_| SlideMediaDataError::InvalidSource)?;
-        let entry = WireView::parse_with_limits(field.payload(), limits)
-            .map_err(|_| SlideMediaDataError::InvalidSource)?;
-        budget.input_bytes(field.payload().len())?;
-        budget.wire_work(field.payload().len())?;
-        budget.wire_nesting(2)?;
-        budget.wire_fields(entry.len())?;
-        let mut data_identifier = None;
-        let mut metadata_identifier = None;
-        for entry_field in entry.fields() {
-            match entry_field.number() {
-                DATA_METADATA_MAP_ENTRY_DATA_FIELD => {
-                    if data_identifier.is_some() {
-                        return Err(SlideMediaDataError::InvalidSource);
-                    }
-                    data_identifier = Some(parse_nonzero_varint(
-                        entry_field,
-                        "DataMetadataMap data identifier",
-                        budget,
-                    )?);
-                },
-                DATA_METADATA_MAP_ENTRY_METADATA_FIELD => {
-                    if metadata_identifier.is_some() {
-                        return Err(SlideMediaDataError::InvalidSource);
-                    }
-                    entry_field
-                        .validate_canonical_framing()
-                        .map_err(|_| SlideMediaDataError::InvalidSource)?;
-                    budget.input_bytes(entry_field.payload().len())?;
-                    budget.wire_work(entry_field.payload().len())?;
-                    budget.wire_nesting(2)?;
-                    metadata_identifier = Some(parse_local_reference(
-                        entry_field.payload(),
-                        limits,
-                        budget,
-                    )?);
-                },
-                _ => {},
-            }
-        }
-        let data_identifier = data_identifier.ok_or(SlideMediaDataError::InvalidSource)?;
-        let metadata_identifier = metadata_identifier.ok_or(SlideMediaDataError::InvalidSource)?;
-        budget.wire_work(data_identifiers.len())?;
-        if data_identifiers.contains(&data_identifier)
-            || !has_unique_data_record(facts, data_identifier, budget)?
-        {
+    budget.wire_fields(map.fields())?;
+    budget.wire_work(map.work_bytes())?;
+    budget.wire_nesting(map.max_depth())?;
+    budget.entries(map.entries())?;
+
+    // The visitation pass has no key scratch and no duplicate sort. Charge
+    // its scan conservatively against the same ledger before callbacks spend
+    // that ledger on package graph lookups.
+    let visit_options = budget.metadata_options(payload)?;
+    budget.input_bytes(payload.len())?;
+    budget.wire_fields(map.fields())?;
+    budget.wire_work(map.work_bytes())?;
+    budget.wire_nesting(map.max_depth())?;
+    let mut visitor = MapClosureVisitor {
+        package,
+        facts,
+        budget,
+        failure: None,
+    };
+    map.visit_entries(visit_options, &mut visitor)
+        .map_err(map_metadata_decode_error)?;
+    match visitor.failure {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
+}
+
+/// Keep application object lookup and type checks in the format owner while
+/// the neutral codec owns strict map decoding and duplicate-key validation.
+struct MapClosureVisitor<'a> {
+    package: &'a Package,
+    facts: &'a OwnedMetadataFacts,
+    budget: &'a mut MediaBudget,
+    failure: Option<SlideMediaDataError>,
+}
+
+impl MapClosureVisitor<'_> {
+    fn validate_entry(&mut self, entry: DataMetadataMapEntry) -> Result<(), SlideMediaDataError> {
+        self.budget.references(2)?;
+        if !has_unique_data_record(self.facts, entry.data_identifier(), self.budget)? {
             return Err(SlideMediaDataError::InvalidSource);
         }
-        data_identifiers.push(data_identifier);
-
-        let (_component, metadata_object) = package
-            .object_with_component(metadata_identifier)
+        let (_component, object) = self
+            .package
+            .object_with_component(entry.metadata_object_identifier())
             .ok_or(SlideMediaDataError::InvalidSource)?;
-        validate_archive_object_shape(metadata_object, metadata_identifier, budget)?;
-        if metadata_object
+        validate_archive_object_shape(object, entry.metadata_object_identifier(), self.budget)?;
+        if object
             .messages
             .iter()
             .filter(|message| message.type_ == DATA_METADATA_MESSAGE_TYPE)
@@ -466,8 +449,17 @@ fn validate_data_metadata_map_payload(
         {
             return Err(SlideMediaDataError::InvalidSource);
         }
+        Ok(())
     }
-    Ok(())
+}
+
+impl DataMetadataMapVisitor for MapClosureVisitor<'_> {
+    fn visit_entry(&mut self, entry: DataMetadataMapEntry) -> Result<(), DecodeError> {
+        if self.failure.is_none() {
+            self.failure = self.validate_entry(entry).err();
+        }
+        Ok(())
+    }
 }
 
 fn parse_local_reference(
