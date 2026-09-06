@@ -768,6 +768,51 @@ fn arrangement_changed_bool_combinations_preserve_presence_and_inverse() -> Test
 }
 
 #[test]
+fn arrangement_changed_commit_preserves_absent_flags_and_opaque_selected_payload_on_inverse()
+-> TestResult<()> {
+    // The semantic value of an omitted flag is false, but its physical
+    // absence is part of the source contract.  Exercise every source shape
+    // that still contains at least one omitted flag while the selected
+    // drawable also carries opaque wire data outside the two edited fields.
+    for state in [(None, None), (Some(false), None), (None, Some(false))] {
+        let source = synthetic_package_with_states([state, (Some(true), Some(false))], true, true)?;
+        assert_eq!(
+            raw_drawable_fields(&source, 0, DRAWABLE_LOCKED_FIELD)?.is_empty(),
+            state.0.is_none(),
+        );
+        assert_eq!(
+            raw_drawable_fields(&source, 0, DRAWABLE_ASPECT_RATIO_LOCKED_FIELD)?.is_empty(),
+            state.1.is_none(),
+        );
+
+        let package = Package::from_bytes(&source)?;
+        let target = ChartArrangement::new(true, true);
+        let commit = commit_arrangement(&package, "Charts", "Revenue", target)?;
+        let candidate = exact_bytes(commit.package())?;
+
+        assert_eq!(arrangement(commit.package(), "Charts", "Revenue")?, target);
+        assert_unknowns_unchanged(&source, &candidate)?;
+
+        let applied = package.apply_slide_chart_arrangement(commit.patch())?;
+        assert_eq!(exact_bytes(applied.package())?, candidate);
+
+        let reopened = Package::from_bytes(&candidate)?;
+        let restored = reopened.apply_slide_chart_arrangement(&commit.patch().inverse())?;
+        let restored_bytes = exact_bytes(restored.package())?;
+        assert_eq!(restored_bytes, source);
+        assert_eq!(
+            raw_drawable_fields(&restored_bytes, 0, DRAWABLE_LOCKED_FIELD)?,
+            raw_drawable_fields(&source, 0, DRAWABLE_LOCKED_FIELD)?,
+        );
+        assert_eq!(
+            raw_drawable_fields(&restored_bytes, 0, DRAWABLE_ASPECT_RATIO_LOCKED_FIELD)?,
+            raw_drawable_fields(&source, 0, DRAWABLE_ASPECT_RATIO_LOCKED_FIELD)?,
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn arrangement_unknown_fields_and_groups_remain_byte_exact_and_local() -> TestResult<()> {
     let source = synthetic_package_with_states(
         [(Some(false), Some(false)), (Some(true), Some(false))],
@@ -950,7 +995,20 @@ fn arrangement_graph_ambiguity_and_ownership_guards_are_atomic() -> TestResult<(
 #[test]
 fn arrangement_semantic_limits_fail_before_publication_and_output_limits_are_atomic()
 -> TestResult<()> {
-    let source = base_source()?;
+    let unpadded = base_source()?;
+    let catalog = Catalog::from_bytes(&unpadded)?;
+    // Give graph verification headroom so this case reaches the independent
+    // output ceiling instead of an earlier aggregate retained-byte refusal.
+    let padding = [0u8; 16 * 1024];
+    let entries: Vec<_> = catalog
+        .iter()
+        .map(|entry| (entry.name(), entry.data()))
+        .chain(std::iter::once((
+            "Data/output-limit-padding.bin",
+            padding.as_slice(),
+        )))
+        .collect();
+    let source = litchi_iwa_archive::package::to_bytes(entries.iter().copied(), Limits::default())?;
     let semantic = SemanticLimits::new(1, 1, 1, 1, 1, 1)?;
     let limited =
         Package::from_bytes_with_options(&source, ReadOptions::new(Limits::default(), semantic));
@@ -980,13 +1038,16 @@ fn arrangement_semantic_limits_fail_before_publication_and_output_limits_are_ato
         .edit_slide_chart_arrangement(0usize, 0usize)
         .and_then(|edit| edit.set(ChartArrangement::new(true, true)).commit())
         .expect_err("arrangement candidate should exceed the output ceiling");
-    assert!(matches!(
-        error,
-        ChartArrangementError::LimitExceeded {
-            kind: ChartArrangementLimitKind::OutputBytes,
-            ..
-        }
-    ));
+    assert!(
+        matches!(
+            error,
+            ChartArrangementError::LimitExceeded {
+                kind: ChartArrangementLimitKind::OutputBytes,
+                ..
+            }
+        ),
+        "unexpected resource refusal: {error:?}"
+    );
     error_is_redacted(&error);
     assert_eq!(exact_bytes(&bounded)?, before);
     Ok(())

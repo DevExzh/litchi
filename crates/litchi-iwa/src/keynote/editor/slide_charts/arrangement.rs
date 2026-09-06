@@ -1,46 +1,11 @@
-//! Selector-first chart Arrange compatibility for Keynote slide charts.
+//! Focused chart Arrange projection for Keynote slide charts.
 //!
 //! The focused `litchi_keynote::Package` owns chart Arrange reads and writes.
-//! The selector-based `KeynoteEditor` methods below are compatibility bridges
-//! for the legacy editor while all physical reads and writes stay focused.
+//! The helpers below populate the host listing and validate lifecycle reads;
+//! physical reads and writes stay focused.
 
 use super::*;
 use litchi_keynote::{ChartSelector, Package as FocusedKeynotePackage, SlideSelector};
-
-impl KeynoteEditor {
-    /// Read one slide chart's Arrange-panel state by semantic chart selector.
-    pub fn slide_chart_arrangement_by_selector<'selector>(
-        &self,
-        slide_index: usize,
-        selector: impl Into<ChartSelector<'selector>>,
-    ) -> Result<ChartArrangement> {
-        let selector = selector.into();
-        focused_chart_arrangement_package(self)?
-            .slide_chart_arrangement(SlideSelector::index(slide_index), selector)
-            .map_err(map_focused_chart_arrangement_error)
-    }
-
-    /// Set one slide chart's Arrange-panel state by semantic chart selector.
-    pub fn set_slide_chart_arrangement_by_selector<'selector>(
-        &mut self,
-        slide_index: usize,
-        selector: impl Into<ChartSelector<'selector>>,
-        arrangement: ChartArrangement,
-    ) -> Result<()> {
-        let selector = selector.into();
-        let package = focused_chart_arrangement_package(self)?;
-        let commit = package
-            .edit_slide_chart_arrangement(SlideSelector::index(slide_index), selector)
-            .map_err(map_focused_chart_arrangement_error)?
-            .set(arrangement)
-            .commit()
-            .map_err(map_focused_chart_arrangement_error)?;
-        if commit.patch().is_noop() {
-            return Ok(());
-        }
-        replace_from_focused_chart_arrangement_commit(self, commit)
-    }
-}
 
 /// Populate the public Keynote chart listing with the focused semantic value.
 ///
@@ -114,63 +79,6 @@ fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKe
     })
 }
 
-fn replace_from_focused_chart_arrangement_commit(
-    editor: &mut KeynoteEditor,
-    commit: litchi_keynote::ChartArrangementCommit,
-) -> Result<()> {
-    let expected = commit.patch().after();
-    let slide_position = commit.patch().slide_position();
-    let chart_position = commit.patch().chart_position();
-    let mut writer = FallibleBytes::default();
-    commit.package().write_to(&mut writer).map_err(|error| {
-        Error::InvalidFormat(format!(
-            "focused Keynote chart arrangement write failed: {error}"
-        ))
-    })?;
-    let bytes = writer.into_bytes();
-    let reopened = KeynoteEditor::from_bytes(&bytes)?;
-    let actual = focused_chart_arrangement_package(&reopened)?
-        .slide_chart_arrangement(
-            SlideSelector::position(slide_position),
-            ChartSelector::position(chart_position),
-        )
-        .map_err(map_focused_chart_arrangement_error)?;
-    if actual != expected {
-        return Err(Error::InvalidFormat(
-            "Keynote chart arrangement update failed semantic verification".to_owned(),
-        ));
-    }
-    *editor = reopened;
-    Ok(())
-}
-
-#[derive(Debug, Default)]
-struct FallibleBytes {
-    bytes: Vec<u8>,
-}
-
-impl FallibleBytes {
-    fn into_bytes(self) -> Vec<u8> {
-        self.bytes
-    }
-}
-
-impl std::io::Write for FallibleBytes {
-    fn write(&mut self, source: &[u8]) -> std::io::Result<usize> {
-        self.bytes
-            .try_reserve_exact(source.len())
-            .map_err(|_error| {
-                std::io::Error::other("Keynote chart arrangement handoff allocation failed")
-            })?;
-        self.bytes.extend_from_slice(source);
-        Ok(source.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
 fn map_focused_chart_arrangement_error(error: litchi_keynote::ChartArrangementError) -> Error {
     Error::InvalidFormat(format!(
         "focused Keynote chart arrangement operation failed: {error}"
@@ -201,12 +109,6 @@ mod tests {
             .unwrap();
         let baseline = editor.to_bytes().unwrap();
         assert_eq!(
-            editor
-                .slide_chart_arrangement_by_selector(0, ChartSelector::index(0))
-                .unwrap(),
-            ChartArrangement::default()
-        );
-        assert_eq!(
             editor.slide_charts(0).unwrap()[0].arrangement,
             ChartArrangement::default()
         );
@@ -217,15 +119,7 @@ mod tests {
         );
 
         let constrained = ChartArrangement::default().with_constrain_proportions(true);
-        editor
-            .set_slide_chart_arrangement_by_selector(0, ChartSelector::index(0), constrained)
-            .unwrap();
-        assert_eq!(
-            editor
-                .slide_chart_arrangement_by_selector(0, ChartSelector::index(0))
-                .unwrap(),
-            constrained
-        );
+        set_focused_arrangement(&mut editor, 0, constrained);
         assert_eq!(editor.slide_charts(0).unwrap()[0].arrangement, constrained);
         let focused = litchi_keynote::Package::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -238,39 +132,128 @@ mod tests {
             .unwrap();
         assert_eq!(
             editor
-                .slide_chart_arrangement_by_selector(0, chart_selector(&editor, &duplicate))
-                .unwrap(),
+                .slide_charts(0)
+                .unwrap()
+                .into_iter()
+                .find(|candidate| candidate.drawable_object_id == duplicate.drawable_object_id)
+                .unwrap()
+                .arrangement,
             constrained
         );
 
         let locked = ChartArrangement::default().with_locked(true);
-        editor
-            .set_slide_chart_arrangement_by_selector(0, chart_selector(&editor, &duplicate), locked)
-            .unwrap();
+        set_focused_arrangement(&mut editor, 1, locked);
         assert_eq!(
             editor
-                .slide_chart_arrangement_by_selector(0, chart_selector(&editor, &chart))
-                .unwrap(),
+                .slide_charts(0)
+                .unwrap()
+                .into_iter()
+                .find(|candidate| candidate.drawable_object_id == chart.drawable_object_id)
+                .unwrap()
+                .arrangement,
             constrained
         );
         assert_eq!(
             editor
-                .slide_chart_arrangement_by_selector(0, chart_selector(&editor, &duplicate))
-                .unwrap(),
+                .slide_charts(0)
+                .unwrap()
+                .into_iter()
+                .find(|candidate| candidate.drawable_object_id == duplicate.drawable_object_id)
+                .unwrap()
+                .arrangement,
             locked
         );
 
         editor
             .remove_slide_chart(0, chart_selector(&editor, &duplicate))
             .unwrap();
+        set_focused_arrangement(&mut editor, 0, ChartArrangement::default());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn focused_arrangement_edit_preserves_a_large_chart_listing_and_inverse() {
+        const CHART_COUNT: usize = 32;
+        const TARGET_POSITION: usize = 17;
+
+        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
         editor
-            .set_slide_chart_arrangement_by_selector(
+            .add_slide_chart(
                 0,
-                chart_selector(&editor, &chart),
-                ChartArrangement::default(),
+                Kind::Line2d,
+                data(),
+                DrawablePoint { x: 20.0, y: 20.0 },
+                DrawableSize {
+                    width: 400.0,
+                    height: 300.0,
+                },
             )
             .unwrap();
-        assert_eq!(editor.to_bytes().unwrap(), baseline);
+        for _ in 1..CHART_COUNT {
+            editor
+                .duplicate_slide_chart(0, ChartSelector::index(0))
+                .unwrap();
+        }
+
+        let baseline = editor.to_bytes().unwrap();
+        let baseline_listing = editor.slide_charts(0).unwrap();
+        assert_eq!(baseline_listing.len(), CHART_COUNT);
+        assert!(
+            baseline_listing
+                .iter()
+                .all(|chart| chart.arrangement == ChartArrangement::default())
+        );
+
+        let focused = litchi_keynote::Package::from_bytes(&baseline).unwrap();
+        assert_eq!(
+            focused
+                .slide_chart_arrangement(0usize, TARGET_POSITION)
+                .unwrap(),
+            ChartArrangement::default()
+        );
+        let replacement = ChartArrangement::default()
+            .with_locked(true)
+            .with_constrain_proportions(true);
+        let changed = focused
+            .edit_slide_chart_arrangement(0usize, TARGET_POSITION)
+            .unwrap()
+            .set(replacement)
+            .commit()
+            .unwrap();
+        let mut candidate_bytes = Vec::new();
+        changed.package().write_to(&mut candidate_bytes).unwrap();
+        let reopened = KeynoteEditor::from_bytes(&candidate_bytes).unwrap();
+        let mut expected_listing = baseline_listing.clone();
+        expected_listing[TARGET_POSITION].arrangement = replacement;
+        assert_eq!(reopened.slide_charts(0).unwrap(), expected_listing);
+
+        let restored = changed
+            .package()
+            .apply_slide_chart_arrangement(&changed.patch().inverse())
+            .unwrap();
+        let mut restored_bytes = Vec::new();
+        restored.package().write_to(&mut restored_bytes).unwrap();
+        assert_eq!(restored_bytes, baseline);
+    }
+
+    fn set_focused_arrangement(
+        editor: &mut KeynoteEditor,
+        chart_position: usize,
+        arrangement: ChartArrangement,
+    ) {
+        let focused = litchi_keynote::Package::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let commit = focused
+            .edit_slide_chart_arrangement(
+                SlideSelector::index(0),
+                ChartSelector::index(chart_position),
+            )
+            .unwrap()
+            .set(arrangement)
+            .commit()
+            .unwrap();
+        let mut bytes = Vec::new();
+        commit.package().write_to(&mut bytes).unwrap();
+        *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
     }
 
     fn data() -> ChartData {

@@ -36846,6 +36846,44 @@ fn rewrite_movie_title_operation(
             self.assertTrue(any("module must be hidden" in item for item in violations), violations)
             self.assertTrue(any("missing its private" in item for item in violations), violations)
 
+    def test_iwa_keynote_chart_arrangement_tombstones_public_selector_wrappers(
+        self,
+    ) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_HOST_TYPED_METHODS,
+            (
+                "slide_chart_arrangement_by_selector",
+                "set_slide_chart_arrangement_by_selector",
+            ),
+        )
+        self.assertIn(
+            Path("crates/litchi-iwa/examples/create_iwork_chart_arrangements.rs"),
+            boundaries.RETIRED_IWA_OBSOLETE_EXAMPLE_PATHS,
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_arrangement_canonical_scaffold(root)
+
+            violations = boundaries.audit_iwa_keynote_chart_arrangement_source_topology(
+                root
+            )
+
+            self.assertTrue(
+                any(
+                    "host wrapper slide_chart_arrangement_by_selector" in item
+                    for item in violations
+                ),
+                violations,
+            )
+            self.assertTrue(
+                any(
+                    "host wrapper set_slide_chart_arrangement_by_selector" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
     def test_iwa_keynote_chart_arrangement_requires_focused_delegate_and_no_native_wire(
         self,
     ) -> None:
@@ -36893,16 +36931,7 @@ fn rewrite_movie_title_operation(
             )
 
             host.write_text(
-                "use litchi_keynote::{ChartArrangement, ChartSelector, Package as FocusedKeynotePackage, SlideSelector};\n"
-                "impl KeynoteEditor {\n"
-                "    pub fn slide_chart_arrangement_by_selector(&self, slide_index: usize, selector: ChartSelector) -> Result<ChartArrangement> {\n"
-                "        focused_chart_arrangement_package(self)?.slide_chart_arrangement(SlideSelector::index(slide_index), selector)\n"
-                "    }\n"
-                "    pub fn set_slide_chart_arrangement_by_selector(&mut self, slide_index: usize, selector: ChartSelector, arrangement: ChartArrangement) -> Result<()> {\n"
-                "        let package = focused_chart_arrangement_package(self)?;\n"
-                "        package.edit_slide_chart_arrangement(SlideSelector::index(slide_index), selector).set(arrangement).commit()\n"
-                "    }\n"
-                "}\n"
+                "use litchi_keynote::{ChartArrangement, Package as FocusedKeynotePackage, SlideSelector};\n"
                 "fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKeynotePackage> { let _ = editor; todo!() }\n",
                 encoding="utf-8",
             )
@@ -36951,16 +36980,7 @@ fn rewrite_movie_title_operation(
             )
 
             host.write_text(
-                "use litchi_keynote::{ChartSelector, Package as FocusedKeynotePackage, SlideSelector};\n"
-                "impl KeynoteEditor {\n"
-                "    pub fn slide_chart_arrangement_by_selector(&self, slide_index: usize, selector: ChartSelector) -> Result<ChartArrangement> {\n"
-                "        focused_chart_arrangement_package(self)?.slide_chart_arrangement(SlideSelector::index(slide_index), selector)\n"
-                "    }\n"
-                "    pub fn set_slide_chart_arrangement_by_selector(&mut self, slide_index: usize, selector: ChartSelector, arrangement: ChartArrangement) -> Result<()> {\n"
-                "        let package = focused_chart_arrangement_package(self)?;\n"
-                "        package.edit_slide_chart_arrangement(SlideSelector::index(slide_index), selector).set(arrangement).commit()\n"
-                "    }\n"
-                "}\n"
+                "use litchi_keynote::{Package as FocusedKeynotePackage, SlideSelector};\n"
                 "fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKeynotePackage> { let _ = editor; todo!() }\n",
                 encoding="utf-8",
             )

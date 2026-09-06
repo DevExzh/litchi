@@ -571,3 +571,41 @@ tests across those files). The Numbers default-feature
 `image_adjustments` library suite passes 12 tests. Boundary verification
 passes 921 tests; the scanner passes with 64 packages, 238 internal
 dependency declarations, and 11 explicit debt items.
+
+## Keynote chart-arrangement host boundary (2026-09-06)
+
+Keynote removes two selector-first host wrappers for chart arrangement. These
+were semantic wrappers rather than raw-ID methods; the internal read-batch,
+listing, and lifecycle helpers remain. The dead handoff writer is removed.
+Pages and Numbers chart-arrangement ownership remains host-owned. The focused
+CLI retains its enhanced no-clobber and forward-conflict behavior.
+
+Selected-graph discovery, codec work, rewrite, and locality validation charge
+against one shared resource ledger. Graph allocations have a separate finite
+allowance; the existing limit of 64 logical rewrite/staging allocations
+remains. Selected locality stream buffers are precharged from parsed-stream
+bounds. Per-payload field ceilings remain in force; graph field visits consume
+the shared work budget without consuming the selected codec's field allowance.
+Full semantic validation and selected slide projection remain separately
+bounded; physical Snappy ceilings still apply.
+
+Computer Use opened the arrangement candidate in Keynote 14.4 with the chart
+lock and `Constrain proportions` flags enabled. After selecting the active
+document from the Window menu, native unlock/relock forced a dirty save; close
+and exact-path reopen retained both flags, the original chart title
+`Native saved chart title — 北区`, and `Native chart caption marker`. The
+checked-in native fixture is
+[`keynote/chart-arrangement-retirement-resaved.key`](keynote/chart-arrangement-retirement-resaved.key),
+510,176 bytes, with SHA-256
+`e82fa36d0a041eeaea5ea9a41ed1b2107351ab9bc67d7888d86995bcbec16e98`.
+
+The focused CLI read both flags, produced an exact no-op with zero touched
+components and no full reparse, and preserved bytes on the existing-output
+refusal path. A reset probe opened the resaved oracle with both flags false;
+that reset observation was not saved or reopened as a reset candidate. Focused
+validation passes 18 tests; the all-feature native integration suite covers 4
+targeted tests. The host arrangement/CRUD suite passes 6/6, including the
+32-chart changed-listing/exact-inverse case and Numbers/Pages CRUD cases. One
+private actual-candidate verification passed exact-work and one-under replays.
+Boundary verification passes 922 tests; the scanner passes with 64 packages,
+238 internal dependency declarations, and 11 explicit debt items.
