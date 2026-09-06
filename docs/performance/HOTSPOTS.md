@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## Change 0435: ODT streaming execution accounting
+
+[0435](changes/0435-odt-bounded-plain-paragraphs.md) removes whole-document
+retention from fresh plaintext ODT publication, with a measured 420,091-byte
+operation allocator peak across three sizes. Large buffered peak is 22,450,985
+bytes. The new path is 3.351 / 3.369 times slower than candidate Builder at
+32,768 paragraphs. Its whole-process stack record attributes 45.74% self
+samples to `ExecutionContext::consume`; that scope includes setup and oracle.
+Next test bounded ordinary-text Work batching in ODT, keeping per-scalar
+cancellation and exact fallback at limits. Retain the measured streaming API
+as the next baseline. This is a hypothesis, not a causal speedup claim.
+ODP fresh creation follows; append, Part addition, repackaging, native breadth,
+and cold/range/scaling work remain separate. All regression flags are retained.
+
 ## Change 0434: ODS ordinary-text work batching
 
 [0434](changes/0434-ods-bounded-text-spans.md) measures a private ODS

@@ -1,0 +1,100 @@
+{
+  "change": 435,
+  "phase": "preparatory-pilot",
+  "role": "before-buffered",
+  "mode": "normal",
+  "shape": "tiny",
+  "samples": 3,
+  "warmups": 1,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/pilots/before-buffered/initial/normal-tiny-resource.log",
+    "/tmp/litchi-goal-0435-binaries/before/normal",
+    "--case",
+    "odt_buffered_create",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "3",
+    "--warmup",
+    "1",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/pilots/before-buffered/initial/normal-tiny.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/pilots/before-buffered/initial/normal-tiny-catalog.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "binary": {
+    "path": "/tmp/litchi-goal-0435-binaries/before/normal",
+    "bytes": 454914992,
+    "sha256": "d361b865157da6ae69d69d4e515bfdfec608cc2d4e3bca2dc10c603b3e922f2b"
+  },
+  "driver_sha256": "e05e9a461b40961a8799d432abb527639288aef78996c031ef45d909b679ef37",
+  "oracle_sha256": "b7a50d6abccc4eb034141624aed946428ed639758f723b1037205905ac9a7702",
+  "protocol_sha256": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+  "build_receipt": "checks/before-build.json",
+  "build_receipt_sha256": "279bc45c248cfa306ec903a7d75bd72a083e9adcd2072292e4c393f0eb8761ff",
+  "source_before": {
+    "path": "sources/6790af6a196f132f59db06679e56cd72c4d43b22bbea25ba125314aac3e94609.json",
+    "sha256": "6790af6a196f132f59db06679e56cd72c4d43b22bbea25ba125314aac3e94609",
+    "files": 6645
+  },
+  "started_utc": "2026-09-06T07:23:00.517351+00:00",
+  "status": "failed",
+  "exit_code": 0,
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/pilots/before-buffered/initial/normal-tiny.json",
+    "--mode",
+    "normal",
+    "--shape",
+    "tiny",
+    "--role",
+    "before-buffered",
+    "--samples",
+    "3",
+    "--warmups",
+    "1"
+  ],
+  "oracle_exit_code": 1,
+  "error": "AssertionError('pilot oracle failed')",
+  "source_after": {
+    "path": "sources/6790af6a196f132f59db06679e56cd72c4d43b22bbea25ba125314aac3e94609.json",
+    "sha256": "6790af6a196f132f59db06679e56cd72c4d43b22bbea25ba125314aac3e94609",
+    "files": 6645
+  },
+  "source_unchanged": true,
+  "finished_utc": "2026-09-06T07:23:00.983955+00:00",
+  "artifacts": {
+    "pilots/before-buffered/initial/normal-tiny.json": {
+      "bytes": 19330,
+      "sha256": "1dc2ca3c78b239a63159eec1c9d58e05c60e0bcb94abf0c4cc69d80506a685c5"
+    },
+    "pilots/before-buffered/initial/normal-tiny-catalog.json": {
+      "bytes": 4838,
+      "sha256": "d9adff6ee97478692be01c4c63a1126e7196da4b856ba5ffc9a4179ee7132b5f"
+    },
+    "pilots/before-buffered/initial/normal-tiny-resource.log": {
+      "bytes": 1097,
+      "sha256": "1afcfe2bf4388cd5497b44da196bb4d5c97e63471412d40164d285728687f178"
+    },
+    "pilots/before-buffered/initial/normal-tiny.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pilots/before-buffered/initial/normal-tiny-oracle.log": {
+      "bytes": 74,
+      "sha256": "60e60bbc3533000bde42e47aeaa4cb0e02d64dcdb882129626f414268b69502a"
+    }
+  }
+}

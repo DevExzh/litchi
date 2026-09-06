@@ -1,0 +1,88 @@
+diff --git a/tools/perf-baseline/src/lib.rs b/tools/perf-baseline/src/lib.rs
+index 49cded3fd..fbc376482 100644
+--- a/tools/perf-baseline/src/lib.rs
++++ b/tools/perf-baseline/src/lib.rs
+@@ -1413,0 +1414 @@ enum Case {
++    OdtStreamingCreate,
+@@ -1993,0 +1995 @@ impl Case {
++            Self::OdtStreamingCreate => "odt_streaming_create",
+@@ -2546,0 +2549,4 @@ impl Case {
++    const fn uses_odt_streaming_creation(self) -> bool {
++        matches!(self, Self::OdtStreamingCreate)
++    }
++
+@@ -8924,0 +8931 @@ pub fn run() -> Result<(), Box<dyn Error>> {
++                    && !case.uses_odt_streaming_creation()
+@@ -10225,0 +10233,23 @@ pub fn run() -> Result<(), Box<dyn Error>> {
++    if options
++        .cases
++        .iter()
++        .any(|case| case.uses_odt_streaming_creation())
++    {
++        for shape in &options.semantic_shapes {
++            let corpus = odt_streaming_create::build_odt_streaming_corpus(*shape)?;
++            for case in options
++                .cases
++                .iter()
++                .copied()
++                .filter(|case| case.uses_odt_streaming_creation())
++            {
++                results.push(odt_streaming_create::run_odt_streaming_creation(
++                    case,
++                    &corpus,
++                    options.warmup_iterations,
++                    options.samples,
++                )?);
++            }
++        }
++    }
++
+@@ -11585,0 +11616 @@ fn parse_case(value: &str) -> Option<Case> {
++        "odt_streaming_create" => Some(Case::OdtStreamingCreate),
+@@ -12041,0 +12073 @@ fn usage_text() -> String {
++                                       odt_streaming_create,\n\
+@@ -22949,0 +22982,3 @@ fn run_case_with_config(
++        Case::OdtStreamingCreate => {
++            Err("streaming ODT creation cases use their dedicated corpus runner".into())
++        },
+@@ -58500 +58535 @@ mod tests {
+-        assert_eq!(selectable_count, 432);
++        assert_eq!(selectable_count, 433);
+@@ -60458,0 +60494,37 @@ mod tests {
++    #[test]
++    fn odt_streaming_creation_is_opt_in_and_reports_provider_window_evidence() {
++        let case = parse_case("odt_streaming_create").expect("streaming ODT selector parses");
++        assert_eq!(case, Case::OdtStreamingCreate);
++        assert!(!Case::DEFAULT.contains(&case));
++        let corpus =
++            super::odt_streaming_create::build_odt_streaming_corpus(SemanticShape::Tiny).unwrap();
++        assert_eq!(corpus.manifest.archive_member_count, 5);
++        assert_eq!(corpus.manifest.entry_count, 64);
++        let measured =
++            super::odt_streaming_create::run_odt_streaming_creation(case, &corpus, 0, 1).unwrap();
++        assert_eq!(measured.elapsed_ns.samples.len(), 1);
++        assert_eq!(
++            measured.output_sha256.as_deref(),
++            Some(corpus.manifest.archive_sha256.as_str())
++        );
++        let sink = measured.sink.as_ref().unwrap();
++        assert_eq!(sink.accepted_bytes, corpus.manifest.archive_bytes as u64);
++        assert_eq!(sink.retained_output_bytes, Some(0));
++        assert_eq!(sink.retained_authoring_window_bytes, Some(4_096));
++        assert_eq!(
++            sink.input_bytes,
++            Some(corpus.manifest.uncompressed_payload_bytes as u64)
++        );
++        let source = measured.source.as_ref().unwrap();
++        let odt = source.odt_paragraphs.as_ref().unwrap();
++        assert_eq!(odt.role, "streaming");
++        assert_eq!(odt.paragraph_count, corpus.manifest.entry_count);
++        assert_eq!(odt.run_count, corpus.manifest.entry_count);
++        assert!(odt.archive_member_set_verified);
++        assert!(odt.manifest_bindings_verified);
++        assert!(odt.semantic_reopen_verified);
++        assert!(odt.immutable_styles_meta_verified);
++        assert!(!odt.timing_scope.is_empty());
++        assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
++    }
++

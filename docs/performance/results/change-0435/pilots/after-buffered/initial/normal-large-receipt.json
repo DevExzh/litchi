@@ -1,0 +1,99 @@
+{
+  "change": 435,
+  "phase": "preparatory-pilot",
+  "role": "after-buffered",
+  "mode": "normal",
+  "shape": "large",
+  "samples": 3,
+  "warmups": 1,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/pilots/after-buffered/initial/normal-large-resource.log",
+    "/tmp/litchi-goal-0435-binaries/after/normal",
+    "--case",
+    "odt_buffered_create",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "3",
+    "--warmup",
+    "1",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/pilots/after-buffered/initial/normal-large.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/pilots/after-buffered/initial/normal-large-catalog.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "binary": {
+    "path": "/tmp/litchi-goal-0435-binaries/after/normal",
+    "bytes": 455987480,
+    "sha256": "5e75ca3927ba274bfba86af2637c22b5a2985972d81caf6e7578ebed6ac3d97a"
+  },
+  "driver_sha256": "e05e9a461b40961a8799d432abb527639288aef78996c031ef45d909b679ef37",
+  "oracle_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+  "protocol_sha256": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+  "build_receipt": "checks/after-build.json",
+  "build_receipt_sha256": "4324b6416b16415e03a5d8aae4595cd89fb418a5086412963795c813e69be890",
+  "source_before": {
+    "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+    "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f",
+    "files": 6649
+  },
+  "started_utc": "2026-09-06T08:24:10.067666+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/pilots/after-buffered/initial/normal-large.json",
+    "--mode",
+    "normal",
+    "--shape",
+    "large",
+    "--role",
+    "after-buffered",
+    "--samples",
+    "3",
+    "--warmups",
+    "1"
+  ],
+  "oracle_exit_code": 0,
+  "source_after": {
+    "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+    "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f",
+    "files": 6649
+  },
+  "source_unchanged": true,
+  "finished_utc": "2026-09-06T08:24:10.746595+00:00",
+  "artifacts": {
+    "pilots/after-buffered/initial/normal-large.json": {
+      "bytes": 19388,
+      "sha256": "c307b3c9466c24f8ee3fec5a67fbc8742f371dacb432b5a805b990a69018c1c7"
+    },
+    "pilots/after-buffered/initial/normal-large-catalog.json": {
+      "bytes": 4865,
+      "sha256": "6d8d89e4e53f661f23a5226179b7ac0c0a222f8f9042cd51e7a7ddfa84a4a34f"
+    },
+    "pilots/after-buffered/initial/normal-large-resource.log": {
+      "bytes": 1098,
+      "sha256": "bdffd63e040ad39826e25dcf0edf0de208af9b14405c30d05c34227f83c3a5d6"
+    },
+    "pilots/after-buffered/initial/normal-large.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "pilots/after-buffered/initial/normal-large-oracle.log": {
+      "bytes": 6,
+      "sha256": "de545cc7e7ff8eaacefae8fcb4a954555a1224f24fe7ce8ff62b9874c54f3fe2"
+    }
+  }
+}

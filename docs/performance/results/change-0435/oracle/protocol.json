@@ -1,0 +1,206 @@
+{
+  "change": 435,
+  "status": "draft",
+  "selector_family": "odt_fresh_paragraph_creation",
+  "classification": "Matched ODT paragraph creation evidence; no speedup, causality, or cross-role lexical-byte claim is authorized by this draft alone.",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "repeats": 2,
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "shapes": {
+    "tiny": 64,
+    "medium": 8192,
+    "large": 32768
+  },
+  "roles": {
+    "before-buffered": {
+      "build_directory": "before",
+      "selector": "odt_buffered_create",
+      "source_field": "odt_paragraphs",
+      "source_role": "buffered",
+      "implementation": "litchi_odt::Builder",
+      "retention": "unbounded"
+    },
+    "after-buffered": {
+      "build_directory": "after",
+      "selector": "odt_buffered_create",
+      "source_field": "odt_paragraphs",
+      "source_role": "buffered",
+      "implementation": "litchi_odt::Builder",
+      "retention": "unbounded"
+    },
+    "after-streaming": {
+      "build_directory": "after",
+      "selector": "odt_streaming_create",
+      "source_field": "odt_paragraphs",
+      "source_role": "streaming",
+      "implementation": "litchi_odt::streaming::stream_plain_paragraphs_to",
+      "retention": "fixed_explicit_window"
+    }
+  },
+  "order": [
+    {
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R2"
+    }
+  ],
+  "corpus": {
+    "package_format": "ODT/ODF/ZIP",
+    "compression": "mimetype=stored;xml=deflate",
+    "payload_kind": "deterministic-mixed-unicode-entities-plain-paragraphs",
+    "mimetype": "application/vnd.oasis.opendocument.text",
+    "member_names": [
+      "mimetype",
+      "content.xml",
+      "styles.xml",
+      "meta.xml",
+      "META-INF/manifest.xml"
+    ],
+    "manifest_entry_count": 4,
+    "target_entry": "content.xml",
+    "default_styles_xml_sha256": "4d1dfc46e4c369722193548ff59269167f3e838a4b61bf1ddca1ecafe5092277",
+    "default_meta_xml_sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719",
+    "paragraph_fixture": {
+      "prefix": "litchi-perf-odt-buffered-",
+      "index_format": "{index:05}",
+      "variants": [
+        "plain paragraph",
+        "Unicode café Δ 中",
+        "entities <&> \"quoted\"",
+        "mixed façade Ω <&> value"
+      ],
+      "cycle": 4,
+      "separator": "\\n",
+      "text_contract": "four-cycle plain/Unicode/XML-significant UTF-8 text with single interior spaces; one logical text run per paragraph"
+    },
+    "semantic_hash": {
+      "domain": "litchi-odt-buffered-semantic-v1\\0",
+      "count_encoding": "u64le",
+      "length_encoding": "u64le",
+      "payload_encoding": "UTF-8",
+      "separator_is_hashed": false
+    }
+  },
+  "source_contract": {
+    "required_fields": [
+      "role",
+      "implementation",
+      "timing_scope",
+      "performance_claim",
+      "semantic_sha256",
+      "content_xml_sha256",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "archive_member_set_verified",
+      "manifest_bindings_verified",
+      "semantic_reopen_verified",
+      "immutable_styles_meta_verified",
+      "paragraph_count",
+      "run_count",
+      "text_contract"
+    ],
+    "all_boolean_gates_required_true": true,
+    "same_role_content_identity_required": true
+  },
+  "timing_scope": "Fresh paragraph input/model construction, public ODT authoring and publication, and HashingDiscardSink write are inside the operation timer. Corpus construction, archive reopen, XML/semantic/package gates, sink construction/finalization, and digest extraction are outside it.",
+  "identity_scope": {
+    "same_role_required": [
+      "paragraph_count",
+      "semantic_sha256",
+      "content_xml_sha256",
+      "content_xml_bytes",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "member_names",
+      "mimetype",
+      "manifest_entry_count",
+      "target_payload_bytes",
+      "target_payload_sha256"
+    ],
+    "cross_role_required": [
+      "paragraph_count",
+      "semantic_sha256",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "member_names",
+      "mimetype",
+      "manifest_entry_count"
+    ],
+    "cross_role_content_xml_rule": "Retain content.xml hashes and byte counts for each role/repeat, but never require lexical content.xml equality across roles; semantic paragraph/style/meta/member-topology equality is the cross-role gate.",
+    "cross_role_archive_rule": "ZIP archive bytes, archive SHA, compression framing, and sink write segmentation may differ across roles; each role/repeat must remain deterministic and internally gated."
+  },
+  "operation_metrics": {
+    "sample_alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+    "normal_allocator_elapsed": "allocator elapsed values are retained for process context only; no allocator latency claim",
+    "allocation_scope": "operation_global_system_allocator",
+    "required_region_peak": true
+  },
+  "report_contract": {
+    "schema_version": 1,
+    "required_reports": 36,
+    "reports_per_role": 12,
+    "retained_samples": 1080,
+    "cross_role_comparison": "outer capture verifier; this per-report oracle validates one role/shape/mode"
+  }
+}

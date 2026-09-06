@@ -1,0 +1,113 @@
+{
+  "ambient_source_manifest": {
+    "files": 6649,
+    "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+    "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/runs/A1/formal/A1-allocator-tiny-r1-resource.log",
+    "/tmp/litchi-goal-0435-binaries/before/allocator",
+    "--case",
+    "odt_buffered_create",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/runs/A1/formal/A1-allocator-tiny-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0435/runs/A1/formal/A1-allocator-tiny-r1-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4838,
+      "path": "runs/A1/formal/A1-allocator-tiny-r1-catalog.json",
+      "sha256": "8ed6f38d9d4f768a3b992259c177a564a17ab1bc4b1e0b6327a2cc0bc515cb91"
+    },
+    "oracle_log": {
+      "bytes": 328,
+      "path": "runs/A1/formal/A1-allocator-tiny-r1-oracle.log",
+      "sha256": "3ac2e1e23fcef05605bfe0fee468c3f60b840d3e0c44970ff67f4ae95d08cf43"
+    },
+    "report": {
+      "bytes": 41918,
+      "path": "runs/A1/formal/A1-allocator-tiny-r1.json",
+      "sha256": "d5421244416fffeb100c0f7d3e0bf8dcc292faf3e578ac50a6989b89c4842fa4"
+    },
+    "resource_log": {
+      "bytes": 1089,
+      "path": "runs/A1/formal/A1-allocator-tiny-r1-resource.log",
+      "sha256": "e45227c1ab6708bc7e8d994346a964a3cf35ad2f3bf4399419dbf13e7dd28561"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/A1/formal/A1-allocator-tiny-r1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 454248792,
+    "path": "/tmp/litchi-goal-0435-binaries/before/allocator",
+    "sha256": "b8e87da941ed18c2e4606834acc0667e0aa63dbe529ba5e5e12ee609e1c83316"
+  },
+  "build_directory": "before",
+  "change": 435,
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "4b2685abbbe0f789f8056c894d5ef243c22ec2105f6dc6ed183e04f292415877",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T08:26:12.267941+00:00",
+  "lane": {
+    "mode": "allocator",
+    "repeat": "R1",
+    "shape": "tiny"
+  },
+  "name": "A1-allocator-tiny-r1",
+  "oracle_exit_code": 0,
+  "oracle_protocol_sha256": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+  "oracle_role": "before-buffered",
+  "oracle_stdout_sha256": "3ac2e1e23fcef05605bfe0fee468c3f60b840d3e0c44970ff67f4ae95d08cf43",
+  "oracle_verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+  "outside_bundle_status_unchanged": true,
+  "phase": "A1",
+  "protocol_sha256": "cb0b0dcf724c8539d295c964bb3200ec13a518f1c6d16c3990f0c3138e026945",
+  "revision": "7c25f299d19d9e02ed1fe7c6b36a126165b474fc",
+  "role": "before-buffered",
+  "schema": "litchi-0435-capture-receipt-v1",
+  "selector": "odt_buffered_create",
+  "source_after": {
+    "files": 6649,
+    "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+    "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+  },
+  "source_before": {
+    "files": 6649,
+    "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+    "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+  },
+  "source_manifest": {
+    "files": 6645,
+    "path": "sources/6790af6a196f132f59db06679e56cd72c4d43b22bbea25ba125314aac3e94609.json",
+    "sha256": "6790af6a196f132f59db06679e56cd72c4d43b22bbea25ba125314aac3e94609"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T08:26:11.933083+00:00",
+  "status": "pass",
+  "status_after": [
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md"
+  ],
+  "verifier_sha256": "1a62103bc3aa8577faac6dde6eaa7f1bf79267bab0cc33181a1124556b360626"
+}
