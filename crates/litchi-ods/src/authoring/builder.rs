@@ -436,6 +436,16 @@ pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
                     "ODS content.xml has non-whitespace text outside its root".to_string(),
                 ));
             },
+            Event::GeneralRef(reference) => {
+                crate::xml_reference::decode(reference.as_ref()).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODS XML character reference: {error}"))
+                })?;
+                if depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml has a character reference outside its root".to_string(),
+                    ));
+                }
+            },
             Event::Eof => {
                 if !root_closed || depth != 0 {
                     return Err(Error::InvalidFormat(
@@ -454,7 +464,6 @@ pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
             | Event::Decl(_)
             | Event::PI(_)
             | Event::DocType(_)
-            | Event::GeneralRef(_)
             | Event::Text(_)
             | Event::CData(_) => {},
         }
@@ -640,6 +649,16 @@ impl ValidateHandler {
                     "ODS content.xml has non-whitespace text outside its root".to_string(),
                 ));
             },
+            Event::GeneralRef(reference) => {
+                crate::xml_reference::decode(reference.as_ref()).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODS XML character reference: {error}"))
+                })?;
+                if self.depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml has a character reference outside its root".to_string(),
+                    ));
+                }
+            },
             Event::Eof => {
                 if !self.root_closed || self.depth != 0 {
                     return Err(Error::InvalidFormat(
@@ -657,7 +676,6 @@ impl ValidateHandler {
             | Event::Decl(_)
             | Event::PI(_)
             | Event::DocType(_)
-            | Event::GeneralRef(_)
             | Event::Text(_)
             | Event::CData(_) => {},
         }

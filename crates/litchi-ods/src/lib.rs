@@ -73,6 +73,7 @@ pub mod settings;
 pub mod source_features;
 pub mod styles;
 pub mod worksheet;
+mod xml_reference;
 
 pub use charts::Chart;
 pub use drawing::{Frame, Part};
