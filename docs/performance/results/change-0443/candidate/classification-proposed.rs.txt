@@ -1,0 +1,41 @@
+/// Exact distinctions needed after an event's namespace scope has ended.
+/// Unknown names and namespaces stay opaque; no original markup is rewritten.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ElementKind {
+    DocumentContent,
+    AutomaticStyles,
+    Body,
+    Presentation,
+    Page,
+    Style,
+    Regenerated,
+    Other,
+}
+
+fn classify(resolved: &ResolveResult<'_>, local: &[u8]) -> ElementKind {
+    let ResolveResult::Bound(Namespace(uri)) = resolved else {
+        return ElementKind::Other;
+    };
+    if *uri == OFFICE_NAMESPACE {
+        for (name, kind) in [
+            (DOCUMENT_CONTENT_ELEMENT, ElementKind::DocumentContent),
+            (AUTOMATIC_STYLES_ELEMENT, ElementKind::AutomaticStyles),
+            (BODY_ELEMENT, ElementKind::Body),
+            (PRESENTATION_ELEMENT, ElementKind::Presentation),
+        ] {
+            if local == name.as_bytes() {
+                return kind;
+            }
+        }
+    } else if *uri == DRAW_NAMESPACE && local == PAGE_ELEMENT.as_bytes() {
+        return ElementKind::Page;
+    } else if *uri == STYLE_NAMESPACE && local == STYLE_ELEMENT.as_bytes() {
+        return ElementKind::Style;
+    } else if *uri == PRESENTATION_NAMESPACE
+        && (local == SETTINGS_ELEMENT.as_bytes()
+            || DECLARATION_ELEMENTS.iter().any(|name| local == name.as_bytes()))
+    {
+        return ElementKind::Regenerated;
+    }
+    ElementKind::Other
+}

@@ -1,0 +1,123 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0443/runs/B2/formal/B2-after-normal-tiny-r2-resource.log",
+    "/tmp/litchi-goal-0443-binaries/after/normal",
+    "--case",
+    "odp_existing_append_lifecycle",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0443/runs/B2/formal/B2-after-normal-tiny-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0443/runs/B2/formal/B2-after-normal-tiny-r2-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4921,
+      "path": "runs/B2/formal/B2-after-normal-tiny-r2-catalog.json",
+      "sha256": "357bb638659955f39a3ce5b63e6a8aa9a28ed859211e52fe8140cf371280807b"
+    },
+    "oracle_log": {
+      "bytes": 299,
+      "path": "runs/B2/formal/B2-after-normal-tiny-r2-oracle.log",
+      "sha256": "a813b9ae643070c7f7a98548389459215fb28fc6e964cd626d4d78decec42414"
+    },
+    "report": {
+      "bytes": 44896,
+      "path": "runs/B2/formal/B2-after-normal-tiny-r2.json",
+      "sha256": "c9039cda1b99584ad6c0ed2ba6c6935f203446778c4e687fed707c80d5b0346d"
+    },
+    "resource_log": {
+      "bytes": 1100,
+      "path": "runs/B2/formal/B2-after-normal-tiny-r2-resource.log",
+      "sha256": "7ea7d6f8d79ae08cd66ccc442621e67a4d52d5bc75a32473d7ab5bd923c95e41"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/B2/formal/B2-after-normal-tiny-r2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 457925160,
+    "path": "/tmp/litchi-goal-0443-binaries/after/normal",
+    "sha256": "f3bc7d42102a3fce14c22044ea7be37c5dc1779db2831f124142f8218e321b19"
+  },
+  "build_directory": "after",
+  "change": 443,
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "3ebf6653fe3cf9f504568f0cfeb19beb2a446a7753d132825201964454057804",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T17:37:26.202938+00:00",
+  "lane": {
+    "mode": "normal",
+    "phase": "B2",
+    "repeat": "R2",
+    "role": "after",
+    "shape": "tiny"
+  },
+  "name": "B2-after-normal-tiny-r2",
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0443/oracle/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0443/runs/B2/formal/B2-after-normal-tiny-r2.json",
+    "--mode",
+    "normal",
+    "--shape",
+    "tiny"
+  ],
+  "oracle_exit_code": 0,
+  "outside_bundle_status_unchanged": true,
+  "phase": "B2",
+  "protocol_sha256": "d00167305459619f1c56d353c400b824f90584941aa5845be16d53e39a176614",
+  "revision": "f283c2cd987bfd03c41adbda8a5d83eb9e8e7a24",
+  "role": "after",
+  "schema": "litchi-0443-capture-receipt-v1",
+  "selector": "odp_existing_append_lifecycle",
+  "source_after": {
+    "files": 6659,
+    "path": "sources/515cee7acc9d97cf6ba73cd551defa7fcc01f5c6f96deb9dfaf3cc2287571530.json",
+    "sha256": "515cee7acc9d97cf6ba73cd551defa7fcc01f5c6f96deb9dfaf3cc2287571530"
+  },
+  "source_before": {
+    "files": 6659,
+    "path": "sources/515cee7acc9d97cf6ba73cd551defa7fcc01f5c6f96deb9dfaf3cc2287571530.json",
+    "sha256": "515cee7acc9d97cf6ba73cd551defa7fcc01f5c6f96deb9dfaf3cc2287571530"
+  },
+  "source_field": "odp_append",
+  "source_manifest": {
+    "files": 6659,
+    "path": "sources/515cee7acc9d97cf6ba73cd551defa7fcc01f5c6f96deb9dfaf3cc2287571530.json",
+    "sha256": "515cee7acc9d97cf6ba73cd551defa7fcc01f5c6f96deb9dfaf3cc2287571530"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T17:37:25.784633+00:00",
+  "status": "pass",
+  "status_after": [
+    " M crates/litchi-odp/src/codec/content_source/mod.rs",
+    " M crates/litchi-odp/src/codec/content_source/scanner.rs",
+    "?? crates/litchi-odp/src/codec/content_source/scanner_reference.rs",
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    " M crates/litchi-odp/src/codec/content_source/mod.rs",
+    " M crates/litchi-odp/src/codec/content_source/scanner.rs",
+    "?? crates/litchi-odp/src/codec/content_source/scanner_reference.rs",
+    "?? docs/GOAL.md"
+  ]
+}

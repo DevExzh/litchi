@@ -21,8 +21,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// One open element on the scanner stack.
 struct Frame {
-    namespace: Option<Vec<u8>>,
-    local: Vec<u8>,
+    kind: ElementKind,
     start: usize,
 }
 
@@ -76,11 +75,17 @@ impl<'input> Scanner<'input> {
 
     pub(super) fn run(&mut self) -> Result<()> {
         loop {
-            let (namespace, event) = {
+            let (kind, event) = {
                 let (resolved, event) = self.reader.read_resolved_event().map_err(|error| {
                     invalid(format!("invalid presentation content.xml: {error}"))
                 })?;
-                (namespace_of(&resolved), event)
+                let kind = match &event {
+                    Event::Start(element) | Event::Empty(element) => {
+                        classify(&resolved, element.local_name().as_ref())
+                    },
+                    _ => ElementKind::Other,
+                };
+                (kind, event)
             };
             let end = usize::try_from(self.reader.buffer_position()).map_err(|_error| {
                 invalid("presentation content.xml position exceeds platform limits")
@@ -88,14 +93,11 @@ impl<'input> Scanner<'input> {
             match event {
                 Event::Start(element) => {
                     let start = event_start(self.xml, end)?;
-                    let local = element.local_name().as_ref().to_vec();
                     if self.stack.is_empty() {
                         self.collect_root_namespaces(&element)?;
                     }
-                    self.on_open(namespace.as_ref(), &local, start, end, false)?;
-                    if self.styles_depth.is_some()
-                        && is(namespace.as_ref(), &local, STYLE_NAMESPACE, STYLE_ELEMENT)
-                    {
+                    self.on_open(kind, start, end, false)?;
+                    if self.styles_depth.is_some() && kind == ElementKind::Style {
                         self.record_style_name(&element)?;
                     }
                     if self.stack.len() >= MAX_DEPTH {
@@ -103,22 +105,15 @@ impl<'input> Scanner<'input> {
                             "presentation content.xml nests deeper than {MAX_DEPTH} elements"
                         )));
                     }
-                    self.stack.push(Frame {
-                        namespace,
-                        local,
-                        start,
-                    });
+                    self.stack.push(Frame { kind, start });
                 },
                 Event::Empty(element) => {
                     let start = event_start(self.xml, end)?;
-                    let local = element.local_name().as_ref().to_vec();
-                    if self.styles_depth.is_some()
-                        && is(namespace.as_ref(), &local, STYLE_NAMESPACE, STYLE_ELEMENT)
-                    {
+                    if self.styles_depth.is_some() && kind == ElementKind::Style {
                         self.record_style_name(&element)?;
                     }
-                    self.on_open(namespace.as_ref(), &local, start, end, true)?;
-                    self.on_close(namespace.as_ref(), &local, start, start, end);
+                    self.on_open(kind, start, end, true)?;
+                    self.on_close(kind, start, start, end);
                 },
                 Event::End(_) => {
                     let close_start = event_start(self.xml, end)?;
@@ -126,13 +121,7 @@ impl<'input> Scanner<'input> {
                         .stack
                         .pop()
                         .ok_or_else(|| invalid("presentation content.xml depth underflow"))?;
-                    self.on_close(
-                        frame.namespace.as_ref(),
-                        &frame.local,
-                        frame.start,
-                        close_start,
-                        end,
-                    );
+                    self.on_close(frame.kind, frame.start, close_start, end);
                 },
                 Event::Eof => break,
                 Event::Text(_)
@@ -151,17 +140,10 @@ impl<'input> Scanner<'input> {
     }
 
     /// Handle an element start, or the start half of an empty element.
-    fn on_open(
-        &mut self,
-        namespace: Option<&Vec<u8>>,
-        local: &[u8],
-        start: usize,
-        end: usize,
-        empty: bool,
-    ) -> Result<()> {
+    fn on_open(&mut self, kind: ElementKind, start: usize, end: usize, empty: bool) -> Result<()> {
         let depth = self.stack.len();
         if depth == 0 {
-            if empty || !is(namespace, local, OFFICE_NAMESPACE, DOCUMENT_CONTENT_ELEMENT) {
+            if empty || kind != ElementKind::DocumentContent {
                 return Err(invalid(
                     "presentation content.xml root is not office:document-content",
                 ));
@@ -182,9 +164,7 @@ impl<'input> Scanner<'input> {
         if self.open_page.is_some() || self.open_extra.is_some() {
             return Ok(());
         }
-        if depth == PROLOGUE_DEPTH
-            && is(namespace, local, OFFICE_NAMESPACE, AUTOMATIC_STYLES_ELEMENT)
-        {
+        if depth == PROLOGUE_DEPTH && kind == ElementKind::AutomaticStyles {
             if empty {
                 let name_end = self
                     .xml
@@ -204,27 +184,23 @@ impl<'input> Scanner<'input> {
             }
             return Ok(());
         }
-        if depth == PROLOGUE_DEPTH && !empty && is(namespace, local, OFFICE_NAMESPACE, BODY_ELEMENT)
-        {
+        if depth == PROLOGUE_DEPTH && !empty && kind == ElementKind::Body {
             self.body_open = Some(XmlSpan { start, end });
             return Ok(());
         }
-        if depth == BODY_CHILD_DEPTH
-            && !empty
-            && is(namespace, local, OFFICE_NAMESPACE, PRESENTATION_ELEMENT)
-        {
+        if depth == BODY_CHILD_DEPTH && !empty && kind == ElementKind::Presentation {
             self.presentation_open = Some(XmlSpan { start, end });
             return Ok(());
         }
         if depth == PRESENTATION_CHILD_DEPTH && self.presentation_open.is_some() {
-            if is(namespace, local, DRAW_NAMESPACE, PAGE_ELEMENT) {
+            if kind == ElementKind::Page {
                 if self.pages.len() >= MAX_PAGES {
                     return Err(invalid(format!(
                         "presentation content.xml holds more than {MAX_PAGES} slides"
                     )));
                 }
                 self.open_page = Some(start);
-            } else if !is_regenerated_child(namespace, local) {
+            } else if kind != ElementKind::Regenerated {
                 self.open_extra = Some(start);
             }
         }
@@ -236,14 +212,7 @@ impl<'input> Scanner<'input> {
     /// `open_start` is the offset of the matching start tag and `close_start`
     /// the offset of the end tag currently being processed; they coincide for
     /// empty elements.
-    fn on_close(
-        &mut self,
-        namespace: Option<&Vec<u8>>,
-        local: &[u8],
-        open_start: usize,
-        close_start: usize,
-        end: usize,
-    ) {
+    fn on_close(&mut self, kind: ElementKind, open_start: usize, close_start: usize, end: usize) {
         if self.open_page == Some(open_start) {
             self.open_page = None;
             self.pages.push(XmlSpan {
@@ -265,9 +234,7 @@ impl<'input> Scanner<'input> {
             }
             return;
         }
-        if self.styles_depth == Some(self.stack.len())
-            && is(namespace, local, OFFICE_NAMESPACE, AUTOMATIC_STYLES_ELEMENT)
-        {
+        if self.styles_depth == Some(self.stack.len()) && kind == ElementKind::AutomaticStyles {
             self.styles_depth = None;
             self.styles_site = Some((close_start, AutomaticStylesSite::Content));
         }
@@ -369,16 +336,6 @@ impl<'input> Scanner<'input> {
     }
 }
 
-/// Whether a presentation child is rebuilt from the typed model on save.
-fn is_regenerated_child(namespace: Option<&Vec<u8>>, local: &[u8]) -> bool {
-    if is(namespace, local, PRESENTATION_NAMESPACE, SETTINGS_ELEMENT) {
-        return true;
-    }
-    DECLARATION_ELEMENTS
-        .iter()
-        .any(|element| is(namespace, local, PRESENTATION_NAMESPACE, element))
-}
-
 /// Locate the `<` that opened the event ending at `end`.
 fn event_start(xml: &str, end: usize) -> Result<usize> {
     xml.get(..end)
@@ -386,18 +343,183 @@ fn event_start(xml: &str, end: usize) -> Result<usize> {
         .ok_or_else(|| invalid("invalid presentation content.xml event boundary"))
 }
 
-fn namespace_of(resolved: &ResolveResult<'_>) -> Option<Vec<u8>> {
-    match resolved {
-        ResolveResult::Bound(Namespace(uri)) => Some(uri.to_vec()),
-        ResolveResult::Unbound | ResolveResult::Unknown(_) => None,
-    }
+/// Exact distinctions needed after an event's namespace scope has ended.
+/// Unknown names and namespaces stay opaque; no original markup is rewritten.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ElementKind {
+    DocumentContent,
+    AutomaticStyles,
+    Body,
+    Presentation,
+    Page,
+    Style,
+    Regenerated,
+    Other,
 }
 
-fn is(
-    namespace: Option<&Vec<u8>>,
-    local: &[u8],
-    expected_uri: &[u8],
-    expected_local: &str,
-) -> bool {
-    namespace.map(Vec::as_slice) == Some(expected_uri) && local == expected_local.as_bytes()
+fn classify(resolved: &ResolveResult<'_>, local: &[u8]) -> ElementKind {
+    let ResolveResult::Bound(Namespace(uri)) = resolved else {
+        return ElementKind::Other;
+    };
+    if *uri == OFFICE_NAMESPACE {
+        for (name, kind) in [
+            (DOCUMENT_CONTENT_ELEMENT, ElementKind::DocumentContent),
+            (AUTOMATIC_STYLES_ELEMENT, ElementKind::AutomaticStyles),
+            (BODY_ELEMENT, ElementKind::Body),
+            (PRESENTATION_ELEMENT, ElementKind::Presentation),
+        ] {
+            if local == name.as_bytes() {
+                return kind;
+            }
+        }
+    } else if *uri == DRAW_NAMESPACE && local == PAGE_ELEMENT.as_bytes() {
+        return ElementKind::Page;
+    } else if *uri == STYLE_NAMESPACE && local == STYLE_ELEMENT.as_bytes() {
+        return ElementKind::Style;
+    } else if *uri == PRESENTATION_NAMESPACE
+        && (local == SETTINGS_ELEMENT.as_bytes()
+            || DECLARATION_ELEMENTS
+                .iter()
+                .any(|name| local == name.as_bytes()))
+    {
+        return ElementKind::Regenerated;
+    }
+    ElementKind::Other
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::{BYTE_ORDER_MARK, MAX_XML_BYTES, scanner_reference};
+    use super::*;
+
+    fn reference(xml: &str) -> Result<Option<ContentSource>> {
+        if xml.len() > MAX_XML_BYTES {
+            return Err(invalid(format!(
+                "presentation content.xml exceeds {MAX_XML_BYTES} bytes"
+            )));
+        }
+        let body = xml.strip_prefix(BYTE_ORDER_MARK).unwrap_or(xml);
+        let has_byte_order_mark = body.len() != xml.len();
+        let mut scanner = scanner_reference::Scanner::new(body);
+        scanner.run()?;
+        Ok(scanner.finish(body, has_byte_order_mark))
+    }
+
+    fn compare(xml: &str) {
+        // Debug includes every private span, root binding, style name and source
+        // byte. The reference retains the original complete scanner unchanged.
+        let normalize = |value: Result<Option<ContentSource>>| {
+            value
+                .map(|source| format!("{source:?}"))
+                .map_err(|error| format!("{error:?}"))
+        };
+        assert_eq!(
+            normalize(ContentSource::parse(xml)),
+            normalize(reference(xml)),
+            "{xml:.200}"
+        );
+    }
+
+    fn wrap(prologue: &str, body: &str) -> String {
+        format!(
+            "<o:document-content xmlns:o=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:d=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" xmlns:p=\"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0\" xmlns:s=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" xmlns:x=\"urn:foreign\">{prologue}<o:body><o:presentation>{body}</o:presentation></o:body></o:document-content>"
+        )
+    }
+
+    #[test]
+    fn compact_frames_match_original_spans_and_namespace_scopes() {
+        let fragments = [
+            "",
+            "<d:page/>",
+            "<d:page d:name=\"one\"><x:unknown>A &amp; B</x:unknown></d:page>",
+            "<x:page/><x:foreign/>",
+            "<p:settings/>",
+            "<p:header-decl/>",
+            "<p:footer-decl/>",
+            "<p:date-time-decl/>",
+            "<d:page xmlns:d=\"urn:foreign\"><d:page/></d:page><d:page/>",
+            "<page xmlns=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\"/>",
+            "<x:foreign><d:page/><p:settings/></x:foreign>",
+            "<!-- before --><d:page><![CDATA[<>]]></d:page><?inert tail?>",
+        ];
+        for left in fragments {
+            for right in fragments {
+                let xml = wrap(
+                    "<o:automatic-styles><s:style s:name=\"style-one\"/></o:automatic-styles>",
+                    &format!("{left}{right}"),
+                );
+                compare(&xml);
+                compare(&format!("\u{feff}<?xml version=\"1.0\"?>{xml}"));
+                compare(
+                    &xml.replace("o:", "office:")
+                        .replace("xmlns:o=", "xmlns:office="),
+                );
+            }
+        }
+        for prologue in [
+            "",
+            "<o:automatic-styles/>",
+            "<o:automatic-styles></o:automatic-styles>",
+            "<o:automatic-styles><s:style s:name=\"outer\"><s:style xmlns:s=\"urn:foreign\" s:name=\"inner\"/></s:style><s:style s:name=\"sibling\"/></o:automatic-styles>",
+            "<o:automatic-styles xmlns:o=\"urn:foreign\"/><o:automatic-styles/>",
+            "<automatic-styles xmlns=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"><style xmlns=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" s:name=\"default\"/></automatic-styles>",
+        ] {
+            compare(&wrap(prologue, "<x:before/><d:page/><x:after/>"));
+        }
+    }
+
+    #[test]
+    fn compact_frames_preserve_original_failures_and_fallbacks() {
+        for xml in [
+            "",
+            "<wrong/>",
+            "<x:unknown/>",
+            "<o:document-content/>",
+            "<",
+            "<x></wrong>",
+            "</x>",
+        ] {
+            compare(xml);
+        }
+        for body in [
+            "<d:page>",
+            "<d:page></x:page>",
+            "<d:page broken=\"unterminated>",
+            "<x:foreign><d:page></x:foreign>",
+            "<d:page xmlns:d=\"urn:foreign\"/>",
+            "<d:page a=\"1\" a=\"2\"/>",
+            "<d:page>&unknown;</d:page>",
+        ] {
+            compare(&wrap("", body));
+        }
+        for prologue in [
+            "<o:automatic-styles><s:style s:name=\"&unknown;\"/></o:automatic-styles>",
+            "<o:automatic-styles><s:style s:name=\"one\" s:name=\"two\"/></o:automatic-styles>",
+            "<o:automatic-styles><s:style broken=\"unterminated/></o:automatic-styles>",
+        ] {
+            compare(&wrap(prologue, "<d:page/>"));
+        }
+        compare(&wrap("", "<d:page/>").replace("xmlns:x=\"urn:foreign\"", "xmlns:x=\"&unknown;\""));
+    }
+
+    #[test]
+    fn compact_frames_preserve_original_depth_page_and_byte_limits() {
+        for depth in [MAX_DEPTH - 3, MAX_DEPTH - 2] {
+            let xml = wrap(
+                "",
+                &format!("{}{}", "<x:n>".repeat(depth), "</x:n>".repeat(depth)),
+            );
+            compare(&xml);
+            assert_eq!(ContentSource::parse(&xml).is_err(), depth == MAX_DEPTH - 2);
+        }
+        for pages in [MAX_PAGES, MAX_PAGES + 1] {
+            let xml = wrap("", &"<d:page/>".repeat(pages));
+            compare(&xml);
+            assert_eq!(ContentSource::parse(&xml).is_err(), pages > MAX_PAGES);
+        }
+        compare(&" ".repeat(MAX_XML_BYTES));
+        let oversized = " ".repeat(MAX_XML_BYTES + 1);
+        compare(&oversized);
+        assert!(ContentSource::parse(&oversized).is_err());
+    }
 }

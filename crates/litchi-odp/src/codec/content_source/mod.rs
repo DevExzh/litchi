@@ -11,6 +11,8 @@
 //! synthesise markup for slides the caller actually changed.
 
 mod scanner;
+#[cfg(test)]
+mod scanner_reference;
 
 use litchi_core::{Error, Result};
 use std::collections::{BTreeMap, BTreeSet};

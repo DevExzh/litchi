@@ -1,0 +1,101 @@
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::{BYTE_ORDER_MARK, MAX_XML_BYTES, scanner_reference};
+
+    fn reference(xml: &str) -> Result<Option<ContentSource>> {
+        if xml.len() > MAX_XML_BYTES {
+            return Err(invalid(format!(
+                "presentation content.xml exceeds {MAX_XML_BYTES} bytes"
+            )));
+        }
+        let body = xml.strip_prefix(BYTE_ORDER_MARK).unwrap_or(xml);
+        let has_byte_order_mark = body.len() != xml.len();
+        let mut scanner = scanner_reference::Scanner::new(body);
+        scanner.run()?;
+        Ok(scanner.finish(body, has_byte_order_mark))
+    }
+
+    fn compare(xml: &str) {
+        // Debug includes every private span, root binding, style name and source
+        // byte. The reference retains the original complete scanner unchanged.
+        let normalize = |value: Result<Option<ContentSource>>| {
+            value.map(|source| format!("{source:?}")).map_err(|error| format!("{error:?}"))
+        };
+        assert_eq!(normalize(ContentSource::parse(xml)), normalize(reference(xml)), "{xml:.200}");
+    }
+
+    fn wrap(prologue: &str, body: &str) -> String {
+        format!("<o:document-content xmlns:o=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:d=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" xmlns:p=\"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0\" xmlns:s=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" xmlns:x=\"urn:foreign\">{prologue}<o:body><o:presentation>{body}</o:presentation></o:body></o:document-content>")
+    }
+
+    #[test]
+    fn compact_frames_match_original_spans_and_namespace_scopes() {
+        let fragments = [
+            "", "<d:page/>", "<d:page d:name=\"one\"><x:unknown>A &amp; B</x:unknown></d:page>",
+            "<x:page/><x:foreign/>", "<p:settings/>", "<p:header-decl/>",
+            "<p:footer-decl/>", "<p:date-time-decl/>",
+            "<d:page xmlns:d=\"urn:foreign\"><d:page/></d:page><d:page/>",
+            "<page xmlns=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\"/>",
+            "<x:foreign><d:page/><p:settings/></x:foreign>",
+            "<!-- before --><d:page><![CDATA[<>]]></d:page><?inert tail?>",
+        ];
+        for left in fragments {
+            for right in fragments {
+                let xml = wrap("<o:automatic-styles><s:style s:name=\"style-one\"/></o:automatic-styles>", &format!("{left}{right}"));
+                compare(&xml);
+                compare(&format!("\u{feff}<?xml version=\"1.0\"?>{xml}"));
+                compare(&xml.replace("o:", "office:").replace("xmlns:o=", "xmlns:office="));
+            }
+        }
+        for prologue in [
+            "", "<o:automatic-styles/>", "<o:automatic-styles></o:automatic-styles>",
+            "<o:automatic-styles><s:style s:name=\"outer\"><s:style xmlns:s=\"urn:foreign\" s:name=\"inner\"/></s:style><s:style s:name=\"sibling\"/></o:automatic-styles>",
+            "<o:automatic-styles xmlns:o=\"urn:foreign\"/><o:automatic-styles/>",
+            "<automatic-styles xmlns=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"><style xmlns=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" s:name=\"default\"/></automatic-styles>",
+        ] {
+            compare(&wrap(prologue, "<x:before/><d:page/><x:after/>"));
+        }
+    }
+
+    #[test]
+    fn compact_frames_preserve_original_failures_and_fallbacks() {
+        for xml in ["", "<wrong/>", "<x:unknown/>", "<o:document-content/>", "<", "<x></wrong>", "</x>"] {
+            compare(xml);
+        }
+        for body in [
+            "<d:page>", "<d:page></x:page>", "<d:page broken=\"unterminated>",
+            "<x:foreign><d:page></x:foreign>", "<d:page xmlns:d=\"urn:foreign\"/>",
+            "<d:page a=\"1\" a=\"2\"/>", "<d:page>&unknown;</d:page>",
+        ] {
+            compare(&wrap("", body));
+        }
+        for prologue in [
+            "<o:automatic-styles><s:style s:name=\"&unknown;\"/></o:automatic-styles>",
+            "<o:automatic-styles><s:style s:name=\"one\" s:name=\"two\"/></o:automatic-styles>",
+            "<o:automatic-styles><s:style broken=\"unterminated/></o:automatic-styles>",
+        ] {
+            compare(&wrap(prologue, "<d:page/>"));
+        }
+        compare(&wrap("", "<d:page/>").replace("xmlns:x=\"urn:foreign\"", "xmlns:x=\"&unknown;\""));
+    }
+
+    #[test]
+    fn compact_frames_preserve_original_depth_page_and_byte_limits() {
+        for depth in [MAX_DEPTH - 3, MAX_DEPTH - 2] {
+            let xml = wrap("", &format!("{}{}", "<x:n>".repeat(depth), "</x:n>".repeat(depth)));
+            compare(&xml);
+            assert_eq!(ContentSource::parse(&xml).is_err(), depth == MAX_DEPTH - 2);
+        }
+        for pages in [MAX_PAGES, MAX_PAGES + 1] {
+            let xml = wrap("", &"<d:page/>".repeat(pages));
+            compare(&xml);
+            assert_eq!(ContentSource::parse(&xml).is_err(), pages > MAX_PAGES);
+        }
+        compare(&" ".repeat(MAX_XML_BYTES));
+        let oversized = " ".repeat(MAX_XML_BYTES + 1);
+        compare(&oversized);
+        assert!(ContentSource::parse(&oversized).is_err());
+    }
+}

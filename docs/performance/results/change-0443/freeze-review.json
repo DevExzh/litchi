@@ -1,0 +1,11 @@
+{
+  "status": "disclosed",
+  "issue": "protocol.frozen_utc was inherited from 0442 during scaffolding and is not the 0443 freeze time. The original frozen file is retained unchanged.",
+  "inherited_label": "2026-09-06T16:40:46.920686+00:00",
+  "observed_protocol_file_mtime_utc": "2026-09-06T17:27:34.498868+00:00",
+  "before_build_started_utc": "2026-09-06T17:27:34.645987+00:00",
+  "first_capture_started_utc": "2026-09-06T17:28:53.760594+00:00",
+  "protocol_sha256": "d00167305459619f1c56d353c400b824f90584941aa5845be16d53e39a176614",
+  "bound_first_capture_protocol_sha256": "d00167305459619f1c56d353c400b824f90584941aa5845be16d53e39a176614",
+  "scope": "File mtime is supporting observation, not an immutable timestamp authority. Retained capture/build descriptors bind the unchanged protocol content. No thresholds, lanes or measured attempts were changed."
+}

@@ -1,0 +1,15 @@
+{
+  "status": "pass",
+  "role": "after",
+  "files": [
+    "crates/litchi-odp/src/codec/content_source/scanner.rs",
+    "crates/litchi-odp/src/codec/content_source/mod.rs",
+    "crates/litchi-odp/src/codec/content_source/scanner_reference.rs"
+  ],
+  "source_manifest": {
+    "path": "sources/515cee7acc9d97cf6ba73cd551defa7fcc01f5c6f96deb9dfaf3cc2287571530.json",
+    "sha256": "515cee7acc9d97cf6ba73cd551defa7fcc01f5c6f96deb9dfaf3cc2287571530",
+    "files": 6659
+  },
+  "utc": "2026-09-06T17:41:59.554010+00:00"
+}

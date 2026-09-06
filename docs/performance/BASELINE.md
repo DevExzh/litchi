@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0443: fewer ODP fragment-scanner allocation calls
+
+[0443](changes/0443-odp-compact-fragment-frames.md) replaces copied namespace/local-name frame data
+with exact element classification. The 24-report/720-sample ABBA matrix passes
+the frozen allocation-call gate: medium/large calls fall 14.886%/14.943% in both
+repeats. Requested bytes fall 2.557%/2.663%; peak and retained bytes are unchanged.
+The normal latency gate fails: medium p50 changes -0.606%/+2.460%, large
++0.267%/+1.402%. Two instrumented R1 tail flags and eight repeat flags remain.
+Four profiles, all [measurements](results/change-0443/measurements.md), and the
+inherited freeze-timestamp disclosure are retained. No latency or RSS gain is claimed.
+
 ## Change 0442: faster owned ODP append through shared staging scans
 
 [0442](changes/0442-odp-shared-staging-traversal.md) consolidates settings, declaration and page-metadata

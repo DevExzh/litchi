@@ -1,5 +1,15 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0443 reduces owned ODP append allocation calls
+
+[0443](changes/0443-odp-compact-fragment-frames.md) reuses category 6's opt-in existing-append case.
+Medium/large allocation calls fall 14.886%/14.943%; peak and retained memory
+are unchanged, and no normal latency improvement is claimed. No scenario or
+coverage promotion is added. The registry remains 436 selectors, the default
+matrix 36 cases, and the index 15 categories/33 mappings (10 measured and
+23 correctness-only under its default-baseline contract). Bounded existing
+append, Part addition, repackaging, native breadth, cold/range and scaling stay open.
+
 ## 2026-09-06: change 0442 accelerates the owned ODP append lifecycle
 
 [0442](changes/0442-odp-shared-staging-traversal.md) reuses category 6's opt-in existing-append case.
