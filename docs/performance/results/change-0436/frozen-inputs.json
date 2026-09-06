@@ -1,0 +1,10 @@
+{
+  "status": "frozen",
+  "utc": "2026-09-06T09:17:01.585141+00:00",
+  "files": {
+    "protocol.json": "79a5cbd7ca212a256e51514ec47dff76b883bb2305bd0651f73a906e640d4bf2",
+    "oracle/protocol.json": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+    "oracle/verify-report.py": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+    "check.py": "078b90cb47b6c3d6866c5b62310ec8b8c898283866db5eebf5e1a4e69bd98d45"
+  }
+}

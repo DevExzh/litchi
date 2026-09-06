@@ -1,0 +1,112 @@
+{
+  "ambient_source_manifest": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/runs/B2/formal/B2-normal-medium-r2-resource.log",
+    "/tmp/litchi-goal-0436-binaries/after/normal",
+    "--case",
+    "odt_streaming_create",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/runs/B2/formal/B2-normal-medium-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/runs/B2/formal/B2-normal-medium-r2-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4872,
+      "path": "runs/B2/formal/B2-normal-medium-r2-catalog.json",
+      "sha256": "b84b0149a682b1a9ea7b0d8cc366a6832ee70892a3c89a782f6482509c81b7d7"
+    },
+    "oracle_log": {
+      "bytes": 326,
+      "path": "runs/B2/formal/B2-normal-medium-r2-oracle.log",
+      "sha256": "0060ba14aa02b05dd5d7824bf2c6b067287e6d5b42c2ead30c0bd6058498155a"
+    },
+    "report": {
+      "bytes": 33300,
+      "path": "runs/B2/formal/B2-normal-medium-r2.json",
+      "sha256": "156f77b1f0e7f11713487ee97c6a130c608860864b52367fa94bb6cb92a09599"
+    },
+    "resource_log": {
+      "bytes": 1085,
+      "path": "runs/B2/formal/B2-normal-medium-r2-resource.log",
+      "sha256": "38a908fdd8ae20f2588173d5b873e72263d9616691b6f0f689b02680a260fced"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/B2/formal/B2-normal-medium-r2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 455929328,
+    "path": "/tmp/litchi-goal-0436-binaries/after/normal",
+    "sha256": "dd4e02bda814dce7d6d6fcb13715cb96ff2cfa9e6f730eb1a2e6bd01a61f64ac"
+  },
+  "build_directory": "after",
+  "change": 436,
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "249f5bcdc2836911ad0ad879a0be09a89a9e4bac3622db9d209adc2fd728b3ac",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T09:17:48.835930+00:00",
+  "lane": {
+    "mode": "normal",
+    "repeat": "R2",
+    "shape": "medium"
+  },
+  "name": "B2-normal-medium-r2",
+  "oracle_exit_code": 0,
+  "oracle_protocol_sha256": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+  "oracle_stdout_sha256": "0060ba14aa02b05dd5d7824bf2c6b067287e6d5b42c2ead30c0bd6058498155a",
+  "oracle_verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+  "outside_bundle_status_unchanged": true,
+  "phase": "B2",
+  "protocol_sha256": "79a5cbd7ca212a256e51514ec47dff76b883bb2305bd0651f73a906e640d4bf2",
+  "revision": "524db2696efc77d85f0abdfd5c21f39a6d5ec18a",
+  "role": "after-streaming",
+  "schema": "litchi-0436-capture-receipt-v1",
+  "selector": "odt_streaming_create",
+  "source_after": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "source_before": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "source_manifest": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T09:17:48.144488+00:00",
+  "status": "pass",
+  "status_after": [
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md"
+  ],
+  "verifier_sha256": "409851684c1e68dd43e3950fc9f57797a56260afee71742effa391b460e4b838"
+}

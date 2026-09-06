@@ -1,0 +1,35 @@
+{
+  "change": 436,
+  "baseline_binary_copies_sha256": "ca9dc636f3e8356b5b55fe5248cb2c20e8054a0c6ba4e0b6985ddf3e6ded5c5a",
+  "reuse_reason": "Both baseline binary hashes exactly match change0435 after binaries; Cargo reused their cached build. Retained raw profile was captured before this implementation. Fresh six-lane pilots independently recheck current baseline.",
+  "profiles": {
+    "stat": {
+      "prior_receipt_path": "docs/performance/results/change-0435/profiles/after-streaming/stat/receipt.json",
+      "prior_receipt_sha256": "84110e1629c899ff7ac11ff8d01f415b1f9ae262d75820e546af11eac1889cc0",
+      "prior_revision": "6fc3179646bf812e76845636d9cbec5bf30b278b",
+      "prior_capture_started_utc": "2026-09-06T08:32:49.621961+00:00",
+      "prior_capture_finished_utc": "2026-09-06T08:32:52.163524+00:00",
+      "prior_executable_sha256": "5e75ca3927ba274bfba86af2637c22b5a2985972d81caf6e7578ebed6ac3d97a",
+      "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle",
+      "artifact": {
+        "path": "preparatory/baseline-profile/perf-stat.txt",
+        "sha256": "3559d61f7adb02878e58933284c667004b3e49af3c59fb95c0b0802d7f5438d4",
+        "bytes": 264
+      }
+    },
+    "record": {
+      "prior_receipt_path": "docs/performance/results/change-0435/profiles/after-streaming/record/receipt.json",
+      "prior_receipt_sha256": "429a566486862680d0fb88e5fa34287d2d179e293676a738ebd7cb2e77772cee",
+      "prior_revision": "6fc3179646bf812e76845636d9cbec5bf30b278b",
+      "prior_capture_started_utc": "2026-09-06T08:33:28.837977+00:00",
+      "prior_capture_finished_utc": "2026-09-06T08:34:59.414854+00:00",
+      "prior_executable_sha256": "5e75ca3927ba274bfba86af2637c22b5a2985972d81caf6e7578ebed6ac3d97a",
+      "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle",
+      "artifact": {
+        "path": "preparatory/baseline-profile/perf-report.txt",
+        "sha256": "8df31a4384e41e4890735f98a26a57fc0c6618505b0c39b63812ac80d7d126f0",
+        "bytes": 1702395
+      }
+    }
+  }
+}

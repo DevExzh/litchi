@@ -1,5 +1,24 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0436: lower ODT text-accounting cost
+
+[0436](changes/0436-odt-bounded-text-spans.md) batches ordinary UTF-8 Work
+charges in the private ODT streaming encoder, with scalar fallback at XML and
+Work limits. The same-API ABBA retains 24 reports, 720 samples and four profiles.
+Normal p50 is descriptively lower by 19.382–20.055% for 64 paragraphs,
+29.886–30.156% for 8,192 and 29.602–29.896% for 32,768 across two repeats.
+Exact archive/content/styles/meta/semantic/sink identities hold. All allocator
+vectors match after sample-index alignment; region peak above entry remains
+420,091 bytes. GNU time RSS stays around 84.5–84.7 MB, with no improvement claim.
+
+None of 78 matched comparisons crosses 5%. One repeat flag remains: candidate
+tiny p99 drops 5.489%. Formal consume-self samples change 44.27% → 19.24%;
+profiles include setup and oracle work, so they are not an operation-only
+causal fraction. All 1,002 ODT release tests pass, along with scoped lint,
+docs, formatting and boundary gates. [The bundle](results/change-0436/README.md)
+retains failed attempts, exact driver versions and portable proof. ODP fresh
+creation follows; the original goal remains open.
+
 ## Change 0435: bounded ODT creation and its CPU tradeoff
 
 [0435](changes/0435-odt-bounded-plain-paragraphs.md) adds opt-in `odt_buffered_create` and `odt_streaming_create`

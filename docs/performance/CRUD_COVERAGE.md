@@ -1,5 +1,21 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0436 reduces fresh ODT text accounting
+
+[0436](changes/0436-odt-bounded-text-spans.md) reuses `odt_streaming_create`
+for a matched before/after comparison: 24 reports, 720 samples, four profiles,
+three sizes, normal/allocator modes, two ABBA repeats, CPU 2 and one worker.
+Normal p50 improves descriptively by 19.382–30.156%; every output identity and
+aligned allocator vector remains identical. No matched regression flag crosses
+5%; one tiny p99 repeat varies −5.489%. All 1,002 ODT release tests pass.
+
+Coverage remains the existing fresh plaintext creation and bounded incremental
+generation slice of taxonomy categories 4/6. This private optimization adds no
+rich authoring or existing-document append coverage. ODP fresh creation, Part
+addition, repackaging, native runtime breadth, cold/range I/O and scaling remain
+open. The previous 0435 Builder/streaming tradeoff is historical evidence, not
+a current matched Builder comparison.
+
 ## 2026-09-06: change 0435 measures fresh ODT paragraph streams
 
 [0435](changes/0435-odt-bounded-plain-paragraphs.md) adds scalable buffered and

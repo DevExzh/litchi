@@ -1,0 +1,149 @@
+{
+  "change": 436,
+  "phase": "before-production-implementation",
+  "status": "baseline-evidence-retained",
+  "inputs": {
+    "pilots/before/initial/normal-tiny.json": "1fb647123a04c339a873220658e8ba488bfeaeb1948df67c0e65eedf75d93356",
+    "pilots/before/initial/normal-tiny-receipt.json": "32cc0b1f28799421b4e66dd23a031388538774ea71eb57e8d73a432f056002e1",
+    "pilots/before/initial/allocator-tiny.json": "07bcfd51610da9d8b4f7dbe72f40a1c49170951724378da9f47f41ad916aca56",
+    "pilots/before/initial/allocator-tiny-receipt.json": "34a1473cc34cdf2407aef4948b4f1daf700431d0d320d0cf1dd4d3c9fd4cee76",
+    "pilots/before/initial/normal-medium.json": "90d0d59e6a2e49a8039f5c841238be986cf080cb46285aad8467b928fc52e9f1",
+    "pilots/before/initial/normal-medium-receipt.json": "591ca8bc70d622eb678e090c528df5caefd05178adf56f4827f4e807dadeb01b",
+    "pilots/before/initial/allocator-medium.json": "8db71ddb4899e96a33ffb1966a35243f094b09aedbd9b4737be9a3943945a03b",
+    "pilots/before/initial/allocator-medium-receipt.json": "2790c246dcb610d58aae63d777cffb197b58a9296100d2d6aa248089af804314",
+    "pilots/before/initial/normal-large.json": "59acde23e57ca444f0f525255a883df805a45ccb5e451ec302af98db9153bd98",
+    "pilots/before/initial/normal-large-receipt.json": "5f0d60ff0f9e9b7f89fe79e5042343301b7c0fc1c720b4d85d5f9d8ccd2ae2bb",
+    "pilots/before/initial/allocator-large.json": "61c6c155d9c74d647f8e03e2fa8e351a09d517f10a078283ebfcd43b080d4791",
+    "pilots/before/initial/allocator-large-receipt.json": "53e130b60ca102351f14b82e1276673783a25955230ad710e432ef1e0ee0ac0c",
+    "preparatory/baseline-profile/provenance.json": "cb317b7098dc6880440d3610f6b3d0be93fa97268424d29d7f7d9213ba2c5b74",
+    "preparatory/baseline-profile/perf-stat.txt": "3559d61f7adb02878e58933284c667004b3e49af3c59fb95c0b0802d7f5438d4",
+    "preparatory/baseline-profile/perf-report.txt": "8df31a4384e41e4890735f98a26a57fc0c6618505b0c39b63812ac80d7d126f0"
+  },
+  "rows": [
+    {
+      "shape": "tiny",
+      "paragraphs": 64,
+      "pilot_normal_p50_ns": 175881,
+      "allocation_calls": [
+        577,
+        577,
+        577
+      ],
+      "allocated_bytes": [
+        1692442,
+        1692442,
+        1692442
+      ],
+      "region_peak_above_entry_bytes": [
+        420091,
+        420091,
+        420091
+      ],
+      "operation_live_delta_bytes": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "shape": "medium",
+      "paragraphs": 8192,
+      "pilot_normal_p50_ns": 13726897,
+      "allocation_calls": [
+        51377,
+        51377,
+        51377
+      ],
+      "allocated_bytes": [
+        3041690,
+        3041690,
+        3041690
+      ],
+      "region_peak_above_entry_bytes": [
+        420091,
+        420091,
+        420091
+      ],
+      "operation_live_delta_bytes": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "shape": "large",
+      "paragraphs": 32768,
+      "pilot_normal_p50_ns": 54492248,
+      "allocation_calls": [
+        204977,
+        204977,
+        204977
+      ],
+      "allocated_bytes": [
+        7121306,
+        7121306,
+        7121306
+      ],
+      "region_peak_above_entry_bytes": [
+        420091,
+        420091,
+        420091
+      ],
+      "operation_live_delta_bytes": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "profiles": {
+    "stat": {
+      "prior_receipt_path": "docs/performance/results/change-0435/profiles/after-streaming/stat/receipt.json",
+      "prior_receipt_sha256": "84110e1629c899ff7ac11ff8d01f415b1f9ae262d75820e546af11eac1889cc0",
+      "prior_revision": "6fc3179646bf812e76845636d9cbec5bf30b278b",
+      "prior_capture_started_utc": "2026-09-06T08:32:49.621961+00:00",
+      "prior_capture_finished_utc": "2026-09-06T08:32:52.163524+00:00",
+      "prior_executable_sha256": "5e75ca3927ba274bfba86af2637c22b5a2985972d81caf6e7578ebed6ac3d97a",
+      "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle",
+      "artifact": {
+        "path": "preparatory/baseline-profile/perf-stat.txt",
+        "sha256": "3559d61f7adb02878e58933284c667004b3e49af3c59fb95c0b0802d7f5438d4",
+        "bytes": 264
+      }
+    },
+    "record": {
+      "prior_receipt_path": "docs/performance/results/change-0435/profiles/after-streaming/record/receipt.json",
+      "prior_receipt_sha256": "429a566486862680d0fb88e5fa34287d2d179e293676a738ebd7cb2e77772cee",
+      "prior_revision": "6fc3179646bf812e76845636d9cbec5bf30b278b",
+      "prior_capture_started_utc": "2026-09-06T08:33:28.837977+00:00",
+      "prior_capture_finished_utc": "2026-09-06T08:34:59.414854+00:00",
+      "prior_executable_sha256": "5e75ca3927ba274bfba86af2637c22b5a2985972d81caf6e7578ebed6ac3d97a",
+      "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle",
+      "artifact": {
+        "path": "preparatory/baseline-profile/perf-report.txt",
+        "sha256": "8df31a4384e41e4890735f98a26a57fc0c6618505b0c39b63812ac80d7d126f0",
+        "bytes": 1702395
+      },
+      "top_self_rows": [
+        "45.74%  normal   normal                              [.] <litchi_core::execution::ExecutionContext>::consume",
+        "10.28%  normal   normal                              [.] sha2::sha256::x86_sha::compress",
+        "6.39%  normal   normal                              [.] xml_minifier::audit::verify_with_policy",
+        "5.75%  normal   libc.so.6                           [.] __memset_avx512_unaligned_erms",
+        "3.85%  normal   normal                              [.] litchi_odf_common::core::generated_xml::validate_fragment_shape",
+        "3.35%  normal   normal                              [.] crc32fast::baseline::update_fast_16",
+        "2.94%  normal   normal                              [.] zlib_rs::deflate::algorithm::medium::deflate_medium",
+        "1.85%  normal   normal                              [.] zlib_rs::deflate::longest_match::longest_match",
+        "1.58%  normal   normal                              [.] litchi_odt::streaming::validate_plain_text",
+        "1.49%  normal   normal                              [.] <litchi_core::execution::ExecutionContext>::check",
+        "1.09%  normal   normal                              [.] alloc::fmt::format::format_inner",
+        "0.95%  normal   libc.so.6                           [.] malloc",
+        "0.91%  normal   normal                              [.] core::str::converts::from_utf8",
+        "0.88%  normal   libc.so.6                           [.] __memmove_avx512_unaligned_erms",
+        "0.86%  normal   normal                              [.] <quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+      ],
+      "addr2line_warning_count": 8
+    }
+  },
+  "hypothesis": "Batch already-safe ordinary UTF-8 into borrowed spans of at most 256 bytes to reduce repeated hierarchical Work charges and scratch writes; preserve scalar cancellation polling and scalar fallback at XML and Work limits.",
+  "claim_limits": "Three-sample fresh pilots are preparatory observations. Prior whole-process profile is reused only because both current baseline executable hashes exactly match 0435 after binaries; it includes setup, hashing, warmups, samples and oracle. A 45.74% consume self share motivates measurement but does not establish an operation-only causal fraction. No latency gain or RSS improvement is yet claimed."
+}

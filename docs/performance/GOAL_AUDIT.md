@@ -1,6 +1,23 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0435
+## Current evidence through 0436
+
+[0436](changes/0436-odt-bounded-text-spans.md) retains measured private ODT
+ordinary-text batching: 24 formal reports, 720 samples, four profiles and
+1,002 passing ODT tests. Normal p50 is 19.382–30.156% lower across three sizes
+and two repeats, with exact archive/sink identities and identical aligned
+allocator vectors. Region peak above entry remains 420,091 bytes; RSS is
+unchanged in practice. No matched comparison crosses 5%; candidate tiny p99
+repeat drift of −5.489% remains visible. Formal whole-process consume-self
+share falls 44.27% → 19.24%; the scope includes setup and oracle work.
+
+The immediate ODT accounting hypothesis is now measured. Next establish ODP
+fresh creation evidence. Rich authoring, logical append, Part addition,
+repackaging, native compatibility breadth, cold/range I/O, scalable parallelism
+and the other original completion criteria remain open. The original user goal
+is unmodified, and this batch neither completes nor narrows it.
+
+## Earlier evidence through 0435
 
 [0435](changes/0435-odt-bounded-plain-paragraphs.md) implements bounded fresh
 plaintext ODT publication and retains 36 formal reports, 1,080 samples, six

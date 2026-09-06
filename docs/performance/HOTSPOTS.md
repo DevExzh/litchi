@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## Change 0436: ODT Work batching measured
+
+[0436](changes/0436-odt-bounded-text-spans.md) closes the immediate ODT
+ordinary-scalar accounting hypothesis. The bounded borrowed-span encoder
+reduces normal p50 by 19.382–30.156% across three sizes and two repeats while
+retaining exact output/sink identities and identical aligned allocator vectors.
+Operation peak above entry stays 420,091 bytes; no matched regression flag
+crosses 5%, and one tiny p99 repeat drift (−5.489%) remains visible.
+
+Fresh whole-process consume self share falls 44.27% → 19.24%; SHA hashing
+(13.70%), XML audit (8.28%), memset (8.16%) and fragment validation (6.31%)
+remain visible. These scopes include setup/oracle work and cannot establish an
+operation-only Amdahl fraction. Preserve validation unless equivalent proof
+supports further work removal. Next establish ODP fresh creation evidence;
+existing append, Part addition, repackaging, native breadth and cold/range/
+scaling remain open. The following 0435 entry records the original hypothesis.
+
 ## Change 0435: ODT streaming execution accounting
 
 [0435](changes/0435-odt-bounded-plain-paragraphs.md) removes whole-document

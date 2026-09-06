@@ -1,0 +1,81 @@
+{
+  "change": 436,
+  "decision": "retain",
+  "summary_sha256": "6504254549c494020d13f177f94f0bf5616e91dc0b80fe5c9eacfba763d70ffd",
+  "reason": "Both repeats show practically useful lower normal p50 at all three sizes with separated descriptive within-report intervals, exact archive/sink identity, identical allocator vectors and no matched regression flag.",
+  "comparisons": [
+    {
+      "shape": "tiny",
+      "repeat": "R1",
+      "before_p50_ns": 168175.5,
+      "after_p50_ns": 135580.5,
+      "p50_reduction_percent": 19.38153892808405,
+      "descriptive_bootstrap_intervals_separated": true,
+      "allocator_vectors_equal_by_sample_index": true
+    },
+    {
+      "shape": "tiny",
+      "repeat": "R2",
+      "before_p50_ns": 170406,
+      "after_p50_ns": 136231,
+      "p50_reduction_percent": 20.055045010152227,
+      "descriptive_bootstrap_intervals_separated": true,
+      "allocator_vectors_equal_by_sample_index": true
+    },
+    {
+      "shape": "medium",
+      "repeat": "R1",
+      "before_p50_ns": 13737551,
+      "after_p50_ns": 9594911.5,
+      "p50_reduction_percent": 30.155589595263375,
+      "descriptive_bootstrap_intervals_separated": true,
+      "allocator_vectors_equal_by_sample_index": true
+    },
+    {
+      "shape": "medium",
+      "repeat": "R2",
+      "before_p50_ns": 13649905,
+      "after_p50_ns": 9570542.5,
+      "p50_reduction_percent": 29.885647555788854,
+      "descriptive_bootstrap_intervals_separated": true,
+      "allocator_vectors_equal_by_sample_index": true
+    },
+    {
+      "shape": "large",
+      "repeat": "R1",
+      "before_p50_ns": 54250537,
+      "after_p50_ns": 38191235,
+      "p50_reduction_percent": 29.602106980065468,
+      "descriptive_bootstrap_intervals_separated": true,
+      "allocator_vectors_equal_by_sample_index": true
+    },
+    {
+      "shape": "large",
+      "repeat": "R2",
+      "before_p50_ns": 54693847,
+      "after_p50_ns": 38342484.5,
+      "p50_reduction_percent": 29.896164553939673,
+      "descriptive_bootstrap_intervals_separated": true,
+      "allocator_vectors_equal_by_sample_index": true
+    }
+  ],
+  "matched_comparison_count": 78,
+  "matched_regression_flags": [],
+  "repeat_comparison_count": 78,
+  "repeat_flags": [
+    {
+      "flagged": true,
+      "higher_is_regression": true,
+      "metric": "elapsed_ns.p99",
+      "mode": "normal",
+      "r1": 153941.0,
+      "r2": 145491.0,
+      "relative_percent": -5.489115960010653,
+      "role": "after-streaming",
+      "scope": "within_role_repeat_drift",
+      "shape": "tiny",
+      "threshold_percent": 5.0
+    }
+  ],
+  "scope": "One named deterministic fresh-ODT scenario on one machine, one worker and warm in-memory inputs. Intervals resample 30 within-process observations; two repeats are not broad independent-run inference. No universal speedup, RSS, native, cold/range, copy-count or parallel-scaling claim."
+}

@@ -1,0 +1,112 @@
+{
+  "ambient_source_manifest": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/runs/A2/formal/A2-allocator-tiny-r2-resource.log",
+    "/tmp/litchi-goal-0436-binaries/before/allocator",
+    "--case",
+    "odt_streaming_create",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/runs/A2/formal/A2-allocator-tiny-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0436/runs/A2/formal/A2-allocator-tiny-r2-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4845,
+      "path": "runs/A2/formal/A2-allocator-tiny-r2-catalog.json",
+      "sha256": "acc5b6fb5e4c6d3951c15bd33a4393a5f6d86bc235b171ce9d963c9dc93c7e8c"
+    },
+    "oracle_log": {
+      "bytes": 328,
+      "path": "runs/A2/formal/A2-allocator-tiny-r2-oracle.log",
+      "sha256": "b94553b4e5d6b52d7081268935de07ac82c32d811ea10eb84093ecb5badd4ca4"
+    },
+    "report": {
+      "bytes": 42148,
+      "path": "runs/A2/formal/A2-allocator-tiny-r2.json",
+      "sha256": "22441b5bd2474032585226aaf08695eb7451bef3ab4a40997163b8f3a9b4949a"
+    },
+    "resource_log": {
+      "bytes": 1090,
+      "path": "runs/A2/formal/A2-allocator-tiny-r2-resource.log",
+      "sha256": "9ce0a72ff1740ce32c5c5b46ba45f19c2b339ec6c492d6c8ff039ffc08fdb10e"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/A2/formal/A2-allocator-tiny-r2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 455327872,
+    "path": "/tmp/litchi-goal-0436-binaries/before/allocator",
+    "sha256": "ac28180dee6d87f34bd26ab66105b1e2e98e91c79e655ccfb3fbd987bfdf4d63"
+  },
+  "build_directory": "before",
+  "change": 436,
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "249f5bcdc2836911ad0ad879a0be09a89a9e4bac3622db9d209adc2fd728b3ac",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T09:18:10.659679+00:00",
+  "lane": {
+    "mode": "allocator",
+    "repeat": "R2",
+    "shape": "tiny"
+  },
+  "name": "A2-allocator-tiny-r2",
+  "oracle_exit_code": 0,
+  "oracle_protocol_sha256": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+  "oracle_stdout_sha256": "b94553b4e5d6b52d7081268935de07ac82c32d811ea10eb84093ecb5badd4ca4",
+  "oracle_verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+  "outside_bundle_status_unchanged": true,
+  "phase": "A2",
+  "protocol_sha256": "79a5cbd7ca212a256e51514ec47dff76b883bb2305bd0651f73a906e640d4bf2",
+  "revision": "4eb78e97ddafa97bf527383d7a59c4b0249d279d",
+  "role": "before-streaming",
+  "schema": "litchi-0436-capture-receipt-v1",
+  "selector": "odt_streaming_create",
+  "source_after": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "source_before": {
+    "files": 6650,
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0"
+  },
+  "source_manifest": {
+    "files": 6649,
+    "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+    "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T09:18:10.322856+00:00",
+  "status": "pass",
+  "status_after": [
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md"
+  ],
+  "verifier_sha256": "409851684c1e68dd43e3950fc9f57797a56260afee71742effa391b460e4b838"
+}

@@ -1,0 +1,71 @@
+{
+  "change": 436,
+  "role": "after",
+  "revision": "524db2696efc77d85f0abdfd5c21f39a6d5ec18a",
+  "created_utc": "2026-09-06T09:16:25.485387+00:00",
+  "source_manifest": {
+    "path": "sources/e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0.json",
+    "sha256": "e446903afc637d5f56e2ce291ba3a841241431995de1e24077c9e6c3d9f213f0",
+    "files": 6650
+  },
+  "protocol_sha256": "79a5cbd7ca212a256e51514ec47dff76b883bb2305bd0651f73a906e640d4bf2",
+  "verifier_sha256": "409851684c1e68dd43e3950fc9f57797a56260afee71742effa391b460e4b838",
+  "outer_verifier_sha256": "409851684c1e68dd43e3950fc9f57797a56260afee71742effa391b460e4b838",
+  "capture_driver_sha256": "249f5bcdc2836911ad0ad879a0be09a89a9e4bac3622db9d209adc2fd728b3ac",
+  "profile_driver_sha256": "2837862b3a329f70c36103a0b817d6f88ed0d6fc014c2eb334a73f109b3cf70c",
+  "oracle_protocol_sha256": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+  "oracle_verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0436-binaries/after/normal",
+      "sha256": "dd4e02bda814dce7d6d6fcb13715cb96ff2cfa9e6f730eb1a2e6bd01a61f64ac",
+      "bytes": 455929328
+    },
+    "allocator": {
+      "path": "/tmp/litchi-goal-0436-binaries/after/allocator",
+      "sha256": "68bbc2abbd636cc06772cde3e51bb31d83baca6de50542025ea5a08116d124cf",
+      "bytes": 455269608
+    }
+  },
+  "build_receipt": "checks/after-build.json",
+  "build_receipt_sha256": "a3e4fd294919c5958f948185c5c3568d344f2002138c645aa11da0414d1e5769",
+  "binary_copies_receipt": "after/binary-copies.json",
+  "binary_copies_receipt_sha256": "da0bb7df2a5a5717a7973dabb349fe49268579bdef0f852c45ad02da6c573b85",
+  "check_driver_sha256": "078b90cb47b6c3d6866c5b62310ec8b8c898283866db5eebf5e1a4e69bd98d45",
+  "build_argv": [
+    "env",
+    "RUSTFLAGS=-Cforce-frame-pointers=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG=1",
+    "cargo",
+    "build",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline",
+    "--bin",
+    "litchi-perf-baseline-alloc"
+  ],
+  "build_environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "rustflags": "-Cforce-frame-pointers=yes",
+  "release_debug": 1,
+  "rust_toolchain": "1.98.1",
+  "profile": "release",
+  "source_scope": "workspace and standalone tools",
+  "capture_script_frozen": true,
+  "driver_hashes": {
+    "verify.py": "409851684c1e68dd43e3950fc9f57797a56260afee71742effa391b460e4b838",
+    "capture.py": "249f5bcdc2836911ad0ad879a0be09a89a9e4bac3622db9d209adc2fd728b3ac",
+    "profile.py": "2837862b3a329f70c36103a0b817d6f88ed0d6fc014c2eb334a73f109b3cf70c",
+    "oracle/protocol.json": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+    "oracle/verify-report.py": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1"
+  }
+}
