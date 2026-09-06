@@ -2966,6 +2966,47 @@ IWA_KEYNOTE_SLIDE_MEDIA_DATA_RETIRED_CALL = re.compile(
     r"(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
 
+# The focused lifecycle owner now owns the selector-first duplicate/remove
+# operations.  The compatibility host may keep its generic media creation,
+# listing, and replacement paths, but these four raw-ID entry points and their
+# removed result types must not return through a wrapper, alias, or re-export.
+# Keep this inventory separate from the focused Package methods: this audit
+# walks only ``litchi-iwa`` host/example source, so same-named methods in the
+# focused package remain legal by construction.
+IWA_KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RETIRED_METHODS = frozenset(
+    {
+        "duplicate_slide_movie",
+        "remove_slide_movie",
+        "duplicate_slide_audio",
+        "remove_slide_audio",
+    }
+)
+# These are private host algorithms, rather than public focused Package
+# methods. Keep their definitions on the host retirement ratchet while
+# allowing generic call sites and the focused Package implementation to use
+# the semantic ``duplicate/remove_slide_media`` names.
+IWA_KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RETIRED_HOST_DEFINITIONS = frozenset(
+    IWA_KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RETIRED_METHODS
+    | {"duplicate_slide_media", "remove_slide_media"}
+)
+IWA_KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RETIRED_TYPES = frozenset(
+    {"RemovedKeynoteSlideMovie", "RemovedKeynoteSlideAudio"}
+)
+IWA_KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RETIRED_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>duplicate_slide_movie|"
+    r"remove_slide_movie|duplicate_slide_audio|remove_slide_audio)"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+IWA_KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RETIRED_TYPE = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?P<type>RemovedKeynoteSlideMovie|"
+    r"RemovedKeynoteSlideAudio)(?![A-Za-z0-9_])"
+)
+IWA_KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_RESTORATION = re.compile(
+    r"(?m)(?:^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?slide_media_lifecycle[ \t]*;|"
+    r"^[ \t]*pub[ \t]+use[^;\n]*\bslide_media_lifecycle\b)"
+)
+
 # The next lifecycle seam owns movie/audio duplication and removal in the
 # focused Keynote package.  Keep this inventory separate from the existing
 # replacement owner: replacement already crossed its host-retirement gate,
@@ -56000,6 +56041,100 @@ def audit_iwa_keynote_slide_media_data_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_keynote_slide_media_lifecycle_retirement_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire the raw-ID movie/audio lifecycle host surface.
+
+    The focused ``Package`` keeps selector-first methods with the same
+    semantic names, so only the compatibility host and its examples are
+    inspected here.  Test-only ``tests.rs`` modules are included from a
+    ``cfg(test)`` parent and may exercise the focused package directly; the
+    production source scanner therefore skips those files while still
+    masking embedded test items in ordinary modules.  Generic creation,
+    listing, replacement, and calls to ``duplicate/remove_slide_media`` are
+    deliberately outside this exact inventory; their private host algorithm
+    definitions are retired along with the raw-ID wrappers.
+    """
+
+    if not _keynote_slide_media_lifecycle_owner_present(root):
+        return []
+
+    source_roots = [root / IWA_KEYNOTE_SOURCE_ROOT]
+    examples = root / IWA_CORE_EXAMPLE_SOURCE_ROOT
+    if examples.is_dir():
+        source_roots.append(examples)
+
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    violations: list[str] = []
+
+    for source_root in source_roots:
+        if not source_root.is_dir():
+            continue
+        for path in sorted(source_root.rglob("*.rs")):
+            # This one file is included by a cfg(test) parent and calls the
+            # focused Package methods directly. Keep the exemption exact so
+            # a newly added test-only host wrapper elsewhere cannot bypass
+            # the retirement ratchet.
+            if path == root / IWA_KEYNOTE_EDITOR_TEST_SOURCE:
+                continue
+            raw = path.read_text(encoding="utf-8")
+            source = _mask_rust_non_code(_mask_rust_cfg_test_items(raw))
+
+            for match in declaration.finditer(source):
+                name = match.group(1)
+                if name not in IWA_KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RETIRED_HOST_DEFINITIONS:
+                    continue
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote slide-media lifecycle method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+            for match in IWA_KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RETIRED_CALL.finditer(
+                source
+            ):
+                line_start = source.rfind("\n", 0, match.start()) + 1
+                line_end = source.find("\n", match.end())
+                line_end = len(source) if line_end < 0 else line_end
+                line = source[line_start:line_end]
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                    line,
+                ):
+                    continue
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote slide-media lifecycle call "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+
+            for match in IWA_KEYNOTE_SLIDE_MEDIA_LIFECYCLE_RETIRED_TYPE.finditer(
+                source
+            ):
+                line_number = source.count("\n", 0, match.start("type")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote slide-media lifecycle type "
+                    f"{match.group('type')}: {path.relative_to(root)}:{line_number}"
+                )
+
+            restoration = IWA_KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_RESTORATION.search(
+                source
+            )
+            if restoration is not None:
+                line_number = source.count("\n", 0, restoration.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote slide-media lifecycle owner "
+                    f"restoration: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def _keynote_movie_geometry_owner_present(root: Path) -> bool:
     """Return whether the Wave87 geometry owner has crossed its activation seam."""
 
@@ -63132,6 +63267,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_slide_media_data_metadata_boundary_source_topology()
         + audit_keynote_slide_media_data_resource_source_topology()
         + audit_keynote_slide_media_data_transaction_source_topology()
+        + audit_iwa_keynote_slide_media_lifecycle_retirement_source_topology()
         + audit_keynote_slide_media_lifecycle_facade_source_topology()
         + audit_keynote_slide_media_lifecycle_codec_source_topology()
         + audit_keynote_slide_media_lifecycle_transaction_source_topology()

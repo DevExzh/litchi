@@ -1,11 +1,16 @@
 use super::*;
+use std::time::Duration;
+
 use crate::archive::{Archive, ArchiveObject, FieldInfo, FieldPath};
+use crate::keynote::KeynoteDocumentBuilder;
 use crate::media::MediaAssetId;
 use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
 use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Reference, Uuid};
 use crate::protobuf::tswp::StorageArchive;
 use crate::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::shape::geometry::{Point as GeometryPoint, Size as GeometrySize};
 use litchi_keynote::slide::media::MovieKind;
+use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 use litchi_keynote::slide::placeholder::{
     Kind as FocusedPlaceholderKind, State as FocusedPlaceholderState,
 };
@@ -37,6 +42,12 @@ fn focused_placeholder_visibility(
         .unwrap()
         .slide_placeholder_visibility(SlideSelector::index(slide_index), kind)
         .unwrap()
+}
+
+fn reopen_focused_package(editor: &mut KeynoteEditor, package: &FocusedKeynotePackage) {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).unwrap();
+    *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
 }
 
 #[test]
@@ -3034,8 +3045,8 @@ fn static_layout_movies_remain_template_only_for_update_and_creation() {
 }
 
 #[test]
-fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_slide_movie()).unwrap();
+fn hand_built_slide_movie_admission_rejection_is_transactional() {
+    let editor = KeynoteEditor::from_package(test_package_with_slide_movie()).unwrap();
     let movies = editor.slide_movies(0).unwrap();
     assert_eq!(movies.len(), 1);
     let original = movies[0].clone();
@@ -3061,18 +3072,103 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
 
     let baseline = editor.to_bytes().unwrap();
     let package = FocusedKeynotePackage::from_bytes(&baseline).unwrap();
-    // This hand-built compatibility fixture is outside the focused owner’s
-    // admitted graph. Keep the host fail-closed and prove the rejection is
-    // atomic; package-owned integration tests cover successful lifecycle edits.
     assert!(
         package
             .edit_slide_movie_geometry(SlideSelector::index(0), MovieSelector::index(0))
             .is_err()
     );
+    assert!(
+        package
+            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .is_err()
+    );
+    assert!(
+        package
+            .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
 
-    let duplicate = editor.duplicate_slide_movie(0, 70).unwrap();
-    assert_ne!(duplicate.drawable_object_id, 70);
+#[test]
+fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let created = editor
+        .add_slide_movie(
+            0,
+            "movie.mov",
+            TEST_MOVIE_VIDEO,
+            "poster.png",
+            TEST_MOVIE_POSTER,
+            SlideMovieOptions::new(
+                GeometryPoint { x: 100.0, y: 200.0 },
+                GeometrySize {
+                    width: 800.0,
+                    height: 300.0,
+                },
+                Duration::from_secs(5),
+            )
+            .unwrap()
+            .with_natural_size(GeometrySize {
+                width: 800.0,
+                height: 300.0,
+            })
+            .unwrap(),
+        )
+        .unwrap();
+    let source_chunk_id = editor
+        .slide_builds(0)
+        .unwrap()
+        .into_iter()
+        .find(|build| build.drawable_object_id == created.drawable_object_id)
+        .and_then(|build| build.chunks.into_iter().next())
+        .map(|chunk| chunk.object_id)
+        .expect("source-built movie has an automatic playback chunk");
+    let movie_data_id = created
+        .movie_data_identifier
+        .expect("source-built movie has content media");
+    let poster_data_id = created
+        .poster_image_data_identifier
+        .expect("source-built movie has poster media");
+    let movies = editor.slide_movies(0).unwrap();
+    assert_eq!(movies.len(), 1);
+    let original = movies[0].clone();
+    assert_eq!(original.kind, MovieKind::File);
+    assert_eq!(original.drawable_object_id, created.drawable_object_id);
+    assert_eq!(original.movie_data_identifier, Some(movie_data_id));
+    assert_eq!(original.poster_image_data_identifier, Some(poster_data_id));
+    assert_eq!(
+        original.original_size,
+        Some(DrawableSize {
+            width: 800.0,
+            height: 300.0,
+        })
+    );
+    assert_eq!(
+        original.natural_size,
+        Some(DrawableSize {
+            width: 800.0,
+            height: 300.0,
+        })
+    );
+    assert_eq!(editor.slide_builds(0).unwrap()[0].chunks.len(), 1);
+
+    let baseline = editor.to_bytes().unwrap();
+    let package = FocusedKeynotePackage::from_bytes(&baseline).unwrap();
+    let duplicate_commit = package
+        .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+        .unwrap();
+    let inverse = duplicate_commit.patch().inverse();
+    let restored = duplicate_commit
+        .package()
+        .apply_slide_media_lifecycle(&inverse)
+        .unwrap();
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes).unwrap();
+    assert_eq!(restored_bytes, baseline);
+    reopen_focused_package(&mut editor, duplicate_commit.package());
+    let duplicate = editor.slide_movies(0).unwrap()[1].clone();
+    assert_ne!(duplicate.drawable_object_id, original.drawable_object_id);
     assert_eq!(
         duplicate.movie_data_identifier,
         original.movie_data_identifier
@@ -3094,7 +3190,11 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     assert_eq!(duplicate_build.chunks.len(), 1);
     let graph = ObjectGraph::read(editor.package()).unwrap();
     let source_chunk: kn::BuildChunkArchive = graph
-        .decode_type(74, BUILD_CHUNK_MESSAGE_TYPE, "KN.BuildChunkArchive")
+        .decode_type(
+            source_chunk_id,
+            BUILD_CHUNK_MESSAGE_TYPE,
+            "KN.BuildChunkArchive",
+        )
         .unwrap();
     let cloned_chunk: kn::BuildChunkArchive = graph
         .decode_type(
@@ -3112,53 +3212,58 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
             .and_then(|identifier| identifier.build_id)
     );
     let assets = editor.media_assets().unwrap();
-    for raw_identifier in [1, 2] {
-        let identifier = MediaAssetId::try_from(raw_identifier).expect("valid media ID");
+    for identifier in [movie_data_id, poster_data_id] {
         let asset = assets
             .iter()
             .find(|asset| asset.data_identifier == identifier)
-            .unwrap_or_else(|| panic!("missing media {raw_identifier} in {assets:?}"));
+            .unwrap_or_else(|| panic!("missing media {identifier:?} in {assets:?}"));
         assert_eq!(asset.component_reference_count, 2);
         assert_eq!(asset.message_reference_count, 2);
     }
 
     assert_eq!(
         editor
-            .replace_media(asset_id(1), TEST_MOVIE_VIDEO_REPLACEMENT)
+            .replace_media(movie_data_id, TEST_MOVIE_VIDEO_REPLACEMENT)
             .unwrap(),
         TEST_MOVIE_VIDEO
     );
     assert_eq!(
-        editor.extract_media(asset_id(1)).unwrap(),
+        editor.extract_media(movie_data_id).unwrap(),
         TEST_MOVIE_VIDEO_REPLACEMENT
     );
     assert_eq!(
         editor
-            .replace_media(asset_id(2), TEST_MOVIE_POSTER_REPLACEMENT)
+            .replace_media(poster_data_id, TEST_MOVIE_POSTER_REPLACEMENT)
             .unwrap(),
         TEST_MOVIE_POSTER
     );
     assert_eq!(
-        editor.extract_media(asset_id(2)).unwrap(),
+        editor.extract_media(poster_data_id).unwrap(),
         TEST_MOVIE_POSTER_REPLACEMENT
     );
 
-    let removed_duplicate = editor
-        .remove_slide_movie(0, duplicate.drawable_object_id)
+    let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let removed_duplicate = package
+        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(1))
         .unwrap();
-    assert!(removed_duplicate.removed_data_identifiers.is_empty());
+    assert_eq!(removed_duplicate.diagnostics().removed_data(), 0);
+    reopen_focused_package(&mut editor, removed_duplicate.package());
     let remaining = editor.slide_movies(0).unwrap();
     assert_eq!(remaining.len(), 1);
     assert_eq!(remaining[0], original);
     assert_eq!(editor.media_assets().unwrap().len(), 2);
     assert_eq!(editor.slide_builds(0).unwrap().len(), 1);
 
-    let removed_original = editor.remove_slide_movie(0, 70).unwrap();
-    assert_eq!(removed_original.movie, original);
-    assert_eq!(
-        removed_original.removed_data_identifiers,
-        [asset_id(1), asset_id(2)]
-    );
+    let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let removed_original = package
+        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+        .unwrap();
+    assert_eq!(removed_original.patch().kind(), MovieKind::File);
+    assert_eq!(removed_original.patch().movie_position().get(), 0);
+    assert_eq!(removed_original.patch().source_media_count(), 1);
+    assert_eq!(removed_original.patch().target_media_count(), 0);
+    assert_eq!(removed_original.diagnostics().removed_data(), 2);
+    reopen_focused_package(&mut editor, removed_original.package());
     assert!(editor.slide_movies(0).unwrap().is_empty());
     assert!(editor.slide_builds(0).unwrap().is_empty());
     assert!(editor.media_assets().unwrap().is_empty());
@@ -3175,8 +3280,17 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
             .slide_movie_geometry(SlideSelector::index(0), MovieSelector::index(9))
             .is_err()
     );
-    assert!(editor.duplicate_slide_movie(0, 5).is_err());
-    assert!(editor.remove_slide_movie(0, 5).is_err());
+    let package = FocusedKeynotePackage::from_bytes(&before).unwrap();
+    assert!(
+        package
+            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(9))
+            .is_err()
+    );
+    assert!(
+        package
+            .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(9))
+            .is_err()
+    );
     assert!(
         editor
             .replace_media(asset_id(1), TEST_MOVIE_POSTER)
@@ -3204,14 +3318,15 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
             .edit_slide_movie_geometry(SlideSelector::index(0), MovieSelector::index(0))
             .is_err()
     );
+    let package = FocusedKeynotePackage::from_bytes(&before).unwrap();
     assert!(
-        placeholder
-            .duplicate_slide_movie(0, movie.drawable_object_id)
+        package
+            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
             .is_err()
     );
     assert!(
-        placeholder
-            .remove_slide_movie(0, movie.drawable_object_id)
+        package
+            .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
             .is_err()
     );
     assert_eq!(placeholder.to_bytes().unwrap(), before);

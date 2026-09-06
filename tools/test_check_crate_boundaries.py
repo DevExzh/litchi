@@ -19274,6 +19274,122 @@ fn rewrite_movie_title_operation(
         ):
             self.assertIn(expression, main_source)
 
+    def test_keynote_slide_media_lifecycle_host_retires_raw_id_surface_only(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_media_lifecycle_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+
+            # Same-named methods belong to the focused Package owner.  The
+            # host audit deliberately does not inspect that package, and the
+            # host's cfg(test)-included integration file may call it directly.
+            focused_tests = root / "crates/litchi-iwa/src/keynote/editor/tests.rs"
+            focused_tests.parent.mkdir(parents=True, exist_ok=True)
+            focused_tests.write_text(
+                "fn focused_package_calls() {\n"
+                "    let package = FocusedKeynotePackage::from_bytes(bytes).unwrap();\n"
+                "    package.duplicate_slide_movie(slide, movie);\n"
+                "    package.remove_slide_audio(slide, audio);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            other_tests = root / "crates/litchi-iwa/src/keynote/other/tests.rs"
+            other_tests.parent.mkdir(parents=True, exist_ok=True)
+            other_tests.write_text(
+                "fn stale_test_wrapper(editor: &mut KeynoteEditor) {\n"
+                "    editor.remove_slide_movie(slide, movie);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_media_lifecycle_retirement_source_topology(
+                root
+            )
+            self.assertTrue(any("other/tests.rs" in item for item in violations), violations)
+            other_tests.write_text(
+                "fn generic_test_helper(editor: &mut KeynoteEditor) {\n"
+                "    editor.duplicate_slide_media(slide, media);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            host = root / "crates/litchi-iwa/src/keynote/editor.rs"
+            host.write_text(
+                "impl KeynoteEditor {\n"
+                "    fn create_media(&mut self) { self.duplicate_slide_media(slide, media); }\n"
+                "    fn remove_media(&mut self) { self.remove_slide_media(slide, media); }\n"
+                "    fn read_media(&self) { self.slide_movies(slide); self.slide_audio(slide); }\n"
+                "    fn replace_media(&mut self) { self.replace_slide_movie_data(slide, movie, data); }\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn cfg_test_decoy() { editor.remove_slide_movie(slide, movie); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_media_lifecycle_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            host.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn duplicate_slide_movie(&mut self, slide: usize, movie: u64) {}\n"
+                "    fn wrapped_remove(&mut self, slide: usize, audio: u64) {\n"
+                "        self.remove_slide_audio(slide, audio);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_media_lifecycle_retirement_source_topology(
+                root
+            )
+            self.assertTrue(any("duplicate_slide_movie" in item for item in violations), violations)
+            self.assertTrue(any("remove_slide_audio" in item for item in violations), violations)
+
+            host.write_text(
+                "pub use slide_audio::RemovedKeynoteSlideAudio;\n"
+                "pub use slide_movies::RemovedKeynoteSlideMovie;\n"
+                "mod slide_media_lifecycle;\n"
+                "pub use crate::slide_media_lifecycle::LifecycleCommit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_media_lifecycle_retirement_source_topology(
+                root
+            )
+            self.assertTrue(any("RemovedKeynoteSlideAudio" in item for item in violations), violations)
+            self.assertTrue(any("RemovedKeynoteSlideMovie" in item for item in violations), violations)
+            self.assertTrue(any("owner restoration" in item for item in violations), violations)
+
+            stale_example = root / "crates/litchi-iwa/examples/stale_keynote_media.rs"
+            stale_example.parent.mkdir(parents=True, exist_ok=True)
+            stale_example.write_text(
+                "fn stale(editor: &mut KeynoteEditor) {\n"
+                "    editor.remove_slide_movie(slide, movie);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_media_lifecycle_retirement_source_topology(
+                root
+            )
+            self.assertTrue(any("remove_slide_movie" in item for item in violations), violations)
+
+            host.write_text(
+                "fn duplicate_slide_media(source: &ArchiveObject) {}\n"
+                "fn remove_slide_media(source: &ArchiveObject) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_media_lifecycle_retirement_source_topology(
+                root
+            )
+            self.assertTrue(any("duplicate_slide_media" in item for item in violations), violations)
+            self.assertTrue(any("remove_slide_media" in item for item in violations), violations)
+
     def test_keynote_slide_media_lifecycle_audits_are_dormant_until_owner_activation(
         self,
     ) -> None:
@@ -20112,6 +20228,7 @@ fn rewrite_movie_title_operation(
     def test_keynote_slide_media_lifecycle_audits_are_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)
         for expression in (
+            "+ audit_iwa_keynote_slide_media_lifecycle_retirement_source_topology()",
             "+ audit_keynote_slide_media_lifecycle_facade_source_topology()",
             "+ audit_keynote_slide_media_lifecycle_codec_source_topology()",
             "+ audit_keynote_slide_media_lifecycle_transaction_source_topology()",

@@ -9709,3 +9709,58 @@ continued migration, with approximately 53 GiB free. The earlier 9.8 GiB full
 `cargo clean` remains the latest full-clean receipt. Caption/title/stand-in
 comment support, native commented-audio verification, and unknown-reference
 completeness remain under review before further media host API retirement.
+
+## 2026-09-07 follow-up: raw Keynote media lifecycle API retirement scope
+
+The current production slice removes the raw `KeynoteEditor`
+`duplicate_slide_movie`/`duplicate_slide_audio` and corresponding remove APIs,
+their private helpers, the `RemovedKeynoteSlideMovie`/
+`RemovedKeynoteSlideAudio` exports, four obsolete examples, and orphaned build
+helpers. Focused `Package` selectors are now the sole format lifecycle owner;
+creation, reading, properties, and replacement remain host-shared compatibility
+surfaces.
+
+Seven editor unit callers, local tests, and external host integration callers
+were migrated while preserving geometry, build/assets, comment/reply, and
+inverse behavior. Read-only host audit found no `633 CaptionInfo` or `3097`
+stand-in CRUD route in `comments.rs`. Arbitrary caption/title comment graph
+behavior remains unproven; it is not a previously supported host comment CRUD
+surface. Selected 633 comments remain `UnsupportedComment`, and the 3097 schema
+is empty with no valid comment edge.
+
+The previously planned programmatic native commented-audio probe is complete.
+A native baseline audio object received a root comment and reply, then focused
+duplication and removal were saved with Cmd-S, actually closed to the theme
+chooser, reopened from their exact paths without alerts, and closed. The
+duplicate contains 3 audio and 2 movie objects; the removal contains 2 audio
+and 2 movie objects and preserves the existing movie comment. The canvas did
+not display an Audio Comment control, so this is programmatic native evidence,
+not a UI-authored audio oracle.
+
+Permanent fixture receipts:
+
+| Fixture | Native result | SHA-256 |
+| --- | --- | --- |
+| `test-data/iwork/keynote/media-audio-comment-duplicate-native.key` | 3 audio, 2 movies, existing movie comment preserved | `e06d46c33f4996b07496b64690388b255a4991d24660b3f39b1cb78b2513dc8c` |
+| `test-data/iwork/keynote/media-audio-comment-removal-native.key` | 2 audio, 2 movies, existing movie comment preserved | `7816b2d99601501373504dec9cc02ace9a6cdf135a3e9b5fd57ee8b68ca4a44a` |
+
+Three mandatory native-fixture Rust checks and six host lifecycle checks pass.
+The two saved-fixture readbacks run against checked-in bytes by default and
+also passed with explicit native-saved path overrides. Seven focused host
+movie tests pass. The original hand-built fixture remains an explicit atomic
+admission-rejection test; successful lifecycle coverage uses the supported
+builder and retains geometry, build chunks, shared assets, replacement,
+final-owner collection, and exact inverse assertions. No speculative metadata
+changes remain in the hand-built fixture.
+
+Boundary verification passes 944 cases, and the full scanner passes for 64
+packages and 238 internal dependency declarations with 11 explicit migration
+debt items. Production all-feature library Clippy and all 242 host Keynote editor
+tests pass. Normal workspace hooks remain pending.
+
+Unknown payload ownership remains within the existing metadata-authoritative
+scope; no proof for all future unknown ownership is claimed. This retirement
+receipt remains limited to the four selected raw lifecycle methods.
+Caption/title/stand-in comment forms remain unsupported and are not previously
+supported host comment CRUD surfaces; unknown-reference completeness remains
+open, and the existing host APIs remain retained where those gates apply.

@@ -5411,11 +5411,11 @@ pub use litchi_keynote::transition::{
     Acceleration, AccelerationKind, AnimationParameters, CustomParameters, Direction, MosaicType,
     TextDelivery, TextDeliveryKind,
 };
-pub use slide_audio::{KeynoteSlideAudioInfo, RemovedKeynoteSlideAudio};
+pub use slide_audio::KeynoteSlideAudioInfo;
 pub use slide_charts::{KeynoteSlideChartInfo, RemovedKeynoteSlideChart};
 use slide_graph::*;
 pub use slide_images::{KeynoteSlideImageInfo, KeynoteSlideImageKind, RemovedKeynoteSlideImage};
-pub use slide_movies::{KeynoteSlideMovieInfo, RemovedKeynoteSlideMovie};
+pub use slide_movies::KeynoteSlideMovieInfo;
 pub use slide_shapes::{KeynoteSlideShapeInfo, RemovedKeynoteSlideShape};
 pub use slide_tables::{
     KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellConditionalHighlightInfo,

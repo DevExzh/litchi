@@ -108,37 +108,25 @@ fn package_watermark(bytes: &[u8]) -> Result<u64, Box<dyn Error>> {
 }
 
 #[test]
-fn focused_suffix_release_matches_host_removal_and_next_allocation() -> TestResult {
+fn focused_suffix_release_and_next_allocation_reopen_in_host() -> TestResult {
     let fixture = source_fixture()?;
     for (source_index, is_movie) in [(0, true), (1, false)] {
         let package = Package::from_bytes(&fixture.bytes)?;
         let duplicated = package
             .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(source_index))?;
         let duplicate_bytes = package_bytes(duplicated.package())?;
-        let mut host = KeynoteEditor::from_bytes(&duplicate_bytes)?;
         let old_watermark = package_watermark(&duplicate_bytes)?;
-        if is_movie {
-            let clone_id = host.slide_movies(0)?.last().unwrap().drawable_object_id;
-            host.remove_slide_movie(0, clone_id)?;
-        } else {
-            let clone_id = host.slide_audio(0)?.last().unwrap().drawable_object_id;
-            host.remove_slide_audio(0, clone_id)?;
-        }
         let removed = duplicated
             .package()
             .remove_slide_media(SlideSelector::index(0), MovieSelector::index(4))?;
         let removed_bytes = package_bytes(removed.package())?;
         let released = package_watermark(&removed_bytes)?;
         assert!(released < old_watermark);
-        assert_eq!(released, package_watermark(&host.to_bytes()?)?);
+        let removed_host = KeynoteEditor::from_bytes(&removed_bytes)?;
+        assert_eq!(released, package_watermark(&removed_host.to_bytes()?)?);
+        assert_eq!(removed_host.slide_movies(0)?.len(), 2);
+        assert_eq!(removed_host.slide_audio(0)?.len(), 2);
 
-        let next_host_id = if is_movie {
-            host.duplicate_slide_movie(0, fixture.movie_a_id)?
-                .drawable_object_id
-        } else {
-            host.duplicate_slide_audio(0, fixture.audio_a_id)?
-                .drawable_object_id
-        };
         let repeated = removed
             .package()
             .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(source_index))?;
@@ -156,7 +144,15 @@ fn focused_suffix_release_matches_host_removal_and_next_allocation() -> TestResu
                 .unwrap()
                 .drawable_object_id
         };
-        assert_eq!(next_focused_id, next_host_id);
+        assert!(next_focused_id > released);
+        assert_eq!(
+            repeated_host.slide_movies(0)?.len(),
+            if is_movie { 3 } else { 2 }
+        );
+        assert_eq!(
+            repeated_host.slide_audio(0)?.len(),
+            if is_movie { 2 } else { 3 }
+        );
         assert_eq!(package_bytes(&package)?, fixture.bytes);
         let restored = removed
             .package()
@@ -922,7 +918,7 @@ fn source_built_selected_commented_audio_with_reply_duplicates_and_removal_is_at
 }
 
 #[test]
-fn source_built_legacy_host_comment_media_lifecycle_is_an_oracle() -> TestResult {
+fn source_built_multiple_reply_threads_survive_focused_media_lifecycle() -> TestResult {
     let fixture = source_fixture()?;
     let mut editor = KeynoteEditor::from_bytes(&fixture.bytes)?;
 
@@ -1000,46 +996,64 @@ fn source_built_legacy_host_comment_media_lifecycle_is_an_oracle() -> TestResult
         Some(audio.clone())
     );
 
-    // These calls intentionally document the current migration-host bug.  A
-    // media clone cannot safely remap a CommentStorageArchive reply edge, and
-    // media removal clears that graph before trying to remove the same
-    // objects from its private media closure.  Both operations must remain
-    // atomic until the focused comment owner replaces this legacy route.
     let before_operations = editor.to_bytes()?;
-    let duplicate_movie = editor.duplicate_slide_movie(0, fixture.movie_a_id);
-    assert!(
-        duplicate_movie.is_err(),
-        "legacy host unexpectedly duplicated a movie with a reply graph"
-    );
-    assert_eq!(editor.to_bytes()?, before_operations);
+    let package = Package::from_bytes(&before_operations)?;
+    for (source_index, selected_id, source_thread, other_id, other_thread) in [
+        (0, fixture.movie_a_id, &movie, fixture.audio_a_id, &audio),
+        (1, fixture.audio_a_id, &audio, fixture.movie_a_id, &movie),
+    ] {
+        let duplicate = package
+            .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(source_index))?;
+        let duplicate_host = host_from_package(duplicate.package())?;
+        let clone_id = if source_index == 0 {
+            duplicate_host
+                .slide_movies(0)?
+                .last()
+                .unwrap()
+                .drawable_object_id
+        } else {
+            duplicate_host
+                .slide_audio(0)?
+                .last()
+                .unwrap()
+                .drawable_object_id
+        };
+        let cloned_thread = drawable_comment_snapshot(&duplicate_host, clone_id)?
+            .ok_or_else(|| io::Error::other("focused clone lost its comment thread"))?;
+        assert_cloned_comment(source_thread, &cloned_thread);
+        assert_eq!(
+            drawable_comment_snapshot(&duplicate_host, other_id)?,
+            Some(other_thread.clone())
+        );
 
-    let duplicate_audio = editor.duplicate_slide_audio(0, fixture.audio_a_id);
-    assert!(
-        duplicate_audio.is_err(),
-        "legacy host unexpectedly duplicated audio with a reply graph"
-    );
-    assert_eq!(editor.to_bytes()?, before_operations);
-
-    let remove_movie = editor.remove_slide_movie(0, fixture.movie_a_id);
-    assert!(
-        remove_movie.is_err(),
-        "legacy host unexpectedly removed a movie while its reply graph was attached"
-    );
-    assert_eq!(editor.to_bytes()?, before_operations);
-
-    let remove_audio = editor.remove_slide_audio(0, fixture.audio_a_id);
-    assert!(
-        remove_audio.is_err(),
-        "legacy host unexpectedly removed audio while its reply graph was attached"
-    );
-    assert_eq!(editor.to_bytes()?, before_operations);
-    assert_eq!(
-        drawable_comment_snapshot(&editor, fixture.movie_a_id)?,
-        Some(movie)
-    );
-    assert_eq!(
-        drawable_comment_snapshot(&editor, fixture.audio_a_id)?,
-        Some(audio)
-    );
+        let removed = package
+            .remove_slide_media(SlideSelector::index(0), MovieSelector::index(source_index))?;
+        let removed_host = host_from_package(removed.package())?;
+        assert!(
+            removed_host
+                .slide_movies(0)?
+                .iter()
+                .all(|item| item.drawable_object_id != selected_id)
+        );
+        assert!(
+            removed_host
+                .slide_audio(0)?
+                .iter()
+                .all(|item| item.drawable_object_id != selected_id)
+        );
+        assert_eq!(
+            drawable_comment_snapshot(&removed_host, other_id)?,
+            Some(other_thread.clone())
+        );
+        let restored = removed
+            .package()
+            .apply_slide_media_lifecycle(&removed.patch().inverse())?;
+        assert_eq!(package_bytes(restored.package())?, before_operations);
+        let restored = duplicate
+            .package()
+            .apply_slide_media_lifecycle(&duplicate.patch().inverse())?;
+        assert_eq!(package_bytes(restored.package())?, before_operations);
+    }
+    assert_eq!(package_bytes(&package)?, before_operations);
     Ok(())
 }
