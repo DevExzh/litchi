@@ -160,6 +160,92 @@ pub(super) fn central_record_preserved(source: &[u8], candidate: &[u8]) -> bool 
         && source[LOCAL_HEADER_OFFSET.end..] == candidate[LOCAL_HEADER_OFFSET.end..]
 }
 
+/// Preserve selected ZIP headers while allowing checksum, size, and offset updates.
+pub(super) fn selected_package_member_preserved(source: &Entry, candidate: &Entry) -> bool {
+    source.name() == candidate.name()
+        && source.raw_name() == candidate.raw_name()
+        && source.is_opaque() == candidate.is_opaque()
+        && source.metadata().local() == candidate.metadata().local()
+        && source.metadata().central() == candidate.metadata().central()
+        && selected_local_record_preserved(source, candidate)
+        && selected_central_record_preserved(
+            source.raw_record().central_directory_record(),
+            candidate.raw_record().central_directory_record(),
+        )
+}
+
+fn selected_local_record_preserved(source: &Entry, candidate: &Entry) -> bool {
+    const CRC_AND_SIZES: std::ops::Range<usize> = 14..26;
+    let source_record = source.raw_record().local_record();
+    let candidate_record = candidate.raw_record().local_record();
+    let Some(source_header_length) = zip_local_header_length(source_record) else {
+        return false;
+    };
+    let Some(candidate_header_length) = zip_local_header_length(candidate_record) else {
+        return false;
+    };
+    if source_header_length != candidate_header_length
+        || source_record[..CRC_AND_SIZES.start] != candidate_record[..CRC_AND_SIZES.start]
+        || source_record[CRC_AND_SIZES.end..source_header_length]
+            != candidate_record[CRC_AND_SIZES.end..candidate_header_length]
+    {
+        return false;
+    }
+    let Some(source_payload_end) = source_header_length
+        .checked_add(source.raw_record().compressed_data().len())
+        .filter(|end| *end <= source_record.len())
+    else {
+        return false;
+    };
+    let Some(candidate_payload_end) = candidate_header_length
+        .checked_add(candidate.raw_record().compressed_data().len())
+        .filter(|end| *end <= candidate_record.len())
+    else {
+        return false;
+    };
+    selected_local_suffix_preserved(
+        source.metadata().local().flags(),
+        &source_record[source_payload_end..],
+        &candidate_record[candidate_payload_end..],
+    )
+}
+
+fn zip_local_header_length(record: &[u8]) -> Option<usize> {
+    if record.get(..4)? != b"PK\x03\x04" {
+        return None;
+    }
+    let name_length = usize::from(u16::from_le_bytes(record.get(26..28)?.try_into().ok()?));
+    let extra_length = usize::from(u16::from_le_bytes(record.get(28..30)?.try_into().ok()?));
+    30usize
+        .checked_add(name_length)?
+        .checked_add(extra_length)
+        .filter(|length| *length <= record.len())
+}
+
+fn selected_local_suffix_preserved(flags: u16, source: &[u8], candidate: &[u8]) -> bool {
+    if flags & 0x0008 == 0 {
+        return source == candidate;
+    }
+    let source_descriptor = usize::from(source.starts_with(b"PK\x07\x08")) * 4;
+    let candidate_descriptor = usize::from(candidate.starts_with(b"PK\x07\x08")) * 4;
+    source_descriptor == candidate_descriptor
+        && source.len() == candidate.len()
+        && source.len() >= source_descriptor + 12
+        && source[..source_descriptor] == candidate[..candidate_descriptor]
+        && source[source_descriptor + 12..] == candidate[candidate_descriptor + 12..]
+}
+
+fn selected_central_record_preserved(source: &[u8], candidate: &[u8]) -> bool {
+    const CRC_AND_SIZES: std::ops::Range<usize> = 16..28;
+    const LOCAL_HEADER_OFFSET: std::ops::Range<usize> = 42..46;
+    source.len() == candidate.len()
+        && source.len() >= LOCAL_HEADER_OFFSET.end
+        && source[..CRC_AND_SIZES.start] == candidate[..CRC_AND_SIZES.start]
+        && source[CRC_AND_SIZES.end..LOCAL_HEADER_OFFSET.start]
+            == candidate[CRC_AND_SIZES.end..LOCAL_HEADER_OFFSET.start]
+        && source[LOCAL_HEADER_OFFSET.end..] == candidate[LOCAL_HEADER_OFFSET.end..]
+}
+
 #[cfg(test)]
 mod tests {
     use litchi_iwa_archive::{Limits, package::EntryEdit};

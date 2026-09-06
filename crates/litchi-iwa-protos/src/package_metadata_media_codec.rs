@@ -19,7 +19,7 @@
     reason = "Wire helpers are kept beside the streaming publication model."
 )]
 
-use core::{fmt, num::NonZeroU64, str};
+use core::{fmt, mem::size_of, num::NonZeroU64, str};
 use std::path::{Component, Path};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -94,6 +94,8 @@ impl DecodeOptions {
     }
 
     /// Build a bounded policy sized for one already-borrowed source payload.
+    /// The work allowance includes sequential validation, identity sorting,
+    /// sizing, emission, and candidate verification passes.
     #[must_use]
     pub fn for_source(source: &[u8]) -> Self {
         let bytes = source.len().max(1);
@@ -101,7 +103,7 @@ impl DecodeOptions {
         Self::new(
             bytes,
             fields,
-            bytes.saturating_mul(16).max(1),
+            bytes.saturating_mul(64).max(1),
             fields,
             fields,
             fields,
@@ -135,6 +137,11 @@ impl DecodeOptions {
         self.max_fields
     }
     #[must_use]
+    pub const fn with_max_fields(mut self, maximum: usize) -> Self {
+        self.max_fields = maximum;
+        self
+    }
+    #[must_use]
     pub const fn max_work_bytes(self) -> usize {
         self.max_work_bytes
     }
@@ -148,12 +155,27 @@ impl DecodeOptions {
         self.max_components
     }
     #[must_use]
+    pub const fn with_max_components(mut self, maximum: usize) -> Self {
+        self.max_components = maximum;
+        self
+    }
+    #[must_use]
     pub const fn max_data_records(self) -> usize {
         self.max_data_records
     }
     #[must_use]
+    pub const fn with_max_data_records(mut self, maximum: usize) -> Self {
+        self.max_data_records = maximum;
+        self
+    }
+    #[must_use]
     pub const fn max_owners(self) -> usize {
         self.max_owners
+    }
+    #[must_use]
+    pub const fn with_max_owners(mut self, maximum: usize) -> Self {
+        self.max_owners = maximum;
+        self
     }
     #[must_use]
     pub const fn max_digest_bytes(self) -> usize {
@@ -172,6 +194,11 @@ impl DecodeOptions {
         BuffaDecodeOptions::new()
             .with_max_message_size(self.max_message_bytes)
             .with_unknown_field_limit(self.max_fields)
+            // The projection below contains borrowed scalar fields only;
+            // repeated PackageMetadata records remain in the handwritten
+            // streaming scanner.  Keep generated repeated-view allocation
+            // disabled so a future schema change fails closed at the
+            // Buffa boundary instead of retaining an unbounded collection.
             .with_element_memory_limit(0)
             .with_recursion_limit(self.max_depth)
     }
@@ -270,6 +297,9 @@ pub enum InvalidReason {
     ComponentAmbiguous,
     VersionedComponent,
     DataInfoNotFound,
+    /// The selected DataInfo did not match one of the caller-provided
+    /// compare-and-set content witnesses.
+    DataInfoContentMismatch,
     DataInfoReferenced,
     DataInfoMetadataMapDependency,
     OwnerNotFound,
@@ -490,8 +520,10 @@ pub struct DecodeReport {
     fields: usize,
     work_bytes: usize,
     max_depth: u32,
+    max_locator_bytes: usize,
     components: usize,
     data_records: usize,
+    data_references: usize,
     owners: usize,
     unknown_records: usize,
     data_metadata_map_present: bool,
@@ -515,12 +547,20 @@ impl DecodeReport {
         self.max_depth
     }
     #[must_use]
+    pub const fn max_locator_bytes(self) -> usize {
+        self.max_locator_bytes
+    }
+    #[must_use]
     pub const fn components(self) -> usize {
         self.components
     }
     #[must_use]
     pub const fn data_records(self) -> usize {
         self.data_records
+    }
+    #[must_use]
+    pub const fn data_references(self) -> usize {
+        self.data_references
     }
     #[must_use]
     pub const fn owners(self) -> usize {
@@ -564,8 +604,10 @@ struct ScanState {
     fields: usize,
     work_bytes: usize,
     max_depth: u32,
+    max_locator_bytes: usize,
     components: usize,
     data_records: usize,
+    data_references: usize,
     owners: usize,
     unknown_records: usize,
     data_metadata_map_present: bool,
@@ -590,8 +632,10 @@ impl ScanState {
             fields: 0,
             work_bytes: 0,
             max_depth: 0,
+            max_locator_bytes: 0,
             components: 0,
             data_records: 0,
+            data_references: 0,
             owners: 0,
             unknown_records: 0,
             data_metadata_map_present: false,
@@ -676,6 +720,14 @@ impl ScanState {
         Ok(())
     }
 
+    fn data_reference(&mut self) -> Result<(), DecodeError> {
+        self.data_references = self
+            .data_references
+            .checked_add(1)
+            .ok_or_else(|| DecodeError::invalid(InvalidReason::MalformedWire))?;
+        Ok(())
+    }
+
     fn owner(&mut self, options: DecodeOptions) -> Result<(), DecodeError> {
         self.owners = self
             .owners
@@ -704,8 +756,10 @@ impl ScanState {
             fields: self.fields,
             work_bytes: self.work_bytes,
             max_depth: self.max_depth,
+            max_locator_bytes: self.max_locator_bytes,
             components: self.components,
             data_records: self.data_records,
+            data_references: self.data_references,
             owners: self.owners,
             unknown_records: self.unknown_records,
             data_metadata_map_present: self.data_metadata_map_present,
@@ -719,7 +773,7 @@ fn scan(
     visitor: &mut dyn PackageMetadataMediaVisitor,
 ) -> Result<DecodeReport, DecodeError> {
     let mut state = ScanState::new(source, options)?;
-    validate_unique_records(source)?;
+    validate_unique_records(source, options, &mut state)?;
     let mut last_identifier = None;
     let mut save_token_seen = false;
     let mut offset = 0usize;
@@ -792,71 +846,196 @@ fn scan(
     Ok(state.report())
 }
 
-/// Validate duplicate identity keys without retaining an input-width vector.
-/// Metadata records are small and already bounded by `DecodeOptions`; the
-/// deliberately simple rescans keep the streaming visitor allocation-free.
-fn validate_unique_records(source: &[u8]) -> Result<(), DecodeError> {
+#[derive(Debug, Clone, Copy)]
+struct ComponentIdentity<'source> {
+    versioned: bool,
+    identifier: u64,
+    locator: &'source str,
+    locator_hash: u64,
+}
+
+fn locator_hash(locator: &str) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325;
+    for byte in locator.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash
+}
+
+fn reserve_identity_slot<T>(
+    keys: &mut Vec<T>,
+    maximum: usize,
+    limit: DecodeLimit,
+    options: DecodeOptions,
+    state: &mut ScanState,
+) -> Result<(), DecodeError> {
+    if keys.len() >= maximum {
+        return Err(DecodeError::limited(limit));
+    }
+    state.work(size_of::<T>(), options)?;
+    keys.try_reserve(1).map_err(|_error| {
+        DecodeError::limited(DecodeLimit::Work {
+            observed: usize::MAX,
+            maximum: options.max_work_bytes,
+        })
+    })
+}
+
+fn sort_work(len: usize) -> usize {
+    if len < 2 {
+        return 0;
+    }
+    let levels = usize::BITS
+        .saturating_sub((len.saturating_sub(1)).leading_zeros())
+        .saturating_add(1);
+    len.saturating_mul(levels as usize)
+}
+
+fn finish_u64_identities(
+    keys: &mut [u64],
+    duplicate: InvalidReason,
+    options: DecodeOptions,
+    state: &mut ScanState,
+) -> Result<(), DecodeError> {
+    state.work(
+        sort_work(keys.len()).saturating_mul(size_of::<u64>()),
+        options,
+    )?;
+    keys.sort_unstable();
+    if keys.windows(2).any(|window| window[0] == window[1]) {
+        return Err(DecodeError::invalid(duplicate));
+    }
+    Ok(())
+}
+
+fn finish_component_identities(
+    keys: &mut Vec<ComponentIdentity<'_>>,
+    options: DecodeOptions,
+    state: &mut ScanState,
+) -> Result<(), DecodeError> {
+    let max_locator_bytes = keys.iter().map(|key| key.locator.len()).max().unwrap_or(0);
+    let sort_comparisons = sort_work(keys.len());
+    state.work(
+        sort_comparisons.saturating_mul(size_of::<u64>().saturating_add(max_locator_bytes)),
+        options,
+    )?;
+    keys.sort_unstable_by(|left, right| {
+        left.versioned
+            .cmp(&right.versioned)
+            .then(left.identifier.cmp(&right.identifier))
+            .then(left.locator_hash.cmp(&right.locator_hash))
+            .then(left.locator.as_bytes().cmp(right.locator.as_bytes()))
+    });
+    for window in keys.windows(2) {
+        let [left, right] = window else {
+            continue;
+        };
+        if left.versioned == right.versioned
+            && left.identifier == right.identifier
+            && left.locator_hash == right.locator_hash
+        {
+            state.work(
+                left.locator.len().saturating_add(right.locator.len()),
+                options,
+            )?;
+            if left.locator == right.locator {
+                return Err(DecodeError::invalid(InvalidReason::DuplicateComponent));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Validate duplicate identity keys with one bounded source pass.
+///
+/// The temporary identity vectors retain only fixed-width keys and borrowed
+/// locator slices.  They are bounded by the same topology limits as the
+/// streaming scan and use fallible reservation.  Sorting keys keeps the
+/// duplicate audit linear in source bytes plus `O(n log n)` fixed-width key
+/// comparisons; it no longer rescans the complete PackageMetadata payload for
+/// every record.
+fn validate_unique_records(
+    source: &[u8],
+    options: DecodeOptions,
+    state: &mut ScanState,
+) -> Result<(), DecodeError> {
+    let mut data_keys = Vec::new();
+    let mut component_keys = Vec::new();
+    let mut reference_keys = Vec::new();
+    let mut owner_keys = Vec::new();
+    state.work(source.len(), options)?;
     let mut root_offset = 0usize;
     while let Some(field) = next_field(source, root_offset)? {
         root_offset = field.end;
         match field.number {
             ROOT_DATA_INFO_FIELD => {
                 let current = data_info_facts(field.payload(source))?;
-                let mut count = 0usize;
-                let mut offset = 0usize;
-                while let Some(candidate) = next_field(source, offset)? {
-                    offset = candidate.end;
-                    if candidate.number == ROOT_DATA_INFO_FIELD
-                        && data_info_facts(candidate.payload(source))?.identifier
-                            == current.identifier
-                    {
-                        count = count
-                            .checked_add(1)
-                            .ok_or_else(|| DecodeError::invalid(InvalidReason::MalformedWire))?;
-                    }
-                }
-                if count > 1 {
-                    return Err(DecodeError::invalid(InvalidReason::DuplicateDataInfo));
-                }
+                let observed = data_keys.len().saturating_add(1);
+                reserve_identity_slot(
+                    &mut data_keys,
+                    options.max_data_records,
+                    DecodeLimit::DataRecords {
+                        observed,
+                        maximum: options.max_data_records,
+                    },
+                    options,
+                    state,
+                )?;
+                data_keys.push(current.identifier);
             },
             ROOT_COMPONENT_FIELD | ROOT_VERSIONED_COMPONENT_FIELD => {
                 let current = component_facts(
                     field.payload(source),
                     field.number == ROOT_VERSIONED_COMPONENT_FIELD,
                 )?;
-                let mut count = 0usize;
-                let mut offset = 0usize;
-                while let Some(candidate) = next_field(source, offset)? {
-                    offset = candidate.end;
-                    if (candidate.number == ROOT_COMPONENT_FIELD
-                        || candidate.number == ROOT_VERSIONED_COMPONENT_FIELD)
-                        && {
-                            let candidate_facts = component_facts(
-                                candidate.payload(source),
-                                candidate.number == ROOT_VERSIONED_COMPONENT_FIELD,
-                            )?;
-                            candidate_facts.identifier == current.identifier
-                                && candidate_facts.effective_locator()
-                                    == current.effective_locator()
-                        }
-                    {
-                        count = count
-                            .checked_add(1)
-                            .ok_or_else(|| DecodeError::invalid(InvalidReason::MalformedWire))?;
-                    }
-                }
-                if count > 1 {
-                    return Err(DecodeError::invalid(InvalidReason::DuplicateComponent));
-                }
-                validate_unique_component_references(field.payload(source))?;
+                let observed = component_keys.len().saturating_add(1);
+                reserve_identity_slot(
+                    &mut component_keys,
+                    options.max_components,
+                    DecodeLimit::Components {
+                        observed,
+                        maximum: options.max_components,
+                    },
+                    options,
+                    state,
+                )?;
+                component_keys.push(ComponentIdentity {
+                    versioned: current.versioned,
+                    identifier: current.identifier,
+                    locator: current.effective_locator(),
+                    locator_hash: locator_hash(current.effective_locator()),
+                });
+                validate_unique_component_references(
+                    field.payload(source),
+                    options,
+                    state,
+                    &mut reference_keys,
+                    &mut owner_keys,
+                )?;
             },
             _ => {},
         }
     }
+    finish_u64_identities(
+        &mut data_keys,
+        InvalidReason::DuplicateDataInfo,
+        options,
+        state,
+    )?;
+    finish_component_identities(&mut component_keys, options, state)?;
     Ok(())
 }
 
-fn validate_unique_component_references(payload: &[u8]) -> Result<(), DecodeError> {
+fn validate_unique_component_references(
+    payload: &[u8],
+    options: DecodeOptions,
+    state: &mut ScanState,
+    reference_keys: &mut Vec<u64>,
+    owner_keys: &mut Vec<u64>,
+) -> Result<(), DecodeError> {
+    state.work(payload.len(), options)?;
+    reference_keys.clear();
     let mut offset = 0usize;
     while let Some(field) = next_field(payload, offset)? {
         offset = field.end;
@@ -864,29 +1043,37 @@ fn validate_unique_component_references(payload: &[u8]) -> Result<(), DecodeErro
             continue;
         }
         let current = data_reference_facts(field.payload(payload))?;
-        let mut parent_count = 0usize;
-        let mut candidate_offset = 0usize;
-        while let Some(candidate) = next_field(payload, candidate_offset)? {
-            candidate_offset = candidate.end;
-            if candidate.number != COMPONENT_DATA_REFERENCE_FIELD {
-                continue;
-            }
-            let candidate_facts = data_reference_facts(candidate.payload(payload))?;
-            if candidate_facts.data_identifier == current.data_identifier {
-                parent_count = parent_count
-                    .checked_add(1)
-                    .ok_or_else(|| DecodeError::invalid(InvalidReason::MalformedWire))?;
-                if parent_count > 1 {
-                    return Err(DecodeError::invalid(InvalidReason::DuplicateDataInfo));
-                }
-            }
-        }
-        validate_unique_owners(field.payload(payload))?;
+        let observed = reference_keys.len().saturating_add(1);
+        reserve_identity_slot(
+            reference_keys,
+            options.max_fields,
+            DecodeLimit::Fields {
+                observed,
+                maximum: options.max_fields,
+            },
+            options,
+            state,
+        )?;
+        reference_keys.push(current.data_identifier);
+        validate_unique_owners(field.payload(payload), options, state, owner_keys)?;
     }
+    finish_u64_identities(
+        reference_keys,
+        InvalidReason::DuplicateDataInfo,
+        options,
+        state,
+    )?;
     Ok(())
 }
 
-fn validate_unique_owners(payload: &[u8]) -> Result<(), DecodeError> {
+fn validate_unique_owners(
+    payload: &[u8],
+    options: DecodeOptions,
+    state: &mut ScanState,
+    owner_keys: &mut Vec<u64>,
+) -> Result<(), DecodeError> {
+    state.work(payload.len(), options)?;
+    owner_keys.clear();
     let mut offset = 0usize;
     while let Some(field) = next_field(payload, offset)? {
         offset = field.end;
@@ -894,24 +1081,20 @@ fn validate_unique_owners(payload: &[u8]) -> Result<(), DecodeError> {
             continue;
         }
         let current = owner_facts(field.payload(payload))?;
-        let mut count = 0usize;
-        let mut candidate_offset = 0usize;
-        while let Some(candidate) = next_field(payload, candidate_offset)? {
-            candidate_offset = candidate.end;
-            if candidate.number != OWNER_COUNT_FIELD {
-                continue;
-            }
-            let candidate_facts = owner_facts(candidate.payload(payload))?;
-            if candidate_facts.object_identifier == current.object_identifier {
-                count = count
-                    .checked_add(1)
-                    .ok_or_else(|| DecodeError::invalid(InvalidReason::MalformedWire))?;
-            }
-        }
-        if count > 1 {
-            return Err(DecodeError::invalid(InvalidReason::DuplicateOwner));
-        }
+        let observed = owner_keys.len().saturating_add(1);
+        reserve_identity_slot(
+            owner_keys,
+            options.max_owners,
+            DecodeLimit::Owners {
+                observed,
+                maximum: options.max_owners,
+            },
+            options,
+            state,
+        )?;
+        owner_keys.push(current.object_identifier);
     }
+    finish_u64_identities(owner_keys, InvalidReason::DuplicateOwner, options, state)?;
     Ok(())
 }
 
@@ -935,6 +1118,20 @@ fn parse_data_info(
     let mut file_name = None;
     let mut materialized_length = None;
     let mut unknown_fields = false;
+    let mut document_resource_locator = false;
+    let mut source_bookmark_data = false;
+    let mut remote_url = false;
+    let mut can_download = false;
+    let mut download_priority = false;
+    let mut attributes = false;
+    let mut encryption_info = false;
+    let mut last_mismatched_digest = false;
+    let mut unmaterialized_ranges = false;
+    let mut remote_data_length = false;
+    let mut remote_data_has_package_storage = false;
+    let mut upload_status = false;
+    let mut remote_data_mtime = false;
+    let mut pasteboard_external_file_path = false;
     for result in fields(payload) {
         let field = result?;
         state.field(field, options, 2)?;
@@ -986,6 +1183,98 @@ fn parse_data_info(
                     return Err(DecodeError::invalid(InvalidReason::DuplicateField));
                 }
                 materialized_length = Some(varint(payload, field)?);
+            },
+            5 | 7 | 99 => {
+                if field.number == 99 && field.wire_type != 2 {
+                    // Older native files occasionally carry an unrecognised
+                    // field 99 shape.  Keep it inspectable as opaque source,
+                    // while ensuring any selected mutation fails closed.
+                    unknown_fields = true;
+                    state.unknown()?;
+                    continue;
+                }
+                let value = utf8(payload, field)?;
+                let seen = match field.number {
+                    5 => &mut document_resource_locator,
+                    7 => &mut remote_url,
+                    _ => &mut pasteboard_external_file_path,
+                };
+                if *seen {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
+                *seen = true;
+                let _ = value;
+            },
+            6 | 12 => {
+                let seen = if field.number == 6 {
+                    &mut source_bookmark_data
+                } else {
+                    &mut last_mismatched_digest
+                };
+                if *seen {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
+                *seen = true;
+                let _ = bytes(payload, field)?;
+            },
+            8 | 15 => {
+                let seen = if field.number == 8 {
+                    &mut can_download
+                } else {
+                    &mut remote_data_has_package_storage
+                };
+                if *seen {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
+                *seen = true;
+                if varint(payload, field)? > 1 {
+                    return Err(DecodeError::invalid(InvalidReason::UnsupportedField));
+                }
+            },
+            9 | 16 => {
+                let seen = if field.number == 9 {
+                    &mut download_priority
+                } else {
+                    &mut upload_status
+                };
+                if *seen {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
+                *seen = true;
+                let _ = varint(payload, field)?;
+            },
+            10 | 11 | 13 => {
+                let seen = match field.number {
+                    10 => &mut attributes,
+                    11 => &mut encryption_info,
+                    _ => &mut unmaterialized_ranges,
+                };
+                if *seen {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
+                *seen = true;
+                let nested = bytes(payload, field)?;
+                state.work(nested.len(), options)?;
+                for nested_result in fields(nested) {
+                    let nested_field = nested_result?;
+                    state.field(nested_field, options, 3)?;
+                }
+            },
+            14 => {
+                if remote_data_length {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
+                remote_data_length = true;
+                let _ = varint(payload, field)?;
+            },
+            17 => {
+                if remote_data_mtime {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
+                remote_data_mtime = true;
+                if field.wire_type != 1 || field.payload_end - field.payload_start != 8 {
+                    return Err(DecodeError::invalid(InvalidReason::MalformedWire));
+                }
             },
             _ => {
                 unknown_fields = true;
@@ -1098,6 +1387,9 @@ fn parse_component(
         unknown_fields,
         raw: payload,
     };
+    state.max_locator_bytes = state
+        .max_locator_bytes
+        .max(component.effective_locator().len());
     visitor.visit_component(component)?;
 
     // Revisit only field-7 payloads to stream their owner records.  No
@@ -1132,6 +1424,7 @@ fn parse_data_reference(
             maximum: options.max_message_bytes,
         }));
     }
+    state.data_reference()?;
     state.work(payload.len(), options)?;
     let mut data_identifier = None;
     let mut owner_count = 0usize;
@@ -1354,6 +1647,25 @@ fn validate_addition(
     Ok(())
 }
 
+fn validate_content_replacement(
+    replacement: DataInfoContentReplacement<'_>,
+    options: DecodeOptions,
+) -> Result<(), RewriteError> {
+    validate_nonzero(replacement.identifier)?;
+    for digest in [replacement.expected_digest, replacement.replacement_digest] {
+        if digest.len() > options.max_digest_bytes {
+            return Err(RewriteError::limited(DecodeLimit::DigestBytes {
+                observed: digest.len(),
+                maximum: options.max_digest_bytes,
+            }));
+        }
+        if digest.len() != SHA1_DIGEST_BYTES {
+            return Err(RewriteError::invalid(InvalidReason::InvalidDigest));
+        }
+    }
+    Ok(())
+}
+
 fn validate_nonzero(value: u64) -> Result<(), RewriteError> {
     NonZeroU64::new(value)
         .map(|_value| ())
@@ -1368,6 +1680,7 @@ fn operation_component_matches(
     validate_nonzero(selector.identifier)?;
     let mut count = 0usize;
     let mut unknown = false;
+    let mut versioned_match = false;
     let mut offset = 0usize;
     while let Some(field) = next_field(source, offset).map_err(map_decode)? {
         offset = field.end;
@@ -1382,14 +1695,18 @@ fn operation_component_matches(
         if component.identifier == selector.identifier
             && component.effective_locator() == selector.locator
         {
+            if component.is_versioned() {
+                versioned_match = true;
+                continue;
+            }
             count = count
                 .checked_add(1)
                 .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
             unknown |= component.has_unknown_fields();
-            if component.is_versioned() {
-                return Err(RewriteError::invalid(InvalidReason::VersionedComponent));
-            }
         }
+    }
+    if count == 0 && versioned_match {
+        return Err(RewriteError::invalid(InvalidReason::VersionedComponent));
     }
     if count > 1 {
         return Err(RewriteError::invalid(InvalidReason::ComponentAmbiguous));
@@ -1492,6 +1809,42 @@ fn data_info_matches(
     Ok((count, unknown))
 }
 
+/// Locate one DataInfo after the strict source pass.  This helper deliberately
+/// returns a borrowed snapshot rather than materializing an input-width map;
+/// duplicate identity is rejected as soon as a second match is observed.
+fn selected_data_info<'source>(
+    source: &'source [u8],
+    identifier: u64,
+    options: DecodeOptions,
+) -> Result<DataInfoSnapshot<'source>, RewriteError> {
+    let mut selected = None;
+    let mut offset = 0usize;
+    while let Some(field) = next_field(source, offset).map_err(map_decode)? {
+        offset = field.end;
+        if field.number != ROOT_DATA_INFO_FIELD {
+            continue;
+        }
+        let mut state = ScanState::new(source, options).map_err(map_decode)?;
+        let mut visitor = NoopVisitor;
+        parse_data_info(
+            source,
+            field.payload(source),
+            options,
+            &mut state,
+            &mut visitor,
+        )
+        .map_err(map_decode)?;
+        let snapshot = data_info_facts(field.payload(source)).map_err(map_decode)?;
+        if snapshot.identifier() != identifier {
+            continue;
+        }
+        if selected.replace(snapshot).is_some() {
+            return Err(RewriteError::invalid(InvalidReason::DuplicateDataInfo));
+        }
+    }
+    selected.ok_or_else(|| RewriteError::invalid(InvalidReason::DataInfoNotFound))
+}
+
 fn data_info_facts<'source>(
     payload: &'source [u8],
 ) -> Result<DataInfoSnapshot<'source>, DecodeError> {
@@ -1534,6 +1887,9 @@ fn data_info_facts<'source>(
                 }
                 materialized_length = Some(varint(payload, field)?);
             },
+            5..=17 => {},
+            99 if field.wire_type == 2 => {},
+            99 => unknown_fields = true,
             _ => unknown_fields = true,
         }
     }
@@ -1643,6 +1999,7 @@ fn owner_matches(
     object_identifier: u64,
 ) -> Result<OwnerMatchFacts, RewriteError> {
     let mut facts = OwnerMatchFacts::default();
+    let mut versioned_match = false;
     let mut offset = 0usize;
     while let Some(field) = next_field(source, offset).map_err(map_decode)? {
         offset = field.end;
@@ -1659,14 +2016,15 @@ fn owner_matches(
         {
             continue;
         }
+        if component.versioned {
+            versioned_match = true;
+            continue;
+        }
         facts.components = facts
             .components
             .checked_add(1)
             .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
         facts.component_unknown |= component.unknown_fields;
-        if component.versioned {
-            return Err(RewriteError::invalid(InvalidReason::VersionedComponent));
-        }
         for result in fields(field.payload(source)) {
             let child = result.map_err(map_decode)?;
             if child.number != COMPONENT_DATA_REFERENCE_FIELD {
@@ -1705,6 +2063,9 @@ fn owner_matches(
     }
     if facts.components > 1 {
         return Err(RewriteError::invalid(InvalidReason::ComponentAmbiguous));
+    }
+    if facts.components == 0 && versioned_match {
+        return Err(RewriteError::invalid(InvalidReason::VersionedComponent));
     }
     if facts.parents > 1 {
         return Err(RewriteError::invalid(InvalidReason::DuplicateDataInfo));
@@ -1914,6 +2275,66 @@ fn emit_data_info<S: Sink>(
     Ok(())
 }
 
+fn data_replacement_for<'source>(
+    replacements: &[DataInfoContentReplacement<'source>],
+    identifier: u64,
+) -> Option<DataInfoContentReplacement<'source>> {
+    replacements
+        .iter()
+        .copied()
+        .find(|replacement| replacement.identifier == identifier)
+}
+
+/// Rewrite only DataInfo fields 2 and 18.  Every other field is emitted from
+/// its original span, including optional native metadata and unknown future
+/// fields (the latter are rejected before this helper can be selected).
+fn emit_rewritten_data_info<S: Sink>(
+    sink: &mut S,
+    payload: &[u8],
+    replacement: DataInfoContentReplacement<'_>,
+    maximum: usize,
+) -> Result<(), RewriteError> {
+    let mut nested = CountSink { len: 0 };
+    for result in fields(payload) {
+        let field = result.map_err(map_decode)?;
+        match field.number {
+            DATA_DIGEST_FIELD => emit_bytes_field(
+                &mut nested,
+                DATA_DIGEST_FIELD,
+                replacement.replacement_digest,
+                usize::MAX,
+            )?,
+            DATA_MATERIALIZED_LENGTH_FIELD => emit_varint_field(
+                &mut nested,
+                DATA_MATERIALIZED_LENGTH_FIELD,
+                replacement.replacement_materialized_length,
+                usize::MAX,
+            )?,
+            _ => nested.emit(field_bytes(payload, field), usize::MAX)?,
+        }
+    }
+    emit_field_header(sink, ROOT_DATA_INFO_FIELD, 2, nested.len, maximum)?;
+    for result in fields(payload) {
+        let field = result.map_err(map_decode)?;
+        match field.number {
+            DATA_DIGEST_FIELD => emit_bytes_field(
+                sink,
+                DATA_DIGEST_FIELD,
+                replacement.replacement_digest,
+                maximum,
+            )?,
+            DATA_MATERIALIZED_LENGTH_FIELD => emit_varint_field(
+                sink,
+                DATA_MATERIALIZED_LENGTH_FIELD,
+                replacement.replacement_materialized_length,
+                maximum,
+            )?,
+            _ => sink.emit(field_bytes(payload, field), maximum)?,
+        }
+    }
+    Ok(())
+}
+
 fn same_component(left: ComponentSelector<'_>, right: ComponentSelector<'_>) -> bool {
     left.identifier == right.identifier && left.locator == right.locator
 }
@@ -1932,6 +2353,16 @@ fn data_removal_duplicate(removals: &[DataInfoRemoval], index: usize, identifier
     removals[..index]
         .iter()
         .any(|removal| removal.identifier == identifier)
+}
+
+fn data_replacement_duplicate(
+    replacements: &[DataInfoContentReplacement<'_>],
+    index: usize,
+    identifier: u64,
+) -> bool {
+    replacements[..index]
+        .iter()
+        .any(|replacement| replacement.identifier == identifier)
 }
 
 fn owner_addition_duplicate(
@@ -2064,6 +2495,7 @@ fn validate_batch(
         .data_additions
         .len()
         .checked_add(batch.data_removals.len())
+        .and_then(|value| value.checked_add(batch.data_replacements.len()))
         .and_then(|value| value.checked_add(batch.owner_additions.len()))
         .and_then(|value| value.checked_add(batch.owner_removals.len()))
         .and_then(|value| value.checked_add(batch.owner_updates.len()))
@@ -2118,6 +2550,33 @@ fn validate_batch(
         }
         if count_data_owners(source, removal.identifier)? != 0 {
             return Err(RewriteError::invalid(InvalidReason::DataInfoReferenced));
+        }
+    }
+
+    for (index, replacement) in batch.data_replacements.iter().copied().enumerate() {
+        validate_content_replacement(replacement, options)?;
+        if data_replacement_duplicate(batch.data_replacements, index, replacement.identifier)
+            || batch
+                .data_additions
+                .iter()
+                .any(|addition| addition.identifier == replacement.identifier)
+            || batch
+                .data_removals
+                .iter()
+                .any(|removal| removal.identifier == replacement.identifier)
+        {
+            return Err(RewriteError::invalid(InvalidReason::DuplicateOperation));
+        }
+        let snapshot = selected_data_info(source, replacement.identifier, options)?;
+        if snapshot.has_unknown_fields()
+            || snapshot.digest() != replacement.expected_digest
+            || snapshot.materialized_length() != Some(replacement.expected_materialized_length)
+        {
+            return Err(RewriteError::invalid(if snapshot.has_unknown_fields() {
+                InvalidReason::UnknownSelectedRecord
+            } else {
+                InvalidReason::DataInfoContentMismatch
+            }));
         }
     }
 
@@ -2585,7 +3044,27 @@ fn rewrite_source<S: Sink>(
                 {
                     continue;
                 }
-                sink.emit(field_bytes(source, field), maximum)?;
+                if let Some(replacement) =
+                    data_replacement_for(batch.data_replacements, snapshot.identifier)
+                {
+                    if replacement.expected_digest == replacement.replacement_digest
+                        && replacement.expected_materialized_length
+                            == replacement.replacement_materialized_length
+                    {
+                        // A semantic no-op must retain even non-canonical
+                        // source field headers and varints byte-for-byte.
+                        sink.emit(field_bytes(source, field), maximum)?;
+                    } else {
+                        emit_rewritten_data_info(
+                            sink,
+                            field.payload(source),
+                            replacement,
+                            maximum,
+                        )?;
+                    }
+                } else {
+                    sink.emit(field_bytes(source, field), maximum)?;
+                }
             },
             _ => sink.emit(field_bytes(source, field), maximum)?,
         }
@@ -2608,11 +3087,15 @@ fn verify_postconditions(
     candidate: &[u8],
     options: DecodeOptions,
     batch: MediaRewriteBatch<'_>,
-    work_limit: usize,
+    requirements: RewriteExecutionRequirements,
 ) -> Result<(), RewriteError> {
     let candidate_options = options
         .with_max_message_bytes(candidate.len().max(options.max_message_bytes))
-        .with_max_work_bytes(work_limit);
+        .with_max_work_bytes(requirements.work_bytes)
+        .with_max_fields(options.max_fields.max(requirements.fields))
+        .with_max_components(options.max_components.max(requirements.components))
+        .with_max_data_records(options.max_data_records.max(requirements.data_records))
+        .with_max_owners(options.max_owners.max(requirements.owners));
     let _report =
         inspect_package_metadata_media(candidate, candidate_options).map_err(map_decode)?;
     for addition in batch.data_additions.iter().copied() {
@@ -2622,6 +3105,14 @@ fn verify_postconditions(
     }
     for removal in batch.data_removals.iter().copied() {
         if postcondition_data_count(candidate, removal.identifier, candidate_options)? != 0 {
+            return Err(RewriteError::invalid(InvalidReason::Verification));
+        }
+    }
+    for replacement in batch.data_replacements.iter().copied() {
+        let snapshot = selected_data_info(candidate, replacement.identifier, candidate_options)?;
+        if snapshot.digest() != replacement.replacement_digest
+            || snapshot.materialized_length() != Some(replacement.replacement_materialized_length)
+        {
             return Err(RewriteError::invalid(InvalidReason::Verification));
         }
     }
@@ -2716,12 +3207,7 @@ impl PreparedPackageMetadataMediaRewrite<'_> {
         if output.len() != self.output_size {
             return Err(RewriteError::invalid(InvalidReason::Verification));
         }
-        verify_postconditions(
-            &output,
-            self.options,
-            self.batch,
-            self.requirements.work_bytes,
-        )?;
+        verify_postconditions(&output, self.options, self.batch, self.requirements)?;
         Ok(MediaRewriteOutput {
             bytes: output,
             report: RewriteReport {
@@ -2735,6 +3221,7 @@ impl PreparedPackageMetadataMediaRewrite<'_> {
                 owners: self.source_report.owners,
                 data_additions: self.batch.data_additions.len(),
                 data_removals: self.batch.data_removals.len(),
+                data_replacements: self.batch.data_replacements.len(),
                 owner_additions: self.batch.owner_additions.len(),
                 owner_removals: self.batch.owner_removals.len(),
                 owner_updates: self.batch.owner_updates.len(),
@@ -2795,6 +3282,69 @@ fn check_execution_limits(
     Ok(())
 }
 
+/// Bound the strict candidate scan without materializing candidate bytes.
+///
+/// The uniqueness audit now has one source pass plus bounded fixed-width key
+/// sorting. Four width passes cover the root and the handwritten nested
+/// parser's maximum depth; the candidate sort bound accounts for records
+/// added by the transaction. This remains finite and linear in candidate
+/// bytes instead of inheriting the old full-payload rescan multiplier.
+fn candidate_scan_work_bound(
+    source_report: DecodeReport,
+    output_size: usize,
+    batch: MediaRewriteBatch<'_>,
+) -> usize {
+    let growth = output_size.saturating_sub(source_report.input_bytes);
+    let candidate_data_records = source_report
+        .data_records
+        .saturating_add(batch.data_additions.len())
+        .saturating_sub(batch.data_removals.len());
+    let candidate_references = source_report
+        .data_references
+        .saturating_add(batch.owner_additions.len());
+    let candidate_owners = source_report
+        .owners
+        .saturating_add(batch.owner_additions.len())
+        .saturating_sub(batch.owner_removals.len());
+    let candidate_sort_work = sort_work(candidate_data_records)
+        .saturating_add(sort_work(candidate_references))
+        .saturating_add(sort_work(candidate_owners))
+        .saturating_mul(size_of::<u64>())
+        .saturating_add(
+            sort_work(source_report.components)
+                .saturating_mul(size_of::<u64>().saturating_add(source_report.max_locator_bytes)),
+        );
+    let nested_width_passes = 4usize;
+    source_report
+        .work_bytes
+        .saturating_add(growth.saturating_mul(nested_width_passes))
+        .saturating_add(candidate_sort_work)
+}
+
+fn source_validation_passes(batch: MediaRewriteBatch<'_>) -> usize {
+    batch
+        .data_additions
+        .len()
+        .saturating_mul(2)
+        .saturating_add(batch.data_removals.len().saturating_mul(5))
+        .saturating_add(batch.data_replacements.len().saturating_mul(3))
+        .saturating_add(batch.owner_additions.len().saturating_mul(6))
+        .saturating_add(batch.owner_removals.len().saturating_mul(3))
+        .saturating_add(batch.owner_updates.len().saturating_mul(6))
+}
+
+fn candidate_validation_passes(batch: MediaRewriteBatch<'_>) -> usize {
+    batch
+        .data_additions
+        .len()
+        .saturating_mul(2)
+        .saturating_add(batch.data_removals.len().saturating_mul(2))
+        .saturating_add(batch.data_replacements.len().saturating_mul(3))
+        .saturating_add(batch.owner_additions.len().saturating_mul(3))
+        .saturating_add(batch.owner_removals.len().saturating_mul(3))
+        .saturating_add(batch.owner_updates.len().saturating_mul(3))
+}
+
 /// Prepare one atomic PackageMetadata media rewrite.
 pub fn prepare_package_metadata_media_rewrite<'source>(
     source: &'source [u8],
@@ -2818,15 +3368,47 @@ pub fn prepare_package_metadata_media_rewrite<'source>(
     let fields = source_report
         .fields
         .saturating_mul(3)
-        .saturating_add(batch.data_additions.len().saturating_mul(5))
+        .saturating_add(
+            source_report
+                .fields
+                .saturating_mul(batch.data_replacements.len()),
+        )
+        // A canonical DataInfo addition contributes its root envelope plus
+        // five inner fields.  Keep this independent of the existing source
+        // field slack so a batch of additions cannot pass an undercharged
+        // exact limit.
+        .saturating_add(batch.data_additions.len().saturating_mul(6))
+        .saturating_add(batch.data_replacements.len().saturating_mul(6))
+        // A missing ComponentDataReference owner append may emit the
+        // reference envelope, data identifier, owner envelope, and both
+        // owner identity/count fields.  Seven is a conservative field
+        // budget that also covers the rewritten component envelope.
+        .saturating_add(batch.owner_additions.len().saturating_mul(7))
         .saturating_add(batch.owner_updates.len().saturating_mul(5));
     // Preparation scans the source once, sizes the raw-preserving stream,
     // and execution writes plus verifies one candidate.  Charge the source
     // scan and two output-width passes; this is finite, deterministic, and
     // leaves `for_source` useful for ordinary small additions.
-    let work_bytes = source_report
+    let rewrite_work = source_report
         .work_bytes
         .saturating_add(output_size.saturating_mul(2));
+    let rewrite_work = rewrite_work.saturating_add(
+        source_report
+            .input_bytes
+            .saturating_mul(batch.data_replacements.len()),
+    );
+    let candidate_work = candidate_scan_work_bound(source_report, output_size, batch);
+    // Validation and postcondition checks revisit selected source/candidate
+    // records independently of the strict full scan. Charge those bounded
+    // traversals as part of the caller's preflight budget as well.
+    let source_validation_work = source_report
+        .input_bytes
+        .saturating_mul(source_validation_passes(batch));
+    let candidate_validation_work = output_size.saturating_mul(candidate_validation_passes(batch));
+    let validation_work = source_validation_work.saturating_add(candidate_validation_work);
+    let work_bytes = rewrite_work
+        .saturating_add(validation_work)
+        .saturating_add(candidate_work);
     if fields > options.max_fields {
         return Err(RewriteError::limited(DecodeLimit::Fields {
             observed: fields,
@@ -2855,19 +3437,41 @@ pub fn prepare_package_metadata_media_rewrite<'source>(
             maximum: options.max_depth,
         }));
     }
+    let candidate_components = source_report.components;
+    let candidate_data_records = source_report
+        .data_records
+        .saturating_add(batch.data_additions.len())
+        .saturating_sub(batch.data_removals.len());
+    let candidate_owners = source_report
+        .owners
+        .saturating_add(batch.owner_additions.len())
+        .saturating_sub(batch.owner_removals.len());
+    if candidate_components > options.max_components {
+        return Err(RewriteError::limited(DecodeLimit::Components {
+            observed: candidate_components,
+            maximum: options.max_components,
+        }));
+    }
+    if candidate_data_records > options.max_data_records {
+        return Err(RewriteError::limited(DecodeLimit::DataRecords {
+            observed: candidate_data_records,
+            maximum: options.max_data_records,
+        }));
+    }
+    if candidate_owners > options.max_owners {
+        return Err(RewriteError::limited(DecodeLimit::Owners {
+            observed: candidate_owners,
+            maximum: options.max_owners,
+        }));
+    }
     let requirements = RewriteExecutionRequirements {
         output_bytes: output_size,
         fields,
         work_bytes,
-        components: source_report.components,
-        data_records: source_report
-            .data_records
-            .saturating_add(batch.data_additions.len())
-            .saturating_sub(batch.data_removals.len()),
-        owners: source_report
-            .owners
-            .saturating_add(batch.owner_additions.len())
-            .saturating_sub(batch.owner_removals.len()),
+        components: candidate_components,
+        data_records: candidate_data_records,
+        owners: candidate_owners,
+        data_replacements: batch.data_replacements.len(),
         allocations: 1,
         retained_bytes: output_size,
         scratch_bytes: 0,
@@ -2892,6 +3496,47 @@ pub fn rewrite_package_metadata_media(
     let prepared = prepare_package_metadata_media_rewrite(source, batch, options)?;
     let limits = prepared.execution_requirements().exact_limits();
     prepared.execute(limits)
+}
+
+/// Prepare only DataInfo digest/length replacements while retaining the same
+/// bounded planner and execution report as the general metadata transaction.
+///
+/// This convenience entry point is useful to format owners that have no
+/// owner-list edits to stage.  Multiple replacements are evaluated against
+/// one source snapshot and published atomically.
+pub fn prepare_package_metadata_media_content_replacements<'source>(
+    source: &'source [u8],
+    replacements: &'source [DataInfoContentReplacement<'source>],
+    options: DecodeOptions,
+) -> Result<PreparedPackageMetadataMediaRewrite<'source>, RewriteError> {
+    prepare_package_metadata_media_rewrite(
+        source,
+        MediaRewriteBatch::empty().with_data_replacements(replacements),
+        options,
+    )
+}
+
+/// Apply one or more strict DataInfo digest/length replacements atomically.
+pub fn rewrite_package_metadata_media_content_replacements<'source>(
+    source: &'source [u8],
+    replacements: &'source [DataInfoContentReplacement<'source>],
+    options: DecodeOptions,
+) -> Result<MediaRewriteOutput, RewriteError> {
+    let prepared =
+        prepare_package_metadata_media_content_replacements(source, replacements, options)?;
+    let limits = prepared.execution_requirements().exact_limits();
+    prepared.execute(limits)
+}
+
+/// Apply one strict DataInfo digest/length replacement without requiring a
+/// caller-owned one-element slice.
+pub fn rewrite_package_metadata_media_content_replacement(
+    source: &[u8],
+    replacement: DataInfoContentReplacement<'_>,
+    options: DecodeOptions,
+) -> Result<MediaRewriteOutput, RewriteError> {
+    let replacements = [replacement];
+    rewrite_package_metadata_media_content_replacements(source, &replacements, options)
 }
 
 /// One new DataInfo record.  The digest is normally a 20-byte SHA-1 digest,
@@ -2962,6 +3607,84 @@ impl<'source> DataInfoAddition<'source> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DataInfoRemoval {
     identifier: u64,
+}
+
+/// One strict compare-and-set replacement of a materialized DataInfo.
+///
+/// The identity, digest, and materialized length are all checked against the
+/// source before a candidate is allocated.  Only fields 2 and 18 are
+/// rewritten; filenames, identifiers, unknown fields, field order, and every
+/// component owner envelope remain source-authoritative.  Both digests must
+/// be the native 20-byte SHA-1 representation.  A missing field 18 is not a
+/// valid target for this operation: callers must first establish the native
+/// materialized-length witness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataInfoContentReplacement<'source> {
+    identifier: u64,
+    expected_digest: &'source [u8],
+    replacement_digest: &'source [u8],
+    expected_materialized_length: u64,
+    replacement_materialized_length: u64,
+}
+
+/// Short spelling for [`DataInfoContentReplacement`].
+pub type DataInfoReplacement<'source> = DataInfoContentReplacement<'source>;
+
+impl<'source> DataInfoContentReplacement<'source> {
+    /// Construct one digest/length compare-and-set operation.
+    #[must_use]
+    pub const fn new(
+        identifier: u64,
+        expected_digest: &'source [u8],
+        replacement_digest: &'source [u8],
+        expected_materialized_length: u64,
+        replacement_materialized_length: u64,
+    ) -> Self {
+        Self {
+            identifier,
+            expected_digest,
+            replacement_digest,
+            expected_materialized_length,
+            replacement_materialized_length,
+        }
+    }
+
+    #[must_use]
+    pub const fn identifier(self) -> u64 {
+        self.identifier
+    }
+
+    #[must_use]
+    pub const fn expected_digest(self) -> &'source [u8] {
+        self.expected_digest
+    }
+
+    #[must_use]
+    pub const fn replacement_digest(self) -> &'source [u8] {
+        self.replacement_digest
+    }
+
+    #[must_use]
+    pub const fn expected_materialized_length(self) -> u64 {
+        self.expected_materialized_length
+    }
+
+    #[must_use]
+    pub const fn replacement_materialized_length(self) -> u64 {
+        self.replacement_materialized_length
+    }
+
+    /// Alias used by format owners that call the target value `new_length`.
+    #[must_use]
+    pub const fn new_materialized_length(self) -> u64 {
+        self.replacement_materialized_length
+    }
+
+    /// Alias used by format owners that call the target digest `new_digest`.
+    #[must_use]
+    pub const fn new_digest(self) -> &'source [u8] {
+        self.replacement_digest
+    }
 }
 
 impl DataInfoRemoval {
@@ -3129,6 +3852,7 @@ impl<'source> DataReferenceOwnerCountUpdate<'source> {
 pub struct MediaRewriteBatch<'source> {
     data_additions: &'source [DataInfoAddition<'source>],
     data_removals: &'source [DataInfoRemoval],
+    data_replacements: &'source [DataInfoContentReplacement<'source>],
     owner_additions: &'source [DataReferenceOwnerAddition<'source>],
     owner_removals: &'source [DataReferenceOwnerRemoval<'source>],
     owner_updates: &'source [DataReferenceOwnerCountUpdate<'source>],
@@ -3145,6 +3869,7 @@ impl<'source> MediaRewriteBatch<'source> {
         Self {
             data_additions,
             data_removals,
+            data_replacements: &[],
             owner_additions,
             owner_removals,
             owner_updates: &[],
@@ -3167,6 +3892,7 @@ impl<'source> MediaRewriteBatch<'source> {
         Self {
             data_additions,
             data_removals,
+            data_replacements: &[],
             owner_additions,
             owner_removals,
             owner_updates,
@@ -3181,6 +3907,37 @@ impl<'source> MediaRewriteBatch<'source> {
     ) -> Self {
         self.owner_updates = owner_updates;
         self
+    }
+
+    /// Return a copy of this batch with strict DataInfo content
+    /// compare-and-set replacements.
+    #[must_use]
+    pub const fn with_data_replacements(
+        mut self,
+        data_replacements: &'source [DataInfoContentReplacement<'source>],
+    ) -> Self {
+        self.data_replacements = data_replacements;
+        self
+    }
+
+    /// Alias emphasizing that the replacement changes materialized content
+    /// metadata while retaining the DataInfo identity and envelope.
+    #[must_use]
+    pub const fn with_content_replacements(
+        self,
+        data_replacements: &'source [DataInfoContentReplacement<'source>],
+    ) -> Self {
+        self.with_data_replacements(data_replacements)
+    }
+
+    /// Explicit DataInfo spelling for format owners that do not use the
+    /// shorter `data_*` batch vocabulary.
+    #[must_use]
+    pub const fn with_data_info_replacements(
+        self,
+        data_replacements: &'source [DataInfoContentReplacement<'source>],
+    ) -> Self {
+        self.with_data_replacements(data_replacements)
     }
 
     /// Alias emphasizing that these are count transitions rather than owner
@@ -3207,6 +3964,18 @@ impl<'source> MediaRewriteBatch<'source> {
         self.data_removals
     }
     #[must_use]
+    pub const fn data_replacements(self) -> &'source [DataInfoContentReplacement<'source>] {
+        self.data_replacements
+    }
+    #[must_use]
+    pub const fn content_replacements(self) -> &'source [DataInfoContentReplacement<'source>] {
+        self.data_replacements
+    }
+    #[must_use]
+    pub const fn data_info_replacements(self) -> &'source [DataInfoContentReplacement<'source>] {
+        self.data_replacements
+    }
+    #[must_use]
     pub const fn owner_additions(self) -> &'source [DataReferenceOwnerAddition<'source>] {
         self.owner_additions
     }
@@ -3227,6 +3996,7 @@ impl<'source> MediaRewriteBatch<'source> {
     pub const fn is_empty(self) -> bool {
         self.data_additions.is_empty()
             && self.data_removals.is_empty()
+            && self.data_replacements.is_empty()
             && self.owner_additions.is_empty()
             && self.owner_removals.is_empty()
             && self.owner_updates.is_empty()
@@ -3258,6 +4028,7 @@ pub struct RewriteExecutionRequirements {
     components: usize,
     data_records: usize,
     owners: usize,
+    data_replacements: usize,
     allocations: usize,
     retained_bytes: usize,
     scratch_bytes: usize,
@@ -3287,6 +4058,12 @@ impl RewriteExecutionRequirements {
     #[must_use]
     pub const fn owners(self) -> usize {
         self.owners
+    }
+    /// Number of compare-and-set DataInfo content replacements validated by
+    /// this prepared transaction.
+    #[must_use]
+    pub const fn data_replacements(self) -> usize {
+        self.data_replacements
     }
     #[must_use]
     pub const fn allocations(self) -> usize {
@@ -3354,6 +4131,7 @@ pub struct RewriteReport {
     owners: usize,
     data_additions: usize,
     data_removals: usize,
+    data_replacements: usize,
     owner_additions: usize,
     owner_removals: usize,
     owner_updates: usize,
@@ -3402,6 +4180,10 @@ impl RewriteReport {
     #[must_use]
     pub const fn data_removals(self) -> usize {
         self.data_removals
+    }
+    #[must_use]
+    pub const fn data_replacements(self) -> usize {
+        self.data_replacements
     }
     #[must_use]
     pub const fn owner_additions(self) -> usize {
@@ -3647,6 +4429,10 @@ fn utf8(source: &[u8], field: WireField) -> Result<&str, DecodeError> {
 }
 
 #[cfg(test)]
+#[path = "package_metadata_media_codec_content_tests.rs"]
+mod content_replacement_tests;
+
+#[cfg(test)]
 #[allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -3751,7 +4537,11 @@ mod tests {
         let report = inspect_package_metadata_media(&source, DecodeOptions::for_source(&source))
             .expect("unselected native legacy DataInfo remains inspectable");
         assert_eq!(report.data_records(), 1);
-        assert_eq!(report.unknown_records(), 1);
+        assert_eq!(
+            report.unknown_records(),
+            1,
+            "a legacy field 99 wire shape remains opaque"
+        );
     }
 
     #[test]

@@ -258,20 +258,6 @@ impl KeynoteEditor {
         Ok(created)
     }
 
-    /// Replace the bytes referenced by one slide-owned audio clip.
-    ///
-    /// Audio controls duplicated with [`Self::duplicate_slide_audio`] share
-    /// their embedded asset, matching Keynote's native Duplicate behavior.
-    pub fn replace_slide_audio_data(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        replacement: &[u8],
-    ) -> Result<Vec<u8>> {
-        let source = require_audio(self, slide_index, drawable_object_id)?;
-        self.replace_media(source.audio_data_identifier, replacement)
-    }
-
     /// Remove an audio clip, its automatic build, private graph, and unshared asset.
     pub fn remove_slide_audio(
         &mut self,
@@ -507,7 +493,7 @@ mod tests {
         );
         assert_eq!(
             editor
-                .replace_slide_audio_data(0, created.drawable_object_id, REPLACEMENT_AUDIO)
+                .replace_media(created.audio_data_identifier, REPLACEMENT_AUDIO)
                 .unwrap(),
             AUDIO
         );
@@ -616,7 +602,7 @@ mod tests {
         );
         assert_eq!(
             editor
-                .replace_slide_audio_data(0, duplicate.drawable_object_id, REPLACEMENT_AUDIO)
+                .replace_media(source.audio_data_identifier, REPLACEMENT_AUDIO)
                 .unwrap(),
             AUDIO
         );
@@ -731,11 +717,7 @@ mod tests {
         assert_eq!(editor.to_bytes().unwrap(), before);
         assert!(
             editor
-                .replace_slide_audio_data(
-                    0,
-                    audio.drawable_object_id,
-                    b"\x89PNG\r\n\x1a\nnot audio",
-                )
+                .replace_media(audio.audio_data_identifier, b"\x89PNG\r\n\x1a\nnot audio",)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

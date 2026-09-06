@@ -9174,3 +9174,76 @@ edge, ordered debt, host count, or ADR 0028 deletion gate, so the monolithic
 crate and its remaining exit gates stay open.
 
 Validation for this retirement passes 37 focused Custom integration tests (19 owner, 7 native Number, 6 native Text, and 5 native Date & Time), 28 host tests filtered by `custom`, and the additional source-built/reopened cross-family compatibility regression. That regression covers admitted mutations and byte-exact refusal of numeric-to-Text conversion. The boundary suite passes 927 tests; the scanner reports 64 workspace packages, 238 internal dependency declarations, and 11 explicit debt items.
+
+## 2026-09-06 follow-up: Keynote slide-media replacement owner (operation-specific E4 evidence)
+
+The focused `litchi-keynote` package now provides the bounded owner for
+materialized content/poster replacement on an existing slide movie or audio
+drawable. `Package::{slide_media_data,edit_slide_media_data,apply_slide_media_data}`
+uses checked slide selectors and source-order media selectors; callers do not
+provide archive IDs, generated messages, `DataInfo` keys, component paths, or
+ZIP names. The owner validates the rooted slide/drawable/media closure and
+uses the neutral lazy Buffa metadata codec to witness and rewrite only the
+selected data member plus its SHA-1 and materialized length. Shared records
+remain shared, exact no-op and inverse behavior is source-bound, stale patches
+are refused, and finite archive, wire, graph, and media limits apply before
+publication.
+
+The focused rewrite preserves graph references, captions, title, geometry,
+playback, opaque fields, and unrelated package members. Preview invalidation
+is limited to the existing root-preview policy. It does not decode media or
+create a new asset. The old Keynote host conveniences
+`replace_slide_movie_data`, `replace_slide_movie_poster`, and
+`replace_slide_audio_data` are removed; generic host `replace_media` remains,
+as do host creation, duplication, removal, drawable-property, and broader
+asset-lifecycle operations until separately owned.
+
+The native source baseline is
+[`media-replacement-native.key`](../../test-data/iwork/keynote/media-replacement-native.key),
+752,060 bytes, SHA-256
+`f5763984974612f078486cb2310f408cbcb7cd06ef6adca494aae19eaf62609d`.
+Keynote 14.4 saved, actually closed, and reopened it from the exact path
+without error. Its source-order media are Audio, Audio, File, File; the two
+file movies share the self-authored 34,651-byte MOV content and 4,408-byte
+poster, and the two audio controls share a 192,044-byte WAV. The title, body
+marker, shared movie caption, 320×180 movie geometry at the two recorded
+positions, and 0–2 second/volume-1/loop-off/click/across-slides playback
+settings remain in the baseline. Local replacement assets and their hashes
+are recorded in the fixture README.
+
+The combined pre-native candidate applies `tone.wav` to audio position 0,
+`striped.mov` to file-movie content position 2, and `poster.png` to that
+movie's poster. It is 742,670 bytes with SHA-256
+`3d6cae99029d0e32ed090576b3a1df3a73885e75066975c234157467a22af600`.
+The shared audio and movie records remain shared across their two source-order
+occurrences, and all three selected ZIP payloads match the checked-in
+replacement assets exactly.
+
+Keynote 14.4 opened the candidate without repair or error. After playback, a
+native body edit to `Saved media ownership marker — 北区`, save, actual close,
+and exact-path reopen, the resaved artifact is
+[`media-replacement-retirement-resaved.key`](../../test-data/iwork/keynote/media-replacement-retirement-resaved.key),
+807,293 bytes with SHA-256
+`31524a79cdb6e5c421fd59953225490f4f0a51bf15d879ad84676dc57dbdc152`.
+All four media objects, both shared captions, both 320×180 movie geometries,
+and the 0–2 second, volume-1, loop-off, click-start, across-slides playback
+settings survived the native cycle without a repair or error.
+
+Keynote displayed the replacement movie's video-derived first frame. The
+selected arbitrary PNG poster bytes were retained byte-for-byte, so this is
+poster storage/metadata evidence and does not claim an arbitrary visual poster
+preview match. Strict Litchi reread of the native-resaved artifact passed six
+shared-record reads and six exact no-op writes, establishing operation-specific
+E4 for the three replacement paths. Focused validation passes 21 owner cases
+plus 2 budget cases (23 total), neutral metadata validation passes 15 module
+and 18 integration cases (33 total), and full boundary verification passes
+933 policy units across 64 crates, 238 internal edges, and 11 explicit debt
+items. A bounded 256-run ASAN smoke passed with harness assertions covering
+all three changed paths and their exact inverses; this is bounded E1 fuzz
+evidence, not exhaustive coverage. Workspace hooks remain a separate pending
+check and are not included in this E4 claim. The caption mutation owner also
+refuses this profile, so no native geometry or caption mutation parity claim
+follows. The
+three-wrapper cutover changes no workspace dependency, ordered-debt entry,
+host count, or global ADR 0028 deletion gate; generic `replace_media` and
+broader media lifecycle remain host-owned.

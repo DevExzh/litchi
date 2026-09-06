@@ -3124,11 +3124,7 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
 
     assert_eq!(
         editor
-            .replace_slide_movie_data(
-                0,
-                duplicate.drawable_object_id,
-                TEST_MOVIE_VIDEO_REPLACEMENT,
-            )
+            .replace_media(asset_id(1), TEST_MOVIE_VIDEO_REPLACEMENT)
             .unwrap(),
         TEST_MOVIE_VIDEO
     );
@@ -3138,7 +3134,7 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     );
     assert_eq!(
         editor
-            .replace_slide_movie_poster(0, 70, TEST_MOVIE_POSTER_REPLACEMENT)
+            .replace_media(asset_id(2), TEST_MOVIE_POSTER_REPLACEMENT)
             .unwrap(),
         TEST_MOVIE_POSTER
     );
@@ -3183,14 +3179,10 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
     assert!(editor.remove_slide_movie(0, 5).is_err());
     assert!(
         editor
-            .replace_slide_movie_data(0, 70, TEST_MOVIE_POSTER)
+            .replace_media(asset_id(1), TEST_MOVIE_POSTER)
             .is_err()
     );
-    assert!(
-        editor
-            .replace_slide_movie_poster(0, 70, TEST_MOVIE_VIDEO)
-            .is_err()
-    );
+    assert!(editor.replace_media(asset_id(2), TEST_MOVIE_VIDEO).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 
     let mut placeholder =

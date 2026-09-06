@@ -454,6 +454,10 @@ pub use package::{
     ChartValueAxisLimitKind, ChartValueAxisPatch,
 };
 pub use package::{
+    MediaPart, SlideMediaData, SlideMediaDataCommit, SlideMediaDataDiagnostics, SlideMediaDataEdit,
+    SlideMediaDataError, SlideMediaDataLimitKind, SlideMediaDataPatch,
+};
+pub use package::{
     SlideTableCellNumberFormatCommit, SlideTableCellNumberFormatDiagnostics,
     SlideTableCellNumberFormatEdit, SlideTableCellNumberFormatError,
     SlideTableCellNumberFormatLimitKind, SlideTableCellNumberFormatPatch,

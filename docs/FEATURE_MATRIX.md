@@ -184,6 +184,33 @@ For exact packages, focused physical-sort refusals are terminal. The legacy host
 retains only the explicitly source-built compatibility route and broader
 table/cell graph work; it is not a general physical-sort fallback.
 
+The Keynote matrix also records a bounded owner for existing slide-media data.
+`Package::{slide_media_data, edit_slide_media_data, apply_slide_media_data}`
+uses checked slide and source-order media selectors to read borrowed content or
+a file-movie poster and to apply an exact-source replacement patch. The owner
+strictly validates the rooted drawable/media closure, SHA-1 and materialized
+length witnesses, shared-record ownership, and finite limits while keeping
+native IDs, `DataInfo` records, and ZIP paths private. Exact no-op/inverse and
+stale-patch refusal, candidate reread, locality, unrelated-member preservation,
+and preview invalidation are source-level contracts. The narrow host wrappers
+`replace_slide_movie_data`, `replace_slide_movie_poster`, and
+`replace_slide_audio_data` are retired; generic `replace_media` and broad
+asset creation, duplication, removal, properties, and lifecycle remain
+host-owned. The checked-in
+[`media-replacement-native.key`](../test-data/iwork/keynote/media-replacement-native.key)
+is a 752,060-byte native Audio/Audio/File/File baseline with SHA-256
+`f5763984974612f078486cb2310f408cbcb7cd06ef6adca494aae19eaf62609d`; it was
+saved, actually closed, and reopened without error. Changed-candidate native
+open/save/actual-close/exact-reopen also succeeded without repair, preserving
+all four objects and the three exact replacement payloads. Strict Litchi reread
+of the native-resaved artifact passed six shared-record reads and six exact
+no-op writes, establishing operation-specific E4. The arbitrary poster is
+certified as byte-preserved storage/metadata rather than a visual-preview
+match. A bounded 256-run ASAN smoke passed with harness assertions covering all
+three changed paths and exact inverses; this is bounded E1 fuzz evidence, not
+exhaustive coverage. This operation-specific evidence has no
+monolith-deletion-gate effect.
+
 The legacy Keynote table listing also has a separate native discovery fixture,
 [`table-discovery.key`](../test-data/iwork/keynote/table-discovery.key), derived
 from `basic.key` with a native Plain 5-by-4 table and `Buffa discovery` in A1.
