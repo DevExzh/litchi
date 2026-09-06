@@ -1,0 +1,81 @@
+{
+  "change": 452,
+  "status": "pass",
+  "lane": {
+    "provider": "bytes",
+    "build": "candidate",
+    "corpus": "media-rich",
+    "repeat": "R1"
+  },
+  "pilot": false,
+  "profile": null,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0452/runs/3/resource.log",
+    "/tmp/litchi-goal-0452-pptx-capture/candidate",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "bytes",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "3778dc08b6f8165b23fc8466af2b73722121d956",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0452/runs/3/report.json"
+  ],
+  "source_before": {
+    "path": "sources/62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb.json",
+    "sha256": "62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb",
+    "files": 6668
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0452-pptx-capture/candidate",
+    "bytes": 57551464,
+    "sha256": "5bc8b7c664e68abbdba3b57fc03843bb6cf952472fbd18de6e5d284d10a1ab53"
+  },
+  "build_sha256": "b6d2bdfea85fa5dae651a2c68ce7cc09865953887b7b22ada6ebd16cae8363d5",
+  "protocol_sha256": "2be6bf80fb784fbcd4b82effc1727c2c68be76b56a45229f6526d0f130831f18",
+  "capture_sha256": "7cd6e7c4b816669b6522572e87582159e671c2dba2688f4fc0c8d89b40b8ddbe",
+  "oracle_sha256": "59b33e888d5233b5462c1c705bedcf4f6b6c118e9e209a0fa1e0ea4af5d2fc95",
+  "started_utc": "2026-09-06T23:35:47.232855+00:00",
+  "exit_code": 0,
+  "oracle_exit_code": 0,
+  "source_after": {
+    "path": "sources/62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb.json",
+    "sha256": "62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb",
+    "files": 6668
+  },
+  "source_unchanged": true,
+  "finished_utc": "2026-09-06T23:35:53.127352+00:00",
+  "artifacts": {
+    "report": {
+      "path": "runs/3/report.json",
+      "bytes": 1824022,
+      "sha256": "8bcf3f2c9bbbcb4aba4338e41be7d2d5c4837a538d732a8e45ac0be7fe12d326"
+    },
+    "resource": {
+      "path": "runs/3/resource.log",
+      "bytes": 994,
+      "sha256": "f63377b687aa5b0eeb487c6c5d6cdc6a831f17254709c79239c2670b5838b133"
+    },
+    "workload": {
+      "path": "runs/3/workload.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "oracle": {
+      "path": "runs/3/oracle.log",
+      "bytes": 284,
+      "sha256": "7fd1048ef8537f2736d00ca5060621775c47f202ca5a6119ef72417507244ad9"
+    }
+  }
+}

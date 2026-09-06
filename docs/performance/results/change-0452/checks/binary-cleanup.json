@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "task": "/tmp/litchi-goal-0452-pptx-capture",
+  "temporary_directory_absent": true,
+  "binaries": {
+    "baseline": {
+      "path": "/tmp/litchi-goal-0452-pptx-capture/baseline",
+      "bytes": 57542712,
+      "sha256": "10248d56548185e3b23d4e6bb0520d5e3f49196fb469d565bd4e3e53dadb61c4"
+    },
+    "candidate": {
+      "path": "/tmp/litchi-goal-0452-pptx-capture/candidate",
+      "bytes": 57551464,
+      "sha256": "5bc8b7c664e68abbdba3b57fc03843bb6cf952472fbd18de6e5d284d10a1ab53"
+    }
+  },
+  "bytes_removed": 115094176
+}

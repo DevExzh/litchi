@@ -1,0 +1,158 @@
+{
+  "change": 452,
+  "status": "frozen",
+  "frozen_utc": "2026-09-06T23:29:58.038723+00:00",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "order": [
+    {
+      "provider": "bytes",
+      "build": "baseline",
+      "corpus": "plain",
+      "repeat": "R1"
+    },
+    {
+      "provider": "bytes",
+      "build": "baseline",
+      "corpus": "media-rich",
+      "repeat": "R1"
+    },
+    {
+      "provider": "bytes",
+      "build": "candidate",
+      "corpus": "plain",
+      "repeat": "R1"
+    },
+    {
+      "provider": "bytes",
+      "build": "candidate",
+      "corpus": "media-rich",
+      "repeat": "R1"
+    },
+    {
+      "provider": "range",
+      "build": "baseline",
+      "corpus": "plain",
+      "repeat": "R1"
+    },
+    {
+      "provider": "range",
+      "build": "baseline",
+      "corpus": "media-rich",
+      "repeat": "R1"
+    },
+    {
+      "provider": "range",
+      "build": "candidate",
+      "corpus": "plain",
+      "repeat": "R1"
+    },
+    {
+      "provider": "range",
+      "build": "candidate",
+      "corpus": "media-rich",
+      "repeat": "R1"
+    },
+    {
+      "provider": "range",
+      "build": "candidate",
+      "corpus": "media-rich",
+      "repeat": "R2"
+    },
+    {
+      "provider": "range",
+      "build": "candidate",
+      "corpus": "plain",
+      "repeat": "R2"
+    },
+    {
+      "provider": "range",
+      "build": "baseline",
+      "corpus": "media-rich",
+      "repeat": "R2"
+    },
+    {
+      "provider": "range",
+      "build": "baseline",
+      "corpus": "plain",
+      "repeat": "R2"
+    },
+    {
+      "provider": "bytes",
+      "build": "candidate",
+      "corpus": "media-rich",
+      "repeat": "R2"
+    },
+    {
+      "provider": "bytes",
+      "build": "candidate",
+      "corpus": "plain",
+      "repeat": "R2"
+    },
+    {
+      "provider": "bytes",
+      "build": "baseline",
+      "corpus": "media-rich",
+      "repeat": "R2"
+    },
+    {
+      "provider": "bytes",
+      "build": "baseline",
+      "corpus": "plain",
+      "repeat": "R2"
+    }
+  ],
+  "reports": 16,
+  "retained_samples": 480,
+  "acceptance": {
+    "range_media_p50_reduction_percent": 10,
+    "both_repeats": true,
+    "positive_regression_review_percent": 5
+  },
+  "profile_order": [
+    {
+      "lane": 1,
+      "kind": "stat"
+    },
+    {
+      "lane": 1,
+      "kind": "record"
+    },
+    {
+      "lane": 3,
+      "kind": "stat"
+    },
+    {
+      "lane": 3,
+      "kind": "record"
+    }
+  ],
+  "claims": "Matched complete source-backed PPTX lifecycle; simulated range service, warm OS cache, no native application roundtrip or cold-disk/scaling claim. Process perf/RSS includes untimed fixture generation, gates and output hashing.",
+  "corpora": {
+    "plain": {
+      "source_archive_sha256": "8ab4513642f48d99fa46e83b2c2764e8b20d417d3933ce3d5efe0825b21f918e",
+      "source_archive_bytes": 31498,
+      "destination_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+      "destination_archive_bytes": 30539,
+      "expected_output_sha256": "ab5109b0584aacb070b9b33a5769f469464ede991c12fd4da7e9e7bce53f159b",
+      "expected_output_bytes": 31514
+    },
+    "media-rich": {
+      "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+      "source_archive_bytes": 16815621,
+      "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "destination_archive_bytes": 16814664,
+      "expected_output_sha256": "809c61728c9e059e7b30758fbd668d2f6bb161cb3bd5f5fbdf0c9465bc611cea",
+      "expected_output_bytes": 33599715
+    }
+  },
+  "bound_files": {
+    "baseline-build.json": "2b259e31dbc2c0280eb281834114387b27c8e3b49ed53b1d463d0e84616e855a",
+    "candidate-build.json": "b6d2bdfea85fa5dae651a2c68ce7cc09865953887b7b22ada6ebd16cae8363d5",
+    "capture.py": "7cd6e7c4b816669b6522572e87582159e671c2dba2688f4fc0c8d89b40b8ddbe",
+    "verify-report.py": "59b33e888d5233b5462c1c705bedcf4f6b6c118e9e209a0fa1e0ea4af5d2fc95",
+    "base-verify-report.py": "d8ec5862592192dbb3b3f08205f6faec19eba10c5f4b9d0a64d536a373474b00"
+  }
+}

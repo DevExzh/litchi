@@ -36,7 +36,12 @@ fuzz_target!(|data: &[u8]| {
                     assert_eq!(cold.as_bytes(), warm.as_bytes());
                     drop(warm_token);
                 }
-                drop(token);
+                let retained = token.into_retained();
+                let copy = retained.clone();
+                let first = retained.authorize_for_publication();
+                let second = copy.authorize_for_publication();
+                drop(first);
+                drop(second);
             }
         }
     }

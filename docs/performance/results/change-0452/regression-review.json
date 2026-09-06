@@ -1,0 +1,651 @@
+{
+  "change": 452,
+  "flags": [
+    {
+      "kind": "paired",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "metric": "plan_p50_ms",
+      "percent_change": -16.716113146845913
+    },
+    {
+      "kind": "paired",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "metric": "publication_p50_ms",
+      "percent_change": -48.88679851135132
+    },
+    {
+      "kind": "paired",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "metric": "api_sum_p50_ms",
+      "percent_change": -36.41928727843112
+    },
+    {
+      "kind": "paired",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "metric": "api_p95_ms",
+      "percent_change": -36.45733514005847
+    },
+    {
+      "kind": "paired",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "metric": "api_p99_ms",
+      "percent_change": -36.5565444511347
+    },
+    {
+      "kind": "paired",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "metric": "plan_p50_ms",
+      "percent_change": 6.524191264151269
+    },
+    {
+      "kind": "paired",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "metric": "publication_p50_ms",
+      "percent_change": -18.620160415381847
+    },
+    {
+      "kind": "paired",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "metric": "api_sum_p50_ms",
+      "percent_change": -7.90269679313157
+    },
+    {
+      "kind": "paired",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "metric": "api_p95_ms",
+      "percent_change": -7.8876565104109115
+    },
+    {
+      "kind": "paired",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "metric": "api_p99_ms",
+      "percent_change": -7.886585183175532
+    },
+    {
+      "kind": "paired",
+      "provider": "range",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "metric": "publication_p50_ms",
+      "percent_change": -45.58092292366071
+    },
+    {
+      "kind": "paired",
+      "provider": "range",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "metric": "api_sum_p50_ms",
+      "percent_change": -31.323797588207125
+    },
+    {
+      "kind": "paired",
+      "provider": "range",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "metric": "api_p95_ms",
+      "percent_change": -31.35287340237134
+    },
+    {
+      "kind": "paired",
+      "provider": "range",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "metric": "api_p99_ms",
+      "percent_change": -31.364888025097592
+    },
+    {
+      "kind": "paired",
+      "provider": "range",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "metric": "publication_p50_ms",
+      "percent_change": -45.436231202787994
+    },
+    {
+      "kind": "paired",
+      "provider": "range",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "metric": "api_sum_p50_ms",
+      "percent_change": -31.048050729144137
+    },
+    {
+      "kind": "paired",
+      "provider": "range",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "metric": "api_p95_ms",
+      "percent_change": -31.034526193991198
+    },
+    {
+      "kind": "paired",
+      "provider": "range",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "metric": "api_p99_ms",
+      "percent_change": -31.035760603815287
+    },
+    {
+      "kind": "repeat",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "metric": "plan_p50_ms",
+      "percent_change": -21.388505680455637
+    },
+    {
+      "kind": "repeat",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "metric": "publication_p50_ms",
+      "percent_change": -36.90988129711198
+    },
+    {
+      "kind": "repeat",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "metric": "api_sum_p50_ms",
+      "percent_change": -30.684836826139872
+    },
+    {
+      "kind": "repeat",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "metric": "api_p95_ms",
+      "percent_change": -30.73729748596553
+    },
+    {
+      "kind": "repeat",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "metric": "api_p99_ms",
+      "percent_change": -30.809018792398845
+    }
+  ],
+  "dispositions": [
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "repeat": "R1",
+        "metric": "plan_p50_ms",
+        "percent_change": -16.716113146845913
+      },
+      "reviewed": true,
+      "reason": "Capture/verification moves into planning and retains another compressed buffer. Source planning returns 3709 additional bytes; approximately 6% planning increase is reproduced in confirmation and accepted for complete API improvement."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "repeat": "R1",
+        "metric": "publication_p50_ms",
+        "percent_change": -48.88679851135132
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "repeat": "R1",
+        "metric": "api_sum_p50_ms",
+        "percent_change": -36.41928727843112
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "repeat": "R1",
+        "metric": "api_p95_ms",
+        "percent_change": -36.45733514005847
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "repeat": "R1",
+        "metric": "api_p99_ms",
+        "percent_change": -36.5565444511347
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "repeat": "R2",
+        "metric": "plan_p50_ms",
+        "percent_change": 6.524191264151269
+      },
+      "reviewed": true,
+      "reason": "Capture/verification moves into planning and retains another compressed buffer. Source planning returns 3709 additional bytes; approximately 6% planning increase is reproduced in confirmation and accepted for complete API improvement."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "repeat": "R2",
+        "metric": "publication_p50_ms",
+        "percent_change": -18.620160415381847
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "repeat": "R2",
+        "metric": "api_sum_p50_ms",
+        "percent_change": -7.90269679313157
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "repeat": "R2",
+        "metric": "api_p95_ms",
+        "percent_change": -7.8876565104109115
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "repeat": "R2",
+        "metric": "api_p99_ms",
+        "percent_change": -7.886585183175532
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "range",
+        "corpus": "media-rich",
+        "repeat": "R1",
+        "metric": "publication_p50_ms",
+        "percent_change": -45.58092292366071
+      },
+      "reviewed": true,
+      "reason": "Both frozen range/media API gates pass with about 31% median reduction. Publication removes 425 source data reads and 16786581 returned bytes. This applies only to the stated simulated range provider."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "range",
+        "corpus": "media-rich",
+        "repeat": "R1",
+        "metric": "api_sum_p50_ms",
+        "percent_change": -31.323797588207125
+      },
+      "reviewed": true,
+      "reason": "Both frozen range/media API gates pass with about 31% median reduction. Publication removes 425 source data reads and 16786581 returned bytes. This applies only to the stated simulated range provider."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "range",
+        "corpus": "media-rich",
+        "repeat": "R1",
+        "metric": "api_p95_ms",
+        "percent_change": -31.35287340237134
+      },
+      "reviewed": true,
+      "reason": "Both frozen range/media API gates pass with about 31% median reduction. Publication removes 425 source data reads and 16786581 returned bytes. This applies only to the stated simulated range provider."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "range",
+        "corpus": "media-rich",
+        "repeat": "R1",
+        "metric": "api_p99_ms",
+        "percent_change": -31.364888025097592
+      },
+      "reviewed": true,
+      "reason": "Both frozen range/media API gates pass with about 31% median reduction. Publication removes 425 source data reads and 16786581 returned bytes. This applies only to the stated simulated range provider."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "range",
+        "corpus": "media-rich",
+        "repeat": "R2",
+        "metric": "publication_p50_ms",
+        "percent_change": -45.436231202787994
+      },
+      "reviewed": true,
+      "reason": "Both frozen range/media API gates pass with about 31% median reduction. Publication removes 425 source data reads and 16786581 returned bytes. This applies only to the stated simulated range provider."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "range",
+        "corpus": "media-rich",
+        "repeat": "R2",
+        "metric": "api_sum_p50_ms",
+        "percent_change": -31.048050729144137
+      },
+      "reviewed": true,
+      "reason": "Both frozen range/media API gates pass with about 31% median reduction. Publication removes 425 source data reads and 16786581 returned bytes. This applies only to the stated simulated range provider."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "range",
+        "corpus": "media-rich",
+        "repeat": "R2",
+        "metric": "api_p95_ms",
+        "percent_change": -31.034526193991198
+      },
+      "reviewed": true,
+      "reason": "Both frozen range/media API gates pass with about 31% median reduction. Publication removes 425 source data reads and 16786581 returned bytes. This applies only to the stated simulated range provider."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "provider": "range",
+        "corpus": "media-rich",
+        "repeat": "R2",
+        "metric": "api_p99_ms",
+        "percent_change": -31.035760603815287
+      },
+      "reviewed": true,
+      "reason": "Both frozen range/media API gates pass with about 31% median reduction. Publication removes 425 source data reads and 16786581 returned bytes. This applies only to the stated simulated range provider."
+    },
+    {
+      "flag": {
+        "kind": "repeat",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "build": "baseline",
+        "metric": "plan_p50_ms",
+        "percent_change": -21.388505680455637
+      },
+      "reviewed": true,
+      "reason": "Primary baseline process drift is unexplained; do not infer a stable 36% CPU benefit. Separate frozen ABBA confirmation gives about 8% API benefit in both pairs, with primary runs retained."
+    },
+    {
+      "flag": {
+        "kind": "repeat",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "build": "baseline",
+        "metric": "publication_p50_ms",
+        "percent_change": -36.90988129711198
+      },
+      "reviewed": true,
+      "reason": "Primary baseline process drift is unexplained; do not infer a stable 36% CPU benefit. Separate frozen ABBA confirmation gives about 8% API benefit in both pairs, with primary runs retained."
+    },
+    {
+      "flag": {
+        "kind": "repeat",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "build": "baseline",
+        "metric": "api_sum_p50_ms",
+        "percent_change": -30.684836826139872
+      },
+      "reviewed": true,
+      "reason": "Primary baseline process drift is unexplained; do not infer a stable 36% CPU benefit. Separate frozen ABBA confirmation gives about 8% API benefit in both pairs, with primary runs retained."
+    },
+    {
+      "flag": {
+        "kind": "repeat",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "build": "baseline",
+        "metric": "api_p95_ms",
+        "percent_change": -30.73729748596553
+      },
+      "reviewed": true,
+      "reason": "Primary baseline process drift is unexplained; do not infer a stable 36% CPU benefit. Separate frozen ABBA confirmation gives about 8% API benefit in both pairs, with primary runs retained."
+    },
+    {
+      "flag": {
+        "kind": "repeat",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "build": "baseline",
+        "metric": "api_p99_ms",
+        "percent_change": -30.809018792398845
+      },
+      "reviewed": true,
+      "reason": "Primary baseline process drift is unexplained; do not infer a stable 36% CPU benefit. Separate frozen ABBA confirmation gives about 8% API benefit in both pairs, with primary runs retained."
+    }
+  ],
+  "confirmation_flags": [
+    {
+      "kind": "paired",
+      "from_lane": 0,
+      "to_lane": 1,
+      "metric": "plan_p50_ms",
+      "percent_change": 6.4817845798819995
+    },
+    {
+      "kind": "paired",
+      "from_lane": 0,
+      "to_lane": 1,
+      "metric": "publication_p50_ms",
+      "percent_change": -18.663798090735174
+    },
+    {
+      "kind": "paired",
+      "from_lane": 0,
+      "to_lane": 1,
+      "metric": "api_sum_p50_ms",
+      "percent_change": -7.980050872801758
+    },
+    {
+      "kind": "paired",
+      "from_lane": 0,
+      "to_lane": 1,
+      "metric": "api_p95_ms",
+      "percent_change": -7.969269955742608
+    },
+    {
+      "kind": "paired",
+      "from_lane": 0,
+      "to_lane": 1,
+      "metric": "api_p99_ms",
+      "percent_change": -7.971557005585184
+    },
+    {
+      "kind": "paired",
+      "from_lane": 3,
+      "to_lane": 2,
+      "metric": "plan_p50_ms",
+      "percent_change": 6.191715735758541
+    },
+    {
+      "kind": "paired",
+      "from_lane": 3,
+      "to_lane": 2,
+      "metric": "publication_p50_ms",
+      "percent_change": -18.57216458557608
+    },
+    {
+      "kind": "paired",
+      "from_lane": 3,
+      "to_lane": 2,
+      "metric": "api_sum_p50_ms",
+      "percent_change": -7.979139934154489
+    },
+    {
+      "kind": "paired",
+      "from_lane": 3,
+      "to_lane": 2,
+      "metric": "api_p95_ms",
+      "percent_change": -7.872240643188466
+    },
+    {
+      "kind": "paired",
+      "from_lane": 3,
+      "to_lane": 2,
+      "metric": "api_p99_ms",
+      "percent_change": -7.886727065360766
+    }
+  ],
+  "confirmation_dispositions": [
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 0,
+        "to_lane": 1,
+        "metric": "plan_p50_ms",
+        "percent_change": 6.4817845798819995
+      },
+      "reviewed": true,
+      "reason": "Capture/verification moves into planning and retains another compressed buffer. Source planning returns 3709 additional bytes; approximately 6% planning increase is reproduced in confirmation and accepted for complete API improvement."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 0,
+        "to_lane": 1,
+        "metric": "publication_p50_ms",
+        "percent_change": -18.663798090735174
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 0,
+        "to_lane": 1,
+        "metric": "api_sum_p50_ms",
+        "percent_change": -7.980050872801758
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 0,
+        "to_lane": 1,
+        "metric": "api_p95_ms",
+        "percent_change": -7.969269955742608
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 0,
+        "to_lane": 1,
+        "metric": "api_p99_ms",
+        "percent_change": -7.971557005585184
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 3,
+        "to_lane": 2,
+        "metric": "plan_p50_ms",
+        "percent_change": 6.191715735758541
+      },
+      "reviewed": true,
+      "reason": "Capture/verification moves into planning and retains another compressed buffer. Source planning returns 3709 additional bytes; approximately 6% planning increase is reproduced in confirmation and accepted for complete API improvement."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 3,
+        "to_lane": 2,
+        "metric": "publication_p50_ms",
+        "percent_change": -18.57216458557608
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 3,
+        "to_lane": 2,
+        "metric": "api_sum_p50_ms",
+        "percent_change": -7.979139934154489
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 3,
+        "to_lane": 2,
+        "metric": "api_p95_ms",
+        "percent_change": -7.872240643188466
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 3,
+        "to_lane": 2,
+        "metric": "api_p99_ms",
+        "percent_change": -7.886727065360766
+      },
+      "reviewed": true,
+      "reason": "Publication avoids a second source capture/verification pass. Confirmed complete bytes/media API improvement is about 8%; primary R1 baseline drift prevents treating its larger reduction as stable. Phase and tail values remain separately reported."
+    }
+  ]
+}

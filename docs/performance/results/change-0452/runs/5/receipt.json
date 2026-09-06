@@ -1,0 +1,89 @@
+{
+  "change": 452,
+  "status": "pass",
+  "lane": {
+    "provider": "range",
+    "build": "baseline",
+    "corpus": "media-rich",
+    "repeat": "R1"
+  },
+  "pilot": false,
+  "profile": null,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0452/runs/5/resource.log",
+    "/tmp/litchi-goal-0452-pptx-capture/baseline",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "range",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "3778dc08b6f8165b23fc8466af2b73722121d956",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0452/runs/5/report.json",
+    "--max-range",
+    "65536",
+    "--delay-us",
+    "200",
+    "--transfer-bytes-per-second",
+    "26214400",
+    "--transfer-delay-policy",
+    "separate-sleeps"
+  ],
+  "source_before": {
+    "path": "sources/62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb.json",
+    "sha256": "62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb",
+    "files": 6668
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0452-pptx-capture/baseline",
+    "bytes": 57542712,
+    "sha256": "10248d56548185e3b23d4e6bb0520d5e3f49196fb469d565bd4e3e53dadb61c4"
+  },
+  "build_sha256": "2b259e31dbc2c0280eb281834114387b27c8e3b49ed53b1d463d0e84616e855a",
+  "protocol_sha256": "2be6bf80fb784fbcd4b82effc1727c2c68be76b56a45229f6526d0f130831f18",
+  "capture_sha256": "7cd6e7c4b816669b6522572e87582159e671c2dba2688f4fc0c8d89b40b8ddbe",
+  "oracle_sha256": "59b33e888d5233b5462c1c705bedcf4f6b6c118e9e209a0fa1e0ea4af5d2fc95",
+  "started_utc": "2026-09-06T23:35:59.571468+00:00",
+  "exit_code": 0,
+  "oracle_exit_code": 0,
+  "source_after": {
+    "path": "sources/62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb.json",
+    "sha256": "62834029b0cf752fa1eff8869cd88e981bfebef0325e758eaa2587bc4dabaadb",
+    "files": 6668
+  },
+  "source_unchanged": true,
+  "finished_utc": "2026-09-06T23:37:29.513426+00:00",
+  "artifacts": {
+    "report": {
+      "path": "runs/5/report.json",
+      "bytes": 1831315,
+      "sha256": "43ba7788a36af6eaddf831d6ca90d6ebcbfdeac4470c62bdcf29b8f61c8afbb9"
+    },
+    "resource": {
+      "path": "runs/5/resource.log",
+      "bytes": 1107,
+      "sha256": "a0b674cefef169906a2f6dfb137031e5a9870c4f498710a72a2c970b894cb7ee"
+    },
+    "workload": {
+      "path": "runs/5/workload.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "oracle": {
+      "path": "runs/5/oracle.log",
+      "bytes": 288,
+      "sha256": "3d576f336a0df0128237b6e433d39455099dd5d3a684ec0956571395d7a7c9de"
+    }
+  }
+}

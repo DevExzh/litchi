@@ -1,0 +1,8 @@
+[
+  "crates/litchi-opc/src/source_backed.rs",
+  "crates/litchi-opc/src/lib.rs",
+  "crates/litchi-opc/tests/source_part_transfer.rs",
+  "crates/litchi-pptx/src/presentation/source_cross_copy.rs",
+  "crates/litchi-pptx/tests/source_backed_cross_copy.rs",
+  "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs"
+]

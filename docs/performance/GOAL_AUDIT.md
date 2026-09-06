@@ -1,6 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0451
+## Current evidence through 0452
+
+[0452](changes/0452-pptx-retained-capture.md) integrates retained OPC captures into PPTX image/chart plans with
+independent publication reservations. Complete simulated-range API p50 improves
+31.324%/31.048%; separate balanced bytes/media confirmation supports about 8%
+improvement with about 6% extra planning time. Publication source data reads
+fall to zero. Plan-held source reservations increase 16,815,144 bytes until drop;
+existing decoded staging remains. All 1,700 final tests and 1,000 fuzz runs pass.
+
+Registry/default counts remain 438/36; representative coverage remains 15
+categories/33 mappings/10 measured/23 correctness-only. Native application
+breadth, cold I/O, bounded existing append, repackaging and scaling remain
+required. Shared staged decoded ownership is the next local memory opportunity.
+This is progress; the full non-iWork goal remains active and uncompleted.
+
+## Earlier evidence through 0451
 
 [0451](changes/0451-opc-combined-capture.md) implements combined OPC read/authorization under cache, source identity,
 work and memory/object budgets. Eight deterministic I/O cases preserve whole

@@ -14,8 +14,8 @@ use std::sync::{Arc, Mutex};
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    PackURI, PartView, Relationships, SourceBackedPackage, SourceLineage, SourceTopologyPlan,
-    TargetMode,
+    PackURI, PartView, Relationships, RetainedPrecompressedPart, SourceBackedPackage,
+    SourceLineage, SourceTopologyPlan, TargetMode,
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, Event};
@@ -116,14 +116,27 @@ pub struct SourceBackedCrossSlideCopyPlan {
     _memory_reservation: Option<Arc<Reservation>>,
 }
 
-#[derive(PartialEq, Eq)]
 struct PreparedImage {
     source_uri: PackURI,
     target_uri: PackURI,
     content_type: String,
     declared_size: u64,
     bytes: Arc<Vec<u8>>,
+    precompressed: Option<RetainedPrecompressedPart>,
 }
+
+// Capture reuse is an optimization. The complete semantic payload identity is
+// checked independently of whether a compressed capture could be retained.
+impl PartialEq for PreparedImage {
+    fn eq(&self, other: &Self) -> bool {
+        self.source_uri == other.source_uri
+            && self.target_uri == other.target_uri
+            && self.content_type == other.content_type
+            && self.declared_size == other.declared_size
+            && self.bytes == other.bytes
+    }
+}
+impl Eq for PreparedImage {}
 
 #[derive(PartialEq, Eq)]
 struct PreparedImageRelationship {
@@ -133,14 +146,27 @@ struct PreparedImageRelationship {
     target_uri: PackURI,
 }
 
-#[derive(PartialEq, Eq)]
 struct PreparedChart {
     source_uri: PackURI,
     target_uri: PackURI,
     content_type: String,
     declared_size: u64,
     bytes: Arc<Vec<u8>>,
+    precompressed: Option<RetainedPrecompressedPart>,
 }
+
+// Capture reuse is an optimization. The complete semantic payload identity is
+// checked independently of whether a compressed capture could be retained.
+impl PartialEq for PreparedChart {
+    fn eq(&self, other: &Self) -> bool {
+        self.source_uri == other.source_uri
+            && self.target_uri == other.target_uri
+            && self.content_type == other.content_type
+            && self.declared_size == other.declared_size
+            && self.bytes == other.bytes
+    }
+}
+impl Eq for PreparedChart {}
 
 #[derive(Clone, Copy)]
 struct PreparedPayloadHint<'a> {
@@ -499,7 +525,11 @@ impl Prepared {
         for image in self.images {
             check_execution(execution_context)?;
             let source_part = source_package.part(&image.source_uri)?;
-            match source_part.authorize_precompressed(Arc::clone(&image.bytes)) {
+            let authorization = match &image.precompressed {
+                Some(capture) => capture.authorize_for_publication(),
+                None => source_part.authorize_precompressed(Arc::clone(&image.bytes)),
+            };
+            match authorization {
                 Ok(payload) => match topology.try_add_precompressed_part(
                     image.target_uri.clone(),
                     image.content_type.clone(),
@@ -528,7 +558,11 @@ impl Prepared {
         for chart in self.charts {
             check_execution(execution_context)?;
             let source_part = source_package.part(&chart.source_uri)?;
-            match source_part.authorize_precompressed(Arc::clone(&chart.bytes)) {
+            let authorization = match &chart.precompressed {
+                Some(capture) => capture.authorize_for_publication(),
+                None => source_part.authorize_precompressed(Arc::clone(&chart.bytes)),
+            };
+            match authorization {
                 Ok(payload) => match topology.try_add_precompressed_part(
                     chart.target_uri.clone(),
                     chart.content_type.clone(),
@@ -1626,7 +1660,7 @@ fn prepare(
         })?;
     for (index, image_part) in source_image_parts.iter().enumerate() {
         check_execution(execution_context)?;
-        let data = image_part.part.data()?;
+        let (data, captured) = read_copy_payload(&image_part.part, reuse_plan.is_none())?;
         let actual_size = data.as_bytes().len();
         let declared_size =
             usize::try_from(image_part.declared_size).map_err(|_| Error::Limit {
@@ -1641,6 +1675,26 @@ fn prepare(
         let target_uri = target_image_uris
             .get(index)
             .ok_or_else(|| invalid("prepared target image URI index is invalid"))?;
+        let bytes = reuse_or_clone_payload(
+            reuse_plan
+                .and_then(|plan| plan.images.get(index))
+                .map(PreparedImage::payload_hint),
+            PreparedPayloadIdentity {
+                source_uri: &image_part.source_uri,
+                target_uri,
+                content_type: &image_part.content_type,
+                declared_size: image_part.declared_size,
+                bytes: data.as_bytes(),
+            },
+            "source-backed copied image",
+            execution_context,
+        )?;
+        let precompressed = captured.or_else(|| {
+            reuse_plan
+                .and_then(|plan| plan.images.get(index))
+                .filter(|previous| Arc::ptr_eq(&bytes, &previous.bytes))
+                .and_then(|previous| previous.precompressed.clone())
+        });
         images.push(PreparedImage {
             source_uri: clone_pack_uri(
                 &image_part.source_uri,
@@ -1652,20 +1706,8 @@ fn prepare(
                 "source-backed copied image content type",
             )?,
             declared_size: image_part.declared_size,
-            bytes: reuse_or_clone_payload(
-                reuse_plan
-                    .and_then(|plan| plan.images.get(index))
-                    .map(PreparedImage::payload_hint),
-                PreparedPayloadIdentity {
-                    source_uri: &image_part.source_uri,
-                    target_uri,
-                    content_type: &image_part.content_type,
-                    declared_size: image_part.declared_size,
-                    bytes: data.as_bytes(),
-                },
-                "source-backed copied image",
-                execution_context,
-            )?,
+            bytes,
+            precompressed,
         });
     }
     let mut charts = Vec::new();
@@ -1677,7 +1719,7 @@ fn prepare(
         })?;
     for (index, chart_part) in source_chart_parts.iter().enumerate() {
         check_execution(execution_context)?;
-        let data = chart_part.part.data()?;
+        let (data, captured) = read_copy_payload(&chart_part.part, reuse_plan.is_none())?;
         let actual_size = data.as_bytes().len();
         let declared_size =
             usize::try_from(chart_part.declared_size).map_err(|_| Error::Limit {
@@ -1698,6 +1740,26 @@ fn prepare(
         let target_uri = target_chart_uris
             .get(index)
             .ok_or_else(|| invalid("prepared target chart URI index is invalid"))?;
+        let bytes = reuse_or_clone_payload(
+            reuse_plan
+                .and_then(|plan| plan.charts.get(index))
+                .map(PreparedChart::payload_hint),
+            PreparedPayloadIdentity {
+                source_uri: &chart_part.source_uri,
+                target_uri,
+                content_type: &chart_part.content_type,
+                declared_size: chart_part.declared_size,
+                bytes: data.as_bytes(),
+            },
+            "source-backed copied chart",
+            execution_context,
+        )?;
+        let precompressed = captured.or_else(|| {
+            reuse_plan
+                .and_then(|plan| plan.charts.get(index))
+                .filter(|previous| Arc::ptr_eq(&bytes, &previous.bytes))
+                .and_then(|previous| previous.precompressed.clone())
+        });
         charts.push(PreparedChart {
             source_uri: clone_pack_uri(
                 &chart_part.source_uri,
@@ -1709,20 +1771,8 @@ fn prepare(
                 "source-backed copied chart content type",
             )?,
             declared_size: chart_part.declared_size,
-            bytes: reuse_or_clone_payload(
-                reuse_plan
-                    .and_then(|plan| plan.charts.get(index))
-                    .map(PreparedChart::payload_hint),
-                PreparedPayloadIdentity {
-                    source_uri: &chart_part.source_uri,
-                    target_uri,
-                    content_type: &chart_part.content_type,
-                    declared_size: chart_part.declared_size,
-                    bytes: data.as_bytes(),
-                },
-                "source-backed copied chart",
-                execution_context,
-            )?,
+            bytes,
+            precompressed,
         });
     }
     let source_slide_original_xml =
@@ -5491,6 +5541,20 @@ fn clone_bytes_checked(
     Ok(output)
 }
 
+fn read_copy_payload(
+    part: &PartView<'_>,
+    capture: bool,
+) -> Result<(litchi_opc::PartData, Option<RetainedPrecompressedPart>)> {
+    if capture {
+        match part.data_and_authorize_precompressed() {
+            Ok((data, token)) => return Ok((data, Some(token.into_retained()))),
+            Err(error) if precompressed_fallback_allowed(&error) => {},
+            Err(error) => return Err(Error::Opc(error)),
+        }
+    }
+    Ok((part.data()?, None))
+}
+
 fn reuse_or_clone_payload(
     hint: Option<PreparedPayloadHint<'_>>,
     current: PreparedPayloadIdentity<'_>,
@@ -5685,6 +5749,7 @@ mod tests {
             content_type: ct::PNG.to_owned(),
             declared_size: 3,
             bytes: Arc::new(vec![1, 2, 3]),
+            precompressed: None,
         };
 
         let reused = reuse_or_clone_payload(
@@ -5746,6 +5811,7 @@ mod tests {
             content_type: TRANSITIONAL_CHART_CONTENT_TYPE.to_owned(),
             declared_size: 4,
             bytes: Arc::new(vec![4, 5, 6, 7]),
+            precompressed: None,
         };
         let chart_reused = reuse_or_clone_payload(
             Some(chart_donor.payload_hint()),

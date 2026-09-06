@@ -1,0 +1,115 @@
+{
+  "change": 452,
+  "stage": "precleanup",
+  "status": "pass",
+  "valid_export": {
+    "exit_code": 0,
+    "stdout": "{\"status\": \"pass\", \"change\": 452, \"opc_tests\": 471, \"pptx_tests\": 848, \"harness_tests\": 381, \"formal_reports\": 16, \"formal_samples\": 480, \"confirmation_samples\": 120, \"profiles\": 4, \"fuzz_runs\": 1000, \"sealed\": true, \"cleanup\": false}\n",
+    "stderr": ""
+  },
+  "rejected": [
+    {
+      "path": "measurements.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 79, in check\n    measurements=d.derive();d.require(measurements==d.load('measurements.json') and d.render(measurements)==d.raw('measurements.md').decode(),'derived measurements')\n                            ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: derived measurements\n"
+    },
+    {
+      "path": "checks/final-opc-tests-r3.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 33, in check\n    d.require(r['source_unchanged'] and r['source_before']==r['source_after'],'source changed during command')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: source changed during command\n"
+    },
+    {
+      "path": "checks/final-opc-tests-r3.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 41, in check\n    for i,key in enumerate(['passed_tests','failed_tests','ignored_tests']):d.require(r[key]==sum(int(v[i]) for v in rows),'derived test count')\n                                                                            ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: derived test count\n"
+    },
+    {
+      "path": "checks/fuzz-smoke.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 84, in check\n    smoke=d.load('checks/fuzz-smoke.json');d.require('Done 1000 runs' in artifact(smoke['log']).decode() and '-runs=1000' in smoke['argv'] and '-seed=452' in smoke['argv'],'fuzz completion')\n                                           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: fuzz completion\n"
+    },
+    {
+      "path": "decision.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 80, in check\n    decision=d.load('decision.json');d.require(decision['goal_complete'] is False and decision['native_coverage_promoted'] is False and decision['decision']=='retain PPTX capture reuse','scoped decision')\n                                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: scoped decision\n"
+    },
+    {
+      "path": "candidate-build.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 50, in check\n    for n,h in protocol['bound_files'].items():d.require(sha(d.raw(n))==h,'frozen dependency '+n)\n                                               ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: frozen dependency candidate-build.json\n"
+    },
+    {
+      "path": "runs/0/receipt.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 61, in check\n    d.require(r['binary']==build['binary'] and r['build_sha256']==sha(d.raw(lane['build']+'-build.json')),'capture binary binding')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: capture binary binding\n"
+    },
+    {
+      "path": "runs/0/report.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 67, in check\n    artifacts=r['artifacts'];report=json.loads(artifact(artifacts['report']));oracle.check_report(report)\n                                               ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 14, in artifact\n    member(r['path']);raw=d.raw(r['path']);d.require(len(raw)==r['bytes'] and sha(raw)==r['sha256'],'artifact '+r['path']);return raw\n                                           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: artifact runs/0/report.json\n"
+    },
+    {
+      "path": "regression-review.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 81, in check\n    review=d.load('regression-review.json');d.require(review['flags']==measurements['review_flags'] and len(review['dispositions'])==len(review['flags']) and all(x['reviewed'] is True and x['reason'] for x in review['dispositions']),'all flags reviewed')\n                                            ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: all flags reviewed\n"
+    },
+    {
+      "path": "checks/fuzz-prepared.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 88, in check\n    d.require(inputs['Cargo.toml']['sha256']==sha(d.raw('checks/fuzz-Cargo.toml.txt')),'fuzz manifest copy')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: fuzz manifest copy\n"
+    },
+    {
+      "path": "checks/fuzz-artifacts.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 93, in check\n    d.require(artifacts['status']=='pass' and artifacts['task']==prepared['task'] and artifacts['files']==len(a) and artifacts['bytes']==sum(r['bytes'] for r in a.values()),'fuzz artifact inventory')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: fuzz artifact inventory\n"
+    },
+    {
+      "path": "confirmation-summary.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 77, in check\n    c=module('confirmation-summary');cv=c.derive();d.require(cv==d.load('confirmation-summary.json') and c.render(cv)==d.raw('confirmation-summary.md').decode(),'derived confirmation')\n                                                   ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: derived confirmation\n"
+    },
+    {
+      "path": "confirmation/0/receipt.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 61, in check\n    d.require(r['binary']==build['binary'] and r['build_sha256']==sha(d.raw(lane['build']+'-build.json')),'capture binary binding')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: capture binary binding\n"
+    },
+    {
+      "path": "regression-review.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 82, in check\n    d.require(review['confirmation_flags']==cv['review_flags'] and len(review['confirmation_dispositions'])==len(cv['review_flags']) and all(x['reviewed'] is True and x['reason'] and x['flag']==flag for x,flag in zip(review['confirmation_dispositions'],cv['review_flags'])),'confirmation reviewed')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: confirmation reviewed\n"
+    },
+    {
+      "path": "profile-summary.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 78, in check\n    profiles=module('profile-summary');d.require(profiles.derive()==d.load('profile-summary.json'),'derived profiles')\n                                       ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: derived profiles\n"
+    },
+    {
+      "path": "candidate/after-source_backed.rs.txt",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 23, in check\n    for label,m in [('before',base),('after',final)]:d.require(sha(d.raw('candidate/'+label+'-'+Path(n).name+'.txt'))==m[n],'exact source copy '+label)\n                                                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: exact source copy after\n"
+    },
+    {
+      "path": "unsealed.txt",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 110, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/verify.py\", line 107, in check\n    d.require(set(inventory)=={str(p.relative_to(ROOT)) for p in ROOT.rglob('*') if p.is_file() and p.name!='SHA256SUMS'},'seal coverage')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0452-portable-7uc8j6oa/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: seal coverage\n"
+    }
+  ],
+  "scratch_removed": true
+}

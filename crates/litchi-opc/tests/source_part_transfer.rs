@@ -1354,3 +1354,241 @@ fn combined_native_image_capture_preserves_compressed_member_after_source_drop()
     assert_eq!(budget.used(Resource::Memory), 0);
     assert_eq!(budget.used(Resource::Objects), 0);
 }
+
+#[test]
+fn retained_capture_charges_each_writer_and_publishes_concurrently_without_reads() {
+    let (bytes, expected) = synthetic_source_bytes();
+    let source = CaptureObservedSource::new(TestSource::new(bytes), 65536);
+    let (budget, _cancel, context) = managed_context(65536);
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        source.clone(),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let (data, token) = package
+        .part(&pack(SOURCE_PART))
+        .unwrap()
+        .data_and_authorize_precompressed()
+        .unwrap();
+    let capture = token.into_retained();
+    drop(data);
+    drop(package);
+    let retained = 2 * expected.len() as u64 + 4096;
+    assert_eq!(budget.used(Resource::Memory), retained);
+    assert_eq!(budget.used(Resource::Objects), 1);
+    let copy = capture.clone();
+    assert_eq!(budget.used(Resource::Memory), retained);
+    let before = source.counts();
+    let work = budget.used(Resource::Work);
+    let first = capture.authorize_for_publication().unwrap();
+    let second = copy.authorize_for_publication().unwrap();
+    assert_eq!(
+        budget.used(Resource::Memory),
+        retained + 2 * (expected.len() as u64 + 4096)
+    );
+    assert_eq!(budget.used(Resource::Work), work);
+    assert_eq!(source.counts(), before);
+    let publish = |token| {
+        let mut plan = SourceTopologyPlan::new();
+        add_synthetic_token(&mut plan, token).unwrap();
+        write_transfer(synthetic_destination_bytes(), plan).unwrap()
+    };
+    let (first, second) = std::thread::scope(|scope| {
+        let a = scope.spawn(|| publish(first));
+        let b = scope.spawn(|| publish(second));
+        (a.join().unwrap(), b.join().unwrap())
+    });
+    assert_eq!(first, second);
+    assert_eq!(
+        compressed_member(&first, "custom/transferred.bin").1,
+        expected
+    );
+    assert_eq!(budget.used(Resource::Memory), retained);
+    assert_eq!(source.counts(), before);
+    drop(copy);
+    drop(capture);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}
+
+#[test]
+fn retained_capture_writer_budget_refusal_does_not_consume_capture() {
+    let (bytes, expected) = synthetic_source_bytes();
+    let exact = 3 * expected.len() as u64 + 8192;
+    let source = CaptureObservedSource::new(TestSource::new(bytes), 65536);
+    let (budget, _cancel, context) = managed_context(exact);
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        source.clone(),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let (data, token) = package
+        .part(&pack(SOURCE_PART))
+        .unwrap()
+        .data_and_authorize_precompressed()
+        .unwrap();
+    let capture = token.into_retained();
+    drop(data);
+    drop(package);
+    let before = source.counts();
+    let first = capture.authorize_for_publication().unwrap();
+    assert_eq!(budget.used(Resource::Memory), exact);
+    assert!(matches!(capture.authorize_for_publication(),
+        Err(OpcError::Execution(ExecutionError::ResourceLimit(limit))) if limit.resource == Resource::Memory));
+    assert_eq!(budget.used(Resource::Memory), exact);
+    drop(first);
+    let retry = capture.authorize_for_publication().unwrap();
+    assert_eq!(budget.used(Resource::Memory), exact);
+    drop(retry);
+    assert_eq!(source.counts(), before);
+    drop(capture);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}
+
+#[test]
+fn retained_capture_rechecks_source_and_cancellation_before_writer_admission() {
+    for change_source in [false, true] {
+        let (bytes, _) = synthetic_source_bytes();
+        let source = CaptureObservedSource::new(TestSource::new(bytes), 65536);
+        let (budget, cancel, context) = managed_context(65536);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let (data, token) = package
+            .part(&pack(SOURCE_PART))
+            .unwrap()
+            .data_and_authorize_precompressed()
+            .unwrap();
+        let capture = token.into_retained();
+        drop(data);
+        drop(package);
+        let memory = budget.used(Resource::Memory);
+        let before = source.counts();
+        cancel.cancel();
+        if change_source {
+            source.inner.bump_revision();
+        }
+        let error = capture.authorize_for_publication().unwrap_err();
+        if change_source {
+            assert!(is_source_changed(&error));
+        } else {
+            assert!(matches!(error, OpcError::Cancelled));
+        }
+        assert_eq!(source.counts(), before);
+        assert_eq!(budget.used(Resource::Memory), memory);
+        drop(capture);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
+    }
+}
+
+#[test]
+fn retained_empty_capture_keeps_metadata_charged_across_repeated_promotion() {
+    let source =
+        CaptureObservedSource::new(TestSource::new(combined_capture_fixture(&[], false)), 65536);
+    let (budget, _cancel, context) = managed_context(3 * 4096);
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        source.clone(),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let (data, token) = package
+        .part(&pack(SOURCE_PART))
+        .unwrap()
+        .data_and_authorize_precompressed()
+        .unwrap();
+    let capture = token.into_retained();
+    drop(data);
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 4096);
+    let before = source.counts();
+    let second = capture.authorize_for_publication().unwrap().into_retained();
+    let third = second.authorize_for_publication().unwrap().into_retained();
+    assert_eq!(budget.used(Resource::Memory), 3 * 4096);
+    assert!(matches!(third.authorize_for_publication(),
+        Err(OpcError::Execution(ExecutionError::ResourceLimit(limit))) if limit.resource == Resource::Memory));
+    assert_eq!(source.counts(), before);
+    drop(second);
+    assert_eq!(budget.used(Resource::Memory), 2 * 4096);
+    let retry = third.authorize_for_publication().unwrap();
+    drop(retry);
+    drop(third);
+    drop(capture);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}
+
+#[test]
+fn retained_empty_capture_charges_long_source_metadata() {
+    let name = format!("custom/{}.bin", "x".repeat(16384));
+    let uri = pack(&format!("/{name}"));
+    let types =
+        content_types(r#"<Default Extension="bin" ContentType="application/octet-stream"/>"#);
+    let root = root_relationships();
+    let bytes = stored_archive(&[
+        Entry {
+            name: b"[Content_Types].xml",
+            data: &types,
+        },
+        Entry {
+            name: b"_rels/.rels",
+            data: &root,
+        },
+        Entry {
+            name: b"word/document.xml",
+            data: b"<document/>",
+        },
+        Entry {
+            name: name.as_bytes(),
+            data: b"",
+        },
+    ]);
+    let source = CaptureObservedSource::new(TestSource::new(bytes), 65536);
+    let (budget, _cancel, context) = managed_context(256 * 1024);
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        source.clone(),
+        ReadLimits::builder()
+            .max_archive_member_name_bytes(32768)
+            .unwrap()
+            .build()
+            .unwrap(),
+        context,
+    )
+    .unwrap();
+    let (data, token) = package
+        .part(&uri)
+        .unwrap()
+        .data_and_authorize_precompressed()
+        .unwrap();
+    let capture = token.into_retained();
+    drop(data);
+    drop(package);
+    let unit = budget.used(Resource::Memory);
+    assert!(unit >= uri.as_str().len() as u64);
+    let before = source.counts();
+    let mut captures = vec![capture];
+    for _ in 0..64 {
+        match captures.last().unwrap().authorize_for_publication() {
+            Ok(token) => captures.push(token.into_retained()),
+            Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+                if limit.resource == Resource::Memory =>
+            {
+                break;
+            },
+            Err(error) => panic!("unexpected retained metadata refusal: {error}"),
+        }
+        assert_eq!(budget.used(Resource::Memory), unit * captures.len() as u64);
+    }
+    assert!(captures.len() < 64);
+    assert_eq!(source.counts(), before);
+    drop(captures);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}

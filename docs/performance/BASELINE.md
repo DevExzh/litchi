@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0452: PPTX retained captures remove a publication source pass
+
+[0452](changes/0452-pptx-retained-capture.md) adopts combined OPC capture in image/chart copy planning and reserves
+independent writer staging at publication. In 480 matched samples, media-rich
+range API p50 falls 2572.729→1766.853 ms and 2572.933→1774.087 ms (31.324%/31.048%).
+The provider simulates 64 KiB returns, 200 µs/call and 25 MiB/s separate sleeps.
+A separate 120-sample ABBA CPU investigation confirms about 8% bytes/media API
+improvement with about 6% extra planning cost; the primary baseline outlier is
+retained. Source publication data reads fall from 425/16,786,581 bytes to zero.
+
+Plan-held source reservations increase by 16,815,144 bytes until plan drop;
+staged decoded copies remain. Process RSS is not timed allocator-peak evidence.
+See [measurements](results/change-0452/measurements.md),
+[confirmation](results/change-0452/confirmation-summary.md) and
+[regression review](results/change-0452/regression-review.md).
+
 ## Change 0451: combined OPC read and transfer authorization
 
 [0451](changes/0451-opc-combined-capture.md) adopts the ZIP primitive through OPC's existing cache and single-flight

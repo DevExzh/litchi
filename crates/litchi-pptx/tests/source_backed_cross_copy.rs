@@ -5204,3 +5204,46 @@ fn namespace_is_0383(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
         ResolveResult::Bound(Namespace(value)) if *value == expected
     )
 }
+
+#[test]
+fn source_backed_cross_copy_retains_verified_image_and_chart_captures() -> TestResult {
+    for charts in [false, true] {
+        let (source_bytes, members) = if charts {
+            (
+                chart_source_fixture_0383(&[("rIdChartOne", "chart-one.xml")])?,
+                vec!["ppt/charts/chart-one.xml"],
+            )
+        } else {
+            (
+                multi_picture_source_fixture(false)?,
+                vec![
+                    "ppt/media/source-only.png",
+                    "ppt/media/second-source.png",
+                    "ppt/media/third-source.jpg",
+                ],
+            )
+        };
+        let ranges = members
+            .iter()
+            .map(|name| zip_member_data_range(&source_bytes, name))
+            .collect::<TestResult<Vec<_>>>()?;
+        let overlaps = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let provider =
+            MultiRangeCountingSource::new(source_bytes.clone(), ranges, overlaps.clone());
+        let source = SourceBackedPresentation::from_read_at(Arc::new(provider))?;
+        let destination = destination_fixture()?;
+        let editor = open_editor(&destination)?;
+        let plan = editor.plan_cross_slide_copy(&source, 0, 1, 1)?;
+        let before = overlaps.load(std::sync::atomic::Ordering::SeqCst);
+        assert!(before > 0);
+        let mut output = Vec::new();
+        editor.publish_cross_slide_copy_to_stream(&mut output, &plan)?;
+        assert_eq!(
+            overlaps.load(std::sync::atomic::Ordering::SeqCst),
+            before,
+            "publication must reuse verified captures and warm decoded cache entries"
+        );
+        assert_eq!(output, publish(&source_bytes, &destination, 0, 1, 1)?);
+    }
+    Ok(())
+}

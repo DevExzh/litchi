@@ -183,6 +183,8 @@ pub struct AuthorizedPrecompressedPart {
     // for as long as the token owns the same allocation.
     decoded_payload: Option<CachedPayload>,
     memory_reservation: Option<Arc<Reservation>>,
+    writer_memory_reservation: Option<Arc<Reservation>>,
+    fixed_memory_reservation: Option<Arc<Reservation>>,
     writer_name_reservation: Option<Arc<Reservation>>,
 }
 
@@ -206,6 +208,17 @@ impl std::fmt::Debug for AuthorizedPrecompressedPart {
                     .map(|reservation| reservation.amount()),
             )
             .field(
+                "writer_memory_reservation",
+                &self
+                    .writer_memory_reservation
+                    .as_ref()
+                    .map(|reservation| reservation.amount()),
+            )
+            .field(
+                "fixed_memory_reservation",
+                &self.fixed_memory_reservation.as_ref().map(|r| r.amount()),
+            )
+            .field(
                 "writer_name_reservation",
                 &self
                     .writer_name_reservation
@@ -216,7 +229,87 @@ impl std::fmt::Debug for AuthorizedPrecompressedPart {
     }
 }
 
+/// A shareable source-authorized compressed capture for repeated publication.
+///
+/// Capture and decoded reservations remain pinned. Each call to
+/// [`Self::authorize_for_publication`] reserves independent writer staging and
+/// checks source freshness; cloning this handle does not authorize a writer.
+#[derive(Debug, Clone)]
+pub struct RetainedPrecompressedPart {
+    payload: Arc<AuthorizedPrecompressedPart>,
+}
+
+impl RetainedPrecompressedPart {
+    /// Authorize one publication using this immutable capture without rereading
+    /// or decoding the source. Source identity and execution checks remain active.
+    pub fn authorize_for_publication(&self) -> Result<AuthorizedPrecompressedPart> {
+        let payload = &self.payload;
+        payload.check_for_publication(payload.source_content_type.as_str())?;
+        let reserve = |bytes| {
+            if bytes == 0 {
+                return Ok(None);
+            }
+            payload
+                .source_artifact
+                .snapshot
+                .context
+                .as_ref()
+                .map(|context| {
+                    context
+                        .reserve(Resource::Memory, bytes)
+                        .map(Arc::new)
+                        .map_err(map_execution_error)
+                })
+                .transpose()
+        };
+        let writer_memory_reservation = reserve(payload.compressed_size())?;
+        let fixed_memory_reservation = reserve(AuthorizedPrecompressedPart::fixed_memory_bytes(
+            &payload.source_partname,
+            payload.source_content_type.as_str(),
+        )?)?;
+        payload.check_for_publication(payload.source_content_type.as_str())?;
+        Ok(AuthorizedPrecompressedPart {
+            physical: payload.physical.clone(),
+            source_artifact: payload.source_artifact.clone(),
+            source_lineage: payload.source_lineage.clone(),
+            source_version: payload.source_version,
+            source_partname: payload.source_partname.clone(),
+            source_content_type: payload.source_content_type.clone(),
+            expected_decoded: Arc::clone(&payload.expected_decoded),
+            decoded_payload: payload.decoded_payload.clone(),
+            memory_reservation: payload.memory_reservation.clone(),
+            writer_memory_reservation,
+            fixed_memory_reservation,
+            writer_name_reservation: None,
+        })
+    }
+}
+
 impl AuthorizedPrecompressedPart {
+    fn fixed_memory_bytes(partname: &PackURI, content_type: &str) -> Result<u64> {
+        let metadata = size_of::<Self>()
+            .checked_add(partname.as_str().len())
+            .and_then(|bytes| bytes.checked_add(content_type.len()))
+            .and_then(|bytes| bytes.checked_add(256))
+            .ok_or_else(|| overlay_unavailable("precompressed token metadata size overflows"))?;
+        let metadata = u64::try_from(metadata)
+            .map_err(|_| overlay_unavailable("precompressed token metadata size exceeds u64"))?;
+        Ok(metadata.max(PRECOMPRESSED_WRITER_FIXED_OVERHEAD))
+    }
+
+    /// Retain this immutable capture for repeated publication, releasing this
+    /// token's payload staging. A fixed overhead reservation remains pinned
+    /// for the retained token metadata, including zero-length captures and
+    /// long Part names/content types. New
+    /// publication tokens each reserve their own payload and fixed overhead.
+    #[must_use]
+    pub fn into_retained(mut self) -> RetainedPrecompressedPart {
+        self.writer_memory_reservation = None;
+        self.writer_name_reservation = None;
+        RetainedPrecompressedPart {
+            payload: Arc::new(self),
+        }
+    }
     fn logical_size(&self) -> u64 {
         self.physical.uncompressed_size()
     }
@@ -4740,12 +4833,16 @@ impl SourceBackedPackage {
         // `C + 2*name + 4096`; reserve the capture `C` plus the
         // payload/fixed portion here. The target-name term is added by
         // `try_add_precompressed_part` once the destination URI is known.
-        let reservation_bytes = metadata
+        let fixed_bytes =
+            AuthorizedPrecompressedPart::fixed_memory_bytes(&part.partname, &part.content_type)?;
+        metadata
             .compressed_size()
             .checked_mul(2)
-            .and_then(|bytes| bytes.checked_add(PRECOMPRESSED_WRITER_FIXED_OVERHEAD))
+            .and_then(|bytes| bytes.checked_add(fixed_bytes))
             .ok_or_else(|| overlay_unavailable("precompressed staging size overflows u64"))?;
-        let memory_reservation = self.reserve_topology_memory(reservation_bytes)?;
+        let memory_reservation = self.reserve_topology_memory(metadata.compressed_size())?;
+        let writer_memory_reservation = self.reserve_topology_memory(metadata.compressed_size())?;
+        let fixed_memory_reservation = self.reserve_topology_memory(fixed_bytes)?;
 
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
@@ -4827,6 +4924,8 @@ impl SourceBackedPackage {
             expected_decoded,
             decoded_payload: data.as_ref().map(|data| data.payload.clone()),
             memory_reservation,
+            writer_memory_reservation,
+            fixed_memory_reservation,
             writer_name_reservation: None,
         };
         Ok((data, token))

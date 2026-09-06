@@ -1,5 +1,18 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0452 measures category 9/15 PPTX capture adoption
+
+[0452](changes/0452-pptx-retained-capture.md) measures complete image/chart copy planning/publication under owned
+bytes and the explicit simulated range provider: 480 primary samples plus 120
+separate CPU confirmation samples. Whole output and lifecycle checks pass; OPC
+tests also cover concurrent independent publications and bounded retention.
+This does not add repeated publication to the consuming public PPTX editor.
+
+Registry/default counts remain 438/36; representative coverage remains 15
+categories/33 mappings/10 measured/23 correctness-only. Synthetic provider
+measurements and existing native-input tests do not promote Office-application
+breadth, cold/scaling coverage or default selectors. The full goal stays active.
+
 ## 2026-09-06: change 0451 integrates the category 9/15 OPC prerequisite
 
 [0451](changes/0451-opc-combined-capture.md) adds cache-aware decoded reading and compressed transfer authorization.
