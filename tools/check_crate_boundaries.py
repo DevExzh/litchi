@@ -191,6 +191,7 @@ IWORK_EXAMPLE_SOURCES = (
 # later reintroduction fails closed; ordinary example audits must not require
 # any of these obsolete files to exist.
 RETIRED_IWA_OBSOLETE_EXAMPLE_PATHS = (
+    Path("crates/litchi-iwa/examples/create_keynote_chart.rs"),
     Path("crates/litchi-iwa/examples/edit_keynote_movie_geometry.rs"),
     Path("crates/litchi-iwa/examples/edit_numbers_comment.rs"),
     Path("crates/litchi-iwa/examples/edit_pages_body_footnotes.rs"),
@@ -697,6 +698,21 @@ IWA_KEYNOTE_CHART_CAPTION_TYPED_METHODS = frozenset(
         "slide_chart_caption_by_selector",
         "set_slide_chart_caption_by_selector",
         "remove_slide_chart_caption_by_selector",
+    }
+)
+RETIRED_IWA_KEYNOTE_CHART_CAPTION_MODULE_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_charts.rs"
+)
+RETIRED_IWA_KEYNOTE_CHART_CAPTION_MODULE = re.compile(
+    r"(?m)^\s*(?:pub(?:\([^()]*\))?\s+)?mod\s+(?:r#)?caption\s*(?:;|\{)"
+)
+RETIRED_IWA_KEYNOTE_CHART_CAPTION_METHODS = frozenset(
+    IWA_KEYNOTE_CHART_CAPTION_LEGACY_METHODS
+    | IWA_KEYNOTE_CHART_CAPTION_TYPED_METHODS
+    | {
+        "focused_chart_caption_package",
+        "replace_from_focused_chart_caption_commit",
+        "map_focused_chart_caption_error",
     }
 )
 KEYNOTE_CHART_CAPTION_EDIT_METHODS = frozenset({"set", "clear", "commit"})
@@ -49488,25 +49504,38 @@ def audit_keynote_chart_caption_legacy_calls(root: Path = ROOT) -> list[str]:
 
 
 def audit_iwa_keynote_chart_caption_source_topology(root: Path = ROOT) -> list[str]:
-    """Require full selector-first chart-caption ownership in litchi-iwa.
+    """Keep the retired chart-caption compatibility shell out of litchi-iwa.
 
-    The compatibility host no longer gets a raw-ID escape hatch once the
-    focused package owns graph creation and stand-in removal.  Test fixtures
-    may still exercise the old graph under ``#[cfg(test)]``; every production
-    source and example is masked item-by-item before this audit so a test-only
-    import or helper cannot hide a later production leak.
+    The focused package owns chart-caption reads and edits, so the old host
+    source/module and its forwarding wrappers stay deleted.  Test fixtures may
+    still exercise unrelated editor graphs under ``#[cfg(test)]``; every
+    production source and example is masked item-by-item before this audit so
+    a test-only import or helper cannot hide a later production leak.
     """
 
     path = root / IWA_KEYNOTE_CHART_CAPTION_SOURCE
-    if not path.is_file():
-        return [
-            "litchi-iwa Keynote chart-caption compatibility source is missing: "
-            f"{IWA_KEYNOTE_CHART_CAPTION_SOURCE}"
-        ]
     violations: list[str] = []
+    if path.is_file():
+        violations.append(
+            "retired litchi-iwa Keynote chart-caption source was restored: "
+            f"{IWA_KEYNOTE_CHART_CAPTION_SOURCE}"
+        )
+
+    module_path = root / RETIRED_IWA_KEYNOTE_CHART_CAPTION_MODULE_SOURCE
+    if module_path.is_file():
+        module_source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(module_path.read_text(encoding="utf-8"))
+        )
+        for match in RETIRED_IWA_KEYNOTE_CHART_CAPTION_MODULE.finditer(module_source):
+            line_number = module_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote chart-caption module declaration: "
+                f"{RETIRED_IWA_KEYNOTE_CHART_CAPTION_MODULE_SOURCE}:{line_number}"
+            )
+
     source_root = root / IWA_KEYNOTE_SOURCE_ROOT
     source_paths = (
-        sorted(source_root.rglob("*.rs")) if source_root.is_dir() else [path]
+        sorted(source_root.rglob("*.rs")) if source_root.is_dir() else []
     )
 
     def caption_scope(path: Path) -> bool:
@@ -49515,30 +49544,6 @@ def audit_iwa_keynote_chart_caption_source_topology(root: Path = ROOT) -> list[s
         # graph/wire audit is therefore limited to the dedicated chart
         # caption source; raw chart method names are still checked globally.
         return path == root / IWA_KEYNOTE_CHART_CAPTION_SOURCE
-
-    def function_body(code: str, name: str) -> tuple[str, int] | None:
-        declaration = re.search(
-            rf"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
-            rf"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
-            rf"fn[ \t\r\n]+(?:r#)?{re.escape(name)}\b",
-            code,
-        )
-        if declaration is None:
-            return None
-        opening = code.find("{", declaration.end())
-        if opening < 0:
-            return None
-        depth = 1
-        cursor = opening + 1
-        while cursor < len(code) and depth:
-            if code[cursor] == "{":
-                depth += 1
-            elif code[cursor] == "}":
-                depth -= 1
-            cursor += 1
-        if depth:
-            return None
-        return code[opening + 1 : cursor - 1], declaration.start()
 
     for source_path in source_paths:
         # The Keynote editor keeps source-built regressions in sibling
@@ -49553,19 +49558,11 @@ def audit_iwa_keynote_chart_caption_source_topology(root: Path = ROOT) -> list[s
         source = _mask_rust_non_code(production_source)
         relative = source_path.relative_to(root)
         declarations = _rust_function_declarations(production_source)
-        declared_names = {name for name, _line_number in declarations}
-
-        if source_path == path:
-            for name in sorted(IWA_KEYNOTE_CHART_CAPTION_TYPED_METHODS - declared_names):
-                violations.append(
-                    "litchi-iwa Keynote chart-caption selector method is missing "
-                    f"{name}: {IWA_KEYNOTE_CHART_CAPTION_SOURCE}"
-                )
 
         for name, line_number in declarations:
-            if name in IWA_KEYNOTE_CHART_CAPTION_LEGACY_METHODS:
+            if name in RETIRED_IWA_KEYNOTE_CHART_CAPTION_METHODS:
                 violations.append(
-                    "litchi-iwa Keynote chart-caption raw-ID method must be retired "
+                    "retired litchi-iwa Keynote chart-caption host wrapper/helper "
                     f"{name}: {relative}:{line_number}"
                 )
             elif name in KEYNOTE_CHART_CAPTION_GRAPH_HELPERS and (
@@ -49638,29 +49635,6 @@ def audit_iwa_keynote_chart_caption_source_topology(root: Path = ROOT) -> list[s
                 "litchi-iwa Keynote chart-caption compatibility source retains "
                 f"{label} marker {marker}: {relative}:{line_number}"
             )
-
-        for method, requirements in (
-            (
-                "set_slide_chart_caption_by_selector",
-                ("edit_slide_chart_caption", ".set(", ".commit("),
-            ),
-            (
-                "remove_slide_chart_caption_by_selector",
-                ("edit_slide_chart_caption", ".clear(", ".commit("),
-            ),
-        ):
-            body_result = function_body(source, method)
-            if body_result is None:
-                continue
-            body, declaration_offset = body_result
-            missing = [requirement for requirement in requirements if requirement not in body]
-            if missing:
-                line_number = source.count("\n", 0, declaration_offset) + 1
-                violations.append(
-                    "litchi-iwa Keynote chart-caption selector mutation must route through "
-                    f"focused Package::{method.removesuffix('_by_selector')}: "
-                    f"{relative}:{line_number}"
-                )
 
     example_root = root / IWA_KEYNOTE_CHART_CAPTION_EXAMPLE_ROOT
     if example_root.is_dir():

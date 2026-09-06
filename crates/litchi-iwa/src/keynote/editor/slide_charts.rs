@@ -16,7 +16,6 @@ mod background_fill;
 mod bar_shape_3d;
 mod border;
 mod border_stroke;
-mod caption;
 mod category_labels;
 mod depth_3d;
 mod donut_inner_radius;

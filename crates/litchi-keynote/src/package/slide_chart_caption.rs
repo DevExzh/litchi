@@ -3,9 +3,11 @@
 //! This owner admits the canonical inline chart-caption graph transition:
 //! creation from an exclusive stand-in and removal by retaining the old graph
 //! while retargeting the chart to a fresh stand-in.  Existing storage text is
-//! still edited through the focused storage owner.  Cross-component graphs,
-//! shared ownership, and metadata shapes that cannot be proven exactly remain
-//! outside this transaction.
+//! still edited through the focused storage owner.  Cross-component writable
+//! graphs, shared ownership, and metadata shapes that cannot be proven exactly
+//! remain outside this transaction. An existing caption's shape-style edge
+//! may legitimately point to the imported document stylesheet; that style is
+//! validated and retained but never rewritten by this owner.
 
 #![allow(
     clippy::map_err_ignore,
@@ -1331,7 +1333,10 @@ fn caption_selection(
         package,
         style_identifier,
         SHAPE_STYLE_MESSAGE_TYPE,
-        Some(chart.slide_component_name.as_str()),
+        // Imported native captions can retain their style in the document
+        // stylesheet. Storage and placement remain private to the chart
+        // component and keep their strict component fences above.
+        None,
     )?;
     if mutation_guards {
         prove_exclusive_caption_storage(
@@ -3480,6 +3485,14 @@ fn verify_caption_graph_transition_with_budget(
     if metadata_member_name(candidate_catalog, candidate)? != metadata_name {
         return Err(ChartCaptionError::Verification);
     }
+    verify_external_style_transition(
+        source,
+        candidate,
+        slide_component_name,
+        before_style,
+        target_style,
+        budget,
+    )?;
     let _source_entries = entry_index(
         source_catalog.package(),
         budget,
@@ -3576,6 +3589,82 @@ fn verify_caption_graph_transition_with_budget(
         }
     }
     Ok(())
+}
+
+/// Prove that a style which crosses the selected slide-component boundary is
+/// an existing immutable dependency.  New graph styles are authored inline in
+/// the selected component; an external style must already exist in the source
+/// and survive with the same component, validated type, and bytes.
+fn verify_external_style_transition(
+    source: &Package,
+    candidate: &Package,
+    slide_component_name: &str,
+    before_style: Option<u64>,
+    target_style: Option<u64>,
+    budget: &mut CaptionBudget,
+) -> Result<(), ChartCaptionError> {
+    let mut checked = [0_u64; 2];
+    let mut checked_len = 0usize;
+    for identifier in [before_style, target_style].into_iter().flatten() {
+        if checked[..checked_len].contains(&identifier) {
+            continue;
+        }
+        checked[checked_len] = identifier;
+        checked_len = checked_len
+            .checked_add(1)
+            .ok_or(ChartCaptionError::InvalidSource)?;
+        let source_location = source.object_with_component(identifier);
+        let candidate_location = candidate.object_with_component(identifier);
+        let source_external =
+            source_location.is_some_and(|(component, _object)| component != slide_component_name);
+        let candidate_external = candidate_location
+            .is_some_and(|(component, _object)| component != slide_component_name);
+        if !source_external && !candidate_external {
+            continue;
+        }
+        let (source_component, source_object) =
+            source_location.ok_or(ChartCaptionError::Verification)?;
+        let (candidate_component, candidate_object) =
+            candidate_location.ok_or(ChartCaptionError::Verification)?;
+        charge_immutable_object_comparison(budget, source_object)?;
+        charge_immutable_object_comparison(budget, candidate_object)?;
+        if source_component != candidate_component
+            || !source_object.same_content_ignoring_offsets(candidate_object)
+        {
+            return Err(ChartCaptionError::Verification);
+        }
+        require_private_object(source, identifier, SHAPE_STYLE_MESSAGE_TYPE, None)?;
+        require_private_object(candidate, identifier, SHAPE_STYLE_MESSAGE_TYPE, None)?;
+    }
+    Ok(())
+}
+
+fn charge_immutable_object_comparison(
+    budget: &mut CaptionBudget,
+    object: &ArchiveObject,
+) -> Result<(), ChartCaptionError> {
+    let mut bytes = usize::try_from(object.header_length)
+        .map_err(|_conversion| ChartCaptionError::InvalidSource)?;
+    for message in &object.messages {
+        bytes = bytes
+            .checked_add(message.data.len())
+            .ok_or(ChartCaptionError::InvalidSource)?;
+    }
+    let mut references = 0usize;
+    for info in &object.archive_info.message_infos {
+        references = references
+            .checked_add(info.object_references.len())
+            .and_then(|value| value.checked_add(info.data_references.len()))
+            .ok_or(ChartCaptionError::InvalidSource)?;
+        for field in &info.field_infos {
+            references = references
+                .checked_add(field.object_references.len())
+                .and_then(|value| value.checked_add(field.data_references.len()))
+                .ok_or(ChartCaptionError::InvalidSource)?;
+        }
+    }
+    budget.charge_work(bytes)?;
+    budget.charge_references(references)
 }
 
 /// Build a bounded physical-member index for graph locality checks.
@@ -3728,6 +3817,7 @@ fn verify_caption_candidate(
                 storage_identifier,
                 before.slide_node_identifier,
                 require_invalidated_previews,
+                budget,
             )?;
         } else {
             super::slide_text::verify_owned_storage_candidate(
@@ -3759,6 +3849,7 @@ pub(super) fn verify_existing_text_metadata_candidate(
     storage_identifier: u64,
     slide_node_identifier: u64,
     require_invalidated_previews: bool,
+    budget: &mut CaptionBudget,
 ) -> Result<(), ChartCaptionError> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
@@ -3809,17 +3900,41 @@ pub(super) fn verify_existing_text_metadata_candidate(
                 if std::mem::replace(&mut slide_node_seen, true) {
                     return Err(ChartCaptionError::Verification);
                 }
-                if !source_object.same_content_ignoring_offsets(candidate_object) {
-                    verify_replaced_caption_object(source_object, candidate_object, true)?;
-                }
-                if require_invalidated_previews
-                    && !super::slide_preview::is_invalidated(
-                        candidate_object,
-                        candidate.wire_limits().map_err(map_wire_error)?,
-                    )
-                    .map_err(map_slide_preview_error)?
-                {
-                    return Err(ChartCaptionError::Verification);
+                let unchanged = source_object.same_content_ignoring_offsets(candidate_object);
+                if require_invalidated_previews || !unchanged {
+                    let direction = if require_invalidated_previews {
+                        super::slide_preview::InvalidationDirection::Forward
+                    } else {
+                        super::slide_preview::InvalidationDirection::Inverse
+                    };
+                    let allowance = super::slide_preview::InvalidationAllowance::new(
+                        budget.remaining_work(),
+                        budget.remaining_references(),
+                    );
+                    let starting_work = budget.work;
+                    let starting_references = budget.references;
+                    let (matches, report) =
+                        super::slide_preview::exact_invalidation_delta_with_allowance(
+                            source_object,
+                            candidate_object,
+                            direction,
+                            candidate.wire_limits().map_err(map_wire_error)?,
+                            allowance,
+                        )
+                        .map_err(|error| {
+                            map_slide_preview_budget_error(
+                                error,
+                                starting_work,
+                                budget.maximum_work,
+                                starting_references,
+                                budget.maximum_references,
+                            )
+                        })?;
+                    budget.charge_work(report.work())?;
+                    budget.charge_references(report.references())?;
+                    if !matches {
+                        return Err(ChartCaptionError::Verification);
+                    }
                 }
             } else if identifier == source_metadata.0 {
                 if std::mem::replace(&mut metadata_seen, true) {
@@ -4223,6 +4338,44 @@ fn map_slide_preview_error(error: super::slide_preview::InvalidationError) -> Ch
     }
 }
 
+fn map_slide_preview_budget_error(
+    error: super::slide_preview::BudgetedInvalidationError,
+    starting_work: usize,
+    maximum_work: usize,
+    starting_references: usize,
+    maximum_references: usize,
+) -> ChartCaptionError {
+    match error {
+        super::slide_preview::BudgetedInvalidationError::Invalidation(error) => {
+            map_slide_preview_error(error)
+        },
+        super::slide_preview::BudgetedInvalidationError::BudgetExceeded {
+            kind, observed, ..
+        } => ChartCaptionError::LimitExceeded {
+            kind: match kind {
+                super::slide_preview::InvalidationBudgetKind::References => {
+                    ChartCaptionLimitKind::References
+                },
+                super::slide_preview::InvalidationBudgetKind::Work => {
+                    ChartCaptionLimitKind::WireWork
+                },
+            },
+            observed: usize_to_u64(match kind {
+                super::slide_preview::InvalidationBudgetKind::References => {
+                    starting_references.saturating_add(observed)
+                },
+                super::slide_preview::InvalidationBudgetKind::Work => {
+                    starting_work.saturating_add(observed)
+                },
+            }),
+            maximum: usize_to_u64(match kind {
+                super::slide_preview::InvalidationBudgetKind::References => maximum_references,
+                super::slide_preview::InvalidationBudgetKind::Work => maximum_work,
+            }),
+        },
+    }
+}
+
 fn map_read_error(error: ReadError) -> ChartCaptionError {
     match error {
         ReadError::Archive(error) => map_archive_error(error),
@@ -4474,3 +4627,7 @@ mod tests {
         assert_eq!(frequencies.get(&9), Some(&1));
     }
 }
+
+#[cfg(test)]
+#[path = "slide_chart_caption/verification_tests.rs"]
+mod verification_tests;

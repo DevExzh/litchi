@@ -368,6 +368,7 @@ impl<'a> SlideMovieCaptionEdit<'a> {
                     .ok_or(SlideMovieCaptionError::InvalidSource)?,
                 self.selection.slide_node_identifier,
                 true,
+                &mut budget,
             )
             .map_err(map_chart_caption_error)?;
         } else {
@@ -689,6 +690,7 @@ impl Package {
                     .ok_or(SlideMovieCaptionError::InvalidSource)?,
                 patch.selection.slide_node_identifier,
                 patch.target_requires_invalidated_previews,
+                &mut budget,
             )
             .map_err(map_chart_caption_error)?;
         } else {

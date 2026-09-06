@@ -239,7 +239,14 @@ impl<'a> SlideMovieTitleEdit<'a> {
         budget
             .charge_validation_scan(&package, 1)
             .map_err(map_chart_error)?;
-        verify_title_transition(self.source, &package, &self.selection, &candidate, true)?;
+        verify_title_transition(
+            self.source,
+            &package,
+            &self.selection,
+            &candidate,
+            true,
+            &mut budget,
+        )?;
         let target = physical_catalog(&package)?.shared_source();
         budget
             .charge_exact_artifacts(source_bytes.len(), target.len())
@@ -504,6 +511,7 @@ impl Package {
             &patch.selection,
             &selected,
             patch.target_requires_invalidated_previews,
+            &mut budget,
         )?;
         Ok(SlideMovieTitleCommit {
             package: candidate,
@@ -577,6 +585,7 @@ fn verify_title_transition(
     before: &super::slide_movie_caption::MovieCaptionSelection,
     target: &super::slide_movie_caption::MovieCaptionSelection,
     require_invalidated_previews: bool,
+    budget: &mut super::slide_chart_caption::CaptionBudget,
 ) -> Result<(), SlideMovieTitleError> {
     if before.storage_identifier.is_some() && target.storage_identifier.is_some() {
         super::slide_chart_caption::verify_existing_text_metadata_candidate(
@@ -587,6 +596,7 @@ fn verify_title_transition(
                 .ok_or(SlideMovieTitleError::InvalidSource)?,
             before.slide_node_identifier,
             require_invalidated_previews,
+            budget,
         )
         .map_err(map_chart_error)
     } else {

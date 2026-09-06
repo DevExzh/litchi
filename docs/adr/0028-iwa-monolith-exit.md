@@ -8878,3 +8878,40 @@ completion. Boundary verification passes 915 tests; the scanner passes with
 64 packages, 238 declarations, and 11 ordered debts. Normal commit hooks
 enforce workspace formatting, lint, library/integration, and documentation
 tests.
+
+## 2026-09-06 follow-up: selector-first Keynote chart captions
+
+The 95-line host `caption.rs` wrapper and obsolete 339-line chart-creation
+example are removed. The regression now calls the focused Package caption API
+while preserving coverage of host chart duplication and removal. The new
+`edit_chart_caption` example supports semantic selectors and set/clear edits.
+Existing captions can retain a style in an external stylesheet: type and header
+checks remain strict, and graph verification proves the style's component and
+content unchanged within the work and reference budgets. Text replacement now
+verifies native preview-header pruning through the focused preview owner's
+exact forward/inverse delta proof. The shared movie caption/title verifier
+also charges that proof to its transaction budget.
+
+Computer Use authored the native source
+[`chart-caption-native.key`](../../test-data/iwork/keynote/chart-caption-native.key)
+in Keynote 14.4, saved, closed, and reopened the exact path. Its SHA-256 is
+`afef5f17f13c4001b01ad1c83ccc7051d11c846fc437728a47d7b1828b537cb1`.
+Rows are `Region 1` and `Region 2`, columns are April through July, and the
+values are `[[17, 26, 53, 96], [55, 43, 70, 58]]`. Focused set to
+`Focused chart caption — 北区` rendered all eight values in Keynote. After a
+forced native edit to `Native saved caption — 北区`, save, close, and exact-path
+reopen preserved the caption and values without repair. The copied resaved
+fixture is
+[`chart-caption-native-resaved.key`](../../test-data/iwork/keynote/chart-caption-native-resaved.key)
+with SHA-256
+`58bf1fc5646e88600745d4c1afa9a10d87304de5d8090f6d4ad8afc23ac5800a`.
+The clear candidate also opened natively with no caption and all values
+intact.
+
+Scoped validation passes 108 tests: four caption unit tests, 23 focused chart
+caption tests, four native fixture tests, 16 movie caption tests, 10 movie title
+tests, and 51 host chart tests. Boundary verification passes 915 tests; the
+scanner passes with 64 packages, 238 internal dependency declarations, and 11
+explicit debt items. Normal commit hooks enforce workspace formatting, lint,
+library/integration, and documentation tests. Chart creation, duplication, and
+removal remain host-owned; this slice does not complete monolith retirement.

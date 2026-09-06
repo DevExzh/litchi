@@ -16,6 +16,7 @@ use litchi_keynote::{
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
+const DOCUMENT_STYLESHEET_MEMBER: &str = "Index/DocumentStylesheet.iwa";
 const METADATA_MEMBER: &str = "Index/Metadata.iwa";
 const METADATA_OBJECT: u64 = 300;
 const METADATA_LAST_IDENTIFIER: u64 = 1_000;
@@ -25,6 +26,7 @@ const FOREIGN_COMPONENT: u64 = 3;
 const METADATA_ROOT_UNKNOWN_FIELD: u32 = 4_001;
 const METADATA_COMPONENT_UNKNOWN_FIELD: u32 = 4_002;
 const METADATA_UNKNOWN_MARKER: &[u8] = b"chart-caption metadata extension";
+const EXTERNAL_STYLE_UNKNOWN_MARKER: &[u8] = b"external chart-caption style extension";
 const SLIDE_NODE: u64 = 3;
 const SLIDE: u64 = 4;
 const CHARTS: [u64; 2] = [100, 101];
@@ -424,6 +426,62 @@ fn metadata_payload_with_foreign_dependencies(
     Ok(payload)
 }
 
+fn metadata_payload_with_external_objects(
+    last_identifier: u64,
+    external_object_identifiers: &[u64],
+    external_references: &[tsp::ComponentExternalReference],
+) -> TestResult<Vec<u8>> {
+    let mut document_objects = vec![
+        1, 2, 3, 4, 80, 81, 82, 90, 100, 101, 110, 111, 120, 121, 130, 131, 140, 141, 150, 151,
+        160, 161,
+    ];
+    document_objects.retain(|identifier| !external_object_identifiers.contains(identifier));
+    let document = metadata_component_payload_with_external_references(
+        DOCUMENT_COMPONENT,
+        "Document",
+        Some("Document"),
+        10,
+        &document_objects,
+        external_references,
+    )?;
+    let unrelated = metadata_component_payload(
+        UNRELATED_COMPONENT,
+        "Unrelated",
+        Some("Unrelated"),
+        7,
+        &[900],
+    )?;
+    let stylesheet = metadata_component_payload(
+        FOREIGN_COMPONENT,
+        "DocumentStylesheet",
+        Some("DocumentStylesheet"),
+        8,
+        external_object_identifiers,
+    )?;
+    let versioned = tsp::ComponentInfo {
+        identifier: DOCUMENT_COMPONENT,
+        preferred_locator: "Document".to_owned(),
+        locator: Some("Document".to_owned()),
+        save_token: Some(3),
+        object_uuid_map_entries: vec![metadata_uuid_entry(901)],
+        ..tsp::ComponentInfo::default()
+    }
+    .encode_to_vec();
+    let mut payload = Vec::new();
+    append_varint_field(&mut payload, 1, last_identifier)?;
+    append_length_delimited_field(&mut payload, 3, &document)?;
+    append_length_delimited_field(&mut payload, 3, &unrelated)?;
+    append_length_delimited_field(&mut payload, 3, &stylesheet)?;
+    append_varint_field(&mut payload, 8, 10)?;
+    append_length_delimited_field(&mut payload, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut payload,
+        METADATA_ROOT_UNKNOWN_FIELD,
+        METADATA_UNKNOWN_MARKER,
+    )?;
+    Ok(payload)
+}
+
 fn caption_theme_payload() -> TestResult<Vec<u8>> {
     let presets = {
         let mut bytes = Vec::new();
@@ -514,6 +572,69 @@ fn synthetic_cross_component_metadata_package(
         .collect::<Vec<_>>();
     entries.push(("Index/Stylesheet.iwa", stylesheet.as_slice()));
     entries.push((METADATA_MEMBER, metadata.as_slice()));
+    Ok(litchi_iwa_archive::package::to_bytes(
+        entries,
+        Limits::default(),
+    )?)
+}
+
+fn synthetic_external_caption_package(
+    external_object_identifiers: &[u64],
+    external_references: &[tsp::ComponentExternalReference],
+) -> TestResult<Vec<u8>> {
+    let source = synthetic_package_with_captions([Some("North"), Some("South")])?;
+    let mut document = Archive::parse(&document_stream(&source)?)?;
+    document
+        .objects
+        .push(object(80, 10, caption_theme_payload()?)?);
+    document.objects.push(object(81, 9_002, Vec::new())?);
+    document.objects.push(object(82, 9_003, Vec::new())?);
+
+    let mut external_objects = Vec::new();
+    for identifier in external_object_identifiers {
+        let index = document
+            .objects
+            .iter()
+            .position(|object| object.archive_info.identifier == Some(*identifier))
+            .ok_or_else(|| io::Error::other("missing external synthetic object"))?;
+        let mut object = document.objects.remove(index);
+        if *identifier == STYLES[0] {
+            let message = object
+                .messages
+                .first_mut()
+                .ok_or_else(|| io::Error::other("external style has no message"))?;
+            if message.type_ != SHAPE_STYLE_MESSAGE_TYPE {
+                return Err(io::Error::other("external style has the wrong message type").into());
+            }
+            append_length_delimited_field(&mut message.data, 4_004, EXTERNAL_STYLE_UNKNOWN_MARKER)?;
+        }
+        external_objects.push(object);
+    }
+
+    let document_component = component(document.objects)?;
+    let stylesheet_component = component(external_objects)?;
+    let metadata_component = component(vec![object(
+        METADATA_OBJECT,
+        11_006,
+        metadata_payload_with_external_objects(
+            METADATA_LAST_IDENTIFIER,
+            external_object_identifiers,
+            external_references,
+        )?,
+    )?])?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let mut entries = catalog
+        .iter()
+        .map(|entry| {
+            if entry.name() == DOCUMENT_MEMBER {
+                (entry.name(), document_component.as_slice())
+            } else {
+                (entry.name(), entry.data())
+            }
+        })
+        .collect::<Vec<_>>();
+    entries.push((DOCUMENT_STYLESHEET_MEMBER, stylesheet_component.as_slice()));
+    entries.push((METADATA_MEMBER, metadata_component.as_slice()));
     Ok(litchi_iwa_archive::package::to_bytes(
         entries,
         Limits::default(),
@@ -714,6 +835,60 @@ fn metadata_stream(package: &[u8]) -> TestResult<Vec<u8>> {
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic metadata component"))?;
+    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+}
+
+fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
+    Catalog::from_bytes(package)?
+        .iter()
+        .find(|entry| entry.name() == name)
+        .map(|entry| entry.data().to_vec())
+        .ok_or_else(|| io::Error::other(format!("missing package member {name}")).into())
+}
+
+fn assert_member_unchanged(source: &[u8], target: &[u8], name: &str) -> TestResult<()> {
+    let source_catalog = Catalog::from_bytes(source)?;
+    let target_catalog = Catalog::from_bytes(target)?;
+    let source_entry = source_catalog
+        .iter()
+        .find(|entry| entry.name() == name)
+        .ok_or_else(|| io::Error::other(format!("missing source package member {name}")))?;
+    let target_entry = target_catalog
+        .iter()
+        .find(|entry| entry.name() == name)
+        .ok_or_else(|| io::Error::other(format!("missing target package member {name}")))?;
+    assert_eq!(
+        source_entry.data(),
+        target_entry.data(),
+        "member {name} changed"
+    );
+    assert_eq!(
+        source_entry.raw_record().local_record(),
+        target_entry.raw_record().local_record(),
+        "member {name} ZIP record changed"
+    );
+    Ok(())
+}
+
+fn without_member(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let entries = catalog
+        .iter()
+        .filter(|entry| entry.name() != name)
+        .map(|entry| (entry.name(), entry.data()))
+        .collect::<Vec<_>>();
+    Ok(litchi_iwa_archive::package::to_bytes(
+        entries,
+        Limits::default(),
+    )?)
+}
+
+fn stylesheet_stream(package: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT_STYLESHEET_MEMBER)
+        .ok_or_else(|| io::Error::other("missing synthetic stylesheet component"))?;
     Ok(SnappyStream::decompress(entry.data())?.into_bytes())
 }
 
@@ -1060,6 +1235,22 @@ fn replace_document_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8
     )?)
 }
 
+fn with_stylesheet_archive(
+    source: &[u8],
+    mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
+) -> TestResult<Vec<u8>> {
+    let mut archive = Archive::parse(&stylesheet_stream(source)?)?;
+    mutate(&mut archive)?;
+    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
+        &[litchi_iwa_archive::package::EntryEdit::new(
+            DOCUMENT_STYLESHEET_MEMBER,
+            &compressed,
+        )],
+        Limits::default(),
+    )?)
+}
+
 fn push_varint(value: u64, output: &mut Vec<u8>) {
     let mut value = value;
     while value >= 0x80 {
@@ -1262,6 +1453,27 @@ fn assert_graph_or_ingress_rejected(source: &[u8]) -> TestResult<()> {
     let result = package
         .edit_slide_chart_caption(0usize, 0usize)
         .and_then(|edit| edit.set("fresh caption"))
+        .and_then(|edit| edit.commit());
+    assert!(matches!(
+        result,
+        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+    ));
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+fn assert_caption_graph_rejected(source: &[u8]) -> TestResult<()> {
+    let package = match Package::from_bytes(source) {
+        Ok(package) => package,
+        Err(_) => return Ok(()),
+    };
+    assert!(matches!(
+        package.slide_chart_caption(0usize, 0usize),
+        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+    ));
+    let result = package
+        .edit_slide_chart_caption(0usize, 0usize)
+        .and_then(|edit| edit.set("rejected external graph"))
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
@@ -2168,6 +2380,99 @@ fn cross_component_caption_dependencies_require_exact_metadata_edges() -> TestRe
         .package()
         .apply_slide_chart_caption(&commit.patch().inverse())?;
     assert_eq!(exact_bytes(restored.package())?, supported);
+    Ok(())
+}
+
+#[test]
+fn external_caption_style_is_readable_opaque_and_reversible() -> TestResult<()> {
+    let references = [external_reference(FOREIGN_COMPONENT, Some(STYLES[0]), None)];
+    let source = synthetic_external_caption_package(&[STYLES[0]], &references)?;
+    let style_before = member_bytes(&source, DOCUMENT_STYLESHEET_MEMBER)?;
+    assert!(
+        stylesheet_stream(&source)?
+            .windows(EXTERNAL_STYLE_UNKNOWN_MARKER.len())
+            .any(|window| window == EXTERNAL_STYLE_UNKNOWN_MARKER),
+        "external style fixture must carry an opaque extension"
+    );
+
+    let package = Package::from_bytes(&source)?;
+    assert_eq!(
+        package.slide_chart_caption(0usize, 0usize)?,
+        Some("North".to_owned())
+    );
+    let replaced = package
+        .edit_slide_chart_caption(0usize, 0usize)?
+        .set("external style replacement")?
+        .commit()?;
+    assert_eq!(
+        replaced.package().slide_chart_caption(0usize, 0usize)?,
+        Some("external style replacement".to_owned())
+    );
+    let replaced_bytes = exact_bytes(replaced.package())?;
+    assert_member_unchanged(&source, &replaced_bytes, DOCUMENT_STYLESHEET_MEMBER)?;
+    assert_eq!(
+        member_bytes(&replaced_bytes, DOCUMENT_STYLESHEET_MEMBER)?,
+        style_before
+    );
+
+    let restored = replaced
+        .package()
+        .apply_slide_chart_caption(&replaced.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+
+    let cleared = replaced
+        .package()
+        .edit_slide_chart_caption(0usize, 0usize)?
+        .clear()?
+        .commit()?;
+    assert_eq!(cleared.package().slide_chart_caption(0usize, 0usize)?, None);
+    let cleared_bytes = exact_bytes(cleared.package())?;
+    assert_member_unchanged(&replaced_bytes, &cleared_bytes, DOCUMENT_STYLESHEET_MEMBER)?;
+    let restored_replacement = cleared
+        .package()
+        .apply_slide_chart_caption(&cleared.patch().inverse())?;
+    assert_eq!(exact_bytes(restored_replacement.package())?, replaced_bytes);
+
+    let missing = without_member(&source, DOCUMENT_STYLESHEET_MEMBER)?;
+    assert_caption_graph_rejected(&missing)?;
+    let wrong_type = with_stylesheet_archive(&source, |archive| {
+        let object = archive
+            .object_mut(STYLES[0])
+            .ok_or_else(|| io::Error::other("missing external style"))?;
+        object
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("external style has no message"))?
+            .type_ = SHAPE_STYLE_MESSAGE_TYPE + 1;
+        Ok(())
+    })?;
+    assert_caption_graph_rejected(&wrong_type)?;
+    let merged = with_stylesheet_archive(&source, |archive| {
+        archive
+            .object_mut(STYLES[0])
+            .ok_or_else(|| io::Error::other("missing external style"))?
+            .archive_info
+            .should_merge = Some(true);
+        Ok(())
+    })?;
+    assert_caption_graph_rejected(&merged)?;
+
+    let external_storage = synthetic_external_caption_package(
+        &[STYLES[0], STORAGES[0]],
+        &[
+            external_reference(FOREIGN_COMPONENT, Some(STYLES[0]), None),
+            external_reference(FOREIGN_COMPONENT, Some(STORAGES[0]), None),
+        ],
+    )?;
+    assert_caption_graph_rejected(&external_storage)?;
+    let external_placement = synthetic_external_caption_package(
+        &[STYLES[0], PLACEMENTS[0]],
+        &[
+            external_reference(FOREIGN_COMPONENT, Some(STYLES[0]), None),
+            external_reference(FOREIGN_COMPONENT, Some(PLACEMENTS[0]), None),
+        ],
+    )?;
+    assert_caption_graph_rejected(&external_placement)?;
     Ok(())
 }
 
