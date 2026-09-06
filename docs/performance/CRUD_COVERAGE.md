@@ -1,5 +1,16 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0445 calibrates Part-addition timing
+
+[0445](changes/0445-opc-part-add-plain-source.md) adds a matched plain-source version of the low-level OPC Part-addition
+case. It measures observer overhead for the existing category 6/15 package slice;
+no semantic owner or native compatibility coverage is promoted. There are now
+438 selectors, with 36 defaults. The representative index remains 15 categories,
+33 mappings, 10 measured and 23 correctness-only mappings. Plain source counters
+are unavailable; observed counters remain separate. Repackaging, broader Part
+dependency closures, bounded semantic append/creation, native, cold/range and
+scaling obligations remain open.
+
 ## 2026-09-06: change 0444 adds an opt-in OPC Part-addition baseline
 
 [0444](changes/0444-opc-part-add-baseline.md) adds `opc_part_add_lifecycle` for one flat package Part and root

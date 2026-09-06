@@ -1,0 +1,272 @@
+{
+  "schema": "litchi-0445-opc-part-add-baseline-v1",
+  "change": 445,
+  "status": "frozen",
+  "frozen_utc": "2026-09-06T19:00:55.203301+00:00",
+  "purpose": "matched single-build OPC observed/plain source baseline; no production speedup claim",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "repeats": 2,
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "shapes": {
+    "tiny": 64,
+    "medium": 1024,
+    "large": 4096
+  },
+  "roles": {
+    "observed": {
+      "build_directory": "observed",
+      "build_receipt": "checks/after-build.json",
+      "selector": "opc_part_add_lifecycle",
+      "source_field": "opc_part_add",
+      "oracle_role": "observed"
+    },
+    "plain": {
+      "build_directory": "plain",
+      "build_receipt": "checks/after-build.json",
+      "selector": "opc_part_add_plain_lifecycle",
+      "source_field": "opc_part_add",
+      "oracle_role": "plain"
+    }
+  },
+  "order": [
+    {
+      "phase": "A1",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "A1",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "A1",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "A1",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "A1",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "A1",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B1",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B1",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B1",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B1",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B1",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B1",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "B2",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "B2",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "B2",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "phase": "B2",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "B2",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "B2",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "phase": "A2",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "A2",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "A2",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "phase": "A2",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "A2",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "A2",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R2"
+    }
+  ],
+  "matrix": {
+    "reports": 24,
+    "retained_samples": 720,
+    "reports_per_phase": 6,
+    "samples_per_report": 30
+  },
+  "timing_scope": {
+    "source_modes": "source selection and preparation are outside timing; both execute the same timed body",
+    "inside": [
+      "source-backed catalog opening",
+      "one Part and root relationship plan construction",
+      "consuming sequential publication including catalog drop"
+    ],
+    "outside": [
+      "source wrapper and prepared input/payload",
+      "sink setup",
+      "digest finalization, source snapshots, full artifact oracles and report assembly"
+    ],
+    "data_path_sha256": "437f6d17e133c21205d02bf7e4e241a489e07f30a3e4f62225973d9ac619ef97"
+  },
+  "profiles": {
+    "roles": [
+      "observed",
+      "plain"
+    ],
+    "symbolization": "perf report --no-inline -g none; perf script --no-inline",
+    "shape": "large",
+    "mode": "normal",
+    "kinds": [
+      "stat",
+      "record"
+    ],
+    "events": [
+      "cycles:u",
+      "instructions:u",
+      "branches:u",
+      "branch-misses:u",
+      "L1-dcache-load-misses:u"
+    ],
+    "record_frequency_hz": 999,
+    "call_graph": "fp,127",
+    "scope": "whole fresh process including fixtures, untimed gates, warmups, timed samples and report hashing; Python oracle afterward"
+  },
+  "oracle": {
+    "verifier_path": "oracle/verify-report.py",
+    "verifier_sha256": "ad8ad13c12e2e7591b2c5e0edd159513e0fd0808ba6e83d24cd6dbb700d9f246",
+    "fixtures_verifier_sha256": "6fef2ce7629bc703593f9e4f6b335d5f9f9e309012a306275c11d9e41b51e708",
+    "protocol_path": "oracle/protocol.json",
+    "protocol_sha256": "ffb5d7a06170648c76bc9c9d7965b7e84da95cd8d299710fada76622c67a0a67",
+    "role_map": {
+      "observed": "observed",
+      "plain": "plain"
+    },
+    "argv": [
+      "{python}",
+      "-B",
+      "{verifier}",
+      "--report",
+      "{report}",
+      "--mode",
+      "{mode}",
+      "--shape",
+      "{shape}",
+      "--role",
+      "{role}"
+    ],
+    "contract": "actual ZIP fixture identities, independent payload/XML/raw-record verification, report/catalog hashes, source/sink alignment and allocation balance; producer refusal gates are separate Rust checks"
+  },
+  "analysis": {
+    "p50": "arithmetic midpoint of central observations",
+    "p95_p99": "nearest rank",
+    "bootstrap_95": "2000 deterministic resamples per report",
+    "bootstrap_seed": 4450301,
+    "repeat_review_trigger_percent": 5,
+    "scope": "descriptive baseline; allocator elapsed time is not a latency claim"
+  },
+  "claims": {
+    "allowed": [
+      "matched source-observer overhead and plain-source baseline for this synthetic OPC case"
+    ],
+    "withheld": [
+      "speedup or before/after regression",
+      "native Office owner creation",
+      "cold/range or scaling",
+      "bounded total memory",
+      "causal attribution from whole-process profiles"
+    ]
+  },
+  "freeze_scope": "implementation and fixture validation preceded this freeze; all retained capture and profile runs must follow it"
+}

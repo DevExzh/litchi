@@ -1,0 +1,7 @@
+{
+  "change": 445,
+  "status": "failed",
+  "exit_code": 1,
+  "error": "profile-summary.py --check: nondeterministic equal-weight inclusive row ordering from set iteration",
+  "correction": "sort rows by descending period then symbol; raw measurement/profile artifacts unchanged"
+}

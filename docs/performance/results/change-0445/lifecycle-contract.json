@@ -1,0 +1,17 @@
+{
+  "change": 445,
+  "cleanup": {
+    "prefix": "litchi-goal-0445-",
+    "paths": [
+      "/tmp/litchi-goal-0445-binaries"
+    ],
+    "preserved_paths": [
+      "/home/zhuhe/code/litchi/target",
+      "/home/zhuhe/code/litchi/tools/perf-baseline/target"
+    ],
+    "precleanup_receipt": "checks/precleanup.json",
+    "cleanup_inventory": "checks/cleanup-inventory.json",
+    "goal_path": "/home/zhuhe/code/litchi/docs/GOAL.md",
+    "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+  }
+}

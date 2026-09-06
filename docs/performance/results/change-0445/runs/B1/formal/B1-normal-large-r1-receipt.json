@@ -1,0 +1,119 @@
+{
+  "ambient_source_manifest": {
+    "files": 6661,
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0445/runs/B1/formal/B1-normal-large-r1-resource.log",
+    "/tmp/litchi-goal-0445-binaries/after/normal",
+    "--case",
+    "opc_part_add_plain_lifecycle",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0445/runs/B1/formal/B1-normal-large-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0445/runs/B1/formal/B1-normal-large-r1-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4820,
+      "path": "runs/B1/formal/B1-normal-large-r1-catalog.json",
+      "sha256": "2dc9691998367b104d94479de162fb829c017074ba36c016197acff13d40bf1c"
+    },
+    "oracle_log": {
+      "bytes": 314,
+      "path": "runs/B1/formal/B1-normal-large-r1-oracle.log",
+      "sha256": "f7b64a75b47341e1f53f7e800079fd5794b324ffcea0d2d6ea85cf2207bf01c7"
+    },
+    "report": {
+      "bytes": 37418,
+      "path": "runs/B1/formal/B1-normal-large-r1.json",
+      "sha256": "c7298a1adba618211e84569ee6fe877ba70c2ee0026c6e7d1f6a8ed2cc6d1b84"
+    },
+    "resource_log": {
+      "bytes": 1090,
+      "path": "runs/B1/formal/B1-normal-large-r1-resource.log",
+      "sha256": "8cbe7fb4a2154b6f1e526949a7463f9a1c39a2773589a96d321b318be0807bd1"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/B1/formal/B1-normal-large-r1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 458719080,
+    "path": "/tmp/litchi-goal-0445-binaries/after/normal",
+    "sha256": "7cdc11710478332d3dd4e125aa8678e5e0c8e1aa1474f0332034cf1c6d5116bc"
+  },
+  "build_directory": "plain",
+  "change": 445,
+  "custody_driver": "/home/zhuhe/code/litchi/docs/performance/results/change-0445/check.py",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "214a35693a6a657daed45e87877e59a3216ca0d9eed6ce62ded659dd1dbe56b0",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T19:02:35.014864+00:00",
+  "lane": {
+    "mode": "normal",
+    "phase": "B1",
+    "repeat": "R1",
+    "shape": "large"
+  },
+  "name": "B1-normal-large-r1",
+  "oracle_exit_code": 0,
+  "oracle_role": "plain",
+  "oracle_stdout_sha256": "f7b64a75b47341e1f53f7e800079fd5794b324ffcea0d2d6ea85cf2207bf01c7",
+  "outside_bundle_status_unchanged": true,
+  "phase": "B1",
+  "protocol_sha256": "1ab209b8d2b9543d0cb206600e0c99909637705aa679e6acd87951f9c3b4bc99",
+  "revision": "adf1ca69aa6ed21cc45e2dcdc01c6d5a81abb10c",
+  "role": "plain",
+  "schema": "litchi-0445-capture-receipt-v1",
+  "selector": "opc_part_add_plain_lifecycle",
+  "source_after": {
+    "files": 6661,
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0"
+  },
+  "source_before": {
+    "files": 6661,
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0"
+  },
+  "source_field": "opc_part_add",
+  "source_manifest": {
+    "files": 6661,
+    "path": "sources/9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0.json",
+    "sha256": "9246ce8fc9f68745338525b6d0d3039f9824d0acd21ff8ddc682e960afa225d0"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-06T19:02:33.225848+00:00",
+  "status": "pass",
+  "status_after": [
+    " M tools/perf-baseline/src/lib.rs",
+    " M tools/perf-baseline/src/opc_part_add.rs",
+    " M tools/perf-baseline/src/operation_metrics.rs",
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    " M tools/perf-baseline/src/lib.rs",
+    " M tools/perf-baseline/src/opc_part_add.rs",
+    " M tools/perf-baseline/src/operation_metrics.rs",
+    "?? docs/GOAL.md"
+  ]
+}

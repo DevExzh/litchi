@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0445: matched source calibration in standalone tooling
+
+[0445](changes/0445-opc-part-add-plain-source.md) adds an opt-in plain source selector with a shared timed body.
+Source construction stays outside timing; OPC catalog and publication ownership,
+source identity, bounds, lexical preservation and typed refusals are unchanged
+(0002/0003/0005/0006/0008/0023/0024). Plain source metrics are unavailable with no
+values, while real sink/process/allocator evidence remains. No production API,
+dependency, unsafe code, executor or ambient production I/O change. Existing
+managed-memory and candidate-validation requirements constrain the next content-
+type allocation candidate. The accepted ADR tree is unchanged. See
+[validation](results/change-0445/validation-notes.md).
+
 ## Change 0444: tooling-only OPC Part-addition baseline
 
 [0444](changes/0444-opc-part-add-baseline.md) adds a standalone benchmark selector and fixture exporter using

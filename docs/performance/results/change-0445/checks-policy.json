@@ -1,0 +1,81 @@
+{
+  "change": 445,
+  "expected_status": {
+    "before-harness-strict.json": "failed",
+    "candidate-harness-strict.json": "failed",
+    "candidate-harness-strict-fixed.json": "failed"
+  },
+  "required": {
+    "after-build.json": {
+      "role": "observed"
+    },
+    "candidate-harness-tests.json": {
+      "role": "observed",
+      "tests": 373
+    },
+    "candidate-topology-tests.json": {
+      "role": "observed",
+      "tests": 37
+    },
+    "independent-fixtures.json": {
+      "role": "observed"
+    },
+    "independent-oracle-probes.json": {
+      "role": "observed"
+    },
+    "pilot-observed.json": {
+      "role": "observed"
+    },
+    "pilot-plain.json": {
+      "role": "observed"
+    },
+    "candidate-workspace-check.json": {
+      "role": "observed"
+    },
+    "candidate-harness-check.json": {
+      "role": "observed"
+    },
+    "candidate-harness-doc.json": {
+      "role": "observed"
+    },
+    "final-format.json": {
+      "role": "observed"
+    },
+    "final-boundaries.json": {
+      "role": "observed"
+    },
+    "formal-a1.json": {
+      "role": "observed"
+    },
+    "formal-b1.json": {
+      "role": "observed"
+    },
+    "formal-b2.json": {
+      "role": "observed"
+    },
+    "formal-a2.json": {
+      "role": "observed"
+    },
+    "observed-stat.json": {
+      "role": "observed"
+    },
+    "observed-record.json": {
+      "role": "observed"
+    },
+    "plain-stat.json": {
+      "role": "observed"
+    },
+    "plain-record.json": {
+      "role": "observed"
+    },
+    "formal-summary.json": {
+      "role": "observed"
+    },
+    "profile-summary-stable.json": {
+      "role": "observed"
+    }
+  },
+  "cleanup_paths": [
+    "/tmp/litchi-goal-0445-binaries"
+  ]
+}

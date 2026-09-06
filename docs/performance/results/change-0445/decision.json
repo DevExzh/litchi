@@ -1,0 +1,7 @@
+{
+  "change": 445,
+  "decision": "baseline",
+  "performance_claim": "matched observer overhead only; no production optimization",
+  "scope": "one fixed-source-build observed/plain Part-addition lifecycle comparison; plain baseline supports follow-up production attribution",
+  "goal_complete": false
+}

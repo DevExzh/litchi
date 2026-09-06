@@ -1,0 +1,8 @@
+{
+  "before-harness-strict.json": {
+    "origin": "change-0444/checks/after-harness-strict-final.json",
+    "scope": "unchanged sealed baseline strict-lint evidence; its complete source manifest matches the current HEAD before the three-file candidate",
+    "receipt_sha256": "903aa762ba444cab4f0f3c1b33f026e85fe6ac330b2ed49c88ad0ddc5f8191ce",
+    "driver_path": "draft-history/imported-check-driver.py.txt"
+  }
+}
