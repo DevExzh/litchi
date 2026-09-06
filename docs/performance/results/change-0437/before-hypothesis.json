@@ -1,0 +1,228 @@
+{
+  "change": 437,
+  "before_revision": "203c50a848204ed51013b0555f61a3c7e75644c9",
+  "classification": "Pre-implementation exploratory decision; pilots use three samples and one warmup, not the formal comparison.",
+  "pilot_rows": [
+    {
+      "shape": "tiny",
+      "slides": 64,
+      "normal_p50_ns": 255021,
+      "allocation_calls": [
+        2985,
+        2985,
+        2985
+      ],
+      "allocated_bytes": [
+        2170651,
+        2170651,
+        2170651
+      ],
+      "region_peak_above_entry_bytes": [
+        592188,
+        592188,
+        592188
+      ],
+      "live_delta_bytes": [
+        0,
+        0,
+        0
+      ],
+      "archive_bytes": 3182,
+      "content_xml_bytes": 49009,
+      "inputs": [
+        {
+          "path": "pilots/before-buffered/initial/normal-tiny.json",
+          "bytes": 19890,
+          "sha256": "8e5a2b1fdabffc29d7fea89064b3512d71080eab9468b2138df216e187737d52"
+        },
+        {
+          "path": "pilots/before-buffered/initial/allocator-tiny.json",
+          "bytes": 22772,
+          "sha256": "e83424e7757c790910d4b8f7e71288cac62bbab85adce339b0cc4da413e2bb02"
+        }
+      ]
+    },
+    {
+      "shape": "medium",
+      "slides": 4096,
+      "normal_p50_ns": 12336695,
+      "allocation_calls": [
+        180405,
+        180405,
+        180405
+      ],
+      "allocated_bytes": [
+        32749223,
+        32749223,
+        32749223
+      ],
+      "region_peak_above_entry_bytes": [
+        11988609,
+        11988609,
+        11988609
+      ],
+      "live_delta_bytes": [
+        0,
+        0,
+        0
+      ],
+      "archive_bytes": 53144,
+      "content_xml_bytes": 3043815,
+      "inputs": [
+        {
+          "path": "pilots/before-buffered/initial/normal-medium.json",
+          "bytes": 19961,
+          "sha256": "12aef8fcf9b361d43b5c02f6d507c1ff76345273e79a44db9d47701b73e3bcf3"
+        },
+        {
+          "path": "pilots/before-buffered/initial/allocator-medium.json",
+          "bytes": 22891,
+          "sha256": "b340ec9dd5bcce9409365079f776f3ce070b1d7404172c69b6a0175ce2157d99"
+        }
+      ]
+    },
+    {
+      "shape": "large",
+      "slides": 8192,
+      "normal_p50_ns": 25040541,
+      "allocation_calls": [
+        360631,
+        360631,
+        360631
+      ],
+      "allocated_bytes": [
+        63817229,
+        63817229,
+        63817229
+      ],
+      "region_peak_above_entry_bytes": [
+        23973505,
+        23973505,
+        23973505
+      ],
+      "live_delta_bytes": [
+        0,
+        0,
+        0
+      ],
+      "archive_bytes": 103610,
+      "content_xml_bytes": 6087143,
+      "inputs": [
+        {
+          "path": "pilots/before-buffered/initial/normal-large.json",
+          "bytes": 19968,
+          "sha256": "63dc6059025558fb8f95ed181c7026d65bb57721bc02bc063ad45855536b582d"
+        },
+        {
+          "path": "pilots/before-buffered/initial/allocator-large.json",
+          "bytes": 22901,
+          "sha256": "ed4ed3ab48aae6704748c40e60a3ea9a9933a9ba41fdecfcd31f0c995cd878d0"
+        }
+      ]
+    }
+  ],
+  "profile": {
+    "scope": "Whole benchmark executable including corpus construction, built-in verification, binary hashing, warmups and samples; excludes the independent Python report oracle and symbolization.",
+    "samples": 30,
+    "warmups": 3,
+    "slides": 8192,
+    "counters": {
+      "cycles:u": 5907624479,
+      "instructions:u": 23591643720,
+      "branches:u": 5215174059,
+      "branch-misses:u": 9710730,
+      "L1-dcache-load-misses:u": 0
+    },
+    "ipc": 3.993423042351775,
+    "branch_miss_percent": 0.18620145540956334,
+    "symbols_at_least_one_percent": [
+      {
+        "self_percent": 18.08,
+        "symbol": "sha2::sha256::x86_sha::compress"
+      },
+      {
+        "self_percent": 9.42,
+        "symbol": "zlib_rs::deflate::longest_match::longest_match"
+      },
+      {
+        "self_percent": 7.63,
+        "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium"
+      },
+      {
+        "self_percent": 7.59,
+        "symbol": "__memmove_avx512_unaligned_erms"
+      },
+      {
+        "self_percent": 6.88,
+        "symbol": "xml_minifier::audit::verify_with_policy"
+      },
+      {
+        "self_percent": 4.61,
+        "symbol": "<quick_xml::events::attributes::IterState>::next"
+      },
+      {
+        "self_percent": 2.63,
+        "symbol": "__memcmp_evex_movbe"
+      },
+      {
+        "self_percent": 2.62,
+        "symbol": "litchi_odp::authoring::builder::xml::generate_text_paragraphs"
+      },
+      {
+        "self_percent": 2.35,
+        "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+      },
+      {
+        "self_percent": 2.26,
+        "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates"
+      },
+      {
+        "self_percent": 2.06,
+        "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+      },
+      {
+        "self_percent": 1.9,
+        "symbol": "_int_malloc"
+      },
+      {
+        "self_percent": 1.75,
+        "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+      },
+      {
+        "self_percent": 1.62,
+        "symbol": "xml_minifier::audit::check_attribute_layout"
+      },
+      {
+        "self_percent": 1.47,
+        "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+      },
+      {
+        "self_percent": 1.4,
+        "symbol": "litchi_core::xml::escape::escape_xml"
+      },
+      {
+        "self_percent": 1.26,
+        "symbol": "crc32fast::specialized::pclmulqdq::calculate"
+      }
+    ],
+    "lost_samples": 0,
+    "addr2line_warnings": 11,
+    "cache_limitations": "L1 miss counter returned zero without a load denominator; LLC was not collected. No cache-rate claim.",
+    "inputs": [
+      {
+        "path": "profiles/preparatory-before-buffered/initial/stat/perf-stat.txt",
+        "bytes": 263,
+        "sha256": "29ef7608254ff3ed39488705d06434b9f4a16a143c11b107203b8faaa164ad21"
+      },
+      {
+        "path": "profiles/preparatory-before-buffered/initial/record/perf-report.txt",
+        "bytes": 1477085,
+        "sha256": "f9ec80b8affa09f87e64e915ff3c7138e625e49fe93f4637726db03109e45850"
+      }
+    ]
+  },
+  "decision": "Implement and measure an opt-in bounded plain-slide source and sequential sink API, plus the narrow common balanced-prelude XML envelope enabler.",
+  "mechanism": "Avoid retaining the whole slide model, all generated page names, body/final content Strings and final archive Vec. Keep one source item, a fixed slide fragment window and bounded ZIP/manifest staging.",
+  "acceptance": "Require identical title/body, page/frame geometry, fixed styles/meta and package semantics. Measure constant operation memory as slide count grows; inspect all latency/RSS regressions above approximately five percent. Preserve the buffered control and existing limits. No speedup is assumed.",
+  "limitations": "Fresh plain titled slides only. The measured memmove/allocator symbols include setup and verification, so their whole-process percentages are not an operation-only Amdahl fraction. Native rendering/runtime is unavailable. Rich slides and append-to-existing are separate work."
+}

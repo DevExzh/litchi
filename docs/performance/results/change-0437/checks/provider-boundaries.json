@@ -1,0 +1,38 @@
+{
+  "change": 437,
+  "argv": [
+    "python3",
+    "-B",
+    "tools/check_crate_boundaries.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "203c50a848204ed51013b0555f61a3c7e75644c9",
+  "driver_sha256": "1838ac8f33c94fb3f0ac661c91fc6bcc2a1d1b3d02e716742156c7efa26cc78b",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T10:47:22.127897+00:00",
+  "source_before": {
+    "path": "sources/3f40341cf9c8baf1d62fca001aafef2fee686793ea35525e96f665e59653462a.json",
+    "sha256": "3f40341cf9c8baf1d62fca001aafef2fee686793ea35525e96f665e59653462a",
+    "files": 6654
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T10:47:52.374429+00:00",
+  "source_after": {
+    "path": "sources/3f40341cf9c8baf1d62fca001aafef2fee686793ea35525e96f665e59653462a.json",
+    "sha256": "3f40341cf9c8baf1d62fca001aafef2fee686793ea35525e96f665e59653462a",
+    "files": 6654
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/provider-boundaries.log",
+    "bytes": 684,
+    "sha256": "b6f38b040ac7308af6ec280e204ed817e3c708cdde84d2566f0b5d74758aeeaf"
+  }
+}

@@ -1,5 +1,26 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0437: bounded ODP creation with a measured CPU tradeoff
+
+[0437](changes/0437-odp-bounded-plain-slides.md) adds plain titled-slide source
+and sequential sink APIs plus matched opt-in buffered/streaming benchmarks.
+The three-role forward/reverse matrix retains 36 reports, 1,080 samples, and
+six profiles across 64, 4,096, and 8,192 slides. All 180 streaming allocator
+samples peak at 420,352 bytes above operation entry; large Builder peak is
+23,973,505 bytes. Large requested allocation bytes fall 85.735%, while normal
+streaming p50 is 1.574 / 1.588 times candidate Builder in the large R1/R2 runs.
+The API is retained for bounded publication, with no latency or RSS gain claim.
+
+All 37 review flags remain visible: 36 cross-API latency/throughput costs and
+tiny R1 same-API Builder p99 at +5.874%. None of the RSS or repeat comparisons
+crosses 5%; whole-process RSS spans 84.529–84.730 MB. The initial RSS reader
+omission was corrected from unchanged raw logs and its prior analysis retained.
+ODP/common/harness release suites pass 349 / 462 / 364 tests, with one existing
+ignored test in each of the latter two suites. Scoped lint, docs, minimal
+features, formatting, and boundaries pass. [The bundle](results/change-0437/README.md)
+retains exact semantic/package gates, failed attempts, and portable proofs.
+The original non-iWork goal remains open.
+
 ## Change 0436: lower ODT text-accounting cost
 
 [0436](changes/0436-odt-bounded-text-spans.md) batches ordinary UTF-8 Work

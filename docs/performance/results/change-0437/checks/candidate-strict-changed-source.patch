@@ -1,0 +1,107 @@
+diff --git a/tools/perf-baseline/src/lib.rs b/tools/perf-baseline/src/lib.rs
+index 0afd28be7..5346abb8e 100644
+--- a/tools/perf-baseline/src/lib.rs
++++ b/tools/perf-baseline/src/lib.rs
+@@ -15,0 +16 @@ mod odp_buffered_create;
++mod odp_streaming_create;
+@@ -1472,0 +1474 @@ enum Case {
++    OdpStreamingCreate,
+@@ -2056,0 +2059 @@ impl Case {
++            Self::OdpStreamingCreate => "odp_streaming_create",
+@@ -2663,0 +2667,4 @@ impl Case {
++    const fn uses_odp_streaming_creation(self) -> bool {
++        matches!(self, Self::OdpStreamingCreate)
++    }
++
+@@ -8941,0 +8949 @@ pub fn run() -> Result<(), Box<dyn Error>> {
++                    && !case.uses_odp_streaming_creation()
+@@ -10518,0 +10527,23 @@ pub fn run() -> Result<(), Box<dyn Error>> {
++    if options
++        .cases
++        .iter()
++        .any(|case| case.uses_odp_streaming_creation())
++    {
++        for shape in &options.semantic_shapes {
++            let corpus = odp_streaming_create::build_odp_streaming_corpus(*shape)?;
++            for case in options
++                .cases
++                .iter()
++                .copied()
++                .filter(|case| case.uses_odp_streaming_creation())
++            {
++                results.push(odp_streaming_create::run_odp_streaming_creation(
++                    case,
++                    &corpus,
++                    options.warmup_iterations,
++                    options.samples,
++                )?);
++            }
++        }
++    }
++
+@@ -11714,0 +11746 @@ fn parse_case(value: &str) -> Option<Case> {
++        "odp_streaming_create" => Some(Case::OdpStreamingCreate),
+@@ -12147,0 +12180 @@ fn usage_text() -> String {
++                                       odp_streaming_create,\n\
+@@ -23115,0 +23149,3 @@ fn run_case_with_config(
++        Case::OdpStreamingCreate => {
++            Err("streaming ODP creation cases use their dedicated corpus runner".into())
++        },
+@@ -58573 +58609 @@ mod tests {
+-        assert_eq!(selectable_count, 434);
++        assert_eq!(selectable_count, 435);
+@@ -60617,0 +60654,54 @@ mod tests {
++    #[test]
++    fn odp_streaming_creation_is_opt_in_and_binds_shared_semantics() {
++        let case = parse_case("odp_streaming_create").expect("streaming ODP selector parses");
++        assert_eq!(case, Case::OdpStreamingCreate);
++        assert!(!Case::DEFAULT.contains(&case));
++        let corpus =
++            super::odp_streaming_create::build_odp_streaming_corpus(SemanticShape::Tiny).unwrap();
++        assert_eq!(corpus.manifest.archive_member_count, 5);
++        assert_eq!(corpus.manifest.entry_count, 64);
++        let measured =
++            super::odp_streaming_create::run_odp_streaming_creation(case, &corpus, 0, 1).unwrap();
++        assert_eq!(measured.elapsed_ns.samples.len(), 1);
++        assert_eq!(
++            measured.output_sha256.as_deref(),
++            Some(corpus.manifest.archive_sha256.as_str())
++        );
++        let sink = measured.sink.as_ref().unwrap();
++        assert_eq!(sink.accepted_bytes, corpus.manifest.archive_bytes as u64);
++        assert_eq!(sink.retained_output_bytes, Some(0));
++        assert_eq!(sink.retained_authoring_window_bytes, Some(4_096));
++        let counts =
++            super::odp_buffered_create::odp_buffered_text_shape_counts(SemanticShape::Tiny)
++                .unwrap();
++        assert_eq!(
++            sink.input_bytes,
++            Some(u64::try_from(counts.title_text_bytes + counts.body_text_bytes).unwrap(),)
++        );
++        let source = measured.source.as_ref().unwrap();
++        let odp = source.odp_slides.as_ref().unwrap();
++        assert_eq!(odp.role, "streaming");
++        assert_eq!(
++            odp.implementation,
++            "litchi_odp::streaming::stream_plain_slides_to"
++        );
++        assert_eq!(odp.slide_count, 64);
++        assert_eq!(odp.title_variant_counts, [16; 4]);
++        assert_eq!(odp.body_variant_counts, [16; 4]);
++        assert!(odp.archive_member_set_verified);
++        assert!(odp.manifest_bindings_verified);
++        assert!(odp.semantic_reopen_verified);
++        assert!(odp.immutable_styles_meta_verified);
++        assert!(odp.runtime_output_digest_verified);
++        assert!(odp.runtime_sink_length_verified);
++        assert_eq!(
++            odp.provider_input_text_bytes,
++            Some(usize::try_from(sink.input_bytes.unwrap()).unwrap())
++        );
++        assert_eq!(
++            odp.semantic_sha256,
++            "167428219fc1603b63046c349a06ef8d0033ac9f720567c5383bb79e379d10d1"
++        );
++        assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
++    }
++

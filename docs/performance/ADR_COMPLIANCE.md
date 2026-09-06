@@ -1,5 +1,23 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0437: ODP plain-slide grammar over common streaming publication
+
+[0437](changes/0437-odp-bounded-plain-slides.md) keeps slide/page/frame/text
+grammar in `litchi-odp` and ZIP/manifest/publication mechanics in
+`litchi-odf-common`. The common fixed-prelude envelope constructor is opt-in;
+the existing strict constructor is unchanged. Caller-provided ordered sources,
+sinks, execution contexts, and finite limits preserve explicit ownership,
+typed refusal, cancellation, and accepted-byte progress. No ambient I/O,
+executor, unsafe code, or production dependency was introduced.
+
+Fresh publication does not change existing-document preservation or commit
+paths. The provider's modeled Memory and Work accounting are documented
+separately from full allocator and CPU costs. Shared XML audit refusals remain
+in force, including ambiguous spacing between adjacent text controls. The
+[batch matrix](results/change-0437/adr-compliance.md) records ownership,
+validation, and resource boundaries; the old constructor and malformed fixed
+preludes have independent differential tests.
+
 ## Change 0436: private ODT ordinary-text spans
 
 [0436](changes/0436-odt-bounded-text-spans.md) keeps ODT grammar and batching

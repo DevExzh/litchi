@@ -1,0 +1,39 @@
+{
+  "change": 437,
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import importlib.util,pathlib; r=pathlib.Path(\"docs/performance/results/change-0437\"); s=importlib.util.spec_from_file_location(\"odp_candidate\",r/\"verify-report-candidate.py\"); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); [m.validate_report(r/\"pilots/before-buffered/initial\"/(mode+\"-\"+shape+\".json\"),mode,shape,\"before-buffered\",samples=3,warmups=1) for mode in (\"normal\",\"allocator\") for shape in (\"tiny\",\"medium\",\"large\")]; print(\"VALID: six retained before pilots accepted by candidate oracle\")"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "203c50a848204ed51013b0555f61a3c7e75644c9",
+  "driver_sha256": "1838ac8f33c94fb3f0ac661c91fc6bcc2a1d1b3d02e716742156c7efa26cc78b",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T10:40:32.695674+00:00",
+  "source_before": {
+    "path": "sources/d02aff0528c384de0e3a804a8b67b236a1a20b6a66f80cb403118f596cc0951d.json",
+    "sha256": "d02aff0528c384de0e3a804a8b67b236a1a20b6a66f80cb403118f596cc0951d",
+    "files": 6653
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T10:40:32.895800+00:00",
+  "source_after": {
+    "path": "sources/d02aff0528c384de0e3a804a8b67b236a1a20b6a66f80cb403118f596cc0951d.json",
+    "sha256": "d02aff0528c384de0e3a804a8b67b236a1a20b6a66f80cb403118f596cc0951d",
+    "files": 6653
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/candidate-oracle-before-compatibility.log",
+    "bytes": 63,
+    "sha256": "8a9eb777d34af93550619d032016f4d0e754c7b56f1bae1a738f9310b1954c6c"
+  }
+}

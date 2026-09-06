@@ -1,6 +1,24 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0436
+## Current evidence through 0437
+
+[0437](changes/0437-odp-bounded-plain-slides.md) implements and measures fresh
+plain titled-slide ODP streaming with explicit source/sink/resource ownership.
+The common fixed-prelude constructor is opt-in and preserves the old strict
+contract. Full release suites, resource/refusal/sink tests, independent
+semantic/package gates, and the 36-report/1,080-sample/six-profile matrix pass.
+The API is kept for its measured 420,352-byte operation peak across three
+sizes, 98.247% below large Builder, with the 1.574/1.588 large p50 ratios and
+all other regression flags disclosed. Native visual compatibility is unproven.
+
+This closes the current plain fresh ODP creation slice, not the program goal.
+Fixed-markup execution-accounting cost is the next measured-hypothesis target;
+existing append, richer creation, Part addition/repackaging, real-producer
+breadth, cold/range/scaling, and other taxonomy gaps remain. The user-owned
+`docs/GOAL.md` stays unchanged and excluded from commits. The batch retains
+reproducible raw evidence and portable cleanup proof.
+
+## Earlier evidence through 0436
 
 [0436](changes/0436-odt-bounded-text-spans.md) retains measured private ODT
 ordinary-text batching: 24 formal reports, 720 samples, four profiles and

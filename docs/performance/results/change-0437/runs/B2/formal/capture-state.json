@@ -1,0 +1,47 @@
+{
+  "ambient_source_manifest": {
+    "files": 6656,
+    "path": "sources/191d59feb360a2cc190a5a80adbd3649cb3da44dd550b9a6f5572abca0c7465b.json",
+    "sha256": "191d59feb360a2cc190a5a80adbd3649cb3da44dd550b9a6f5572abca0c7465b"
+  },
+  "attempt": "formal",
+  "change": 437,
+  "completed_lanes": 6,
+  "driver_sha256": "5aa1bf61fdf4c8b01b92be24dc8777d95dd31ec0d2853b6e159c32400bdbbfa2",
+  "expected_lanes": 6,
+  "finished_utc": "2026-09-06T11:25:52.291202+00:00",
+  "index": [
+    "runs/B2/formal/B2-allocator-large-r2-receipt.json",
+    "runs/B2/formal/B2-allocator-medium-r2-receipt.json",
+    "runs/B2/formal/B2-allocator-tiny-r2-receipt.json",
+    "runs/B2/formal/B2-normal-large-r2-receipt.json",
+    "runs/B2/formal/B2-normal-medium-r2-receipt.json",
+    "runs/B2/formal/B2-normal-tiny-r2-receipt.json"
+  ],
+  "phase": "B2",
+  "protocol_sha256": "790a42ab5966ceea11a999aea6f61696d2270677f58754cf67313a1fa625480a",
+  "role": "after-buffered",
+  "schema": "litchi-0437-capture-state-v1",
+  "source_after": {
+    "files": 6656,
+    "path": "sources/191d59feb360a2cc190a5a80adbd3649cb3da44dd550b9a6f5572abca0c7465b.json",
+    "sha256": "191d59feb360a2cc190a5a80adbd3649cb3da44dd550b9a6f5572abca0c7465b"
+  },
+  "source_before": {
+    "files": 6656,
+    "path": "sources/191d59feb360a2cc190a5a80adbd3649cb3da44dd550b9a6f5572abca0c7465b.json",
+    "sha256": "191d59feb360a2cc190a5a80adbd3649cb3da44dd550b9a6f5572abca0c7465b"
+  },
+  "source_manifest": {
+    "files": 6656,
+    "path": "sources/191d59feb360a2cc190a5a80adbd3649cb3da44dd550b9a6f5572abca0c7465b.json",
+    "sha256": "191d59feb360a2cc190a5a80adbd3649cb3da44dd550b9a6f5572abca0c7465b"
+  },
+  "status": "pass",
+  "status_after": [
+    "?? docs/GOAL.md"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md"
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "baseline_revision": "1ca6b69c8b6a2774c658c8200ea05bfe9b5ee885",
+  "baseline_revision_input": "1ca6b69c8b6a2774c658c8200ea05bfe9b5ee885",
+  "baseline_sha256": "63bad8494080f30f8b0d73ebdcca148f6679ed7daa931355abd8650ad21db72c",
+  "changed_line_ranges": [
+    {
+      "end": 15,
+      "start": 15
+    },
+    {
+      "end": 1472,
+      "start": 1472
+    },
+    {
+      "end": 2056,
+      "start": 2056
+    },
+    {
+      "end": 2663,
+      "start": 2660
+    },
+    {
+      "end": 4356,
+      "start": 4355
+    },
+    {
+      "end": 8941,
+      "start": 8941
+    },
+    {
+      "end": 10518,
+      "start": 10496
+    },
+    {
+      "end": 11714,
+      "start": 11714
+    },
+    {
+      "end": 12148,
+      "start": 12147
+    },
+    {
+      "end": 23115,
+      "start": 23113
+    },
+    {
+      "end": 58573,
+      "start": 58573
+    },
+    {
+      "end": 60617,
+      "start": 60569
+    }
+  ],
+  "current_head_revision": "1ca6b69c8b6a2774c658c8200ea05bfe9b5ee885",
+  "current_revision_binding": "working-tree source at comparison time",
+  "current_worktree_sha256": "42fde4110c48948cfa8be9ec9bcb04a64452a3239411fbce1e21226c7772daa4",
+  "file": "tools/perf-baseline/src/lib.rs",
+  "line_range_convention": "1-based inclusive current-file lines",
+  "patch_bytes": 4832,
+  "patch_format": "git diff --unified=0",
+  "patch_path": "checks/strict-changed-source.patch",
+  "patch_sha256": "e5ea174866d629933164fbe06549955f939988ce842622cec50a518f1c25a180",
+  "tracked_status": [
+    " M tools/perf-baseline/src/lib.rs"
+  ]
+}

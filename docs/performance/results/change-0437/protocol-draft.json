@@ -1,0 +1,239 @@
+{
+  "change": 437,
+  "status": "draft",
+  "selector_family": "odp_fresh_slide_creation",
+  "classification": "Matched ODP buffered fresh slide creation evidence; this baseline draft authorizes no speedup, causality, fixed-memory, throughput, or cross-role lexical-byte claim.",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "repeats": 2,
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "shapes": {
+    "tiny": 64,
+    "medium": 4096,
+    "large": 8192
+  },
+  "roles": {
+    "before-buffered": {
+      "build_directory": "before",
+      "selector": "odp_buffered_create",
+      "source_field": "odp_slides",
+      "source_role": "buffered",
+      "implementation": "litchi_odp::Builder::add_slide_with_title/build",
+      "retention": "unbounded"
+    },
+    "after-buffered": {
+      "build_directory": "after",
+      "selector": "odp_buffered_create",
+      "source_field": "odp_slides",
+      "source_role": "buffered",
+      "implementation": "litchi_odp::Builder::add_slide_with_title/build",
+      "retention": "unbounded"
+    },
+    "after-streaming": {
+      "build_directory": "after",
+      "selector": "odp_streaming_create",
+      "source_field": "odp_slides",
+      "source_role": "streaming",
+      "implementation": "litchi_odp::streaming::stream_slides_to",
+      "retention": "fixed_explicit_window"
+    }
+  },
+  "order": [
+    {
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R2"
+    }
+  ],
+  "corpus": {
+    "package_format": "ODP/ODF/ZIP",
+    "compression": "mimetype=stored;xml=deflate",
+    "payload_kind": "deterministic-mixed-unicode-entities-plain-titled-slides",
+    "mimetype": "application/vnd.oasis.opendocument.presentation",
+    "member_names": [
+      "mimetype",
+      "content.xml",
+      "styles.xml",
+      "meta.xml",
+      "META-INF/manifest.xml"
+    ],
+    "manifest_entry_count": 4,
+    "target_entry": "content.xml",
+    "default_styles_xml_sha256": "d9881e91085516246a19c30d9e5cde39a8b10d7e42120b135f48f5ca8afef8d2",
+    "default_meta_xml_sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719",
+    "slide_fixture": {
+      "title_prefix": "litchi-perf-odp-buffered-title-",
+      "body_prefix": "litchi-perf-odp-buffered-body-",
+      "index_format": "{index:05}",
+      "variants": [
+        "plain slide",
+        "Unicode caf\u00e9 \u0394 \u4e2d",
+        "entities <&> \"quoted\"",
+        "mixed fa\u00e7ade \u03a9 <&> value"
+      ],
+      "cycle": 4,
+      "title_body_separator": "LF",
+      "slide_separator": "LF LF",
+      "text_contract": "four-cycle plain/Unicode/XML-significant UTF-8 title and body text with single interior spaces; one title and one body text object per slide"
+    },
+    "semantic_hash": {
+      "domain": "litchi-odp-buffered-semantic-v1\\0",
+      "count_encoding": "u64le",
+      "length_encoding": "u64le",
+      "payload_encoding": "UTF-8",
+      "field_order": [
+        "title",
+        "body"
+      ],
+      "separator_is_hashed": false,
+      "input_projection": "UTF-8 title, LF, body, with LF LF between slides and no trailing separator"
+    },
+    "declaration_policy": "XML declaration may be absent; when present it must declare UTF-8 XML 1.0 without standalone.",
+    "mimetype_layout": "Stored offset-zero first local and central entry; no extra field or data descriptor; header name, sizes, payload and central CRC match."
+  },
+  "source_contract": {
+    "required_fields": [
+      "role",
+      "implementation",
+      "timing_scope",
+      "performance_claim",
+      "semantic_sha256",
+      "content_xml_sha256",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "archive_member_set_verified",
+      "manifest_bindings_verified",
+      "semantic_reopen_verified",
+      "immutable_styles_meta_verified",
+      "runtime_output_digest_verified",
+      "runtime_sink_length_verified",
+      "page_structure_verified",
+      "page_geometry_verified",
+      "slide_count",
+      "title_count",
+      "body_count",
+      "title_text_bytes",
+      "body_text_bytes",
+      "title_variant_counts",
+      "body_variant_counts",
+      "text_contract"
+    ],
+    "all_boolean_gates_required_true": true,
+    "same_role_content_identity_required": true
+  },
+  "timing_scope": "Fresh slide title/body input and public ODP authoring/publication plus HashingDiscardSink write are inside the operation timer. Corpus construction, archive reopen, XML/semantic/package gates, sink construction/finalization, and digest extraction are outside it.",
+  "identity_scope": {
+    "same_role_required": [
+      "slide_count",
+      "title_count",
+      "body_count",
+      "title_text_bytes",
+      "body_text_bytes",
+      "title_variant_counts",
+      "body_variant_counts",
+      "semantic_sha256",
+      "content_xml_sha256",
+      "content_xml_bytes",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "member_names",
+      "mimetype",
+      "manifest_entry_count",
+      "target_payload_bytes",
+      "target_payload_sha256"
+    ],
+    "cross_role_required": [
+      "slide_count",
+      "title_count",
+      "body_count",
+      "title_text_bytes",
+      "body_text_bytes",
+      "title_variant_counts",
+      "body_variant_counts",
+      "semantic_sha256",
+      "styles_xml_sha256",
+      "meta_xml_sha256",
+      "member_names",
+      "mimetype",
+      "manifest_entry_count"
+    ],
+    "cross_role_content_xml_rule": "Retain content.xml hashes and byte counts for each role/repeat, but never require lexical content.xml equality across roles; semantic title/body/style/meta/member-topology equality is the cross-role gate.",
+    "cross_role_archive_rule": "ZIP archive bytes, archive SHA, compression framing, and sink write segmentation may differ across roles; each role/repeat must remain deterministic and internally gated."
+  },
+  "operation_metrics": {
+    "sample_alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+    "normal_allocator_elapsed": "allocator elapsed values are retained for process context only; no allocator latency claim",
+    "allocation_scope": "operation_global_system_allocator",
+    "required_region_peak": true
+  },
+  "report_contract": {
+    "schema_version": 1,
+    "required_reports": 36,
+    "reports_per_role": 12,
+    "retained_samples": 1080,
+    "cross_role_comparison": "outer capture verifier; this per-report oracle validates one role/shape/mode",
+    "currently_supported_source_role": "buffered",
+    "future_role_contracts_are_draft": true
+  },
+  "limit_boundary": "The legacy 32,768-title request remains an intentional aggregate audit-limit refusal; this baseline measures only 64, 4,096, and 8,192 slides and does not relax production limits."
+}
