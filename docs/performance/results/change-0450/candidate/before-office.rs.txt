@@ -728,11 +728,10 @@ pub struct EntryId(usize);
 /// A source-issued, fully verified compressed member payload.
 ///
 /// The fields are intentionally private.  Callers can only obtain this value
-/// from [`IndexedArchive::read_entry_precompressed_with_progress`] or
-/// [`IndexedArchive::read_entry_precompressed_and_decoded_with_progress`], which
-/// validate the source layout, capture the exact bounded compressed range,
-/// decode that immutable capture, compare or return its logical bytes, and
-/// record the actual decoded CRC.  This prevents an
+/// from [`IndexedArchive::read_entry_precompressed_with_progress`], which
+/// validates the source layout, captures the exact bounded compressed range,
+/// decodes that immutable capture, compares it with the caller's validated
+/// logical bytes, and records the actual decoded CRC.  This prevents an
 /// unchecked `(compressed, crc, size)` tuple from crossing into a writer.
 #[derive(Debug, Clone)]
 pub struct VerifiedPrecompressedEntry {
@@ -777,15 +776,14 @@ impl VerifiedPrecompressedEntry {
 ///
 /// The callback receives byte counts rather than unverified payload bytes. It
 /// is called after each bounded compressed capture chunk and each bounded
-/// decoded verification chunk.
+/// decoded comparison chunk.
 /// Counts are cumulative within each phase. A decoded count may repeat when
 /// a bounded decoder step consumes input without producing output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PrecompressedProgress {
     /// Bytes captured from the bounded source compressed range.
     Compressed { bytes: u64 },
-    /// Bytes decoded and checked against the declared bound (and expected bytes,
-    /// when supplied). Final size and CRC validation precede token publication.
+    /// Bytes decoded and compared with the caller's expected logical payload.
     Decoded { bytes: u64 },
 }
 
@@ -1590,71 +1588,10 @@ fn precompressed_decode_error<E>(error: io::Error) -> VerifiedPrecompressedError
     )
 }
 
-enum CapturedDecodedOutput<'a> {
-    Compare(&'a [u8]),
-    Collect { bytes: Vec<u8>, length: usize },
-}
-
-impl CapturedDecodedOutput<'_> {
-    fn len(&self) -> usize {
-        match self {
-            Self::Compare(bytes) => bytes.len(),
-            Self::Collect { length, .. } => *length,
-        }
-    }
-
-    fn reserve<E>(&mut self) -> Result<(), VerifiedPrecompressedError<E>> {
-        if let Self::Collect { bytes, length } = self {
-            bytes.try_reserve_exact(*length).map_err(|source| {
-                precompressed_archive_error(
-                    ErrorKind::Allocation {
-                        resource: "verified precompressed decoded payload",
-                        source,
-                    }
-                    .into(),
-                )
-            })?;
-        }
-        Ok(())
-    }
-
-    fn accept<E>(
-        &mut self,
-        chunk: &[u8],
-        start: usize,
-        end: usize,
-    ) -> Result<(), VerifiedPrecompressedError<E>> {
-        if end > self.len() {
-            return Err(precompressed_archive_error(
-                ErrorKind::InvalidSize {
-                    expected: u64::try_from(self.len()).unwrap_or(u64::MAX),
-                    actual: u64::try_from(end).unwrap_or(u64::MAX),
-                }
-                .into(),
-            ));
-        }
-        match self {
-            Self::Compare(expected) => {
-                if expected.get(start..end) != Some(chunk) {
-                    return Err(precompressed_archive_error(ErrorKind::InvalidInput {
-                        msg: "captured compressed payload decodes differently from expected logical bytes".to_string(),
-                    }.into()));
-                }
-            },
-            Self::Collect { bytes, .. } => {
-                // The full declared length was reserved after layout validation.
-                // Checked bounds prevent allocation or oversized output here.
-                bytes.extend_from_slice(chunk);
-            },
-        }
-        Ok(())
-    }
-}
-
 fn verify_captured_precompressed_payload<E, F>(
     method: CompressionMethod,
     compressed: &[u8],
-    expected_decoded: &mut CapturedDecodedOutput<'_>,
+    expected_decoded: &[u8],
     expected: ZipVerification,
     progress: &mut F,
 ) -> Result<u32, VerifiedPrecompressedError<E>>
@@ -1689,7 +1626,7 @@ where
 
 fn verify_captured_deflate_payload<E, F>(
     compressed: &[u8],
-    expected_decoded: &mut CapturedDecodedOutput<'_>,
+    expected_decoded: &[u8],
     expected: ZipVerification,
     progress: &mut F,
 ) -> Result<u32, VerifiedPrecompressedError<E>>
@@ -1819,7 +1756,7 @@ where
 
 fn compare_captured_decoded_chunk<E, F>(
     chunk: &[u8],
-    expected_decoded: &mut CapturedDecodedOutput<'_>,
+    expected_decoded: &[u8],
     compared: &mut usize,
     actual_crc: &mut u32,
     progress: &mut F,
@@ -1835,7 +1772,25 @@ where
             .into(),
         )
     })?;
-    expected_decoded.accept(chunk, *compared, end)?;
+    let expected_chunk = expected_decoded.get(*compared..end).ok_or_else(|| {
+        precompressed_archive_error(
+            ErrorKind::InvalidSize {
+                expected: usize_to_u64(expected_decoded.len(), "expected decoded payload length")
+                    .unwrap_or(u64::MAX),
+                actual: usize_to_u64(end, "captured decoded payload length").unwrap_or(u64::MAX),
+            }
+            .into(),
+        )
+    })?;
+    if expected_chunk != chunk {
+        return Err(precompressed_archive_error(
+            ErrorKind::InvalidInput {
+                msg: "captured compressed payload decodes differently from expected logical bytes"
+                    .to_string(),
+            }
+            .into(),
+        ));
+    }
     *compared = end;
     *actual_crc = crc32_chunk(chunk, *actual_crc);
     if let Err(error) = progress(PrecompressedProgress::Decoded {
@@ -1847,7 +1802,7 @@ where
 }
 
 fn finish_captured_decoded_verification<E>(
-    expected_decoded: &mut CapturedDecodedOutput<'_>,
+    expected_decoded: &[u8],
     expected: ZipVerification,
     compared: usize,
     actual_crc: u32,
@@ -1873,7 +1828,7 @@ fn finish_captured_decoded_verification<E>(
 
 fn verify_captured_decoded_reader<E, F, R: Read>(
     reader: &mut R,
-    expected_decoded: &mut CapturedDecodedOutput<'_>,
+    expected_decoded: &[u8],
     expected: ZipVerification,
     progress: &mut F,
 ) -> Result<u32, VerifiedPrecompressedError<E>>
@@ -3865,67 +3820,6 @@ where
         &self,
         entry_id: EntryId,
         expected_decoded: &[u8],
-        progress: F,
-    ) -> Result<VerifiedPrecompressedEntry, VerifiedPrecompressedError<E>>
-    where
-        F: FnMut(PrecompressedProgress) -> Result<(), E>,
-    {
-        self.capture_precompressed(
-            entry_id,
-            &mut CapturedDecodedOutput::Compare(expected_decoded),
-            progress,
-        )
-    }
-
-    /// Read logical bytes and issue a verified compressed token in one source capture.
-    ///
-    /// Unlike [`Self::read_entry_precompressed_with_progress`], this method does
-    /// not require a prior decoded read. Store/Deflate bytes are captured once,
-    /// decoded once, and checked against the authoritative size and CRC before
-    /// either result is returned. The caller must still validate the decoded
-    /// bytes semantically before authorizing a document-level transfer.
-    ///
-    /// Retains the complete compressed and decoded payloads simultaneously, plus
-    /// bounded capture/decoder scratch. Archive limits apply; callers with an
-    /// external memory budget must reserve both declared sizes before calling.
-    /// The decoded callback reports bounded progress, not semantic acceptance.
-    /// Callback failure aborts immediately and returns neither result.
-    pub fn read_entry_precompressed_and_decoded_with_progress<E, F>(
-        &self,
-        entry_id: EntryId,
-        progress: F,
-    ) -> Result<(VerifiedPrecompressedEntry, Vec<u8>), VerifiedPrecompressedError<E>>
-    where
-        F: FnMut(PrecompressedProgress) -> Result<(), E>,
-    {
-        let declared = self
-            .indexed_entry(entry_id)
-            .map_err(precompressed_archive_error)?
-            .info
-            .uncompressed_size;
-        let length = usize::try_from(declared).map_err(|_| {
-            precompressed_archive_error(
-                ErrorKind::InvalidInput {
-                    msg: format!("decoded ZIP payload size {declared} does not fit this platform"),
-                }
-                .into(),
-            )
-        })?;
-        let mut output = CapturedDecodedOutput::Collect {
-            bytes: Vec::new(),
-            length,
-        };
-        let token = self.capture_precompressed(entry_id, &mut output, progress)?;
-        let CapturedDecodedOutput::Collect { bytes, .. } = output else {
-            unreachable!("decoded capture uses a collecting output")
-        };
-        Ok((token, bytes))
-    }
-
-    fn capture_precompressed<E, F>(
-        &self,
-        entry_id: EntryId,
-        expected_decoded: &mut CapturedDecodedOutput<'_>,
         mut progress: F,
     ) -> Result<VerifiedPrecompressedEntry, VerifiedPrecompressedError<E>>
     where
@@ -3989,7 +3883,6 @@ where
                 .into(),
             )
         })?;
-        expected_decoded.reserve()?;
         let mut compressed = Vec::new();
         compressed
             .try_reserve_exact(compressed_capacity)
@@ -13299,7 +13192,7 @@ mod tests {
         let error = verify_captured_precompressed_payload(
             CompressionMethod::Deflate,
             &compressed[..compressed.len() - 1],
-            &mut CapturedDecodedOutput::Compare(payload),
+            payload,
             ZipVerification {
                 crc: crate::crc32(payload),
                 uncompressed_size: payload.len() as u64,
@@ -13411,373 +13304,6 @@ mod tests {
             .unwrap();
         assert_eq!(token.uncompressed_size(), payload.len() as u64);
         assert_eq!(token.crc32(), crate::crc32(payload));
-    }
-
-    #[test]
-    fn fused_precompressed_capture_removes_a_cold_source_pass() {
-        for deflated in [false, true] {
-            for size in [0, 1, 65536, 262181, 1048613] {
-                let mut state = 0x5a17_932d_u32;
-                let payload = (0..size)
-                    .map(|_| {
-                        state ^= state << 13;
-                        state ^= state >> 17;
-                        state ^= state << 5;
-                        state.to_le_bytes()[0]
-                    })
-                    .collect::<Vec<_>>();
-                let mut writer = StreamingArchiveWriter::new();
-                if deflated {
-                    writer.write_deflated("payload.bin", &payload).unwrap();
-                } else {
-                    writer.write_stored("payload.bin", &payload).unwrap();
-                }
-                let bytes = writer.finish_to_bytes().unwrap();
-                let source_len = bytes.len() as u64;
-                let fused_input = bytes.clone();
-                let compressed = raw_payload_for_single_entry(&bytes);
-                let requests = Arc::new(Mutex::new(Vec::new()));
-                let archive = IndexedArchive::from_reader_with_limits(
-                    InstrumentedChunkedReaderAt {
-                        bytes,
-                        max_chunk: 65536,
-                        requests: Arc::clone(&requests),
-                    },
-                    source_len,
-                    ArchiveLimits::default(),
-                )
-                .unwrap();
-                let id = archive.entry_id("payload.bin").unwrap();
-                requests.lock().unwrap().clear();
-                let decoded = archive.read_entry(id).unwrap();
-                let control = archive
-                    .read_entry_precompressed_with_progress(id, &decoded, |_| {
-                        Ok::<(), io::Error>(())
-                    })
-                    .unwrap();
-                let control_reads = requests.lock().unwrap().clone();
-                drop(archive);
-                // Each alternative starts with an independently indexed archive;
-                // the control cannot warm the candidate's strict-layout cache.
-                let archive = IndexedArchive::from_reader_with_limits(
-                    InstrumentedChunkedReaderAt {
-                        bytes: fused_input,
-                        max_chunk: 65536,
-                        requests: Arc::clone(&requests),
-                    },
-                    source_len,
-                    ArchiveLimits::default(),
-                )
-                .unwrap();
-                let id = archive.entry_id("payload.bin").unwrap();
-                requests.lock().unwrap().clear();
-                let mut captured = 0;
-                let mut produced = 0;
-                let (fused, decoded) = archive
-                    .read_entry_precompressed_and_decoded_with_progress(id, |p| {
-                        match p {
-                            PrecompressedProgress::Compressed { bytes } => {
-                                assert!(bytes >= captured);
-                                captured = bytes;
-                            },
-                            PrecompressedProgress::Decoded { bytes } => {
-                                assert!(bytes >= produced);
-                                produced = bytes;
-                            },
-                        }
-                        Ok::<(), io::Error>(())
-                    })
-                    .unwrap();
-                let fused_reads = requests.lock().unwrap().clone();
-                let control_bytes: usize = control_reads.iter().map(|(_, n)| n).sum();
-                let fused_bytes: usize = fused_reads.iter().map(|(_, n)| n).sum();
-                assert_eq!(decoded, payload);
-                assert_eq!(fused.compressed_payload(), compressed);
-                assert_eq!(fused.compressed_payload(), control.compressed_payload());
-                assert_eq!(
-                    (
-                        fused.compression_method(),
-                        fused.crc32(),
-                        fused.uncompressed_size()
-                    ),
-                    (
-                        control.compression_method(),
-                        control.crc32(),
-                        control.uncompressed_size()
-                    )
-                );
-                assert_eq!(captured, compressed.len() as u64);
-                assert_eq!(produced, payload.len() as u64);
-                assert!(control_bytes >= fused_bytes + compressed.len());
-                assert!(fused_reads.iter().all(|(requested, returned)| *requested
-                    <= PRECOMPRESSED_CAPTURE_BUFFER_SIZE
-                    && returned <= requested));
-                println!(
-                    "FUSED_CAPTURE_IO {{\"deflated\":{deflated},\"decoded_bytes\":{size},\"compressed_bytes\":{},\"control_calls\":{},\"control_bytes\":{control_bytes},\"fused_calls\":{},\"fused_bytes\":{fused_bytes}}}",
-                    compressed.len(),
-                    control_reads.len(),
-                    fused_reads.len()
-                );
-                drop(archive);
-                let mut destination = StreamingArchiveWriter::new();
-                destination
-                    .write_stored("untouched.bin", b"original bytes")
-                    .unwrap();
-                let destination = destination.finish_to_bytes().unwrap();
-                let destination = ZipArchive::from_slice(destination.as_slice())
-                    .unwrap()
-                    .into_zip_archive();
-                let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
-                let index = PreservationIndex::new(&destination, &mut scratch).unwrap();
-                let mut plan = crate::PreservationPlan::copy_all(&index);
-                plan.try_append(crate::RegeneratedEntry::new_precompressed_shared(
-                    "copied.bin",
-                    fused,
-                ))
-                .unwrap();
-                let mut accounting = ZipOperationAccounting::default();
-                let output = index
-                    .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
-                    .unwrap();
-                let reopened = ArchiveReader::new(&output).unwrap();
-                assert_eq!(reopened.read("copied.bin").unwrap(), payload);
-                assert_eq!(reopened.read("untouched.bin").unwrap(), b"original bytes");
-                assert_eq!(
-                    accounting.precompressed_payload_bytes_emitted(),
-                    if deflated { compressed.len() as u64 } else { 0 }
-                );
-                assert_eq!(
-                    accounting.stored_payload_bytes_emitted(),
-                    if deflated { 0 } else { payload.len() as u64 }
-                );
-                assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
-            }
-        }
-    }
-
-    #[test]
-    fn fused_precompressed_capture_handles_short_reads_and_cancellation() {
-        let payload = vec![b'x'; 131091];
-        for deflated in [false, true] {
-            let mut writer = StreamingArchiveWriter::new();
-            if deflated {
-                writer.write_deflated("payload.bin", &payload).unwrap();
-            } else {
-                writer.write_stored("payload.bin", &payload).unwrap();
-            }
-            let bytes = writer.finish_to_bytes().unwrap();
-            let len = bytes.len() as u64;
-            let requests = Arc::new(Mutex::new(Vec::new()));
-            let archive = IndexedArchive::from_reader_with_limits(
-                InstrumentedChunkedReaderAt {
-                    bytes,
-                    max_chunk: 3,
-                    requests: Arc::clone(&requests),
-                },
-                len,
-                ArchiveLimits::default(),
-            )
-            .unwrap();
-            let id = archive.entry_id("payload.bin").unwrap();
-            let (token, decoded) = archive
-                .read_entry_precompressed_and_decoded_with_progress(id, |_| {
-                    Ok::<(), &'static str>(())
-                })
-                .unwrap();
-            assert_eq!(decoded, payload);
-            assert_eq!(token.crc32(), crate::crc32(&payload));
-            for cancel_decode in [false, true] {
-                let mut callbacks = 0;
-                let result = archive.read_entry_precompressed_and_decoded_with_progress(id, |p| {
-                    if matches!(p, PrecompressedProgress::Decoded { .. }) == cancel_decode {
-                        callbacks += 1;
-                        Err("cancelled at exact phase")
-                    } else {
-                        Ok(())
-                    }
-                });
-                assert!(matches!(
-                    result,
-                    Err(VerifiedPrecompressedError::Callback(
-                        "cancelled at exact phase"
-                    ))
-                ));
-                assert_eq!(callbacks, 1);
-            }
-        }
-    }
-
-    #[test]
-    fn fused_precompressed_capture_checks_crc_size_and_deflate_end() {
-        let payload = vec![b'z'; 131091];
-        for deflated in [false, true] {
-            let mut writer = StreamingArchiveWriter::new();
-            if deflated {
-                writer.write_deflated("payload.bin", &payload).unwrap();
-            } else {
-                writer.write_stored("payload.bin", &payload).unwrap();
-            }
-            let archive_bytes = writer.finish_to_bytes().unwrap();
-            let method = if deflated {
-                CompressionMethod::Deflate
-            } else {
-                CompressionMethod::Store
-            };
-            let compressed = raw_payload_for_single_entry(&archive_bytes);
-            for (declared, crc) in [
-                (payload.len() as u64, crate::crc32(&payload) ^ 1),
-                (payload.len() as u64 - 1, crate::crc32(&payload)),
-                (payload.len() as u64 + 1, crate::crc32(&payload)),
-            ] {
-                let mut writer = StreamingArchiveWriter::new();
-                writer
-                    .archive
-                    .write_precompressed_file("payload.bin", method, crc, declared, &compressed)
-                    .unwrap();
-                let archive = indexed_archive(writer.finish_to_bytes().unwrap());
-                let id = archive.entry_id("payload.bin").unwrap();
-                assert!(matches!(
-                    archive.read_entry_precompressed_and_decoded_with_progress(id, |_| Ok::<
-                        (),
-                        io::Error,
-                    >(
-                        ()
-                    )),
-                    Err(VerifiedPrecompressedError::Archive(_))
-                ));
-            }
-            if deflated {
-                for bad in [
-                    compressed[..compressed.len() - 1].to_vec(),
-                    [compressed.as_slice(), &[0, 1, 2]].concat(),
-                ] {
-                    let mut writer = StreamingArchiveWriter::new();
-                    writer
-                        .archive
-                        .write_precompressed_file(
-                            "payload.bin",
-                            method,
-                            crate::crc32(&payload),
-                            payload.len() as u64,
-                            &bad,
-                        )
-                        .unwrap();
-                    let archive = indexed_archive(writer.finish_to_bytes().unwrap());
-                    assert!(
-                        archive
-                            .read_entry_precompressed_and_decoded_with_progress(
-                                archive.entry_id("payload.bin").unwrap(),
-                                |_| Ok::<(), io::Error>(())
-                            )
-                            .is_err()
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn fused_precompressed_capture_preserves_zero_crc_zip64_and_entry_bounds() {
-        let payload = b"zero CRC remains compatibility-readable";
-        let archive = indexed_archive(skipped_crc_fixture(payload));
-        for name in ["stored.bin", "deflated.bin"] {
-            let (token, decoded) = archive
-                .read_entry_precompressed_and_decoded_with_progress(
-                    archive.entry_id(name).unwrap(),
-                    |_| Ok::<(), io::Error>(()),
-                )
-                .unwrap();
-            assert_eq!(decoded, payload);
-            assert_eq!(token.crc32(), crate::crc32(payload));
-        }
-        assert!(
-            archive
-                .read_entry_precompressed_and_decoded_with_progress(EntryId(usize::MAX), |_| Ok::<
-                    (),
-                    io::Error,
-                >(
-                    ()
-                ))
-                .is_err()
-        );
-        let archive = indexed_archive_result(
-            include_bytes!("../assets/zip64.zip").to_vec(),
-            ArchiveLimits::UNBOUNDED,
-        )
-        .unwrap();
-        let (token, decoded) = archive
-            .read_entry_precompressed_and_decoded_with_progress(
-                archive.entry_id("README").unwrap(),
-                |_| Ok::<(), io::Error>(()),
-            )
-            .unwrap();
-        assert_eq!(decoded, b"This small file is in ZIP64 format.\n");
-        assert_eq!(token.crc32(), crate::crc32(&decoded));
-    }
-
-    #[test]
-    fn fused_precompressed_capture_preserves_transport_and_allocation_failures() {
-        let payload = vec![b'a'; 256 * 1024];
-        let mut writer = StreamingArchiveWriter::new();
-        writer.write_stored("payload.bin", &payload).unwrap();
-        let bytes = writer.finish_to_bytes().unwrap();
-        let start = {
-            let archive = ZipArchive::from_slice(&bytes).unwrap();
-            let record = archive.entries().next_entry().unwrap().unwrap();
-            archive
-                .get_entry(record.wayfinder())
-                .unwrap()
-                .compressed_data_range()
-                .0
-        };
-        let length = bytes.len() as u64;
-        let archive = IndexedArchive::from_reader_with_limits(
-            FailOnRangeReaderAt {
-                bytes,
-                fail_start: start + 32,
-                fail_end: start + 33,
-            },
-            length,
-            ArchiveLimits::default(),
-        )
-        .unwrap();
-        let result = archive.read_entry_precompressed_and_decoded_with_progress(
-            archive.entry_id("payload.bin").unwrap(),
-            |_| Ok::<(), io::Error>(()),
-        );
-        assert!(matches!(
-            result,
-            Err(VerifiedPrecompressedError::Transport(_))
-        ));
-
-        // A ZIP64 declaration larger than Vec's capacity must fail before
-        // capture, rather than panic or publish a partially decoded token.
-        let mut writer = StreamingArchiveWriter::new();
-        writer
-            .archive
-            .write_precompressed_file(
-                "huge.bin",
-                CompressionMethod::Deflate,
-                1,
-                usize::MAX as u64,
-                &[3, 0],
-            )
-            .unwrap();
-        let archive =
-            indexed_archive_result(writer.finish_to_bytes().unwrap(), ArchiveLimits::UNBOUNDED)
-                .unwrap();
-        let mut callbacks = 0;
-        let result = archive.read_entry_precompressed_and_decoded_with_progress(
-            archive.entry_id("huge.bin").unwrap(),
-            |_| {
-                callbacks += 1;
-                Ok::<(), io::Error>(())
-            },
-        );
-        assert!(
-            matches!(result, Err(VerifiedPrecompressedError::Archive(error)) if matches!(error.kind(), ErrorKind::Allocation { .. }))
-        );
-        assert_eq!(callbacks, 0);
     }
 
     #[derive(Debug)]

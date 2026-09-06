@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0450: one ZIP source capture returns decoded bytes and transfer token
+
+[0450](changes/0450-zip-combined-capture-decode.md) adds an explicit combined capture/decode primitive. Ten independently
+indexed Store/Deflate test cases preserve decoded/token bytes while removing at
+least one compressed payload's returned source bytes. At about 1 MiB, Store
+returns 1,048,654 versus 2,097,297 bytes and Deflate 1,049,011 versus 2,098,011.
+These are deterministic I/O assertions, not latency samples or a PPTX speedup.
+Complete decoded and compressed payloads remain retained; no peak-memory claim.
+See [all cases](results/change-0450/measurements.md).
+
 ## Change 0449: attribute existing PPTX samples to callers and source owners
 
 [0449](changes/0449-pptx-caller-source-attribution.md) reanalyses the two 0448 profiles and all eight reports/240 samples.

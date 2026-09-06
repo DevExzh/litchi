@@ -1,0 +1,55 @@
+{
+  "change": 450,
+  "stage": "precleanup",
+  "status": "pass",
+  "valid_export": {
+    "exit_code": 0,
+    "stdout": "{\"status\": \"pass\", \"change\": 450, \"zip_tests\": 455, \"opc_tests\": 436, \"pptx_tests\": 59, \"io_cases\": 10, \"fuzz_runs\": 1000, \"sealed\": true, \"cleanup\": false}\n",
+    "stderr": ""
+  },
+  "rejected": [
+    {
+      "path": "measurements.json",
+      "exit_code": 1,
+      "stdout": "INVALID: derived measurements\n",
+      "stderr": ""
+    },
+    {
+      "path": "checks/final-zip-tests.json",
+      "exit_code": 1,
+      "stdout": "INVALID: source changed during CPU job\n",
+      "stderr": ""
+    },
+    {
+      "path": "checks/fuzz-smoke.json",
+      "exit_code": 1,
+      "stdout": "INVALID: fuzz completion\n",
+      "stderr": ""
+    },
+    {
+      "path": "decision.json",
+      "exit_code": 1,
+      "stdout": "INVALID: scoped decision\n",
+      "stderr": ""
+    },
+    {
+      "path": "checks/fuzz-source-custody.json",
+      "exit_code": 1,
+      "stdout": "INVALID: fuzz copy identity\n",
+      "stderr": ""
+    },
+    {
+      "path": "candidate/after-office.rs.txt",
+      "exit_code": 1,
+      "stdout": "INVALID: exact tested source copy\n",
+      "stderr": ""
+    },
+    {
+      "path": "unsealed.txt",
+      "exit_code": 1,
+      "stdout": "INVALID: seal coverage\n",
+      "stderr": ""
+    }
+  ],
+  "scratch_removed": true
+}

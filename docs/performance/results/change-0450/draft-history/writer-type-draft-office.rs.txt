@@ -13524,9 +13524,7 @@ mod tests {
                     .write_stored("untouched.bin", b"original bytes")
                     .unwrap();
                 let destination = destination.finish_to_bytes().unwrap();
-                let destination = ZipArchive::from_slice(destination.as_slice())
-                    .unwrap()
-                    .into_zip_archive();
+                let destination = ZipArchive::from_slice(&destination).unwrap();
                 let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
                 let index = PreservationIndex::new(&destination, &mut scratch).unwrap();
                 let mut plan = crate::PreservationPlan::copy_all(&index);

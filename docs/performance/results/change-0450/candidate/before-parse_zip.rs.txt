@@ -154,48 +154,6 @@ fn exercise_precompressed<R: ReaderAt>(archive: &IndexedArchive<R>, borrowed: &A
     }
 }
 
-fn exercise_fused_precompressed<R: ReaderAt>(
-    archive: &IndexedArchive<R>,
-    borrowed: &ArchiveReader<'_>,
-) {
-    for name in archive.file_names() {
-        let Some(entry_id) = archive.entry_id(name) else {
-            continue;
-        };
-        let mut progress_events = 0usize;
-        let result =
-            archive.read_entry_precompressed_and_decoded_with_progress(entry_id, |progress| {
-                progress_events = progress_events.saturating_add(1);
-                let _ = black_box(progress);
-                if progress_events > MAX_PRECOMPRESSED_PROGRESS_EVENTS {
-                    Err(())
-                } else {
-                    Ok(())
-                }
-            });
-        if let Ok((token, decoded)) = result {
-            let metadata = archive
-                .metadata_for(entry_id)
-                .expect("verified entry remains indexed");
-            assert_eq!(token.compressed_size(), metadata.compressed_size());
-            assert_eq!(token.uncompressed_size(), metadata.uncompressed_size());
-            assert_eq!(token.uncompressed_size(), decoded.len() as u64);
-            assert_eq!(token.crc32(), soapberry_zip::crc32(&decoded));
-            assert_eq!(
-                borrowed
-                    .read(name)
-                    .expect("verified capture remains readable"),
-                decoded
-            );
-            black_box(token);
-        }
-        // Exercise malformed payloads too, without requiring an earlier
-        // decoded read to succeed. Entry/total bounds and the progress-event
-        // limit bound simultaneous compressed+decoded retention and CPU work.
-        break;
-    }
-}
-
 fn exercise_bounded_paths(data: &[u8]) {
     let limits = fuzz_limits();
     let borrowed = ArchiveReader::new_with_limits(data, limits);
@@ -213,7 +171,6 @@ fn exercise_bounded_paths(data: &[u8]) {
     // successful results keeps this target sensitive to drift between the
     // contiguous borrowed source and the positional ReaderAt source.
     if let (Ok(reader), Ok(archive)) = (&borrowed, &reader_at) {
-        exercise_fused_precompressed(archive, reader);
         exercise_precompressed(archive, reader);
         for name in reader.file_names() {
             assert!(archive.contains(name));

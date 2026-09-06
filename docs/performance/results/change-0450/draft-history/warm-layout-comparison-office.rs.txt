@@ -13434,7 +13434,6 @@ mod tests {
                 }
                 let bytes = writer.finish_to_bytes().unwrap();
                 let source_len = bytes.len() as u64;
-                let fused_input = bytes.clone();
                 let compressed = raw_payload_for_single_entry(&bytes);
                 let requests = Arc::new(Mutex::new(Vec::new()));
                 let archive = IndexedArchive::from_reader_with_limits(
@@ -13456,20 +13455,6 @@ mod tests {
                     })
                     .unwrap();
                 let control_reads = requests.lock().unwrap().clone();
-                drop(archive);
-                // Each alternative starts with an independently indexed archive;
-                // the control cannot warm the candidate's strict-layout cache.
-                let archive = IndexedArchive::from_reader_with_limits(
-                    InstrumentedChunkedReaderAt {
-                        bytes: fused_input,
-                        max_chunk: 65536,
-                        requests: Arc::clone(&requests),
-                    },
-                    source_len,
-                    ArchiveLimits::default(),
-                )
-                .unwrap();
-                let id = archive.entry_id("payload.bin").unwrap();
                 requests.lock().unwrap().clear();
                 let mut captured = 0;
                 let mut produced = 0;
@@ -13519,38 +13504,24 @@ mod tests {
                     fused_reads.len()
                 );
                 drop(archive);
-                let mut destination = StreamingArchiveWriter::new();
-                destination
-                    .write_stored("untouched.bin", b"original bytes")
+                let mut output = StreamingArchiveWriter::new();
+                output
+                    .archive
+                    .write_precompressed_file(
+                        "copied.bin",
+                        fused.compression_method(),
+                        fused.crc32(),
+                        fused.uncompressed_size(),
+                        fused.compressed_payload(),
+                    )
                     .unwrap();
-                let destination = destination.finish_to_bytes().unwrap();
-                let destination = ZipArchive::from_slice(destination.as_slice())
-                    .unwrap()
-                    .into_zip_archive();
-                let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
-                let index = PreservationIndex::new(&destination, &mut scratch).unwrap();
-                let mut plan = crate::PreservationPlan::copy_all(&index);
-                plan.try_append(crate::RegeneratedEntry::new_precompressed_shared(
-                    "copied.bin",
-                    fused,
-                ))
-                .unwrap();
-                let mut accounting = ZipOperationAccounting::default();
-                let output = index
-                    .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
-                    .unwrap();
-                let reopened = ArchiveReader::new(&output).unwrap();
-                assert_eq!(reopened.read("copied.bin").unwrap(), payload);
-                assert_eq!(reopened.read("untouched.bin").unwrap(), b"original bytes");
+                let reopened = indexed_archive(output.finish_to_bytes().unwrap());
                 assert_eq!(
-                    accounting.precompressed_payload_bytes_emitted(),
-                    if deflated { compressed.len() as u64 } else { 0 }
+                    reopened
+                        .read_entry(reopened.entry_id("copied.bin").unwrap())
+                        .unwrap(),
+                    payload
                 );
-                assert_eq!(
-                    accounting.stored_payload_bytes_emitted(),
-                    if deflated { 0 } else { payload.len() as u64 }
-                );
-                assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
             }
         }
     }
@@ -13713,71 +13684,6 @@ mod tests {
             .unwrap();
         assert_eq!(decoded, b"This small file is in ZIP64 format.\n");
         assert_eq!(token.crc32(), crate::crc32(&decoded));
-    }
-
-    #[test]
-    fn fused_precompressed_capture_preserves_transport_and_allocation_failures() {
-        let payload = vec![b'a'; 256 * 1024];
-        let mut writer = StreamingArchiveWriter::new();
-        writer.write_stored("payload.bin", &payload).unwrap();
-        let bytes = writer.finish_to_bytes().unwrap();
-        let start = {
-            let archive = ZipArchive::from_slice(&bytes).unwrap();
-            let record = archive.entries().next_entry().unwrap().unwrap();
-            archive
-                .get_entry(record.wayfinder())
-                .unwrap()
-                .compressed_data_range()
-                .0
-        };
-        let length = bytes.len() as u64;
-        let archive = IndexedArchive::from_reader_with_limits(
-            FailOnRangeReaderAt {
-                bytes,
-                fail_start: start + 32,
-                fail_end: start + 33,
-            },
-            length,
-            ArchiveLimits::default(),
-        )
-        .unwrap();
-        let result = archive.read_entry_precompressed_and_decoded_with_progress(
-            archive.entry_id("payload.bin").unwrap(),
-            |_| Ok::<(), io::Error>(()),
-        );
-        assert!(matches!(
-            result,
-            Err(VerifiedPrecompressedError::Transport(_))
-        ));
-
-        // A ZIP64 declaration larger than Vec's capacity must fail before
-        // capture, rather than panic or publish a partially decoded token.
-        let mut writer = StreamingArchiveWriter::new();
-        writer
-            .archive
-            .write_precompressed_file(
-                "huge.bin",
-                CompressionMethod::Deflate,
-                1,
-                usize::MAX as u64,
-                &[3, 0],
-            )
-            .unwrap();
-        let archive =
-            indexed_archive_result(writer.finish_to_bytes().unwrap(), ArchiveLimits::UNBOUNDED)
-                .unwrap();
-        let mut callbacks = 0;
-        let result = archive.read_entry_precompressed_and_decoded_with_progress(
-            archive.entry_id("huge.bin").unwrap(),
-            |_| {
-                callbacks += 1;
-                Ok::<(), io::Error>(())
-            },
-        );
-        assert!(
-            matches!(result, Err(VerifiedPrecompressedError::Archive(error)) if matches!(error.kind(), ErrorKind::Allocation { .. }))
-        );
-        assert_eq!(callbacks, 0);
     }
 
     #[derive(Debug)]

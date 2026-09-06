@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0450: ZIP-owned combined capture and physical verification
+
+[0450](changes/0450-zip-combined-capture-decode.md) adds an explicit ZIP API without moving physical types into a semantic
+facade (0002/0010/0011/0024). Private token construction, exact bounded capture,
+size/CRC/stream-end validation and immediate callback cancellation remain shared
+(0005/0006). Decoded and compressed buffers retain ordinary ownership; there is no
+new unsafe code, dependency, hidden pool or ambient I/O. OPC source identity,
+semantic validation and combined memory reservations remain required before
+format adoption (0003/0005). Accepted ADRs are unchanged. See
+[source review](results/change-0450/source-review.md).
+
 ## Change 0449: ownership-specific diagnostic attribution
 
 [0449](changes/0449-pptx-caller-source-attribution.md) changes only evidence tooling and documentation. All seven retained source

@@ -13519,38 +13519,24 @@ mod tests {
                     fused_reads.len()
                 );
                 drop(archive);
-                let mut destination = StreamingArchiveWriter::new();
-                destination
-                    .write_stored("untouched.bin", b"original bytes")
+                let mut output = StreamingArchiveWriter::new();
+                output
+                    .archive
+                    .write_precompressed_file(
+                        "copied.bin",
+                        fused.compression_method(),
+                        fused.crc32(),
+                        fused.uncompressed_size(),
+                        fused.compressed_payload(),
+                    )
                     .unwrap();
-                let destination = destination.finish_to_bytes().unwrap();
-                let destination = ZipArchive::from_slice(destination.as_slice())
-                    .unwrap()
-                    .into_zip_archive();
-                let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
-                let index = PreservationIndex::new(&destination, &mut scratch).unwrap();
-                let mut plan = crate::PreservationPlan::copy_all(&index);
-                plan.try_append(crate::RegeneratedEntry::new_precompressed_shared(
-                    "copied.bin",
-                    fused,
-                ))
-                .unwrap();
-                let mut accounting = ZipOperationAccounting::default();
-                let output = index
-                    .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
-                    .unwrap();
-                let reopened = ArchiveReader::new(&output).unwrap();
-                assert_eq!(reopened.read("copied.bin").unwrap(), payload);
-                assert_eq!(reopened.read("untouched.bin").unwrap(), b"original bytes");
+                let reopened = indexed_archive(output.finish_to_bytes().unwrap());
                 assert_eq!(
-                    accounting.precompressed_payload_bytes_emitted(),
-                    if deflated { compressed.len() as u64 } else { 0 }
+                    reopened
+                        .read_entry(reopened.entry_id("copied.bin").unwrap())
+                        .unwrap(),
+                    payload
                 );
-                assert_eq!(
-                    accounting.stored_payload_bytes_emitted(),
-                    if deflated { 0 } else { payload.len() as u64 }
-                );
-                assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
             }
         }
     }
