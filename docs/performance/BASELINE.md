@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0431: verified compressed media transfer
+
+[0431](changes/0431-verified-compressed-source-transfer.md) compares 16 fresh
+processes and 480 samples per role using the unchanged provider harness.
+Synthetic media-rich API medians fall 86.5–89.0% for bytes, warm files and
+4 KiB short ranges, and 19.4–20.1% for the 64 KiB/200 µs simulated range.
+Plain changes are -1.045% to +0.091%, with no >5% API repeat/regression flags.
+The first candidate's delayed-range regression is retained; bounded 64 KiB
+capture resolves it in the refined result. Peak media RSS stays within
+783.2–785.3 MiB; endpoint baseline variability prevents causal memory claims.
+
 ## Change 0430: recovered PPTX publication callers
 
 [0430](changes/0430-pptx-publication-cpu-attribution.md) profiles the unchanged

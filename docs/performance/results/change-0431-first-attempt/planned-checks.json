@@ -1,0 +1,21 @@
+{
+  "required_pass": [
+    "before-capture",
+    "after-capture",
+    "comparison",
+    "release-build",
+    "consumer-tests-final",
+    "zip-tests",
+    "affected-strict-v3",
+    "affected-doc",
+    "workspace-check",
+    "default-check",
+    "affected-fmt",
+    "boundaries",
+    "zip-fuzz-smoke",
+    "zip-fuzz-cleanup",
+    "precleanup-portable",
+    "aftercleanup-portable"
+  ],
+  "scope": "Required terminal implementation and capture gates; failed development attempts remain expected historical records."
+}

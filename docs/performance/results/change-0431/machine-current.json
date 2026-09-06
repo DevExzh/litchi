@@ -1,0 +1,65 @@
+{
+  "recorded_utc": "2026-09-06T01:25:30.665842+00:00",
+  "scope": "Current environment observation after baseline capture; not a retrospective per-process hardware snapshot.",
+  "uname": [
+    "Linux",
+    "ip-172-31-39-190",
+    "7.0.0-1011-aws",
+    "#11-Ubuntu SMP PREEMPT Thu Aug  6 15:41:35 UTC 2026",
+    "x86_64",
+    ""
+  ],
+  "cpu_first_processor": "processor\t: 0\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9R45\nstepping\t: 1\nmicrocode\t: 0xb002162\ncpu MHz\t\t: 4513.103\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 32\ncore id\t\t: 0\ncpu cores\t: 32\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 16\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch topoext perfctr_core ssbd perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr rdpru wbnoinvd arat avx512vbmi pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect flush_l1d\nbugs\t\t: sysret_ss_attrs spectre_v1 spectre_v2 spec_store_bypass srso ibpb_no_ret spectre_v2_user\nbogomips\t: 5200.00\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:",
+  "affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "memory": "MemTotal:       129447068 kB\nMemFree:         5855752 kB\nMemAvailable:   109288444 kB\nBuffers:         1233848 kB\nCached:         108786052 kB\nSwapCached:            0 kB\nActive:         23418716 kB\nInactive:       91669276 kB\nActive(anon):   10011624 kB\nInactive(anon):  7281880 kB\nActive(file):   13407092 kB\nInactive(file): 84387396 kB\nUnevictable:       24920 kB\nMlocked:            8288 kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:             46592 kB\nWriteback:             0 kB\nAnonPages:       5093420 kB\nMapped:           347676 kB\nShmem:          12204576 kB\nKReclaimable:    6832164 kB\nSlab:            8074924 kB\nSReclaimable:    6832164 kB\nSUnreclaim:      1242760 kB\nKernelStack:       22080 kB\nPageTables:       100180 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    64723532 kB\nCommitted_AS:   24645632 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       39172 kB\nVmallocChunk:          0 kB\nPercpu:            25472 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:   3917824 kB\nFilePmdMapped:         0 kB\nCmaTotal:              0 kB\nCmaFree:          176612 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:      209324 kB\nDirectMap2M:    16181248 kB\nDirectMap1G:    115343360 kB\n",
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+  "tools": {
+    "perf": {
+      "exit_code": 0,
+      "output": "perf version 7.0.14\n"
+    },
+    "cargo": {
+      "exit_code": 0,
+      "output": "cargo 1.98.1 (797e8a9bc 2026-08-05)\n"
+    },
+    "python": {
+      "exit_code": 0,
+      "output": "Python 3.14.4\n"
+    }
+  },
+  "scaling_governor": null,
+  "scaling_driver": null
+}

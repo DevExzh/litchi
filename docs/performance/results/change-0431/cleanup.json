@@ -1,0 +1,71 @@
+{
+  "status": "pass",
+  "removed_roots": [
+    "/tmp/litchi-goal-0431-binaries",
+    "/tmp/litchi-goal-0431-drafts"
+  ],
+  "files": [
+    {
+      "path": "/tmp/litchi-goal-0431-binaries/after",
+      "bytes": 452839208,
+      "sha256": "f9f58c8eeff7a2bdad94e0b9da20296e4f94a340831068f3df149cf71db545df"
+    },
+    {
+      "path": "/tmp/litchi-goal-0431-binaries/after-v2",
+      "bytes": 452838680,
+      "sha256": "b0518ef94b9865465b19d27bda8a0b1246df56e3ceb17885d3dce9776127e491"
+    },
+    {
+      "path": "/tmp/litchi-goal-0431-binaries/before",
+      "bytes": 451782312,
+      "sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969"
+    },
+    {
+      "path": "/tmp/litchi-goal-0431-drafts/opc/crates/litchi-opc/src/source_backed.rs",
+      "bytes": 627263,
+      "sha256": "33adba1c3646461245ba14157009afaf65ee08e6777e31aef8547a0737b5fe96"
+    },
+    {
+      "path": "/tmp/litchi-goal-0431-drafts/opc/crates/litchi-pptx/src/presentation/source_cross_copy.rs",
+      "bytes": 220108,
+      "sha256": "00b624de2d7b2e311b885e1fcfb16fd3366205786bbdd230a387692f3e533889"
+    },
+    {
+      "path": "/tmp/litchi-goal-0431-drafts/zip/api-proposal.md",
+      "bytes": 3897,
+      "sha256": "217aee261bb3af8708714beebd510abc19367d252f5cb847e20a72af430071c6"
+    },
+    {
+      "path": "/tmp/litchi-goal-0431-drafts/zip/lib.rs",
+      "bytes": 1381,
+      "sha256": "99df448608c2f551e796c8785414cc784b2fe94de21b12a6f02d7f2c7e296b97"
+    },
+    {
+      "path": "/tmp/litchi-goal-0431-drafts/zip/office.patch",
+      "bytes": 24502,
+      "sha256": "8c34e259dd0f93cd6fa4250800f7e74d8c07218e2af08657174009337d6a4d5c"
+    },
+    {
+      "path": "/tmp/litchi-goal-0431-drafts/zip/office.rs",
+      "bytes": 523019,
+      "sha256": "b5260f3ef6f8b590510e3d6cc8de568e924da461f91d091b20eef00368b2a87b"
+    },
+    {
+      "path": "/tmp/litchi-goal-0431-drafts/zip/preserve.patch",
+      "bytes": 10674,
+      "sha256": "f5ab543d6e13fff69e5141986038f6aa8b71b4fc94390d28a1dad3709718251e"
+    },
+    {
+      "path": "/tmp/litchi-goal-0431-drafts/zip/preserve.rs",
+      "bytes": 190018,
+      "sha256": "96ee31bbe84d2d21768b999be47b257b790048d7d6dc5d0d4da3990a6f701777"
+    }
+  ],
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "preserved": [
+    "target",
+    "tools/perf-baseline/target"
+  ],
+  "scope": "Only task-owned binaries and drafts removed; fuzz scratch was separately cleaned with retained receipts."
+}

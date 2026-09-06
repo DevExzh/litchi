@@ -1,0 +1,39 @@
+{
+  "change": 431,
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0431/fuzz-control-refined.py",
+    "prepare"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "e68c1decb472e4823c7bea9322f12419ddc51bee",
+  "driver_sha256": "fafc8b2c1ce6e9bca9cb1e5de4009ba7cb3413b33e536ea47656dbeeec7f7067",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-06T02:08:08.333830+00:00",
+  "source_before": {
+    "path": "sources/df91d79e442f571d60d0ce0ce1af78e33b14a90f62683ded0629b8be5ee9b75f.json",
+    "sha256": "df91d79e442f571d60d0ce0ce1af78e33b14a90f62683ded0629b8be5ee9b75f",
+    "files": 6635
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T02:08:08.508162+00:00",
+  "source_after": {
+    "path": "sources/df91d79e442f571d60d0ce0ce1af78e33b14a90f62683ded0629b8be5ee9b75f.json",
+    "sha256": "df91d79e442f571d60d0ce0ce1af78e33b14a90f62683ded0629b8be5ee9b75f",
+    "files": 6635
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/refined-fuzz-prepare.log",
+    "bytes": 328,
+    "sha256": "3ee4a1c1455337c8fd9a89aa96464814d3ab205fd56561de1689d644df3a8e3f"
+  }
+}

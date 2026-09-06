@@ -1,0 +1,251 @@
+{
+  "change": 431,
+  "baseline_revision": "5729f8eaa847cb26abd5e2254d4e506fade94073",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "rust_toolchain": "1.98.1",
+  "build_profile": "release",
+  "rustflags": "-Cforce-frame-pointers=yes",
+  "release_debug": 1,
+  "cpu": 2,
+  "samples_per_process": 30,
+  "warmups_per_process": 3,
+  "lanes": [
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200
+    }
+  ],
+  "order": [
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200,
+      "repeat": "R1"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "media-rich",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "delayed-range",
+      "provider": "range",
+      "max_range": 65536,
+      "delay_us": 200,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "short-range",
+      "provider": "range",
+      "max_range": 4096,
+      "delay_us": 0,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "file",
+      "provider": "file",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R2"
+    },
+    {
+      "command": "provider-lifecycle",
+      "selector_key": "corpus",
+      "selector": "plain",
+      "provider_label": "bytes",
+      "provider": "bytes",
+      "max_range": null,
+      "delay_us": null,
+      "repeat": "R2"
+    }
+  ],
+  "expected_processes_per_role": 16,
+  "regression_review_percent": 5,
+  "scope": "Matched before/after API-only durations and managed resource journals for verified compressed source-part transfer. Bytes, warm files, caller-simulated ranges. No cold/native/scaling claim; output wrapper changes require independent semantic and untouched-member equivalence. Root serializes CPU workloads."
+}

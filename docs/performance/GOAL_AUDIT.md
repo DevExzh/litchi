@@ -1,6 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0430
+## Current evidence through 0431
+
+[0431](changes/0431-verified-compressed-source-transfer.md) implements and
+measures verified compressed source-part transfer in the source-backed PPTX/OPC
+workflow. Matched synthetic media API medians improve 86.5–89.0% for bytes,
+warm files and short ranges, and 19.4–20.1% for simulated delayed range. The
+initial delayed-range regression and its bounded-read refinement remain
+reviewable. Refined validation includes 1,755 tests, strict checks and ASAN
+smoke. This closes one measured publication hotspot; representative CRUD,
+broader native/size coverage, true cold/remote I/O, semantic streaming/append,
+allocator/physical-copy attribution, concurrent scaling and remaining strict
+gates stay open. See [batch scope](results/change-0431/goal-scope.md). The
+broader non-iWork goal remains active.
+
+## Prior evidence through 0430
 
 [0430](changes/0430-pptx-publication-cpu-attribution.md) closes the missing
 publication CPU attribution in the synthetic media-rich provider experiment.
@@ -54,7 +68,7 @@ Composite harness coverage is 288 passes and one ignored after a baseline-
 reproduced stale selector assertion is corrected; the full failed command is
 retained. Existing harness strict debt remains the same 29 findings.
 
-The latest retained optimization is
+An earlier retained allocation optimization is
 [0424](changes/0424-staged-pptx-payload-reuse.md), based on production revision
 `d18bf7db4` and evidence revision `340cc91ae`. Its matched source-backed media
 lifecycle records 14.266% fewer requested allocation bytes and a 7.317% lower

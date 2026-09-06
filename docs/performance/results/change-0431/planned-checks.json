@@ -1,0 +1,33 @@
+{
+  "required_pass": [
+    "before-capture",
+    "after-capture",
+    "comparison",
+    "release-build",
+    "consumer-tests-final",
+    "zip-tests",
+    "affected-strict-v3",
+    "affected-doc",
+    "workspace-check",
+    "default-check",
+    "affected-fmt",
+    "boundaries",
+    "zip-fuzz-smoke",
+    "zip-fuzz-cleanup",
+    "release-build-refined",
+    "after-capture-v2",
+    "comparison-v2",
+    "refined-tests",
+    "refined-strict",
+    "refined-fmt",
+    "refined-fuzz-smoke",
+    "refined-fuzz-cleanup",
+    "refinement-identities",
+    "final-python-syntax",
+    "final-diff-check",
+    "precleanup-portable",
+    "task-cleanup",
+    "aftercleanup-portable"
+  ],
+  "scope": "Required terminal implementation and capture gates; failed development attempts remain expected historical records."
+}
