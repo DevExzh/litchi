@@ -143,8 +143,9 @@ pub(super) struct MutablePresentation {
     /// constructs outside the model — nested tables, image text alternatives,
     /// automatic styles, font declarations — survive a save.
     content_source: Option<ContentSource>,
-    /// Slides exactly as parsed, used to detect which pages are still pristine.
-    source_slides: Vec<Slide>,
+    /// Immutable snapshot projection used to detect which pages are still pristine.
+    /// Sharing this authority keeps the detached draft as the only editable copy.
+    source_slides: std::sync::Arc<[Slide]>,
     /// Exact source-page identity for every staged slide; inserted slides have no source origin.
     origins: Vec<Option<usize>>,
     /// Owned exact page fragments for dependency-free blank-slide copies.
@@ -189,7 +190,7 @@ impl MutablePresentation {
     /// ```
     pub(super) fn from_presentation_with_validated_slides(
         presentation: &Presentation,
-        validated_slides: &[Slide],
+        validated_slides: &std::sync::Arc<[Slide]>,
     ) -> Result<Self> {
         // Editing snapshots construct this projection from the same immutable
         // package bytes before a transaction can be opened. Keep staging
@@ -211,8 +212,10 @@ impl MutablePresentation {
             // Only pages the scanner actually recovered can be retained; a
             // mismatch means the model and the markup disagree, so fall back to
             // regenerating every page.
-            Some(source) if source.page_count() == slides.len() => slides.clone(),
-            _ if slides.is_empty() => Vec::new(),
+            Some(source) if source.page_count() == slides.len() => {
+                std::sync::Arc::clone(validated_slides)
+            },
+            _ if slides.is_empty() => std::sync::Arc::clone(validated_slides),
             _ => {
                 return Err(litchi_core::Error::Unsupported(
                     "ODP source slide coverage is incomplete; transaction staging refuses regeneration"
@@ -2682,6 +2685,7 @@ mod tests {
     use super::MutablePresentation;
     use crate::{Builder, Presentation};
     use litchi_core::Result;
+    use std::sync::Arc;
 
     fn presentation_with_two_slides() -> Result<Presentation> {
         let mut builder = Builder::new();
@@ -2693,20 +2697,36 @@ mod tests {
     #[test]
     fn validated_slide_projection_is_cloned_into_isolated_draft_state() -> Result<()> {
         let presentation = presentation_with_two_slides()?;
-        let validated_slides = presentation.slides()?;
+        let validated_slides = Arc::from(presentation.slides()?);
         let mut draft = MutablePresentation::from_presentation_with_validated_slides(
             &presentation,
             &validated_slides,
         )?;
 
-        assert_eq!(draft.slides, validated_slides);
+        assert_eq!(draft.slides.as_slice(), validated_slides.as_ref());
         assert_eq!(draft.source_slides, validated_slides);
+        assert!(Arc::ptr_eq(&draft.source_slides, &validated_slides));
+        assert!(!std::ptr::eq(
+            draft.slides.as_ptr(),
+            validated_slides.as_ptr()
+        ));
         assert!(draft.retains_source_slide(0));
+
+        let peer = MutablePresentation::from_presentation_with_validated_slides(
+            &presentation,
+            &validated_slides,
+        )?;
 
         draft.update_slide(0, "Changed", "Changed body")?;
         assert_eq!(validated_slides[0].title.as_deref(), Some("First"));
         assert_eq!(draft.source_slides, validated_slides);
         assert!(!draft.retains_source_slide(0));
+        assert_eq!(peer.slides[0].title.as_deref(), Some("First"));
+        assert!(peer.retains_source_slide(0));
+        drop(validated_slides);
+        drop(draft);
+        assert_eq!(peer.source_slides[0].title.as_deref(), Some("First"));
+        assert!(peer.retains_source_slide(0));
         Ok(())
     }
 
@@ -2716,7 +2736,7 @@ mod tests {
         let validated_slides = presentation.slides()?;
         let error = match MutablePresentation::from_presentation_with_validated_slides(
             &presentation,
-            &validated_slides[..1],
+            &Arc::from(&validated_slides[..1]),
         ) {
             Ok(_) => panic!("incomplete source slide coverage was accepted"),
             Err(error) => error,

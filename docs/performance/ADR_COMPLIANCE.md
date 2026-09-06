@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0441: immutable sharing with detached ODP staging
+
+[0441](changes/0441-odp-shared-preservation-projection.md) shares only the
+snapshot's pristine slide projection; editable state remains a deep-copied
+Vec. Existing origin mapping, semantic comparisons, exact retained markup,
+coverage refusal and final readback stay intact. The transaction already owns
+the source snapshot, so this adds no source-lifetime extension. Ownership stays
+inside ODP with no public API, dependency, unsafe code or ambient behavior.
+The [source review](results/change-0441/validation-notes.md) and explicit
+[post-hoc acceptance review](results/change-0441/acceptance-review.md) preserve
+the failed initial gate alongside the measured peak-memory benefit.
+
 ## Change 0440: reader-scoped namespace ownership in ODP
 
 [0440](changes/0440-odp-borrowed-attribute-namespaces.md) keeps XML attribute

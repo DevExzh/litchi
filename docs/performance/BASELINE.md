@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0441: lower ODP staging peak with a failed initial gate
+
+[0441](changes/0441-odp-shared-preservation-projection.md) shares the immutable
+source comparison model while retaining a detached editable draft. Medium/large
+operation peak falls 9.834%/9.857% across both repeats of 24 reports/720 samples.
+Retained live bytes are unchanged. The original calls/requested-bytes/latency
+gate failed; retention rests on a disclosed post-hoc peak-memory review.
+Normal medium/large p50 is 0.664–1.279% slower, with no matched >5% adverse
+flag. Baseline tiny normal p99 has a +5.807% repeat flag. Four profiles and all
+[measurements](results/change-0441/measurements.md) remain retained. No normal
+latency, RSS or bounded append improvement is claimed.
+
 ## Change 0440: fewer ODP namespace allocations
 
 [0440](changes/0440-odp-borrowed-attribute-namespaces.md) borrows cached XML

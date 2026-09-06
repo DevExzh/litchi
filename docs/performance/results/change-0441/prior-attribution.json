@@ -1,0 +1,16 @@
+{
+  "source": "change-0440/profiles/after/record/formal/perf-script.txt.gz",
+  "stored_sha256": "08bc46005d474527b85c746198b4248e3c8a1480db6c76aa1fc629dc026c6a53",
+  "raw_sha256": "3c54549fd0d326497a8166d548a438472836d3c95b69320cb9f859ac2888d0e3",
+  "samples": 6855,
+  "sampled_period_sums": {
+    "total": 29863185167,
+    "transaction": 9127015107,
+    "visible_clone_under_transaction": 79307502
+  },
+  "sampled_period_percent": {
+    "transaction": 30.562765009693983,
+    "visible_clone_under_transaction": 0.26556946808084597
+  },
+  "scope": "Observed call chains include warmups and whole-process setup/oracles. Symbolization and inlining limit visible clone attribution; these are not operation phase timings or allocation fractions."
+}

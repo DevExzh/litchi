@@ -1,0 +1,37 @@
+{
+  "change": 441,
+  "roles": {
+    "before": {
+      "counters": {
+        "cycles:u": 29856570040,
+        "instructions:u": 124389972837,
+        "branches:u": 27641333755,
+        "branch-misses:u": 56382030,
+        "L1-dcache-load-misses:u": 0
+      },
+      "ipc": 4.166251269665268,
+      "perf_script_addr2line_warnings": 13,
+      "perf_report_addr2line_warnings": 13
+    },
+    "after": {
+      "counters": {
+        "cycles:u": 29643616753,
+        "instructions:u": 124042342342,
+        "branches:u": 27563752053,
+        "branch-misses:u": 52609334,
+        "L1-dcache-load-misses:u": 0
+      },
+      "ipc": 4.184453718166716,
+      "perf_script_addr2line_warnings": 11,
+      "perf_report_addr2line_warnings": 11
+    }
+  },
+  "counter_change_percent": {
+    "cycles:u": -0.7132543581352387,
+    "instructions:u": -0.27946826184738643,
+    "branches:u": -0.2806727876724341,
+    "branch-misses:u": -6.691309269992584,
+    "L1-dcache-load-misses:u": null
+  },
+  "scope": "Whole fresh executable including fixture setup, warmups and Rust oracle work. Counters are not operation-only causal attribution. Zero L1 values support no cache-miss claim."
+}

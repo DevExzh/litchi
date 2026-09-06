@@ -384,7 +384,7 @@ impl Snapshot {
             source: self.clone(),
             draft: MutablePresentation::from_presentation_with_validated_slides(
                 &presentation,
-                self.slides(),
+                &self.slides,
             )?,
             changed: false,
             rdf: None,
