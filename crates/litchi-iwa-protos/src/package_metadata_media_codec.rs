@@ -35,6 +35,9 @@ const ROOT_DATA_INFO_FIELD: u32 = 4;
 const ROOT_SAVE_TOKEN_FIELD: u32 = 8;
 const ROOT_DATA_METADATA_MAP_FIELD: u32 = 10;
 const ROOT_VERSIONED_COMPONENT_FIELD: u32 = 11;
+const DATA_METADATA_MAP_ENTRY_FIELD: u32 = 1;
+const DATA_METADATA_MAP_ENTRY_DATA_FIELD: u32 = 1;
+const DATA_METADATA_MAP_ENTRY_METADATA_FIELD: u32 = 2;
 const COMPONENT_IDENTIFIER_FIELD: u32 = 1;
 const COMPONENT_PREFERRED_LOCATOR_FIELD: u32 = 2;
 const COMPONENT_LOCATOR_FIELD: u32 = 3;
@@ -527,6 +530,8 @@ pub struct DecodeReport {
     owners: usize,
     unknown_records: usize,
     data_metadata_map_present: bool,
+    data_metadata_map_identifier: Option<u64>,
+    data_metadata_map_unknown_fields: bool,
 }
 
 impl DecodeReport {
@@ -574,6 +579,206 @@ impl DecodeReport {
     pub const fn data_metadata_map_present(self) -> bool {
         self.data_metadata_map_present
     }
+
+    /// Object identifier referenced by the root `data_metadata_map` edge.
+    ///
+    /// The identifier is retained in the report so a caller-provided map
+    /// payload witness can be paired with the exact source edge without
+    /// reparsing PackageMetadata.  `None` means the optional edge is absent.
+    #[must_use]
+    pub const fn data_metadata_map_identifier(self) -> Option<u64> {
+        self.data_metadata_map_identifier
+    }
+
+    /// Whether the selected root map reference contains extension fields.
+    #[must_use]
+    pub const fn data_metadata_map_has_unknown_fields(self) -> bool {
+        self.data_metadata_map_unknown_fields
+    }
+}
+
+/// Strict borrowed witness for the external `TSP.DataMetadataMap` payload
+/// referenced by PackageMetadata field 10.
+///
+/// PackageMetadata stores only a local reference to this object.  The object
+/// payload therefore has to be supplied by the package/archive owner.  The
+/// constructor validates the complete payload and records finite scan facts;
+/// callers cannot provide a precomputed membership boolean.  Preparation
+/// still compares [`Self::object_identifier`] with the source root edge and
+/// rechecks every selected DataInfo identifier against this payload.
+///
+/// The package owner must resolve the current type-11015 object from the
+/// same immutable package source and verify its root edge and component.
+/// This witness validates the supplied wire content, not archive provenance.
+/// Before reclaiming archive objects or ZIP members, the owner must also
+/// check physical data references outside PackageMetadata; this codec only
+/// authorizes changes to the supplied metadata records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataMetadataMapSource<'source> {
+    object_identifier: u64,
+    payload: &'source [u8],
+    fields: usize,
+    work_bytes: usize,
+    entries: usize,
+    unknown_fields: bool,
+    max_depth: u32,
+    scratch_bytes: usize,
+    allocations: usize,
+}
+
+impl<'source> DataMetadataMapSource<'source> {
+    /// Validate one source `DataMetadataMap` payload for use as a removal
+    /// witness.  The package/archive owner must resolve the PackageMetadata
+    /// root reference to the unique current object and its native
+    /// `DataMetadataMap` message before calling this constructor; this neutral
+    /// codec can validate the borrowed payload and pair its identifier with
+    /// the root edge, but cannot prove archive provenance from bytes alone.
+    /// The payload remains borrowed and is never rewritten.
+    pub fn from_source(
+        object_identifier: u64,
+        payload: &'source [u8],
+        options: DecodeOptions,
+    ) -> Result<Self, DecodeError> {
+        if NonZeroU64::new(object_identifier).is_none() {
+            return Err(DecodeError::invalid(InvalidReason::InvalidIdentifier));
+        }
+        let report = scan_data_metadata_map(payload, options)?;
+        Ok(Self {
+            object_identifier,
+            payload,
+            fields: report.fields,
+            work_bytes: report.work_bytes,
+            entries: report.entries,
+            unknown_fields: report.unknown_fields,
+            max_depth: report.max_depth,
+            scratch_bytes: report.scratch_bytes,
+            allocations: report.allocations,
+        })
+    }
+
+    #[must_use]
+    pub const fn object_identifier(self) -> u64 {
+        self.object_identifier
+    }
+
+    /// Borrow the exact source map payload used for validation.
+    #[must_use]
+    pub const fn payload(self) -> &'source [u8] {
+        self.payload
+    }
+
+    /// Number of validated map wire fields in the witness scan.
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+
+    /// Work consumed by one complete witness validation scan, including the
+    /// bounded duplicate-key audit.
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    #[must_use]
+    pub const fn entries(self) -> usize {
+        self.entries
+    }
+
+    /// Whether the validated map contains extension fields outside its
+    /// selected schema envelope.  Format owners may still inspect such a map
+    /// through the visitor; DataInfo removal treats it as ambiguous.
+    #[must_use]
+    pub const fn has_unknown_fields(self) -> bool {
+        self.unknown_fields
+    }
+
+    #[must_use]
+    pub const fn max_depth(self) -> u32 {
+        self.max_depth
+    }
+
+    /// Temporary bytes required by the bounded duplicate-key audit.  The
+    /// witness itself retains no parsed map collection.
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
+
+    /// The constructor uses one temporary key vector, which is released
+    /// before the witness is returned.
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    /// Visit each validated map key/reference pair without retaining a
+    /// collection.  This is the neutral borrowed seam for format owners that
+    /// need the map closure while retaining their own archive-object checks.
+    pub fn visit_entries(
+        self,
+        options: DecodeOptions,
+        visitor: &mut dyn DataMetadataMapVisitor,
+    ) -> Result<DecodeReport, DecodeError> {
+        visit_data_metadata_map(self.payload, options, visitor)
+    }
+
+    /// Check map membership from the validated payload.  The lookup reparses
+    /// only the borrowed key envelopes and is finite in the payload length;
+    /// callers that perform several lookups should charge one lookup pass per
+    /// selected identifier.
+    pub fn contains_data_identifier(
+        self,
+        identifier: u64,
+        options: DecodeOptions,
+    ) -> Result<bool, DecodeError> {
+        if NonZeroU64::new(identifier).is_none() {
+            return Err(DecodeError::invalid(InvalidReason::InvalidIdentifier));
+        }
+        data_metadata_map_contains(self.payload, identifier, options)
+    }
+
+    /// Conservative work charged for one membership lookup pass.
+    #[must_use]
+    pub const fn lookup_work_bytes(self) -> usize {
+        if self.payload.is_empty() {
+            1
+        } else {
+            self.payload.len().saturating_mul(2)
+        }
+    }
+}
+
+/// One validated borrowed DataMetadataMap entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataMetadataMapEntry {
+    data_identifier: u64,
+    metadata_object_identifier: u64,
+    unknown_fields: bool,
+}
+
+impl DataMetadataMapEntry {
+    #[must_use]
+    pub const fn data_identifier(self) -> u64 {
+        self.data_identifier
+    }
+
+    #[must_use]
+    pub const fn metadata_object_identifier(self) -> u64 {
+        self.metadata_object_identifier
+    }
+
+    #[must_use]
+    pub const fn has_unknown_fields(self) -> bool {
+        self.unknown_fields
+    }
+}
+
+/// Visitor used by [`DataMetadataMapSource::visit_entries`].
+pub trait DataMetadataMapVisitor {
+    fn visit_entry(&mut self, _entry: DataMetadataMapEntry) -> Result<(), DecodeError> {
+        Ok(())
+    }
 }
 
 /// Scan the metadata closure while streaming records to `visitor`.
@@ -611,6 +816,8 @@ struct ScanState {
     owners: usize,
     unknown_records: usize,
     data_metadata_map_present: bool,
+    data_metadata_map_identifier: Option<u64>,
+    data_metadata_map_unknown_fields: bool,
 }
 
 impl ScanState {
@@ -639,6 +846,8 @@ impl ScanState {
             owners: 0,
             unknown_records: 0,
             data_metadata_map_present: false,
+            data_metadata_map_identifier: None,
+            data_metadata_map_unknown_fields: false,
         })
     }
 
@@ -763,6 +972,8 @@ impl ScanState {
             owners: self.owners,
             unknown_records: self.unknown_records,
             data_metadata_map_present: self.data_metadata_map_present,
+            data_metadata_map_identifier: self.data_metadata_map_identifier,
+            data_metadata_map_unknown_fields: self.data_metadata_map_unknown_fields,
         }
     }
 }
@@ -818,8 +1029,10 @@ fn scan(
                     return Err(DecodeError::invalid(InvalidReason::DuplicateField));
                 }
                 let payload = bytes(source, field)?;
-                parse_reference(payload, options, &mut state)?;
+                let reference = parse_reference_facts(payload, options, &mut state, 2)?;
                 state.data_metadata_map_present = true;
+                state.data_metadata_map_identifier = Some(reference.identifier);
+                state.data_metadata_map_unknown_fields = reference.unknown_fields;
             },
             2 => {
                 let _ = bytes(source, field)?;
@@ -1540,11 +1753,28 @@ fn parse_owner<'source>(
     })
 }
 
-fn parse_reference(
+#[derive(Debug, Clone, Copy)]
+struct ReferenceFacts {
+    identifier: u64,
+    deprecated_type: Option<i32>,
+    external: Option<bool>,
+    unknown_fields: bool,
+}
+
+fn canonical_int32(source: &[u8], field: WireField) -> Result<i32, DecodeError> {
+    let value = varint(source, field)?;
+    if value > i32::MAX as u64 && value < 0xffff_ffff_8000_0000 {
+        return Err(DecodeError::invalid(InvalidReason::UnsupportedField));
+    }
+    Ok(value as i32)
+}
+
+fn parse_reference_facts(
     payload: &[u8],
     options: DecodeOptions,
     state: &mut ScanState,
-) -> Result<(), DecodeError> {
+    depth: u32,
+) -> Result<ReferenceFacts, DecodeError> {
     if payload.len() > options.max_message_bytes {
         return Err(DecodeError::limited(DecodeLimit::Bytes {
             observed: payload.len(),
@@ -1553,9 +1783,12 @@ fn parse_reference(
     }
     state.work(payload.len(), options)?;
     let mut identifier = None;
+    let mut deprecated_type = None;
+    let mut external = None;
+    let mut unknown_fields = false;
     for result in fields(payload) {
         let field = result?;
-        state.field(field, options, 2)?;
+        state.field(field, options, depth)?;
         match field.number {
             1 => {
                 if identifier.is_some() {
@@ -1568,21 +1801,279 @@ fn parse_reference(
                 identifier = Some(value);
             },
             2 => {
-                let _ = varint(payload, field)?;
+                if deprecated_type.is_some() {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
+                deprecated_type = Some(canonical_int32(payload, field)?);
             },
             3 => {
+                if external.is_some() {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
                 let value = varint(payload, field)?;
                 if value > 1 {
                     return Err(DecodeError::invalid(InvalidReason::UnsupportedField));
                 }
+                external = Some(value == 1);
             },
-            _ => state.unknown()?,
+            _ => {
+                unknown_fields = true;
+                state.unknown()?;
+            },
         }
     }
-    if identifier.is_none() {
-        return Err(DecodeError::invalid(InvalidReason::MissingRequiredField));
+    Ok(ReferenceFacts {
+        identifier: identifier
+            .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequiredField))?,
+        deprecated_type,
+        external,
+        unknown_fields,
+    })
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DataMetadataMapReport {
+    fields: usize,
+    work_bytes: usize,
+    entries: usize,
+    unknown_fields: bool,
+    max_depth: u32,
+    scratch_bytes: usize,
+    allocations: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DataMetadataMapEntryFacts {
+    entry: DataMetadataMapEntry,
+    unknown_fields: bool,
+}
+
+fn parse_data_metadata_map_entry(
+    payload: &[u8],
+    options: DecodeOptions,
+    state: &mut ScanState,
+) -> Result<DataMetadataMapEntryFacts, DecodeError> {
+    if payload.len() > options.max_message_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Bytes {
+            observed: payload.len(),
+            maximum: options.max_message_bytes,
+        }));
     }
-    Ok(())
+    state.work(payload.len(), options)?;
+    let mut data_identifier = None;
+    let mut metadata_object_identifier = None;
+    let mut deprecated_type = None;
+    let mut external = None;
+    let mut unknown_fields = false;
+    for result in fields(payload) {
+        let field = result?;
+        state.field(field, options, 2)?;
+        match field.number {
+            DATA_METADATA_MAP_ENTRY_DATA_FIELD => {
+                if data_identifier.is_some() {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
+                let value = varint(payload, field)?;
+                if NonZeroU64::new(value).is_none() {
+                    return Err(DecodeError::invalid(InvalidReason::InvalidIdentifier));
+                }
+                data_identifier = Some(value);
+            },
+            DATA_METADATA_MAP_ENTRY_METADATA_FIELD => {
+                if metadata_object_identifier.is_some() {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
+                let reference = parse_reference_facts(bytes(payload, field)?, options, state, 3)?;
+                if reference.external == Some(true) {
+                    return Err(DecodeError::invalid(InvalidReason::UnsupportedField));
+                }
+                unknown_fields |= reference.unknown_fields;
+                deprecated_type = reference.deprecated_type;
+                external = reference.external;
+                metadata_object_identifier = Some(reference.identifier);
+            },
+            _ => {
+                unknown_fields = true;
+                state.unknown()?;
+            },
+        }
+    }
+    let view: projection::DataMetadataMapEntryArchiveLazyView<'_> = options
+        .buffa()
+        .decode_lazy_view(payload)
+        .map_err(|_error| DecodeError::invalid(InvalidReason::MalformedWire))?;
+    if !view.has_data_identifier() || view.data_identifier != data_identifier.unwrap_or_default() {
+        return Err(DecodeError::invalid(InvalidReason::Verification));
+    }
+    let metadata = view
+        .data_metadata
+        .get()
+        .map_err(|_error| DecodeError::invalid(InvalidReason::MalformedWire))?
+        .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequiredField))?;
+    if !metadata.has_identifier()
+        || metadata.identifier != metadata_object_identifier.unwrap_or_default()
+        || metadata.deprecated_type != deprecated_type
+        || metadata.deprecated_is_external != external
+    {
+        return Err(DecodeError::invalid(InvalidReason::Verification));
+    }
+    Ok(DataMetadataMapEntryFacts {
+        entry: DataMetadataMapEntry {
+            data_identifier: data_identifier
+                .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequiredField))?,
+            metadata_object_identifier: metadata_object_identifier
+                .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequiredField))?,
+            unknown_fields,
+        },
+        unknown_fields,
+    })
+}
+
+fn map_entry_identifier(
+    payload: &[u8],
+    options: DecodeOptions,
+    state: &mut ScanState,
+) -> Result<u64, DecodeError> {
+    let mut identifier = None;
+    for result in fields(payload) {
+        let field = result?;
+        state.field(field, options, 2)?;
+        if field.number != DATA_METADATA_MAP_ENTRY_DATA_FIELD {
+            continue;
+        }
+        if identifier.is_some() {
+            return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+        }
+        let value = varint(payload, field)?;
+        if NonZeroU64::new(value).is_none() {
+            return Err(DecodeError::invalid(InvalidReason::InvalidIdentifier));
+        }
+        identifier = Some(value);
+    }
+    identifier.ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequiredField))
+}
+
+fn scan_data_metadata_map_pass(
+    payload: &[u8],
+    options: DecodeOptions,
+    state: &mut ScanState,
+    mut identifiers: Option<&mut Vec<u64>>,
+) -> Result<(usize, bool), DecodeError> {
+    let mut entries = 0usize;
+    let mut unknown_fields = false;
+    let mut offset = 0usize;
+    while let Some(field) = next_field(payload, offset)? {
+        offset = field.end;
+        state.field(field, options, 1)?;
+        if field.number != DATA_METADATA_MAP_ENTRY_FIELD {
+            unknown_fields = true;
+            state.unknown()?;
+            continue;
+        }
+        entries = entries
+            .checked_add(1)
+            .ok_or_else(|| DecodeError::invalid(InvalidReason::MalformedWire))?;
+        if entries > options.max_data_records {
+            return Err(DecodeError::limited(DecodeLimit::DataRecords {
+                observed: entries,
+                maximum: options.max_data_records,
+            }));
+        }
+        let entry_payload = bytes(payload, field)?;
+        let entry = parse_data_metadata_map_entry(entry_payload, options, state)?;
+        if let Some(identifiers) = identifiers.as_deref_mut() {
+            identifiers.push(entry.entry.data_identifier);
+        }
+        unknown_fields |= entry.unknown_fields;
+    }
+    Ok((entries, unknown_fields))
+}
+
+fn scan_data_metadata_map(
+    payload: &[u8],
+    options: DecodeOptions,
+) -> Result<DataMetadataMapReport, DecodeError> {
+    let mut state = ScanState::new(payload, options)?;
+    // First validate and count all entries without allocating.  The second
+    // pass can then reserve exactly one key vector, making the scratch and
+    // allocation ledger deterministic for the duplicate sort.
+    let (entries, first_unknown_fields) =
+        scan_data_metadata_map_pass(payload, options, &mut state, None)?;
+    let scratch_bytes = entries.saturating_mul(size_of::<u64>());
+    let mut identifiers = Vec::new();
+    if entries != 0 {
+        state.work(scratch_bytes, options)?;
+        identifiers.try_reserve_exact(entries).map_err(|_error| {
+            DecodeError::limited(DecodeLimit::Work {
+                observed: usize::MAX,
+                maximum: options.max_work_bytes,
+            })
+        })?;
+    }
+    let (second_entries, second_unknown_fields) =
+        scan_data_metadata_map_pass(payload, options, &mut state, Some(&mut identifiers))?;
+    if second_entries != entries {
+        return Err(DecodeError::invalid(InvalidReason::Verification));
+    }
+    finish_u64_identities(
+        &mut identifiers,
+        InvalidReason::DuplicateDataInfo,
+        options,
+        &mut state,
+    )?;
+    let report = state.report();
+    Ok(DataMetadataMapReport {
+        fields: report.fields,
+        work_bytes: report.work_bytes,
+        entries,
+        unknown_fields: first_unknown_fields || second_unknown_fields,
+        max_depth: report.max_depth,
+        scratch_bytes,
+        allocations: if entries == 0 { 0 } else { 1 },
+    })
+}
+
+fn data_metadata_map_contains(
+    payload: &[u8],
+    identifier: u64,
+    options: DecodeOptions,
+) -> Result<bool, DecodeError> {
+    let mut state = ScanState::new(payload, options)?;
+    let mut offset = 0usize;
+    while let Some(field) = next_field(payload, offset)? {
+        offset = field.end;
+        state.field(field, options, 1)?;
+        if field.number != DATA_METADATA_MAP_ENTRY_FIELD {
+            continue;
+        }
+        state.data_record(options)?;
+        if map_entry_identifier(bytes(payload, field)?, options, &mut state)? == identifier {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn visit_data_metadata_map(
+    payload: &[u8],
+    options: DecodeOptions,
+    visitor: &mut dyn DataMetadataMapVisitor,
+) -> Result<DecodeReport, DecodeError> {
+    let mut state = ScanState::new(payload, options)?;
+    let mut offset = 0usize;
+    while let Some(field) = next_field(payload, offset)? {
+        offset = field.end;
+        state.field(field, options, 1)?;
+        if field.number != DATA_METADATA_MAP_ENTRY_FIELD {
+            state.unknown()?;
+            continue;
+        }
+        state.data_record(options)?;
+        state.data_reference()?;
+        let facts = parse_data_metadata_map_entry(bytes(payload, field)?, options, &mut state)?;
+        visitor.visit_entry(facts.entry)?;
+    }
+    Ok(state.report())
 }
 
 fn validate_packed_varints(payload: &[u8]) -> Result<(), DecodeError> {
@@ -2073,8 +2564,15 @@ fn owner_matches(
     Ok(facts)
 }
 
-fn count_data_owners(source: &[u8], data_identifier: u64) -> Result<usize, RewriteError> {
-    let mut count = 0usize;
+/// Return whether every current component parent for `data_identifier` is
+/// removed by this batch.  An empty parent is still a live reference and
+/// cannot be left behind when its DataInfo disappears.  Versioned parents are
+/// immutable in this codec and therefore always keep the DataInfo referenced.
+fn data_references_removed_after_owner_batch(
+    source: &[u8],
+    data_identifier: u64,
+    removals: &[DataReferenceOwnerRemoval<'_>],
+) -> Result<bool, RewriteError> {
     let mut offset = 0usize;
     while let Some(field) = next_field(source, offset).map_err(map_decode)? {
         offset = field.end;
@@ -2082,21 +2580,38 @@ fn count_data_owners(source: &[u8], data_identifier: u64) -> Result<usize, Rewri
             continue;
         }
         let component_payload = field.payload(source);
+        let component = component_facts(
+            component_payload,
+            field.number == ROOT_VERSIONED_COMPONENT_FIELD,
+        )
+        .map_err(map_decode)?;
         for result in fields(component_payload) {
             let child = result.map_err(map_decode)?;
             if child.number != COMPONENT_DATA_REFERENCE_FIELD {
                 continue;
             }
-            let reference =
+            let parent =
                 data_reference_facts(child.payload(component_payload)).map_err(map_decode)?;
-            if reference.data_identifier == data_identifier {
-                count = count
-                    .checked_add(reference.owners)
-                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+            if parent.data_identifier != data_identifier {
+                continue;
+            }
+            if component.versioned || parent.owners == 0 {
+                return Ok(false);
+            }
+            let removal_count = removals
+                .iter()
+                .filter(|removal| {
+                    removal.data_identifier == data_identifier
+                        && removal.component.identifier == component.identifier
+                        && removal.component.locator == component.effective_locator()
+                })
+                .count();
+            if removal_count != parent.owners {
+                return Ok(false);
             }
         }
     }
-    Ok(count)
+    Ok(true)
 }
 
 trait Sink {
@@ -2507,6 +3022,41 @@ fn validate_batch(
         }));
     }
 
+    if !batch.data_removals.is_empty() && report.data_metadata_map_present {
+        let map_source = batch
+            .data_metadata_map_source
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::DataInfoMetadataMapDependency))?;
+        if report.data_metadata_map_has_unknown_fields()
+            || map_source.has_unknown_fields()
+            || report.data_metadata_map_identifier() != Some(map_source.object_identifier())
+            || map_source.entries() > options.max_data_records
+            || map_source.max_depth() > options.max_depth
+        {
+            return Err(RewriteError::invalid(
+                InvalidReason::DataInfoMetadataMapDependency,
+            ));
+        }
+        let map_passes = batch.data_removals.len().saturating_add(1);
+        let map_fields = map_source.fields().saturating_mul(map_passes);
+        let map_work = map_source.work_bytes().saturating_add(
+            map_source
+                .lookup_work_bytes()
+                .saturating_mul(batch.data_removals.len()),
+        );
+        if report.fields.saturating_add(map_fields) > options.max_fields {
+            return Err(RewriteError::limited(DecodeLimit::Fields {
+                observed: report.fields.saturating_add(map_fields),
+                maximum: options.max_fields,
+            }));
+        }
+        if report.work_bytes.saturating_add(map_work) > options.max_work_bytes {
+            return Err(RewriteError::limited(DecodeLimit::Work {
+                observed: report.work_bytes.saturating_add(map_work),
+                maximum: options.max_work_bytes,
+            }));
+        }
+    }
+
     for (index, addition) in batch.data_additions.iter().copied().enumerate() {
         validate_addition(addition, options)?;
         if data_addition_duplicate(batch.data_additions, index, addition.identifier)
@@ -2534,6 +3084,22 @@ fn validate_batch(
             return Err(RewriteError::invalid(InvalidReason::DuplicateOperation));
         }
         if report.data_metadata_map_present {
+            let map_source = batch.data_metadata_map_source.ok_or_else(|| {
+                RewriteError::invalid(InvalidReason::DataInfoMetadataMapDependency)
+            })?;
+            if map_source.has_unknown_fields()
+                || report.data_metadata_map_has_unknown_fields()
+                || map_source.object_identifier()
+                    != report.data_metadata_map_identifier().unwrap_or_default()
+                || map_source
+                    .contains_data_identifier(removal.identifier, options)
+                    .map_err(map_decode)?
+            {
+                return Err(RewriteError::invalid(
+                    InvalidReason::DataInfoMetadataMapDependency,
+                ));
+            }
+        } else if batch.data_metadata_map_source.is_some() {
             return Err(RewriteError::invalid(
                 InvalidReason::DataInfoMetadataMapDependency,
             ));
@@ -2548,7 +3114,22 @@ fn validate_batch(
         if unknown {
             return Err(RewriteError::invalid(InvalidReason::UnknownSelectedRecord));
         }
-        if count_data_owners(source, removal.identifier)? != 0 {
+        if batch
+            .owner_additions
+            .iter()
+            .any(|addition| addition.data_identifier == removal.identifier)
+            || batch
+                .owner_updates
+                .iter()
+                .any(|update| update.data_identifier == removal.identifier)
+        {
+            return Err(RewriteError::invalid(InvalidReason::ConflictingOperation));
+        }
+        if !data_references_removed_after_owner_batch(
+            source,
+            removal.identifier,
+            batch.owner_removals,
+        )? {
             return Err(RewriteError::invalid(InvalidReason::DataInfoReferenced));
         }
     }
@@ -3326,7 +3907,7 @@ fn source_validation_passes(batch: MediaRewriteBatch<'_>) -> usize {
         .data_additions
         .len()
         .saturating_mul(2)
-        .saturating_add(batch.data_removals.len().saturating_mul(5))
+        .saturating_add(batch.data_removals.len().saturating_mul(6))
         .saturating_add(batch.data_replacements.len().saturating_mul(3))
         .saturating_add(batch.owner_additions.len().saturating_mul(6))
         .saturating_add(batch.owner_removals.len().saturating_mul(3))
@@ -3384,7 +3965,17 @@ pub fn prepare_package_metadata_media_rewrite<'source>(
         // owner identity/count fields.  Seven is a conservative field
         // budget that also covers the rewritten component envelope.
         .saturating_add(batch.owner_additions.len().saturating_mul(7))
-        .saturating_add(batch.owner_updates.len().saturating_mul(5));
+        .saturating_add(batch.owner_updates.len().saturating_mul(5))
+        .saturating_add(
+            batch
+                .data_metadata_map_source
+                .filter(|_source| !batch.data_removals.is_empty())
+                .map_or(0, |map_source| {
+                    map_source
+                        .fields()
+                        .saturating_mul(batch.data_removals.len().saturating_add(1))
+                }),
+        );
     // Preparation scans the source once, sizes the raw-preserving stream,
     // and execution writes plus verifies one candidate.  Charge the source
     // scan and two output-width passes; this is finite, deterministic, and
@@ -3406,9 +3997,20 @@ pub fn prepare_package_metadata_media_rewrite<'source>(
         .saturating_mul(source_validation_passes(batch));
     let candidate_validation_work = output_size.saturating_mul(candidate_validation_passes(batch));
     let validation_work = source_validation_work.saturating_add(candidate_validation_work);
+    let map_work = batch
+        .data_metadata_map_source
+        .filter(|_source| !batch.data_removals.is_empty())
+        .map_or(0, |map_source| {
+            map_source.work_bytes().saturating_add(
+                map_source
+                    .lookup_work_bytes()
+                    .saturating_mul(batch.data_removals.len()),
+            )
+        });
     let work_bytes = rewrite_work
         .saturating_add(validation_work)
-        .saturating_add(candidate_work);
+        .saturating_add(candidate_work)
+        .saturating_add(map_work);
     if fields > options.max_fields {
         return Err(RewriteError::limited(DecodeLimit::Fields {
             observed: fields,
@@ -3856,6 +4458,7 @@ pub struct MediaRewriteBatch<'source> {
     owner_additions: &'source [DataReferenceOwnerAddition<'source>],
     owner_removals: &'source [DataReferenceOwnerRemoval<'source>],
     owner_updates: &'source [DataReferenceOwnerCountUpdate<'source>],
+    data_metadata_map_source: Option<DataMetadataMapSource<'source>>,
 }
 
 impl<'source> MediaRewriteBatch<'source> {
@@ -3873,6 +4476,7 @@ impl<'source> MediaRewriteBatch<'source> {
             owner_additions,
             owner_removals,
             owner_updates: &[],
+            data_metadata_map_source: None,
         }
     }
 
@@ -3896,6 +4500,7 @@ impl<'source> MediaRewriteBatch<'source> {
             owner_additions,
             owner_removals,
             owner_updates,
+            data_metadata_map_source: None,
         }
     }
 
@@ -3906,6 +4511,17 @@ impl<'source> MediaRewriteBatch<'source> {
         owner_updates: &'source [DataReferenceOwnerCountUpdate<'source>],
     ) -> Self {
         self.owner_updates = owner_updates;
+        self
+    }
+
+    /// Pair DataInfo removals with the validated external DataMetadataMap
+    /// payload referenced by PackageMetadata field 10.
+    #[must_use]
+    pub const fn with_data_metadata_map_source(
+        mut self,
+        map_source: DataMetadataMapSource<'source>,
+    ) -> Self {
+        self.data_metadata_map_source = Some(map_source);
         self
     }
 
@@ -3990,6 +4606,11 @@ impl<'source> MediaRewriteBatch<'source> {
     #[must_use]
     pub const fn owner_count_updates(self) -> &'source [DataReferenceOwnerCountUpdate<'source>] {
         self.owner_updates
+    }
+
+    #[must_use]
+    pub const fn data_metadata_map_source(self) -> Option<DataMetadataMapSource<'source>> {
+        self.data_metadata_map_source
     }
 
     #[must_use]

@@ -17201,3 +17201,42 @@ mutation parity:
 the separate caption mutation owner refuses this profile. The three-wrapper
 host cutover remains bounded to these content/poster paths; generic
 `replace_media` and broad media lifecycle remain host-owned.
+
+## 2026-09-06 follow-up: Keynote media lifecycle oracle and implemented core prerequisites
+
+A pair of permanent native-authored Keynote 14.4 oracles records the expected
+behavior for the remaining media lifecycle work. The duplicate oracle
+[`media-lifecycle-duplicate-native.key`](../../test-data/iwork/keynote/media-lifecycle-duplicate-native.key)
+is 752,730 bytes with SHA-256
+`e9a9d2779749252861a9fc592a3af5020b92ca3cb9adf14a03d155606bb7c276`; it
+contains five media objects, the duplicate offset by `(10,10)`, and the
+appended caption. The removal oracle
+[`media-lifecycle-remove-native.key`](../../test-data/iwork/keynote/media-lifecycle-remove-native.key)
+is 697,237 bytes with SHA-256
+`88813924afc1566dcffa92a8a59ab33e65b919bcef83dc3352cab3782bf95d13`; after
+the final movie removal, two audio objects remain and the movie/poster assets
+are culled. Both artifacts were saved, actually closed, and reopened from
+their exact paths in Keynote 14.4. These observations are native-authored
+expected-behavior evidence only; they are not acceptance of a Litchi-mutated
+candidate and do not establish focused mutation E3/E4.
+
+The neutral prerequisite implementation is now landed. The core clone path
+preserves raw headers and source bytes, stages source-atomic remaps, sorts exact
+remap scratch deterministically, and requires explicit consistent remaps for known self-references. Its
+bounded six-case core validation covers those clone/remap and atomic-source
+guards. The neutral map decoder uses a bounded two-pass traversal, one temporary
+allocation for nonempty O(n log n) ordering, lazy Buffa views with canonical `int32`
+fields, and reference-parity checks. The metadata codec atomically removes final owners and their `DataInfo`
+records. The native baseline test removes four owner references and two
+`DataInfo` records. Mapped or ambiguous records and surviving empty or
+versioned component references refuse removal before publication.
+
+The existing focused media-replacement closure now delegates map decoding to
+the neutral reader, with a regression preserving unknown-extension reads. The
+neutral map layer passes 22 unit and 18 integration cases (40 total), and the
+Keynote lifecycle slice passes 22 replacement plus 4 native-oracle integration
+cases (26 total); boundary verification passes 936 units. Workspace strict linting passes, and both clone/remap and metadata fuzz
+targets pass 256 AddressSanitizer runs. Full scanner and workspace hooks
+remain pending root verification. The selector-level lifecycle owner and further host-route
+retirement remain pending; this does not change generic `replace_media` or the
+ADR 0028 deletion gate.

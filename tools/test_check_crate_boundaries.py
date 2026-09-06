@@ -3280,6 +3280,18 @@ def add_keynote_movie_geometry_completion_scaffold(root: Path) -> None:
 def add_keynote_slide_media_data_canonical_scaffold(root: Path) -> None:
     """Create the focused selector-first slide-media replacement fixture."""
 
+    core = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CORE_SOURCE_ROOT / "archive.rs"
+    core.parent.mkdir(parents=True, exist_ok=True)
+    core.write_text(
+        "impl ArchiveObject {\n"
+        "    pub fn clone_with_identity_remap(&self) { self.clone_with_identity_remap_with_limits(); }\n"
+        "    pub fn clone_with_identity_remap_with_limits(&self) {\n"
+        "        let _ = (archive_info, messages, original_header, original_canonical_header, remap);\n"
+        "    }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
     owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE
     owner.parent.mkdir(parents=True, exist_ok=True)
     owner.write_text(
@@ -3396,9 +3408,25 @@ def add_keynote_slide_media_data_canonical_scaffold(root: Path) -> None:
     metadata_codec = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES[1]
     metadata_codec.parent.mkdir(parents=True, exist_ok=True)
     metadata_codec.write_text(
-        "pub struct MediaRewriteBatch;\n"
+        "pub struct DataMetadataMapSource<'source> { payload: &'source [u8], fields: usize, work_bytes: usize, entries: usize, scratch_bytes: usize }\n"
+        "pub struct DataMetadataMapEntry;\n"
+        "pub trait DataMetadataMapVisitor {}\n"
+        "pub struct MediaRewriteBatch { data_removals: &[DataInfoRemoval], owner_removals: &[DataReferenceOwnerRemoval], data_metadata_map_source: Option<DataMetadataMapSource<'source>> }\n"
         "pub struct DataInfoContentReplacement;\n"
+        "pub struct DataInfoRemoval;\n"
+        "pub struct DataReferenceOwnerRemoval;\n"
         "pub struct RewriteExecutionRequirements;\n"
+        "fn from_source() { scan_data_metadata_map(payload, options); }\n"
+        "fn scan_data_metadata_map(payload: &[u8], options: DecodeOptions, state: &mut State) { reserve_identity_slot; finish_u64_identities; options.max_fields; let _ = (payload, state); }\n"
+        "fn validate_batch(source: &[u8], batch: MediaRewriteBatch, report: DecodeReport) {\n"
+        "    if report.data_metadata_map_present { DataInfoMetadataMapDependency; }\n"
+        "    for (index, removal) in batch.data_removals.iter().copied().enumerate() {\n"
+        "        let map_source = batch.data_metadata_map_source; count_data_owners(source, removal.identifier); owner_removals;\n"
+        "        let _ = (index, map_source);\n"
+        "    }\n"
+        "    for (index, replacement) in batch.data_replacements.iter().copied().enumerate() { let _ = (index, replacement); }\n"
+        "}\n"
+        "fn verify_postconditions() { data_removals; owner_removals; }\n"
         "pub fn visit_package_metadata_media() {}\n"
         "pub fn prepare_package_metadata_media_rewrite() {}\n"
         "pub fn rewrite_package_metadata_media() {}\n"
@@ -18617,6 +18645,8 @@ fn rewrite_movie_title_operation(
             audits = (
                 boundaries.audit_keynote_slide_media_data_facade_source_topology,
                 boundaries.audit_keynote_slide_media_data_codec_source_topology,
+                boundaries.audit_keynote_slide_media_data_core_boundary_source_topology,
+                boundaries.audit_keynote_slide_media_data_metadata_boundary_source_topology,
                 boundaries.audit_keynote_slide_media_data_resource_source_topology,
                 boundaries.audit_keynote_slide_media_data_transaction_source_topology,
                 boundaries.audit_iwa_keynote_slide_media_data_source_topology,
@@ -18708,6 +18738,63 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(any("must prepare metadata rewrite" in item for item in violations), violations)
 
+    def test_keynote_slide_media_data_transaction_allows_only_borrowed_budget_visitors(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            closure = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE
+            closure.write_text(
+                closure.read_text(encoding="utf-8")
+                + "\n"
+                + "struct SafeVisitor<'a> { budget: &'a mut MediaBudget }\n"
+                + "impl SafeVisitor<'_> { fn validate_entry(&mut self) { self.budget.wire_work(1); } }\n"
+                + "fn make_safe_visitor(budget: &mut MediaBudget) { let mut visitor = SafeVisitor { budget }; visitor.validate_entry(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_transaction_source_topology(root),
+                [],
+            )
+
+            invalid_visitors = {
+                "copied ledger": (
+                    "struct CopiedVisitor<'a> { budget: &'a mut MediaBudget }\n"
+                    "impl CopiedVisitor<'_> { fn validate_entry(&mut self) { self.budget.wire_work(1); } }\n"
+                    "fn make_copied(budget: &mut MediaBudget) { let copied = CopiedVisitor { budget: *budget }; copied.validate_entry(); }\n"
+                ),
+                "owned ledger": (
+                    "struct OwnedVisitor { budget: MediaBudget }\n"
+                    "impl OwnedVisitor { fn validate_entry(&mut self) { self.budget.wire_work(1); } }\n"
+                    "fn make_owned(budget: &mut MediaBudget) { let owned = OwnedVisitor { budget: MediaBudget }; owned.validate_entry(); }\n"
+                ),
+                "non-budget ledger": (
+                    "struct NonBudgetVisitor<'a> { budget: &'a mut OtherBudget }\n"
+                    "impl NonBudgetVisitor<'_> { fn validate_entry(&mut self) { self.budget.wire_work(1); } }\n"
+                    "fn make_non_budget(budget: &mut MediaBudget) { let visitor = NonBudgetVisitor { budget }; visitor.validate_entry(); }\n"
+                ),
+            }
+            for label, visitor in invalid_visitors.items():
+                with self.subTest(label=label):
+                    invalid_root = Path(temporary) / label.replace(" ", "_")
+                    invalid_root.mkdir()
+                    add_keynote_slide_media_data_canonical_scaffold(invalid_root)
+                    invalid_closure = (
+                        invalid_root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE
+                    )
+                    invalid_closure.write_text(
+                        invalid_closure.read_text(encoding="utf-8") + "\n" + visitor,
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_keynote_slide_media_data_transaction_source_topology(
+                        invalid_root
+                    )
+                    self.assertTrue(
+                        any("validate_entry" in item and "must thread" in item for item in violations),
+                        violations,
+                    )
+
     def test_keynote_slide_media_data_codecs_and_owner_require_lazy_bounded_markers(
         self,
     ) -> None:
@@ -18746,6 +18833,94 @@ fn rewrite_movie_title_operation(
                 root
             )
             self.assertTrue(any("preview invalidation" in item for item in violations), violations)
+
+    def test_keynote_slide_media_data_core_clone_boundary_keeps_core_ownership(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            core = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CORE_SOURCE_ROOT / "archive.rs"
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_core_boundary_source_topology(root),
+                [],
+            )
+
+            host = root / "crates/litchi-iwa/src/keynote/editor.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn compatibility(object: ArchiveObject) { object.clone_with_identity_remap(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_core_boundary_source_topology(root),
+                [],
+            )
+
+            package = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES[0]
+            package.write_text(
+                package.read_text(encoding="utf-8")
+                + "pub use crate::clone_with_identity_remap;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_core_boundary_source_topology(
+                root
+            )
+            self.assertTrue(any("public API exposes" in item for item in violations), violations)
+
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "pub use crate::clone_with_identity_remap;\n", ""
+                ),
+                encoding="utf-8",
+            )
+            core.write_text(
+                core.read_text(encoding="utf-8").replace(
+                    "let _ = (archive_info, messages, original_header, original_canonical_header, remap);",
+                    "buffa::Message; let _ = (archive_info, messages, original_header, original_canonical_header, remap);",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_core_boundary_source_topology(
+                root
+            )
+            self.assertTrue(any("must not depend" in item for item in violations), violations)
+
+    def test_keynote_slide_media_data_metadata_boundary_requires_borrowed_witness(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            metadata = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES[1]
+            metadata_source = metadata.read_text(encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_metadata_boundary_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            metadata.write_text(
+                metadata_source.replace(
+                    "let map_source = batch.data_metadata_map_source; count_data_owners(source, removal.identifier); owner_removals;",
+                    "count_data_owners(source, removal.identifier); owner_removals;",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_metadata_boundary_source_topology(
+                root
+            )
+            self.assertTrue(any("bounded map witness" in item for item in violations), violations)
+
+            metadata.write_text(
+                metadata_source + "pub struct DataMetadataMap;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_metadata_boundary_source_topology(
+                root
+            )
+            self.assertTrue(any("unbounded/public map" in item for item in violations), violations)
 
     def test_keynote_slide_media_data_host_retires_only_raw_wrappers_and_calls(
         self,
@@ -18798,6 +18973,8 @@ fn rewrite_movie_title_operation(
             "+ audit_iwa_keynote_slide_media_data_source_topology()",
             "+ audit_keynote_slide_media_data_facade_source_topology()",
             "+ audit_keynote_slide_media_data_codec_source_topology()",
+            "+ audit_keynote_slide_media_data_core_boundary_source_topology()",
+            "+ audit_keynote_slide_media_data_metadata_boundary_source_topology()",
             "+ audit_keynote_slide_media_data_resource_source_topology()",
             "+ audit_keynote_slide_media_data_transaction_source_topology()",
         ):

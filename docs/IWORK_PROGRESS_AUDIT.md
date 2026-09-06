@@ -26,6 +26,42 @@ The iWork implementation is substantial but is **not suite-complete or release-c
 
 The detailed bounded coverage assessment is in [IWORK_FEATURE_MATRIX_AUDIT.md](IWORK_FEATURE_MATRIX_AUDIT.md).
 
+## Keynote media lifecycle follow-up (2026-09-06)
+
+Permanent native-authored Keynote 14.4 oracles record expected lifecycle
+behavior. [`media-lifecycle-duplicate-native.key`](../test-data/iwork/keynote/media-lifecycle-duplicate-native.key)
+is 752,730 bytes with SHA-256
+`e9a9d2779749252861a9fc592a3af5020b92ca3cb9adf14a03d155606bb7c276`; it
+contains five media objects, a duplicate offset by `(10,10)`, and an appended
+caption. [`media-lifecycle-remove-native.key`](../test-data/iwork/keynote/media-lifecycle-remove-native.key)
+is 697,237 bytes with SHA-256
+`88813924afc1566dcffa92a8a59ab33e65b919bcef83dc3352cab3782bf95d13`; its
+final movie removal leaves two audio objects and culls the movie/poster assets.
+Both artifacts were saved, actually closed, and reopened from their exact
+paths in Keynote 14.4.
+
+These are native-authored expected-behavior oracles only; no Litchi-mutated
+candidate or focused lifecycle E3/E4 claim follows. The neutral prerequisite
+implementation is now landed: the core clone path preserves raw headers and
+source bytes, stages source-atomic remaps, sorts exact remap scratch
+deterministically, and requires explicit consistent remaps for known self-references. The neutral map decoder
+uses a bounded two-pass traversal, one temporary allocation for nonempty O(n log n)
+ordering, lazy Buffa views with canonical `int32` fields, and reference-parity
+checks. The metadata codec atomically removes final owners and their `DataInfo`
+records. The native baseline test removes four owner references and two
+`DataInfo` records. Mapped or ambiguous records and surviving empty or
+versioned component references refuse removal before publication.
+
+The existing focused media-replacement closure delegates map decoding to the
+neutral reader and has an unknown-extension read-preservation regression. Core
+validation passes 6 cases, neutral map validation passes 22 unit plus 18
+integration cases (40 total), Keynote validation passes 22 replacement plus 4
+native-oracle integration cases (26 total), and boundary verification passes
+936 units. Workspace strict linting passes, and both clone/remap and metadata fuzz
+targets pass 256 AddressSanitizer runs. Full scanner and workspace hooks
+remain pending root verification. The selector-level lifecycle
+owner and further host-route retirement remain pending.
+
 ## Current maturity
 
 | Layer | What is solid | What still lacks | Assessment |

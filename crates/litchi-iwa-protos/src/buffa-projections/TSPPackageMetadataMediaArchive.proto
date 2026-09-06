@@ -18,3 +18,17 @@ message DataInfoArchive {
 message ComponentDataReferenceArchive {
   required uint64 data_identifier = 1;
 }
+
+// The repeated DataMetadataMap envelope remains handwritten and borrowed.
+// This scalar entry projection gives the neutral codec a Buffa lazy-view
+// parity check for each selected entry without retaining the collection.
+message DataMetadataMapEntryArchive {
+  required uint64 data_identifier = 1;
+  required ReferenceArchive data_metadata = 2;
+}
+
+message ReferenceArchive {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}

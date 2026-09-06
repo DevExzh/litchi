@@ -796,7 +796,44 @@ neutral metadata validation reports 15 module and 18 integration cases (33
 total); full boundary verification reports 933 policy units across 64 crates,
 238 internal edges, and 11 explicit debt items. A bounded 256-run ASAN smoke
 passed with harness assertions covering all three changed paths and their exact
-inverses; this is bounded E1 fuzz evidence, not exhaustive coverage. Workspace
-hooks remain a separate pending check. The separate caption mutation owner
-refuses this profile, so this record does not claim native geometry or caption
-mutation parity.
+inverses; this is bounded E1 fuzz evidence, not exhaustive coverage. Previous
+full hook runs passed in commits `f57f5e74c` and `f4b4865ae`; those repository
+checks are prerequisites, not lifecycle mutation evidence. The separate
+caption mutation owner refuses this profile, so this record does not claim
+native geometry or caption mutation parity.
+
+## Keynote media lifecycle native oracles and remaining owner boundary (2026-09-06)
+
+Two permanent native-authored Keynote 14.4 oracles record expected lifecycle
+behavior. [`keynote/media-lifecycle-duplicate-native.key`](keynote/media-lifecycle-duplicate-native.key)
+is 752,730 bytes with SHA-256
+`e9a9d2779749252861a9fc592a3af5020b92ca3cb9adf14a03d155606bb7c276`; it has
+five media objects, a duplicate offset by `(10,10)`, and an appended caption.
+[`keynote/media-lifecycle-remove-native.key`](keynote/media-lifecycle-remove-native.key)
+is 697,237 bytes with SHA-256
+`88813924afc1566dcffa92a8a59ab33e65b919bcef83dc3352cab3782bf95d13`; removing
+the final movie leaves two audio objects and culls the movie/poster assets.
+Both artifacts were saved, actually closed, and reopened from their exact
+paths in Keynote 14.4.
+
+These are native-authored expected-behavior oracles only. They do not certify a
+Litchi-mutated candidate or establish focused mutation E3/E4. The neutral
+prerequisite implementation is now landed: the core clone path preserves raw
+headers and source bytes, stages source-atomic remaps, sorts exact remap scratch
+deterministically, and requires explicit consistent remaps for known self-references. The neutral map decoder
+uses a bounded two-pass traversal, one temporary allocation for nonempty O(n log n)
+ordering, lazy Buffa views with canonical `int32` fields, and reference-parity
+checks. The metadata codec atomically removes final owners and their `DataInfo`
+records. The native baseline test removes four owner references and two
+`DataInfo` records. Mapped or ambiguous records and surviving empty or
+versioned component references refuse removal before publication.
+
+The existing focused media-replacement closure delegates map decoding to the
+neutral reader and has an unknown-extension read-preservation regression. Core
+validation passes 6 cases, neutral map validation passes 22 unit plus 18
+integration cases (40 total), Keynote validation passes 22 replacement plus 4
+native-oracle integration cases (26 total), and boundary verification passes
+936 units. Workspace strict linting passes, and both clone/remap and metadata fuzz
+targets pass 256 AddressSanitizer runs. Full scanner and workspace hooks
+remain pending root verification. The selector-level lifecycle
+owner and further host-route retirement remain pending.

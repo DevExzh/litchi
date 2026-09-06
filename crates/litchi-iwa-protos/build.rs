@@ -1546,8 +1546,8 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
         ),
         (
             "TSPPackageMetadataMediaArchive.proto",
-            709,
-            "22a2b38e074069cfbbc9607ebe355302b2d978c802148637482c373b5f80b8c5",
+            1205,
+            "628a59003db0c571772749a98e8a2293a683c4ba4b0161f82ac1492190672bca",
         ),
         (
             "TSTGroupNodeCategoryArchive.proto",

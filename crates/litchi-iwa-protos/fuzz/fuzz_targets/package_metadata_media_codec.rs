@@ -163,6 +163,7 @@ impl codec::PackageMetadataMediaVisitor for Facts {
 fuzz_target!(|data: &[u8]| {
     if let Some(source) = normalize_input(data) {
         exercise_source(&source);
+        exercise_map_source(&source);
     }
 
     static FIXED: OnceLock<()> = OnceLock::new();
@@ -173,6 +174,51 @@ fuzz_target!(|data: &[u8]| {
         exercise_transition_chain(FIXED_CASES[2]);
     });
 });
+
+#[derive(Default)]
+struct MapFacts {
+    entries: usize,
+    first_identifier: Option<u64>,
+}
+
+impl codec::DataMetadataMapVisitor for MapFacts {
+    fn visit_entry(
+        &mut self,
+        entry: codec::DataMetadataMapEntry,
+    ) -> Result<(), codec::DecodeError> {
+        self.entries += 1;
+        self.first_identifier.get_or_insert(entry.data_identifier());
+        black_box((
+            entry.metadata_object_identifier(),
+            entry.has_unknown_fields(),
+        ));
+        Ok(())
+    }
+}
+
+fn exercise_map_source(source: &[u8]) {
+    let finite = options(source);
+    match codec::DataMetadataMapSource::from_source(MAP_OBJECT_IDENTIFIER, source, finite) {
+        Ok(witness) => {
+            assert_eq!(witness.payload(), source);
+            let mut facts = MapFacts::default();
+            witness
+                .visit_entries(finite, &mut facts)
+                .expect("validated map must remain visitable under the same limits");
+            assert_eq!(facts.entries, witness.entries());
+            let identifier = facts.first_identifier.unwrap_or(1);
+            assert_eq!(
+                witness
+                    .contains_data_identifier(identifier, finite)
+                    .expect("validated map lookup must obey the same finite profile"),
+                facts.first_identifier.is_some()
+            );
+        },
+        Err(error) => {
+            black_box((error.resource_limit(), error.invalid_reason()));
+        },
+    }
+}
 
 fn normalize_input(data: &[u8]) -> Option<Vec<u8>> {
     if let Some(encoded) = data.strip_prefix(b"hex:") {
@@ -211,6 +257,31 @@ fn hex_nibble(byte: u8) -> Option<u8> {
         b'A'..=b'F' => Some(byte - b'A' + 10),
         _ => None,
     }
+}
+
+fn append_varint(output: &mut Vec<u8>, mut value: u64) {
+    loop {
+        let mut byte = (value & 0x7f) as u8;
+        value >>= 7;
+        if value != 0 {
+            byte |= 0x80;
+        }
+        output.push(byte);
+        if value == 0 {
+            return;
+        }
+    }
+}
+
+fn append_varint_field(output: &mut Vec<u8>, number: u32, value: u64) {
+    append_varint(output, u64::from(number) << 3);
+    append_varint(output, value);
+}
+
+fn append_bytes_field(output: &mut Vec<u8>, number: u32, payload: &[u8]) {
+    append_varint(output, (u64::from(number) << 3) | 2);
+    append_varint(output, payload.len() as u64);
+    output.extend_from_slice(payload);
 }
 
 fn options(source: &[u8]) -> codec::DecodeOptions {
@@ -274,6 +345,9 @@ const TRANSITION_OWNER_IDENTIFIER: u64 = 42;
 const ADDED_DATA_IDENTIFIER: u64 = 43;
 const ADDED_OWNER_IDENTIFIER: u64 = 94;
 const ADDED_DATA_DIGEST: &[u8; 20] = b"01234567890123456789";
+const MAP_OBJECT_IDENTIFIER: u64 = 80;
+const MAP_METADATA_OBJECT_IDENTIFIER: u64 = 81;
+const SURVIVING_OWNER_IDENTIFIER: u64 = 43;
 
 #[derive(Clone, Copy)]
 enum RewriteLimit {
@@ -361,6 +435,190 @@ fn exercise_transition_chain(source: &[u8]) {
     .expect("the existing-owner transition must produce a valid package");
     assert_eq!(final_existing_report.data_records(), 0);
     black_box((data_removed, existing_data_removed));
+
+    exercise_data_metadata_map_transactions();
+}
+
+fn source_with_data_metadata_map(extra_owner: bool) -> Vec<u8> {
+    let mut owner = Vec::new();
+    append_varint_field(&mut owner, 1, TRANSITION_OWNER_IDENTIFIER);
+    append_varint_field(&mut owner, 2, 1);
+
+    let mut reference = Vec::new();
+    append_varint_field(&mut reference, 1, TRANSITION_DATA_IDENTIFIER);
+    append_bytes_field(&mut reference, 2, &owner);
+    if extra_owner {
+        let mut surviving_owner = Vec::new();
+        append_varint_field(&mut surviving_owner, 1, SURVIVING_OWNER_IDENTIFIER);
+        append_varint_field(&mut surviving_owner, 2, 1);
+        append_bytes_field(&mut reference, 2, &surviving_owner);
+    }
+
+    let mut component = Vec::new();
+    append_varint_field(&mut component, 1, TRANSITION_COMPONENT.identifier());
+    append_bytes_field(&mut component, 2, TRANSITION_COMPONENT.locator().as_bytes());
+    append_bytes_field(&mut component, 7, &reference);
+
+    let mut data_info = Vec::new();
+    append_varint_field(&mut data_info, 1, TRANSITION_DATA_IDENTIFIER);
+    append_bytes_field(&mut data_info, 2, ADDED_DATA_DIGEST);
+    append_bytes_field(&mut data_info, 3, b"audio.aiff");
+
+    let mut root_map_reference = Vec::new();
+    append_varint_field(&mut root_map_reference, 1, MAP_OBJECT_IDENTIFIER);
+
+    let mut source = Vec::new();
+    append_varint_field(&mut source, 1, 10);
+    append_bytes_field(&mut source, 3, &component);
+    append_bytes_field(&mut source, 4, &data_info);
+    append_bytes_field(&mut source, 10, &root_map_reference);
+    source
+}
+
+fn data_metadata_map_payload(
+    data_identifier: u64,
+    metadata_object_identifier: u64,
+    unknown_reference_field: bool,
+) -> Vec<u8> {
+    let mut metadata_reference = Vec::new();
+    append_varint_field(&mut metadata_reference, 1, metadata_object_identifier);
+    if unknown_reference_field {
+        append_varint_field(&mut metadata_reference, 99, 1);
+    }
+
+    let mut entry = Vec::new();
+    append_varint_field(&mut entry, 1, data_identifier);
+    append_bytes_field(&mut entry, 2, &metadata_reference);
+
+    let mut payload = Vec::new();
+    append_bytes_field(&mut payload, 1, &entry);
+    payload
+}
+
+fn map_witness<'source>(
+    object_identifier: u64,
+    payload: &'source [u8],
+) -> Result<codec::DataMetadataMapSource<'source>, codec::DecodeError> {
+    codec::DataMetadataMapSource::from_source(object_identifier, payload, options(payload))
+}
+
+fn final_owner_batch<'source>(
+    map_payload: &'source [u8],
+    data_removals: &'source [codec::DataInfoRemoval],
+    owner_removals: &'source [codec::DataReferenceOwnerRemoval<'source>],
+) -> Result<codec::MediaRewriteBatch<'source>, codec::DecodeError> {
+    Ok(
+        codec::MediaRewriteBatch::new(&[], data_removals, &[], owner_removals)
+            .with_data_metadata_map_source(map_witness(MAP_OBJECT_IDENTIFIER, map_payload)?),
+    )
+}
+
+fn assert_refused<'source>(
+    source: &'source [u8],
+    batch: codec::MediaRewriteBatch<'source>,
+    label: &str,
+) {
+    let original = source.to_vec();
+    assert!(
+        run_rewrite(source, batch, options(source)).is_none(),
+        "{label} must refuse before publication"
+    );
+    assert_eq!(source, original.as_slice(), "{label} modified its source");
+}
+
+fn exercise_data_metadata_map_transactions() {
+    let source = source_with_data_metadata_map(false);
+    let original = source.clone();
+    let owner_removal = codec::DataReferenceOwnerRemoval::new(
+        TRANSITION_COMPONENT,
+        TRANSITION_DATA_IDENTIFIER,
+        TRANSITION_OWNER_IDENTIFIER,
+        1,
+    );
+    let owner_removals = [owner_removal];
+    let data_removal = codec::DataInfoRemoval::new(TRANSITION_DATA_IDENTIFIER);
+    let data_removals = [data_removal];
+    let absent_map = Vec::new();
+    let valid_batch = final_owner_batch(absent_map.as_slice(), &data_removals, &owner_removals)
+        .expect("an empty DataMetadataMap witness must remain valid");
+    let output = run_rewrite(&source, valid_batch, options(&source))
+        .expect("an absent map key must admit the atomic final-owner/DataInfo removal");
+    let output_report = codec::inspect_package_metadata_media(&output, options(&output))
+        .expect("the final-owner candidate must remain inspectable");
+    assert_eq!(output_report.data_records(), 0);
+    assert_eq!(output_report.owners(), 0);
+    assert!(output_report.data_metadata_map_present());
+    assert_eq!(
+        source,
+        original.as_slice(),
+        "valid rewrite modified its source"
+    );
+
+    let present_map = data_metadata_map_payload(
+        TRANSITION_DATA_IDENTIFIER,
+        MAP_METADATA_OBJECT_IDENTIFIER,
+        false,
+    );
+    let present_map_original = present_map.clone();
+    assert_refused(
+        &source,
+        final_owner_batch(present_map.as_slice(), &data_removals, &owner_removals)
+            .expect("a known DataMetadataMap key must remain structurally valid"),
+        "a present DataMetadataMap key",
+    );
+    assert_eq!(present_map, present_map_original, "present map was mutated");
+
+    let stale_owner_removal = codec::DataReferenceOwnerRemoval::new(
+        TRANSITION_COMPONENT,
+        TRANSITION_DATA_IDENTIFIER,
+        TRANSITION_OWNER_IDENTIFIER,
+        2,
+    );
+    let stale_owner_removals = [stale_owner_removal];
+    let wrong_count_map = Vec::new();
+    assert_refused(
+        &source,
+        final_owner_batch(
+            wrong_count_map.as_slice(),
+            &data_removals,
+            &stale_owner_removals,
+        )
+        .expect("an empty DataMetadataMap witness must remain valid"),
+        "a stale final-owner count",
+    );
+
+    let partial_source = source_with_data_metadata_map(true);
+    let partial_map = Vec::new();
+    assert_refused(
+        &partial_source,
+        final_owner_batch(partial_map.as_slice(), &data_removals, &owner_removals)
+            .expect("an empty DataMetadataMap witness must remain valid"),
+        "a source with a surviving owner",
+    );
+
+    let unknown_map = data_metadata_map_payload(
+        TRANSITION_DATA_IDENTIFIER + 1,
+        MAP_METADATA_OBJECT_IDENTIFIER,
+        true,
+    );
+    let unknown_map_original = unknown_map.clone();
+    let original = source.clone();
+    match final_owner_batch(unknown_map.as_slice(), &data_removals, &owner_removals) {
+        Ok(batch) => assert_refused(
+            &source,
+            batch,
+            "an unknown nested map reference with an absent key",
+        ),
+        Err(error) => {
+            black_box((error.resource_limit(), error.invalid_reason()));
+        },
+    }
+    assert_eq!(
+        source,
+        original.as_slice(),
+        "unknown map case modified its source"
+    );
+    assert_eq!(unknown_map, unknown_map_original, "unknown map was mutated");
 }
 
 fn run_rewrite<'source>(

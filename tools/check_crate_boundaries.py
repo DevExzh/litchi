@@ -2712,12 +2712,26 @@ KEYNOTE_SLIDE_MEDIA_DATA_PHYSICAL_TYPES = frozenset(
 )
 KEYNOTE_SLIDE_MEDIA_DATA_WIRE_TYPES = frozenset(
     {
+        "ComponentSnapshot",
+        "ComponentSelector",
+        "DataInfoAddition",
+        "DataInfoContentReplacement",
+        "DataInfoRemoval",
+        "DataInfoSnapshot",
+        "DataMetadataMapEntry",
+        "DataMetadataMapSource",
+        "DataMetadataMapVisitor",
+        "DataReferenceOwnerAddition",
+        "DataReferenceOwnerCountUpdate",
+        "DataReferenceOwnerRemoval",
         "DecodeError",
         "DecodeLimit",
         "DecodeOptions",
         "DecodeReport",
+        "MediaRewriteBatch",
         "NestedFieldEdit",
         "NestedFieldReplacement",
+        "OwnerSnapshot",
         "RewriteError",
         "RewriteExecutionLimits",
         "RewriteExecutionRequirements",
@@ -2770,6 +2784,11 @@ KEYNOTE_SLIDE_MEDIA_DATA_CODEC_APIS = {
         "rewrite_package_metadata_media",
         "MediaRewriteBatch",
         "DataInfoContentReplacement",
+        "DataInfoRemoval",
+        "DataReferenceOwnerRemoval",
+        "DataMetadataMapSource",
+        "DataMetadataMapEntry",
+        "DataMetadataMapVisitor",
         "RewriteExecutionRequirements",
     ),
 }
@@ -2797,6 +2816,27 @@ KEYNOTE_SLIDE_MEDIA_DATA_CODEC_MARKERS = {
         "try_reserve",
     ),
 }
+# The physical clone/remap primitive stays in the archive core.  The focused
+# Keynote owner may use it through private adapters; the implementation may
+# live in archive.rs or a private archive child module as the core is split.
+KEYNOTE_SLIDE_MEDIA_DATA_CORE_SOURCE_ROOT = Path("crates/litchi-iwa-core/src")
+KEYNOTE_SLIDE_MEDIA_DATA_CORE_CLONE_METHODS = (
+    "clone_with_identity_remap",
+    "clone_with_identity_remap_with_limits",
+)
+KEYNOTE_SLIDE_MEDIA_DATA_CORE_CLONE_FORBIDDEN_IMPORTS = re.compile(
+    r"(?<![A-Za-z0-9_])(?:buffa|prost|prost_types|litchi_iwa_protos|"
+    r"(?:kn|tsa|tsd|tsp|tn|tp|tswp)(?:sos)?)[ \t\r\n]*::"
+)
+KEYNOTE_SLIDE_MEDIA_DATA_METADATA_MAP_APIS = (
+    "DataMetadataMapSource",
+    "DataMetadataMapEntry",
+    "DataMetadataMapVisitor",
+)
+KEYNOTE_SLIDE_MEDIA_DATA_METADATA_PUBLIC_COLLECTION = re.compile(
+    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+(?:struct|enum|type|trait|use)"
+    r"[^\n;{}]*(?:HashMap|BTreeMap|DataMetadataMap)(?!Source|Entry|Visitor)"
+)
 KEYNOTE_SLIDE_MEDIA_DATA_OWNER_MARKER_GROUPS = {
     "selector resolution": ("SlideSelector", "MovieSelector", "select_media"),
     "media and metadata closure": (
@@ -53013,6 +53053,258 @@ def audit_keynote_slide_media_data_codec_source_topology(
     return sorted(set(violations))
 
 
+def audit_keynote_slide_media_data_core_boundary_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep identity-remap clone implementation in the archive core.
+
+    The compatibility host may route through the neutral core helper while
+    the migration is in progress.  This ratchet therefore checks ownership of
+    definitions, the core helper's dependency direction, and public facade
+    exposure without forbidding a legitimate compatibility call site.
+    """
+
+    if not _keynote_slide_media_data_owner_present(root):
+        return []
+
+    violations: list[str] = []
+
+    def masked_file(path: Path) -> str:
+        if not path.is_file():
+            return ""
+        return _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+
+    core_root = root / KEYNOTE_SLIDE_MEDIA_DATA_CORE_SOURCE_ROOT
+    core_files = (
+        sorted(core_root.rglob("*.rs")) if core_root.is_dir() else []
+    )
+
+    definition_pattern = {
+        method: re.compile(
+            rf"\b(?:pub(?:\s*\([^)]*\))?\s+)?fn\s+"
+            rf"(?:r#)?{re.escape(method)}\b"
+        )
+        for method in KEYNOTE_SLIDE_MEDIA_DATA_CORE_CLONE_METHODS
+    }
+    definitions: dict[str, list[tuple[Path, str]]] = {
+        method: [] for method in KEYNOTE_SLIDE_MEDIA_DATA_CORE_CLONE_METHODS
+    }
+    for path in core_files:
+        code = masked_file(path)
+        for method, pattern in definition_pattern.items():
+            if pattern.search(code) is not None:
+                definitions[method].append((path, code))
+
+    # The audit is dormant for fixtures that predate the clone migration.  A
+    # partially introduced pair, however, must not leave a second owner.
+    if not any(definitions.values()):
+        return []
+    for method, entries in definitions.items():
+        if not entries:
+            violations.append(
+                "focused litchi-keynote slide-media clone boundary is missing "
+                f"core helper {method}: {KEYNOTE_SLIDE_MEDIA_DATA_CORE_SOURCE_ROOT}"
+            )
+            continue
+        for path, code in entries:
+            body = _rust_any_function_body(code, method)
+            if body is None:
+                continue
+            forbidden = KEYNOTE_SLIDE_MEDIA_DATA_CORE_CLONE_FORBIDDEN_IMPORTS.search(
+                body
+            )
+            if forbidden is not None:
+                violations.append(
+                    "focused litchi-keynote slide-media clone boundary core helper "
+                    "must not depend on generated/protobuf types: "
+                    f"{forbidden.group(0).strip()}: {path.relative_to(root)}"
+                )
+
+    # Definitions belong to the archive core.  Calls in the compatibility
+    # host remain legal while it is being retired, so deliberately inspect
+    # declarations only here.
+    for source_root in (
+        root / IWA_KEYNOTE_SLIDE_MEDIA_DATA_SOURCE_ROOT,
+        root / Path("crates/litchi-iwa-protos/src"),
+    ):
+        if not source_root.is_dir():
+            continue
+        for path in sorted(source_root.rglob("*.rs")):
+            code = masked_file(path)
+            for method, pattern in definition_pattern.items():
+                if pattern.search(code) is not None:
+                    line_number = code.count("\n", 0, pattern.search(code).start()) + 1
+                    violations.append(
+                        "focused litchi-keynote slide-media clone helper is "
+                        "implemented outside the archive core: "
+                        f"{method}: {path.relative_to(root)}:{line_number}"
+                    )
+
+    # A public semantic declaration must not publish the physical helper or
+    # any of its raw archive vocabulary. The dedicated facade audit performs
+    # the broader type classification; this exact check catches a helper
+    # re-export even when its source name is aliased.
+    public_paths = (
+        KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE,
+        KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_SOURCE,
+        *KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES,
+    )
+    clone_name = re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:clone_with_identity_remap_with_limits|"
+        r"clone_with_identity_remap)(?![A-Za-z0-9_])"
+    )
+    for relative in public_paths:
+        path = root / relative
+        source = masked_file(path)
+        if not source:
+            continue
+        for declaration, line_number in _rust_public_declarations(source):
+            if clone_name.search(declaration) is not None:
+                violations.append(
+                    "focused litchi-keynote slide-media public API exposes the "
+                    f"physical clone helper: {relative}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_media_data_metadata_boundary_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require a bounded map witness for atomic owner/DataInfo removal.
+
+    The neutral codec may expose a borrowed DataMetadataMapSource to a private
+    format adapter, but it must validate the external payload with the same
+    finite limits as PackageMetadata and carry owner/DataInfo removals through
+    the prepared transaction. This blocks a direct map materialization or a
+    one-shot removal path from silently bypassing the final-owner proof.
+    """
+
+    if not _keynote_slide_media_data_owner_present(root):
+        return []
+    codec_path = root / KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES[1]
+    if not codec_path.is_file():
+        return [
+            "focused litchi-keynote slide-media metadata boundary is missing "
+            f"the neutral codec: {codec_path.relative_to(root)}"
+        ]
+
+    source = _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+    code = _mask_rust_non_code(source)
+    violations: list[str] = []
+
+    # Keep this focused ratchet dormant for older metadata codecs.  Once the
+    # DataInfo removal seam exists, the neutral borrowed witness is required.
+    if re.search(r"\b(?:pub\s+)?struct\s+DataInfoRemoval\b", code) is None:
+        return []
+
+    for name in KEYNOTE_SLIDE_MEDIA_DATA_METADATA_MAP_APIS:
+        if re.search(
+            rf"\b(?:pub[ \t]+)?(?:struct|enum|trait|type)[ \t]+"
+            rf"(?:r#)?{re.escape(name)}\b",
+            code,
+        ) is None:
+            violations.append(
+                "focused litchi-keynote slide-media metadata boundary is missing "
+                f"map witness API {name}: {codec_path.relative_to(root)}"
+            )
+
+    map_struct = _rust_named_struct_body(code, "DataMetadataMapSource")
+    if map_struct is None:
+        violations.append(
+            "focused litchi-keynote slide-media metadata map witness must remain a "
+            f"named borrowed source type: {codec_path.relative_to(root)}"
+        )
+    else:
+        map_body, _offset = map_struct
+        for marker in ("payload", "fields", "work_bytes", "entries", "scratch_bytes"):
+            if not re.search(rf"\b{re.escape(marker)}\b", map_body):
+                violations.append(
+                    "focused litchi-keynote slide-media metadata map witness omits "
+                    f"{marker}: {codec_path.relative_to(root)}"
+                )
+        if re.search(
+            r"\bpayload\s*:\s*&\s*(?:'[A-Za-z_][A-Za-z0-9_]*\s*)?\[\s*u8\s*\]",
+            map_body,
+        ) is None:
+            violations.append(
+                "focused litchi-keynote slide-media metadata map witness must borrow "
+                f"its payload: {codec_path.relative_to(root)}"
+            )
+
+    batch_struct = _rust_named_struct_body(code, "MediaRewriteBatch")
+    if batch_struct is None:
+        violations.append(
+            "focused litchi-keynote slide-media metadata boundary is missing the "
+            f"atomic rewrite batch: {codec_path.relative_to(root)}"
+        )
+    else:
+        batch_body, _offset = batch_struct
+        for marker in ("data_removals", "owner_removals", "data_metadata_map_source"):
+            if not re.search(rf"\b{re.escape(marker)}\b", batch_body):
+                violations.append(
+                    "focused litchi-keynote slide-media metadata batch must carry "
+                    f"{marker}: {codec_path.relative_to(root)}"
+                )
+
+    validation = _rust_named_function_body(code, "validate_batch")
+    if validation is None:
+        violations.append(
+            "focused litchi-keynote slide-media metadata boundary is missing "
+            f"batch validation: {codec_path.relative_to(root)}"
+        )
+    else:
+        validation_body, _offset = validation
+        removal_loop = re.search(
+            r"\bfor\b[^\n{]*\bbatch\.data_removals\b", validation_body
+        )
+        removal_region = ""
+        if removal_loop is not None:
+            removal_start = removal_loop.start()
+            removal_end = re.search(
+                r"\n\s*for\s+[^\n]*\bbatch\.(?:data_replacements|"
+                r"owner_(?:additions|removals|updates))\b",
+                validation_body[removal_start:],
+            )
+            end = (
+                removal_start + removal_end.start()
+                if removal_end is not None
+                else len(validation_body)
+            )
+            removal_region = validation_body[removal_start:end]
+        if re.search(
+            r"\b(?:count_data_owners|owner_removals|owner_matches|"
+            r"remaining|final|after|data_references_removed_after_owner_batch)\w*\b",
+            removal_region,
+            re.IGNORECASE,
+        ) is None:
+            violations.append(
+                "focused litchi-keynote slide-media metadata DataInfo removal must "
+                "prove final-owner state or conservatively refuse: "
+                f"{codec_path.relative_to(root)}"
+            )
+        if "data_metadata_map_source" not in removal_region.lower():
+            violations.append(
+                "focused litchi-keynote slide-media metadata DataInfo removal must "
+                "honor the bounded map witness dependency: "
+                f"{codec_path.relative_to(root)}"
+            )
+
+    # A public map-shaped collection is a second, unbounded ownership route.
+    # The three borrowed witness names above are the only permitted public map
+    # vocabulary inside this neutral module.
+    for match in KEYNOTE_SLIDE_MEDIA_DATA_METADATA_PUBLIC_COLLECTION.finditer(code):
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-keynote slide-media metadata boundary exposes an "
+            f"unbounded/public map collection: {codec_path.relative_to(root)}:{line_number}"
+        )
+
+    return sorted(set(violations))
+
+
 def audit_keynote_slide_media_data_resource_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -53155,6 +53447,111 @@ def audit_keynote_slide_media_data_transaction_source_topology(
             )
         return records
 
+    def borrowed_budget_receiver_methods(code: str) -> set[str]:
+        """Find receiver methods that retain the operation's mutable ledger.
+
+        A Buffa visitor callback cannot add a budget argument to its trait
+        method. Permit that shape only when the named receiver struct stores
+        exactly one ``&mut MediaBudget`` field and a function receiving
+        ``&mut MediaBudget`` constructs it with that same borrowed variable.
+        This keeps ``&mut self`` from becoming a general budget exemption.
+        """
+
+        struct_names = {
+            match.group(1)
+            for match in re.finditer(
+                r"\bstruct[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b", code
+            )
+        }
+        if not struct_names:
+            return set()
+
+        borrowed_field = re.compile(
+            r"\bbudget\s*:\s*&\s*(?:'[A-Za-z_][A-Za-z0-9_]*\s*)?"
+            r"mut\s+MediaBudget\b"
+        )
+        literal_start = {
+            name: re.compile(
+                rf"\b{re.escape(name)}(?:\s*<[^{{}}]*>)?\s*\{{"
+            )
+            for name in struct_names
+        }
+
+        def balanced_body(source: str, opening: int) -> str | None:
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(source) and depth:
+                if source[cursor] == "{":
+                    depth += 1
+                elif source[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            if depth:
+                return None
+            return source[opening + 1 : cursor - 1]
+
+        borrowed_structs: set[str] = set()
+        for name in struct_names:
+            struct = _rust_named_struct_body(code, name)
+            if struct is None:
+                continue
+            struct_body, _offset = struct
+            if len(borrowed_field.findall(struct_body)) != 1:
+                continue
+
+            # Require the literal inside a function with an explicit mutable
+            # MediaBudget parameter. This rejects owned or copied visitors.
+            constructed_from_ledger = False
+            for _function_name, signature, function_body in function_records(code):
+                if KEYNOTE_SLIDE_MEDIA_DATA_MUTABLE_BUDGET_PARAMETER.search(
+                    signature
+                ) is None:
+                    continue
+                for literal in literal_start[name].finditer(function_body):
+                    opening = function_body.find("{", literal.start(), literal.end())
+                    if opening < 0:
+                        continue
+                    body = balanced_body(function_body, opening)
+                    if body is None:
+                        continue
+                    if re.search(
+                        r"(?:\bbudget\s*:\s*budget\b(?=\s*(?:,|$))|"
+                        r"(?<![A-Za-z0-9_*])budget\s*(?:,|$))",
+                        body,
+                    ):
+                        constructed_from_ledger = True
+                        break
+                if constructed_from_ledger:
+                    break
+            if constructed_from_ledger:
+                borrowed_structs.add(name)
+
+        if not borrowed_structs:
+            return set()
+
+        allowed: set[str] = set()
+        for impl in re.finditer(r"\bimpl\b[^{}]*\{", code):
+            opening = code.find("{", impl.start(), impl.end())
+            if opening < 0:
+                continue
+            body = balanced_body(code, opening)
+            if body is None:
+                continue
+            header = code[impl.start() : opening]
+            if not any(
+                re.search(rf"\b{re.escape(name)}\b", header)
+                for name in borrowed_structs
+            ):
+                continue
+            for method in function_declaration.finditer(body):
+                method_opening = body.find("{", method.end())
+                if method_opening < 0:
+                    continue
+                signature = body[method.start() : method_opening]
+                if re.search(r"&[ \t]*mut[ \t]+self\b", signature):
+                    allowed.add(method.group("name"))
+        return allowed
+
     owner_functions = function_records(owner_code)
     closure_functions = function_records(closure_code)
     owner_by_name: dict[str, tuple[str, str]] = {
@@ -53236,6 +53633,14 @@ def audit_keynote_slide_media_data_transaction_source_topology(
 
     # A helper that touches the ledger must receive the same mutable instance;
     # a second factory call inside the graph would reset aggregate limits.
+    receiver_budget_methods = {
+        KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE: borrowed_budget_receiver_methods(
+            owner_code
+        ),
+        KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE: borrowed_budget_receiver_methods(
+            closure_code
+        ),
+    }
     for source_label, records in (
         (KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE, owner_functions),
         (KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE, closure_functions),
@@ -53244,14 +53649,6 @@ def audit_keynote_slide_media_data_transaction_source_topology(
             if name in budget_roots:
                 continue
             if name in factory_owner_names:
-                continue
-            # Buffa's visitor callback receives the ledger through its
-            # MetadataVisitor receiver; Rust's trait signature cannot add a
-            # second budget parameter. The visitor itself is private and its
-            # nested calls remain covered by the receiver's ledger field.
-            if name.startswith("visit_") and re.search(
-                r"&[ \t]*mut[ \t]+self\b", signature
-            ):
                 continue
             uses_budget = bool(
                 re.search(r"\bMediaBudget\b|\bbudget\b", signature + "\n" + body)
@@ -53263,6 +53660,8 @@ def audit_keynote_slide_media_data_transaction_source_topology(
                     "focused litchi-keynote slide-media helper must not reset the "
                     f"root MediaBudget ({name}): {source_label}"
                 )
+            if name in receiver_budget_methods[source_label]:
+                continue
             if KEYNOTE_SLIDE_MEDIA_DATA_MUTABLE_BUDGET_PARAMETER.search(signature) is None:
                 violations.append(
                     "focused litchi-keynote slide-media helper must thread &mut MediaBudget "
@@ -60540,6 +60939,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_slide_media_data_source_topology()
         + audit_keynote_slide_media_data_facade_source_topology()
         + audit_keynote_slide_media_data_codec_source_topology()
+        + audit_keynote_slide_media_data_core_boundary_source_topology()
+        + audit_keynote_slide_media_data_metadata_boundary_source_topology()
         + audit_keynote_slide_media_data_resource_source_topology()
         + audit_keynote_slide_media_data_transaction_source_topology()
         + audit_iwa_keynote_slide_table_number_format_source_topology()

@@ -105,6 +105,16 @@ fn component_with_identity(
     output
 }
 
+fn component_with_empty_parent(data_identifier: u64) -> Vec<u8> {
+    let mut reference = Vec::new();
+    varint_field(&mut reference, DATA_IDENTIFIER_FIELD, data_identifier);
+    let mut output = Vec::new();
+    varint_field(&mut output, COMPONENT_IDENTIFIER_FIELD, 9);
+    bytes_field(&mut output, COMPONENT_PREFERRED_LOCATOR_FIELD, b"Document");
+    bytes_field(&mut output, COMPONENT_DATA_REFERENCE_FIELD, &reference);
+    output
+}
+
 fn source_with_data_info(data_info: &[u8], root_unknown: bool) -> Vec<u8> {
     let mut output = Vec::new();
     varint_field(&mut output, ROOT_LAST_IDENTIFIER_FIELD, 10);
@@ -116,9 +126,97 @@ fn source_with_data_info(data_info: &[u8], root_unknown: bool) -> Vec<u8> {
     output
 }
 
+fn source_with_empty_parent(data_info: &[u8]) -> Vec<u8> {
+    let mut output = Vec::new();
+    varint_field(&mut output, ROOT_LAST_IDENTIFIER_FIELD, 10);
+    bytes_field(
+        &mut output,
+        ROOT_COMPONENT_FIELD,
+        &component_with_empty_parent(41),
+    );
+    bytes_field(&mut output, ROOT_DATA_INFO_FIELD, data_info);
+    output
+}
+
 fn source_with_versioned_component(data_info: &[u8]) -> Vec<u8> {
     let mut output = source_with_data_info(data_info, false);
     bytes_field(&mut output, ROOT_VERSIONED_COMPONENT_FIELD, &component(41));
+    output
+}
+
+fn data_metadata_map_payload(entries: &[(u64, u64)], unknown: bool) -> Vec<u8> {
+    let mut output = Vec::new();
+    for &(data_identifier, metadata_identifier) in entries {
+        let mut entry = Vec::new();
+        varint_field(
+            &mut entry,
+            DATA_METADATA_MAP_ENTRY_DATA_FIELD,
+            data_identifier,
+        );
+        let mut reference = Vec::new();
+        varint_field(&mut reference, 1, metadata_identifier);
+        bytes_field(
+            &mut entry,
+            DATA_METADATA_MAP_ENTRY_METADATA_FIELD,
+            &reference,
+        );
+        if unknown {
+            varint_field(&mut entry, 99, 1);
+        }
+        bytes_field(&mut output, DATA_METADATA_MAP_ENTRY_FIELD, &entry);
+    }
+    output
+}
+
+#[test]
+fn map_membership_lookup_obeys_its_own_finite_profile() {
+    let payload = data_metadata_map_payload(&[(11, 91), (12, 92)], false);
+    let options = DecodeOptions::for_source(&payload);
+    let map = DataMetadataMapSource::from_source(80, &payload, options).expect("valid map");
+    assert!(
+        map.contains_data_identifier(12, options)
+            .expect("present key")
+    );
+    assert!(
+        !map.contains_data_identifier(13, options)
+            .expect("absent key")
+    );
+    for tight in [
+        DecodeOptions {
+            max_fields: 1,
+            ..options
+        },
+        DecodeOptions {
+            max_work_bytes: 1,
+            ..options
+        },
+        DecodeOptions {
+            max_depth: 1,
+            ..options
+        },
+        DecodeOptions {
+            max_data_records: 1,
+            ..options
+        },
+    ] {
+        assert!(map.contains_data_identifier(13, tight).is_err());
+    }
+}
+
+fn source_with_data_metadata_map(
+    data_info: &[u8],
+    map_identifier: u64,
+    reference_unknown: bool,
+) -> Vec<u8> {
+    let mut output = Vec::new();
+    varint_field(&mut output, ROOT_LAST_IDENTIFIER_FIELD, 10);
+    bytes_field(&mut output, ROOT_DATA_INFO_FIELD, data_info);
+    let mut reference = Vec::new();
+    varint_field(&mut reference, 1, map_identifier);
+    if reference_unknown {
+        varint_field(&mut reference, 99, 1);
+    }
+    bytes_field(&mut output, ROOT_DATA_METADATA_MAP_FIELD, &reference);
     output
 }
 
@@ -488,5 +586,192 @@ fn component_identity_hash_collisions_are_sorted_before_duplicate_check() {
     assert_eq!(
         error.invalid_reason(),
         Some(InvalidReason::DuplicateComponent)
+    );
+}
+
+#[test]
+fn data_info_removal_can_atomically_remove_the_final_owner() {
+    let old_digest = digest(0x91);
+    let source = source_with_data_info(&rich_data_info(41, &old_digest, 12, false), false);
+    let data_removals = [DataInfoRemoval::new(41)];
+    let owner_removals = [DataReferenceOwnerRemoval::new(
+        ComponentSelector::new(9, "Document"),
+        41,
+        700,
+        2,
+    )];
+    let batch = MediaRewriteBatch::new(&[], &data_removals, &[], &owner_removals);
+    let output = rewrite_package_metadata_media(&source, batch, rewrite_options(&source))
+        .expect("the final owner and its DataInfo are one atomic removal");
+
+    assert_eq!(output.report().data_removals(), 1);
+    assert_eq!(output.report().owner_removals(), 1);
+    let report =
+        inspect_package_metadata_media(output.bytes(), DecodeOptions::for_source(output.bytes()))
+            .expect("the candidate remains inspectable");
+    assert_eq!(report.data_records(), 0);
+    assert_eq!(report.owners(), 0);
+}
+
+#[test]
+fn data_info_removal_rejects_a_remaining_owner_in_the_same_batch() {
+    let old_digest = digest(0x92);
+    let source = source_with_data_info(&rich_data_info(41, &old_digest, 12, false), false);
+    let data_removals = [DataInfoRemoval::new(41)];
+    let error = rewrite_package_metadata_media(
+        &source,
+        MediaRewriteBatch::new(&[], &data_removals, &[], &[]),
+        rewrite_options(&source),
+    )
+    .expect_err("a DataInfo with a live owner cannot be removed");
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::DataInfoReferenced)
+    );
+}
+
+#[test]
+fn data_info_removal_rejects_an_empty_parent_reference() {
+    let old_digest = digest(0x92);
+    let source = source_with_empty_parent(&rich_data_info(41, &old_digest, 12, false));
+    let data_removals = [DataInfoRemoval::new(41)];
+    let error = rewrite_package_metadata_media(
+        &source,
+        MediaRewriteBatch::new(&[], &data_removals, &[], &[]),
+        rewrite_options(&source),
+    )
+    .expect_err("an empty parent is still a live DataInfo reference");
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::DataInfoReferenced)
+    );
+}
+
+struct MapEntries {
+    values: Vec<(u64, u64)>,
+}
+
+impl DataMetadataMapVisitor for MapEntries {
+    fn visit_entry(&mut self, entry: DataMetadataMapEntry) -> Result<(), DecodeError> {
+        self.values
+            .push((entry.data_identifier(), entry.metadata_object_identifier()));
+        Ok(())
+    }
+}
+
+#[test]
+fn map_source_authorizes_unmapped_data_info_removal_and_exposes_bounded_visit() {
+    let old_digest = digest(0x93);
+    let data_info = rich_data_info(41, &old_digest, 12, false);
+    let source = source_with_data_metadata_map(&data_info, 500, false);
+    let map_payload = data_metadata_map_payload(&[(99, 600)], false);
+    let options = rewrite_options(&source);
+    let map_source = DataMetadataMapSource::from_source(500, &map_payload, options)
+        .expect("the borrowed map payload is a valid source witness");
+    assert_eq!(map_source.entries(), 1);
+    assert_eq!(map_source.scratch_bytes(), size_of::<u64>());
+    assert_eq!(map_source.allocations(), 1);
+    let mut entries = MapEntries { values: Vec::new() };
+    let visit_report = map_source
+        .visit_entries(options, &mut entries)
+        .expect("validated entries can be streamed without retaining the map");
+    assert_eq!(entries.values, vec![(99, 600)]);
+    assert!(visit_report.fields() >= 3);
+
+    let data_removals = [DataInfoRemoval::new(41)];
+    let batch = MediaRewriteBatch::new(&[], &data_removals, &[], &[])
+        .with_data_metadata_map_source(map_source);
+    let output = rewrite_package_metadata_media(&source, batch, options)
+        .expect("an unmapped DataInfo may be removed while the map edge remains");
+    assert!(
+        !output
+            .bytes()
+            .windows(data_info.len())
+            .any(|window| window == data_info)
+    );
+    assert!(
+        output
+            .bytes()
+            .windows(5)
+            .any(|window| window == [0x52, 3, 0x08, 0xf4, 0x03])
+    );
+}
+
+#[test]
+fn map_source_rejects_mapped_or_ambiguous_selected_data_info() {
+    let old_digest = digest(0x94);
+    let data_info = rich_data_info(41, &old_digest, 12, false);
+    let source = source_with_data_metadata_map(&data_info, 500, false);
+    let options = rewrite_options(&source);
+    let mapped_payload = data_metadata_map_payload(&[(41, 600)], false);
+    let mapped = DataMetadataMapSource::from_source(500, &mapped_payload, options)
+        .expect("mapped payload is structurally valid");
+    let data_removals = [DataInfoRemoval::new(41)];
+    let error = rewrite_package_metadata_media(
+        &source,
+        MediaRewriteBatch::new(&[], &data_removals, &[], &[]).with_data_metadata_map_source(mapped),
+        options,
+    )
+    .expect_err("map membership protects the selected DataInfo");
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::DataInfoMetadataMapDependency)
+    );
+
+    let unknown_payload = data_metadata_map_payload(&[(99, 600)], true);
+    let unknown = DataMetadataMapSource::from_source(500, &unknown_payload, options)
+        .expect("unknown fields remain readable by the map visitor");
+    let error = rewrite_package_metadata_media(
+        &source,
+        MediaRewriteBatch::new(&[], &data_removals, &[], &[])
+            .with_data_metadata_map_source(unknown),
+        options,
+    )
+    .expect_err("unknown map extensions cannot authorize removal");
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::DataInfoMetadataMapDependency)
+    );
+
+    let error = rewrite_package_metadata_media(
+        &source,
+        MediaRewriteBatch::new(&[], &data_removals, &[], &[]),
+        options,
+    )
+    .expect_err("a present map needs a source-authoritative witness");
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::DataInfoMetadataMapDependency)
+    );
+}
+
+#[test]
+fn map_source_rejects_duplicate_keys_and_root_extension_witnesses() {
+    let options = DecodeOptions::for_source(&[0; 128]);
+    let duplicate_payload = data_metadata_map_payload(&[(41, 600), (41, 601)], false);
+    let error = DataMetadataMapSource::from_source(500, &duplicate_payload, options)
+        .expect_err("duplicate map keys are ambiguous");
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::DuplicateDataInfo)
+    );
+
+    let old_digest = digest(0x95);
+    let data_info = rich_data_info(41, &old_digest, 12, false);
+    let source = source_with_data_metadata_map(&data_info, 500, true);
+    let map_payload = data_metadata_map_payload(&[(99, 600)], false);
+    let map_source = DataMetadataMapSource::from_source(500, &map_payload, options)
+        .expect("the map payload itself is valid");
+    let data_removals = [DataInfoRemoval::new(41)];
+    let error = rewrite_package_metadata_media(
+        &source,
+        MediaRewriteBatch::new(&[], &data_removals, &[], &[])
+            .with_data_metadata_map_source(map_source),
+        rewrite_options(&source),
+    )
+    .expect_err("unknown root map reference fields are ambiguous");
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::DataInfoMetadataMapDependency)
     );
 }
