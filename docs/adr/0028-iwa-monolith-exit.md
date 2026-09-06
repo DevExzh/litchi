@@ -9384,5 +9384,22 @@ Regenerating all six focused candidate inputs produces bytes exactly equal to
 the native-verified originals. Fresh-export equality and strict native-saved
 readback both pass. The bounded lifecycle AddressSanitizer campaign passed 256 runs with no
 findings (244 MiB peak RSS); boundary verification passes 942 unit tests.
-Normal repository hooks remain pending, and no host lifecycle routes were retired or ADR 0028 deletion-gate
+Implementation commit `182f31566` passed all normal repository hooks:
+formatting, manifest sorting, workspace library Clippy, all-feature
+library/integration tests, and doctests, and no host lifecycle routes were retired or ADR 0028 deletion-gate
 status changed.
+
+
+The next host-retirement gate must preserve source-built editor behavior,
+source-order selection across unsupported live/placeholder movie records,
+multiple/interleaved build and chunk forms, and title/caption graph variants.
+The host currently releases a trailing identifier suffix on removal, whereas
+the focused owner retains the package's last identifier; that allocation
+policy difference needs an explicit compatibility decision before deleting
+the host implementation. The focused native gate does not imply parity for
+those broader host forms.
+
+The six temporary focused candidates and native-saved copies were removed
+after verification. The isolated sanitizer target was cleaned with
+`cargo clean` (2.1 GiB reclaimed); permanent audio oracle fixtures remain
+checked in.
