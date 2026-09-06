@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "started_utc": "2026-09-06T00:47:05.063461+00:00",
+  "input_inventory_sha256": "c3f52bf95ddfde21bc6110781c2eee71fdea058300ce38bdea3d7e6a9e7dc488",
+  "input_verifier_sha256": "9c3fd42be8f66b27ba6920b69271a1597dee40d3a9bbffd93d93bf72528839b6",
+  "driver_sha256": "12db440d5af729bbed8907d5dbd634d33acbb73dd991bb8e99beb4886fb719ce",
+  "tag": "portable-after-cleanup",
+  "temporary_directory": "/tmp/litchi-0430-replay-qcszecx3",
+  "exit_code": 0,
+  "temporary_directory_absent": true,
+  "finished_utc": "2026-09-06T00:47:25.008403+00:00"
+}

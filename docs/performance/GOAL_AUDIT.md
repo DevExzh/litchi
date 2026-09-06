@@ -1,6 +1,19 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0429
+## Current evidence through 0430
+
+[0430](changes/0430-pptx-publication-cpu-attribution.md) closes the missing
+publication CPU attribution in the synthetic media-rich provider experiment.
+Frame-pointer capture on the unchanged binary resolves the Deflate callers;
+its measured iteration share is 83.22% / 83.38% for bytes/warm files. The
+[source and transfer audit](results/change-0430/transfer-design.md) identifies
+compressed-media reuse as the next optimization, subject to preserved
+validation, source authority, budgets and archive ownership. This batch makes
+no production change or performance-improvement claim. Normal matched
+captures, transfer implementation and adversarial validation remain required;
+the broader non-iWork goal remains active.
+
+## Prior evidence through 0429
 
 [0429](changes/0429-pptx-provider-native-baselines.md) completes the 32-process/960-sample provider and native selected-
 image baseline. It adds a bounded ZIP short-read correctness fix, not a measured

@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## Change 0430: copied-media recompression
+
+[0430](changes/0430-pptx-publication-cpu-attribution.md) recovers publication
+callers with frame-pointer capture on the unchanged release binary. Deflate
+with the measured CountingSink occurs in 83.22% / 83.38% of iteration samples
+for synthetic media-rich bytes/warm-file workloads. OPC topology additions
+currently retain decoded shared payloads and regenerate Deflate members;
+untouched destination members already copy raw. The next measured candidate is
+source-bound compressed media transfer owned by ZIP/OPC, retaining all logical
+validation and publication checks. Its staging memory, source reads, limits,
+and output framing require implementation and matched measurements. The
+[design audit](results/change-0430/transfer-design.md) records those boundaries.
+
 ## Change 0429: provider boundary and ZIP refill correctness
 
 [0429](changes/0429-pptx-provider-native-baselines.md) extends the matched PPTX lifecycle with bytes, warm files and

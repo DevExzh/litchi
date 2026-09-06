@@ -1,0 +1,12 @@
+{
+  "status": "failed",
+  "started_utc": "2026-09-06T00:44:50.077201+00:00",
+  "input_inventory_sha256": "ab263bda4e4da615908da5ead0b81e9ce5892e1e9d2a3c7e4fa7c5f2e69a2b37",
+  "input_verifier_sha256": "1bf5b764ebfd713f8346be882389ecaeeb44d64a6cb9ed0e1a23a0306946855e",
+  "driver_sha256": "12db440d5af729bbed8907d5dbd634d33acbb73dd991bb8e99beb4886fb719ce",
+  "tag": "portable-before-cleanup",
+  "temporary_directory": "/tmp/litchi-0430-replay-alc3rjdp",
+  "exit_code": 1,
+  "temporary_directory_absent": true,
+  "finished_utc": "2026-09-06T00:44:50.432282+00:00"
+}

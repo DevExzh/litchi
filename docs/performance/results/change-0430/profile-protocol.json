@@ -1,0 +1,22 @@
+{
+  "change": 430,
+  "baseline_revision": "e86d46b8317448575db34137cdafdd7f8f309e3a",
+  "source_revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969",
+  "binary_bytes": 451782312,
+  "capture_binary": "/tmp/litchi-goal-0430-binaries/litchi-perf-baseline",
+  "original_binary": "tools/perf-baseline/target/release/litchi-perf-baseline",
+  "cpu": 2,
+  "event": "cycles:u",
+  "frequency_hz": 499,
+  "call_graph": "fp",
+  "corpus": "media-rich",
+  "providers": [
+    "bytes",
+    "file"
+  ],
+  "samples": 100,
+  "warmup": 3,
+  "scope": "CPU attribution controls on unchanged 0429 binary, existing public API and exact output gates. Not normal timing, not an optimization or causal provider comparison. Roots serialize CPU workloads. Compare ancestry completeness with retained historical DWARF16384 profiles without treating counts as wall-clock fractions."
+}

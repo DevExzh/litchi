@@ -1,0 +1,957 @@
+{
+  "status": "pass",
+  "schema": "pptx_frame_pointer_profile_analysis_v1",
+  "change": 430,
+  "protocol": {
+    "path": "profile-protocol.json",
+    "sha256": "de1cfea56275a9e8f240ca97c4d9b38850817167060b1e796190c2e0c53c5e66",
+    "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969",
+    "source_revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+    "event": "cycles:u",
+    "call_graph": "fp",
+    "frequency_hz": 499,
+    "corpus": "media-rich",
+    "providers": [
+      "bytes",
+      "file"
+    ],
+    "samples": 100,
+    "warmup": 3
+  },
+  "artifact_binding": {
+    "protocol": {
+      "path": "profile-protocol.json",
+      "sha256": "de1cfea56275a9e8f240ca97c4d9b38850817167060b1e796190c2e0c53c5e66",
+      "bytes": 1000
+    },
+    "profile_index": {
+      "path": "profile-index.json",
+      "sha256": "bd9529ac03c9d38abe9292d8c282dfa4f60af703eafc983f060ac6c033f563c6",
+      "bytes": 68
+    },
+    "receipts": [
+      {
+        "provider": "bytes",
+        "path": "profiles/bytes-receipt.json",
+        "sha256": "737e20e69db12414a2ff2daf95a61c56f20e21cfb421d20612d39e8118264a05",
+        "bytes": 2133,
+        "artifacts": {
+          "profiles/bytes-record.log": {
+            "path": "profiles/bytes-record.log",
+            "sha256": "d0f95012f6b107cb398e6550e2d1939097d40f06465944fd6edbbd38216ba731",
+            "bytes": 191
+          },
+          "profiles/bytes-report.log": {
+            "path": "profiles/bytes-report.log",
+            "sha256": "c074db603c9db60fb50991e67a14e912fb6c7103cf74c2778fffc461e6744f8a",
+            "bytes": 182524
+          },
+          "profiles/bytes-script.log": {
+            "path": "profiles/bytes-script.log",
+            "sha256": "da948011ca9c0ce13c611629dbc1d7ce33f2ebfef2cc20da9d6218afa3c48f39",
+            "bytes": 85399097
+          },
+          "profiles/bytes.data": {
+            "path": "profiles/bytes.data",
+            "sha256": "af4704ffaee6d2ad472e250af8659023f32f70849ec18dadaca93df070cbdc8d",
+            "bytes": 3933744
+          },
+          "profiles/bytes.json": {
+            "path": "profiles/bytes.json",
+            "sha256": "dd5b2b44e1d27310cda4ee9725d34916c2e6a3d235aa30fb283acc25c17b7de8",
+            "bytes": 5831785
+          }
+        },
+        "report": {
+          "schema": "pptx_provider_lifecycle_v1",
+          "corpus": "media-rich",
+          "samples": 100,
+          "warmup": 3,
+          "checked_iteration_count": 103,
+          "source_revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+          "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969"
+        }
+      },
+      {
+        "provider": "file",
+        "path": "profiles/file-receipt.json",
+        "sha256": "369d8825dea735ce58584afba6536a3342bb2961c77651a5c06149239bf13400",
+        "bytes": 2124,
+        "artifacts": {
+          "profiles/file-record.log": {
+            "path": "profiles/file-record.log",
+            "sha256": "206b5826f41f2f72d102aa9db811c4eda736fc2dac43dcfb156e9e11105edf60",
+            "bytes": 190
+          },
+          "profiles/file-report.log": {
+            "path": "profiles/file-report.log",
+            "sha256": "f97434ae2400e88ebda98bc2a1840a8f46438cd8501a02c9fe7a542592bc0fcd",
+            "bytes": 179820
+          },
+          "profiles/file-script.log": {
+            "path": "profiles/file-script.log",
+            "sha256": "812ed2dd1c80ea911f5d1c3371b5767628015518583e212982a61550cb236e83",
+            "bytes": 85285976
+          },
+          "profiles/file.data": {
+            "path": "profiles/file.data",
+            "sha256": "4f625927eacc8231393fa87e7d1fef2a860266d9f064cba11b7b4b50e7bd8a46",
+            "bytes": 3933240
+          },
+          "profiles/file.json": {
+            "path": "profiles/file.json",
+            "sha256": "a2c8eee93bfbc8afba2775e454ac07bb58e80cd9ce4cd3dac89c238f683946fa",
+            "bytes": 5831783
+          }
+        },
+        "report": {
+          "schema": "pptx_provider_lifecycle_v1",
+          "corpus": "media-rich",
+          "samples": 100,
+          "warmup": 3,
+          "checked_iteration_count": 103,
+          "source_revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+          "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969"
+        }
+      }
+    ]
+  },
+  "source_audit": {
+    "source_manifest": {
+      "path": "sources/1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122.json",
+      "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+      "bytes": 803233,
+      "files": 6634
+    },
+    "input_source_manifest": {
+      "path": "input-source-manifest.json",
+      "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+      "bytes": 803233
+    },
+    "input_build": {
+      "path": "input-build-0429.json",
+      "sha256": "f5c5b0f6e910e7a85e8c12f57f3965ff4a5d4f499a16606267a7ae397094563d",
+      "bytes": 3038,
+      "revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+      "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969"
+    },
+    "capture_check": {
+      "path": "checks/frame-pointer-profiles.json",
+      "sha256": "305b3b547b0caffe8cdd398be4f0ff62f6e981d72ff4a33753217e08169c32a7",
+      "bytes": 1284,
+      "status": "pass",
+      "source_unchanged": true,
+      "log": {
+        "path": "checks/frame-pointer-profiles.log",
+        "sha256": "4b696aec9b16724a055e212161d9fcc29ea70ab7d59695825fb7c8f9337d438a",
+        "bytes": 384
+      }
+    },
+    "symbol_identity_check": {
+      "path": "checks/symbol-identity.json",
+      "sha256": "206c2f6f9196d99c041223d7a03c210489f090c9bf188ce8370a6a506b1bda86",
+      "bytes": 1351,
+      "log": {
+        "path": "checks/symbol-identity.log",
+        "sha256": "e4707c344a56f661f2ad7949f45bc6dbf05a4664f89b03a96cb8048a35d98f68",
+        "bytes": 116177
+      },
+      "unique_run_lifecycle_iteration_symbols": 1,
+      "bound_symbol": "0000000001266520 t litchi_perf_baseline::pptx_provider_lifecycle::run_lifecycle_iteration"
+    }
+  },
+  "profiles": [
+    {
+      "samples": 16674,
+      "recorded_samples": 16674,
+      "exclusive_ancestry_counts": {
+        "iteration": 14050,
+        "corpus_setup": 2386,
+        "other_or_unresolved": 238
+      },
+      "exclusive_ancestry_percent": {
+        "iteration": 84.26292431330215,
+        "corpus_setup": 14.309703730358642,
+        "other_or_unresolved": 1.4273719563392107
+      },
+      "ancestry_coverage": {
+        "resolved_iteration_or_setup_samples": 16436,
+        "resolved_iteration_or_setup_percent": 98.57262804366079,
+        "unresolved_or_ambiguous_samples": 238,
+        "unresolved_or_ambiguous_percent": 1.4273719563392107
+      },
+      "iteration_api_ancestry_counts_nonexclusive": {
+        "plan_cross_slide_copy": 610,
+        "publish_cross_slide_copy_to_stream": 12520,
+        "from_read_at_with_limits_and_cache_limits_and_execution_context": 34,
+        "try_cache_diagnostics": 0,
+        "sha256_hex": 801,
+        "rss_point": 2
+      },
+      "deflate_intersections": {
+        "marker": "deflate_medium",
+        "deflate_medium_samples": 13183,
+        "deflate_medium_by_exclusive_ancestry": {
+          "iteration": 11692,
+          "corpus_setup": 1489,
+          "other_or_unresolved": 2
+        },
+        "deflate_medium_iteration_samples": 11692,
+        "deflate_medium_corpus_setup_samples": 1489,
+        "counting_sink_deflate_medium_samples": 11692,
+        "counting_sink_deflate_medium_iteration_samples": 11692,
+        "source_reader_counting_sink_deflate_medium_iteration_samples": 11692,
+        "publication_counting_sink_deflate_medium_iteration_samples": 11692
+      },
+      "top_leaf_symbols_by_ancestry": {
+        "iteration": [
+          [
+            "deflate_medium+0x63d",
+            1383
+          ],
+          [
+            "quick_insert_value+0x586",
+            1361
+          ],
+          [
+            "deflate_medium+0x5d6",
+            671
+          ],
+          [
+            "longest_match_help<false>+0x158",
+            514
+          ],
+          [
+            "deflate_medium+0x649",
+            362
+          ],
+          [
+            "len<u8>+0xb38",
+            362
+          ],
+          [
+            "copied<[u8; 8], core::array::TryFromSliceError>+0x154",
+            337
+          ],
+          [
+            "index<u8>+0x567",
+            335
+          ],
+          [
+            "tally_lit_help+0xb98",
+            331
+          ],
+          [
+            "len<u8>+0x18",
+            260
+          ],
+          [
+            "deflate_medium+0x5d9",
+            244
+          ],
+          [
+            "push_lit+0xb87",
+            242
+          ],
+          [
+            "deflate_medium+0x645",
+            216
+          ],
+          [
+            "len<u8>+0x553",
+            204
+          ],
+          [
+            "hash_calc+0x57d",
+            201
+          ],
+          [
+            "longest_match_help<false>+0x169",
+            195
+          ],
+          [
+            "quick_insert_value+0x5bb",
+            174
+          ],
+          [
+            "pqdownheap+0x61",
+            172
+          ],
+          [
+            "as_slice<u16, 65536>+0x579",
+            172
+          ],
+          [
+            "longest_match_help<false>+0x136",
+            152
+          ]
+        ],
+        "corpus_setup": [
+          [
+            "quick_insert_value+0x586",
+            180
+          ],
+          [
+            "deflate_medium+0x63d",
+            167
+          ],
+          [
+            "deflate_medium+0x5d6",
+            86
+          ],
+          [
+            "[unknown]",
+            63
+          ],
+          [
+            "longest_match_help<false>+0x158",
+            57
+          ],
+          [
+            "copied<[u8; 8], core::array::TryFromSliceError>+0x154",
+            50
+          ],
+          [
+            "len<u8>+0xb38",
+            49
+          ],
+          [
+            "tally_lit_help+0xb98",
+            45
+          ],
+          [
+            "deflate_medium+0x649",
+            42
+          ],
+          [
+            "_mm_add_epi32+0xbd",
+            42
+          ],
+          [
+            "len<u8>+0x553",
+            39
+          ],
+          [
+            "index<u8>+0x567",
+            37
+          ],
+          [
+            "len<u8>+0x18",
+            36
+          ],
+          [
+            "deflate_medium+0x645",
+            36
+          ],
+          [
+            "__memmove_avx512_unaligned_erms+0x22f",
+            33
+          ],
+          [
+            "_mm_sha256rnds2_epu32+0xf9",
+            30
+          ],
+          [
+            "deflate_medium+0x5d9",
+            29
+          ],
+          [
+            "_mm_shuffle_epi32<14>+0xd3",
+            27
+          ],
+          [
+            "longest_match_help<false>+0x169",
+            27
+          ],
+          [
+            "hash_calc+0x57d",
+            27
+          ]
+        ],
+        "other_or_unresolved": [
+          [
+            "[unknown]",
+            14
+          ],
+          [
+            "__memcmp_evex_movbe+0x1db",
+            13
+          ],
+          [
+            "__memcmp_evex_movbe+0x1c4",
+            12
+          ],
+          [
+            "_mm_shuffle_epi32<14>+0xb4",
+            11
+          ],
+          [
+            "_mm_sha256msg1_epu32+0x12a",
+            11
+          ],
+          [
+            "_mm_sha256msg1_epu32+0x198",
+            8
+          ],
+          [
+            "__memcmp_evex_movbe+0x1e2",
+            8
+          ],
+          [
+            "__memcmp_evex_movbe+0x1e8",
+            8
+          ],
+          [
+            "__memcmp_evex_movbe+0x1bc",
+            8
+          ],
+          [
+            "_mm_add_epi32+0xbd",
+            8
+          ],
+          [
+            "_mm_add_epi32+0x110",
+            7
+          ],
+          [
+            "_mm_add_epi32+0x369",
+            7
+          ],
+          [
+            "_mm_add_epi32+0x349",
+            7
+          ],
+          [
+            "_mm_shuffle_epi32<14>+0xd3",
+            7
+          ],
+          [
+            "__memcmp_evex_movbe+0x1a7",
+            6
+          ],
+          [
+            "__memcmp_evex_movbe+0x1ee",
+            6
+          ],
+          [
+            "__memcmp_evex_movbe+0x1cb",
+            6
+          ],
+          [
+            "_mm_shuffle_epi32<14>+0x315",
+            6
+          ],
+          [
+            "_mm_sha256rnds2_epu32+0xf9",
+            6
+          ],
+          [
+            "[no decoded frame]",
+            5
+          ]
+        ]
+      },
+      "parse_quality": {
+        "sample_blocks": 16674,
+        "blocks_with_decoded_frames": 16669,
+        "blocks_without_decoded_frames": 5,
+        "malformed_frame_lines": 0,
+        "ambiguous_ancestry_blocks": 0,
+        "diagnostic_lines": 6,
+        "diagnostic_kinds": {
+          "addr2line": 6,
+          "could_not_read_first_record": 6
+        },
+        "diagnostic_examples": [
+          "litchi-perf-bas 2370618 214221.150735:    2849926 cycles:u: cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+          "cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+          "litchi-perf-bas 2370618 214221.155811:    7274697 cycles:u: cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+          "litchi-perf-bas 2370618 214231.228372:    8874643 cycles:u: cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+          "litchi-perf-bas 2370618 214236.990218:    8851178 cycles:u: cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+          "litchi-perf-bas 2370618 214246.391695:    8843781 cycles:u: cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record"
+        ],
+        "diagnostics_by_artifact": {
+          "script": {
+            "lines": 6,
+            "kinds": {
+              "addr2line": 6,
+              "could_not_read_first_record": 6
+            }
+          },
+          "record": {
+            "lines": 0,
+            "kinds": {},
+            "examples": []
+          },
+          "report": {
+            "lines": 6,
+            "kinds": {
+              "addr2line": 6,
+              "could_not_read_first_record": 6
+            },
+            "examples": [
+              "cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+              "cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+              "cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+              "cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record"
+            ]
+          }
+        },
+        "diagnostic_rule": "retain addr2line and could-not-read-first-record lines; do not infer frames"
+      },
+      "stack_input": {
+        "path": "profiles/bytes-script.log",
+        "accepted_storage": "raw or gzip; receipt raw hash and byte count are checked"
+      },
+      "scope_note": "Iteration ancestry is a stack marker over the three warmups and 100 retained iterations; perf stacks do not identify warmup versus retained sample. Counts are unweighted full-process cycles:u sample blocks, not API wall-time fractions.",
+      "provider": "bytes",
+      "receipt": "profiles/bytes-receipt.json",
+      "receipt_sha256": "737e20e69db12414a2ff2daf95a61c56f20e21cfb421d20612d39e8118264a05",
+      "artifact_binding": {
+        "profiles/bytes-record.log": {
+          "path": "profiles/bytes-record.log",
+          "sha256": "d0f95012f6b107cb398e6550e2d1939097d40f06465944fd6edbbd38216ba731",
+          "bytes": 191
+        },
+        "profiles/bytes-report.log": {
+          "path": "profiles/bytes-report.log",
+          "sha256": "c074db603c9db60fb50991e67a14e912fb6c7103cf74c2778fffc461e6744f8a",
+          "bytes": 182524
+        },
+        "profiles/bytes-script.log": {
+          "path": "profiles/bytes-script.log",
+          "sha256": "da948011ca9c0ce13c611629dbc1d7ce33f2ebfef2cc20da9d6218afa3c48f39",
+          "bytes": 85399097
+        },
+        "profiles/bytes.data": {
+          "path": "profiles/bytes.data",
+          "sha256": "af4704ffaee6d2ad472e250af8659023f32f70849ec18dadaca93df070cbdc8d",
+          "bytes": 3933744
+        },
+        "profiles/bytes.json": {
+          "path": "profiles/bytes.json",
+          "sha256": "dd5b2b44e1d27310cda4ee9725d34916c2e6a3d235aa30fb283acc25c17b7de8",
+          "bytes": 5831785
+        }
+      }
+    },
+    {
+      "samples": 16673,
+      "recorded_samples": 16673,
+      "exclusive_ancestry_counts": {
+        "iteration": 14046,
+        "corpus_setup": 2370,
+        "other_or_unresolved": 257
+      },
+      "exclusive_ancestry_percent": {
+        "iteration": 84.24398728483176,
+        "corpus_setup": 14.214598452588017,
+        "other_or_unresolved": 1.5414142625802194
+      },
+      "ancestry_coverage": {
+        "resolved_iteration_or_setup_samples": 16416,
+        "resolved_iteration_or_setup_percent": 98.45858573741978,
+        "unresolved_or_ambiguous_samples": 257,
+        "unresolved_or_ambiguous_percent": 1.5414142625802194
+      },
+      "iteration_api_ancestry_counts_nonexclusive": {
+        "plan_cross_slide_copy": 618,
+        "publish_cross_slide_copy_to_stream": 12541,
+        "from_read_at_with_limits_and_cache_limits_and_execution_context": 39,
+        "try_cache_diagnostics": 0,
+        "sha256_hex": 839,
+        "rss_point": 3
+      },
+      "deflate_intersections": {
+        "marker": "deflate_medium",
+        "deflate_medium_samples": 13199,
+        "deflate_medium_by_exclusive_ancestry": {
+          "iteration": 11712,
+          "corpus_setup": 1485,
+          "other_or_unresolved": 2
+        },
+        "deflate_medium_iteration_samples": 11712,
+        "deflate_medium_corpus_setup_samples": 1485,
+        "counting_sink_deflate_medium_samples": 11712,
+        "counting_sink_deflate_medium_iteration_samples": 11712,
+        "source_reader_counting_sink_deflate_medium_iteration_samples": 11712,
+        "publication_counting_sink_deflate_medium_iteration_samples": 11712
+      },
+      "top_leaf_symbols_by_ancestry": {
+        "iteration": [
+          [
+            "deflate_medium+0x63d",
+            1349
+          ],
+          [
+            "quick_insert_value+0x586",
+            1348
+          ],
+          [
+            "deflate_medium+0x5d6",
+            704
+          ],
+          [
+            "longest_match_help<false>+0x158",
+            497
+          ],
+          [
+            "deflate_medium+0x649",
+            351
+          ],
+          [
+            "copied<[u8; 8], core::array::TryFromSliceError>+0x154",
+            330
+          ],
+          [
+            "len<u8>+0xb38",
+            322
+          ],
+          [
+            "tally_lit_help+0xb98",
+            308
+          ],
+          [
+            "index<u8>+0x567",
+            302
+          ],
+          [
+            "len<u8>+0x18",
+            253
+          ],
+          [
+            "push_lit+0xb87",
+            237
+          ],
+          [
+            "deflate_medium+0x5d9",
+            236
+          ],
+          [
+            "deflate_medium+0x645",
+            222
+          ],
+          [
+            "len<u8>+0x553",
+            216
+          ],
+          [
+            "longest_match_help<false>+0x169",
+            215
+          ],
+          [
+            "hash_calc+0x57d",
+            206
+          ],
+          [
+            "as_slice<u16, 65536>+0x579",
+            177
+          ],
+          [
+            "longest_match_help<false>+0x136",
+            165
+          ],
+          [
+            "quick_insert_value+0x5bb",
+            162
+          ],
+          [
+            "pqdownheap+0x61",
+            150
+          ]
+        ],
+        "corpus_setup": [
+          [
+            "deflate_medium+0x63d",
+            208
+          ],
+          [
+            "quick_insert_value+0x586",
+            163
+          ],
+          [
+            "deflate_medium+0x5d6",
+            95
+          ],
+          [
+            "[unknown]",
+            75
+          ],
+          [
+            "longest_match_help<false>+0x158",
+            53
+          ],
+          [
+            "_mm_sha256rnds2_epu32+0xf9",
+            49
+          ],
+          [
+            "copied<[u8; 8], core::array::TryFromSliceError>+0x154",
+            46
+          ],
+          [
+            "_mm_shuffle_epi32<14>+0xd3",
+            44
+          ],
+          [
+            "index<u8>+0x567",
+            42
+          ],
+          [
+            "tally_lit_help+0xb98",
+            42
+          ],
+          [
+            "deflate_medium+0x649",
+            38
+          ],
+          [
+            "len<u8>+0xb38",
+            35
+          ],
+          [
+            "push_lit+0xb87",
+            33
+          ],
+          [
+            "len<u8>+0x18",
+            28
+          ],
+          [
+            "__memmove_avx512_unaligned_erms+0x22f",
+            27
+          ],
+          [
+            "_mm_add_epi32+0xbd",
+            27
+          ],
+          [
+            "_mm_sha256msg1_epu32+0x12a",
+            27
+          ],
+          [
+            "_mm_shuffle_epi32<14>+0x376",
+            27
+          ],
+          [
+            "longest_match_help<false>+0x169",
+            25
+          ],
+          [
+            "payload_bytes+0xad",
+            24
+          ]
+        ],
+        "other_or_unresolved": [
+          [
+            "[unknown]",
+            18
+          ],
+          [
+            "__memcmp_evex_movbe+0x1cb",
+            17
+          ],
+          [
+            "__memcmp_evex_movbe+0x1e8",
+            13
+          ],
+          [
+            "_mm_shuffle_epi32<14>+0xd3",
+            12
+          ],
+          [
+            "__memcmp_evex_movbe+0x1ee",
+            11
+          ],
+          [
+            "__memcmp_evex_movbe+0x1ad",
+            10
+          ],
+          [
+            "_mm_shuffle_epi32<14>+0xb4",
+            10
+          ],
+          [
+            "_mm_add_epi32+0x9e",
+            10
+          ],
+          [
+            "_mm_sha256msg1_epu32+0x12a",
+            9
+          ],
+          [
+            "_mm_alignr_epi8<4>+0x328",
+            8
+          ],
+          [
+            "__memcmp_evex_movbe+0x1a7",
+            8
+          ],
+          [
+            "_mm_add_epi32+0xbd",
+            8
+          ],
+          [
+            "__memcmp_evex_movbe+0x1c4",
+            7
+          ],
+          [
+            "__memcmp_evex_movbe+0x1f8",
+            6
+          ],
+          [
+            "_mm_add_epi32+0x110",
+            6
+          ],
+          [
+            "_mm_sha256rnds2_epu32+0xf9",
+            6
+          ],
+          [
+            "_mm_alignr_epi8<4>+0x299",
+            5
+          ],
+          [
+            "__memcmp_evex_movbe+0x1e2",
+            5
+          ],
+          [
+            "_mm_add_epi32+0x369",
+            5
+          ],
+          [
+            "[no decoded frame]",
+            4
+          ]
+        ]
+      },
+      "parse_quality": {
+        "sample_blocks": 16673,
+        "blocks_with_decoded_frames": 16669,
+        "blocks_without_decoded_frames": 4,
+        "malformed_frame_lines": 0,
+        "ambiguous_ancestry_blocks": 0,
+        "diagnostic_lines": 5,
+        "diagnostic_kinds": {
+          "addr2line": 5,
+          "could_not_read_first_record": 5
+        },
+        "diagnostic_examples": [
+          "litchi-perf-bas 2371388 214333.094127:    2573791 cycles:u: cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+          "cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+          "litchi-perf-bas 2371388 214333.998207:    8720151 cycles:u: cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+          "litchi-perf-bas 2371388 214350.078172:    8750532 cycles:u: cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+          "litchi-perf-bas 2371388 214351.197661:    8481656 cycles:u: cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record"
+        ],
+        "diagnostics_by_artifact": {
+          "script": {
+            "lines": 5,
+            "kinds": {
+              "addr2line": 5,
+              "could_not_read_first_record": 5
+            }
+          },
+          "record": {
+            "lines": 0,
+            "kinds": {},
+            "examples": []
+          },
+          "report": {
+            "lines": 5,
+            "kinds": {
+              "addr2line": 5,
+              "could_not_read_first_record": 5
+            },
+            "examples": [
+              "cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+              "cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+              "cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record",
+              "cmd__addr2line /home/zhuhe/.debug/.build-id/1b/5ccccae16e73647c4e4015b45ca167e029130f/elf: could not read first record"
+            ]
+          }
+        },
+        "diagnostic_rule": "retain addr2line and could-not-read-first-record lines; do not infer frames"
+      },
+      "stack_input": {
+        "path": "profiles/file-script.log",
+        "accepted_storage": "raw or gzip; receipt raw hash and byte count are checked"
+      },
+      "scope_note": "Iteration ancestry is a stack marker over the three warmups and 100 retained iterations; perf stacks do not identify warmup versus retained sample. Counts are unweighted full-process cycles:u sample blocks, not API wall-time fractions.",
+      "provider": "file",
+      "receipt": "profiles/file-receipt.json",
+      "receipt_sha256": "369d8825dea735ce58584afba6536a3342bb2961c77651a5c06149239bf13400",
+      "artifact_binding": {
+        "profiles/file-record.log": {
+          "path": "profiles/file-record.log",
+          "sha256": "206b5826f41f2f72d102aa9db811c4eda736fc2dac43dcfb156e9e11105edf60",
+          "bytes": 190
+        },
+        "profiles/file-report.log": {
+          "path": "profiles/file-report.log",
+          "sha256": "f97434ae2400e88ebda98bc2a1840a8f46438cd8501a02c9fe7a542592bc0fcd",
+          "bytes": 179820
+        },
+        "profiles/file-script.log": {
+          "path": "profiles/file-script.log",
+          "sha256": "812ed2dd1c80ea911f5d1c3371b5767628015518583e212982a61550cb236e83",
+          "bytes": 85285976
+        },
+        "profiles/file.data": {
+          "path": "profiles/file.data",
+          "sha256": "4f625927eacc8231393fa87e7d1fef2a860266d9f064cba11b7b4b50e7bd8a46",
+          "bytes": 3933240
+        },
+        "profiles/file.json": {
+          "path": "profiles/file.json",
+          "sha256": "a2c8eee93bfbc8afba2775e454ac07bb58e80cd9ce4cd3dac89c238f683946fa",
+          "bytes": 5831783
+        }
+      }
+    }
+  ],
+  "scope": "Evidence-only interpretation of retained raw or gzip perf script stacks from the unchanged 0429 binary. Iteration ancestry includes warmup and retained sample iterations because the stacks do not carry the iteration index. API names are nonexclusive. Exact deflate_medium and CountingSink intersections are stack co-occurrence evidence, not measured API timing.",
+  "historical_0429_comparison": {
+    "available": true,
+    "path": "input-profile-summary-0429.json",
+    "sha256": "0f53ef7ebc0925961794a777535ef2de48366c9a9e6cec8d2e26dad87b616854",
+    "profiles": [
+      {
+        "provider": "bytes",
+        "historical_profile": "media-rich-bytes",
+        "available": true,
+        "current_samples": 16674,
+        "historical_samples": 17217,
+        "current_exclusive_ancestry_counts": {
+          "iteration": 14050,
+          "corpus_setup": 2386,
+          "other_or_unresolved": 238
+        },
+        "historical_exclusive_ancestry_counts": {
+          "other_or_unresolved": 13991,
+          "corpus_setup": 830,
+          "iteration": 2396
+        }
+      },
+      {
+        "provider": "file",
+        "historical_profile": "media-rich-file",
+        "available": true,
+        "current_samples": 16673,
+        "historical_samples": 16635,
+        "current_exclusive_ancestry_counts": {
+          "iteration": 14046,
+          "corpus_setup": 2370,
+          "other_or_unresolved": 257
+        },
+        "historical_exclusive_ancestry_counts": {
+          "other_or_unresolved": 13776,
+          "corpus_setup": 785,
+          "iteration": 2074
+        }
+      }
+    ],
+    "interpretation": "Descriptive sample-count comparison only. The historical profiles use the retained DWARF16384 call graph while this bundle uses fp; neither set of counts is an API wall-time fraction or a speedup estimate."
+  },
+  "performance_claim": null,
+  "analysis_script_sha256": "fa63a9674ddd41af1cbd45c1befa7836f57bebcebc871f5f959773a403de8a9a"
+}
