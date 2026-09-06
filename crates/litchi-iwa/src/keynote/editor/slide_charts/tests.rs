@@ -69,6 +69,89 @@ fn focused_bytes(package: &FocusedKeynotePackage) -> Vec<u8> {
     bytes
 }
 
+fn focused_package(editor: &KeynoteEditor) -> FocusedKeynotePackage {
+    FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap()
+}
+
+fn chart_title<'chart>(
+    editor: &KeynoteEditor,
+    selector: impl Into<ChartSelector<'chart>>,
+) -> Option<String> {
+    focused_package(editor)
+        .slide_chart_title(0usize, selector)
+        .unwrap()
+}
+
+fn set_chart_title<'chart>(
+    editor: &mut KeynoteEditor,
+    selector: impl Into<ChartSelector<'chart>>,
+    title: impl AsRef<str>,
+) {
+    let package = focused_package(editor);
+    let commit = package
+        .edit_slide_chart_title(0usize, selector)
+        .unwrap()
+        .set(title)
+        .unwrap()
+        .commit()
+        .unwrap();
+    *editor = KeynoteEditor::from_bytes(&focused_bytes(commit.package())).unwrap();
+}
+
+fn clear_chart_title<'chart>(
+    editor: &mut KeynoteEditor,
+    selector: impl Into<ChartSelector<'chart>>,
+) -> bool {
+    let package = focused_package(editor);
+    let edit = package.edit_slide_chart_title(0usize, selector).unwrap();
+    let changed = edit.before().is_some();
+    let commit = edit.clear().unwrap().commit().unwrap();
+    *editor = KeynoteEditor::from_bytes(&focused_bytes(commit.package())).unwrap();
+    changed
+}
+
+fn chart_axis_title<'chart>(
+    editor: &KeynoteEditor,
+    selector: impl Into<ChartSelector<'chart>>,
+    axis: Axis,
+) -> Option<String> {
+    focused_package(editor)
+        .slide_chart_axis_title(0usize, selector, axis)
+        .unwrap()
+}
+
+fn set_chart_axis_title<'chart>(
+    editor: &mut KeynoteEditor,
+    selector: impl Into<ChartSelector<'chart>>,
+    axis: Axis,
+    title: impl AsRef<str>,
+) {
+    let package = focused_package(editor);
+    let commit = package
+        .edit_slide_chart_axis_title(0usize, selector, axis)
+        .unwrap()
+        .set(title)
+        .unwrap()
+        .commit()
+        .unwrap();
+    *editor = KeynoteEditor::from_bytes(&focused_bytes(commit.package())).unwrap();
+}
+
+fn clear_chart_axis_title<'chart>(
+    editor: &mut KeynoteEditor,
+    selector: impl Into<ChartSelector<'chart>>,
+    axis: Axis,
+) -> bool {
+    let package = focused_package(editor);
+    let edit = package
+        .edit_slide_chart_axis_title(0usize, selector, axis)
+        .unwrap();
+    let changed = edit.before().is_some();
+    let commit = edit.clear().unwrap().commit().unwrap();
+    *editor = KeynoteEditor::from_bytes(&focused_bytes(commit.package())).unwrap();
+    changed
+}
+
 fn pie_data() -> ChartData {
     ChartData::new(
         vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
@@ -415,12 +498,8 @@ fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
             SIZE,
         )
         .unwrap();
-    editor
-        .set_slide_chart_title_by_selector(0, ChartSelector::index(0), "Revenue")
-        .unwrap();
-    editor
-        .set_slide_chart_title_by_selector(0, ChartSelector::index(1), "Cost")
-        .unwrap();
+    set_chart_title(&mut editor, ChartSelector::index(0), "Revenue");
+    set_chart_title(&mut editor, ChartSelector::index(1), "Cost");
 
     let catalog = editor.slide_chart_catalog(0).unwrap();
     assert_eq!(catalog.len(), 2);
@@ -428,15 +507,13 @@ fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
     assert_eq!(catalog.select_position("Cost").unwrap(), Some(1));
 
     assert_eq!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::name("Cost"))
-            .unwrap(),
+        chart_title(&editor, ChartSelector::name("Cost")),
         Some("Cost".to_owned())
     );
     let before_case_mismatch = editor.to_bytes().unwrap();
     assert!(
-        editor
-            .set_slide_chart_title_by_selector(0, ChartSelector::name("cost"), "Wrong case")
+        focused_package(&editor)
+            .edit_slide_chart_title(0usize, ChartSelector::name("cost"))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before_case_mismatch);
@@ -448,24 +525,27 @@ fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
 
     let before_missing = editor.to_bytes().unwrap();
     assert!(
+        focused_package(&editor)
+            .edit_slide_chart_title(0usize, ChartSelector::name("cost"))
+            .is_err()
+    );
+    assert!(
         editor
             .set_slide_chart_kind(0, ChartSelector::name("cost"), Kind::Pie2d)
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before_missing);
 
-    editor
-        .set_slide_chart_title_by_selector(0, ChartSelector::index(0), "Cost")
-        .unwrap();
+    set_chart_title(&mut editor, ChartSelector::index(0), "Cost");
     let before_ambiguous = editor.to_bytes().unwrap();
     assert!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::name("Cost"))
+        focused_package(&editor)
+            .slide_chart_title(0usize, ChartSelector::name("Cost"))
             .is_err()
     );
     assert!(
-        editor
-            .remove_slide_chart_title_by_selector(0, ChartSelector::name("Cost"))
+        focused_package(&editor)
+            .edit_slide_chart_title(0usize, ChartSelector::name("Cost"))
             .is_err()
     );
     assert!(
@@ -730,19 +810,10 @@ fn scratch_presentation_supports_native_chart_title_crud() {
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
+    assert_eq!(chart_title(&editor, ChartSelector::index(0)), None);
+    set_chart_title(&mut editor, ChartSelector::index(0), "Revenue by region");
     assert_eq!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::index(0))
-            .unwrap(),
-        None
-    );
-    editor
-        .set_slide_chart_title_by_selector(0, ChartSelector::index(0), "Revenue by region")
-        .unwrap();
-    assert_eq!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::index(0))
-            .unwrap(),
+        chart_title(&editor, ChartSelector::index(0)),
         Some("Revenue by region".to_owned())
     );
 
@@ -750,49 +821,26 @@ fn scratch_presentation_supports_native_chart_title_crud() {
         .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::index(1))
-            .unwrap(),
+        chart_title(&editor, ChartSelector::index(1)),
         Some("Revenue by region".to_owned())
     );
 
-    editor
-        .set_slide_chart_title_by_selector(0, ChartSelector::index(0), "Updated source title")
-        .unwrap();
+    set_chart_title(&mut editor, ChartSelector::index(0), "Updated source title");
     assert_eq!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::index(0))
-            .unwrap(),
+        chart_title(&editor, ChartSelector::index(0)),
         Some("Updated source title".to_owned())
     );
     assert_eq!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::index(1))
-            .unwrap(),
+        chart_title(&editor, ChartSelector::index(1)),
         Some("Revenue by region".to_owned())
     );
-    assert!(
-        editor
-            .remove_slide_chart_title_by_selector(0, ChartSelector::index(0))
-            .unwrap()
-    );
-    assert!(
-        !editor
-            .remove_slide_chart_title_by_selector(0, ChartSelector::index(0))
-            .unwrap()
-    );
-    assert_eq!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::index(0))
-            .unwrap(),
-        None
-    );
+    assert!(clear_chart_title(&mut editor, ChartSelector::index(0)));
+    assert!(!clear_chart_title(&mut editor, ChartSelector::index(0)));
+    assert_eq!(chart_title(&editor, ChartSelector::index(0)), None);
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        reopened
-            .slide_chart_title_by_selector(0, ChartSelector::index(1))
-            .unwrap(),
+        chart_title(&reopened, ChartSelector::index(1)),
         Some("Revenue by region".to_owned())
     );
     reopened
@@ -839,13 +887,9 @@ fn keynote_chart_title_rewrite_is_field_local_and_lossless() {
     let before_outer_unknown = raw_fields(&before, UNKNOWN_OUTER_FIELD);
     let before_generated_unknown = raw_fields(&before_extension, UNKNOWN_GENERATED_FIELD);
 
-    editor
-        .set_slide_chart_title_by_selector(0, ChartSelector::index(0), "Revenue by region")
-        .unwrap();
+    set_chart_title(&mut editor, ChartSelector::index(0), "Revenue by region");
     assert_eq!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::index(0))
-            .unwrap(),
+        chart_title(&editor, ChartSelector::index(0)),
         Some("Revenue by region".to_owned())
     );
     let after = keynote_chart_non_style_data(&editor, chart.drawable_object_id);
@@ -864,9 +908,7 @@ fn keynote_chart_title_rewrite_is_field_local_and_lossless() {
     );
 
     let no_op = editor.to_bytes().unwrap();
-    editor
-        .set_slide_chart_title_by_selector(0, ChartSelector::index(0), "Revenue by region")
-        .unwrap();
+    set_chart_title(&mut editor, ChartSelector::index(0), "Revenue by region");
     assert_eq!(editor.to_bytes().unwrap(), no_op);
 }
 
@@ -890,15 +932,18 @@ fn keynote_chart_title_rejects_duplicate_selected_field_without_publication() {
     });
 
     let before = editor.to_bytes().unwrap();
+    let focused = focused_package(&editor);
     assert!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::index(0))
+        focused
+            .slide_chart_title(0usize, ChartSelector::index(0))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
     assert!(
-        editor
-            .set_slide_chart_title_by_selector(0, ChartSelector::index(0), "rejected")
+        focused
+            .edit_slide_chart_title(0usize, ChartSelector::index(0))
+            .and_then(|edit| edit.set("rejected"))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -923,19 +968,23 @@ fn keynote_chart_title_clear_hidden_stale_value_is_an_exact_no_op() {
         .unwrap();
     });
 
+    let focused = focused_package(&editor);
     assert_eq!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::index(0))
+        focused
+            .slide_chart_title(0usize, ChartSelector::index(0))
             .unwrap(),
         None
     );
     let before = editor.to_bytes().unwrap();
-    assert!(
-        !editor
-            .remove_slide_chart_title_by_selector(0, ChartSelector::index(0))
-            .unwrap()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), before);
+    let no_op = focused
+        .edit_slide_chart_title(0usize, ChartSelector::index(0))
+        .unwrap()
+        .clear()
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(no_op.patch().is_noop());
+    assert_eq!(focused_bytes(no_op.package()), before);
 }
 
 #[test]
@@ -947,15 +996,18 @@ fn keynote_chart_title_rejects_non_standin_title_graph_without_publication() {
     mutate_keynote_chart_title_standin(&mut editor, chart.drawable_object_id);
 
     let before = editor.to_bytes().unwrap();
+    let focused = focused_package(&editor);
     assert!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::index(0))
+        focused
+            .slide_chart_title(0usize, ChartSelector::index(0))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
     assert!(
-        editor
-            .set_slide_chart_title_by_selector(0, ChartSelector::index(0), "rejected")
+        focused
+            .edit_slide_chart_title(0usize, ChartSelector::index(0))
+            .and_then(|edit| edit.set("rejected"))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -970,17 +1022,22 @@ fn selector_chart_title_rejects_non_standin_title_graph_without_publication() {
     mutate_keynote_chart_title_standin(&mut editor, chart.drawable_object_id);
 
     let before = editor.to_bytes().unwrap();
-    assert!(editor.slide_chart_title_by_selector(0, 0usize).is_err());
+    let focused = focused_package(&editor);
+    assert!(focused.slide_chart_title(0usize, 0usize).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
     assert!(
-        editor
-            .set_slide_chart_title_by_selector(0, 0usize, "rejected")
+        focused
+            .edit_slide_chart_title(0usize, 0usize)
+            .and_then(|edit| edit.set("rejected"))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
     assert!(
-        editor
-            .remove_slide_chart_title_by_selector(0, 0usize)
+        focused
+            .edit_slide_chart_title(0usize, 0usize)
+            .and_then(|edit| edit.clear())
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -1020,13 +1077,19 @@ fn selector_chart_title_host_paths_interoperate_with_focused_package() {
         None
     );
 
-    editor
-        .set_slide_chart_title_by_selector(0, ChartSelector::index(0), "Revenue by region")
+    let focused = FocusedKeynotePackage::from_bytes(&source).unwrap();
+    let set_commit = focused
+        .edit_slide_chart_title(0usize, ChartSelector::index(0))
+        .unwrap()
+        .set("Revenue by region")
+        .unwrap()
+        .commit()
         .unwrap();
-    let set_bytes = editor.to_bytes().unwrap();
+    let set_bytes = focused_bytes(set_commit.package());
+    let set_editor = KeynoteEditor::from_bytes(&set_bytes).unwrap();
     assert_only_title_fields_changed(
         &before_non_style,
-        &keynote_chart_non_style_data(&editor, chart.drawable_object_id),
+        &keynote_chart_non_style_data(&set_editor, chart.drawable_object_id),
     );
     assert_eq!(
         FocusedKeynotePackage::from_bytes(&set_bytes)
@@ -1036,18 +1099,25 @@ fn selector_chart_title_host_paths_interoperate_with_focused_package() {
         Some("Revenue by region".to_owned())
     );
 
-    let no_op = editor.to_bytes().unwrap();
-    editor
-        .set_slide_chart_title_by_selector(0, "Revenue by region", "Revenue by region")
+    let set_package = FocusedKeynotePackage::from_bytes(&set_bytes).unwrap();
+    let no_op = set_package
+        .edit_slide_chart_title(0usize, ChartSelector::name("Revenue by region"))
+        .unwrap()
+        .set("Revenue by region")
+        .unwrap()
+        .commit()
         .unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), no_op);
+    assert!(no_op.patch().is_noop());
+    assert_eq!(focused_bytes(no_op.package()), set_bytes);
 
-    assert!(
-        editor
-            .remove_slide_chart_title_by_selector(0, "Revenue by region")
-            .unwrap()
-    );
-    let cleared = editor.to_bytes().unwrap();
+    let clear = set_package
+        .edit_slide_chart_title(0usize, ChartSelector::name("Revenue by region"))
+        .unwrap()
+        .clear()
+        .unwrap()
+        .commit()
+        .unwrap();
+    let cleared = focused_bytes(clear.package());
     assert_eq!(
         FocusedKeynotePackage::from_bytes(&cleared)
             .unwrap()
@@ -1055,13 +1125,16 @@ fn selector_chart_title_host_paths_interoperate_with_focused_package() {
             .unwrap(),
         None
     );
-    let clear_no_op = editor.to_bytes().unwrap();
-    assert!(
-        !editor
-            .remove_slide_chart_title_by_selector(0, ChartSelector::index(0))
-            .unwrap()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), clear_no_op);
+    let clear_no_op = FocusedKeynotePackage::from_bytes(&cleared)
+        .unwrap()
+        .edit_slide_chart_title(0usize, ChartSelector::index(0))
+        .unwrap()
+        .clear()
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(clear_no_op.patch().is_noop());
+    assert_eq!(focused_bytes(clear_no_op.package()), cleared);
 }
 
 #[test]
@@ -1076,37 +1149,15 @@ fn scratch_presentation_supports_selector_chart_title_crud() {
     assert_eq!(catalog.select_position(0usize).unwrap(), Some(0));
     assert_eq!(catalog.charts()[0].title(), None);
 
+    assert_eq!(chart_title(&editor, ChartSelector::index(0)), None);
+    set_chart_title(&mut editor, 0usize, "Revenue by region");
     assert_eq!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::index(0))
-            .unwrap(),
-        None
-    );
-    editor
-        .set_slide_chart_title_by_selector(0, 0usize, "Revenue by region")
-        .unwrap();
-    assert_eq!(
-        editor
-            .slide_chart_title_by_selector(0, "Revenue by region")
-            .unwrap(),
+        chart_title(&editor, "Revenue by region"),
         Some("Revenue by region".to_owned())
     );
-    assert!(
-        editor
-            .remove_slide_chart_title_by_selector(0, "Revenue by region")
-            .unwrap()
-    );
-    assert!(
-        !editor
-            .remove_slide_chart_title_by_selector(0, ChartSelector::index(0))
-            .unwrap()
-    );
-    assert_eq!(
-        editor
-            .slide_chart_title_by_selector(0, ChartSelector::index(0))
-            .unwrap(),
-        None
-    );
+    assert!(clear_chart_title(&mut editor, "Revenue by region"));
+    assert!(!clear_chart_title(&mut editor, ChartSelector::index(0)));
+    assert_eq!(chart_title(&editor, ChartSelector::index(0)), None);
 }
 
 #[test]
@@ -1116,11 +1167,9 @@ fn selector_chart_title_set_accepts_owned_text() {
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    editor
-        .set_slide_chart_title_by_selector(0, 0usize, String::from("Revenue by region"))
-        .unwrap();
+    set_chart_title(&mut editor, 0usize, String::from("Revenue by region"));
     assert_eq!(
-        editor.slide_chart_title_by_selector(0, 0usize).unwrap(),
+        chart_title(&editor, 0usize),
         Some("Revenue by region".to_owned())
     );
 }
@@ -1134,55 +1183,42 @@ fn selector_chart_axis_title_builder_route_is_semantic_and_atomic() {
 
     for (axis, title) in [(Axis::Category, "Quarter"), (Axis::Value, "Revenue")] {
         let baseline = editor.to_bytes().unwrap();
-        let error = editor
-            .slide_chart_axis_title_by_selector(0, ChartSelector::index(usize::MAX), axis)
-            .expect_err("invalid axis selector must be rejected by the focused owner");
         assert!(
-            error
-                .to_string()
-                .contains("focused Keynote chart axis title"),
-            "axis title read bypassed the focused owner: {error}"
+            focused_package(&editor)
+                .slide_chart_axis_title(0usize, ChartSelector::index(usize::MAX), axis)
+                .is_err(),
+            "invalid axis selector must be rejected by the focused owner"
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         assert_eq!(
-            editor
-                .slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis)
-                .unwrap(),
+            chart_axis_title(&editor, ChartSelector::index(0), axis),
             None
         );
-        editor
-            .set_slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis, title)
-            .unwrap();
+        set_chart_axis_title(&mut editor, ChartSelector::index(0), axis, title);
         assert_eq!(
-            editor
-                .slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis)
-                .unwrap(),
+            chart_axis_title(&editor, ChartSelector::index(0), axis),
             Some(title.to_owned())
         );
 
         let changed = editor.to_bytes().unwrap();
-        editor
-            .set_slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis, title)
-            .unwrap();
+        set_chart_axis_title(&mut editor, ChartSelector::index(0), axis, title);
         assert_eq!(editor.to_bytes().unwrap(), changed);
 
-        assert!(
-            editor
-                .remove_slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis)
-                .unwrap()
-        );
+        assert!(clear_chart_axis_title(
+            &mut editor,
+            ChartSelector::index(0),
+            axis
+        ));
         assert_eq!(
-            editor
-                .slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis)
-                .unwrap(),
+            chart_axis_title(&editor, ChartSelector::index(0), axis),
             None
         );
-        assert!(
-            !editor
-                .remove_slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis)
-                .unwrap()
-        );
+        assert!(!clear_chart_axis_title(
+            &mut editor,
+            ChartSelector::index(0),
+            axis
+        ));
     }
 }
 

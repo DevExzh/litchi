@@ -3368,16 +3368,6 @@ def add_keynote_chart_axis_title_canonical_scaffold(root: Path) -> None:
         )
     for corpus in boundaries.KEYNOTE_CHART_AXIS_TITLE_FUZZ_CORPORA:
         (root / corpus).mkdir(parents=True, exist_ok=True)
-    host = root / boundaries.IWA_KEYNOTE_CHART_AXIS_TITLE_SOURCE
-    host.parent.mkdir(parents=True, exist_ok=True)
-    host.write_text(
-        "impl KeynoteEditor {\n"
-        "    pub fn slide_chart_axis_title_by_selector(&self, slide_index: usize, selector: ChartSelector, axis: Axis) { focused_chart_axis_title_package(self)?.slide_chart_axis_title(selector, axis); }\n"
-        "    pub fn set_slide_chart_axis_title_by_selector(&mut self, slide_index: usize, selector: ChartSelector, axis: Axis, title: &str) { focused_chart_axis_title_package(self)?.edit_slide_chart_axis_title(selector, axis).set(title).commit(); }\n"
-        "    pub fn remove_slide_chart_axis_title_by_selector(&mut self, slide_index: usize, selector: ChartSelector, axis: Axis) { focused_chart_axis_title_package(self)?.edit_slide_chart_axis_title(selector, axis).clear().commit(); }\n"
-        "}\n",
-        encoding="utf-8",
-    )
 
 
 def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
@@ -16575,6 +16565,20 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "fn decode(bytes: &[u8]) { let _ = ArchiveInfo::decode(bytes); }\n",
                 encoding="utf-8",
             )
+            verification_only = (
+                root
+                / boundaries.KEYNOTE_SOURCE_ROOT
+                / "package"
+                / "slide_chart_title"
+                / "verification_tests.rs"
+            )
+            verification_only.parent.mkdir(parents=True)
+            verification_only.write_text(
+                "use litchi_iwa_protos::kn::SlideArchive;\n"
+                "use prost::Message as _;\n"
+                "fn decode(bytes: &[u8]) { let _ = SlideArchive::decode(bytes); }\n",
+                encoding="utf-8",
+            )
             manifest = root / boundaries.KEYNOTE_PACKAGE_MANIFEST
             manifest.parent.mkdir(parents=True, exist_ok=True)
             manifest.write_text(
@@ -16823,188 +16827,83 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_keynote_chart_title_legacy_calls(root), [])
 
-    def test_iwa_keynote_chart_title_rejects_raw_id_surface_even_with_typed_names(
-        self,
-    ) -> None:
+    def test_iwa_keynote_chart_title_retirement_rejects_source_and_module(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / boundaries.IWA_KEYNOTE_CHART_TITLE_SOURCE
             source.parent.mkdir(parents=True)
-            source.write_text(
-                "impl KeynoteEditor {\n"
-                "    pub fn slide_chart_title(&self, id: u64) {}\n"
-                "    pub fn set_slide_chart_title(&mut self, id: u64) {}\n"
-                "    pub fn remove_slide_chart_title(&mut self, id: u64) {}\n"
-                "    pub fn slide_chart_title_by_selector(&self, selector: ChartSelector) {}\n"
-                "    pub fn set_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
-                "    pub fn remove_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
-                "}\n",
-                encoding="utf-8",
-            )
-
-            self.assertEqual(
-                boundaries.audit_iwa_keynote_chart_title_source_topology(root),
-                [
-                    "litchi-iwa Keynote chart-title raw identifier parameter must be "
-                    "retired id: u64: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:2",
-                    "litchi-iwa Keynote chart-title raw identifier parameter must be "
-                    "retired id: u64: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:3",
-                    "litchi-iwa Keynote chart-title raw identifier parameter must be "
-                    "retired id: u64: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:4",
-                    "litchi-iwa Keynote chart-title raw-ID call must be retired "
-                    "remove_slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:4",
-                    "litchi-iwa Keynote chart-title raw-ID call must be retired "
-                    "set_slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:3",
-                    "litchi-iwa Keynote chart-title raw-ID method must be retired "
-                    "remove_slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:4",
-                    "litchi-iwa Keynote chart-title raw-ID method must be retired "
-                    "set_slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:3",
-                    "litchi-iwa Keynote chart-title raw-ID method must be retired "
-                    "slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:2",
-                ],
-            )
-
-    def test_iwa_keynote_chart_title_requires_all_selector_methods(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / boundaries.IWA_KEYNOTE_CHART_TITLE_SOURCE
-            source.parent.mkdir(parents=True)
-            source.write_text(
-                "impl KeynoteEditor {\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
-                "    pub fn slide_chart_title(&self, id: u64) {}\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
-                "    pub fn set_slide_chart_title(&mut self, id: u64) {}\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
-                "    pub fn remove_slide_chart_title(&mut self, id: u64) {}\n"
-                "}\n",
-                encoding="utf-8",
-            )
-
-            self.assertEqual(
-                boundaries.audit_iwa_keynote_chart_title_source_topology(root),
-                [
-                    "litchi-iwa Keynote chart-title raw identifier parameter must be "
-                    "retired id: u64: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:3",
-                    "litchi-iwa Keynote chart-title raw identifier parameter must be "
-                    "retired id: u64: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:5",
-                    "litchi-iwa Keynote chart-title raw identifier parameter must be "
-                    "retired id: u64: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:7",
-                    "litchi-iwa Keynote chart-title raw-ID call must be retired "
-                    "remove_slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:7",
-                    "litchi-iwa Keynote chart-title raw-ID call must be retired "
-                    "set_slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:5",
-                    "litchi-iwa Keynote chart-title raw-ID method must be retired "
-                    "remove_slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:7",
-                    "litchi-iwa Keynote chart-title raw-ID method must be retired "
-                    "set_slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:5",
-                    "litchi-iwa Keynote chart-title raw-ID method must be retired "
-                    "slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:3",
-                    "litchi-iwa Keynote chart-title selector method is missing "
-                    "remove_slide_chart_title_by_selector: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs",
-                    "litchi-iwa Keynote chart-title selector method is missing "
-                    "set_slide_chart_title_by_selector: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs",
-                    "litchi-iwa Keynote chart-title selector method is missing "
-                    "slide_chart_title_by_selector: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs",
-                ],
-            )
-
-    def test_iwa_keynote_chart_title_accepts_selector_bridge_without_legacy_methods(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / boundaries.IWA_KEYNOTE_CHART_TITLE_SOURCE
-            source.parent.mkdir(parents=True)
-            source.write_text(
-                "impl KeynoteEditor {\n"
-                "    pub fn slide_chart_title_by_selector(&self, selector: ChartSelector) {}\n"
-                "    pub fn set_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
-                "    pub fn remove_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
-                "}\n",
-                encoding="utf-8",
-            )
-
-            self.assertEqual(boundaries.audit_iwa_keynote_chart_title_source_topology(root), [])
-
-    def test_iwa_keynote_chart_title_rejects_private_calls_and_position_fallback(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / boundaries.IWA_KEYNOTE_CHART_TITLE_SOURCE
-            source.parent.mkdir(parents=True)
-            source.write_text(
-                "impl KeynoteEditor {\n"
-                "    pub fn slide_chart_title_by_selector(&self, selector: ChartSelector) {}\n"
-                "    pub fn set_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
-                "    pub fn remove_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
-                "    fn chart_position_for_identifier(&self, drawable_object_id: u64) -> usize {\n"
-                "        self.slide_charts(0).unwrap().iter().position(|chart| chart.drawable_object_id == drawable_object_id).unwrap()\n"
-                "    }\n"
-                "    fn set_legacy(&mut self, drawable_object_id: u64) {\n"
-                "        set_slide_chart_title(self, 0, drawable_object_id, \"title\");\n"
-                "    }\n"
-                "}\n",
-                encoding="utf-8",
-            )
+            source.write_text("fn focused_chart_title_package() {}\n", encoding="utf-8")
+            editor = root / boundaries.RETIRED_IWA_KEYNOTE_CHART_TITLE_MODULE_SOURCE
+            editor.parent.mkdir(parents=True, exist_ok=True)
+            editor.write_text("mod arrangement;\nmod title;\n", encoding="utf-8")
 
             violations = boundaries.audit_iwa_keynote_chart_title_source_topology(root)
-            self.assertTrue(
-                any("raw identifier parameter must be retired" in item for item in violations)
-            )
-            self.assertTrue(
-                any("raw-ID call must be retired set_slide_chart_title" in item for item in violations)
-            )
-            self.assertTrue(
-                any("identifier-to-position fallback must be retired" in item for item in violations)
-            )
+            self.assertTrue(any("source was restored" in item for item in violations), violations)
+            self.assertTrue(any("module declaration" in item for item in violations), violations)
+            self.assertTrue(any("host wrapper/helper" in item for item in violations), violations)
 
-    def test_iwa_keynote_chart_title_masks_cfg_test_legacy_items_without_truncating_production(
-        self,
-    ) -> None:
+    def test_iwa_keynote_chart_title_retirement_rejects_raw_call_and_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / boundaries.IWA_KEYNOTE_CHART_TITLE_SOURCE
             source.parent.mkdir(parents=True)
             source.write_text(
-                "impl KeynoteEditor {\n"
-                "    pub fn slide_chart_title_by_selector(&self, selector: ChartSelector) {}\n"
-                "    pub fn set_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
-                "    pub fn remove_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
-                "}\n"
-                "\n"
-                "#[cfg(test)]\n"
-                "fn chart_position_for_identifier(&self, drawable_object_id: u64) {\n"
-                "    set_slide_chart_title(self, 0, drawable_object_id, \"test\");\n"
-                "}\n"
-                "\n"
-                "fn production_selector_helper(selector: ChartSelector) {\n"
-                "    let _ = selector;\n"
+                "fn legacy(&mut self, drawable_object_id: u64) {\n"
+                "    chart_position_for_identifier(drawable_object_id);\n"
+                "    set_slide_chart_title(self, 0, drawable_object_id, \"title\");\n"
                 "}\n",
                 encoding="utf-8",
             )
+            violations = boundaries.audit_iwa_keynote_chart_title_source_topology(root)
+            self.assertTrue(any("raw identifier parameter" in item for item in violations), violations)
+            self.assertTrue(any("identifier-to-position fallback" in item for item in violations), violations)
+            self.assertTrue(any("raw-ID call" in item for item in violations), violations)
 
-            self.assertEqual(boundaries.audit_iwa_keynote_chart_title_source_topology(root), [])
+    def test_iwa_keynote_chart_title_retirement_accepts_deleted_shell(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.RETIRED_IWA_KEYNOTE_CHART_TITLE_MODULE_SOURCE
+            editor.parent.mkdir(parents=True, exist_ok=True)
+            editor.write_text("mod arrangement;\n", encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_title_source_topology(root), []
+            )
+
+    def test_iwa_keynote_chart_title_retirement_allows_focused_catalog_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.RETIRED_IWA_KEYNOTE_CHART_TITLE_MODULE_SOURCE
+            editor.parent.mkdir(parents=True, exist_ok=True)
+            editor.write_text(
+                "fn focused_chart_catalog(editor: &KeynoteEditor) {\n"
+                "    let _ = editor;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_title_source_topology(root), []
+            )
+
+    def test_iwa_keynote_chart_title_retirement_masks_cfg_test_items(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.RETIRED_IWA_KEYNOTE_CHART_TITLE_MODULE_SOURCE
+            editor.parent.mkdir(parents=True, exist_ok=True)
+            editor.write_text(
+                "#[cfg(test)]\nmod title;\n"
+                "fn focused_chart_catalog() {}\n",
+                encoding="utf-8",
+            )
+            test_source = editor.parent / "slide_charts/tests.rs"
+            test_source.parent.mkdir(parents=True, exist_ok=True)
+            test_source.write_text(
+                "fn set_slide_chart_title_by_selector() {}\n"
+                "fn chart_position_for_identifier() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_title_source_topology(root), []
+            )
 
     def test_focused_keynote_chart_caption_rejects_legacy_calls_and_ignores_near_names(
         self,
@@ -35858,7 +35757,7 @@ fn rewrite_movie_title_operation(
         )
 
 
-    def test_keynote_chart_axis_title_audits_are_dormant_until_owner_module_wiring(
+    def test_keynote_chart_axis_title_retirement_rejects_host_before_owner_wiring(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -35869,25 +35768,15 @@ fn rewrite_movie_title_operation(
                 "fn set_slide_chart_axis_title(&mut self, id: u64) {}\n",
                 encoding="utf-8",
             )
-            for audit in (
-                boundaries.audit_keynote_chart_axis_title_legacy_calls,
-                boundaries.audit_iwa_keynote_chart_axis_title_source_topology,
-                boundaries.audit_keynote_chart_axis_title_facade_source_topology,
-                boundaries.audit_keynote_chart_axis_title_resource_source_topology,
-                boundaries.audit_keynote_chart_axis_title_completion_source_topology,
-            ):
-                with self.subTest(audit=audit.__name__):
-                    self.assertEqual(audit(root), [])
+            self.assertEqual(
+                boundaries.audit_keynote_chart_axis_title_legacy_calls(root), []
+            )
+            violations = boundaries.audit_iwa_keynote_chart_axis_title_source_topology(root)
+            self.assertTrue(any("source was restored" in item for item in violations), violations)
 
             owner = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
             owner.parent.mkdir(parents=True, exist_ok=True)
             owner.write_text("pub struct ChartAxisTitlePatch;\n", encoding="utf-8")
-            # An owner file alone is still staged; the package module is the
-            # activation seam shared by every axis-title audit.
-            self.assertEqual(
-                boundaries.audit_iwa_keynote_chart_axis_title_source_topology(root),
-                [],
-            )
             package = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[0]
             package.parent.mkdir(parents=True, exist_ok=True)
             package.write_text("mod slide_chart_axis_title;\n", encoding="utf-8")
@@ -35921,7 +35810,14 @@ fn rewrite_movie_title_operation(
                 boundaries.audit_keynote_chart_axis_title_completion_source_topology,
             ):
                 with self.subTest(audit=audit.__name__):
-                    self.assertEqual(audit(root), [])
+                    violations = audit(root)
+                    if audit is boundaries.audit_iwa_keynote_chart_axis_title_source_topology:
+                        self.assertTrue(
+                            any("source was restored" in item for item in violations),
+                            violations,
+                        )
+                    else:
+                        self.assertEqual(violations, [])
 
     def test_keynote_chart_axis_title_complete_scaffold_satisfies_all_ratchets(
         self,
@@ -36013,6 +35909,7 @@ fn rewrite_movie_title_operation(
             root = Path(directory)
             add_keynote_chart_axis_title_canonical_scaffold(root)
             host = root / boundaries.IWA_KEYNOTE_CHART_AXIS_TITLE_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
                 "impl KeynoteEditor {\n"
                 "    pub fn slide_chart_axis_title(&self, drawable_object_id: u64, axis: Axis) {}\n"
@@ -36028,13 +35925,21 @@ fn rewrite_movie_title_operation(
             self.assertTrue(any("raw identifier parameter" in item for item in violations), violations)
             self.assertTrue(any("native helper" in item for item in violations), violations)
 
-            host.write_text(
-                "impl KeynoteEditor {\n"
-                "    pub fn slide_chart_axis_title_by_selector(&self, selector: ChartSelector, axis: Axis) { focused_chart_axis_title_package(self)?.slide_chart_axis_title(selector, axis); }\n"
-                "    pub fn set_slide_chart_axis_title_by_selector(&mut self, selector: ChartSelector, axis: Axis, title: &str) { focused_chart_axis_title_package(self)?.edit_slide_chart_axis_title(selector, axis).set(title).commit(); }\n"
-                "    pub fn remove_slide_chart_axis_title_by_selector(&mut self, selector: ChartSelector, axis: Axis) { focused_chart_axis_title_package(self)?.edit_slide_chart_axis_title(selector, axis).clear().commit(); }\n"
-                "}\n",
+            host.unlink()
+            editor = root / boundaries.RETIRED_IWA_KEYNOTE_CHART_AXIS_TITLE_MODULE_SOURCE
+            editor.parent.mkdir(parents=True, exist_ok=True)
+            editor.write_text("mod arrangement;\nmod axis;\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_keynote_chart_axis_title_source_topology(root)
+            self.assertTrue(any("module declaration" in item for item in violations), violations)
+            editor.write_text(
+                "mod arrangement;\n"
+                "fn set_slide_chart_axis_title_by_selector() {}\n",
                 encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_chart_axis_title_source_topology(root)
+            self.assertTrue(any("host wrapper/helper" in item for item in violations), violations)
+            editor.write_text(
+                "mod arrangement;\n#[cfg(test)]\nmod axis;\n", encoding="utf-8"
             )
             self.assertEqual(
                 boundaries.audit_iwa_keynote_chart_axis_title_source_topology(root),

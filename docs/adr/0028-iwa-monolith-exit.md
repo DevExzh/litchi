@@ -8915,3 +8915,57 @@ scanner passes with 64 packages, 238 internal dependency declarations, and 11
 explicit debt items. Normal commit hooks enforce workspace formatting, lint,
 library/integration, and documentation tests. Chart creation, duplication, and
 removal remain host-owned; this slice does not complete monolith retirement.
+
+## 2026-09-06 follow-up: selector-first chart titles and axis retirement
+
+The 108-line host `title.rs` and 130-line host `axis.rs` modules are deleted.
+The `focused_chart_catalog` helper moves into the parent chart module so
+host listing and selection by title continue to serve chart creation,
+duplication, and removal. Eighteen obsolete examples are removed. The focused
+`edit_chart_title` example supports chart, category-axis, and value-axis titles
+through semantic selectors and set/clear edits.
+
+Computer Use authored the native source
+[`chart-titles-native.key`](../../test-data/iwork/keynote/chart-titles-native.key)
+in Keynote 14.4, saved, closed, and reopened the exact path. Its SHA-256 is
+`101893df3949129530b3d05ab9ba13b15cdad06258e567754733aec4995706ee`.
+The chart title is `Native chart title — 北区`, the value title is
+`Native revenue — 元`, the category title is `Native months — 月`, and the
+caption marker is `Native chart caption marker`. Rows are `Region 1` and
+`Region 2`, columns are April through July, and the values are
+`[[17, 26, 53, 96], [55, 43, 70, 58]]`; all eight values survived exact-path
+reopen.
+
+Selected chart-title reads now use canonical headers with zero/absent mediator
+guards. Both selection paths perform a global inbound non-style metadata
+ownership census. Exact selected before/after payloads are retained for patch,
+inverse, and locality checks. Changed chart-title publication rejects unknown
+reference metadata; reads and exact no-ops retain opaque headers, preserving
+other chart owners' contracts. Stylesheet admission accepts one exact stylesheet wire plus the aggregate
+registry allowance. Full codec work is precharged; this does not claim
+peak-memory or full allocator proof. Forward root-preview invalidation and
+inverse/double-inverse diagnostics are correct for chart and axis titles.
+
+Focused tests pass 10 title and 16 axis cases. The native chart candidate
+opened with `Focused chart title — 北区`, `Focused revenue — 元`, and
+`Focused months — 月`; axes, caption, and all eight values were preserved.
+`PackageMetadata` may use a generic preferred locator alongside an exact
+explicit/effective archive locator; matching now uses that exact physical
+locator while retaining current-component and UUID/reference authority checks.
+After a forced native edit to
+`Native saved chart title — 北区`, save, close, and exact-path reopen confirmed
+the native chart title, both focused axes, caption, and all eight values without
+repair. The copied resaved fixture is
+[`chart-titles-native-resaved.key`](../../test-data/iwork/keynote/chart-titles-native-resaved.key)
+with SHA-256
+`a12c1bd02ed5316699beef3e6cbe6422359032916848beb370efc3eae5bf0cba`.
+The clear candidate opened with no chart title, Y-axis `Numeric`, X-axis
+`Categorical`, and no custom names; `Native chart caption marker` and all eight
+values remained intact without repair. Scoped validation passes 284 focused
+Rust tests with all features: 231 Keynote library, four native fixture, 16 axis,
+23 caption, and 10 title tests, plus 51 host chart tests. Boundary verification passes 915 tests; the
+scanner passes with 64 packages, 238 internal dependency declarations, and 11
+explicit debt items. Workspace formatting and lint pass. Normal commit hooks
+enforce workspace library/integration and documentation tests. Chart creation,
+duplication, and removal remain host-owned; this slice does not complete
+monolith retirement.

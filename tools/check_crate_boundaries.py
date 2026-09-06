@@ -192,6 +192,24 @@ IWORK_EXAMPLE_SOURCES = (
 # any of these obsolete files to exist.
 RETIRED_IWA_OBSOLETE_EXAMPLE_PATHS = (
     Path("crates/litchi-iwa/examples/create_keynote_chart.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_axis_label_affixes.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_axis_label_angles.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_axis_number_format.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_axis_values.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_category_label_layouts.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_chart_arrangements.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_chart_axis_label_positions_3d.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_chart_depths.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_chart_fonts.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_chart_lighting_styles.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_chart_pie_leader_lines.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_chart_radar_grid_shapes.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_chart_radar_series_styles.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_chart_radar_start_angles.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_chart_series_gaps_3d.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_chart_symbols.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_reference_lines.rs"),
+    Path("crates/litchi-iwa/examples/create_iwork_scatter_connections.rs"),
     Path("crates/litchi-iwa/examples/edit_keynote_movie_geometry.rs"),
     Path("crates/litchi-iwa/examples/edit_numbers_comment.rs"),
     Path("crates/litchi-iwa/examples/edit_pages_body_footnotes.rs"),
@@ -302,10 +320,12 @@ KEYNOTE_DOCUMENT_SEMANTIC_LIMIT_PARAMETERS = frozenset(
         "max_text_bytes",
     }
 )
-# `perf_tests.rs` is included only from a `#[cfg(test)]` module in its parent
-# source file. Keep the production audit from treating that test-only module
-# body as a reachable crate item when walking the source tree.
-KEYNOTE_TEST_ONLY_SOURCE_NAMES = frozenset({"perf_tests.rs"})
+# These files are included only from `#[cfg(test)]` modules in their parent
+# source files. Keep the production audits from treating those test-only
+# module bodies as reachable crate items when walking the source tree.
+KEYNOTE_TEST_ONLY_SOURCE_NAMES = frozenset(
+    {"perf_tests.rs", "verification_tests.rs"}
+)
 KEYNOTE_GENERATED_PROTO_MODULES = (
     "kn",
     "knsos",
@@ -370,6 +390,22 @@ IWA_KEYNOTE_CHART_TITLE_TYPED_METHODS = frozenset(
         "slide_chart_title_by_selector",
         "set_slide_chart_title_by_selector",
         "remove_slide_chart_title_by_selector",
+    }
+)
+RETIRED_IWA_KEYNOTE_CHART_TITLE_MODULE_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_charts.rs"
+)
+RETIRED_IWA_KEYNOTE_CHART_TITLE_MODULE = re.compile(
+    r"(?m)^\s*(?:pub(?:\([^()]*\))?\s+)?mod\s+(?:r#)?title\s*(?:;|\{)"
+)
+RETIRED_IWA_KEYNOTE_CHART_TITLE_METHODS = frozenset(
+    IWA_KEYNOTE_CHART_TITLE_LEGACY_METHODS
+    | IWA_KEYNOTE_CHART_TITLE_TYPED_METHODS
+    | {
+        "focused_chart_title_package",
+        "replace_from_focused_chart_title_commit",
+        "map_focused_chart_title_error",
+        "map_focused_chart_title_read_error",
     }
 )
 IWA_KEYNOTE_CHART_TITLE_RAW_ID_PARAMETER = re.compile(
@@ -1064,6 +1100,22 @@ IWA_KEYNOTE_CHART_AXIS_TITLE_LEGACY_METHODS = frozenset(
         "slide_chart_axis_title",
         "set_slide_chart_axis_title",
         "remove_slide_chart_axis_title",
+    }
+)
+RETIRED_IWA_KEYNOTE_CHART_AXIS_TITLE_MODULE_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_charts.rs"
+)
+RETIRED_IWA_KEYNOTE_CHART_AXIS_TITLE_MODULE = re.compile(
+    r"(?m)^\s*(?:pub(?:\([^()]*\))?\s+)?mod\s+(?:r#)?axis\s*(?:;|\{)"
+)
+RETIRED_IWA_KEYNOTE_CHART_AXIS_TITLE_METHODS = frozenset(
+    IWA_KEYNOTE_CHART_AXIS_TITLE_LEGACY_METHODS
+    | IWA_KEYNOTE_CHART_AXIS_TITLE_TYPED_METHODS
+    | {
+        "focused_chart_axis_title_package",
+        "replace_from_focused_chart_axis_title_commit",
+        "map_focused_chart_axis_title_error",
+        "map_focused_chart_axis_title_read_error",
     }
 )
 IWA_KEYNOTE_CHART_AXIS_TITLE_RAW_ID_CALL = re.compile(
@@ -46440,101 +46492,77 @@ def audit_keynote_chart_title_legacy_calls(root: Path = ROOT) -> list[str]:
 
 
 def audit_iwa_keynote_chart_title_source_topology(root: Path = ROOT) -> list[str]:
-    """Require a selector-first chart-title bridge in the compatibility host.
-
-    The focused package owns chart-title semantics now, so the host must not
-    retain either public or private raw-ID wrappers.  This audit deliberately
-    works on the production slice of ``title.rs``: source-built regressions may
-    keep compatibility helpers under ``#[cfg(test)]``, but those items must not
-    be able to hide a later production declaration or call.
-    """
+    """Keep the retired chart-title compatibility shell out of litchi-iwa."""
 
     path = root / IWA_KEYNOTE_CHART_TITLE_SOURCE
-    if not path.is_file():
-        return []
-
-    production_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
-    source = _mask_rust_non_code(production_source)
     violations: list[str] = []
-    declaration = re.compile(
-        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
-        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
-        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
-    )
-    declaration_matches = list(declaration.finditer(source))
-    declarations = {match.group(1) for match in declaration_matches}
-
-    for name in sorted(IWA_KEYNOTE_CHART_TITLE_TYPED_METHODS - declarations):
+    if path.is_file():
         violations.append(
-            "litchi-iwa Keynote chart-title selector method is missing "
-            f"{name}: {IWA_KEYNOTE_CHART_TITLE_SOURCE}"
+            "retired litchi-iwa Keynote chart-title source was restored: "
+            f"{IWA_KEYNOTE_CHART_TITLE_SOURCE}"
         )
 
-    for match in declaration_matches:
-        name = match.group(1)
-        line_number = source.count("\n", 0, match.start()) + 1
-        if name in IWA_KEYNOTE_CHART_TITLE_LEGACY_METHODS:
+    module_path = root / RETIRED_IWA_KEYNOTE_CHART_TITLE_MODULE_SOURCE
+    if module_path.is_file():
+        module_source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(module_path.read_text(encoding="utf-8"))
+        )
+        for match in RETIRED_IWA_KEYNOTE_CHART_TITLE_MODULE.finditer(module_source):
+            line_number = module_source.count("\n", 0, match.start()) + 1
             violations.append(
-                "litchi-iwa Keynote chart-title raw-ID method must be retired "
-                f"{name}: {IWA_KEYNOTE_CHART_TITLE_SOURCE}:{line_number}"
+                "retired litchi-iwa Keynote chart-title module declaration: "
+                f"{RETIRED_IWA_KEYNOTE_CHART_TITLE_MODULE_SOURCE}:{line_number}"
             )
 
-        if name not in IWA_KEYNOTE_CHART_TITLE_TYPED_METHODS:
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    source_paths = sorted(source_root.rglob("*.rs")) if source_root.is_dir() else []
+    for source_path in source_paths:
+        if source_path.name == "tests.rs" or "tests" in source_path.parts:
             continue
-        opening = source.find("{", match.end())
-        signature = source[match.start() : opening if opening >= 0 else len(source)]
-        if not re.search(
-            r"\bselector\b[ \t\r\n]*:[^,)]*\bChartSelector\b", signature
-        ):
-            violations.append(
-                "litchi-iwa Keynote chart-title selector method must accept a "
-                f"ChartSelector parameter {name}: "
-                f"{IWA_KEYNOTE_CHART_TITLE_SOURCE}:{line_number}"
-            )
-
-    for match in IWA_KEYNOTE_CHART_TITLE_RAW_ID_PARAMETER.finditer(source):
-        line_number = source.count("\n", 0, match.start()) + 1
-        violations.append(
-            "litchi-iwa Keynote chart-title raw identifier parameter must be retired "
-            f"{match.group(0).strip()}: "
-            f"{IWA_KEYNOTE_CHART_TITLE_SOURCE}:{line_number}"
+        production_source = _mask_rust_cfg_test_items(
+            source_path.read_text(encoding="utf-8")
         )
+        source = _mask_rust_non_code(production_source)
+        relative = source_path.relative_to(root)
+        for name, line_number in _rust_function_declarations(production_source):
+            if name in RETIRED_IWA_KEYNOTE_CHART_TITLE_METHODS:
+                violations.append(
+                    "retired litchi-iwa Keynote chart-title host wrapper/helper "
+                    f"{name}: {relative}:{line_number}"
+                )
 
-    for match in IWA_KEYNOTE_CHART_TITLE_IDENTIFIER_POSITION_FALLBACK.finditer(source):
-        line_number = source.count("\n", 0, match.start()) + 1
-        violations.append(
-            "litchi-iwa Keynote chart-title identifier-to-position fallback must be "
-            f"retired {match.group(0).strip()}: "
-            f"{IWA_KEYNOTE_CHART_TITLE_SOURCE}:{line_number}"
-        )
-
-    for match in IWA_KEYNOTE_CHART_TITLE_RAW_ID_CALL.finditer(source):
-        line_start = source.rfind("\n", 0, match.start()) + 1
-        line_end = source.find("\n", match.end())
-        if line_end < 0:
-            line_end = len(source)
-        line = source[line_start:line_end]
-        # A declaration is already reported above.  The focused Package's
-        # selector getter has the same semantic name as the old host getter;
-        # recognize that qualified call only when it is visibly fed the
-        # borrowed selector, never a raw object identifier or position.
-        if re.search(r"\bfn[ \t\r\n]+slide_chart_title\b", line):
-            continue
-        if match.group("method") == "slide_chart_title":
-            prefix = source[max(0, match.start() - 160) : match.start()]
-            suffix = source[match.end() : match.end() + 320]
-            if (
-                "focused_chart_title_package" in prefix
-                and re.search(r"\bselector\b", suffix)
-                and "drawable_object_id" not in suffix
-                and "chart_position" not in suffix
+        for match in IWA_KEYNOTE_CHART_TITLE_RAW_ID_CALL.finditer(source):
+            line_start = source.rfind("\n", 0, match.start()) + 1
+            line_end = source.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(source)
+            if re.search(
+                rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                source[line_start:line_end],
             ):
                 continue
-        line_number = source.count("\n", 0, match.start("method")) + 1
-        violations.append(
-            "litchi-iwa Keynote chart-title raw-ID call must be retired "
-            f"{match.group('method')}: {IWA_KEYNOTE_CHART_TITLE_SOURCE}:{line_number}"
-        )
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "retired litchi-iwa Keynote chart-title raw-ID call "
+                f"{match.group('method')}: {relative}:{line_number}"
+            )
+
+        if source_path != path:
+            continue
+        for match in IWA_KEYNOTE_CHART_TITLE_RAW_ID_PARAMETER.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote chart-title raw identifier parameter "
+                f"{match.group(0).strip()}: {relative}:{line_number}"
+            )
+        for match in IWA_KEYNOTE_CHART_TITLE_IDENTIFIER_POSITION_FALLBACK.finditer(
+            source
+        ):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote chart-title identifier-to-position "
+                f"fallback {match.group(0).strip()}: {relative}:{line_number}"
+            )
 
     return sorted(set(violations))
 
@@ -47534,19 +47562,35 @@ def audit_keynote_chart_axis_title_legacy_calls(root: Path = ROOT) -> list[str]:
 def audit_iwa_keynote_chart_axis_title_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Retire raw Keynote chart-axis-title methods, calls, and helpers.
+    """Keep the retired chart-axis-title compatibility shell out of litchi-iwa.
 
     Pages and Numbers continue to use the shared ``crates/litchi-iwa/src/charts``
     implementation, so this scan is deliberately scoped to the Keynote host,
-    its examples, and its README.  A selector-first bridge can remain only
-    when it visibly calls the focused Package with ChartSelector and Axis.
+    its examples, and its README.  The focused Package owns the selector-first
+    transaction; the old host source/module and forwarding wrappers remain
+    deleted.  The focused chart catalog helper in ``slide_charts.rs`` is
+    unrelated and remains allowed.
     """
-
-    if not _keynote_chart_axis_title_owner_present(root):
-        return []
 
     source_root = root / IWA_KEYNOTE_SOURCE_ROOT
     violations: list[str] = []
+    retired_source = root / IWA_KEYNOTE_CHART_AXIS_TITLE_SOURCE
+    if retired_source.is_file():
+        violations.append(
+            "retired litchi-iwa Keynote chart-axis-title source was restored: "
+            f"{IWA_KEYNOTE_CHART_AXIS_TITLE_SOURCE}"
+        )
+    module_path = root / RETIRED_IWA_KEYNOTE_CHART_AXIS_TITLE_MODULE_SOURCE
+    if module_path.is_file():
+        module_source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(module_path.read_text(encoding="utf-8"))
+        )
+        for match in RETIRED_IWA_KEYNOTE_CHART_AXIS_TITLE_MODULE.finditer(module_source):
+            line_number = module_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote chart-axis-title module declaration: "
+                f"{RETIRED_IWA_KEYNOTE_CHART_AXIS_TITLE_MODULE_SOURCE}:{line_number}"
+            )
     source_paths = (
         sorted(source_root.rglob("*.rs")) if source_root.is_dir() else []
     )
@@ -47571,6 +47615,11 @@ def audit_iwa_keynote_chart_axis_title_source_topology(
             if name in IWA_KEYNOTE_CHART_AXIS_TITLE_LEGACY_METHODS:
                 violations.append(
                     "retired litchi-iwa Keynote chart-axis-title raw-ID method "
+                    f"{name}: {relative}:{line_number}"
+                )
+            elif name in RETIRED_IWA_KEYNOTE_CHART_AXIS_TITLE_METHODS:
+                violations.append(
+                    "retired litchi-iwa Keynote chart-axis-title host wrapper/helper "
                     f"{name}: {relative}:{line_number}"
                 )
             if IWA_KEYNOTE_CHART_AXIS_TITLE_RAW_HELPER.search(name):
