@@ -1,0 +1,128 @@
+{
+  "change": 435,
+  "phase": "before-production-implementation",
+  "status": "baseline-evidence-retained",
+  "inputs": {
+    "pilots/before-buffered/v3/normal-tiny.json": "71c6848dcc268860d2ab066b1c67faedaac2361c4ae13a74b1a397e53f84c895",
+    "pilots/before-buffered/v3/normal-tiny-receipt.json": "46584233eff2a2757724b72ae3b57edf61a053eeffabf9066dffe0d38506c8be",
+    "pilots/before-buffered/v3/allocator-tiny.json": "7cddd57560c522d6da6cd7f3d4590abe65d963ef27deff32035382232195821c",
+    "pilots/before-buffered/v3/allocator-tiny-receipt.json": "28de9f2eaad08669781a86f9eba909856a6a07fb980b88fa395816a15d54a938",
+    "pilots/before-buffered/v3/normal-medium.json": "1ef89477657be8aed28ac004b4157bbc0b21df4f0b4fc6a6b539e4f7fb9bb3c2",
+    "pilots/before-buffered/v3/normal-medium-receipt.json": "1a1594f8b99598c3369cd29d3e635ae1f1a34def162b62927a6482b5ad685e56",
+    "pilots/before-buffered/v3/allocator-medium.json": "dc1874fe5a7007ba995e4cad3ea43f45acd86a9f7a02d07ce393a87eb6bf75b4",
+    "pilots/before-buffered/v3/allocator-medium-receipt.json": "fae094bf8a5948dc0410b4963cd706e6a8e3e09c1f03c438595e31b00040b001",
+    "pilots/before-buffered/v3/normal-large.json": "1f3a1b2a86581e7443d76cfc7bb58566268ce13c7fa8c12e5dadf8ff63d8afe4",
+    "pilots/before-buffered/v3/normal-large-receipt.json": "e79f4b9fa758b7bc1054d9423d7134d0aaed6eb19ede5e9ab0e25ad751b3fde6",
+    "pilots/before-buffered/v3/allocator-large.json": "82c8637341b960dc2d07dcc09094550526a27caede1899b2f0c820f5dc9268de",
+    "pilots/before-buffered/v3/allocator-large-receipt.json": "ccce429869bea10f11389220fd1258506c0ff45b1789e0df6b777bf7939e6bab",
+    "profiles/preparatory-before-buffered/v3/stat/receipt.json": "e8c03755dd857d924e2a693454fee91fc5294866f797b30247964784ba60609b",
+    "profiles/preparatory-before-buffered/v3/record/receipt.json": "b6aa01d33248e8bfea87294006c662905c29e7af680beb1a9e49fb1887d66756"
+  },
+  "rows": [
+    {
+      "shape": "tiny",
+      "paragraphs": 64,
+      "pilot_normal_p50_ns": 103910,
+      "allocation_calls": [
+        1053,
+        1053,
+        1053
+      ],
+      "allocated_bytes": [
+        1785843,
+        1785843,
+        1785843
+      ],
+      "region_peak_above_entry_bytes": [
+        458819,
+        458819,
+        458819
+      ],
+      "operation_live_delta_bytes": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "shape": "medium",
+      "paragraphs": 8192,
+      "pilot_normal_p50_ns": 4748220,
+      "allocation_calls": [
+        112819,
+        112819,
+        112819
+      ],
+      "allocated_bytes": [
+        14126834,
+        14126834,
+        14126834
+      ],
+      "region_peak_above_entry_bytes": [
+        5616425,
+        5616425,
+        5616425
+      ],
+      "operation_live_delta_bytes": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "shape": "large",
+      "paragraphs": 32768,
+      "pilot_normal_p50_ns": 16982942,
+      "allocation_calls": [
+        450741,
+        450741,
+        450741
+      ],
+      "allocated_bytes": [
+        51449840,
+        51449840,
+        51449840
+      ],
+      "region_peak_above_entry_bytes": [
+        22450985,
+        22450985,
+        22450985
+      ],
+      "operation_live_delta_bytes": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "profiles": {
+    "stat": {
+      "receipt": "profiles/preparatory-before-buffered/v3/stat/receipt.json",
+      "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle"
+    },
+    "record": {
+      "receipt": "profiles/preparatory-before-buffered/v3/record/receipt.json",
+      "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle",
+      "addr2line_warning_count": 10,
+      "top_self_rows": [
+        "25.04%  normal   normal                [.] sha2::sha256::x86_sha::compress",
+        "11.90%  normal   libc.so.6             [.] __memmove_avx512_unaligned_erms",
+        "10.07%  normal   normal                [.] xml_minifier::audit::verify_with_policy",
+        "5.91%  normal   normal                [.] zlib_rs::deflate::algorithm::medium::deflate_medium",
+        "4.89%  normal   normal                [.] <litchi_odt::elements::element::Element as core::clone::Clone>::clone",
+        "4.83%  normal   normal                [.] <litchi_odt::elements::element::Element>::write_xml",
+        "3.40%  normal   libc.so.6             [.] _int_malloc",
+        "2.79%  normal   libc.so.6             [.] _int_free_merge_chunk",
+        "2.00%  normal   normal                [.] <litchi_odt::builder::model::Builder>::generate_content_body",
+        "1.73%  normal   libc.so.6             [.] __memcmp_evex_movbe",
+        "1.72%  normal   libc.so.6             [.] malloc",
+        "1.68%  normal   normal                [.] zlib_rs::deflate::longest_match::longest_match",
+        "1.28%  normal   normal                [.] <litchi_odt::elements::element::Element>::to_xml_string",
+        "1.24%  normal   normal                [.] <litchi_odt::elements::element::Element>::new",
+        "0.95%  normal   libc.so.6             [.] _int_free_maybe_trim"
+      ]
+    }
+  },
+  "hypothesis": "Once-consumed bounded paragraph publication can remove Builder document-proportional model/content/archive retention while preserving the supported fresh paragraph semantics.",
+  "claim_limits": "Three-sample pilots establish preparatory counter observations, not formal latency evidence. Allocator vectors cover the timed operation; region peak above entry is not RSS or total process memory. Whole-process profiles include corpus setup, binary/output hashing, warmups, timed calls, and untimed oracles. L1 zero and absent LLC counters do not prove zero misses. No causal speedup or 10x claim is made."
+}

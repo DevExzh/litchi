@@ -1,0 +1,99 @@
+diff --git a/tools/perf-baseline/src/lib.rs b/tools/perf-baseline/src/lib.rs
+index 1dd34921b..49cded3fd 100644
+--- a/tools/perf-baseline/src/lib.rs
++++ b/tools/perf-baseline/src/lib.rs
+@@ -14,0 +15 @@ mod filesystem;
++mod odt_streaming_create;
+@@ -1411,0 +1413 @@ enum Case {
++    OdtBufferedCreate,
+@@ -1990,0 +1993 @@ impl Case {
++            Self::OdtBufferedCreate => "odt_buffered_create",
+@@ -2539,0 +2543,4 @@ impl Case {
++    const fn uses_odt_buffered_creation(self) -> bool {
++        matches!(self, Self::OdtBufferedCreate)
++    }
++
+@@ -4332,0 +4340,2 @@ struct SourceSummary {
++    odt_paragraphs: Option<odt_streaming_create::OdtParagraphsSummary>,
++    #[serde(skip_serializing_if = "Option::is_none")]
+@@ -8914,0 +8924 @@ pub fn run() -> Result<(), Box<dyn Error>> {
++                    && !case.uses_odt_buffered_creation()
+@@ -10192,0 +10203,23 @@ pub fn run() -> Result<(), Box<dyn Error>> {
++    if options
++        .cases
++        .iter()
++        .any(|case| case.uses_odt_buffered_creation())
++    {
++        for shape in &options.semantic_shapes {
++            let corpus = odt_streaming_create::build_odt_buffered_corpus(*shape)?;
++            for case in options
++                .cases
++                .iter()
++                .copied()
++                .filter(|case| case.uses_odt_buffered_creation())
++            {
++                results.push(odt_streaming_create::run_odt_buffered_creation(
++                    case,
++                    &corpus,
++                    options.warmup_iterations,
++                    options.samples,
++                )?);
++            }
++        }
++    }
++
+@@ -11551,0 +11585 @@ fn parse_case(value: &str) -> Option<Case> {
++        "odt_buffered_create" => Some(Case::OdtBufferedCreate),
+@@ -12006,0 +12041 @@ fn usage_text() -> String {
++                                       odt_buffered_create,\n\
+@@ -22911,0 +22947,3 @@ fn run_case_with_config(
++        Case::OdtBufferedCreate => {
++            Err("buffered ODT creation cases use their dedicated corpus runner".into())
++        },
+@@ -58462 +58500 @@ mod tests {
+-        assert_eq!(selectable_count, 431);
++        assert_eq!(selectable_count, 432);
+@@ -60377,0 +60416,43 @@ mod tests {
++    #[test]
++    fn odt_buffered_creation_is_opt_in_and_reports_semantic_scaling_evidence() {
++        let case = parse_case("odt_buffered_create").expect("buffered ODT selector parses");
++        assert_eq!(case, Case::OdtBufferedCreate);
++        assert!(!Case::DEFAULT.contains(&case));
++        for shape in [SemanticShape::Tiny, SemanticShape::Large] {
++            let corpus = super::odt_streaming_create::build_odt_buffered_corpus(shape).unwrap();
++            assert_eq!(corpus.manifest.archive_member_count, 5);
++            assert_eq!(
++                corpus.manifest.entry_count,
++                match shape {
++                    SemanticShape::Tiny => 64,
++                    SemanticShape::Large => 32_768,
++                    SemanticShape::Medium => unreachable!(),
++                }
++            );
++            let measured =
++                super::odt_streaming_create::run_odt_buffered_creation(case, &corpus, 0, 1)
++                    .unwrap();
++            assert_eq!(measured.elapsed_ns.samples.len(), 1);
++            assert_eq!(
++                measured.output_sha256.as_deref(),
++                Some(corpus.manifest.archive_sha256.as_str())
++            );
++            let sink = measured.sink.as_ref().unwrap();
++            assert_eq!(sink.accepted_bytes, corpus.manifest.archive_bytes as u64);
++            assert_eq!(sink.retained_output_bytes, Some(0));
++            assert!(sink.retained_authoring_window_bytes.is_none());
++            let source = measured.source.as_ref().unwrap();
++            let odt = source.odt_paragraphs.as_ref().unwrap();
++            assert_eq!(odt.role, "buffered");
++            assert_eq!(odt.paragraph_count, corpus.manifest.entry_count);
++            assert!(odt.archive_member_set_verified);
++            assert!(odt.manifest_bindings_verified);
++            assert!(odt.semantic_reopen_verified);
++            assert!(odt.immutable_styles_meta_verified);
++            assert!(odt.content_xml_sha256.len() == 64);
++            assert!(odt.styles_xml_sha256.len() == 64);
++            assert!(odt.meta_xml_sha256.len() == 64);
++            assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 1);
++        }
++    }
++

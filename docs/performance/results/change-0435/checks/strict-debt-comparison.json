@@ -1,0 +1,172 @@
+{
+  "baseline_origin": "change-0433/checks/harness-strict-final-v2.log.gz",
+  "baseline_original_bytes": 19533,
+  "baseline_original_sha256": "2a7c7d693af1ba6c1e06e8ee5f0888fe4b60db33d2ce5a326c0eabb9b9d01c92",
+  "baseline_path": "checks/baseline-harness-strict.log",
+  "change": 435,
+  "changed_harness_src_lib_findings": 0,
+  "changed_line_findings": [],
+  "changed_new_source_findings": 0,
+  "changed_source_patch": "checks/strict-changed-source.patch",
+  "current_log": "checks/buffered-harness-strict.log",
+  "current_original_bytes": 19675,
+  "current_original_sha256": "107ef4f88df4ae0d0268ae4c970c4e4faf2d4b1de26f4ceaae053ee2056f866c",
+  "findings": [
+    {
+      "count": 1,
+      "file": "src/lib.rs",
+      "message": "a `Vec` of `Range` that is only one element"
+    },
+    {
+      "count": 1,
+      "file": "src/docx_story_hyperlinks.rs",
+      "message": "field assignment outside of initializer for an instance created with Default::default()"
+    },
+    {
+      "count": 4,
+      "file": "src/docx_story_hyperlinks.rs",
+      "message": "manual implementation of `.is_multiple_of()`"
+    },
+    {
+      "count": 3,
+      "file": "src/lib.rs",
+      "message": "manual implementation of `.is_multiple_of()`"
+    },
+    {
+      "count": 1,
+      "file": "src/filesystem.rs",
+      "message": "redundant field names in struct initialization"
+    },
+    {
+      "count": 1,
+      "file": "src/operation_metrics.rs",
+      "message": "struct update has no effect, all the fields in the struct have already been specified"
+    },
+    {
+      "count": 1,
+      "file": "src/filesystem.rs",
+      "message": "the following explicit lifetimes could be elided: 'a"
+    },
+    {
+      "count": 2,
+      "file": "src/lib.rs",
+      "message": "the loop variable `repetition` is only used to index `outcomes`"
+    },
+    {
+      "count": 3,
+      "file": "src/filesystem.rs",
+      "message": "this `if` statement can be collapsed"
+    },
+    {
+      "count": 3,
+      "file": "src/lib.rs",
+      "message": "this `if` statement can be collapsed"
+    },
+    {
+      "count": 2,
+      "file": "src/parallel_metrics.rs",
+      "message": "this `if` statement can be collapsed"
+    },
+    {
+      "count": 1,
+      "file": "src/lib.rs",
+      "message": "this `map_or` can be simplified"
+    },
+    {
+      "count": 1,
+      "file": "src/lib.rs",
+      "message": "this method chain can be written more clearly with `if .. else ..`"
+    },
+    {
+      "count": 2,
+      "file": "src/xls_numeric.rs",
+      "message": "this method chain can be written more clearly with `if .. else ..`"
+    },
+    {
+      "count": 1,
+      "file": "src/lib.rs",
+      "message": "useless conversion to the same type: `std::io::Error`"
+    },
+    {
+      "count": 1,
+      "file": "src/lib.rs",
+      "message": "useless conversion to the same type: `u64`"
+    },
+    {
+      "count": 1,
+      "file": "src/filesystem.rs",
+      "message": "using `contains()` instead of `iter().any()` is more efficient"
+    }
+  ],
+  "same_message_and_source_file_multiset": true,
+  "source_binding": {
+    "baseline_revision": "76710f5c1676fd305e85e6d045dfeb570eb1f421",
+    "baseline_revision_input": "76710f5c1676fd305e85e6d045dfeb570eb1f421",
+    "baseline_sha256": "95d57d12b885cb2642dbe44eb0ed684575eb2055c455e0d0659437a4314775b2",
+    "changed_line_ranges": [
+      {
+        "end": 15,
+        "start": 15
+      },
+      {
+        "end": 1413,
+        "start": 1413
+      },
+      {
+        "end": 1993,
+        "start": 1993
+      },
+      {
+        "end": 2546,
+        "start": 2543
+      },
+      {
+        "end": 4341,
+        "start": 4340
+      },
+      {
+        "end": 8924,
+        "start": 8924
+      },
+      {
+        "end": 10225,
+        "start": 10203
+      },
+      {
+        "end": 11585,
+        "start": 11585
+      },
+      {
+        "end": 12041,
+        "start": 12041
+      },
+      {
+        "end": 22949,
+        "start": 22947
+      },
+      {
+        "end": 58500,
+        "start": 58500
+      },
+      {
+        "end": 60458,
+        "start": 60416
+      }
+    ],
+    "current_head_revision": "76710f5c1676fd305e85e6d045dfeb570eb1f421",
+    "current_revision_binding": "working-tree source at comparison time",
+    "current_worktree_sha256": "c24e7d4707f5f4da59f138d39da0792d31d95da80cf61eca7bfcaed8094cc68c",
+    "file": "tools/perf-baseline/src/lib.rs",
+    "line_range_convention": "1-based inclusive current-file lines",
+    "patch_bytes": 4428,
+    "patch_format": "git diff --unified=0",
+    "patch_path": "checks/strict-changed-source.patch",
+    "patch_sha256": "5aa3df587abd6eeebcd6f538eff0656d5b11c3f1f2fdc5399b37cf6097d32254",
+    "tracked_status": [
+      " M tools/perf-baseline/src/lib.rs"
+    ]
+  },
+  "source_binding_path": "checks/strict-source-binding.json",
+  "status": "pass",
+  "unique_findings": 17
+}

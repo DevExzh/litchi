@@ -1,5 +1,18 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0435: ODT grammar over typed common XML publication
+
+[0435](changes/0435-odt-bounded-plain-paragraphs.md) keeps plaintext/whitespace
+semantics in `litchi-odt` and XML/archive publication in the common owner.
+The typed authored-XML method preserves fixed styles/meta comments; generated
+XML limit attribution survives reader adapters without diagnostic parsing.
+The provider uses explicit finite limits, hierarchical execution budgets,
+cancellation, and caller-owned sequential output. It adds no dependency,
+unsafe code, ambient I/O, or hidden worker pool. Failure reports acknowledge
+only accepted sink bytes. The Memory reservation model excludes total ZIP and
+auditor allocator usage. See the [batch matrix](results/change-0435/adr-compliance.md).
+The accepted ADR tree and user goal are unchanged; the overall goal stays open.
+
 ## Change 0434: ODS ordinary-text span batching
 
 [0434](changes/0434-ods-bounded-text-spans.md) stays inside the existing

@@ -1,6 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0434
+## Current evidence through 0435
+
+[0435](changes/0435-odt-bounded-plain-paragraphs.md) implements bounded fresh
+plaintext ODT publication and retains 36 formal reports, 1,080 samples, six
+profiles, 1,445 passing ODT/common tests, and 315 passing harness tests.
+The new API lowers large-case operation allocator peak from 22.45 MB to
+0.42 MB and requested bytes by 86.159%, with roughly 3.35–3.37 times candidate
+Builder latency. Whole-process RSS is essentially unchanged. Every regression
+and repeat flag remains visible; this is a measured sequential-output enabler.
+The next hypothesis targets ODT per-text Work charging, sampled at 45.74% self
+in the whole-process profile, before ODP fresh creation. Logical append, Part
+addition, repackaging, rich authoring, native compatibility breadth, cold/range
+I/O, scaling, and the other original completion criteria remain open.
+`docs/GOAL.md` is unmodified. This batch does not complete or narrow that goal.
+
+## Earlier evidence through 0434
 
 [0434](changes/0434-ods-bounded-text-spans.md) retains a matched ODS
 streaming comparison with 24 formal reports, 720 samples, and four passing

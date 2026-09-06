@@ -1,0 +1,1147 @@
+{
+  "change": 435,
+  "claims": [],
+  "classification": "Whole-process ODT profiles retained for descriptive PMU and caller evidence; no causal hotspot, speedup, cache-miss, or 10x claim.",
+  "limitations": [
+    "Every counter, IPC result, miss rate, sample count, and self row is whole-command evidence including setup, corpus generation, warmups, timed calls, output hashing, and untimed oracle work.",
+    "A zero measured L1-dcache-load-misses count is retained as an observed counter value; it does not prove zero misses, and LLC counters are explicitly unavailable in this event set.",
+    "perf-record samples are caller evidence, not a paired instructions/cycles counter measurement; IPC and branch miss rate are unavailable in record lanes.",
+    "Total Lost Samples and addr2line warnings have separate scopes: lost samples concern perf data; addr2line warnings concern symbolization and are not lost-sample evidence.",
+    "Self rows come from perf report --no-children and may contain unresolved/inlined symbols; they do not isolate the timed operation from setup or oracle work.",
+    "No profile establishes causality, optimization benefit, latency improvement, or a 10x/cache-miss claim."
+  ],
+  "matrix": {
+    "formal_profiles": 6,
+    "kinds": [
+      "stat",
+      "record"
+    ],
+    "required_profiles": 6,
+    "roles": [
+      "before-buffered",
+      "after-buffered",
+      "after-streaming"
+    ],
+    "shape": "large",
+    "source_matrix_reports": 36
+  },
+  "oracle": {
+    "protocol_sha256": "42d4b60997a9ed8f78301c8f56f7e01c7d241aaeae3d8cac0824a01ba9cd7599",
+    "verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1"
+  },
+  "preparatory_evidence": {
+    "path": "buffered-hypothesis.json",
+    "scope": "retained separately from formal profiles and formal latency matrix"
+  },
+  "profiles": [
+    {
+      "artifacts": {
+        "catalog": {
+          "bytes": 4865,
+          "path": "profiles/before-buffered/stat/report-catalog.json",
+          "sha256": "6d8d89e4e53f661f23a5226179b7ac0c0a222f8f9042cd51e7a7ddfa84a4a34f"
+        },
+        "oracle_log": {
+          "bytes": 20,
+          "path": "profiles/before-buffered/stat/oracle.log",
+          "sha256": "a5877c6ed4457d98d613157c653b24aac2870f55ea0cd32e928f55acfac72489"
+        },
+        "perf_stat": {
+          "bytes": 263,
+          "path": "profiles/before-buffered/stat/perf-stat.txt",
+          "sha256": "41e2794332b87e64dbbbade6da7cdaaeade8f0319a282bb461274896d6b89684"
+        },
+        "report": {
+          "bytes": 33039,
+          "path": "profiles/before-buffered/stat/report.json",
+          "sha256": "a4b3dd59d51e9392f807a4a3852220426da8b61bfe0c24c7d966557934414f71"
+        },
+        "resource": {
+          "bytes": 1308,
+          "path": "profiles/before-buffered/stat/resource.log",
+          "sha256": "bddb4a420caccc46fd2bf3d35cb2c9767477a7f81457c1e91ed40307be3f82b7"
+        },
+        "workload_log": {
+          "bytes": 0,
+          "path": "profiles/before-buffered/stat/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "attempt": "formal",
+      "binary": {
+        "bytes": 454914992,
+        "path": "/tmp/litchi-goal-0435-binaries/before/normal",
+        "sha256": "d361b865157da6ae69d69d4e515bfdfec608cc2d4e3bca2dc10c603b3e922f2b"
+      },
+      "claims": [],
+      "driver_sha256": "36f7fa57dbfd79c9f1754703a163c9299e049deaf625c4f2ee8477941d6a1932",
+      "kind": "stat",
+      "oracle_verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+      "pmu": {
+        "branch_miss_rate": {
+          "percent": 0.16691365729272073,
+          "status": "available"
+        },
+        "events": {
+          "L1-dcache-load-misses:u": {
+            "count": 0,
+            "running_percent": "100.00",
+            "status": "available"
+          },
+          "branch-misses:u": {
+            "count": 5119622,
+            "running_percent": "100.00",
+            "status": "available"
+          },
+          "branches:u": {
+            "count": 3067227741,
+            "running_percent": "100.00",
+            "status": "available"
+          },
+          "cycles:u": {
+            "count": 3969285072,
+            "running_percent": "100.00",
+            "status": "available"
+          },
+          "instructions:u": {
+            "count": 14793957047,
+            "running_percent": "100.00",
+            "status": "available"
+          }
+        },
+        "ipc": {
+          "status": "available",
+          "value": 3.727108730828895
+        },
+        "l1_load_count": {
+          "reason": "L1 load denominator was not collected",
+          "status": "missing"
+        },
+        "llc_cache_misses": {
+          "reason": "LLC event was unavailable/not part of the frozen event set",
+          "status": "missing"
+        },
+        "raw_sha256": "41e2794332b87e64dbbbade6da7cdaaeade8f0319a282bb461274896d6b89684",
+        "scope": "perf_stat_whole_process_including_setup_warmups_timed_calls_hashing_oracle"
+      },
+      "protocol_sha256": "cb0b0dcf724c8539d295c964bb3200ec13a518f1c6d16c3990f0c3138e026945",
+      "role": "before-buffered",
+      "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle",
+      "selector": "odt_buffered_create",
+      "shape": "large",
+      "source_custody": {
+        "ambient_source_manifest": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_after": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_before": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_manifest": {
+          "files": 6645,
+          "path": "sources/6790af6a196f132f59db06679e56cd72c4d43b22bbea25ba125314aac3e94609.json",
+          "sha256": "6790af6a196f132f59db06679e56cd72c4d43b22bbea25ba125314aac3e94609"
+        },
+        "source_unchanged": true
+      },
+      "whole_process_rss": {
+        "bytes": 84602880,
+        "kib": 82620,
+        "path": "profiles/before-buffered/stat/resource.log",
+        "scope": "gnu_time_v_verbose_whole_fresh_process_including_setup_warmups_timed_calls_hashing_oracle",
+        "status": "measured"
+      }
+    },
+    {
+      "artifacts": {
+        "catalog": {
+          "bytes": 4865,
+          "path": "profiles/before-buffered/record/report-catalog.json",
+          "sha256": "6d8d89e4e53f661f23a5226179b7ac0c0a222f8f9042cd51e7a7ddfa84a4a34f"
+        },
+        "oracle_log": {
+          "bytes": 20,
+          "path": "profiles/before-buffered/record/oracle.log",
+          "sha256": "a5877c6ed4457d98d613157c653b24aac2870f55ea0cd32e928f55acfac72489"
+        },
+        "perf_data": {
+          "bytes": 216480,
+          "path": "profiles/before-buffered/record/perf.data",
+          "sha256": "6377752e66350e7fc638024cd2731a54df7f45ff854155dc6f8623b9bdf7398a"
+        },
+        "perf_report": {
+          "bytes": 769459,
+          "path": "profiles/before-buffered/record/perf-report.txt",
+          "sha256": "7ae7b3630ce22234edf0c79f83d244b01e40a852d05d741d1a80baff144096fc"
+        },
+        "perf_script": {
+          "bytes": 2588497,
+          "path": "profiles/before-buffered/record/perf-script.txt",
+          "sha256": "fa7121e6e120988d44ef111f4f3d2bc0ea80066a80ad847f8df7bcbd03b3e89e"
+        },
+        "report": {
+          "bytes": 33031,
+          "path": "profiles/before-buffered/record/report.json",
+          "sha256": "fad40a9e8a5441fc69f31eabf50feeb8b99419d68b3d85199d183ffc1440a305"
+        },
+        "resource": {
+          "bytes": 1272,
+          "path": "profiles/before-buffered/record/resource.log",
+          "sha256": "9bd2cc1c1efed7e9ece0cf0f4f761cef61d6d335cb4840cc1b98b1a71f4b2049"
+        },
+        "workload_log": {
+          "bytes": 196,
+          "path": "profiles/before-buffered/record/workload.log",
+          "sha256": "65d2f75bf2fca40e8389a0b1017f75e8bb8f1fe99aecb5ab217d6268f4ec43ee"
+        }
+      },
+      "attempt": "formal",
+      "binary": {
+        "bytes": 454914992,
+        "path": "/tmp/litchi-goal-0435-binaries/before/normal",
+        "sha256": "d361b865157da6ae69d69d4e515bfdfec608cc2d4e3bca2dc10c603b3e922f2b"
+      },
+      "claims": [],
+      "driver_sha256": "36f7fa57dbfd79c9f1754703a163c9299e049deaf625c4f2ee8477941d6a1932",
+      "kind": "record",
+      "oracle_verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+      "pmu": {
+        "branch_miss_rate": {
+          "reason": "branch counters were not collected by this record lane",
+          "status": "missing"
+        },
+        "events": {
+          "L1-dcache-load-misses:u": {
+            "reason": "record lane sampled cycles:u only",
+            "status": "missing"
+          },
+          "branch-misses:u": {
+            "reason": "record lane sampled cycles:u only",
+            "status": "missing"
+          },
+          "branches:u": {
+            "reason": "record lane sampled cycles:u only",
+            "status": "missing"
+          },
+          "cycles:u": {
+            "scope": "perf_record_sampling_event",
+            "status": "available_sampled"
+          },
+          "instructions:u": {
+            "reason": "record lane sampled cycles:u only",
+            "status": "missing"
+          }
+        },
+        "ipc": {
+          "reason": "instructions and cycles counts are not a paired perf-record counter measurement",
+          "status": "missing"
+        },
+        "l1_load_count": {
+          "reason": "L1 load denominator was not collected",
+          "status": "missing"
+        },
+        "llc_cache_misses": {
+          "reason": "LLC event was unavailable/not part of the frozen event set",
+          "status": "missing"
+        },
+        "scope": "perf_record_whole_process_including_setup_warmups_timed_calls_hashing_oracle"
+      },
+      "protocol_sha256": "cb0b0dcf724c8539d295c964bb3200ec13a518f1c6d16c3990f0c3138e026945",
+      "record": {
+        "addr2line_warnings": {
+          "count": 6,
+          "scope": "symbolization_diagnostic_not_lost_sample_count",
+          "status": "available"
+        },
+        "event": {
+          "name": "cycles:u",
+          "status": "available"
+        },
+        "event_count": {
+          "count": 3935541972,
+          "status": "available"
+        },
+        "lost_samples": {
+          "count": 0,
+          "status": "available"
+        },
+        "perf_data": {
+          "bytes": 216480,
+          "path": "profiles/before-buffered/record/perf.data",
+          "sha256": "6377752e66350e7fc638024cd2731a54df7f45ff854155dc6f8623b9bdf7398a"
+        },
+        "perf_script": {
+          "bytes": 2588497,
+          "path": "profiles/before-buffered/record/perf-script.txt",
+          "sha256": "fa7121e6e120988d44ef111f4f3d2bc0ea80066a80ad847f8df7bcbd03b3e89e"
+        },
+        "raw_sha256": "7ae7b3630ce22234edf0c79f83d244b01e40a852d05d741d1a80baff144096fc",
+        "scope": "perf_report_no_children_whole_process_samples",
+        "top_self_rows": [
+          {
+            "overhead_percent": 24.99,
+            "symbol": "[.] sha2::sha256::x86_sha::compress"
+          },
+          {
+            "overhead_percent": 10.31,
+            "symbol": "[.] xml_minifier::audit::verify_with_policy"
+          },
+          {
+            "overhead_percent": 9.57,
+            "symbol": "[.] __memmove_avx512_unaligned_erms"
+          },
+          {
+            "overhead_percent": 6.72,
+            "symbol": "[.] <litchi_odt::elements::element::Element as core::clone::Clone>::clone"
+          },
+          {
+            "overhead_percent": 5.65,
+            "symbol": "[.] zlib_rs::deflate::algorithm::medium::deflate_medium"
+          },
+          {
+            "overhead_percent": 3.86,
+            "symbol": "[.] <litchi_odt::elements::element::Element>::write_xml"
+          },
+          {
+            "overhead_percent": 3.38,
+            "symbol": "[.] _int_malloc"
+          },
+          {
+            "overhead_percent": 3.35,
+            "symbol": "[.] _int_free_merge_chunk"
+          },
+          {
+            "overhead_percent": 2.23,
+            "symbol": "[.] zlib_rs::deflate::longest_match::longest_match"
+          },
+          {
+            "overhead_percent": 2.17,
+            "symbol": "[.] __memcmp_evex_movbe"
+          },
+          {
+            "overhead_percent": 1.9,
+            "symbol": "[.] <litchi_odt::builder::model::Builder>::generate_content_body"
+          },
+          {
+            "overhead_percent": 1.54,
+            "symbol": "[.] malloc"
+          },
+          {
+            "overhead_percent": 1.45,
+            "symbol": "[.] <litchi_odt::elements::element::Element>::new"
+          },
+          {
+            "overhead_percent": 1.18,
+            "symbol": "[.] unlink_chunk.isra.0"
+          },
+          {
+            "overhead_percent": 1.12,
+            "symbol": "[.] <alloc::string::String as core::clone::Clone>::clone"
+          },
+          {
+            "overhead_percent": 0.99,
+            "symbol": "[.] <litchi_odt::elements::element::Element>::to_xml_string"
+          },
+          {
+            "overhead_percent": 0.89,
+            "symbol": "[.] core::str::converts::from_utf8"
+          },
+          {
+            "overhead_percent": 0.78,
+            "symbol": "[.] _int_free_chunk"
+          },
+          {
+            "overhead_percent": 0.75,
+            "symbol": "[.] realloc"
+          },
+          {
+            "overhead_percent": 0.67,
+            "symbol": "[.] _int_free_maybe_trim"
+          }
+        ]
+      },
+      "role": "before-buffered",
+      "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle",
+      "selector": "odt_buffered_create",
+      "shape": "large",
+      "source_custody": {
+        "ambient_source_manifest": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_after": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_before": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_manifest": {
+          "files": 6645,
+          "path": "sources/6790af6a196f132f59db06679e56cd72c4d43b22bbea25ba125314aac3e94609.json",
+          "sha256": "6790af6a196f132f59db06679e56cd72c4d43b22bbea25ba125314aac3e94609"
+        },
+        "source_unchanged": true
+      },
+      "whole_process_rss": {
+        "bytes": 84672512,
+        "kib": 82688,
+        "path": "profiles/before-buffered/record/resource.log",
+        "scope": "gnu_time_v_verbose_whole_fresh_process_including_setup_warmups_timed_calls_hashing_oracle",
+        "status": "measured"
+      }
+    },
+    {
+      "artifacts": {
+        "catalog": {
+          "bytes": 4865,
+          "path": "profiles/after-buffered/stat/report-catalog.json",
+          "sha256": "6d8d89e4e53f661f23a5226179b7ac0c0a222f8f9042cd51e7a7ddfa84a4a34f"
+        },
+        "oracle_log": {
+          "bytes": 20,
+          "path": "profiles/after-buffered/stat/oracle.log",
+          "sha256": "a5877c6ed4457d98d613157c653b24aac2870f55ea0cd32e928f55acfac72489"
+        },
+        "perf_stat": {
+          "bytes": 263,
+          "path": "profiles/after-buffered/stat/perf-stat.txt",
+          "sha256": "d8221b41c95729de3b899fdfdfb9ab8467070820979c7b4c7f8a06c931fce1e9"
+        },
+        "report": {
+          "bytes": 33059,
+          "path": "profiles/after-buffered/stat/report.json",
+          "sha256": "7b7f8e0290f310b772dd673622411b4c51c43867dfba371c01ec840bed36f123"
+        },
+        "resource": {
+          "bytes": 1300,
+          "path": "profiles/after-buffered/stat/resource.log",
+          "sha256": "562cd56cbfd18ebb8aa6c21e00d5c4e5437a50bd96cca83f36327bbfa8136371"
+        },
+        "workload_log": {
+          "bytes": 0,
+          "path": "profiles/after-buffered/stat/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "attempt": "formal",
+      "binary": {
+        "bytes": 455987480,
+        "path": "/tmp/litchi-goal-0435-binaries/after/normal",
+        "sha256": "5e75ca3927ba274bfba86af2637c22b5a2985972d81caf6e7578ebed6ac3d97a"
+      },
+      "claims": [],
+      "driver_sha256": "36f7fa57dbfd79c9f1754703a163c9299e049deaf625c4f2ee8477941d6a1932",
+      "kind": "stat",
+      "oracle_verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+      "pmu": {
+        "branch_miss_rate": {
+          "percent": 0.14714622840912023,
+          "status": "available"
+        },
+        "events": {
+          "L1-dcache-load-misses:u": {
+            "count": 0,
+            "running_percent": "100.00",
+            "status": "available"
+          },
+          "branch-misses:u": {
+            "count": 4524536,
+            "running_percent": "100.00",
+            "status": "available"
+          },
+          "branches:u": {
+            "count": 3074856929,
+            "running_percent": "100.00",
+            "status": "available"
+          },
+          "cycles:u": {
+            "count": 3932364219,
+            "running_percent": "100.00",
+            "status": "available"
+          },
+          "instructions:u": {
+            "count": 14824693689,
+            "running_percent": "100.00",
+            "status": "available"
+          }
+        },
+        "ipc": {
+          "status": "available",
+          "value": 3.7699187723689334
+        },
+        "l1_load_count": {
+          "reason": "L1 load denominator was not collected",
+          "status": "missing"
+        },
+        "llc_cache_misses": {
+          "reason": "LLC event was unavailable/not part of the frozen event set",
+          "status": "missing"
+        },
+        "raw_sha256": "d8221b41c95729de3b899fdfdfb9ab8467070820979c7b4c7f8a06c931fce1e9",
+        "scope": "perf_stat_whole_process_including_setup_warmups_timed_calls_hashing_oracle"
+      },
+      "protocol_sha256": "cb0b0dcf724c8539d295c964bb3200ec13a518f1c6d16c3990f0c3138e026945",
+      "role": "after-buffered",
+      "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle",
+      "selector": "odt_buffered_create",
+      "shape": "large",
+      "source_custody": {
+        "ambient_source_manifest": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_after": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_before": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_manifest": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_unchanged": true
+      },
+      "whole_process_rss": {
+        "bytes": 84721664,
+        "kib": 82736,
+        "path": "profiles/after-buffered/stat/resource.log",
+        "scope": "gnu_time_v_verbose_whole_fresh_process_including_setup_warmups_timed_calls_hashing_oracle",
+        "status": "measured"
+      }
+    },
+    {
+      "artifacts": {
+        "catalog": {
+          "bytes": 4865,
+          "path": "profiles/after-buffered/record/report-catalog.json",
+          "sha256": "6d8d89e4e53f661f23a5226179b7ac0c0a222f8f9042cd51e7a7ddfa84a4a34f"
+        },
+        "oracle_log": {
+          "bytes": 20,
+          "path": "profiles/after-buffered/record/oracle.log",
+          "sha256": "a5877c6ed4457d98d613157c653b24aac2870f55ea0cd32e928f55acfac72489"
+        },
+        "perf_data": {
+          "bytes": 217608,
+          "path": "profiles/after-buffered/record/perf.data",
+          "sha256": "13ffb6a9d5400c7dc8a03dfc1b46681e4ce1261d2393d5aab55086c42a9bfac6"
+        },
+        "perf_report": {
+          "bytes": 786689,
+          "path": "profiles/after-buffered/record/perf-report.txt",
+          "sha256": "fe26ec470b87c65b27eed0f8fd50926a99afe81a2062bdec51725402f9cb1d8d"
+        },
+        "perf_script": {
+          "bytes": 2605298,
+          "path": "profiles/after-buffered/record/perf-script.txt",
+          "sha256": "c8cc992c96d0f63410b51be301930d661be08e526ccc96a5a128c9c3242723d7"
+        },
+        "report": {
+          "bytes": 33067,
+          "path": "profiles/after-buffered/record/report.json",
+          "sha256": "0682b059c9628684b8d9aa909fc2bf403cec258a6e5bec000867549bfcfda8d2"
+        },
+        "resource": {
+          "bytes": 1268,
+          "path": "profiles/after-buffered/record/resource.log",
+          "sha256": "1ac27bda73f489bfb1dea7ea1dd2524e190cbcef977871313ab4bb00c927a902"
+        },
+        "workload_log": {
+          "bytes": 195,
+          "path": "profiles/after-buffered/record/workload.log",
+          "sha256": "0eebbc5afc3d329ec545b4d9634c38267c8ed87dac5c6d0e3ef9f7d278653386"
+        }
+      },
+      "attempt": "formal",
+      "binary": {
+        "bytes": 455987480,
+        "path": "/tmp/litchi-goal-0435-binaries/after/normal",
+        "sha256": "5e75ca3927ba274bfba86af2637c22b5a2985972d81caf6e7578ebed6ac3d97a"
+      },
+      "claims": [],
+      "driver_sha256": "36f7fa57dbfd79c9f1754703a163c9299e049deaf625c4f2ee8477941d6a1932",
+      "kind": "record",
+      "oracle_verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+      "pmu": {
+        "branch_miss_rate": {
+          "reason": "branch counters were not collected by this record lane",
+          "status": "missing"
+        },
+        "events": {
+          "L1-dcache-load-misses:u": {
+            "reason": "record lane sampled cycles:u only",
+            "status": "missing"
+          },
+          "branch-misses:u": {
+            "reason": "record lane sampled cycles:u only",
+            "status": "missing"
+          },
+          "branches:u": {
+            "reason": "record lane sampled cycles:u only",
+            "status": "missing"
+          },
+          "cycles:u": {
+            "scope": "perf_record_sampling_event",
+            "status": "available_sampled"
+          },
+          "instructions:u": {
+            "reason": "record lane sampled cycles:u only",
+            "status": "missing"
+          }
+        },
+        "ipc": {
+          "reason": "instructions and cycles counts are not a paired perf-record counter measurement",
+          "status": "missing"
+        },
+        "l1_load_count": {
+          "reason": "L1 load denominator was not collected",
+          "status": "missing"
+        },
+        "llc_cache_misses": {
+          "reason": "LLC event was unavailable/not part of the frozen event set",
+          "status": "missing"
+        },
+        "scope": "perf_record_whole_process_including_setup_warmups_timed_calls_hashing_oracle"
+      },
+      "protocol_sha256": "cb0b0dcf724c8539d295c964bb3200ec13a518f1c6d16c3990f0c3138e026945",
+      "record": {
+        "addr2line_warnings": {
+          "count": 7,
+          "scope": "symbolization_diagnostic_not_lost_sample_count",
+          "status": "available"
+        },
+        "event": {
+          "name": "cycles:u",
+          "status": "available"
+        },
+        "event_count": {
+          "count": 3903716262,
+          "status": "available"
+        },
+        "lost_samples": {
+          "count": 0,
+          "status": "available"
+        },
+        "perf_data": {
+          "bytes": 217608,
+          "path": "profiles/after-buffered/record/perf.data",
+          "sha256": "13ffb6a9d5400c7dc8a03dfc1b46681e4ce1261d2393d5aab55086c42a9bfac6"
+        },
+        "perf_script": {
+          "bytes": 2605298,
+          "path": "profiles/after-buffered/record/perf-script.txt",
+          "sha256": "c8cc992c96d0f63410b51be301930d661be08e526ccc96a5a128c9c3242723d7"
+        },
+        "raw_sha256": "fe26ec470b87c65b27eed0f8fd50926a99afe81a2062bdec51725402f9cb1d8d",
+        "scope": "perf_report_no_children_whole_process_samples",
+        "top_self_rows": [
+          {
+            "overhead_percent": 25.46,
+            "symbol": "[.] sha2::sha256::x86_sha::compress"
+          },
+          {
+            "overhead_percent": 10.74,
+            "symbol": "[.] __memmove_avx512_unaligned_erms"
+          },
+          {
+            "overhead_percent": 9.26,
+            "symbol": "[.] xml_minifier::audit::verify_with_policy"
+          },
+          {
+            "overhead_percent": 5.51,
+            "symbol": "[.] <litchi_odt::elements::element::Element>::write_xml"
+          },
+          {
+            "overhead_percent": 4.85,
+            "symbol": "[.] zlib_rs::deflate::algorithm::medium::deflate_medium"
+          },
+          {
+            "overhead_percent": 4.52,
+            "symbol": "[.] <litchi_odt::elements::element::Element as core::clone::Clone>::clone"
+          },
+          {
+            "overhead_percent": 2.88,
+            "symbol": "[.] zlib_rs::deflate::longest_match::longest_match"
+          },
+          {
+            "overhead_percent": 2.6,
+            "symbol": "[.] _int_malloc"
+          },
+          {
+            "overhead_percent": 2.38,
+            "symbol": "[.] <litchi_odt::builder::model::Builder>::generate_content_body"
+          },
+          {
+            "overhead_percent": 2.33,
+            "symbol": "[.] _int_free_merge_chunk"
+          },
+          {
+            "overhead_percent": 1.73,
+            "symbol": "[.] __memcmp_evex_movbe"
+          },
+          {
+            "overhead_percent": 1.63,
+            "symbol": "[.] <litchi_odt::elements::element::Element>::new"
+          },
+          {
+            "overhead_percent": 1.52,
+            "symbol": "[.] <litchi_odt::elements::element::Element>::to_xml_string"
+          },
+          {
+            "overhead_percent": 1.23,
+            "symbol": "[.] cfree@GLIBC_2.2.5"
+          },
+          {
+            "overhead_percent": 1.0,
+            "symbol": "[.] zlib_rs::deflate::flush_block_only"
+          },
+          {
+            "overhead_percent": 0.99,
+            "symbol": "[.] unlink_chunk.isra.0"
+          },
+          {
+            "overhead_percent": 0.89,
+            "symbol": "[.] <core::fmt::Formatter>::pad_integral"
+          },
+          {
+            "overhead_percent": 0.89,
+            "symbol": "[k] 0xffffffff8c800ef0"
+          },
+          {
+            "overhead_percent": 0.88,
+            "symbol": "[.] <litchi_odt::elements::element::Element>::estimated_xml_len"
+          },
+          {
+            "overhead_percent": 0.84,
+            "symbol": "[.] litchi_odt::elements::text::parse_text_block_texts"
+          }
+        ]
+      },
+      "role": "after-buffered",
+      "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle",
+      "selector": "odt_buffered_create",
+      "shape": "large",
+      "source_custody": {
+        "ambient_source_manifest": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_after": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_before": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_manifest": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_unchanged": true
+      },
+      "whole_process_rss": {
+        "bytes": 84672512,
+        "kib": 82688,
+        "path": "profiles/after-buffered/record/resource.log",
+        "scope": "gnu_time_v_verbose_whole_fresh_process_including_setup_warmups_timed_calls_hashing_oracle",
+        "status": "measured"
+      }
+    },
+    {
+      "artifacts": {
+        "catalog": {
+          "bytes": 4872,
+          "path": "profiles/after-streaming/stat/report-catalog.json",
+          "sha256": "0f60ab43b5b2b7a8bceda3427d7d4c7358443ee570971b574a13a9bbe268cc2b"
+        },
+        "oracle_log": {
+          "bytes": 20,
+          "path": "profiles/after-streaming/stat/oracle.log",
+          "sha256": "a5877c6ed4457d98d613157c653b24aac2870f55ea0cd32e928f55acfac72489"
+        },
+        "perf_stat": {
+          "bytes": 264,
+          "path": "profiles/after-streaming/stat/perf-stat.txt",
+          "sha256": "3559d61f7adb02878e58933284c667004b3e49af3c59fb95c0b0802d7f5438d4"
+        },
+        "report": {
+          "bytes": 33342,
+          "path": "profiles/after-streaming/stat/report.json",
+          "sha256": "b2eda35faec18db01b9c578439c63c06f902bcc519bc549a07d4876edd700d97"
+        },
+        "resource": {
+          "bytes": 1304,
+          "path": "profiles/after-streaming/stat/resource.log",
+          "sha256": "cae41a2e94644c10ddb595e8e5d5f81dac0b4e9e65f3974c6b3a960025e70fbb"
+        },
+        "workload_log": {
+          "bytes": 0,
+          "path": "profiles/after-streaming/stat/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "attempt": "formal",
+      "binary": {
+        "bytes": 455987480,
+        "path": "/tmp/litchi-goal-0435-binaries/after/normal",
+        "sha256": "5e75ca3927ba274bfba86af2637c22b5a2985972d81caf6e7578ebed6ac3d97a"
+      },
+      "claims": [],
+      "driver_sha256": "36f7fa57dbfd79c9f1754703a163c9299e049deaf625c4f2ee8477941d6a1932",
+      "kind": "stat",
+      "oracle_verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+      "pmu": {
+        "branch_miss_rate": {
+          "percent": 0.29344771235270195,
+          "status": "available"
+        },
+        "events": {
+          "L1-dcache-load-misses:u": {
+            "count": 0,
+            "running_percent": "100.00",
+            "status": "available"
+          },
+          "branch-misses:u": {
+            "count": 19821738,
+            "running_percent": "100.00",
+            "status": "available"
+          },
+          "branches:u": {
+            "count": 6754776802,
+            "running_percent": "100.00",
+            "status": "available"
+          },
+          "cycles:u": {
+            "count": 9850235983,
+            "running_percent": "100.00",
+            "status": "available"
+          },
+          "instructions:u": {
+            "count": 35990868954,
+            "running_percent": "100.00",
+            "status": "available"
+          }
+        },
+        "ipc": {
+          "status": "available",
+          "value": 3.6538077885763074
+        },
+        "l1_load_count": {
+          "reason": "L1 load denominator was not collected",
+          "status": "missing"
+        },
+        "llc_cache_misses": {
+          "reason": "LLC event was unavailable/not part of the frozen event set",
+          "status": "missing"
+        },
+        "raw_sha256": "3559d61f7adb02878e58933284c667004b3e49af3c59fb95c0b0802d7f5438d4",
+        "scope": "perf_stat_whole_process_including_setup_warmups_timed_calls_hashing_oracle"
+      },
+      "protocol_sha256": "cb0b0dcf724c8539d295c964bb3200ec13a518f1c6d16c3990f0c3138e026945",
+      "role": "after-streaming",
+      "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle",
+      "selector": "odt_streaming_create",
+      "shape": "large",
+      "source_custody": {
+        "ambient_source_manifest": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_after": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_before": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_manifest": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_unchanged": true
+      },
+      "whole_process_rss": {
+        "bytes": 84713472,
+        "kib": 82728,
+        "path": "profiles/after-streaming/stat/resource.log",
+        "scope": "gnu_time_v_verbose_whole_fresh_process_including_setup_warmups_timed_calls_hashing_oracle",
+        "status": "measured"
+      }
+    },
+    {
+      "artifacts": {
+        "catalog": {
+          "bytes": 4872,
+          "path": "profiles/after-streaming/record/report-catalog.json",
+          "sha256": "0f60ab43b5b2b7a8bceda3427d7d4c7358443ee570971b574a13a9bbe268cc2b"
+        },
+        "oracle_log": {
+          "bytes": 20,
+          "path": "profiles/after-streaming/record/oracle.log",
+          "sha256": "a5877c6ed4457d98d613157c653b24aac2870f55ea0cd32e928f55acfac72489"
+        },
+        "perf_data": {
+          "bytes": 489304,
+          "path": "profiles/after-streaming/record/perf.data",
+          "sha256": "e3e3521d32bd2ea9700732964ba831be6d7cfbb69a456a258412587aaea23bbf"
+        },
+        "perf_report": {
+          "bytes": 1702395,
+          "path": "profiles/after-streaming/record/perf-report.txt",
+          "sha256": "8df31a4384e41e4890735f98a26a57fc0c6618505b0c39b63812ac80d7d126f0"
+        },
+        "perf_script": {
+          "bytes": 12965459,
+          "path": "profiles/after-streaming/record/perf-script.txt",
+          "sha256": "f4d4e55c24be7aa6cf00c4258cf94198bbe71aa170220483db110e04598984cd"
+        },
+        "report": {
+          "bytes": 33341,
+          "path": "profiles/after-streaming/record/report.json",
+          "sha256": "2c57510dc5a1709a9c055fa81e0cf2058ed2b9d357617f92baa8a394e3fc19d6"
+        },
+        "resource": {
+          "bytes": 1273,
+          "path": "profiles/after-streaming/record/resource.log",
+          "sha256": "ed6426342e9d8305977a206aa17ce6c44ed308032ce539ee4bd4c0c262a00829"
+        },
+        "workload_log": {
+          "bytes": 196,
+          "path": "profiles/after-streaming/record/workload.log",
+          "sha256": "2b7f66cd44d77a9b7a55d8740818a1c648cf39b1f5ee8ede7823d2e92b55e2fa"
+        }
+      },
+      "attempt": "formal",
+      "binary": {
+        "bytes": 455987480,
+        "path": "/tmp/litchi-goal-0435-binaries/after/normal",
+        "sha256": "5e75ca3927ba274bfba86af2637c22b5a2985972d81caf6e7578ebed6ac3d97a"
+      },
+      "claims": [],
+      "driver_sha256": "36f7fa57dbfd79c9f1754703a163c9299e049deaf625c4f2ee8477941d6a1932",
+      "kind": "record",
+      "oracle_verifier_sha256": "d75d54313a333b94589e7f0a32a9e5f508ead5ce989a96b345d7e9dd60a60ba1",
+      "pmu": {
+        "branch_miss_rate": {
+          "reason": "branch counters were not collected by this record lane",
+          "status": "missing"
+        },
+        "events": {
+          "L1-dcache-load-misses:u": {
+            "reason": "record lane sampled cycles:u only",
+            "status": "missing"
+          },
+          "branch-misses:u": {
+            "reason": "record lane sampled cycles:u only",
+            "status": "missing"
+          },
+          "branches:u": {
+            "reason": "record lane sampled cycles:u only",
+            "status": "missing"
+          },
+          "cycles:u": {
+            "scope": "perf_record_sampling_event",
+            "status": "available_sampled"
+          },
+          "instructions:u": {
+            "reason": "record lane sampled cycles:u only",
+            "status": "missing"
+          }
+        },
+        "ipc": {
+          "reason": "instructions and cycles counts are not a paired perf-record counter measurement",
+          "status": "missing"
+        },
+        "l1_load_count": {
+          "reason": "L1 load denominator was not collected",
+          "status": "missing"
+        },
+        "llc_cache_misses": {
+          "reason": "LLC event was unavailable/not part of the frozen event set",
+          "status": "missing"
+        },
+        "scope": "perf_record_whole_process_including_setup_warmups_timed_calls_hashing_oracle"
+      },
+      "protocol_sha256": "cb0b0dcf724c8539d295c964bb3200ec13a518f1c6d16c3990f0c3138e026945",
+      "record": {
+        "addr2line_warnings": {
+          "count": 8,
+          "scope": "symbolization_diagnostic_not_lost_sample_count",
+          "status": "available"
+        },
+        "event": {
+          "name": "cycles:u",
+          "status": "available"
+        },
+        "event_count": {
+          "count": 9731562193,
+          "status": "available"
+        },
+        "lost_samples": {
+          "count": 0,
+          "status": "available"
+        },
+        "perf_data": {
+          "bytes": 489304,
+          "path": "profiles/after-streaming/record/perf.data",
+          "sha256": "e3e3521d32bd2ea9700732964ba831be6d7cfbb69a456a258412587aaea23bbf"
+        },
+        "perf_script": {
+          "bytes": 12965459,
+          "path": "profiles/after-streaming/record/perf-script.txt",
+          "sha256": "f4d4e55c24be7aa6cf00c4258cf94198bbe71aa170220483db110e04598984cd"
+        },
+        "raw_sha256": "8df31a4384e41e4890735f98a26a57fc0c6618505b0c39b63812ac80d7d126f0",
+        "scope": "perf_report_no_children_whole_process_samples",
+        "top_self_rows": [
+          {
+            "overhead_percent": 45.74,
+            "symbol": "[.] <litchi_core::execution::ExecutionContext>::consume"
+          },
+          {
+            "overhead_percent": 10.28,
+            "symbol": "[.] sha2::sha256::x86_sha::compress"
+          },
+          {
+            "overhead_percent": 6.39,
+            "symbol": "[.] xml_minifier::audit::verify_with_policy"
+          },
+          {
+            "overhead_percent": 5.75,
+            "symbol": "[.] __memset_avx512_unaligned_erms"
+          },
+          {
+            "overhead_percent": 3.85,
+            "symbol": "[.] litchi_odf_common::core::generated_xml::validate_fragment_shape"
+          },
+          {
+            "overhead_percent": 3.35,
+            "symbol": "[.] crc32fast::baseline::update_fast_16"
+          },
+          {
+            "overhead_percent": 2.94,
+            "symbol": "[.] zlib_rs::deflate::algorithm::medium::deflate_medium"
+          },
+          {
+            "overhead_percent": 1.85,
+            "symbol": "[.] zlib_rs::deflate::longest_match::longest_match"
+          },
+          {
+            "overhead_percent": 1.58,
+            "symbol": "[.] litchi_odt::streaming::validate_plain_text"
+          },
+          {
+            "overhead_percent": 1.49,
+            "symbol": "[.] <litchi_core::execution::ExecutionContext>::check"
+          },
+          {
+            "overhead_percent": 1.09,
+            "symbol": "[.] alloc::fmt::format::format_inner"
+          },
+          {
+            "overhead_percent": 0.95,
+            "symbol": "[.] malloc"
+          },
+          {
+            "overhead_percent": 0.91,
+            "symbol": "[.] core::str::converts::from_utf8"
+          },
+          {
+            "overhead_percent": 0.88,
+            "symbol": "[.] __memmove_avx512_unaligned_erms"
+          },
+          {
+            "overhead_percent": 0.86,
+            "symbol": "[.] <quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+          },
+          {
+            "overhead_percent": 0.86,
+            "symbol": "[.] <quick_xml::reader::state::ReaderState>::emit_start"
+          },
+          {
+            "overhead_percent": 0.63,
+            "symbol": "[.] <quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+          },
+          {
+            "overhead_percent": 0.49,
+            "symbol": "[.] <memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+          },
+          {
+            "overhead_percent": 0.42,
+            "symbol": "[.] __memcmp_evex_movbe"
+          },
+          {
+            "overhead_percent": 0.41,
+            "symbol": "[.] <memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2"
+          }
+        ]
+      },
+      "role": "after-streaming",
+      "scope": "whole fresh process including setup, corpus generation, warmups, samples, output hashing, and oracle",
+      "selector": "odt_streaming_create",
+      "shape": "large",
+      "source_custody": {
+        "ambient_source_manifest": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_after": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_before": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_manifest": {
+          "files": 6649,
+          "path": "sources/097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f.json",
+          "sha256": "097caa2eaab6d5f17fa51915efe5ad9b14144c6426b32b05c4969d7807747c3f"
+        },
+        "source_unchanged": true
+      },
+      "whole_process_rss": {
+        "bytes": 84721664,
+        "kib": 82736,
+        "path": "profiles/after-streaming/record/resource.log",
+        "scope": "gnu_time_v_verbose_whole_fresh_process_including_setup_warmups_timed_calls_hashing_oracle",
+        "status": "measured"
+      }
+    }
+  ],
+  "protocol_sha256": "cb0b0dcf724c8539d295c964bb3200ec13a518f1c6d16c3990f0c3138e026945",
+  "schema_version": 1
+}

@@ -1,5 +1,27 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0435: bounded ODT creation and its CPU tradeoff
+
+[0435](changes/0435-odt-bounded-plain-paragraphs.md) adds opt-in `odt_buffered_create` and `odt_streaming_create`
+selectors and a bounded fresh plaintext ODT sink API. The formal three-role
+forward/reverse matrix retains 36 reports, 1,080 samples, and six profiles.
+At 32,768 paragraphs, streaming's operation allocator peak is 420,091 bytes
+versus 22,450,985 buffered, and requested allocation bytes are 86.159% lower.
+Normal p50 latency is 3.351 / 3.369 times the candidate Builder's in R1/R2;
+whole-process RSS is essentially unchanged. All 38 matched review flags and
+10 repeat flags remain visible, including the same-API buffered medium R2
++7.983% p50 regression. No general latency or RSS improvement is claimed.
+
+The final ODT/common suite passes 1,445 tests (one existing ignored), and the
+standalone harness passes 315 (one existing ignored). Scoped production Clippy,
+documentation, format, and boundaries pass; existing strict debt is retained.
+The new API is kept as a measured bounded sequential-publication enabler.
+The streaming whole-process profile assigns 45.74% self samples to
+`ExecutionContext::consume`, making bounded ODT text Work batching the next
+hypothesis before ODP creation. Copied verification and eight mutation probes pass before and after cleanup;
+five task scratch directories were removed with shared targets and the user goal
+preserved. The original non-iWork goal remains open.
+
 ## Change 0434: ODS borrowed text-span comparison
 
 [0434](changes/0434-ods-bounded-text-spans.md) compares the existing ODS

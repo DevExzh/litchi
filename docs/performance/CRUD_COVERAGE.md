@@ -1,5 +1,18 @@
 # Performance CRUD coverage
 
+## 2026-09-06: change 0435 measures fresh ODT paragraph streams
+
+[0435](changes/0435-odt-bounded-plain-paragraphs.md) adds scalable buffered and
+bounded streaming ODT creation selectors for 64/8,192/32,768 paragraphs.
+Thirty-six reports and six profiles bind paragraph semantics, five-member
+topology, manifest entries, fixed styles/meta, deterministic per-role output,
+source/build identities, and explicit sink windows. Cross-API content XML/ZIP
+framing may differ. The measured memory improvement comes with a substantial
+CPU regression; all flags remain in the result bundle. Fresh plaintext creation
+covers a bounded slice of creation and incremental generation taxonomy only.
+Existing-document append, package-Part addition, repackaging, rich authoring,
+native runtime validation, cold/range I/O, and scaling are still open.
+
 ## 2026-09-06: change 0434 compares ODS text-span encoding
 
 [0434](changes/0434-ods-bounded-text-spans.md) reuses the existing opt-in
