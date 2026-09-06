@@ -66,7 +66,7 @@ fn owned_sink_matches_text_for_rows_repetition_tabs_and_empty_boundaries() {
     assert_eq!(output, expected.as_bytes());
     assert_eq!(bytes, expected.len() as u64);
     assert_eq!(objects, 4);
-    assert_eq!(expected, "  left  right  \t尾\nsame\tsame\nsame\tsame\n");
+    assert_eq!(expected, "  left & right  \t尾\nsame\tsame\nsame\tsame\n");
 }
 
 #[test]

@@ -41,12 +41,12 @@ pub(crate) fn decode(reference: &[u8]) -> Result<char, Error> {
 
     let reference = core::str::from_utf8(reference).map_err(|_| Error::InvalidUtf8)?;
     let value = if let Some(hexadecimal) = reference.strip_prefix("#x") {
-        if hexadecimal.is_empty() {
+        if hexadecimal.is_empty() || !hexadecimal.bytes().all(|byte| byte.is_ascii_hexdigit()) {
             return Err(Error::InvalidNumber);
         }
         u32::from_str_radix(hexadecimal, 16).map_err(|_| Error::InvalidNumber)?
     } else if let Some(decimal) = reference.strip_prefix('#') {
-        if decimal.is_empty() {
+        if decimal.is_empty() || !decimal.bytes().all(|byte| byte.is_ascii_digit()) {
             return Err(Error::InvalidNumber);
         }
         decimal.parse::<u32>().map_err(|_| Error::InvalidNumber)?
@@ -84,7 +84,15 @@ mod tests {
 
     #[test]
     fn rejects_unknown_and_non_xml_1_0_references() {
-        for reference in [b"bogus".as_slice(), b"#".as_slice(), b"#x".as_slice()] {
+        for reference in [
+            b"bogus".as_slice(),
+            b"#".as_slice(),
+            b"#x".as_slice(),
+            b"#+65".as_slice(),
+            b"#x+41".as_slice(),
+            b"# 65".as_slice(),
+            b"#x 41".as_slice(),
+        ] {
             assert!(decode(reference).is_err(), "{reference:?}");
         }
         for reference in [
@@ -94,7 +102,11 @@ mod tests {
             b"#xD800".as_slice(),
             b"#x110000".as_slice(),
         ] {
-            assert_eq!(decode(reference), Err(Error::IllegalCharacter), "{reference:?}");
+            assert_eq!(
+                decode(reference),
+                Err(Error::IllegalCharacter),
+                "{reference:?}"
+            );
         }
     }
 }
