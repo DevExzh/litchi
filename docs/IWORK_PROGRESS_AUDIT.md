@@ -702,7 +702,7 @@ changes remain in the hand-built fixture.
 Boundary verification passes 944 cases, and the full scanner passes for 64
 packages and 238 internal dependency declarations with 11 explicit migration
 debt items. Production all-feature library Clippy and all 242 host Keynote editor
-tests pass. Normal workspace hooks remain pending.
+tests pass. Normal workspace hooks passed in commit `ef9784512`.
 
 Unknown payload ownership remains within the existing metadata-authoritative
 scope; no proof for all future unknown ownership is claimed. This retirement
@@ -710,3 +710,20 @@ receipt remains limited to the four selected raw lifecycle methods.
 Caption/title/stand-in comment forms remain unsupported and are not previously
 supported host comment CRUD surfaces; unknown-reference completeness remains
 open, and the existing host APIs remain retained where those gates apply.
+
+
+### Final raw media lifecycle retirement receipt (2026-09-07)
+
+Commit `ef9784512` retires the four raw Keynote movie/audio duplication and
+removal APIs, their result types and private lifecycle helpers, and four
+obsolete examples. Normal hooks passed formatting, workspace all-feature
+library lint, workspace all-feature library/integration tests, and workspace
+documentation tests. The native audio fixtures and all 242 host editor tests
+pass; boundary verification reports 944 cases and 64 packages, 238 internal
+dependency declarations, and 11 explicit migration debt items.
+
+The owned `/private/tmp/litchi-media-retirement-20260907w` directory was removed:
+14 temporary files totaling 3,865,199 bytes. A full `cargo clean` removed
+14,001 files and 9.4 GiB, leaving approximately 62 GiB free. The two native
+fixtures remain tracked. The monolith exit remains active; creation, richer
+media properties/readers, and audio positioning still require focused owners.
