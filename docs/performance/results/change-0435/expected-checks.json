@@ -65,6 +65,7 @@
   "checks/provider-focused-v3": "pass",
   "checks/task-cleanup": "pass",
   "checks/terminal-drivers-syntax": "pass",
+  "checks/tracked-whitespace-final": "pass",
   "checks/typed-xml-focused": "failed",
   "checks/typed-xml-focused-v2": "pass",
   "pilots/after-buffered/initial/allocator-large-receipt": "pass",
