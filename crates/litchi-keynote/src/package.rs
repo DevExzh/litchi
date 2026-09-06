@@ -101,6 +101,9 @@ pub use image_adjustments::{
 };
 #[cfg(feature = "internal-iwork-source")]
 pub use slide_movie_playback::__decode_movie_playback_payload;
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use slide_preview::{__invalidate_slide_preview, SlidePreviewInvalidationError};
 
 pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};
 pub use image_adjustments::{

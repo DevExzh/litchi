@@ -75,6 +75,33 @@ pub(super) enum InvalidationError {
     Archive(#[from] litchi_iwa_core::Error),
 }
 
+/// Content-redacted failures at the hidden slide-preview migration seam.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+pub enum SlidePreviewInvalidationError {
+    /// The selected source did not satisfy the strict invalidation contract.
+    #[error("the selected Keynote slide preview source is invalid")]
+    InvalidSource,
+    /// The selected payload exceeded or violated its wire contract.
+    #[error("the selected Keynote slide preview payload is invalid")]
+    Wire,
+    /// The selected archive object failed physical archive validation.
+    #[error("the selected Keynote slide preview archive is invalid")]
+    Archive,
+}
+
+#[cfg(feature = "internal-iwork-source")]
+impl From<InvalidationError> for SlidePreviewInvalidationError {
+    fn from(error: InvalidationError) -> Self {
+        match error {
+            InvalidationError::InvalidSource => Self::InvalidSource,
+            InvalidationError::Wire(_) => Self::Wire,
+            InvalidationError::Archive(_) => Self::Archive,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct InvalidationReport {
     bytes: usize,
@@ -310,6 +337,21 @@ pub(super) fn invalidate(
     let mut budget = ScanBudget::new(wire_limits);
     invalidate_if_needed_inner(object, archive_limits, &mut budget)?;
     Ok(())
+}
+
+/// Invalidate one already-selected slide-preview object for the migration host.
+///
+/// This unstable seam exposes only a content-redacted error classification. It
+/// keeps graph selection and object ownership in the host while retaining the
+/// strict, atomic invalidator in this format adapter.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub fn __invalidate_slide_preview(
+    object: &mut ArchiveObject,
+    archive_limits: ArchiveLimits,
+    wire_limits: WireLimits,
+) -> Result<(), SlidePreviewInvalidationError> {
+    invalidate(object, archive_limits, wire_limits).map_err(Into::into)
 }
 
 pub(super) fn invalidate_if_needed_with_report(
@@ -2073,6 +2115,54 @@ mod tests {
             }))
         ));
         assert_eq!(object, original);
+        Ok(())
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn hidden_bridge_redacts_failures_and_preserves_atomicity() -> Result<(), InvalidationError> {
+        let mut wire_limited = preview_object(false)?;
+        let original = wire_limited.clone();
+        let limits = WireLimits::default().with_fields(1)?;
+        assert_eq!(
+            __invalidate_slide_preview(&mut wire_limited, ArchiveLimits::default(), limits,)
+                .expect_err("wire limit"),
+            SlidePreviewInvalidationError::Wire
+        );
+        assert_eq!(wire_limited, original);
+
+        let mut invalid_source = preview_object(false)?;
+        invalid_source.archive_info.should_merge = Some(true);
+        let original = invalid_source.clone();
+        assert_eq!(
+            __invalidate_slide_preview(
+                &mut invalid_source,
+                ArchiveLimits::default(),
+                WireLimits::default(),
+            )
+            .expect_err("invalid source"),
+            SlidePreviewInvalidationError::InvalidSource
+        );
+        assert_eq!(invalid_source, original);
+
+        let mut invalid_archive = preview_object(false)?;
+        invalid_archive.messages.pop();
+        let original = invalid_archive.clone();
+        assert_eq!(
+            __invalidate_slide_preview(
+                &mut invalid_archive,
+                ArchiveLimits::default(),
+                WireLimits::default(),
+            )
+            .expect_err("invalid archive"),
+            SlidePreviewInvalidationError::Archive
+        );
+        assert_eq!(invalid_archive, original);
+
+        let mut valid = preview_object(false)?;
+        __invalidate_slide_preview(&mut valid, ArchiveLimits::default(), WireLimits::default())
+            .expect("valid preview invalidation");
+        assert!(is_invalidated(&valid, WireLimits::default())?);
         Ok(())
     }
 

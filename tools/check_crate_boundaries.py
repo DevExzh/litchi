@@ -2174,6 +2174,40 @@ IWA_IMAGE_ADJUSTMENTS_HOST_LEGACY_HELPER = re.compile(
     r"\bcrate\s*::\s*image_adjustments\b"
 )
 
+# The Keynote layout editor keeps graph selection and transaction staging, but
+# preview invalidation belongs to the focused package owner.  The compatibility
+# edge may call only the feature-gated hidden bridge; the duplicate host helper
+# and module are tombstoned once the native route lands.
+IWA_KEYNOTE_SLIDE_PREVIEW_SOURCE = IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_preview.rs"
+IWA_KEYNOTE_SLIDE_PREVIEW_MODULE = re.compile(
+    r"(?m)^\s*(?:pub(?:\([^()]*\))?\s+)?mod\s+(?:r#)?slide_preview\s*;"
+)
+IWA_KEYNOTE_SLIDE_LAYOUT_UPDATE_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_layout_update.rs"
+)
+KEYNOTE_SLIDE_PREVIEW_OWNER_SOURCE = KEYNOTE_SOURCE_ROOT / "package" / "slide_preview.rs"
+KEYNOTE_SLIDE_PREVIEW_OWNER_MODULE = re.compile(
+    r"(?m)^\s*mod\s+(?:r#)?slide_preview\s*;"
+)
+KEYNOTE_SLIDE_PREVIEW_SEAM = "__invalidate_slide_preview"
+KEYNOTE_SLIDE_PREVIEW_HIDDEN_SEAM = re.compile(
+    r"(?ms)^(?P<attributes>(?:\s*#\s*\[[^\]]+\]\s*\n)+)"
+    rf"\s*pub\s+fn\s+{re.escape(KEYNOTE_SLIDE_PREVIEW_SEAM)}\s*\("
+    r"(?=[^)]*\bArchiveObject\b)"
+    r"(?=[^)]*\bArchiveLimits\b)"
+    r"(?=[^)]*\bWireLimits\b)"
+)
+KEYNOTE_SLIDE_PREVIEW_GENERATED_DECODER = re.compile(
+    r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?SlideNodeArchive\s*::\s*decode\s*\("
+    r"|\b(?:prost|buffa)\s*::\s*Message\b"
+)
+KEYNOTE_SLIDE_PREVIEW_HOST_CALL = re.compile(
+    rf"\blitchi_keynote\s*::\s*{re.escape(KEYNOTE_SLIDE_PREVIEW_SEAM)}\s*\("
+)
+KEYNOTE_SLIDE_PREVIEW_HOST_LEGACY_CALL = re.compile(
+    r"\b(?:slide_preview|invalidate_slide_preview)\s*::\s*invalidate\s*\("
+)
+
 # Wave87 moves Keynote movie geometry behind a selector-first package facade.
 # Keep this separate from playback/title/caption and from generic image, shape,
 # or audio geometry. Geometry writes own preview invalidation as an explicit
@@ -42172,6 +42206,159 @@ def audit_iwa_shared_image_adjustments_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_keynote_slide_preview_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire duplicate Keynote host preview invalidation ownership."""
+
+    owner_path = root / KEYNOTE_SLIDE_PREVIEW_OWNER_SOURCE
+    if not owner_path.is_file():
+        return []
+
+    package_path = root / KEYNOTE_SOURCE_ROOT / "package.rs"
+    lib_path = root / KEYNOTE_SOURCE_ROOT / "lib.rs"
+    host_source_path = root / IWA_KEYNOTE_SLIDE_LAYOUT_UPDATE_SOURCE
+    host_editor_path = root / IWA_KEYNOTE_EDITOR_SOURCE
+    host_preview_path = root / IWA_KEYNOTE_SLIDE_PREVIEW_SOURCE
+    violations: list[str] = []
+
+    owner_source = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    owner_declaration_source = _mask_rust_comments(owner_source)
+    owner_code = _mask_rust_non_code(owner_source)
+    seam_match = KEYNOTE_SLIDE_PREVIEW_HIDDEN_SEAM.search(owner_declaration_source)
+    if seam_match is None or not (
+        IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(seam_match.group("attributes"))
+        and IWA_DOC_HIDDEN_ATTRIBUTE.search(seam_match.group("attributes"))
+    ):
+        violations.append(
+            "focused litchi-keynote slide-preview owner is missing its "
+            "feature-gated doc(hidden) source seam: "
+            f"{KEYNOTE_SLIDE_PREVIEW_OWNER_SOURCE}"
+        )
+    seam_body = _rust_any_function_body(owner_code, KEYNOTE_SLIDE_PREVIEW_SEAM)
+    if seam_body is None or re.search(r"\binvalidate\s*\(", seam_body) is None:
+        violations.append(
+            "focused litchi-keynote slide-preview bridge must forward to the "
+            f"bounded package invalidator {KEYNOTE_SLIDE_PREVIEW_SEAM}: "
+            f"{KEYNOTE_SLIDE_PREVIEW_OWNER_SOURCE}"
+        )
+    for match in KEYNOTE_SLIDE_PREVIEW_GENERATED_DECODER.finditer(owner_code):
+        line_number = owner_code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-keynote slide-preview owner retains generated eager "
+            f"decoding {match.group(0).strip()}: "
+            f"{KEYNOTE_SLIDE_PREVIEW_OWNER_SOURCE}:{line_number}"
+        )
+
+    package_source = (
+        _mask_rust_comments(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    if KEYNOTE_SLIDE_PREVIEW_OWNER_MODULE.search(package_source) is None:
+        violations.append(
+            "focused litchi-keynote slide-preview package is missing its private "
+            f"owner module: {KEYNOTE_SOURCE_ROOT / 'package.rs'}"
+        )
+    export_sources = [package_source]
+    if lib_path.is_file():
+        export_sources.append(_mask_rust_comments(lib_path.read_text(encoding="utf-8")))
+    hidden_export = re.compile(
+        r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
+        r'"internal-iwork-source"\s*\)\s*\]\s*\n'
+        r"\s*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\]\s*\n"
+        rf"\s*pub\s+use[^;]*\b{re.escape(KEYNOTE_SLIDE_PREVIEW_SEAM)}\b[^;]*;"
+    )
+    for path, source in zip((package_path, lib_path), export_sources, strict=False):
+        if path.is_file() and not hidden_export.search(source):
+            violations.append(
+                "focused litchi-keynote slide-preview seam must use the hidden "
+                "internal-iwork-source export: "
+                f"{path.relative_to(root)}"
+            )
+
+    if host_preview_path.is_file():
+        violations.append(
+            "retired litchi-iwa Keynote slide-preview source was restored: "
+            f"{IWA_KEYNOTE_SLIDE_PREVIEW_SOURCE}"
+        )
+        old_host_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(host_preview_path.read_text(encoding="utf-8"))
+        )
+        for match in KEYNOTE_SLIDE_PREVIEW_GENERATED_DECODER.finditer(old_host_code):
+            line_number = old_host_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote slide-preview source retains generated "
+                f"eager decoding {match.group(0).strip()}: "
+                f"{IWA_KEYNOTE_SLIDE_PREVIEW_SOURCE}:{line_number}"
+            )
+    if host_editor_path.is_file():
+        editor_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(host_editor_path.read_text(encoding="utf-8"))
+        )
+        for match in IWA_KEYNOTE_SLIDE_PREVIEW_MODULE.finditer(editor_code):
+            line_number = editor_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote slide-preview module declaration: "
+                f"{IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+            )
+
+    focused_calls = 0
+    if not host_source_path.is_file():
+        violations.append(
+            "litchi-iwa Keynote slide-layout update is missing its focused "
+            f"slide-preview caller: {IWA_KEYNOTE_SLIDE_LAYOUT_UPDATE_SOURCE}"
+        )
+    else:
+        host_source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(host_source_path.read_text(encoding="utf-8"))
+        )
+        focused_calls = len(KEYNOTE_SLIDE_PREVIEW_HOST_CALL.findall(host_source))
+        if focused_calls == 0:
+            violations.append(
+                "litchi-iwa Keynote slide-layout update must call the focused "
+                f"{KEYNOTE_SLIDE_PREVIEW_SEAM} bridge: "
+                f"{IWA_KEYNOTE_SLIDE_LAYOUT_UPDATE_SOURCE}"
+            )
+        for match in KEYNOTE_SLIDE_PREVIEW_HOST_LEGACY_CALL.finditer(host_source):
+            line_number = host_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "litchi-iwa Keynote slide-layout update retains the retired "
+                f"host preview route {match.group(0).strip()}: "
+                f"{IWA_KEYNOTE_SLIDE_LAYOUT_UPDATE_SOURCE}:{line_number}"
+            )
+        for match in KEYNOTE_SLIDE_PREVIEW_GENERATED_DECODER.finditer(host_source):
+            line_number = host_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "litchi-iwa Keynote slide-layout update retains generated eager "
+                f"preview decoding {match.group(0).strip()}: "
+                f"{IWA_KEYNOTE_SLIDE_LAYOUT_UPDATE_SOURCE}:{line_number}"
+            )
+
+    host_root = root / IWA_KEYNOTE_SOURCE_ROOT / "editor"
+    if host_root.is_dir():
+        for path in sorted(host_root.rglob("*.rs")):
+            code = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            )
+            if path != host_source_path:
+                focused_calls += len(KEYNOTE_SLIDE_PREVIEW_HOST_CALL.findall(code))
+            for match in KEYNOTE_SLIDE_PREVIEW_HOST_LEGACY_CALL.finditer(code):
+                line_number = code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "litchi-iwa Keynote editor retains the retired slide-preview "
+                    f"route {match.group(0).strip()}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+    if focused_calls > 1:
+        violations.append(
+            "litchi-iwa Keynote slide-preview bridge must have one focused caller; "
+            f"found {focused_calls}: {IWA_KEYNOTE_SOURCE_ROOT / 'editor'}"
+        )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_keynote_slide_table_discovery_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -58704,6 +58891,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_model_storage_source_topology()
         + audit_iwa_shared_media_playback_source_topology()
         + audit_iwa_shared_image_adjustments_source_topology()
+        + audit_iwa_keynote_slide_preview_source_topology()
         + audit_iwa_keynote_slide_table_discovery_source_topology()
         + audit_iwa_keynote_slide_table_listing_appearance_source_topology()
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()

@@ -472,6 +472,77 @@ def add_iwa_shared_image_adjustments_scaffold(
         root_lib.write_text("mod image_adjustments;\n", encoding="utf-8")
 
 
+def add_iwa_keynote_slide_preview_scaffold(
+    root: Path,
+    *,
+    restore_host: bool = False,
+    missing_hidden_gate: bool = False,
+    host_legacy_route: bool = False,
+) -> None:
+    """Install the focused Keynote preview owner and one host forwarding route."""
+
+    owner = root / boundaries.KEYNOTE_SLIDE_PREVIEW_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "use litchi_iwa_common::WireLimits;\n"
+        "use litchi_iwa_core::{ArchiveObject, Limits as ArchiveLimits};\n"
+        "pub enum InvalidationError { InvalidSource }\n"
+        "fn invalidate(object: &mut ArchiveObject, archive_limits: ArchiveLimits, wire_limits: WireLimits) "
+        "-> Result<(), InvalidationError> { let _ = (object, archive_limits, wire_limits); Ok(()) }\n"
+        + ("" if missing_hidden_gate else '#[cfg(feature = "internal-iwork-source")]\n')
+        + "#[doc(hidden)]\n"
+        "pub fn __invalidate_slide_preview(object: &mut ArchiveObject, archive_limits: ArchiveLimits, wire_limits: WireLimits) "
+        "-> Result<(), InvalidationError> { invalidate(object, archive_limits, wire_limits) }\n",
+        encoding="utf-8",
+    )
+
+    package = root / (boundaries.KEYNOTE_SOURCE_ROOT / "package.rs")
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text(
+        "mod slide_preview;\n"
+        + ("" if missing_hidden_gate else '#[cfg(feature = "internal-iwork-source")]\n')
+        + ("" if missing_hidden_gate else "#[doc(hidden)]\n")
+        + "pub use slide_preview::__invalidate_slide_preview;\n",
+        encoding="utf-8",
+    )
+    lib = root / (boundaries.KEYNOTE_SOURCE_ROOT / "lib.rs")
+    lib.parent.mkdir(parents=True, exist_ok=True)
+    lib.write_text(
+        ("" if missing_hidden_gate else '#[cfg(feature = "internal-iwork-source")]\n')
+        + ("" if missing_hidden_gate else "#[doc(hidden)]\n")
+        + "pub use package::__invalidate_slide_preview;\n",
+        encoding="utf-8",
+    )
+
+    editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+    editor.parent.mkdir(parents=True, exist_ok=True)
+    editor.write_text(
+        ("mod slide_preview;\n" if restore_host else "")
+        + "mod slide_layout_update;\n",
+        encoding="utf-8",
+    )
+    layout = root / boundaries.IWA_KEYNOTE_SLIDE_LAYOUT_UPDATE_SOURCE
+    layout.parent.mkdir(parents=True, exist_ok=True)
+    layout.write_text(
+        "fn update(object: &mut ArchiveObject, archive_limits: ArchiveLimits, wire_limits: WireLimits) "
+        "-> Result<(), Error> { litchi_keynote::__invalidate_slide_preview(object, archive_limits, wire_limits) }\n",
+        encoding="utf-8",
+    )
+    if restore_host:
+        old = root / boundaries.IWA_KEYNOTE_SLIDE_PREVIEW_SOURCE
+        old.parent.mkdir(parents=True, exist_ok=True)
+        old.write_text(
+            "fn invalidate() { kn::SlideNodeArchive::decode(source); }\n",
+            encoding="utf-8",
+        )
+    if host_legacy_route:
+        layout.write_text(
+            layout.read_text(encoding="utf-8")
+            + "fn legacy() { slide_preview::invalidate(object, archive_limits, wire_limits); }\n",
+            encoding="utf-8",
+        )
+
+
 def add_iwa_table_cell_borders_scaffold(root: Path) -> None:
     """Install the minimal common-owner and host-import boundary fixture."""
 
@@ -40507,6 +40578,53 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_iwa_shared_image_adjustments_source_topology()",
+            main_source,
+        )
+
+    def test_iwa_keynote_slide_preview_boundary_accepts_focused_bridge(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_preview_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_preview_source_topology(root), []
+            )
+
+    def test_iwa_keynote_slide_preview_boundary_rejects_host_resurrection_and_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_preview_scaffold(
+                root,
+                restore_host=True,
+                missing_hidden_gate=True,
+                host_legacy_route=True,
+            )
+
+            violations = boundaries.audit_iwa_keynote_slide_preview_source_topology(root)
+
+            self.assertTrue(
+                any("source was restored" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("module declaration" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("internal-iwork-source" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("retired host preview route" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("generated eager" in item for item in violations), violations
+            )
+
+    def test_iwa_keynote_slide_preview_boundary_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_keynote_slide_preview_source_topology()",
             main_source,
         )
 

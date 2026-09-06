@@ -16702,3 +16702,35 @@ Native integration passes 8 Numbers and 11 Pages tests (19 total). Focused
 checks pass 7 Numbers and 6 Pages cases (13 total), including inclusive and
 one-under parse and prepared-rewrite limits, archive cloning, and header
 staging.
+
+## 2026-09-06 follow-up: Keynote native metadata reconciliation
+
+The deferred Keynote crash was traced to stale metadata slide dependencies when
+a layout change with no layout-owned media changed `Title` to `Title Only`.
+Final archive `MessageInfo` and `FieldInfo` references now reconcile style and
+template edges: obsolete unmarked component-only template links are removed
+only if the final archive no longer references the old component; weak,
+versioned, and unknown references are preserved.
+
+The corrected candidate was generated after the host preview helper was
+deleted and its call sites were wired to the focused hidden bridge. It passed
+in `/Applications/Keynote 14.4`: a forced title edit, save, close, and
+exact-path reopen left the `Title Only` title visible and the body hidden,
+preserved the 1024 × 768 image centered 14.4% from the top, and retained the
+marker `Saved layout Native image adjustment marker` without repair or crash.
+The closed and copied fixture is
+[`slide-layout-native-resaved.key`](../../test-data/iwork/keynote/slide-layout-native-resaved.key)
+with SHA-256
+`fcd7e2337cb6dd098fdeeccc7e088557591dfb7d7e401dee6266cdf67775ca27`.
+
+The focused preview bridge passes 23 tests, the final metadata-removal suite
+passes four tests including weak-reference preservation, and the host layout
+unit suite passes 14 tests covering movie/live-video/image materialization and
+transactional-negative cases. The `native_layout_graph` integration suite
+passes two tests covering the generated candidate's exact raw image and
+metadata regression plus the actual native-resaved fixture. The host still
+owns graph selection and layout mutation; this does not claim broad layout-API
+retirement or monolith completion. Boundary verification passes 912 cases; the
+scanner remains at 64 packages, 238 declarations, and 11 ordered debts.
+Normal commit hooks enforce workspace formatting, lint, library/integration,
+and documentation tests. The default-feature Keynote library check passes.

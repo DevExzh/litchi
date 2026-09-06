@@ -399,6 +399,9 @@ pub use package::{
 pub use package::{
     __decode_image_adjustments_payload, __rewrite_image_adjustments_payload, ImageAdjustmentsError,
 };
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use package::{__invalidate_slide_preview, SlidePreviewInvalidationError};
 pub use package::{
     ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
     ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch, ChartAxisTitleCommit,

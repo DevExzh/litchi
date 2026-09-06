@@ -5398,7 +5398,6 @@ mod slide_images;
 mod slide_layout_media;
 mod slide_layout_update;
 mod slide_movies;
-mod slide_preview;
 mod slide_shapes;
 mod slide_tables;
 mod text_box_create;
