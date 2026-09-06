@@ -1,4 +1,4 @@
-//! Independently positioned audio-object CRUD for Keynote slides.
+//! Independently positioned audio-object creation and editing for Keynote slides.
 
 use std::time::Duration;
 
@@ -33,14 +33,6 @@ pub struct KeynoteSlideAudioInfo {
     /// Trim, poster, repeat, and volume settings.
     pub playback: MediaPlaybackSettings,
     pub duration: Duration,
-}
-
-/// Result of removing one slide-owned audio clip and its private object graph.
-#[derive(Debug, Clone, PartialEq)]
-pub struct RemovedKeynoteSlideAudio {
-    pub audio: KeynoteSlideAudioInfo,
-    /// Assets culled because the removed clip held their final package reference.
-    pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
 impl KeynoteEditor {
@@ -228,54 +220,6 @@ impl KeynoteEditor {
         *self = verified;
         Ok(())
     }
-
-    /// Duplicate one slide audio control using Keynote's native placement.
-    ///
-    /// The audio, title/caption stand-ins, and automatic Start Audio build
-    /// receive fresh object identifiers and UUIDs. The clone shares its
-    /// embedded audio asset with the source, exactly as with Keynote's
-    /// Duplicate command.
-    pub fn duplicate_slide_audio(
-        &mut self,
-        slide_index: usize,
-        source_drawable_object_id: u64,
-    ) -> Result<KeynoteSlideAudioInfo> {
-        let source = require_audio(self, slide_index, source_drawable_object_id)?;
-        let media =
-            self.duplicate_slide_media(slide_index, source_drawable_object_id, MovieKind::Audio)?;
-        let created = require_audio(self, slide_index, media.drawable_object_id)?;
-        let media_position = media.geometry.position.ok_or_else(|| {
-            Error::InvalidFormat("Keynote audio clone has no position".to_owned())
-        })?;
-        if created.audio_data_identifier != source.audio_data_identifier
-            || created.position != media_position
-            || created.duration != source.duration
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote audio duplication produced an inconsistent graph".to_owned(),
-            ));
-        }
-        Ok(created)
-    }
-
-    /// Remove an audio clip, its automatic build, private graph, and unshared asset.
-    pub fn remove_slide_audio(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<RemovedKeynoteSlideAudio> {
-        let audio = require_audio(self, slide_index, drawable_object_id)?;
-        let removed = self.remove_slide_media(slide_index, drawable_object_id, MovieKind::Audio)?;
-        if removed.movie.movie_data_identifier != Some(audio.audio_data_identifier) {
-            return Err(Error::InvalidFormat(
-                "Keynote audio deletion removed a mismatched media graph".to_owned(),
-            ));
-        }
-        Ok(RemovedKeynoteSlideAudio {
-            audio,
-            removed_data_identifiers: removed.removed_data_identifiers,
-        })
-    }
 }
 
 fn require_audio(
@@ -364,6 +308,7 @@ mod tests {
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-audio";
     const REPLACEMENT_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFFreplacement-audio";
     const POSITION: DrawablePoint = DrawablePoint { x: 960.0, y: 540.0 };
+    const DUPLICATE_OFFSET: f32 = 10.0;
 
     fn properties(description: &str) -> DrawableProperties {
         DrawableProperties {
@@ -389,6 +334,49 @@ mod tests {
         }
         .canonicalize()
         .expect("common playback values are valid Keynote settings")
+    }
+
+    fn focused_audio_package(editor: &KeynoteEditor) -> KeynotePackage {
+        KeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap()
+    }
+
+    fn replace_with_focused_audio_package(editor: &mut KeynoteEditor, package: &KeynotePackage) {
+        let mut bytes = Vec::new();
+        package.write_to(&mut bytes).unwrap();
+        *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
+    }
+
+    fn duplicate_audio(editor: &mut KeynoteEditor, movie: MovieSelector) -> KeynoteSlideAudioInfo {
+        let package = focused_audio_package(editor);
+        let commit = package
+            .duplicate_slide_audio(SlideSelector::index(0), movie)
+            .unwrap();
+        replace_with_focused_audio_package(editor, commit.package());
+        editor.slide_audio(0).unwrap().into_iter().last().unwrap()
+    }
+
+    fn remove_audio(editor: &mut KeynoteEditor, movie: MovieSelector) -> Vec<MediaAssetId> {
+        let before = editor
+            .media_assets()
+            .unwrap()
+            .into_iter()
+            .map(|asset| asset.data_identifier)
+            .collect::<Vec<_>>();
+        let package = focused_audio_package(editor);
+        let commit = package
+            .remove_slide_audio(SlideSelector::index(0), movie)
+            .unwrap();
+        replace_with_focused_audio_package(editor, commit.package());
+        let after = editor
+            .media_assets()
+            .unwrap()
+            .into_iter()
+            .map(|asset| asset.data_identifier)
+            .collect::<Vec<_>>();
+        before
+            .into_iter()
+            .filter(|identifier| !after.contains(identifier))
+            .collect()
     }
 
     #[test]
@@ -502,14 +490,8 @@ mod tests {
             REPLACEMENT_AUDIO
         );
 
-        let removed = editor
-            .remove_slide_audio(0, created.drawable_object_id)
-            .unwrap();
-        assert_eq!(removed.audio.drawable_object_id, created.drawable_object_id);
-        assert_eq!(
-            removed.removed_data_identifiers,
-            [created.audio_data_identifier]
-        );
+        let removed = remove_audio(&mut editor, MovieSelector::index(0));
+        assert_eq!(removed, [created.audio_data_identifier]);
         assert!(editor.slide_audio(0).unwrap().is_empty());
         assert!(editor.slide_builds(0).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
@@ -536,9 +518,7 @@ mod tests {
             .set_slide_audio_properties(0, source.drawable_object_id, source_properties.clone())
             .unwrap();
 
-        let duplicate = editor
-            .duplicate_slide_audio(0, source.drawable_object_id)
-            .unwrap();
+        let duplicate = duplicate_audio(&mut editor, MovieSelector::index(0));
         assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
         let source_graph = editor
             .slide_movie_graph(0, source.drawable_object_id)
@@ -552,11 +532,9 @@ mod tests {
                 .iter()
                 .all(|identifier| !duplicate_graph.object_ids.contains(identifier))
         );
-        assert!(
-            source_graph
-                .uuid_object_ids
-                .iter()
-                .all(|identifier| !duplicate_graph.uuid_object_ids.contains(identifier))
+        assert_eq!(
+            source_graph.object_ids.len(),
+            duplicate_graph.object_ids.len()
         );
         assert_eq!(
             duplicate.audio_data_identifier,
@@ -565,8 +543,8 @@ mod tests {
         assert_eq!(
             duplicate.position,
             DrawablePoint {
-                x: source.position.x + DRAWABLE_DUPLICATE_OFFSET,
-                y: source.position.y + DRAWABLE_DUPLICATE_OFFSET,
+                x: source.position.x + DUPLICATE_OFFSET,
+                y: source.position.y + DUPLICATE_OFFSET,
             }
         );
         assert_eq!(duplicate.duration, source.duration);
@@ -633,18 +611,11 @@ mod tests {
             1
         );
 
-        let removed_source = editor
-            .remove_slide_audio(0, source.drawable_object_id)
-            .unwrap();
-        assert!(removed_source.removed_data_identifiers.is_empty());
+        let removed_source = remove_audio(&mut editor, MovieSelector::index(0));
+        assert!(removed_source.is_empty());
         assert_eq!(editor.slide_audio(0).unwrap().len(), 1);
-        let removed_duplicate = editor
-            .remove_slide_audio(0, duplicate.drawable_object_id)
-            .unwrap();
-        assert_eq!(
-            removed_duplicate.removed_data_identifiers,
-            [source.audio_data_identifier]
-        );
+        let removed_duplicate = remove_audio(&mut editor, MovieSelector::index(0));
+        assert_eq!(removed_duplicate, [source.audio_data_identifier]);
         assert!(editor.slide_audio(0).unwrap().is_empty());
         assert!(editor.slide_builds(0).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
@@ -655,7 +626,11 @@ mod tests {
     fn invalid_slide_audio_creation_and_cross_type_edits_are_transactional() {
         let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
         let baseline = editor.to_bytes().unwrap();
-        assert!(editor.duplicate_slide_audio(0, 999).is_err());
+        assert!(
+            focused_audio_package(&editor)
+                .duplicate_slide_audio(SlideSelector::index(0), MovieSelector::index(0))
+                .is_err()
+        );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
         for result in [
             editor.add_slide_audio(

@@ -59,9 +59,8 @@ pub use editor::{
     KeynoteTableCellTextOutline, KeynoteTableCellTextScript, KeynoteTableCellTextShadow,
     KeynoteTableCellTextStyle, KeynoteTableCellUpdate, KeynoteTableCellValue,
     KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTablePoints, MovieKind,
-    RemovedKeynoteSlideAudio, RemovedKeynoteSlideChart, RemovedKeynoteSlideImage,
-    RemovedKeynoteSlideMovie, RemovedKeynoteSlideShape, RemovedKeynoteSlideTable,
-    RemovedKeynoteTextBox,
+    RemovedKeynoteSlideChart, RemovedKeynoteSlideImage, RemovedKeynoteSlideShape,
+    RemovedKeynoteSlideTable, RemovedKeynoteTextBox,
 };
 pub use litchi_keynote::build::{AnimationType, Build};
 pub use litchi_keynote::show::{Mode, Settings, Show, Size};

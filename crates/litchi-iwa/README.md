@@ -1023,11 +1023,12 @@ use std::time::Duration;
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
+use litchi_keynote::{MovieSelector, Package, SlideSelector};
 
 let movie = fs::read("demo.mov")?;
 let poster = fs::read("demo-poster.png")?;
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
-let source = keynote.add_slide_movie(
+keynote.add_slide_movie(
     0,
     "demo.mov",
     &movie,
@@ -1039,18 +1040,24 @@ let source = keynote.add_slide_movie(
         Duration::from_secs(8),
     )?,
 )?;
-let duplicate = keynote.duplicate_slide_movie(0, source.drawable_object_id)?;
-assert_eq!(duplicate.movie_data_identifier, source.movie_data_identifier);
-assert_eq!(
-    duplicate.poster_image_data_identifier,
-    source.poster_image_data_identifier,
-);
-keynote.save("created-with-movie.key")?;
-# Ok::<(), litchi_iwa::Error>(())
+keynote.save("created-with-movie-source.key")?;
+
+let package = Package::open("created-with-movie-source.key")?;
+let duplicate = package.duplicate_slide_movie(
+    SlideSelector::index(0),
+    MovieSelector::index(0),
+)?;
+duplicate.package().save("created-with-movie.key")?;
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`duplicate_slide_movie` mirrors Keynote's Duplicate command: it creates a new
-movie graph and playback build with shared video and poster data.
+The builder remains the host's creation path. The lifecycle handoff reopens the
+saved artifact through `litchi_keynote::Package`, where the typed
+`SlideSelector` and `MovieSelector` address the source-order movie without
+exposing drawable IDs, native object IDs, or data keys. The verified commit
+returned by `Package::duplicate_slide_movie` creates the new movie graph and
+playback build while sharing video and poster data; use
+`Package::remove_slide_movie` for the corresponding typed removal.
 
 Independently positioned audio uses a distinct typed API even though Keynote
 stores it in the movie-archive family. Its zero-size control, media style,
@@ -1063,23 +1070,35 @@ use std::time::Duration;
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa_common::shape::geometry::Point;
 use litchi_keynote::slide::audio::Options as SlideAudioOptions;
+use litchi_keynote::{MovieSelector, Package, SlideSelector};
 
 let audio = fs::read("narration.aiff")?;
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
-let source = keynote.add_slide_audio(
+keynote.add_slide_audio(
     0,
     "narration.aiff",
     &audio,
     SlideAudioOptions::new(Point { x: 960.0, y: 540.0 }, Duration::from_secs(12))?,
 )?;
-let duplicate = keynote.duplicate_slide_audio(0, source.drawable_object_id)?;
-assert_eq!(duplicate.audio_data_identifier, source.audio_data_identifier);
-keynote.save("created-with-audio.key")?;
-# Ok::<(), litchi_iwa::Error>(())
+keynote.save("created-with-audio-source.key")?;
+
+let source_bytes = fs::read("created-with-audio-source.key")?;
+let package = Package::from_bytes(&source_bytes)?;
+let duplicate = package.duplicate_slide_audio(
+    SlideSelector::index(0),
+    MovieSelector::index(0),
+)?;
+duplicate.package().save("created-with-audio.key")?;
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`duplicate_slide_audio` creates a separate audio graph and Start Audio build
-while sharing the embedded audio asset, mirroring Keynote's Duplicate command.
+Audio creation remains on the host builder, while lifecycle mutation belongs to
+the focused package API. `Package::duplicate_slide_audio` uses the same typed
+source-order selectors and returns a verified commit with a separate audio
+graph and Start Audio build that shares the embedded asset. Use
+`Package::remove_slide_audio` for typed removal; callers that already hold
+source bytes can use `Package::from_bytes`, as shown above, instead of opening
+the filename directly.
 
 All source-built media exposes its shared `DrawableProperties` without
 normalizing unrelated native fields. Read the current value, update only the
@@ -1087,8 +1106,10 @@ field you need, then write it back—for example,
 `body_movie_properties`/`set_body_movie_properties`,
 `sheet_audio_properties`/`set_sheet_audio_properties`, or
 `slide_movie_properties`/`set_slide_movie_properties`. The paired Pages,
-Numbers, and Keynote movie/audio APIs preserve unknown movie-archive fields and
-carry the properties through native-style duplication.
+Numbers, and Keynote host APIs remain the compatibility surface for media
+creation, reading, properties, and replacement. They preserve unknown
+movie-archive fields; Keynote lifecycle duplication and removal use the focused
+`Package` commits above rather than raw identifiers.
 
 The same media APIs expose the archive-free
 `litchi_iwa_common::media::playback::{MediaPlaybackSettings, MediaVolume,
