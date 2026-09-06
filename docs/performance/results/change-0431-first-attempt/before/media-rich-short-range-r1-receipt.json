@@ -1,0 +1,69 @@
+{
+  "role": "before",
+  "name": "media-rich-short-range-r1",
+  "lane": {
+    "command": "provider-lifecycle",
+    "selector_key": "corpus",
+    "selector": "media-rich",
+    "provider_label": "short-range",
+    "provider": "range",
+    "max_range": 4096,
+    "delay_us": 0,
+    "repeat": "R1"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0431/before/media-rich-short-range-r1-resource.log",
+    "/tmp/litchi-goal-0431-binaries/before",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "range",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0431/before/media-rich-short-range-r1.json",
+    "--max-range",
+    "4096",
+    "--delay-us",
+    "0"
+  ],
+  "source_manifest": {
+    "path": "sources/1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122.json",
+    "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+    "files": 6634
+  },
+  "revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+  "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969",
+  "protocol_sha256": "36e454c4c7462c350de6f1a05e0d138c57449ed68bad8b9af0de744f4012ef5c",
+  "driver_sha256": "073ce3c9d85cf3d9590cce19ebc6bc2f744d4969453d1a8326822313a80378b8",
+  "verifier_sha256": "d8ec5862592192dbb3b3f08205f6faec19eba10c5f4b9d0a64d536a373474b00",
+  "started_utc": "2026-09-06T00:56:13.120349+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T00:56:27.853483+00:00",
+  "artifacts": {
+    "before/media-rich-short-range-r1.json": {
+      "sha256": "123d8eb98c00ad9502a9c5d24a0db17423f2a806cc11ba1fbe48fcaa1f522317",
+      "bytes": 1757863
+    },
+    "before/media-rich-short-range-r1.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "before/media-rich-short-range-r1-resource.log": {
+      "sha256": "644486b025c5186960d21e716c884f69fc2b5564c648322b1b919ffa6895db5e",
+      "bytes": 1039
+    }
+  }
+}

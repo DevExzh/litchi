@@ -1,5 +1,18 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0431: verified compressed source-part transfer
+
+[0431](changes/0431-verified-compressed-source-transfer.md) keeps ZIP framing
+and validation in `soapberry-zip`, source-bound authorization and publication
+in OPC, and semantic planning in PPTX (0001/0002/0010/0011/0024). Source revision,
+cancellation, finite budgets, CRC/size/Deflate termination, policy refusals and
+exact partial-output accounting remain enforced (0003/0005/0006). Canonical
+new wrappers and physical preservation of untouched destination members have
+separate gates. The [batch matrix](results/change-0431/adr-review.md) records
+scoped memory modeling, 1,755 passing refined tests, strict checks and ASAN
+smoke. Matched evidence retains the first delayed-range regression and the
+refined improvement without a zero-copy or whole-heap claim.
+
 ## Change 0430: publication CPU attribution
 
 [0430](changes/0430-pptx-publication-cpu-attribution.md) changes no Rust or

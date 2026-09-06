@@ -1,0 +1,10 @@
+{
+  "change": 431,
+  "status": "review",
+  "file": "crates/litchi-docx/tests/glossary_authoring.rs",
+  "before_sha256": "9cdb25c9b4721274198a9563b2c5190231b366bca94276c38e33ac78168cb564",
+  "current_sha256": "9cdb25c9b4721274198a9563b2c5190231b366bca94276c38e33ac78168cb564",
+  "unchanged_from_before_capture": true,
+  "scope": "Workspace formatting reports this unchanged DOCX test file. Batch-owned ZIP/OPC/PPTX formatting passes; unrelated file is preserved.",
+  "evidence": "checks/fmt.log"
+}

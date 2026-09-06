@@ -1,0 +1,7 @@
+{
+  "change": 431,
+  "status": "retained",
+  "bundle": "../change-0431-first-attempt",
+  "revision": "e68c1decb472e4823c7bea9322f12419ddc51bee",
+  "reason": "Delayed-range API median regressed 8.8–10% with 16 KiB compressed capture. The complete first comparison is retained. The main bundle captures the bounded 64 KiB refinement against the unchanged original baseline."
+}

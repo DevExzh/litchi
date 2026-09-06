@@ -1,0 +1,65 @@
+{
+  "role": "after",
+  "name": "media-rich-file-r1",
+  "lane": {
+    "command": "provider-lifecycle",
+    "selector_key": "corpus",
+    "selector": "media-rich",
+    "provider_label": "file",
+    "provider": "file",
+    "max_range": null,
+    "delay_us": null,
+    "repeat": "R1"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0431/after/media-rich-file-r1-resource.log",
+    "/tmp/litchi-goal-0431-binaries/after",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "file",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "e68c1decb472e4823c7bea9322f12419ddc51bee",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0431/after/media-rich-file-r1.json"
+  ],
+  "source_manifest": {
+    "path": "sources/3c98377a84dc9b7d70143971c9471b1067fab11d3eba817faa0caa1dcb9079d8.json",
+    "sha256": "3c98377a84dc9b7d70143971c9471b1067fab11d3eba817faa0caa1dcb9079d8",
+    "files": 6635
+  },
+  "revision": "e68c1decb472e4823c7bea9322f12419ddc51bee",
+  "binary_sha256": "f9f58c8eeff7a2bdad94e0b9da20296e4f94a340831068f3df149cf71db545df",
+  "protocol_sha256": "36e454c4c7462c350de6f1a05e0d138c57449ed68bad8b9af0de744f4012ef5c",
+  "driver_sha256": "073ce3c9d85cf3d9590cce19ebc6bc2f744d4969453d1a8326822313a80378b8",
+  "verifier_sha256": "d8ec5862592192dbb3b3f08205f6faec19eba10c5f4b9d0a64d536a373474b00",
+  "started_utc": "2026-09-06T01:53:24.027138+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T01:53:30.235243+00:00",
+  "artifacts": {
+    "after/media-rich-file-r1.json": {
+      "sha256": "a3f4d7791a9058458479b8a3500aa2f61a989de8f2142ae6193641ad5757f960",
+      "bytes": 1755106
+    },
+    "after/media-rich-file-r1.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "after/media-rich-file-r1-resource.log": {
+      "sha256": "adf22df8d93ae57c4addec4a92255dab187399e7e2b1270f7767f2ff06e0af03",
+      "bytes": 996
+    }
+  }
+}

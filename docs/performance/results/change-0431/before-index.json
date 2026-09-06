@@ -1,0 +1,18 @@
+[
+  "before/plain-bytes-r1-receipt.json",
+  "before/plain-file-r1-receipt.json",
+  "before/plain-short-range-r1-receipt.json",
+  "before/plain-delayed-range-r1-receipt.json",
+  "before/media-rich-bytes-r1-receipt.json",
+  "before/media-rich-file-r1-receipt.json",
+  "before/media-rich-short-range-r1-receipt.json",
+  "before/media-rich-delayed-range-r1-receipt.json",
+  "before/media-rich-delayed-range-r2-receipt.json",
+  "before/media-rich-short-range-r2-receipt.json",
+  "before/media-rich-file-r2-receipt.json",
+  "before/media-rich-bytes-r2-receipt.json",
+  "before/plain-delayed-range-r2-receipt.json",
+  "before/plain-short-range-r2-receipt.json",
+  "before/plain-file-r2-receipt.json",
+  "before/plain-bytes-r2-receipt.json"
+]

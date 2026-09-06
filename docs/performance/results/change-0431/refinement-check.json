@@ -1,0 +1,136 @@
+{
+  "status": "pass",
+  "scope": "Retained source-bound producer reports; output artifacts are not exported by this harness.",
+  "first_comparison_sha256": "fee08bc3ec639e615233d663f0adcb7abc8c122d4b6dcfb021c9922fbc2b8072",
+  "refined_comparison_sha256": "98766f52724062c9722e147ecd443c34792152618214dacdd80ded9372bd9e82",
+  "rows": [
+    {
+      "name": "media-rich-bytes-r1",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 1193.0,
+      "refined_publication_source_calls_p50": 425.0
+    },
+    {
+      "name": "media-rich-bytes-r2",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 1193.0,
+      "refined_publication_source_calls_p50": 425.0
+    },
+    {
+      "name": "media-rich-delayed-range-r1",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 1193.0,
+      "refined_publication_source_calls_p50": 425.0
+    },
+    {
+      "name": "media-rich-delayed-range-r2",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 1193.0,
+      "refined_publication_source_calls_p50": 425.0
+    },
+    {
+      "name": "media-rich-file-r1",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 1193.0,
+      "refined_publication_source_calls_p50": 425.0
+    },
+    {
+      "name": "media-rich-file-r2",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 1193.0,
+      "refined_publication_source_calls_p50": 425.0
+    },
+    {
+      "name": "media-rich-short-range-r1",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 4265.0,
+      "refined_publication_source_calls_p50": 4265.0
+    },
+    {
+      "name": "media-rich-short-range-r2",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 4265.0,
+      "refined_publication_source_calls_p50": 4265.0
+    },
+    {
+      "name": "plain-bytes-r1",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 0.0,
+      "refined_publication_source_calls_p50": 0.0
+    },
+    {
+      "name": "plain-bytes-r2",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 0.0,
+      "refined_publication_source_calls_p50": 0.0
+    },
+    {
+      "name": "plain-delayed-range-r1",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 0.0,
+      "refined_publication_source_calls_p50": 0.0
+    },
+    {
+      "name": "plain-delayed-range-r2",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 0.0,
+      "refined_publication_source_calls_p50": 0.0
+    },
+    {
+      "name": "plain-file-r1",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 0.0,
+      "refined_publication_source_calls_p50": 0.0
+    },
+    {
+      "name": "plain-file-r2",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 0.0,
+      "refined_publication_source_calls_p50": 0.0
+    },
+    {
+      "name": "plain-short-range-r1",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 0.0,
+      "refined_publication_source_calls_p50": 0.0
+    },
+    {
+      "name": "plain-short-range-r2",
+      "input_equal": true,
+      "output_equal": true,
+      "input_and_work_equal": true,
+      "first_publication_source_calls_p50": 0.0,
+      "refined_publication_source_calls_p50": 0.0
+    }
+  ]
+}

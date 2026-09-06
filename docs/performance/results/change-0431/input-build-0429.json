@@ -1,0 +1,44 @@
+{
+  "revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+  "baseline_revision": "995e217ba5624d6e9926a7bf2677191067f2bd6c",
+  "build_receipt": "checks/release-build.json",
+  "build_receipt_sha256": "501e268efbc0df9ec48f321a125269b3b71dd2abcd1fd9e09bec7fbdd156dfc5",
+  "source_manifest": {
+    "path": "sources/1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122.json",
+    "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+    "files": 6634
+  },
+  "original_binary": "tools/perf-baseline/target/release/litchi-perf-baseline",
+  "capture_binary": "/tmp/litchi-goal-0429-binaries/litchi-perf-baseline",
+  "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969",
+  "binary_bytes": 451782312,
+  "protocol_sha256": "f4da6b83b5d90ab521a11cae1be14e22b6d1599cf0c8d1e9cd1b42ea8c8f4971",
+  "planned_checks_sha256": "3c6e2349546cee2d44772970d816b8a15206b8e2056318559906e5da85c50d7f",
+  "machine_sha256": "3452b1537195c8af04a464dfb2c0ccc844f513fd9418badbe64256e785763428",
+  "capture_driver_sha256": "44d96921273436aba642278165d54bdef7c8653c1bfd7376ce4acde3211e4cb7",
+  "verifier_sha256": "d8ec5862592192dbb3b3f08205f6faec19eba10c5f4b9d0a64d536a373474b00",
+  "replay_verifier_sha256": "3662daaa0397ef2585af20f4258d9f24d9a102ffe868fc4cfb47183eccd67d4a",
+  "probe_sha256": "302160d8a5fad82178554b97562b5e09fbce67507d4360024e3a74be6aaa0e1f",
+  "summary_driver_sha256": "30b6ab2ebc53144f02696a15e40c5237892ae4a70efbb5fd634bceea076574b9",
+  "strict_comparison_driver_sha256": "36ca14478c3a148aa8fcd964b17ae5c4b2bdbb7811219ceb41d92d48e9b02628",
+  "additional_artifact_sha256": {
+    "check.py": "fe045dd9f3e4128911a377dc44313bcd7ff33c8baf8ed0fb7b45cfcd43c9be9d",
+    "profiles.py": "6750326822b24e11687e0b9846af4bbec6eee7a163b513b822a3c8d72eff32db",
+    "profile-audit.py": "83ccec72b82f93ba1627406273932634c5c50794b38ac64f53fc59577fe8e79d",
+    "native-oracles.py": "74713e54c1458fd3108ac4036a254591ceac854694ca72b1244841b8ccd497c5",
+    "native-image-oracles.json": "7f6374c7d6d217b82e73870a05f55ad24fb618e4631c44f2832795d3954bf738",
+    "native-inputs/original.pptx": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571",
+    "native-inputs/libreoffice.pptx": "fcc8acffad88f5091316f67403c099a4c9eaa372e17927edfee29c35fb132034",
+    "native-inputs/poi-slide.pptx": "cd841112bd5b53f21e8434d080af8b2eeca78a07bc820e9ea0b97a0962c85c79",
+    "native-inputs/poi-video.pptx": "7940e3b1a339db11f00b65399a2fe77e0e85a5da3a30ac8d6c8a0a77527b2ab2",
+    "shapes-static-oracles.json": "198e44068a6d8b7f5ca21cbaff6761af2f1984be2cd28b06b5abe656ff9f36d8",
+    "resume-profiles.py": "b3d7d40489416b9e7e970d3561587f0767daef3d39fec25ba8ea6745128064f3"
+  },
+  "rust_toolchain": "1.98.1",
+  "profile": "release",
+  "scope": "one frozen provider baseline build with ZIP short-read correctness enabler; no causal before/after speedup",
+  "validation_amendment": {
+    "path": "validation-amendment.json",
+    "sha256": "c32cbbc19c45b89d23b5c3577950b608b111234efe9b28ecded14a118e1e0f35"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "role": "before",
+  "name": "plain-delayed-range-r1",
+  "lane": {
+    "command": "provider-lifecycle",
+    "selector_key": "corpus",
+    "selector": "plain",
+    "provider_label": "delayed-range",
+    "provider": "range",
+    "max_range": 65536,
+    "delay_us": 200,
+    "repeat": "R1"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0431/before/plain-delayed-range-r1-resource.log",
+    "/tmp/litchi-goal-0431-binaries/before",
+    "provider-lifecycle",
+    "--corpus",
+    "plain",
+    "--provider",
+    "range",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0431/before/plain-delayed-range-r1.json",
+    "--max-range",
+    "65536",
+    "--delay-us",
+    "200"
+  ],
+  "source_manifest": {
+    "path": "sources/1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122.json",
+    "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+    "files": 6634
+  },
+  "revision": "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+  "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969",
+  "protocol_sha256": "36e454c4c7462c350de6f1a05e0d138c57449ed68bad8b9af0de744f4012ef5c",
+  "driver_sha256": "073ce3c9d85cf3d9590cce19ebc6bc2f744d4969453d1a8326822313a80378b8",
+  "verifier_sha256": "d8ec5862592192dbb3b3f08205f6faec19eba10c5f4b9d0a64d536a373474b00",
+  "started_utc": "2026-09-06T00:55:40.503230+00:00",
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-06T00:55:44.930629+00:00",
+  "artifacts": {
+    "before/plain-delayed-range-r1.json": {
+      "sha256": "4e45a4ffe2513e98b79ca2a6eee07c592988a5f72d4500d528702ce3babb3489",
+      "bytes": 1744411
+    },
+    "before/plain-delayed-range-r1.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "before/plain-delayed-range-r1-resource.log": {
+      "sha256": "9cb215db99cc8302963108cecefc4e9e82d72067c31d932ac8d5be73b5c649d1",
+      "bytes": 1031
+    }
+  }
+}

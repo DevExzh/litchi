@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## Change 0431: compressed media transfer measured
+
+[0431](changes/0431-verified-compressed-source-transfer.md) addresses the
+publication recompression identified by 0430. ZIP verifies an opaque compressed
+payload, OPC binds it to source authority, and PPTX retains semantic validation
+before adding a canonical destination member. Synthetic media API medians
+improve 86.5–89.0% for bytes/warm-file/short-range and 19.4–20.1% for simulated
+delayed range. The retained first attempt regressed delayed reads; batching
+capture to 64 KiB reduces publication calls from 1,193 to 425. Extra source
+input and verification work remain explicit. Native cross-copy, broader size
+coverage, allocator/copy attribution and real remote behavior remain open.
+
 ## Change 0430: copied-media recompression
 
 [0430](changes/0430-pptx-publication-cpu-attribution.md) recovers publication
