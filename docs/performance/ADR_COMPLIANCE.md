@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0430: publication CPU attribution
+
+[0430](changes/0430-pptx-publication-cpu-attribution.md) changes no Rust or
+dependency surface. Captures retain the same source manifest, executable,
+provider constructors, validation and API timing boundaries. The
+[batch matrix](results/change-0430/adr-review.md) requires ZIP/OPC ownership,
+source-bound authority, checked publication, and bounded resources for the
+proposed compressed-media transfer. Profiling establishes neither permission
+to weaken those contracts nor a measured improvement.
+
 ## Change 0429: ZIP short reads and provider evidence
 
 [0429](changes/0429-pptx-provider-native-baselines.md) keeps fixed-header refill logic inside the ZIP grammar owner

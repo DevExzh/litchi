@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0430: recovered PPTX publication callers
+
+[0430](changes/0430-pptx-publication-cpu-attribution.md) profiles the unchanged
+0429 executable using frame pointers. Explicit iteration ancestry is recovered
+for 14,050/16,674 bytes and 14,046/16,673 warm-file cycle samples. Deflate during
+publication accounts for 83.22% / 83.38% of those iteration samples, which
+include warmups and untimed iteration work. These are sampled CPU proportions,
+not API wall-clock fractions. The two retained recordings prioritize safe
+compressed-media transfer; no implementation or speedup is claimed.
+
 ## Change 0429: PPTX providers and native selected images
 
 [0429](changes/0429-pptx-provider-native-baselines.md) records 32 fresh release processes, 960 samples and 8,160 phase

@@ -1,0 +1,68 @@
+{
+  "provider": "file",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "perf",
+    "record",
+    "-e",
+    "cycles:u",
+    "-F",
+    "499",
+    "--call-graph",
+    "fp",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0430/profiles/file.data",
+    "--",
+    "/tmp/litchi-goal-0430-binaries/litchi-perf-baseline",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "file",
+    "--samples",
+    "100",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "56ec912e5b387e8f4f55f7044a73bb4cdd11e324",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0430/profiles/file.json"
+  ],
+  "source": {
+    "path": "sources/1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122.json",
+    "sha256": "1f85ca448f9fd4d970576870e10d699ddfc6b12ad38f0e70ed2be733fe43f122",
+    "files": 6634
+  },
+  "binary_sha256": "9b3fca778443b6c9bd49a8522f56a251f1df27fc775a76af6124186398f78969",
+  "protocol_sha256": "de1cfea56275a9e8f240ca97c4d9b38850817167060b1e796190c2e0c53c5e66",
+  "driver_sha256": "982ffc6d68b059027345d9c9b4a68543ec0d997a08bcb0be41f9ea7b2dfd26bd",
+  "verifier_sha256": "d8ec5862592192dbb3b3f08205f6faec19eba10c5f4b9d0a64d536a373474b00",
+  "started_utc": "2026-09-06T00:16:25.955577+00:00",
+  "status": "pass",
+  "record_exit_code": 0,
+  "finished_utc": "2026-09-06T00:18:07.776905+00:00",
+  "artifacts": {
+    "profiles/file-record.log": {
+      "sha256": "206b5826f41f2f72d102aa9db811c4eda736fc2dac43dcfb156e9e11105edf60",
+      "bytes": 190
+    },
+    "profiles/file-report.log": {
+      "sha256": "f97434ae2400e88ebda98bc2a1840a8f46438cd8501a02c9fe7a542592bc0fcd",
+      "bytes": 179820
+    },
+    "profiles/file-script.log": {
+      "sha256": "812ed2dd1c80ea911f5d1c3371b5767628015518583e212982a61550cb236e83",
+      "bytes": 85285976
+    },
+    "profiles/file.data": {
+      "sha256": "4f625927eacc8231393fa87e7d1fef2a860266d9f064cba11b7b4b50e7bd8a46",
+      "bytes": 3933240
+    },
+    "profiles/file.json": {
+      "sha256": "a2c8eee93bfbc8afba2775e454ac07bb58e80cd9ce4cd3dac89c238f683946fa",
+      "bytes": 5831783
+    }
+  }
+}

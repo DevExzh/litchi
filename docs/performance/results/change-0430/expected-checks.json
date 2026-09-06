@@ -1,0 +1,12 @@
+{
+  "analysis-portable": "pass",
+  "cleanup": "pass",
+  "diff-check": "pass",
+  "frame-pointer-profiles": "pass",
+  "portable-after-cleanup": "pass",
+  "portable-before-cleanup": "failed",
+  "portable-before-cleanup-v2": "failed",
+  "portable-before-cleanup-v3": "pass",
+  "profile-analysis": "pass",
+  "symbol-identity": "pass"
+}
