@@ -115,10 +115,13 @@ deletion gate.
 The Numbers matrix now records bounded existing-cell Number, Percentage, Currency, Scientific,
 Fraction, Text, Date & Time, Duration, and document-scoped Custom display-format owners. Text support is
 limited to focused E1 owner evidence plus checked-in native-fixture E2 read/no-op evidence and has
-no native E3/E4 acceptance claim. Custom has deterministic source-built E1 evidence only, with no
-Apple-authored fixture or E2/E3/E4 evidence. Custom covers one existing rooted cell's
-registry-backed Number, Text, or Date & Time format and does not imply generic custom-format
-authoring. Currency, Scientific, Fraction, Date & Time, and Duration support are operation-specific and remain separate
+no native E3/E4 acceptance claim. Custom has deterministic source-built E1 evidence plus
+operation-specific native Number, Text, and Date & Time replacement/clear evidence. Its admitted
+registry routes are `TN.DocumentArchive` field 9/message type 222 and `TN.super` field 8 →
+`TSA.custom_format_list` field 12. The checked-in replacement and clear artifacts are documented in
+the [fixture README](../test-data/iwork/README.md#numbers-custom-format-raw-id-retirement-2026-09-06); focused
+Custom integration validation passes 37 tests and boundary verification passes 927 policy tests. This
+does not imply generic custom-format authoring. Currency, Scientific, Fraction, Date & Time, and Duration support are operation-specific and remain separate
 from generic display format or rich-style support; suite-wide/native general-format acceptance and
 the ADR 0028 deletion gate remain open. Scientific has focused build, test, fuzz, and native Numbers
 evidence recorded in ADR 0008. Fraction has source/build/test/fuzz evidence for native type 262 and
@@ -144,8 +147,8 @@ producer parity, native byte parity, or package-wide performance.
 The eight scalar owners and the bounded Custom registry owner do not retire every compatibility path: generic
 source-built or cross-format `DataFormat` mutation remains host-owned. The
 dedicated raw-ID `NumbersEditor` routes for Number, Percentage, Currency,
-Scientific, Fraction, Date & Time, and Duration are retired, and there is no dedicated
-host Text route or Custom retirement. Generic source-built/cross-format
+Scientific, Fraction, Date & Time, Duration, and Custom are retired, and there is no dedicated
+host Text route. Generic source-built/cross-format
 `DataFormat::Custom`, `DataFormat::DateTime`, and `DataFormat::Duration`, the
 broad `TextDateTimeField` smart-field lifecycle, and attached Pages/Keynote
 table compatibility remain host-owned. Numbers persisted-sort compatibility is

@@ -141,8 +141,9 @@ The temporary native-resaved clear artifact had SHA-256
 `432538800987ae78ee5a0d06a164d6f97abfa900bcbf4eb6dc73cbf2dda8b577`.
 Both focused mutations verified semantic reopen, byte-exact no-op behavior,
 and exact inverse restoration before native verification. This qualifies
-these Custom Number replacement and clear cases; Custom Text, Custom DateTime,
-and broader native format parity remain outside this evidence.
+these Custom Number replacement and clear cases; the separate Custom Text and
+Custom DateTime records below cover those operations, while broader native
+format parity remains outside this evidence.
 
 ## Numbers Custom Text source (2026-09-06)
 
@@ -184,8 +185,9 @@ repair prompt. The temporary native-resaved clear artifact had SHA-256
 Both Rust mutations verified semantic reopen, byte-exact no-op behavior,
 and exact inverse restoration before native verification. Rust also read the
 native-resaved clear result and confirmed that another clear was an exact
-no-op. This qualifies these Custom Text replacement and clear cases; Custom
-DateTime and broader native format parity remain outside this evidence.
+no-op. This qualifies these Custom Text replacement and clear cases; the
+separate Custom DateTime record below covers that operation, while broader
+native format parity remains outside this evidence.
 
 ## Numbers Custom DateTime source (2026-09-06)
 
@@ -686,3 +688,43 @@ resaved fixtures, strict Date headers, body/U+FFFC/grid preservation, and
 metadata-ownership regressions are included. The Pages private ZIP-mask unit
 passes 1 test. The Keynote shared-rename regression set passes 22 tests;
 boundary verification passes 927 tests.
+
+## Numbers Custom-format raw-ID retirement (2026-09-06)
+
+The three production `NumbersEditor` Custom conveniences
+(`table_cell_custom_format`, `set_table_cell_custom_format`, and
+`reset_table_cell_custom_format`) were removed. Existing-cell Custom reads
+and edits now use the focused selector-first `litchi_numbers::Package` APIs;
+native IDs, registry UUIDs, and format-list keys remain private. The obsolete
+`crates/litchi-iwa/examples/create_iwork_table_number_formats.rs` example was
+also deleted, leaving no legacy example entry point.
+
+The focused CLI changed one existing Custom Number cell to the name
+`Focused Custom Retirement` and pattern `#,##0.000`. Exact no-op,
+candidate-reopen, inverse, three-component locality, and full-reparse checks
+passed. Numbers 14.4 opened the candidate without repair with B2 displaying
+`42.000` and the same name in the inspector. After C2 was changed to
+`Focused Custom retirement saved`, native save, close, and exact-path reopen
+preserved the formatted value, underlying value `42`, inspector name, and
+marker. The checked-in native-resaved fixture is
+[`numbers/custom-retirement-resaved.numbers`](numbers/custom-retirement-resaved.numbers),
+137,073 bytes, SHA-256
+`d7636fa0e468696b1a0d5f3ec06cc98e26eeeedb734d60f157e3ef7c1ebd227d`.
+
+The focused reset candidate passed the same exact-source checks. Numbers
+reopened it without repair with B2 displaying `42` and `Automatic`; after C2
+was changed to `Focused Custom clear saved`, native save, close, and exact-path
+reopen preserved the value, Automatic state, and marker. The checked-in
+clear fixture is
+[`numbers/custom-retirement-cleared.numbers`](numbers/custom-retirement-cleared.numbers),
+136,435 bytes, SHA-256
+`f854090055544d4f59cf9023c95def9a303134b7a8c3f8ff17242c34fbe9fc65`.
+The final focused reread of that fixture was an exact byte-equal reset no-op
+(`changed=false`, zero touched components, `full_reparse=false`).
+
+The existing Custom Number, Custom Text (including the UTF-16 cache profile),
+and Custom Date & Time records above remain operation-specific native
+evidence. Generic source-built or cross-format `DataFormat::Custom`
+compatibility and private attached Pages/Keynote table adapters remain
+host-owned; broader Custom-format authoring and monolith exit gates remain
+open.

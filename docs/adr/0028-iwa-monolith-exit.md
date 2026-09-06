@@ -7988,16 +7988,17 @@ reused, shared references remain live, replacements receive private UUIDs,
 and unused entries are culled only after their final reference is cleared.
 
 The focused package suite passes 19/19, the strict custom-format codec passes
-8/8, and both fuzz targets complete 100-run AddressSanitizer smokes. There is
-no native Numbers acceptance or native save/resave
-evidence for this owner, no generic Custom-format authoring claim, and no
-retirement of the legacy `NumbersEditor` Custom route; host Custom
-compatibility remains migration-host-only. This owner addition closes no
-dependency edge, ordered migration debt, migration-host item, or ADR 0028
-deletion gate. The current topology remains 64 workspace packages, 238
-internal dependency declarations, 227 canonical edges, 11 development-only
-edges, 11 ordered migration debts with IDs
-`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+8/8, and both fuzz targets complete 100-run AddressSanitizer smokes. At the
+time of this initial owner amendment there was no native Numbers acceptance
+or native save/resave evidence, and the legacy `NumbersEditor` Custom route
+was retained. The later 2026-09-06 follow-up records operation-specific
+native evidence and retires that dedicated route; it still makes no generic
+Custom-format authoring claim. This owner addition closes no dependency edge,
+ordered migration debt, migration-host item, or ADR 0028 deletion gate. The
+topology recorded here remains 64 workspace packages, 238 internal dependency
+declarations, 227 canonical edges, 11 development-only edges, 11 ordered
+migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
+migration host.
 
 ## 2026-09-04 amendment: Numbers Duration groundwork does not advance exit
 
@@ -9127,3 +9128,49 @@ resaved fixtures, strict Date headers, body/U+FFFC/grid preservation, and
 metadata-ownership regressions are included. The Pages private ZIP-mask unit
 passes 1 test. The Keynote shared-rename regression set passes 22 tests;
 boundary verification passes 927 tests.
+
+## 2026-09-06 follow-up: Numbers Custom-format route retirement
+
+The three production raw-ID `NumbersEditor` Custom conveniences
+(`table_cell_custom_format`, `set_table_cell_custom_format`, and
+`reset_table_cell_custom_format`) are retired. The focused
+`litchi_numbers::Package` selector-first Custom owner is now the semantic
+route for existing-cell reads, replacement, clear, reset, exact inverse, and
+candidate verification. Selectors and the archive-free `Custom` value remain
+the public surface; native IDs and registry details remain private.
+The obsolete `crates/litchi-iwa/examples/create_iwork_table_number_formats.rs`
+example is deleted as part of the route retirement, so it cannot preserve a
+second raw-ID entry point.
+
+The focused Number replacement selected the name `Focused Custom Retirement`
+and pattern `#,##0.000`. Exact no-op, candidate-reopen, inverse,
+three-component locality, and full-reparse checks passed. Numbers 14.4 opened
+the candidate without repair with B2 displaying `42.000` and the focused name
+in the inspector. After a marker edit, native save, close, and exact-path
+reopen retained the formatted value, underlying value `42`, inspector name,
+and marker. The checked-in artifact
+[`custom-retirement-resaved.numbers`](../../test-data/iwork/numbers/custom-retirement-resaved.numbers)
+is 137,073 bytes with SHA-256
+`d7636fa0e468696b1a0d5f3ec06cc98e26eeeedb734d60f157e3ef7c1ebd227d`.
+
+The focused clear candidate likewise passed exact no-op, candidate-reopen,
+inverse, three-component locality, and full-reparse checks. Numbers reopened
+it without repair with B2 displaying `42` and `Automatic`; after a marker
+edit, native save, close, and exact-path reopen retained the value, Automatic
+state, and marker. The checked-in clear artifact
+[`custom-retirement-cleared.numbers`](../../test-data/iwork/numbers/custom-retirement-cleared.numbers)
+is 136,435 bytes with SHA-256
+`f854090055544d4f59cf9023c95def9a303134b7a8c3f8ff17242c34fbe9fc65`.
+The final focused reread of that native-resaved clear fixture was an exact
+byte-equal reset no-op (`changed=false`, zero touched components,
+`full_reparse=false`).
+
+The existing Custom Number, Custom Text, and Custom Date & Time native records
+remain operation-specific and do not close the global monolith gates. Generic
+source-built or cross-format `DataFormat::Custom` compatibility and private
+attached Pages/Keynote table adapters remain in `litchi-iwa`; focused-owner
+refusals remain terminal. This slice changes no workspace package, dependency
+edge, ordered debt, host count, or ADR 0028 deletion gate, so the monolithic
+crate and its remaining exit gates stay open.
+
+Validation for this retirement passes 37 focused Custom integration tests (19 owner, 7 native Number, 6 native Text, and 5 native Date & Time), 28 host tests filtered by `custom`, and the additional source-built/reopened cross-family compatibility regression. That regression covers admitted mutations and byte-exact refusal of numeric-to-Text conversion. The boundary suite passes 927 tests; the scanner reports 64 workspace packages, 238 internal dependency declarations, and 11 explicit debt items.

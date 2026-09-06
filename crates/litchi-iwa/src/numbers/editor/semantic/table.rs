@@ -1213,93 +1213,6 @@ impl NumbersEditor {
         Ok(())
     }
 
-    /// Read a named custom Number, Date & Time, or Text format.
-    ///
-    /// `None` means the cell uses iWork's automatic data format.
-    pub fn table_cell_custom_format(
-        &self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<Option<Custom>> {
-        cell_data_format::cell_custom_format(&self.package, table_id, row, column)
-    }
-
-    /// Create or replace a named custom format transactionally.
-    pub fn set_table_cell_custom_format(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-        format: Custom,
-    ) -> Result<()> {
-        self.set_table_cell_data_format(table_id, row, column, format.into())
-    }
-
-    /// Restore Automatic from a named custom format.
-    pub fn reset_table_cell_custom_format(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<bool> {
-        let current = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;
-        if !matches!(&current, DataFormat::Custom(_)) {
-            return match current {
-                DataFormat::Automatic => Ok(false),
-                _ => Err(Error::InvalidFormat(
-                    "Cannot reset Custom format from a non-Custom cell".to_owned(),
-                )),
-            };
-        }
-
-        // Exact sources are validated by the focused Custom owner. It accepts
-        // both the native TN.DocumentArchive field-9 route and the builder
-        // or Numbers-resaved TSA.custom_format_list field-12 route. A
-        // malformed or ambiguous route remains a terminal focused error;
-        // source-built packages retain the compatibility writer below.
-        if self.package.source_is_exact() {
-            let location = focused_data_format_owner_is_eligible(
-                self,
-                table_id,
-                row,
-                column,
-                &current,
-                &DataFormat::Automatic,
-            )?
-            .ok_or_else(|| {
-                Error::InvalidFormat(
-                    "focused Numbers owner rejected the existing Custom format".to_owned(),
-                )
-            })?;
-            *self = commit_exact_focused_data_format_with_location(
-                self,
-                table_id,
-                row,
-                column,
-                &current,
-                &DataFormat::Automatic,
-                location,
-            )?;
-            return Ok(true);
-        }
-
-        let mut staged = self.package.clone();
-        // The Custom family was checked above; avoid decoding it again in
-        // the compatibility convenience wrapper.
-        let changed = cell_data_format::reset_cell_data_format(&mut staged, table_id, row, column)?;
-        if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
-                return Err(Error::InvalidFormat(
-                    "Numbers Custom-format reset failed package validation".to_owned(),
-                ));
-            }
-            *self = verified;
-        }
-        Ok(changed)
-    }
-
     /// Read an explicit positional numeral-system format for one table cell.
     ///
     /// `None` means the cell uses iWork's automatic data format.
@@ -3409,7 +3322,7 @@ mod focused_custom_tests {
     }
 
     #[test]
-    fn native_custom_host_cutover_handles_number_source_and_resaved_routes() {
+    fn native_custom_data_format_compatibility_matches_focused_number_owner() {
         let fixtures = [
             include_bytes!(
                 "../../../../../../test-data/iwork/numbers/custom-number-native.numbers"
@@ -3424,26 +3337,25 @@ mod focused_custom_tests {
             let mut editor = NumbersEditor::from_bytes(source_bytes).expect("native number editor");
             let table_id = native_custom_table_id(&editor);
             let current = editor
-                .table_cell_custom_format(table_id, 1, 1)
-                .expect("native number format read")
-                .expect("native number custom format");
-            assert!(matches!(current, Custom::Number(_)));
+                .table_cell_data_format(table_id, 1, 1)
+                .expect("native number format read");
+            assert!(matches!(current, DataFormat::Custom(Custom::Number(_))));
             let replacement = custom_number("Host Grouped", "#,##0.00");
             editor
-                .set_table_cell_custom_format(table_id, 1, 1, replacement.clone())
+                .set_table_cell_data_format(table_id, 1, 1, replacement.clone().into())
                 .expect("host native number replacement");
             let replacement_bytes = editor.to_bytes().expect("host native number bytes");
             assert_native_custom_host_locality(source_bytes, &replacement_bytes);
             assert_eq!(
                 editor
-                    .table_cell_custom_format(table_id, 1, 1)
+                    .table_cell_data_format(table_id, 1, 1)
                     .expect("host replacement read"),
-                Some(replacement.clone())
+                DataFormat::Custom(replacement.clone())
             );
 
             let before_noop = editor.to_bytes().expect("host replacement source");
             editor
-                .set_table_cell_custom_format(table_id, 1, 1, replacement.clone())
+                .set_table_cell_data_format(table_id, 1, 1, replacement.clone().into())
                 .expect("host native number no-op");
             assert_eq!(
                 editor.to_bytes().expect("host native number no-op bytes"),
@@ -3462,11 +3374,9 @@ mod focused_custom_tests {
                 .commit()
                 .expect("focused replacement clear");
             let expected_reset = focused_package_bytes(expected_reset.package());
-            assert!(
-                editor
-                    .reset_table_cell_custom_format(table_id, 1, 1)
-                    .expect("host native number reset")
-            );
+            editor
+                .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
+                .expect("host native number reset");
             assert_eq!(
                 editor.to_bytes().expect("host native number reset bytes"),
                 expected_reset,
@@ -3474,15 +3384,15 @@ mod focused_custom_tests {
             );
             assert_eq!(
                 editor
-                    .table_cell_custom_format(table_id, 1, 1)
+                    .table_cell_data_format(table_id, 1, 1)
                     .expect("host reset read"),
-                None
+                DataFormat::Automatic
             );
         }
     }
 
     #[test]
-    fn native_custom_host_cutover_handles_text_route_and_preserves_value() {
+    fn native_custom_data_format_compatibility_preserves_native_text_value() {
         let source_bytes =
             include_bytes!("../../../../../../test-data/iwork/numbers/custom-text-native.numbers");
         let mut editor = NumbersEditor::from_bytes(source_bytes).expect("native Text editor");
@@ -3500,13 +3410,13 @@ mod focused_custom_tests {
             .cloned();
         assert!(matches!(
             editor
-                .table_cell_custom_format(table_id, 1, 1)
+                .table_cell_data_format(table_id, 1, 1)
                 .expect("native Text format read"),
-            Some(Custom::Text(_))
+            DataFormat::Custom(Custom::Text(_))
         ));
         let replacement = custom_text("Host Text", "Rust <", ">");
         editor
-            .set_table_cell_custom_format(table_id, 1, 1, replacement.clone())
+            .set_table_cell_data_format(table_id, 1, 1, replacement.clone().into())
             .expect("host native Text replacement");
         let replacement_bytes = editor.to_bytes().expect("host native Text bytes");
         assert_native_custom_host_locality(source_bytes, &replacement_bytes);
@@ -3527,18 +3437,16 @@ mod focused_custom_tests {
 
         let before_noop = editor.to_bytes().expect("host Text source");
         editor
-            .set_table_cell_custom_format(table_id, 1, 1, replacement)
+            .set_table_cell_data_format(table_id, 1, 1, replacement.into())
             .expect("host native Text no-op");
         assert_eq!(
             editor.to_bytes().expect("host native Text no-op bytes"),
             before_noop
         );
 
-        assert!(
-            editor
-                .reset_table_cell_custom_format(table_id, 1, 1)
-                .expect("host native Text reset")
-        );
+        editor
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
+            .expect("host native Text reset");
         let reset =
             FocusedNumbersPackage::from_bytes(&editor.to_bytes().expect("Text reset bytes"))
                 .expect("reopened Text reset");
@@ -3568,7 +3476,7 @@ mod focused_custom_tests {
     }
 
     #[test]
-    fn native_custom_host_route_corruption_is_terminal_and_atomic() {
+    fn native_custom_data_format_route_corruption_is_terminal_and_atomic() {
         let source_bytes = include_bytes!(
             "../../../../../../test-data/iwork/numbers/custom-number-native.numbers"
         );
@@ -3606,7 +3514,7 @@ mod focused_custom_tests {
                 assert_eq!(editor.to_bytes().expect("hostile native unchanged"), before);
             }
             let error = editor
-                .reset_table_cell_custom_format(table_id, 1, 1)
+                .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
                 .expect_err("hostile native Custom reset must refuse");
             assert!(
                 error
@@ -3823,11 +3731,9 @@ mod focused_custom_tests {
         let original = NumbersEditor::from_bytes(source_bytes).expect("exact editor");
 
         let mut editor = original.clone();
-        assert!(
-            editor
-                .reset_table_cell_custom_format(4, 0, 0)
-                .expect("focused custom reset")
-        );
+        editor
+            .set_table_cell_data_format(4, 0, 0, DataFormat::Automatic)
+            .expect("focused custom reset");
         assert_eq!(
             editor
                 .table_cell_data_format(4, 0, 0)
@@ -3836,9 +3742,9 @@ mod focused_custom_tests {
         );
         assert_eq!(
             editor
-                .table_cell_custom_format(4, 0, 0)
+                .table_cell_data_format(4, 0, 0)
                 .expect("focused reset custom"),
-            None
+            DataFormat::Automatic
         );
         let reset = FocusedNumbersPackage::from_bytes(&editor.to_bytes().expect("reset bytes"))
             .expect("focused reset package");
@@ -3871,11 +3777,9 @@ mod focused_custom_tests {
         );
 
         let before_noop = editor.to_bytes().expect("automatic bytes");
-        assert!(
-            !editor
-                .reset_table_cell_custom_format(4, 0, 0)
-                .expect("automatic reset no-op")
-        );
+        editor
+            .set_table_cell_data_format(4, 0, 0, DataFormat::Automatic)
+            .expect("automatic reset no-op");
         assert_eq!(
             editor.to_bytes().expect("automatic no-op bytes"),
             before_noop
@@ -3903,11 +3807,9 @@ mod focused_custom_tests {
             .expect("builder custom format");
 
         let mut source_built_reset = editor.clone();
-        assert!(
-            source_built_reset
-                .reset_table_cell_custom_format(table_id, 0, 0)
-                .expect("source-built custom reset")
-        );
+        source_built_reset
+            .set_table_cell_data_format(table_id, 0, 0, DataFormat::Automatic)
+            .expect("source-built custom reset");
         assert_eq!(
             source_built_reset
                 .table_cell_data_format(table_id, 0, 0)
@@ -3919,9 +3821,9 @@ mod focused_custom_tests {
         let mut reopened = NumbersEditor::from_bytes(&source_bytes).expect("reopened builder");
         assert_eq!(
             reopened
-                .table_cell_custom_format(table_id, 0, 0)
+                .table_cell_data_format(table_id, 0, 0)
                 .expect("builder custom read"),
-            Some(initial)
+            DataFormat::Custom(initial)
         );
 
         let replacement = custom_number("Builder Signed Integer", "#,##0;(#,##0)");
@@ -3930,9 +3832,9 @@ mod focused_custom_tests {
             .expect("builder custom replacement");
         assert_eq!(
             reopened
-                .table_cell_custom_format(table_id, 0, 0)
+                .table_cell_data_format(table_id, 0, 0)
                 .expect("builder replacement read"),
-            Some(replacement.clone())
+            DataFormat::Custom(replacement.clone())
         );
         let before_value =
             FocusedNumbersPackage::from_bytes(&reopened.to_bytes().expect("replacement bytes"))
@@ -3974,16 +3876,14 @@ mod focused_custom_tests {
         );
 
         let mut reset_clone = reopened.clone();
-        assert!(
-            reset_clone
-                .reset_table_cell_custom_format(table_id, 0, 0)
-                .expect("builder custom reset")
-        );
+        reset_clone
+            .set_table_cell_data_format(table_id, 0, 0, DataFormat::Automatic)
+            .expect("builder custom reset");
         assert_eq!(
             reset_clone
-                .table_cell_custom_format(table_id, 0, 0)
+                .table_cell_data_format(table_id, 0, 0)
                 .expect("builder reset read"),
-            None
+            DataFormat::Automatic
         );
         assert_eq!(
             reset_clone
@@ -3997,12 +3897,15 @@ mod focused_custom_tests {
             .set_table_cell_data_format(table_id, 0, 0, DataFormat::Number(Number::default()))
             .expect("builder Number format");
         let non_custom_bytes = non_custom.to_bytes().expect("Number source bytes");
-        let error = non_custom
-            .reset_table_cell_custom_format(table_id, 0, 0)
-            .expect_err("Number reset must reject non-Custom format");
-        assert!(error.to_string().contains("non-Custom cell"));
+        non_custom
+            .set_table_cell_data_format(table_id, 0, 0, DataFormat::Automatic)
+            .expect("generic DataFormat reset from Number");
         assert_eq!(
-            non_custom.to_bytes().expect("Number source unchanged"),
+            non_custom.table_cell_data_format(table_id, 0, 0).unwrap(),
+            DataFormat::Automatic
+        );
+        assert_ne!(
+            non_custom.to_bytes().expect("Number source reset"),
             non_custom_bytes
         );
 
@@ -4011,9 +3914,9 @@ mod focused_custom_tests {
             .expect("builder custom clear");
         assert_eq!(
             reopened
-                .table_cell_custom_format(table_id, 0, 0)
+                .table_cell_data_format(table_id, 0, 0)
                 .expect("builder clear read"),
-            None
+            DataFormat::Automatic
         );
         let cleared =
             FocusedNumbersPackage::from_bytes(&reopened.to_bytes().expect("builder clear bytes"))
@@ -4031,6 +3934,140 @@ mod focused_custom_tests {
                 .cloned(),
             Some(CellValue::number(42.0).expect("finite expected number"))
         );
+    }
+
+    #[test]
+    fn generic_custom_compatibility_mutations_roundtrip_source_built_and_reopened() {
+        let cases = [
+            (
+                "Number to Custom Number",
+                DataFormat::Number(Number::default()),
+                DataFormat::Custom(custom_number("Compatibility Number", "#,##0.00")),
+                CellValue::number(42.0).expect("finite test number"),
+                false,
+            ),
+            (
+                "Custom Number to Custom Text",
+                DataFormat::Custom(custom_number("Initial Number", "#,##0")),
+                DataFormat::Custom(custom_text("Compatibility Text", "ID: ", "")),
+                CellValue::Text("Orchid".to_owned()),
+                false,
+            ),
+            (
+                "Custom Number to Custom Date & Time",
+                DataFormat::Custom(custom_number("Initial Number", "#,##0")),
+                DataFormat::Custom(Custom::DateTime(CustomDateTime::new(
+                    Name::try_new("Compatibility Date & Time").expect("valid custom name"),
+                    DateTimePattern::try_new("yyyy-MM-dd").expect("valid date pattern"),
+                ))),
+                CellValue::number(42.0).expect("finite test number"),
+                false,
+            ),
+            (
+                "Custom Number to Custom Text refuses a numeric cell",
+                DataFormat::Custom(custom_number("Initial Number", "#,##0")),
+                DataFormat::Custom(custom_text("Compatibility Text", "ID: ", "")),
+                CellValue::number(42.0).expect("finite test number"),
+                true,
+            ),
+        ];
+
+        for (label, initial, requested, value, refuses) in cases {
+            for reopen in [false, true] {
+                let mut editor = NumbersDocumentBuilder::new()
+                    .table_name("Custom compatibility")
+                    .table_dimensions(2, 2)
+                    .build()
+                    .expect("builder source");
+                let table_id = editor.tables().expect("builder table")[0].id();
+                crate::numbers::editor::set_cell_fixture(
+                    &mut editor,
+                    table_id,
+                    0,
+                    0,
+                    value.clone(),
+                )
+                .expect("builder cell value");
+                editor
+                    .set_table_cell_data_format(table_id, 0, 0, initial.clone())
+                    .unwrap_or_else(|error| panic!("{label}: initial format failed: {error}"));
+
+                if reopen {
+                    let bytes = editor.to_bytes().expect("initial compatibility bytes");
+                    editor = NumbersEditor::from_bytes(&bytes)
+                        .unwrap_or_else(|error| panic!("{label}: reopen failed: {error}"));
+                }
+                assert_eq!(
+                    editor
+                        .table_cell_data_format(table_id, 0, 0)
+                        .unwrap_or_else(|error| {
+                            panic!("{label}: initial format read failed: {error}")
+                        }),
+                    initial,
+                    "{label}: initial format differs before mutation"
+                );
+
+                let before = editor.to_bytes().expect("source compatibility bytes");
+                let mutation = editor.set_table_cell_data_format(table_id, 0, 0, requested.clone());
+                let expected = if refuses {
+                    let error = mutation.expect_err("numeric-to-Text conversion must refuse");
+                    assert!(error.to_string().contains("empty or text cell"), "{error}");
+                    assert_eq!(
+                        editor.to_bytes().expect("refused compatibility bytes"),
+                        before,
+                        "{label}: refusal changed the source"
+                    );
+                    &initial
+                } else {
+                    mutation.unwrap_or_else(|error| {
+                        panic!("{label}: compatibility mutation failed: {error}")
+                    });
+                    &requested
+                };
+                assert_eq!(
+                    editor
+                        .table_cell_data_format(table_id, 0, 0)
+                        .unwrap_or_else(|error| {
+                            panic!("{label}: mutated format read failed: {error}")
+                        }),
+                    *expected,
+                    "{label}: mutated format differs"
+                );
+
+                let bytes = editor.to_bytes().expect("mutated compatibility bytes");
+                let reopened_editor = NumbersEditor::from_bytes(&bytes)
+                    .unwrap_or_else(|error| panic!("{label}: mutated reopen failed: {error}"));
+                assert_eq!(
+                    reopened_editor
+                        .table_cell_data_format(table_id, 0, 0)
+                        .unwrap_or_else(|error| {
+                            panic!("{label}: reopened format read failed: {error}")
+                        }),
+                    *expected,
+                    "{label}: reopened format differs"
+                );
+
+                let focused = FocusedNumbersPackage::from_bytes(&bytes).unwrap_or_else(|error| {
+                    panic!("{label}: focused semantic reopen failed: {error}")
+                });
+                assert_eq!(
+                    focused
+                        .table_cell(
+                            SheetSelector::index(0),
+                            TableSelector::index(0),
+                            CellPosition::new(0, 0),
+                        )
+                        .unwrap_or_else(|error| panic!(
+                            "{label}: focused cell read failed: {error}"
+                        ))
+                        .storage()
+                        .value()
+                        .cloned(),
+                    Some(value.clone()),
+                    "{label}: scalar value changed during format mutation"
+                );
+            }
+        }
     }
 
     #[test]
@@ -4117,7 +4154,7 @@ mod focused_custom_tests {
             before
         );
         let error = actual
-            .reset_table_cell_custom_format(4, 0, 0)
+            .set_table_cell_data_format(4, 0, 0, DataFormat::Automatic)
             .expect_err("malformed focused custom reset must refuse");
         assert!(
             error
@@ -4185,7 +4222,7 @@ mod focused_custom_tests {
             assert_eq!(editor.to_bytes().expect("unchanged source"), bytes);
         }
         let error = editor
-            .reset_table_cell_custom_format(4, 0, 0)
+            .set_table_cell_data_format(4, 0, 0, DataFormat::Automatic)
             .expect_err("present malformed edge reset is terminal");
         assert!(
             error

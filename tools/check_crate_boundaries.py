@@ -10213,54 +10213,22 @@ IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_LEGACY_CALL = re.compile(
     r"(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
 
-# The migration host's Custom reset keeps a compatibility writer for
-# source-built packages while routing every exact source through the focused
-# owner.  The focused owner performs its own strict registry-route admission;
-# the host must not grow a second, root-field-specific gate or fall back to
-# compatibility after focused admission.  This ratchet scopes those ordering
-# and delegation requirements to the one host method; the focused
-# litchi-numbers package owns the physical rewrite.
-IWA_NUMBERS_CUSTOM_RESET_SOURCE = (
-    IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs"
+# The focused Custom owner now replaces the three NumbersEditor convenience
+# methods.  Keep this inventory separate from generic ``DataFormat`` helper
+# names: source-built Numbers packages and attached Pages/Keynote tables still
+# use those compatibility routes.  The shared retirement scanner also masks
+# comments, literals, and cfg-only items, while allowing only a lexically bound
+# focused ``litchi-numbers::Package`` call with the same method spelling.
+RETIRED_IWA_NUMBERS_TABLE_CELL_CUSTOM_FORMAT_METHODS = (
+    "table_cell_custom_format",
+    "set_table_cell_custom_format",
+    "reset_table_cell_custom_format",
 )
-IWA_NUMBERS_CUSTOM_RESET_FUNCTION = "reset_table_cell_custom_format"
-IWA_NUMBERS_CUSTOM_RESET_RETIRED_GATE = re.compile(
-    r"\bhas_focused_custom_registry_edge\b"
+RETIRED_IWA_NUMBERS_TABLE_CELL_CUSTOM_FORMAT_METHOD_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_CELL_CUSTOM_FORMAT_METHODS
 )
-IWA_NUMBERS_CUSTOM_RESET_COMPAT_MODULE_ALIAS = re.compile(
-    r"\bcell_data_format\b[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
-    r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b"
-)
-IWA_NUMBERS_CUSTOM_RESET_REQUIRED_MARKERS = (
-    (
-        "current Custom read",
-        re.compile(
-            r"\bcell_data_format[ \t\r\n]*::[ \t\r\n]*"
-            r"cell_data_format[ \t\r\n]*\("
-        ),
-    ),
-    (
-        "exact-source gate",
-        re.compile(r"\bsource_is_exact[ \t\r\n]*\([ \t\r\n]*\)"),
-    ),
-    (
-        "focused owner eligibility",
-        re.compile(r"\bfocused_data_format_owner_is_eligible[ \t\r\n]*\("),
-    ),
-    (
-        "focused owner commit",
-        re.compile(
-            r"\bcommit_exact_focused_data_format_with_location"
-            r"[ \t\r\n]*\("
-        ),
-    ),
-    (
-        "compatibility reset",
-        re.compile(
-            r"\bcell_data_format[ \t\r\n]*::[ \t\r\n]*"
-            r"reset_cell_data_format[ \t\r\n]*\("
-        ),
-    ),
+RETIRED_IWA_NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs",
 )
 IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_README_CALL = re.compile(
     r"(?<![A-Za-z0-9_])(?:r#)?(?:numbers|numbers_editor|editor)"
@@ -26545,92 +26513,28 @@ def audit_iwa_numbers_table_cell_number_format_source_topology(
     return sorted(set(violations))
 
 
-def audit_iwa_numbers_custom_reset_source_topology(
+def audit_iwa_numbers_table_cell_custom_format_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep the migration-host Custom reset behind one focused owner gate.
+    """Retire NumbersEditor Custom-format raw-ID routes after owner cutover.
 
-    ``NumbersEditor::reset_table_cell_custom_format`` has two intentional
-    routes. Exact sources use the focused package owner, whose own strict
-    codec admits the supported native registry profiles; source-built packages
-    retain the compatibility writer. Inspect only this method so a future edit
-    cannot reintroduce the retired root-field-specific gate, move the legacy
-    reset ahead of focused admission, or bypass focused admission on an exact
-    source.
+    The focused ``litchi-numbers::Package`` owns the selector-first Custom
+    transaction.  Generic ``DataFormat`` helpers remain compatibility-only
+    ingress for source-built Numbers packages and attached Pages/Keynote
+    tables, so this audit bans only the three dedicated NumbersEditor method
+    names.  Focused Package calls with the same names remain valid and are
+    checked for their lexical receiver by the shared retirement scanner.
     """
 
-    path = root / IWA_NUMBERS_CUSTOM_RESET_SOURCE
-    if not path.is_file():
+    if not _numbers_table_cell_custom_format_owner_present(root):
         return []
-
-    masked_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
-    body = _rust_any_function_body(
-        masked_source, IWA_NUMBERS_CUSTOM_RESET_FUNCTION
+    return _audit_iwa_numbers_table_cell_format_retirement(
+        root,
+        label="Custom",
+        methods=RETIRED_IWA_NUMBERS_TABLE_CELL_CUSTOM_FORMAT_METHODS,
+        focused_helpers=frozenset(),
+        focused_tests=frozenset(),
     )
-    if body is None:
-        return []
-    production_body = _mask_rust_non_code(body)
-    source_code = _mask_rust_non_code(masked_source)
-    line_number = next(
-        (
-            line
-            for name, line in _rust_function_declarations(masked_source)
-            if name == IWA_NUMBERS_CUSTOM_RESET_FUNCTION
-        ),
-        1,
-    )
-
-    violations: list[str] = []
-    for label, marker in IWA_NUMBERS_CUSTOM_RESET_REQUIRED_MARKERS:
-        if marker.search(production_body) is None:
-            violations.append(
-                "litchi-iwa Numbers Custom reset is missing its "
-                f"{label} marker: {path.relative_to(root)}:{line_number}"
-            )
-
-    for match in IWA_NUMBERS_CUSTOM_RESET_RETIRED_GATE.finditer(production_body):
-        line = production_body.count("\n", 0, match.start()) + line_number
-        violations.append(
-            "litchi-iwa Numbers Custom reset retains the retired root-field "
-            f"registry gate: {path.relative_to(root)}:{line}"
-        )
-
-    focused_commit = re.search(
-        r"\bcommit_exact_focused_data_format_with_location"
-        r"[ \t\r\n]*\(",
-        production_body,
-    )
-    compatibility_reset = re.search(
-        r"\bcell_data_format[ \t\r\n]*::[ \t\r\n]*"
-        r"reset_cell_data_format[ \t\r\n]*\(",
-        production_body,
-    )
-    if focused_commit and compatibility_reset:
-        if compatibility_reset.start() < focused_commit.start():
-            violations.append(
-                "litchi-iwa Numbers Custom reset must keep its compatibility "
-                "reset after focused owner admission: "
-                f"{path.relative_to(root)}:{line_number}"
-            )
-
-    # A module alias can hide the compatibility edge from the canonical marker
-    # while still reintroducing the same raw-ID writer into this method.
-    for alias_match in IWA_NUMBERS_CUSTOM_RESET_COMPAT_MODULE_ALIAS.finditer(
-        source_code
-    ):
-        alias = alias_match.group("alias")
-        aliased_reset = re.compile(
-            rf"\b(?:r#)?{re.escape(alias)}[ \t\r\n]*::"
-            r"[ \t\r\n]*reset_cell_data_format[ \t\r\n]*\("
-        )
-        if aliased_reset.search(production_body) is None:
-            continue
-        violations.append(
-            "litchi-iwa Numbers Custom reset bypasses the canonical compatibility "
-            f"edge through alias {alias}: {path.relative_to(root)}:{line_number}"
-        )
-
-    return sorted(set(violations))
 
 
 def _numbers_table_cell_text_format_owner_present(root: Path) -> bool:
@@ -59741,7 +59645,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_cell_text_format_source_topology()
         + audit_numbers_table_cell_custom_format_codec_source_topology()
         + audit_numbers_table_cell_custom_format_facade_source_topology()
-        + audit_iwa_numbers_custom_reset_source_topology()
+        + audit_iwa_numbers_table_cell_custom_format_source_topology()
         + audit_numbers_table_cell_percentage_format_codec_source_topology()
         + audit_numbers_table_cell_percentage_format_facade_source_topology()
         + audit_iwa_numbers_table_cell_percentage_format_source_topology()

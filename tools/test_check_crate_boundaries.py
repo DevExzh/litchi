@@ -38670,98 +38670,135 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
-            # The focused owner is deliberately not coupled to a host-retirement
-            # audit: the migration-host Custom route remains compatibility-only.
-            self.assertNotIn(
-                "audit_iwa_numbers_table_cell_custom_format",
-                vars(boundaries),
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_custom_format_source_topology(
+                    root
+                ),
+                [],
             )
 
-    def test_iwa_numbers_custom_reset_requires_focused_and_compatibility_routes(
+    def test_iwa_numbers_table_cell_custom_format_retires_raw_id_routes_and_preserves_compatibility(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            source = root / boundaries.IWA_NUMBERS_CUSTOM_RESET_SOURCE
+            add_numbers_table_cell_custom_format_canonical_scaffold(root)
+            source = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SOURCE[0]
             source.parent.mkdir(parents=True, exist_ok=True)
-            complete = (
-                "impl NumbersEditor {\n"
-                "    pub fn reset_table_cell_custom_format(&mut self) -> Result<bool> {\n"
-                "        let current = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;\n"
-                "        if self.package.source_is_exact() {\n"
-                "            let location = focused_data_format_owner_is_eligible(self, table_id, row, column, &current, &DataFormat::Automatic)?;\n"
-                "            *self = commit_exact_focused_data_format_with_location(self, table_id, row, column, &current, &DataFormat::Automatic, location)?;\n"
-                "            return Ok(true);\n"
-                "        }\n"
-                "        let mut staged = self.package.clone();\n"
-                "        let changed = cell_data_format::reset_cell_data_format(&mut staged, table_id, row, column)?;\n"
-                "        Ok(changed)\n"
-                "    }\n"
-                "}\n"
-            )
-            source.write_text(complete, encoding="utf-8")
 
+            # Generic DataFormat helpers remain compatibility vocabulary, and
+            # attached Pages/Keynote adapters are outside the Numbers host
+            # subtree inspected by this ratchet.
+            pages = root / "crates/litchi-iwa/src/pages/editor/tables/semantic.rs"
+            pages.parent.mkdir(parents=True, exist_ok=True)
+            pages.write_text(
+                "impl PagesEditor {\n"
+                "    pub fn table_cell_custom_format(&self) {}\n"
+                "    pub fn set_table_cell_custom_format(&mut self) {}\n"
+                "    pub fn reset_table_cell_custom_format(&mut self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            keynote = root / "crates/litchi-iwa/src/keynote/editor/slide_tables.rs"
+            keynote.parent.mkdir(parents=True, exist_ok=True)
+            keynote.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_table_cell_custom_format(&self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            source.write_text(
+                "fn generic_data_format_route() {\n"
+                "    cell_data_format::cell_custom_format();\n"
+                "    cell_data_format::set_cell_data_format();\n"
+                "    cell_data_format::reset_cell_data_format();\n"
+                "}\n",
+                encoding="utf-8",
+            )
             self.assertEqual(
-                boundaries.audit_iwa_numbers_custom_reset_source_topology(root),
+                boundaries.audit_iwa_numbers_table_cell_custom_format_source_topology(
+                    root
+                ),
                 [],
             )
 
+            # A returned NumbersEditor method is retired as soon as the
+            # focused owner is present.
             source.write_text(
-                complete.replace(
-                    "        if self.package.source_is_exact() {\n",
-                    "        if self.package.source_is_exact() && has_focused_custom_registry_edge(self)? {\n",
-                    1,
-                ),
+                "impl NumbersEditor {\n"
+                + "".join(
+                    f"pub fn {method}(&self) {{}}\n"
+                    for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CUSTOM_FORMAT_METHODS
+                )
+                + "}\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_iwa_numbers_custom_reset_source_topology(root)
-            self.assertTrue(
-                any("retired root-field registry gate" in item for item in violations),
-                violations,
+            violations = boundaries.audit_iwa_numbers_table_cell_custom_format_source_topology(
+                root
             )
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CUSTOM_FORMAT_METHODS:
+                self.assertTrue(
+                    any(f"raw-ID method returned {method}" in item for item in violations),
+                    (method, violations),
+                )
 
-            reversed_route = complete.replace(
-                "            *self = commit_exact_focused_data_format_with_location(self, table_id, row, column, &current, &DataFormat::Automatic, location)?;\n"
-                "            return Ok(true);\n",
-                "",
-                1,
-            )
-            reversed_route = reversed_route.replace(
-                "        let mut staged = self.package.clone();\n"
-                "        let changed = cell_data_format::reset_cell_data_format(&mut staged, table_id, row, column)?;\n",
-                "        let mut staged = self.package.clone();\n"
-                    "        let changed = cell_data_format::reset_cell_data_format(&mut staged, table_id, row, column)?;\n"
-                "        let _ = commit_exact_focused_data_format_with_location(self, table_id, row, column, &current, &DataFormat::Automatic, location)?;\n",
-                1,
-            )
-            source.write_text(reversed_route, encoding="utf-8")
-            violations = boundaries.audit_iwa_numbers_custom_reset_source_topology(root)
-            self.assertTrue(
-                any("after focused owner admission" in item for item in violations),
-                violations,
-            )
-
+            # Focused Package calls retain the historical method spelling, but
+            # only a bound focused receiver or explicit focused path is exempt.
             source.write_text(
-                complete.replace(
-                    "cell_data_format::reset_cell_data_format",
-                    "legacy::reset_cell_data_format",
-                ).replace(
-                    "impl NumbersEditor {",
-                    "use cell_data_format as legacy;\nimpl NumbersEditor {",
-                    1,
-                ),
+                "use litchi_numbers::Package as FocusedNumbersPackage;\n"
+                "fn focused_routes() {\n"
+                "    let package = FocusedNumbersPackage::from_bytes(bytes);\n"
+                "    package.table_cell_custom_format();\n"
+                "    package.set_table_cell_custom_format();\n"
+                "    litchi_numbers::Package::from_bytes(bytes)?.reset_table_cell_custom_format();\n"
+                "}\n"
+                "fn generic_routes() {\n"
+                "    editor.table_cell_custom_format();\n"
+                "    editor.r#table_cell_custom_format();\n"
+                "}\n"
+                "use crate::legacy::table_cell_custom_format as legacy_custom;\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_iwa_numbers_custom_reset_source_topology(root)
-            self.assertTrue(
-                any("alias legacy" in item for item in violations),
+            violations = boundaries.audit_iwa_numbers_table_cell_custom_format_source_topology(
+                root
+            )
+            production_calls = [
+                item for item in violations if "raw-ID production call" in item
+            ]
+            self.assertEqual(len(production_calls), 3, violations)
+            # The shared diagnostic reports the token name and source line;
+            # these three lines are respectively the ordinary receiver, raw
+            # identifier spelling, and renamed import alias.  The focused
+            # package's read/set/reset calls are intentionally absent.
+            self.assertEqual(
+                {int(item.rsplit(":", 1)[-1]) for item in production_calls},
+                {9, 10, 12},
                 violations,
             )
+            self.assertFalse(any("set_table_cell_custom_format" in item for item in violations))
+            self.assertFalse(any("reset_table_cell_custom_format" in item for item in violations))
 
-    def test_iwa_numbers_custom_reset_audit_is_in_main_dispatch(self) -> None:
+            # Comments, literals, and composite cfg-only items cannot resurrect
+            # the retired surface.
+            source.write_text(
+                "// table_cell_custom_format(); set_table_cell_custom_format();\n"
+                'const NOTE: &str = "reset_table_cell_custom_format(";\n'
+                "#[cfg(any(all(test, feature = \"oracle\"), all(test, unix)))]\n"
+                "fn hidden_route() { editor.table_cell_custom_format(); }\n"
+                "fn generic_route() { cell_custom_format(); reset_cell_data_format(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_custom_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_table_cell_custom_format_audit_is_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
-            "+ audit_iwa_numbers_custom_reset_source_topology()",
+            "+ audit_iwa_numbers_table_cell_custom_format_source_topology()",
             main_source,
         )
 

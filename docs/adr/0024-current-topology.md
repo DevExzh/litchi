@@ -4113,8 +4113,9 @@ The private document registry is rooted by `TN.DocumentArchive` field 9 and
 message type 222. Its custom archive format discriminators are 270 (Number),
 271 (Text), and 272 (Date & Time). Handwritten wire preflight runs before the
 private lazy Buffa view, and deterministic source-built exact-source fixtures
-provide E1 evidence only. There is no Apple-authored fixture or E2/E3/E4
-evidence.
+provide the original E1 evidence for this amendment. At that historical point
+there was no Apple-authored fixture or E2/E3/E4 evidence; the 2026-09-06
+follow-up recorded in ADR 0008 and ADR 0028 supersedes that interim status.
 
 Custom edits are exact-source transactions with copy-on-write publication,
 candidate reopen/readback, exact inverse patches, physical-locality checks,
@@ -4123,11 +4124,16 @@ closure, and private UUID handling. Semantically equal registry entries are
 reused; shared references remain live, replacement entries receive UUIDs, and
 unused entries are culled only after their last reference is cleared. The
 focused package suite passes 19/19, the strict custom-format codec passes 8/8,
-and both fuzz targets complete 100-run AddressSanitizer smokes. This amendment
-claims no native Numbers acceptance or native save/resave
-evidence, no generic Custom-format authoring, and no retirement of the legacy
-`NumbersEditor` Custom route; host Custom compatibility remains in the
-migration host.
+and both fuzz targets complete 100-run AddressSanitizer smokes. This historical
+amendment claimed no native Numbers acceptance or native save/resave evidence,
+no generic Custom-format authoring, and no retirement of the legacy
+`NumbersEditor` Custom route. The current follow-up admits both registry routes
+(`TN.DocumentArchive` field 9/message type 222 and `TN.super` field 8 →
+`TSA.custom_format_list` field 12), records operation-specific native
+replacement/clear evidence, retires the three dedicated raw-ID conveniences,
+and passes 37 focused integration tests with 927 boundary policy tests.
+Generic source-built/cross-format `DataFormat::Custom` compatibility and
+private attached Pages/Keynote table adapters remain in the migration host.
 
 No workspace package, dependency edge, ordered migration debt, migration host,
 or ADR 0028 deletion gate changes by this owner addition. The authoritative

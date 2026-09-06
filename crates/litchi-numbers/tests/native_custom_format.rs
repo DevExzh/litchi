@@ -42,6 +42,16 @@ fn resaved_fixture_path() -> PathBuf {
         .join("../../test-data/iwork/numbers/custom-number-native-resaved.numbers")
 }
 
+fn retirement_resaved_fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/custom-retirement-resaved.numbers")
+}
+
+fn retirement_cleared_fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/custom-retirement-cleared.numbers")
+}
+
 fn position() -> CellPosition {
     CellPosition::new(1, 1)
 }
@@ -373,6 +383,83 @@ fn native_custom_resaved_fixture_reopens_clears_and_inverts_exactly() -> TestRes
     assert_eq!(exact_bytes(restored.package())?, source);
     assert_number(restored.package(), &original)?;
     assert_cell_values(restored.package(), "Native Custom marker saved")?;
+    Ok(())
+}
+
+#[test]
+fn native_custom_retirement_fixture_roundtrips_reset_and_inverse() -> TestResult {
+    let source = std::fs::read(retirement_resaved_fixture_path())?;
+    let package = Package::open(retirement_resaved_fixture_path())?;
+    assert_eq!(exact_bytes(&package)?, source);
+
+    let original = native_number(&package)?;
+    assert_eq!(original.name().as_str(), "Focused Custom Retirement");
+    assert_eq!(original.default_pattern().as_str(), "#,##0.000");
+    assert!(original.rules().is_empty());
+    assert_number(&package, &original)?;
+    assert_cell_values(&package, "Focused Custom retirement saved")?;
+
+    let no_op = package
+        .edit_table_cell_custom_format(SHEET_NAME, TABLE_NAME, position())?
+        .set(Custom::Number(original.clone()))
+        .commit()?;
+    assert!(no_op.patch().is_noop());
+    assert_eq!(exact_bytes(no_op.package())?, source);
+    assert!(!no_op.diagnostics().changed());
+    assert_number(no_op.package(), &original)?;
+    assert_cell_values(no_op.package(), "Focused Custom retirement saved")?;
+
+    let original_custom = Custom::Number(original.clone());
+    let cleared = package
+        .edit_table_cell_custom_format(SHEET_NAME, TABLE_NAME, position())?
+        .clear()
+        .commit()?;
+    let cleared_bytes = exact_bytes(cleared.package())?;
+    assert_eq!(cleared.patch().before(), Some(&original_custom));
+    assert_eq!(cleared.patch().after(), None);
+    assert!(cleared.diagnostics().changed());
+    assert_eq!(
+        cleared
+            .package()
+            .table_cell_custom_format(SHEET_NAME, TABLE_NAME, position())?,
+        None
+    );
+    assert_cell_values(cleared.package(), "Focused Custom retirement saved")?;
+    assert_exact_locality(&source, &cleared_bytes)?;
+
+    let reopened = Package::from_bytes(&cleared_bytes)?;
+    assert_eq!(
+        reopened.table_cell_custom_format(SHEET_NAME, TABLE_NAME, position())?,
+        None
+    );
+    assert_cell_values(&reopened, "Focused Custom retirement saved")?;
+
+    let restored = reopened.apply_table_cell_custom_format(&cleared.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    assert_number(restored.package(), &original)?;
+    assert_cell_values(restored.package(), "Focused Custom retirement saved")?;
+    Ok(())
+}
+
+#[test]
+fn native_custom_retirement_cleared_fixture_is_exact_automatic_noop() -> TestResult {
+    let source = std::fs::read(retirement_cleared_fixture_path())?;
+    let package = Package::open(retirement_cleared_fixture_path())?;
+    assert_eq!(exact_bytes(&package)?, source);
+    assert_eq!(
+        package.table_cell_custom_format(SHEET_NAME, TABLE_NAME, position())?,
+        None
+    );
+    assert_cell_values(&package, "Focused Custom clear saved")?;
+
+    let no_op = package
+        .edit_table_cell_custom_format(SHEET_NAME, TABLE_NAME, position())?
+        .clear()
+        .commit()?;
+    assert!(no_op.patch().is_noop());
+    assert_eq!(exact_bytes(no_op.package())?, source);
+    assert!(!no_op.diagnostics().changed());
+    assert_cell_values(no_op.package(), "Focused Custom clear saved")?;
     Ok(())
 }
 
