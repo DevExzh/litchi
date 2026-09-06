@@ -1,7 +1,6 @@
 //! Standalone, inline-data chart CRUD for Keynote slides.
 
 mod arrangement;
-mod axis;
 mod axis_gridlines;
 mod axis_label_affixes;
 mod axis_label_angle;
@@ -51,7 +50,6 @@ mod series_value_label_number_format;
 mod series_value_labels;
 mod shadow;
 mod theme;
-mod title;
 
 use std::collections::HashMap;
 
@@ -81,9 +79,27 @@ use crate::shapes::{
     remove_orphaned_image_asset,
 };
 use litchi_keynote::{ChartArrangement, ChartCatalog, ChartSelector, ChartSelectorError};
-use title::focused_chart_catalog;
 
 const KEYNOTE_THEME_MESSAGE_TYPE: u32 = 10;
+
+pub(super) fn focused_chart_catalog(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+) -> Result<ChartCatalog> {
+    let bytes = editor.to_bytes()?;
+    let package = litchi_keynote::Package::from_bytes(&bytes).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "focused Keynote chart catalog source failed: {error}"
+        ))
+    })?;
+    package
+        .slide_chart_catalog(litchi_core::Position::new(slide_index))
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "focused Keynote chart catalog operation failed: {error}"
+            ))
+        })
+}
 
 /// One native chart drawable owned directly by a Keynote slide.
 #[derive(Debug, Clone, PartialEq)]

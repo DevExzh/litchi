@@ -660,7 +660,7 @@ pub(super) fn validate_unlocked_drawable(
 /// reused for its canonical identifier/deprecated-field rules; this wrapper
 /// accounts its second-level parse without exposing those low-level details
 /// to either semantic owner.
-fn validate_reference_payload(
+pub(super) fn validate_reference_payload(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut dyn AxisSupportBudget,
@@ -932,6 +932,49 @@ fn charge_archive_reference_inspection(
     budget.charge_reference_vector(buffer_capacity)?;
     budget.charge_reference_vector(buffer_capacity)?;
     budget.charge_references(references)
+}
+
+struct StrictArchiveReferenceVisitor;
+
+impl ArchiveReferenceVisitor for StrictArchiveReferenceVisitor {
+    fn visit_reference(
+        &mut self,
+        _occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        Ok(())
+    }
+}
+
+/// Inspect one archive object with the deletion-grade metadata policy.
+///
+/// Callers that perform their own ownership census still need the complete
+/// source metadata proof: an unknown ArchiveInfo, MessageInfo, or FieldInfo
+/// field may contain an owner edge the focused census cannot see. Charge the
+/// same retained header/reference work as the axis proof before invoking the
+/// core inspector, then discard known occurrences after the strict policy has
+/// established that the projection is complete.
+pub(super) fn inspect_archive_references_strict(
+    package: &Package,
+    object: &ArchiveObject,
+    budget: &mut dyn AxisSupportBudget,
+) -> Result<(), AxisSupportError> {
+    budget.charge_work(1)?;
+    charge_archive_reference_inspection(object, budget)?;
+    let archive_limits = package
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let mut visitor = StrictArchiveReferenceVisitor;
+    object
+        .inspect_references_with_policy_and_limits(
+            &mut visitor,
+            ArchiveReferencePolicy::RejectUnknownMetadata,
+            archive_limits,
+        )
+        .map_err(map_core_error)?;
+    Ok(())
 }
 
 /// Charge the aggregate/field reference census used to reject aliases before
@@ -1289,7 +1332,19 @@ pub(super) fn metadata_component_matches_physical(
     else {
         return false;
     };
-    component.preferred_locator() == expected
+    // Native PackageMetadata keeps a human-readable preferred locator (for
+    // example, `Slide`) alongside an explicit archive locator (for example,
+    // `Slide-2652150`).  When the explicit locator is present it is the
+    // physical identity; requiring the preferred locator to repeat it rejects
+    // otherwise valid native packages.  A preferred locator alone still has
+    // to be the exact physical basename, and an explicit locator must agree
+    // with the effective locator, so generic or conflicting descriptors stay
+    // rejected.
+    let preferred_matches = component.preferred_locator() == expected;
+    let explicit_matches = component
+        .locator()
+        .is_some_and(|locator| locator == expected);
+    (preferred_matches || explicit_matches)
         && component
             .locator()
             .is_none_or(|locator| locator == expected)
@@ -1491,6 +1546,43 @@ pub(super) fn verify_package_locality(
     )
 }
 
+/// The minimal accounting surface needed by the physical locality proof.
+///
+/// Axis owners have a full aggregate ledger, while a few legacy semantic
+/// owners only expose a bounded wire-work ledger. Keeping this smaller seam
+/// private lets those owners reuse the same ZIP/object/message proof without
+/// duplicating its source-preservation logic or manufacturing an unrelated
+/// axis selection.
+pub(super) trait LocalityBudget {
+    fn charge_locality_scan(&mut self, package: &Package) -> Result<(), AxisSupportError>;
+    fn charge_reference_vector(&mut self, capacity: usize) -> Result<(), AxisSupportError>;
+    fn charge_wire_vector(&mut self, payload: usize) -> Result<(), AxisSupportError>;
+    fn finish_wire_scan(&mut self, fields: usize) -> Result<(), AxisSupportError>;
+    fn charge_work(&mut self, amount: usize) -> Result<(), AxisSupportError>;
+}
+
+impl<T: AxisSupportBudget + ?Sized> LocalityBudget for T {
+    fn charge_locality_scan(&mut self, package: &Package) -> Result<(), AxisSupportError> {
+        AxisSupportBudget::charge_locality_scan(self, package)
+    }
+
+    fn charge_reference_vector(&mut self, capacity: usize) -> Result<(), AxisSupportError> {
+        AxisSupportBudget::charge_reference_vector(self, capacity)
+    }
+
+    fn charge_wire_vector(&mut self, payload: usize) -> Result<(), AxisSupportError> {
+        AxisSupportBudget::charge_wire_vector(self, payload)
+    }
+
+    fn finish_wire_scan(&mut self, fields: usize) -> Result<(), AxisSupportError> {
+        AxisSupportBudget::finish_wire_scan(self, fields)
+    }
+
+    fn charge_work(&mut self, amount: usize) -> Result<(), AxisSupportError> {
+        AxisSupportBudget::charge_work(self, amount)
+    }
+}
+
 /// Verify locality with an optional source-authoritative selected message.
 ///
 /// Chart-axis title rewrites predate value-axis transactions and retain their
@@ -1506,6 +1598,36 @@ pub(super) fn verify_package_locality_with_expected_message(
     previews_must_be_absent: bool,
     expected_selected_message: Option<&[u8]>,
     budget: &mut dyn AxisSupportBudget,
+) -> Result<(), AxisSupportError> {
+    verify_package_locality_for_component(
+        source,
+        candidate,
+        &selection.axis_component_name,
+        selection.axis_identifier,
+        selection.axis_message_index,
+        previews_must_be_absent,
+        expected_selected_message,
+        budget,
+    )
+}
+
+/// Verify physical locality for one selected object/message in one component.
+///
+/// The selected component may be a native slide component or a separately
+/// stored imported chart component. Every other package member and every
+/// unselected object/message must remain source-authoritative. When the caller
+/// supplies `Some` expected bytes, the selected message must match those bytes
+/// exactly; `None` retains the semantic-only compatibility behavior used by
+/// older axis owners.
+pub(super) fn verify_package_locality_for_component<B: LocalityBudget + ?Sized>(
+    source: &Package,
+    candidate: &Package,
+    selected_component_name: &str,
+    selected_identifier: u64,
+    selected_message_index: usize,
+    previews_must_be_absent: bool,
+    expected_selected_message: Option<&[u8]>,
+    budget: &mut B,
 ) -> Result<(), AxisSupportError> {
     budget.charge_locality_scan(source)?;
     budget.charge_locality_scan(candidate)?;
@@ -1552,7 +1674,7 @@ pub(super) fn verify_package_locality_with_expected_message(
     loop {
         match (source_entries.next(), candidate_entries.next()) {
             (Some(entry), Some(other)) => {
-                let selected_component = entry.name() == selection.axis_component_name;
+                let selected_component = entry.name() == selected_component_name;
                 budget.charge_work(entry_comparison_work(entry, other)?)?;
                 if entry.name() != other.name()
                     || entry.raw_name() != other.raw_name()
@@ -1577,7 +1699,6 @@ pub(super) fn verify_package_locality_with_expected_message(
     if previews_must_be_absent && !candidate_previews.names().is_empty() {
         return Err(AxisSupportError::InvalidSource);
     }
-
     let component_lookup_work = source
         .state
         .source
@@ -1591,14 +1712,14 @@ pub(super) fn verify_package_locality_with_expected_message(
         .source
         .components()
         .iter()
-        .find(|component| component.name() == selection.axis_component_name)
+        .find(|component| component.name() == selected_component_name)
         .ok_or(AxisSupportError::InvalidSource)?;
     let candidate_component = candidate
         .state
         .source
         .components()
         .iter()
-        .find(|component| component.name() == selection.axis_component_name)
+        .find(|component| component.name() == selected_component_name)
         .ok_or(AxisSupportError::InvalidSource)?;
     let source_objects = &source_component.archive().objects;
     let candidate_objects = &candidate_component.archive().objects;
@@ -1619,12 +1740,11 @@ pub(super) fn verify_package_locality_with_expected_message(
         if source_object.archive_info.identifier != candidate_object.archive_info.identifier {
             return Err(AxisSupportError::InvalidSource);
         }
-        let selected_object =
-            source_object.archive_info.identifier == Some(selection.axis_identifier);
+        let selected_object = source_object.archive_info.identifier == Some(selected_identifier);
         if !archive_info_compatible(
             source_object,
             candidate_object,
-            selected_object.then_some(selection.axis_message_index),
+            selected_object.then_some(selected_message_index),
         ) || source_object.messages.len() != candidate_object.messages.len()
             || (!selected_object && !source_object.same_content_ignoring_offsets(candidate_object))
         {
@@ -1636,7 +1756,7 @@ pub(super) fn verify_package_locality_with_expected_message(
             .zip(&candidate_object.messages)
             .enumerate()
         {
-            if selected_object && message_index == selection.axis_message_index {
+            if selected_object && message_index == selected_message_index {
                 budget.charge_work(
                     source_message
                         .data
@@ -1669,7 +1789,14 @@ pub(super) fn verify_package_locality_with_expected_message(
             }
         }
     }
-    verify_selected_archive_info_framing(source, candidate, selection, budget)?;
+    verify_selected_archive_info_framing(
+        source,
+        candidate,
+        selected_component_name,
+        selected_identifier,
+        selected_message_index,
+        budget,
+    )?;
     Ok(())
 }
 
@@ -1687,10 +1814,10 @@ struct ZipEnvelopeShape {
     comment_end: usize,
 }
 
-fn verify_zip_envelope_locality(
+fn verify_zip_envelope_locality<B: LocalityBudget + ?Sized>(
     source: &litchi_iwa_archive::package::Catalog,
     candidate: &litchi_iwa_archive::package::Catalog,
-    budget: &mut dyn AxisSupportBudget,
+    budget: &mut B,
 ) -> Result<(), AxisSupportError> {
     let source_bytes = source.source_bytes();
     let candidate_bytes = candidate.source_bytes();
@@ -1832,21 +1959,23 @@ fn parse_zip_eocd_at(bytes: &[u8], eocd_offset: usize) -> Option<ZipEnvelopeShap
 /// only permitted difference here is the selected `MessageInfo.length`
 /// scalar; its enclosing length prefixes are checked against the same
 /// source-width-preserving varint rule used by the IWA rewriter.
-fn verify_selected_archive_info_framing(
+fn verify_selected_archive_info_framing<B: LocalityBudget + ?Sized>(
     source: &Package,
     candidate: &Package,
-    selection: &AxisSelection,
-    budget: &mut dyn AxisSupportBudget,
+    selected_component_name: &str,
+    selected_identifier: u64,
+    selected_message_index: usize,
+    budget: &mut B,
 ) -> Result<(), AxisSupportError> {
     let source_catalog = physical_catalog(source)?.package();
     let candidate_catalog = physical_catalog(candidate)?.package();
     let source_entry = source_catalog
         .iter()
-        .find(|entry| entry.name() == selection.axis_component_name)
+        .find(|entry| entry.name() == selected_component_name)
         .ok_or(AxisSupportError::InvalidSource)?;
     let candidate_entry = candidate_catalog
         .iter()
-        .find(|entry| entry.name() == selection.axis_component_name)
+        .find(|entry| entry.name() == selected_component_name)
         .ok_or(AxisSupportError::InvalidSource)?;
     if source_entry.is_opaque() || candidate_entry.is_opaque() {
         return Err(AxisSupportError::InvalidSource);
@@ -1856,26 +1985,26 @@ fn verify_selected_archive_info_framing(
         .source
         .components()
         .iter()
-        .find(|component| component.name() == selection.axis_component_name)
+        .find(|component| component.name() == selected_component_name)
         .ok_or(AxisSupportError::InvalidSource)?;
     let candidate_component = candidate
         .state
         .source
         .components()
         .iter()
-        .find(|component| component.name() == selection.axis_component_name)
+        .find(|component| component.name() == selected_component_name)
         .ok_or(AxisSupportError::InvalidSource)?;
     let source_object = source_component
         .archive()
         .objects
         .iter()
-        .find(|object| object.archive_info.identifier == Some(selection.axis_identifier))
+        .find(|object| object.archive_info.identifier == Some(selected_identifier))
         .ok_or(AxisSupportError::InvalidSource)?;
     let candidate_object = candidate_component
         .archive()
         .objects
         .iter()
-        .find(|object| object.archive_info.identifier == Some(selection.axis_identifier))
+        .find(|object| object.archive_info.identifier == Some(selected_identifier))
         .ok_or(AxisSupportError::InvalidSource)?;
     if source_object.header_offset != candidate_object.header_offset {
         return Err(AxisSupportError::InvalidSource);
@@ -1936,19 +2065,19 @@ fn verify_selected_archive_info_framing(
     let source_length = source_object
         .archive_info
         .message_infos
-        .get(selection.axis_message_index)
+        .get(selected_message_index)
         .ok_or(AxisSupportError::InvalidSource)?
         .length;
     let candidate_length = candidate_object
         .archive_info
         .message_infos
-        .get(selection.axis_message_index)
+        .get(selected_message_index)
         .ok_or(AxisSupportError::InvalidSource)?
         .length;
     compare_archive_info_headers(
         source_header,
         candidate_header,
-        selection.axis_message_index,
+        selected_message_index,
         source_length,
         candidate_length,
         source.wire_limits().map_err(map_wire_error)?,
@@ -1970,14 +2099,14 @@ fn framed_object_header<'a>(stream: &'a [u8], object: &ArchiveObject) -> Option<
     framed.get(prefix_length..)
 }
 
-fn compare_archive_info_headers(
+fn compare_archive_info_headers<B: LocalityBudget + ?Sized>(
     source: &[u8],
     candidate: &[u8],
     selected_message_index: usize,
     source_length: u32,
     candidate_length: u32,
     limits: WireLimits,
-    budget: &mut dyn AxisSupportBudget,
+    budget: &mut B,
 ) -> Result<(), AxisSupportError> {
     budget.charge_wire_vector(source.len())?;
     budget.charge_wire_vector(candidate.len())?;
@@ -2029,7 +2158,7 @@ fn compare_archive_info_headers(
     Ok(())
 }
 
-fn compare_selected_message_info(
+fn compare_selected_message_info<B: LocalityBudget + ?Sized>(
     source_field: WireField,
     candidate_field: WireField,
     source: &[u8],
@@ -2037,7 +2166,7 @@ fn compare_selected_message_info(
     source_length: u32,
     candidate_length: u32,
     limits: WireLimits,
-    budget: &mut dyn AxisSupportBudget,
+    budget: &mut B,
 ) -> Result<(), AxisSupportError> {
     if source_field.key(source).map_err(map_wire_error)?
         != candidate_field.key(candidate).map_err(map_wire_error)?
@@ -2466,4 +2595,84 @@ fn read_u16(bytes: &[u8], offset: usize) -> Option<u16> {
 fn read_u32(bytes: &[u8], offset: usize) -> Option<u32> {
     let value = bytes.get(offset..offset.checked_add(4)?)?;
     Some(u32::from_le_bytes([value[0], value[1], value[2], value[3]]))
+}
+
+#[cfg(test)]
+mod tests {
+    use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
+    use litchi_iwa_protos::package_metadata_codec::{
+        self, ComponentDescriptor, PackageMetadataVisitor, RewriteError, RewriteOptions,
+    };
+
+    use super::metadata_component_matches_physical;
+
+    fn put_varint(output: &mut Vec<u8>, field: u32, value: u64) {
+        append_varint_field(output, field, value).expect("test varint fits wire limits");
+    }
+
+    fn put_bytes(output: &mut Vec<u8>, field: u32, value: &[u8]) {
+        append_length_delimited_field(output, field, value)
+            .expect("test bytes field fits wire limits");
+    }
+
+    fn component_metadata(preferred: &str, locator: Option<&str>) -> Vec<u8> {
+        let mut component = Vec::new();
+        put_varint(&mut component, 1, 1);
+        put_bytes(&mut component, 2, preferred.as_bytes());
+        if let Some(locator) = locator {
+            put_bytes(&mut component, 3, locator.as_bytes());
+        }
+
+        let mut metadata = Vec::new();
+        put_varint(&mut metadata, 1, 1);
+        put_bytes(&mut metadata, 3, &component);
+        metadata
+    }
+
+    struct MatchVisitor<'source> {
+        physical: &'source str,
+        matched: Option<bool>,
+    }
+
+    impl PackageMetadataVisitor for MatchVisitor<'_> {
+        fn visit_component(
+            &mut self,
+            component: ComponentDescriptor<'_>,
+        ) -> Result<(), RewriteError> {
+            self.matched = Some(metadata_component_matches_physical(
+                component,
+                self.physical,
+            ));
+            Ok(())
+        }
+    }
+
+    fn matches(preferred: &str, locator: Option<&str>) -> bool {
+        let source = component_metadata(preferred, locator);
+        let mut visitor = MatchVisitor {
+            physical: "Index/Slide-2652150.iwa",
+            matched: None,
+        };
+        package_metadata_codec::inspect_package_metadata_with_visitor(
+            &source,
+            RewriteOptions::new(source.len(), source.len(), 32, 4096, 8, 4, 4, 0),
+            &mut visitor,
+        )
+        .expect("minimal PackageMetadata component should inspect");
+        visitor.matched.expect("component callback should run")
+    }
+
+    #[test]
+    fn metadata_component_matching_accepts_native_explicit_locator() {
+        assert!(matches("Slide", Some("Slide-2652150")));
+        assert!(matches("Slide-2652150", None));
+    }
+
+    #[test]
+    fn metadata_component_matching_rejects_generic_or_conflicting_locator() {
+        assert!(!matches("Slide", None));
+        assert!(!matches("Slide", Some("Slide-2652151")));
+        assert!(!matches("Slide-2652150", Some("Slide-2652151")));
+        assert!(!matches("Other", Some("Slide-2652151")));
+    }
 }

@@ -1152,6 +1152,7 @@ impl<'a> ChartAxisTitleEdit<'a> {
                     before: self.before,
                     after: self.after,
                     deleted_previews: 0,
+                    restored_previews: 0,
                     target_requires_invalidated_previews: false,
                 },
                 diagnostics: ChartAxisTitleDiagnostics::unchanged(),
@@ -1218,6 +1219,7 @@ impl<'a> ChartAxisTitleEdit<'a> {
                 before: self.before,
                 after: self.after,
                 deleted_previews,
+                restored_previews: 0,
                 target_requires_invalidated_previews: true,
             },
             diagnostics: ChartAxisTitleDiagnostics::published(deleted_previews),
@@ -1240,6 +1242,7 @@ pub struct ChartAxisTitlePatch {
     before: Option<String>,
     after: Option<String>,
     deleted_previews: usize,
+    restored_previews: usize,
     target_requires_invalidated_previews: bool,
 }
 
@@ -1313,7 +1316,8 @@ impl ChartAxisTitlePatch {
             slide_identifier: self.slide_identifier,
             before: self.after.clone(),
             after: self.before.clone(),
-            deleted_previews: 0,
+            deleted_previews: self.restored_previews,
+            restored_previews: self.deleted_previews,
             target_requires_invalidated_previews: !self.artifacts.is_byte_noop()
                 && !self.target_requires_invalidated_previews,
         }

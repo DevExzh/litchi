@@ -747,13 +747,17 @@ fn output_limit_at_max_minus_one_rejects_atomically() -> TestResult<()> {
         .edit_slide_chart_axis_title(0usize, 0usize, Axis::Category)
         .and_then(|edit| edit.set(long_title))
         .and_then(|edit| edit.commit());
-    assert!(matches!(
-        result,
-        Err(ChartAxisTitleError::LimitExceeded {
-            kind: ChartAxisTitleLimitKind::OutputBytes,
-            ..
-        })
-    ));
+    assert!(
+        matches!(
+            result,
+            Err(ChartAxisTitleError::LimitExceeded {
+                kind: ChartAxisTitleLimitKind::OutputBytes,
+                ..
+            })
+        ),
+        "unexpected error: {:?}",
+        result.as_ref().err()
+    );
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
 }
