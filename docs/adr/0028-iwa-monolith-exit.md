@@ -9524,3 +9524,16 @@ artifact verified in Keynote before native save. Strict Clippy for both changed
 production libraries and workspace formatting pass. Boundary unit verification
 passes 943 cases. Full boundary scanning and normal commit hooks are pending
 the final receipt.
+
+Final commit and cleanup receipt: `ce6ab2e43` passed the normal pre-commit
+hooks: workspace formatting, all-feature production lint, all-feature workspace
+library/integration tests, and workspace documentation tests. The full boundary
+scanner passed for 64 packages and 238 internal dependency declarations, with
+11 explicit migration-debt items. This supersedes the pending final-verification
+notes above. No further host route was retired.
+
+After verification, the owned temporary directory
+`/private/tmp/litchi-media-comments-20260907t` was removed. `cargo clean` removed
+14,129 files and reclaimed 9.8 GiB; free disk space was approximately 62 GiB.
+The two checked-in native comment fixtures remain. Native reply authoring and
+selected commented-media removal remain outside this completed duplication slice.
