@@ -20,20 +20,20 @@ use std::{collections::BTreeSet, error::Error, io::Write, time::Instant};
 
 /// Stable corpus identity for the buffered ODP role.
 pub(crate) const ODP_BUFFERED_CORPUS_GENERATOR: &str = "litchi-odp-buffered-slides-v1";
-const ODP_BUFFERED_MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.presentation";
-const ODP_BUFFERED_MEMBER_NAMES: [&str; 5] = [
+pub(super) const ODP_BUFFERED_MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.presentation";
+pub(super) const ODP_BUFFERED_MEMBER_NAMES: [&str; 5] = [
     "mimetype",
     "content.xml",
     "styles.xml",
     "meta.xml",
     "META-INF/manifest.xml",
 ];
-const ODP_BUFFERED_COMPRESSION: &str = "mimetype=stored;xml=deflate";
-const ODP_BUFFERED_DEFAULT_STYLES_BYTES: usize = 1_960;
-const ODP_BUFFERED_DEFAULT_STYLES_SHA256: &str =
+pub(super) const ODP_BUFFERED_COMPRESSION: &str = "mimetype=stored;xml=deflate";
+pub(super) const ODP_BUFFERED_DEFAULT_STYLES_BYTES: usize = 1_960;
+pub(super) const ODP_BUFFERED_DEFAULT_STYLES_SHA256: &str =
     "d9881e91085516246a19c30d9e5cde39a8b10d7e42120b135f48f5ca8afef8d2";
-const ODP_BUFFERED_DEFAULT_META_BYTES: usize = 387;
-const ODP_BUFFERED_DEFAULT_META_SHA256: &str =
+pub(super) const ODP_BUFFERED_DEFAULT_META_BYTES: usize = 387;
+pub(super) const ODP_BUFFERED_DEFAULT_META_SHA256: &str =
     "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719";
 /// Source evidence for one role-local fresh ODP titled-slide corpus.
 #[derive(Clone, Debug, Serialize)]
@@ -54,6 +54,8 @@ pub(crate) struct OdpSlidesSummary {
     pub(crate) runtime_sink_length_verified: bool,
     pub(crate) page_structure_verified: bool,
     pub(crate) page_geometry_verified: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) provider_input_text_bytes: Option<usize>,
     pub(crate) slide_count: usize,
     pub(crate) title_count: usize,
     pub(crate) body_count: usize,
@@ -65,38 +67,38 @@ pub(crate) struct OdpSlidesSummary {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct OdpBufferedIdentity {
-    archive_bytes: usize,
-    archive_member_count: usize,
-    slide_count: usize,
-    representative_slide_bytes: usize,
-    archive_sha256: String,
-    semantic_sha256: String,
-    semantic_input_bytes: usize,
-    target_payload_bytes: usize,
-    target_payload_sha256: String,
-    content_xml_bytes: usize,
-    content_xml_sha256: String,
-    styles_xml_sha256: String,
-    meta_xml_sha256: String,
-    title_text_bytes: usize,
-    body_text_bytes: usize,
-    title_variant_counts: [usize; 4],
-    body_variant_counts: [usize; 4],
+pub(super) struct OdpBufferedIdentity {
+    pub(super) archive_bytes: usize,
+    pub(super) archive_member_count: usize,
+    pub(super) slide_count: usize,
+    pub(super) representative_slide_bytes: usize,
+    pub(super) archive_sha256: String,
+    pub(super) semantic_sha256: String,
+    pub(super) semantic_input_bytes: usize,
+    pub(super) target_payload_bytes: usize,
+    pub(super) target_payload_sha256: String,
+    pub(super) content_xml_bytes: usize,
+    pub(super) content_xml_sha256: String,
+    pub(super) styles_xml_sha256: String,
+    pub(super) meta_xml_sha256: String,
+    pub(super) title_text_bytes: usize,
+    pub(super) body_text_bytes: usize,
+    pub(super) title_variant_counts: [usize; 4],
+    pub(super) body_variant_counts: [usize; 4],
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct OdpTextShapeCounts {
-    slide_count: usize,
-    title_count: usize,
-    body_count: usize,
-    title_text_bytes: usize,
-    body_text_bytes: usize,
-    title_variant_counts: [usize; 4],
-    body_variant_counts: [usize; 4],
+pub(super) struct OdpTextShapeCounts {
+    pub(super) slide_count: usize,
+    pub(super) title_count: usize,
+    pub(super) body_count: usize,
+    pub(super) title_text_bytes: usize,
+    pub(super) body_text_bytes: usize,
+    pub(super) title_variant_counts: [usize; 4],
+    pub(super) body_variant_counts: [usize; 4],
 }
 
-const fn odp_buffered_slide_count(shape: SemanticShape) -> usize {
+pub(super) const fn odp_buffered_slide_count(shape: SemanticShape) -> usize {
     match shape {
         SemanticShape::Tiny => 64,
         SemanticShape::Medium => 4_096,
@@ -123,21 +125,21 @@ const fn odp_buffered_variant_text(index: usize) -> &'static str {
 /// whitespace. It still exercises ordinary text, non-ASCII UTF-8, and XML
 /// significant characters that the Builder must escape and the Presentation
 /// facade must restore.
-fn odp_buffered_title(index: usize) -> String {
+pub(super) fn odp_buffered_title(index: usize) -> String {
     format!(
         "litchi-perf-odp-buffered-title-{index:05} {}",
         odp_buffered_variant_text(index)
     )
 }
 
-fn odp_buffered_body(index: usize) -> String {
+pub(super) fn odp_buffered_body(index: usize) -> String {
     format!(
         "litchi-perf-odp-buffered-body-{index:05} {}",
         odp_buffered_variant_text(index)
     )
 }
 
-fn odp_buffered_semantic_digest(shape: SemanticShape) -> Result<String, Box<dyn Error>> {
+pub(super) fn odp_buffered_semantic_digest(shape: SemanticShape) -> Result<String, Box<dyn Error>> {
     let slide_count = odp_buffered_slide_count(shape);
     let mut hasher = sha2::Sha256::new();
     hasher.update(b"litchi-odp-buffered-semantic-v1\0");
@@ -159,7 +161,9 @@ fn odp_buffered_semantic_digest(shape: SemanticShape) -> Result<String, Box<dyn 
     Ok(output)
 }
 
-fn odp_buffered_semantic_input_bytes(shape: SemanticShape) -> Result<usize, Box<dyn Error>> {
+pub(super) fn odp_buffered_semantic_input_bytes(
+    shape: SemanticShape,
+) -> Result<usize, Box<dyn Error>> {
     let slide_count = odp_buffered_slide_count(shape);
     (0..slide_count).try_fold(0usize, |total, index| {
         let title = odp_buffered_title(index);
@@ -179,7 +183,7 @@ fn odp_buffered_semantic_input_bytes(shape: SemanticShape) -> Result<usize, Box<
     })
 }
 
-fn odp_buffered_text_shape_counts(
+pub(super) fn odp_buffered_text_shape_counts(
     shape: SemanticShape,
 ) -> Result<OdpTextShapeCounts, Box<dyn Error>> {
     let slide_count = odp_buffered_slide_count(shape);
@@ -335,7 +339,7 @@ fn verify_odp_buffered_manifest(archive: &ArchiveReader<'_>) -> Result<(), Box<d
     Ok(())
 }
 
-fn inspect_odp_buffered_archive(
+pub(super) fn inspect_odp_buffered_archive(
     bytes: &[u8],
     shape: SemanticShape,
 ) -> Result<OdpBufferedIdentity, Box<dyn Error>> {
@@ -447,10 +451,11 @@ fn inspect_odp_buffered_archive(
     })
 }
 
-fn verify_odp_buffered_corpus_binding(
+pub(super) fn verify_odp_corpus_binding(
     corpus: &Corpus,
     shape: SemanticShape,
     identity: &OdpBufferedIdentity,
+    expected_generator: &str,
     expected_name: &str,
 ) -> Result<(), Box<dyn Error>> {
     let reopened_target = ArchiveReader::new(&corpus.archive)?.read("content.xml")?;
@@ -461,7 +466,7 @@ fn verify_odp_buffered_corpus_binding(
         return Err("buffered ODP corpus target entry is not bound to reopened content.xml".into());
     }
     if corpus.manifest.name != expected_name
-        || corpus.manifest.generator != ODP_BUFFERED_CORPUS_GENERATOR
+        || corpus.manifest.generator != expected_generator
         || corpus.manifest.package_format != "ODP/ODF/ZIP"
         || corpus.manifest.shape != shape.name()
         || corpus.manifest.payload_kind
@@ -525,10 +530,11 @@ pub(crate) fn build_odp_buffered_corpus(shape: SemanticShape) -> Result<Corpus, 
         target_payload,
         xlsx: None,
     };
-    verify_odp_buffered_corpus_binding(
+    verify_odp_corpus_binding(
         &corpus,
         shape,
         &identity,
+        ODP_BUFFERED_CORPUS_GENERATOR,
         &format!("odp-buffered-slides-{}", shape.name()),
     )?;
     Ok(corpus)
@@ -547,10 +553,11 @@ pub(crate) fn run_odp_buffered_creation(
     }
     let shape = semantic_shape(corpus)?;
     let identity = inspect_odp_buffered_archive(&corpus.archive, shape)?;
-    verify_odp_buffered_corpus_binding(
+    verify_odp_corpus_binding(
         corpus,
         shape,
         &identity,
+        ODP_BUFFERED_CORPUS_GENERATOR,
         &format!("odp-buffered-slides-{}", shape.name()),
     )?;
     let expected_semantic_sha256 = odp_buffered_semantic_digest(shape)?;
@@ -649,6 +656,7 @@ pub(crate) fn run_odp_buffered_creation(
             runtime_sink_length_verified: true,
             page_structure_verified: true,
             page_geometry_verified: true,
+            provider_input_text_bytes: None,
             slide_count: text_counts.slide_count,
             title_count: text_counts.title_count,
             body_count: text_counts.body_count,

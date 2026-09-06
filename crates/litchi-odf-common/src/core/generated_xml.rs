@@ -75,9 +75,11 @@ fn xml_limit(resource: GeneratedXmlLimitResource, actual: usize, maximum: usize)
 
 /// A checked XML shell with one insertion point between its prefix and suffix.
 ///
-/// The prefix and suffix are owned after construction. The constructor checks
-/// that the prefix contains only an optional declaration followed by open
-/// elements, and that the suffix closes those elements in reverse order.
+/// The prefix and suffix are owned after construction. [`Self::try_new`] checks
+/// a prefix containing only an optional declaration followed by open elements.
+/// [`Self::try_new_with_prelude`] also allows balanced fixed element subtrees
+/// before the final open insertion path. Both require the suffix to close the
+/// remaining open elements in reverse order.
 #[derive(Debug)]
 pub struct GeneratedXmlEnvelope {
     prefix: Vec<u8>,
@@ -105,6 +107,49 @@ impl GeneratedXmlEnvelope {
         let _ =
             xml_minifier::audit::verify_authored(&combined, hard_limits).map_err(audit_error)?;
         let insertion_depth = parse_envelope_shape(&combined, prefix.len())?;
+
+        Ok(Self {
+            prefix: owned_bytes(prefix, "generated XML envelope prefix")?,
+            suffix: owned_bytes(suffix, "generated XML envelope suffix")?,
+            insertion_depth,
+        })
+    }
+
+    /// Checks and owns a generated XML shell with a fixed balanced prelude.
+    ///
+    /// The prefix may contain an optional declaration, one document root,
+    /// balanced fixed element subtrees, and a final open insertion path. The
+    /// suffix must contain only the matching end tags for the elements still
+    /// open at the prefix boundary. Fixed text, CDATA, references, comments,
+    /// processing instructions, doctypes, and `xml:space` are refused. Names
+    /// are matched as raw qualified names; namespace URI and schema policy
+    /// remain with the format provider.
+    ///
+    /// This is an opt-in extension for providers that need fixed child
+    /// subtrees before the streamed fragments. [`Self::try_new`] retains its
+    /// strict prefix-only-start contract.
+    ///
+    /// Fixed children may occur under any ancestor left open in the prefix.
+    /// The final insertion path is the trailing sequence of start tags after
+    /// the last fixed child closes; at least one such start tag is required.
+    /// For example, `<root><slot><fixed/><inner>` inserts inside `inner` at
+    /// depth three. Fixed character data is forbidden, so shell text-byte
+    /// accounting is zero and all character data comes from fragments.
+    pub fn try_new_with_prelude(prefix: &[u8], suffix: &[u8]) -> Result<Self> {
+        let shell_bytes = prefix
+            .len()
+            .checked_add(suffix.len())
+            .ok_or_else(|| invalid_generated_xml("generated XML shell byte count overflow"))?;
+        if shell_bytes > xml_minifier::audit::Limits::BYTE_CEILING {
+            return Err(invalid_generated_xml(
+                "generated XML envelope exceeds its immutable byte ceiling",
+            ));
+        }
+        let combined = concatenate(prefix, suffix, "generated XML envelope shape")?;
+        let hard_limits = immutable_hard_limits()?;
+        let _ =
+            xml_minifier::audit::verify_authored(&combined, hard_limits).map_err(audit_error)?;
+        let insertion_depth = parse_prelude_envelope_shape(&combined, prefix.len())?;
 
         Ok(Self {
             prefix: owned_bytes(prefix, "generated XML envelope prefix")?,
@@ -643,6 +688,145 @@ fn parse_envelope_shape(bytes: &[u8], boundary: usize) -> Result<usize> {
     if insertion_depth == 0 {
         return Err(invalid_generated_xml(
             "envelope must open at least one element",
+        ));
+    }
+    if !stack.is_empty() {
+        return Err(invalid_generated_xml(
+            "envelope suffix leaves open elements",
+        ));
+    }
+    Ok(insertion_depth)
+}
+
+fn parse_prelude_envelope_shape(bytes: &[u8], boundary: usize) -> Result<usize> {
+    if boundary > bytes.len() {
+        return Err(invalid_generated_xml(
+            "envelope prefix boundary exceeds the combined shell",
+        ));
+    }
+    let text = std::str::from_utf8(bytes)
+        .map_err(|error| invalid_generated_xml(format!("envelope is not UTF-8: {error}")))?;
+    let mut reader = Reader::from_str(text);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = false;
+    let mut stack = Vec::new();
+    let mut insertion_depth = None;
+    let mut saw_root = false;
+    let mut saw_document_event = false;
+    let mut trailing_starts = 0usize;
+
+    loop {
+        let start_offset = usize::try_from(reader.buffer_position()).unwrap_or(usize::MAX);
+        let event = reader
+            .read_event()
+            .map_err(|error| invalid_generated_xml(format!("invalid envelope: {error}")))?;
+        let end_offset = usize::try_from(reader.buffer_position()).unwrap_or(usize::MAX);
+        if start_offset < boundary && end_offset > boundary {
+            return Err(invalid_generated_xml(
+                "envelope boundary splits an XML event",
+            ));
+        }
+        let in_prefix = start_offset < boundary && end_offset <= boundary;
+        if !in_prefix && insertion_depth.is_none() {
+            insertion_depth = Some(stack.len());
+        }
+
+        match event {
+            Event::Decl(_)
+                if in_prefix
+                    && start_offset == 0
+                    && !saw_document_event
+                    && bytes.starts_with(b"<?xml") =>
+            {
+                saw_document_event = true;
+            },
+            Event::Start(start) if in_prefix => {
+                if stack.is_empty() {
+                    if saw_root {
+                        return Err(invalid_generated_xml(
+                            "envelope prefix contains a second document root",
+                        ));
+                    }
+                    saw_root = true;
+                }
+                reject_xml_space(&start)?;
+                let name = owned_name(start.name().as_ref())?;
+                stack.try_reserve(1).map_err(|source| Error::Allocation {
+                    resource: "generated XML envelope depth",
+                    source,
+                })?;
+                stack.push(name);
+                trailing_starts = trailing_starts.checked_add(1).ok_or_else(|| {
+                    invalid_generated_xml("generated XML envelope path depth overflow")
+                })?;
+                saw_document_event = true;
+            },
+            Event::Empty(empty) if in_prefix => {
+                if stack.is_empty() {
+                    return Err(invalid_generated_xml(
+                        "envelope fixed element appears outside its document root",
+                    ));
+                }
+                reject_xml_space(&empty)?;
+                trailing_starts = 0;
+                saw_document_event = true;
+            },
+            Event::End(end) if in_prefix => {
+                if stack.len() <= 1 {
+                    return Err(invalid_generated_xml(
+                        "envelope prefix closes its document root",
+                    ));
+                }
+                let expected = stack
+                    .pop()
+                    .ok_or_else(|| invalid_generated_xml("envelope has an extra end tag"))?;
+                if expected.as_slice() != end.name().as_ref() {
+                    return Err(invalid_generated_xml(
+                        "envelope end tag does not match its start tag",
+                    ));
+                }
+                trailing_starts = 0;
+                saw_document_event = true;
+            },
+            Event::End(end) if !in_prefix => {
+                let expected = stack
+                    .pop()
+                    .ok_or_else(|| invalid_generated_xml("envelope has an extra end tag"))?;
+                if expected.as_slice() != end.name().as_ref() {
+                    return Err(invalid_generated_xml(
+                        "envelope end tag does not match its start tag",
+                    ));
+                }
+            },
+            Event::Eof => {
+                if start_offset != bytes.len() || end_offset != bytes.len() {
+                    return Err(invalid_generated_xml("envelope EOF position is invalid"));
+                }
+                break;
+            },
+            _ => {
+                return Err(invalid_generated_xml(
+                    "envelope prelude must contain only declaration, elements, and matching end tags",
+                ));
+            },
+        }
+    }
+
+    let insertion_depth =
+        insertion_depth.ok_or_else(|| invalid_generated_xml("envelope has no prefix boundary"))?;
+    if !saw_root || !saw_document_event {
+        return Err(invalid_generated_xml(
+            "envelope must contain one document root",
+        ));
+    }
+    if insertion_depth == 0 {
+        return Err(invalid_generated_xml(
+            "envelope must leave an open insertion path",
+        ));
+    }
+    if trailing_starts == 0 {
+        return Err(invalid_generated_xml(
+            "envelope must end with open insertion-path start tags",
         ));
     }
     if !stack.is_empty() {
