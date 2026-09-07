@@ -1,0 +1,74 @@
+{
+  "schema": "litchi-0458-capture-v1",
+  "change": 458,
+  "lane": {
+    "id": "R1-normal-tiny-lifecycle",
+    "repeat": "R1",
+    "instrumentation": "normal",
+    "shape": "tiny",
+    "scope": "lifecycle"
+  },
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0458/runs/R1-normal-tiny-lifecycle/resource.log",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0458/litchi-perf-baseline",
+    "odp-append-attribution",
+    "--mode",
+    "lifecycle",
+    "--shape",
+    "tiny",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--repeat",
+    "R1",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0458/runs/R1-normal-tiny-lifecycle/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "protocol_sha256": "d653c26fda0eebdf54b314e5c17f2ac1d545609e7f3c43ddf36d840eedf31979",
+  "binary_binding_sha256": "73d79e56b124e95ebd61541b06c39bd856687fac1564f00f87cf2842699cbb17",
+  "environment_fixed": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "DEBUGINFOD_URLS": "",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "allocator_environment": {},
+  "started_utc": "2026-09-07T14:45:36.785249+00:00",
+  "exit_code": 0,
+  "oracle": {
+    "status": "pass",
+    "rows": 30,
+    "phase_count": 0
+  },
+  "status": "pass",
+  "finished_utc": "2026-09-07T14:45:36.892983+00:00",
+  "artifacts": [
+    {
+      "path": "runs/R1-normal-tiny-lifecycle/report.json",
+      "bytes": 33887,
+      "sha256": "9e0383f8e4c1172a063bd28e2f1fa1cb1f506f2e9280e273e703cc34a809b514"
+    },
+    {
+      "path": "runs/R1-normal-tiny-lifecycle/resource.log",
+      "bytes": 972,
+      "sha256": "f6d660c41178f0f6c1790e19ad120bf5e2356acc501454b28598e236aedeadec"
+    },
+    {
+      "path": "runs/R1-normal-tiny-lifecycle/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "runs/R1-normal-tiny-lifecycle/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

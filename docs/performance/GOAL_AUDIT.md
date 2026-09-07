@@ -1,5 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0458 evidence (2026-09-07)
+
+0458 completes a supplementary ordinary ODP append phase diagnostic: 24 lanes,
+720 samples, separate profiles, exact allocation-volume conservation, and
+recomputable sealed evidence. Commit is the largest individual large-input
+phase; opening plus transaction setup consumes about half the phase time.
+Sampled stacks do not resolve phase-marker ancestry, so internal cost ranking
+needs another diagnostic. This batch adds no production optimization or new
+CRUD/source/output coverage. The registry remains 439 selectors / 36 defaults.
+
+The full non-iWork goal remains open: wider selective CRUD, source/input/output
+matrices, native application roundtrips, cold/range behavior and measured
+bounded-worker scaling still need completion. The historical 0457 audit below
+retains its original scope. See the [0458 evidence](results/change-0458/README.md).
+
 ## Current audit: 0457 evidence (2026-09-07)
 
 The full non-iWork goal remains open, but the bounded existing-ODP evidence

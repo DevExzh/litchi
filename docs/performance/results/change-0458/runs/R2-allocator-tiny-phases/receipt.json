@@ -1,0 +1,74 @@
+{
+  "schema": "litchi-0458-capture-v1",
+  "change": 458,
+  "lane": {
+    "id": "R2-allocator-tiny-phases",
+    "repeat": "R2",
+    "instrumentation": "allocator",
+    "shape": "tiny",
+    "scope": "phases"
+  },
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0458/runs/R2-allocator-tiny-phases/resource.log",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0458/litchi-perf-baseline-alloc",
+    "odp-append-attribution",
+    "--mode",
+    "phases",
+    "--shape",
+    "tiny",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--repeat",
+    "R2",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0458/runs/R2-allocator-tiny-phases/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "protocol_sha256": "d653c26fda0eebdf54b314e5c17f2ac1d545609e7f3c43ddf36d840eedf31979",
+  "binary_binding_sha256": "73d79e56b124e95ebd61541b06c39bd856687fac1564f00f87cf2842699cbb17",
+  "environment_fixed": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "DEBUGINFOD_URLS": "",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "allocator_environment": {},
+  "started_utc": "2026-09-07T14:46:33.039844+00:00",
+  "exit_code": 0,
+  "oracle": {
+    "status": "pass",
+    "rows": 30,
+    "phase_count": 5
+  },
+  "status": "pass",
+  "finished_utc": "2026-09-07T14:46:33.154363+00:00",
+  "artifacts": [
+    {
+      "path": "runs/R2-allocator-tiny-phases/report.json",
+      "bytes": 137678,
+      "sha256": "5d51224bd5c635378502f14efbdb9d46df870eea7eaa2733761b65cadc650d29"
+    },
+    {
+      "path": "runs/R2-allocator-tiny-phases/resource.log",
+      "bytes": 976,
+      "sha256": "595c2dac33b7ef801f72c0532acf1042216b16ac7c8c7948ab7f2c241490493a"
+    },
+    {
+      "path": "runs/R2-allocator-tiny-phases/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "runs/R2-allocator-tiny-phases/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

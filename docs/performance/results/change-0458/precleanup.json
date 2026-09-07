@@ -1,0 +1,44 @@
+{
+  "schema": "litchi-0458-precleanup-v1",
+  "change": 458,
+  "status": "pass",
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0458/verify.py",
+    "--precleanup"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "verifier_path": "verify.py",
+  "verifier_sha256": "fa7533293a1ac61a8cc66443576cef782ab38e89573ad3b64edcf77eaa74c8c7",
+  "driver_sha256": "4e779e784aebff7d202c3c6c4b6d4f6b3f3b57d1ae7625e957aa8c7370ef25f2",
+  "started_utc": "2026-09-07T14:54:08.734775+00:00",
+  "exit_code": 0,
+  "stdout": "{\n  \"change\": 458,\n  \"lanes\": 24,\n  \"portable\": false,\n  \"precleanup\": true,\n  \"profiles\": 2,\n  \"schema\": \"litchi-0458-verification-v1\",\n  \"sealed_files\": 207,\n  \"selected_gates\": {\n    \"bind\": \"bind\",\n    \"build\": \"build\",\n    \"derive\": \"derive\",\n    \"derive-profile\": \"derive-profile\",\n    \"doc\": \"doc\",\n    \"format\": \"format\",\n    \"matrix\": \"matrix\",\n    \"oracle-tests\": \"oracle-tests\",\n    \"profiles\": \"profiles\",\n    \"smoke\": \"smoke-r2\",\n    \"strict\": \"strict\",\n    \"tests\": \"tests\"\n  },\n  \"status\": \"pass\"\n}\n",
+  "stderr": "",
+  "verifier_output": {
+    "change": 458,
+    "lanes": 24,
+    "portable": false,
+    "precleanup": true,
+    "profiles": 2,
+    "schema": "litchi-0458-verification-v1",
+    "sealed_files": 207,
+    "selected_gates": {
+      "bind": "bind",
+      "build": "build",
+      "derive": "derive",
+      "derive-profile": "derive-profile",
+      "doc": "doc",
+      "format": "format",
+      "matrix": "matrix",
+      "oracle-tests": "oracle-tests",
+      "profiles": "profiles",
+      "smoke": "smoke-r2",
+      "strict": "strict",
+      "tests": "tests"
+    },
+    "status": "pass"
+  },
+  "finished_utc": "2026-09-07T14:54:10.240535+00:00"
+}

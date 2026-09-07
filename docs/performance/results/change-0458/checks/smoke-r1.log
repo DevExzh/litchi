@@ -1,0 +1,22 @@
+{"lane": {"id": "normal-lifecycle", "instrumentation": "normal", "scope": "lifecycle", "shape": "tiny", "repeat": "R1"}, "oracle": {"status": "pass", "rows": 30, "phase_count": 0}}
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0458/smoke-r1.py", line 32, in <module>
+    main()
+    ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0458/smoke-r1.py", line 27, in main
+    proof = oracle.validate(report, lane, {"samples": 30, "warmup": 3})
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0458/oracle.py", line 580, in validate
+    _validate_row(row, index, expected_identity, scope, instrumentation)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0458/oracle.py", line 481, in _validate_row
+    _validate_phase_metrics(phases, f"{path}.phases", instrumentation)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0458/oracle.py", line 408, in _validate_phase_metrics
+    _exact_keys(phase, expected_keys, f"{path}[{index}]")
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0458/oracle.py", line 131, in _exact_keys
+    _fail(path, "; ".join(detail))
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0458/oracle.py", line 105, in _fail
+    raise OracleError(f"{path}: {message}")
+oracle458.OracleError: report.rows[0].phases[0]: missing allocation_metrics

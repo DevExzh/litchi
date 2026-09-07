@@ -1,0 +1,1701 @@
+{
+  "schema": "litchi-odp-append-attribution-v1",
+  "mode": "phases",
+  "scope": "phases",
+  "repeat": "R2",
+  "shape": "tiny",
+  "warmup": 3,
+  "samples": 30,
+  "checked_iteration_count": 33,
+  "corpus_generator": "litchi-odp-existing-append-lifecycle-v1",
+  "corpus": {
+    "name": "odp-existing-append-lifecycle-tiny",
+    "generator": "litchi-odp-existing-append-lifecycle-v1",
+    "package_format": "ODP/ODF/ZIP",
+    "shape": "tiny",
+    "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+    "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+    "entry_count": 64,
+    "archive_member_count": 6,
+    "entry_bytes": 96,
+    "uncompressed_payload_bytes": 7358,
+    "archive_bytes": 4684,
+    "archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+    "target_entry": "content.xml",
+    "target_payload_bytes": 49009,
+    "target_payload_sha256": "6085294e5d6a363515b71c9131fa1c49af5bf5b34374e26a7436fd509fde3037",
+    "xlsx": null
+  },
+  "identity": {
+    "source_archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+    "source_archive_bytes": 4684,
+    "expected_output_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+    "expected_output_bytes": 4697
+  },
+  "allocator": {
+    "allocator": "Rust system allocator",
+    "instrumentation": "none"
+  },
+  "timing_scope": "input/title/body/sink construction outside; lifecycle_ns encloses five harness phase clocks and their boundary instrumentation; each phase clock includes only its named public call; hashes, gates, report assembly, and drops outside",
+  "phase_order": [
+    "snapshot_open",
+    "transaction",
+    "add",
+    "commit",
+    "publication"
+  ],
+  "phases": [
+    {
+      "name": "snapshot_open",
+      "scope": "Snapshot::from_bytes(input Vec)"
+    },
+    {
+      "name": "transaction",
+      "scope": "Snapshot::transaction()"
+    },
+    {
+      "name": "add",
+      "scope": "Transaction::add(title, body)"
+    },
+    {
+      "name": "commit",
+      "scope": "Transaction::commit() including Patch construction and readback"
+    },
+    {
+      "name": "publication",
+      "scope": "HashingDiscardSink::write_all(committed snapshot bytes)"
+    }
+  ],
+  "preflight_gates": {
+    "source_manifest_bindings_verified": true,
+    "output_manifest_bindings_verified": true,
+    "untouched_members_verified": true,
+    "opaque_member_compressed_identity_verified": true,
+    "patch_replay_verified": true,
+    "inverse_patch_verified": true,
+    "stale_source_refusal_verified": true,
+    "exact_noop_verified": true
+  },
+  "rows": [
+    {
+      "sample_index": 0,
+      "lifecycle_ns": 1910008,
+      "phase_sum_ns": 1909108,
+      "boundary_gap_ns": 900,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 376732
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 394011
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16951
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1119224
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2190
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 1,
+      "lifecycle_ns": 1918148,
+      "phase_sum_ns": 1917368,
+      "boundary_gap_ns": 780,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 379442
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 393501
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16640
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1125595
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2190
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 2,
+      "lifecycle_ns": 1933548,
+      "phase_sum_ns": 1932418,
+      "boundary_gap_ns": 1130,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 377132
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 412111
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 17120
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1123845
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2210
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 3,
+      "lifecycle_ns": 1916148,
+      "phase_sum_ns": 1915398,
+      "boundary_gap_ns": 750,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 378122
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 395271
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16890
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1122945
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2170
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 4,
+      "lifecycle_ns": 1911298,
+      "phase_sum_ns": 1910598,
+      "boundary_gap_ns": 700,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 378881
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 388012
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16570
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1124975
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2160
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 5,
+      "lifecycle_ns": 1900267,
+      "phase_sum_ns": 1899567,
+      "boundary_gap_ns": 700,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 375151
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 388232
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16920
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1117094
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2170
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 6,
+      "lifecycle_ns": 1919868,
+      "phase_sum_ns": 1919328,
+      "boundary_gap_ns": 540,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 385722
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 390262
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 17250
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1123944
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2150
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 7,
+      "lifecycle_ns": 1946268,
+      "phase_sum_ns": 1945828,
+      "boundary_gap_ns": 440,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 382662
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 390112
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16670
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1154154
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2230
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 8,
+      "lifecycle_ns": 1967258,
+      "phase_sum_ns": 1966748,
+      "boundary_gap_ns": 510,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 387652
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 388732
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 17370
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1170824
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2170
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 9,
+      "lifecycle_ns": 1905438,
+      "phase_sum_ns": 1904878,
+      "boundary_gap_ns": 560,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 381642
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 390082
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16760
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1114244
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2150
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 10,
+      "lifecycle_ns": 1908228,
+      "phase_sum_ns": 1907718,
+      "boundary_gap_ns": 510,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 382832
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 391981
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 17031
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1113724
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2150
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 11,
+      "lifecycle_ns": 1908558,
+      "phase_sum_ns": 1908058,
+      "boundary_gap_ns": 500,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 382622
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 390101
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 17060
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1116125
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2150
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 12,
+      "lifecycle_ns": 1903868,
+      "phase_sum_ns": 1903148,
+      "boundary_gap_ns": 720,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 372742
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 397221
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16980
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1114055
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2150
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 13,
+      "lifecycle_ns": 1902658,
+      "phase_sum_ns": 1902138,
+      "boundary_gap_ns": 520,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 373141
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 397192
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16750
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1112905
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2150
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 14,
+      "lifecycle_ns": 1906847,
+      "phase_sum_ns": 1906337,
+      "boundary_gap_ns": 510,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 373221
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 401172
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16890
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1112904
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2150
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 15,
+      "lifecycle_ns": 1902338,
+      "phase_sum_ns": 1901878,
+      "boundary_gap_ns": 460,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 374392
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 396202
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16970
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1112144
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2170
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 16,
+      "lifecycle_ns": 1902448,
+      "phase_sum_ns": 1902018,
+      "boundary_gap_ns": 430,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 373702
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 394461
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 19621
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1112084
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2150
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 17,
+      "lifecycle_ns": 1908078,
+      "phase_sum_ns": 1907658,
+      "boundary_gap_ns": 420,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 373212
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 390311
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16960
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1125025
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2150
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 18,
+      "lifecycle_ns": 1940418,
+      "phase_sum_ns": 1939908,
+      "boundary_gap_ns": 510,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 375782
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 387581
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16870
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1157445
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2230
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 19,
+      "lifecycle_ns": 1946618,
+      "phase_sum_ns": 1946198,
+      "boundary_gap_ns": 420,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 374871
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 390452
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 17060
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1161625
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2190
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 20,
+      "lifecycle_ns": 1908698,
+      "phase_sum_ns": 1908208,
+      "boundary_gap_ns": 490,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 379141
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 389262
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16780
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1120855
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2170
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 21,
+      "lifecycle_ns": 1933598,
+      "phase_sum_ns": 1933198,
+      "boundary_gap_ns": 400,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 378761
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 391202
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16860
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1144165
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2210
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 22,
+      "lifecycle_ns": 1949108,
+      "phase_sum_ns": 1948608,
+      "boundary_gap_ns": 500,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 379861
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 390362
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16830
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1159385
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2170
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 23,
+      "lifecycle_ns": 1898527,
+      "phase_sum_ns": 1898147,
+      "boundary_gap_ns": 380,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 377181
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 389722
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16840
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1112214
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2190
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 24,
+      "lifecycle_ns": 1902128,
+      "phase_sum_ns": 1901698,
+      "boundary_gap_ns": 430,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 380612
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 388242
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16850
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1113814
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2180
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 25,
+      "lifecycle_ns": 1933818,
+      "phase_sum_ns": 1933418,
+      "boundary_gap_ns": 400,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 379582
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 390921
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16590
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1144125
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2200
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 26,
+      "lifecycle_ns": 1944688,
+      "phase_sum_ns": 1944238,
+      "boundary_gap_ns": 450,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 370242
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 398321
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16790
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1156715
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2170
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 27,
+      "lifecycle_ns": 1903048,
+      "phase_sum_ns": 1902508,
+      "boundary_gap_ns": 540,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 373282
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 397461
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16820
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1112775
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2170
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 28,
+      "lifecycle_ns": 1905848,
+      "phase_sum_ns": 1905318,
+      "boundary_gap_ns": 530,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 373202
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 397831
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16700
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1115435
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2150
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 29,
+      "lifecycle_ns": 1895178,
+      "phase_sum_ns": 1894628,
+      "boundary_gap_ns": 550,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 371051
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 392302
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 16790
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 1112335
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 2150
+        }
+      ],
+      "source_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "source_bytes": 4684,
+      "candidate_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "candidate_bytes": 4697,
+      "sink_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+      "sink": {
+        "accepted_bytes": 4697,
+        "write_calls": 1,
+        "largest_write": 4697,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_16385_to_65536": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    }
+  ]
+}

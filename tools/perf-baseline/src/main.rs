@@ -15,6 +15,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(selector) if selector == std::ffi::OsStr::new("native-image-lifecycle") => {
             return litchi_perf_baseline::pptx_native_image::run_from_args(args);
         },
+        Some(selector) if selector == std::ffi::OsStr::new("odp-append-attribution") => {
+            return litchi_perf_baseline::odp_append_attribution::run_from_args(args);
+        },
         _ => {},
     }
     litchi_perf_baseline::run()

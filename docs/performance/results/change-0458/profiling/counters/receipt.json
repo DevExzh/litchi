@@ -1,0 +1,82 @@
+{
+  "schema": "litchi-0458-profile-v1",
+  "change": 458,
+  "kind": "counters",
+  "protocol_sha256": "d653c26fda0eebdf54b314e5c17f2ac1d545609e7f3c43ddf36d840eedf31979",
+  "binary": {
+    "path": "/tmp/litchi-goal-0458/litchi-perf-baseline",
+    "source": "tools/perf-baseline/target/release/litchi-perf-baseline",
+    "sha256": "b9acbbf3d1b5f64d40e862d743e7d202629670c96394438016d96aee7f98e7a6",
+    "bytes": 58337688
+  },
+  "started_utc": "2026-09-07T14:50:16.919711+00:00",
+  "scope": "whole process including fixture setup, warmups, API calls, output checks, teardown and reporting",
+  "workload": {
+    "argv": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0458/profiling/counters/resource.log",
+      "taskset",
+      "-c",
+      "2",
+      "perf",
+      "stat",
+      "-x,",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0458/profiling/counters/counters.csv",
+      "-e",
+      "cycles,instructions,branches,branch-misses,cache-misses,page-faults,context-switches",
+      "--",
+      "/tmp/litchi-goal-0458/litchi-perf-baseline",
+      "odp-append-attribution",
+      "--mode",
+      "phases",
+      "--shape",
+      "large",
+      "--warmup",
+      "3",
+      "--samples",
+      "100",
+      "--repeat",
+      "diagnostic",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0458/profiling/counters/report.json"
+    ],
+    "exit_code": 0
+  },
+  "oracle": {
+    "status": "pass",
+    "rows": 100,
+    "phase_count": 5
+  },
+  "status": "pass",
+  "finished_utc": "2026-09-07T14:50:33.564921+00:00",
+  "artifacts": [
+    {
+      "path": "profiling/counters/counters.csv",
+      "bytes": 344,
+      "sha256": "fca2383652742686e9b447b656a9ad31ed19ac57e760865e15bfea0a8feea418"
+    },
+    {
+      "path": "profiling/counters/report.json",
+      "bytes": 158855,
+      "sha256": "951929d6ec5db43fb90c006cbf06db57ffe064e787bc3feedac12fa028828a86"
+    },
+    {
+      "path": "profiling/counters/resource.log",
+      "bytes": 1174,
+      "sha256": "415824823c9e4aa2b0b4a4aadba4a0a95ab9964f18a343a13d1b9c0eae057a47"
+    },
+    {
+      "path": "profiling/counters/workload.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "profiling/counters/workload.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

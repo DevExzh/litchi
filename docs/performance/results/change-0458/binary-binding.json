@@ -1,0 +1,29 @@
+{
+  "schema": "litchi-0458-binary-binding-v1",
+  "change": 458,
+  "revision": "a79321ebe919e078e2d09bfb7043eccaf63c4616",
+  "build_receipt": {
+    "path": "checks/build.json",
+    "bytes": 1430,
+    "sha256": "d8ea17b0cf1d05df52854cfd67106cb43412da1b5674087d0376f48c5edb76c3"
+  },
+  "source_manifest": {
+    "path": "sources/28d1a0973bb2ff4a15d733b92c8ba23d2f1dbea3dfeb81fb61e290e4a7a28237.json",
+    "sha256": "28d1a0973bb2ff4a15d733b92c8ba23d2f1dbea3dfeb81fb61e290e4a7a28237",
+    "files": 7030
+  },
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0458/litchi-perf-baseline",
+      "source": "tools/perf-baseline/target/release/litchi-perf-baseline",
+      "sha256": "b9acbbf3d1b5f64d40e862d743e7d202629670c96394438016d96aee7f98e7a6",
+      "bytes": 58337688
+    },
+    "allocator": {
+      "path": "/tmp/litchi-goal-0458/litchi-perf-baseline-alloc",
+      "source": "tools/perf-baseline/target/release/litchi-perf-baseline-alloc",
+      "sha256": "d7af35881a76fea19fb7cdb9212ce4b6dbd940758aff54ba695ce095c1da50d6",
+      "bytes": 58178752
+    }
+  }
+}

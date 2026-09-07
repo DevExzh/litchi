@@ -1,0 +1,132 @@
+{
+  "schema": "litchi-0458-profile-v1",
+  "change": 458,
+  "kind": "samples",
+  "protocol_sha256": "d653c26fda0eebdf54b314e5c17f2ac1d545609e7f3c43ddf36d840eedf31979",
+  "binary": {
+    "path": "/tmp/litchi-goal-0458/litchi-perf-baseline",
+    "source": "tools/perf-baseline/target/release/litchi-perf-baseline",
+    "sha256": "b9acbbf3d1b5f64d40e862d743e7d202629670c96394438016d96aee7f98e7a6",
+    "bytes": 58337688
+  },
+  "started_utc": "2026-09-07T14:50:33.565410+00:00",
+  "scope": "whole process including fixture setup, warmups, API calls, output checks, teardown and reporting",
+  "workload": {
+    "argv": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0458/profiling/samples/resource.log",
+      "taskset",
+      "-c",
+      "2",
+      "perf",
+      "record",
+      "--no-buildid-cache",
+      "-F",
+      "99",
+      "-e",
+      "cycles:u",
+      "--call-graph",
+      "dwarf,8192",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0458/profiling/samples/perf.data",
+      "--",
+      "/tmp/litchi-goal-0458/litchi-perf-baseline",
+      "odp-append-attribution",
+      "--mode",
+      "phases",
+      "--shape",
+      "large",
+      "--warmup",
+      "3",
+      "--samples",
+      "100",
+      "--repeat",
+      "diagnostic",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0458/profiling/samples/report.json"
+    ],
+    "exit_code": 0
+  },
+  "oracle": {
+    "status": "pass",
+    "rows": 100,
+    "phase_count": 5
+  },
+  "top_symbols": {
+    "argv": [
+      "perf",
+      "report",
+      "--stdio",
+      "--no-inline",
+      "--no-children",
+      "--call-graph",
+      "none",
+      "--percent-limit",
+      "0",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0458/profiling/samples/perf.data"
+    ],
+    "exit_code": 0
+  },
+  "script": {
+    "argv": [
+      "perf",
+      "script",
+      "--no-inline",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0458/profiling/samples/perf.data"
+    ],
+    "exit_code": 0
+  },
+  "status": "pass",
+  "finished_utc": "2026-09-07T14:50:50.486100+00:00",
+  "artifacts": [
+    {
+      "path": "profiling/samples/perf-script.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "profiling/samples/perf-script.stdout",
+      "bytes": 470193,
+      "sha256": "dc2fed42f7159eb6ebe5e7540e229647f1ebb242e930121caa0495d9407e3c04"
+    },
+    {
+      "path": "profiling/samples/perf.data",
+      "bytes": 14001800,
+      "sha256": "7b57ae644becf13349e03e265c9fa3d307c3eeca88745780ba3cc3437be33c38"
+    },
+    {
+      "path": "profiling/samples/report.json",
+      "bytes": 158855,
+      "sha256": "5823749e67e15393ec958a8c69731fc795f883f15666272fab3fd39cf228297e"
+    },
+    {
+      "path": "profiling/samples/resource.log",
+      "bytes": 1143,
+      "sha256": "1e433ddba5d6ed9ab8c2a61a6fa259631e362c2de47511a2fcf0b4018e409f99"
+    },
+    {
+      "path": "profiling/samples/top-symbols.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "profiling/samples/top-symbols.stdout",
+      "bytes": 16752,
+      "sha256": "b82a305231b0996af644442a714f380894c51d275c67a4d22e8b9a98e2cce0b5"
+    },
+    {
+      "path": "profiling/samples/workload.stderr",
+      "bytes": 184,
+      "sha256": "0e4538820e4c1616ebffd602e5d38456b6d7eec517666b86a4d925b9d705e9cb"
+    },
+    {
+      "path": "profiling/samples/workload.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

@@ -1,0 +1,3952 @@
+{
+  "schema": "litchi-odp-append-attribution-v1",
+  "mode": "phases",
+  "scope": "phases",
+  "repeat": "R1",
+  "shape": "medium",
+  "warmup": 3,
+  "samples": 30,
+  "checked_iteration_count": 33,
+  "corpus_generator": "litchi-odp-existing-append-lifecycle-v1",
+  "corpus": {
+    "name": "odp-existing-append-lifecycle-medium",
+    "generator": "litchi-odp-existing-append-lifecycle-v1",
+    "package_format": "ODP/ODF/ZIP",
+    "shape": "medium",
+    "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+    "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+    "entry_count": 4096,
+    "archive_member_count": 6,
+    "entry_bytes": 96,
+    "uncompressed_payload_bytes": 471038,
+    "archive_bytes": 54646,
+    "archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+    "target_entry": "content.xml",
+    "target_payload_bytes": 3043815,
+    "target_payload_sha256": "53b6c3426ab2cbd140fa2a92a6d3b6d981fa15c769e6c5236a8ee2dc2b7644e7",
+    "xlsx": null
+  },
+  "identity": {
+    "source_archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+    "source_archive_bytes": 54646,
+    "expected_output_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+    "expected_output_bytes": 54658
+  },
+  "allocator": {
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "counter_revision": "serialized_region_peak_v3"
+  },
+  "timing_scope": "input/title/body/sink construction outside; lifecycle_ns encloses five harness phase clocks and their boundary instrumentation; each phase clock includes only its named public call; hashes, gates, report assembly, and drops outside",
+  "phase_order": [
+    "snapshot_open",
+    "transaction",
+    "add",
+    "commit",
+    "publication"
+  ],
+  "phases": [
+    {
+      "name": "snapshot_open",
+      "scope": "Snapshot::from_bytes(input Vec)"
+    },
+    {
+      "name": "transaction",
+      "scope": "Snapshot::transaction()"
+    },
+    {
+      "name": "add",
+      "scope": "Transaction::add(title, body)"
+    },
+    {
+      "name": "commit",
+      "scope": "Transaction::commit() including Patch construction and readback"
+    },
+    {
+      "name": "publication",
+      "scope": "HashingDiscardSink::write_all(committed snapshot bytes)"
+    }
+  ],
+  "preflight_gates": {
+    "source_manifest_bindings_verified": true,
+    "output_manifest_bindings_verified": true,
+    "untouched_members_verified": true,
+    "opaque_member_compressed_identity_verified": true,
+    "patch_replay_verified": true,
+    "inverse_patch_verified": true,
+    "stale_source_refusal_verified": true,
+    "exact_noop_verified": true
+  },
+  "rows": [
+    {
+      "sample_index": 0,
+      "lifecycle_ns": 81612322,
+      "phase_sum_ns": 81610702,
+      "boundary_gap_ns": 1620,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23047713,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9364039,
+            "live_bytes_after": 11332688,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15885803
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19572980,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11332688,
+            "live_bytes_after": 17472911,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20518698
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1395086,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17472911,
+            "live_bytes_after": 19148478,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20268576
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37570113,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19148478,
+            "live_bytes_after": 13405288,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27391607
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24810,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13405288,
+            "live_bytes_after": 13405288,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13405288
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 1,
+      "lifecycle_ns": 81844163,
+      "phase_sum_ns": 81842863,
+      "boundary_gap_ns": 1300,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23135764,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9365271,
+            "live_bytes_after": 11333920,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15887035
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19646790,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11333920,
+            "live_bytes_after": 17474143,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20519930
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1399816,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17474143,
+            "live_bytes_after": 19149710,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20269808
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37635773,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19149710,
+            "live_bytes_after": 13406520,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27392839
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24720,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13406520,
+            "live_bytes_after": 13406520,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13406520
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 2,
+      "lifecycle_ns": 82063213,
+      "phase_sum_ns": 82061483,
+      "boundary_gap_ns": 1730,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23118144,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9366503,
+            "live_bytes_after": 11335152,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15888267
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19765880,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11335152,
+            "live_bytes_after": 17475375,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20521162
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1406746,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17475375,
+            "live_bytes_after": 19150942,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20271040
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37745833,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19150942,
+            "live_bytes_after": 13407752,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27394071
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24880,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13407752,
+            "live_bytes_after": 13407752,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13407752
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 3,
+      "lifecycle_ns": 81989433,
+      "phase_sum_ns": 81988183,
+      "boundary_gap_ns": 1250,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23120574,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9367735,
+            "live_bytes_after": 11336384,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15889499
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19869971,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11336384,
+            "live_bytes_after": 17476607,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20522394
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1402565,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17476607,
+            "live_bytes_after": 19152174,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20272272
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37570213,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19152174,
+            "live_bytes_after": 13408984,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27395303
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24860,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13408984,
+            "live_bytes_after": 13408984,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13408984
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 4,
+      "lifecycle_ns": 81917693,
+      "phase_sum_ns": 81916303,
+      "boundary_gap_ns": 1390,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23161694,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9368967,
+            "live_bytes_after": 11337616,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15890731
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19793551,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11337616,
+            "live_bytes_after": 17477839,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20523626
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1384915,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17477839,
+            "live_bytes_after": 19153406,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20273504
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37551243,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19153406,
+            "live_bytes_after": 13410216,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27396535
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24900,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13410216,
+            "live_bytes_after": 13410216,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13410216
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 5,
+      "lifecycle_ns": 81988203,
+      "phase_sum_ns": 81986863,
+      "boundary_gap_ns": 1340,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23076203,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9370199,
+            "live_bytes_after": 11338848,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15891963
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19720731,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11338848,
+            "live_bytes_after": 17479071,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20524858
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1394865,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17479071,
+            "live_bytes_after": 19154638,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20274736
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37770234,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19154638,
+            "live_bytes_after": 13411448,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27397767
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24830,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13411448,
+            "live_bytes_after": 13411448,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13411448
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 6,
+      "lifecycle_ns": 82274764,
+      "phase_sum_ns": 82272944,
+      "boundary_gap_ns": 1820,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23154484,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9371431,
+            "live_bytes_after": 11340080,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15893195
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19762890,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11340080,
+            "live_bytes_after": 17480303,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20526090
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1394016,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17480303,
+            "live_bytes_after": 19155870,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20275968
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37936584,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19155870,
+            "live_bytes_after": 13412680,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27398999
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24970,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13412680,
+            "live_bytes_after": 13412680,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13412680
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 7,
+      "lifecycle_ns": 82134654,
+      "phase_sum_ns": 82133474,
+      "boundary_gap_ns": 1180,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23068044,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9372663,
+            "live_bytes_after": 11341312,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15894427
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19861230,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11341312,
+            "live_bytes_after": 17481535,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20527322
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1407746,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17481535,
+            "live_bytes_after": 19157102,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20277200
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37771624,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19157102,
+            "live_bytes_after": 13413912,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27400231
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24830,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13413912,
+            "live_bytes_after": 13413912,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13413912
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 8,
+      "lifecycle_ns": 81989594,
+      "phase_sum_ns": 81987854,
+      "boundary_gap_ns": 1740,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23046794,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9373895,
+            "live_bytes_after": 11342544,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15895659
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19735720,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11342544,
+            "live_bytes_after": 17482767,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20528554
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1425846,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17482767,
+            "live_bytes_after": 19158334,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20278432
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37754664,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19158334,
+            "live_bytes_after": 13415144,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27401463
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24830,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13415144,
+            "live_bytes_after": 13415144,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13415144
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 9,
+      "lifecycle_ns": 82349445,
+      "phase_sum_ns": 82348045,
+      "boundary_gap_ns": 1400,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23221035,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9375127,
+            "live_bytes_after": 11343776,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15896891
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19876891,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11343776,
+            "live_bytes_after": 17483999,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20529786
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1384745,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17483999,
+            "live_bytes_after": 19159566,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20279664
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37840504,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19159566,
+            "live_bytes_after": 13416376,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27402695
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24870,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13416376,
+            "live_bytes_after": 13416376,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13416376
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 10,
+      "lifecycle_ns": 82123134,
+      "phase_sum_ns": 82121654,
+      "boundary_gap_ns": 1480,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23300855,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9376359,
+            "live_bytes_after": 11345008,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15898123
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19660000,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11345008,
+            "live_bytes_after": 17485231,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20531018
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1387415,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17485231,
+            "live_bytes_after": 19160798,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20280896
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37748504,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19160798,
+            "live_bytes_after": 13417608,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27403927
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24880,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13417608,
+            "live_bytes_after": 13417608,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13417608
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 11,
+      "lifecycle_ns": 82244225,
+      "phase_sum_ns": 82243095,
+      "boundary_gap_ns": 1130,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23206215,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9377591,
+            "live_bytes_after": 11346240,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15899355
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19837170,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11346240,
+            "live_bytes_after": 17486463,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20532250
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1401616,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17486463,
+            "live_bytes_after": 19162030,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20282128
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37773264,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19162030,
+            "live_bytes_after": 13418840,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27405159
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24830,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13418840,
+            "live_bytes_after": 13418840,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13418840
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 12,
+      "lifecycle_ns": 82573446,
+      "phase_sum_ns": 82571956,
+      "boundary_gap_ns": 1490,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23168615,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9378823,
+            "live_bytes_after": 11347472,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15900587
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 20187432,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11347472,
+            "live_bytes_after": 17487695,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20533482
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1414836,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17487695,
+            "live_bytes_after": 19163262,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20283360
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37776153,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19163262,
+            "live_bytes_after": 13420072,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27406391
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24920,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13420072,
+            "live_bytes_after": 13420072,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13420072
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 13,
+      "lifecycle_ns": 82059834,
+      "phase_sum_ns": 82058424,
+      "boundary_gap_ns": 1410,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23248764,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9380055,
+            "live_bytes_after": 11348704,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15901819
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19802911,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11348704,
+            "live_bytes_after": 17488927,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20534714
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1422316,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17488927,
+            "live_bytes_after": 19164494,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20284592
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37559563,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19164494,
+            "live_bytes_after": 13421304,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27407623
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24870,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13421304,
+            "live_bytes_after": 13421304,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13421304
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 14,
+      "lifecycle_ns": 82270965,
+      "phase_sum_ns": 82269735,
+      "boundary_gap_ns": 1230,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23243445,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9381287,
+            "live_bytes_after": 11349936,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15903051
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19866191,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11349936,
+            "live_bytes_after": 17490159,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20535946
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1415125,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17490159,
+            "live_bytes_after": 19165726,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20285824
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37720134,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19165726,
+            "live_bytes_after": 13422536,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27408855
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24840,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13422536,
+            "live_bytes_after": 13422536,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13422536
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 15,
+      "lifecycle_ns": 82184365,
+      "phase_sum_ns": 82182995,
+      "boundary_gap_ns": 1370,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23182915,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9382519,
+            "live_bytes_after": 11351168,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15904283
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19634610,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11351168,
+            "live_bytes_after": 17491391,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20537178
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1414195,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17491391,
+            "live_bytes_after": 19166958,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20287056
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37926415,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19166958,
+            "live_bytes_after": 13423768,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27410087
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24860,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13423768,
+            "live_bytes_after": 13423768,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13423768
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 16,
+      "lifecycle_ns": 82195864,
+      "phase_sum_ns": 82194444,
+      "boundary_gap_ns": 1420,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23168444,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9383751,
+            "live_bytes_after": 11352400,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15905515
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19689090,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11352400,
+            "live_bytes_after": 17492623,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20538410
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1424306,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17492623,
+            "live_bytes_after": 19168190,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20288288
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37887684,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19168190,
+            "live_bytes_after": 13425000,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27411319
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24920,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13425000,
+            "live_bytes_after": 13425000,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13425000
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 17,
+      "lifecycle_ns": 82237754,
+      "phase_sum_ns": 82236184,
+      "boundary_gap_ns": 1570,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23177724,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9384983,
+            "live_bytes_after": 11353632,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15906747
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19642890,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11353632,
+            "live_bytes_after": 17493855,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20539642
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1431206,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17493855,
+            "live_bytes_after": 19169422,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20289520
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37959474,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19169422,
+            "live_bytes_after": 13426232,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27412551
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24890,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13426232,
+            "live_bytes_after": 13426232,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13426232
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 18,
+      "lifecycle_ns": 81962603,
+      "phase_sum_ns": 81961033,
+      "boundary_gap_ns": 1570,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23085144,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9386215,
+            "live_bytes_after": 11354864,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15907979
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19974631,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11354864,
+            "live_bytes_after": 17495087,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20540874
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1429786,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17495087,
+            "live_bytes_after": 19170654,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20290752
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37446542,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19170654,
+            "live_bytes_after": 13427464,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27413783
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24930,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13427464,
+            "live_bytes_after": 13427464,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13427464
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 19,
+      "lifecycle_ns": 81995023,
+      "phase_sum_ns": 81993393,
+      "boundary_gap_ns": 1630,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23097974,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9387447,
+            "live_bytes_after": 11356096,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15909211
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19894671,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11356096,
+            "live_bytes_after": 17496319,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20542106
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1418386,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17496319,
+            "live_bytes_after": 19171886,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20291984
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37557452,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19171886,
+            "live_bytes_after": 13428696,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27415015
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24910,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13428696,
+            "live_bytes_after": 13428696,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13428696
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 20,
+      "lifecycle_ns": 81820893,
+      "phase_sum_ns": 81819493,
+      "boundary_gap_ns": 1400,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23132754,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9388679,
+            "live_bytes_after": 11357328,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15910443
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19699370,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11357328,
+            "live_bytes_after": 17497551,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20543338
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1416656,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17497551,
+            "live_bytes_after": 19173118,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20293216
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37545753,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19173118,
+            "live_bytes_after": 13429928,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27416247
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24960,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13429928,
+            "live_bytes_after": 13429928,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13429928
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 21,
+      "lifecycle_ns": 82416696,
+      "phase_sum_ns": 82414786,
+      "boundary_gap_ns": 1910,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23360875,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9389911,
+            "live_bytes_after": 11358560,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15911675
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19793181,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11358560,
+            "live_bytes_after": 17498783,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20544570
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1424336,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17498783,
+            "live_bytes_after": 19174350,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20294448
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37809083,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19174350,
+            "live_bytes_after": 13431160,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27417479
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 27311,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13431160,
+            "live_bytes_after": 13431160,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13431160
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 22,
+      "lifecycle_ns": 81501822,
+      "phase_sum_ns": 81500472,
+      "boundary_gap_ns": 1350,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23057754,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9391143,
+            "live_bytes_after": 11359792,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15912907
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19635970,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11359792,
+            "live_bytes_after": 17500015,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20545802
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1417175,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17500015,
+            "live_bytes_after": 19175582,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20295680
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37364653,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19175582,
+            "live_bytes_after": 13432392,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27418711
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24920,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13432392,
+            "live_bytes_after": 13432392,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13432392
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 23,
+      "lifecycle_ns": 81628502,
+      "phase_sum_ns": 81626812,
+      "boundary_gap_ns": 1690,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23070264,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9392375,
+            "live_bytes_after": 11361024,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15914139
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19621200,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11361024,
+            "live_bytes_after": 17501247,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20547034
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1419316,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17501247,
+            "live_bytes_after": 19176814,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20296912
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37491242,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19176814,
+            "live_bytes_after": 13433624,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27419943
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24790,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13433624,
+            "live_bytes_after": 13433624,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13433624
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 24,
+      "lifecycle_ns": 81696362,
+      "phase_sum_ns": 81695012,
+      "boundary_gap_ns": 1350,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23009783,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9393607,
+            "live_bytes_after": 11362256,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15915371
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19742211,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11362256,
+            "live_bytes_after": 17502479,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20548266
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1415985,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17502479,
+            "live_bytes_after": 19178046,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20298144
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37502073,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19178046,
+            "live_bytes_after": 13434856,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27421175
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24960,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13434856,
+            "live_bytes_after": 13434856,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13434856
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 25,
+      "lifecycle_ns": 81900123,
+      "phase_sum_ns": 81898153,
+      "boundary_gap_ns": 1970,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23011863,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9394839,
+            "live_bytes_after": 11363488,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15916603
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19763881,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11363488,
+            "live_bytes_after": 17503711,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20549498
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1440285,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17503711,
+            "live_bytes_after": 19179278,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20299376
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37656964,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19179278,
+            "live_bytes_after": 13436088,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27422407
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 25160,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13436088,
+            "live_bytes_after": 13436088,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13436088
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 26,
+      "lifecycle_ns": 82133394,
+      "phase_sum_ns": 82131644,
+      "boundary_gap_ns": 1750,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23084364,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9396071,
+            "live_bytes_after": 11364720,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15917835
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 20008221,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11364720,
+            "live_bytes_after": 17504943,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20550730
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1443866,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17504943,
+            "live_bytes_after": 19180510,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20300608
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37570123,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19180510,
+            "live_bytes_after": 13437320,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27423639
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 25070,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13437320,
+            "live_bytes_after": 13437320,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13437320
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 27,
+      "lifecycle_ns": 81815163,
+      "phase_sum_ns": 81813813,
+      "boundary_gap_ns": 1350,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23178804,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9397303,
+            "live_bytes_after": 11365952,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15919067
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19699820,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11365952,
+            "live_bytes_after": 17506175,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20551962
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1433676,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17506175,
+            "live_bytes_after": 19181742,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20301840
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37476593,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19181742,
+            "live_bytes_after": 13438552,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27424871
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24920,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13438552,
+            "live_bytes_after": 13438552,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13438552
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 28,
+      "lifecycle_ns": 82075504,
+      "phase_sum_ns": 82073904,
+      "boundary_gap_ns": 1600,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23078904,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9398535,
+            "live_bytes_after": 11367184,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15920299
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19983041,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11367184,
+            "live_bytes_after": 17507407,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20553194
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1411696,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17507407,
+            "live_bytes_after": 19182974,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20303072
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37575203,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19182974,
+            "live_bytes_after": 13439784,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27426103
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 25060,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13439784,
+            "live_bytes_after": 13439784,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13439784
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    },
+    {
+      "sample_index": 29,
+      "lifecycle_ns": 82046263,
+      "phase_sum_ns": 82044913,
+      "boundary_gap_ns": 1350,
+      "phases": [
+        {
+          "name": "snapshot_open",
+          "elapsed_ns": 23086984,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 203301,
+            "deallocation_calls": 154031,
+            "reallocation_calls": 41052,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 27167884,
+            "deallocated_bytes": 25199235,
+            "live_bytes_before": 9399767,
+            "live_bytes_after": 11368416,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 15921531
+          }
+        },
+        {
+          "name": "transaction",
+          "elapsed_ns": 19804740,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 29383,
+            "deallocation_calls": 8740,
+            "reallocation_calls": 109,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 14585569,
+            "deallocated_bytes": 8445346,
+            "live_bytes_before": 11368416,
+            "live_bytes_after": 17508639,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20554426
+          }
+        },
+        {
+          "name": "add",
+          "elapsed_ns": 1422006,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 20514,
+            "deallocation_calls": 20486,
+            "reallocation_calls": 25,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 5854294,
+            "deallocated_bytes": 4178727,
+            "live_bytes_before": 17508639,
+            "live_bytes_after": 19184206,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 20304304
+          }
+        },
+        {
+          "name": "commit",
+          "elapsed_ns": 37706373,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 238738,
+            "deallocation_calls": 201523,
+            "reallocation_calls": 49530,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 62618358,
+            "deallocated_bytes": 68361548,
+            "live_bytes_before": 19184206,
+            "live_bytes_after": 13441016,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 27427335
+          }
+        },
+        {
+          "name": "publication",
+          "elapsed_ns": 24810,
+          "allocation_metrics": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 0,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 13441016,
+            "live_bytes_after": 13441016,
+            "peak_live_bytes_before": 27755296,
+            "peak_live_bytes_after": 27755296,
+            "region_peak_live_bytes": 13441016
+          }
+        }
+      ],
+      "source_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "source_bytes": 54646,
+      "candidate_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "candidate_bytes": 54658,
+      "sink_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+      "sink": {
+        "accepted_bytes": 54658,
+        "write_calls": 1,
+        "largest_write": 54658,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "runtime_gates": {
+        "source_bytes_identity_verified": true,
+        "candidate_bytes_identity_verified": true,
+        "commit_changed_verified": true,
+        "patch_non_noop_verified": true,
+        "sink_digest_verified": true,
+        "sink_length_verified": true
+      }
+    }
+  ]
+}

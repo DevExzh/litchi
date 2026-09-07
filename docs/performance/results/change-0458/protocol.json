@@ -1,0 +1,225 @@
+{
+  "schema": "litchi-0458-protocol-v1",
+  "change": 458,
+  "revision": "a79321ebe919e078e2d09bfb7043eccaf63c4616",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmup": 3,
+  "reports": 24,
+  "retained_samples": 720,
+  "order": [
+    {
+      "id": "R1-normal-tiny-lifecycle",
+      "repeat": "R1",
+      "instrumentation": "normal",
+      "shape": "tiny",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R1-normal-tiny-phases",
+      "repeat": "R1",
+      "instrumentation": "normal",
+      "shape": "tiny",
+      "scope": "phases"
+    },
+    {
+      "id": "R1-normal-medium-lifecycle",
+      "repeat": "R1",
+      "instrumentation": "normal",
+      "shape": "medium",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R1-normal-medium-phases",
+      "repeat": "R1",
+      "instrumentation": "normal",
+      "shape": "medium",
+      "scope": "phases"
+    },
+    {
+      "id": "R1-normal-large-lifecycle",
+      "repeat": "R1",
+      "instrumentation": "normal",
+      "shape": "large",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R1-normal-large-phases",
+      "repeat": "R1",
+      "instrumentation": "normal",
+      "shape": "large",
+      "scope": "phases"
+    },
+    {
+      "id": "R1-allocator-tiny-lifecycle",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "shape": "tiny",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R1-allocator-tiny-phases",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "shape": "tiny",
+      "scope": "phases"
+    },
+    {
+      "id": "R1-allocator-medium-lifecycle",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "shape": "medium",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R1-allocator-medium-phases",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "shape": "medium",
+      "scope": "phases"
+    },
+    {
+      "id": "R1-allocator-large-lifecycle",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "shape": "large",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R1-allocator-large-phases",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "shape": "large",
+      "scope": "phases"
+    },
+    {
+      "id": "R2-allocator-large-phases",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "shape": "large",
+      "scope": "phases"
+    },
+    {
+      "id": "R2-allocator-large-lifecycle",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "shape": "large",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R2-allocator-medium-phases",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "shape": "medium",
+      "scope": "phases"
+    },
+    {
+      "id": "R2-allocator-medium-lifecycle",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "shape": "medium",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R2-allocator-tiny-phases",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "shape": "tiny",
+      "scope": "phases"
+    },
+    {
+      "id": "R2-allocator-tiny-lifecycle",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "shape": "tiny",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R2-normal-large-phases",
+      "repeat": "R2",
+      "instrumentation": "normal",
+      "shape": "large",
+      "scope": "phases"
+    },
+    {
+      "id": "R2-normal-large-lifecycle",
+      "repeat": "R2",
+      "instrumentation": "normal",
+      "shape": "large",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R2-normal-medium-phases",
+      "repeat": "R2",
+      "instrumentation": "normal",
+      "shape": "medium",
+      "scope": "phases"
+    },
+    {
+      "id": "R2-normal-medium-lifecycle",
+      "repeat": "R2",
+      "instrumentation": "normal",
+      "shape": "medium",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R2-normal-tiny-phases",
+      "repeat": "R2",
+      "instrumentation": "normal",
+      "shape": "tiny",
+      "scope": "phases"
+    },
+    {
+      "id": "R2-normal-tiny-lifecycle",
+      "repeat": "R2",
+      "instrumentation": "normal",
+      "shape": "tiny",
+      "scope": "lifecycle"
+    }
+  ],
+  "argv": [
+    "{binary}",
+    "odp-append-attribution",
+    "--mode",
+    "{scope}",
+    "--shape",
+    "{shape}",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--repeat",
+    "{repeat}",
+    "--output",
+    "{report}"
+  ],
+  "diagnostic_argv": [
+    "{binary}",
+    "odp-append-attribution",
+    "--mode",
+    "{scope}",
+    "--shape",
+    "{shape}",
+    "--warmup",
+    "3",
+    "--samples",
+    "100",
+    "--repeat",
+    "{repeat}",
+    "--output",
+    "{report}"
+  ],
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "DEBUGINFOD_URLS": "",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "binary_binding_sha256": "73d79e56b124e95ebd61541b06c39bd856687fac1564f00f87cf2842699cbb17",
+  "capture_sha256": "0efa2127c0f5db25b57b58999cb0534cf24557d5145c5d018b2c549cbf38b18f",
+  "profile_sha256": "435247ba73711e2c4b2bcb7549e8f4a2e2a5da013994e9023848da17bf05ab1b",
+  "oracle_sha256": "6d8c440db698acc21056d96dfc927ea0be47daa8f34357ad1a4178a812f11286",
+  "prior_control_binding_sha256": "7897115d35da533db7bb51240c70164a35e0af8317b31f6edcb8f7029e074b4b",
+  "host_sha256": "7640ad07b7e1ebef6a27e749ac382d20d5d1a3cdf4eb2d8db52335b59e4f539d",
+  "claims": "public API phase diagnostic and same-binary instrumentation overhead; no production optimization, bounded memory, physical I/O, or worker scaling claim"
+}

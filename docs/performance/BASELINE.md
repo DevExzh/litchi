@@ -1,5 +1,23 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0458: ordinary ODP append phase baseline
+
+The standalone `odp-append-attribution` command measures the same owned append
+lifecycle with either one clock or five public API phase clocks. Two repeats of
+normal/allocator binaries on 64/4,096/8,192 slides retain 24 reports and 720
+samples, with three warmups and 30 samples per lane on CPU 2, one worker.
+Large normal phase-envelope p50 is 152.056 / 152.334 ms. Commit accounts for
+45.64 / 45.55% of paired phase time, snapshot opening 27.04 / 26.89%, and
+transaction construction 25.73 / 25.96%. All six allocation-volume comparisons
+match exactly; phase peaks have distinct entry baselines and cannot be summed.
+
+Instrumentation p50 differences span -0.655% to +3.448%; no elapsed quantile
+or maximum-RSS comparison exceeds an absolute 5%. These measurements add phase
+attribution, with no production optimization or selector-index promotion.
+Registry counts remain 439 selectors and 36 defaults. See the
+[0458 bundle](results/change-0458/README.md) and
+[recomputed summary](results/change-0458/summary.json).
+
 ## Change 0457: bounded source-backed ODP tail publication
 
 0457 records a current-revision formal baseline for the ordinary

@@ -1,0 +1,87 @@
+{
+  "change": 458,
+  "diagnostics": [],
+  "failed_tests": 0,
+  "finished_utc": "2026-09-07T14:35:15.666534+00:00",
+  "oracle_sha256": "6d8c440db698acc21056d96dfc927ea0be47daa8f34357ad1a4178a812f11286",
+  "passed_tests": 18,
+  "schema": "litchi-0458-oracle-tests-v1",
+  "started_utc": "2026-09-07T14:35:15.653411+00:00",
+  "status": "pass",
+  "temporary_directory_removed": true,
+  "test_count": 18,
+  "tests": [
+    {
+      "name": "positive:normal-lifecycle",
+      "status": "pass"
+    },
+    {
+      "name": "positive:normal-phases",
+      "status": "pass"
+    },
+    {
+      "name": "positive:allocator-lifecycle",
+      "status": "pass"
+    },
+    {
+      "name": "positive:allocator-phases",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:changed-source-hash",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:changed-output-hash",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:false-preflight-gate",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:false-runtime-gate",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:boolean-sample-count",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:wrong-sample-index",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:swapped-phase-order",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:changed-phase-sum",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:bad-sink-bucket",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:bad-sink-length",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:bad-allocation-conservation",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:bad-allocation-peak",
+      "status": "pass"
+    },
+    {
+      "name": "mutation:wrong-instrumentation",
+      "status": "pass"
+    },
+    {
+      "name": "allocator-phase-metrics-present",
+      "status": "pass"
+    }
+  ]
+}

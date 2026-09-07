@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0458/smoke.py", line 32, in <module>
+    main()
+    ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0458/smoke.py", line 27, in main
+    proof = oracle.validate(report, lane, {"samples": 1, "warmup": 0})
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0458/oracle.py", line 503, in validate
+    _, repeat, instrumentation, shape, scope, samples, warmup = _validate_lane_and_protocol(lane, protocol)
+                                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0458/oracle.py", line 286, in _validate_lane_and_protocol
+    _fail("protocol.warmup", "must be exactly 3")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0458/oracle.py", line 105, in _fail
+    raise OracleError(f"{path}: {message}")
+oracle458.OracleError: protocol.warmup: must be exactly 3

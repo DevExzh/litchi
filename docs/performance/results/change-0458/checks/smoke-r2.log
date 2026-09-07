@@ -1,0 +1,4 @@
+{"lane": {"id": "normal-lifecycle", "instrumentation": "normal", "scope": "lifecycle", "shape": "tiny", "repeat": "R1"}, "oracle": {"status": "pass", "rows": 30, "phase_count": 0}}
+{"lane": {"id": "normal-phases", "instrumentation": "normal", "scope": "phases", "shape": "tiny", "repeat": "R1"}, "oracle": {"status": "pass", "rows": 30, "phase_count": 5}}
+{"lane": {"id": "allocator-lifecycle", "instrumentation": "allocator", "scope": "lifecycle", "shape": "tiny", "repeat": "R1"}, "oracle": {"status": "pass", "rows": 30, "phase_count": 0}}
+{"lane": {"id": "allocator-phases", "instrumentation": "allocator", "scope": "phases", "shape": "tiny", "repeat": "R1"}, "oracle": {"status": "pass", "rows": 30, "phase_count": 5}}

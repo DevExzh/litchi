@@ -1,0 +1,16 @@
+{
+  "schema": "litchi-0458-perf-capability-v1",
+  "argv": [
+    "perf",
+    "stat",
+    "-x,",
+    "-e",
+    "cycles,instructions,branches,branch-misses,cache-misses",
+    "--",
+    "true"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "934876,,cycles,25447251,100.00,,\n703265,,instructions,25447251,100.00,,\n129094,,branches,25447251,100.00,,\n6955,,branch-misses,25447251,100.00,,\n18198,,cache-misses,25447251,100.00,,\n",
+  "scope": "Tool capability probe only, not workload measurements"
+}

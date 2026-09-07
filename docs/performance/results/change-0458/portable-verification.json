@@ -1,0 +1,52 @@
+{
+  "schema": "litchi-0458-portable-verification-v1",
+  "change": 458,
+  "status": "pass",
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/tmp/litchi-0458-portable-cxfv6_v3/change-0458/verify.py",
+    "--portable"
+  ],
+  "cwd": "/tmp/litchi-0458-portable-cxfv6_v3/change-0458",
+  "verifier_path": "verify.py",
+  "verifier_sha256": "fa7533293a1ac61a8cc66443576cef782ab38e89573ad3b64edcf77eaa74c8c7",
+  "copied_verifier_sha256": "fa7533293a1ac61a8cc66443576cef782ab38e89573ad3b64edcf77eaa74c8c7",
+  "driver_sha256": "4e779e784aebff7d202c3c6c4b6d4f6b3f3b57d1ae7625e957aa8c7370ef25f2",
+  "copy_seal_path": "SHA256SUMS",
+  "copy_seal_sha256": "e2d4afe4e7129c413c0d679e07decbf0f5b36c712711151e7c3f81820a48e43b",
+  "copy_seal_sha256_after": "e2d4afe4e7129c413c0d679e07decbf0f5b36c712711151e7c3f81820a48e43b",
+  "copy_seal_bytes": 20828,
+  "copy_seal_unchanged": true,
+  "started_utc": "2026-09-07T14:54:22.928624+00:00",
+  "finished_utc": "2026-09-07T14:54:24.175729+00:00",
+  "exit_code": 0,
+  "stdout": "{\n  \"change\": 458,\n  \"lanes\": 24,\n  \"portable\": true,\n  \"precleanup\": false,\n  \"profiles\": 2,\n  \"schema\": \"litchi-0458-verification-v1\",\n  \"sealed_files\": 208,\n  \"selected_gates\": {\n    \"bind\": \"bind\",\n    \"build\": \"build\",\n    \"derive\": \"derive\",\n    \"derive-profile\": \"derive-profile\",\n    \"doc\": \"doc\",\n    \"format\": \"format\",\n    \"matrix\": \"matrix\",\n    \"oracle-tests\": \"oracle-tests\",\n    \"profiles\": \"profiles\",\n    \"smoke\": \"smoke-r2\",\n    \"strict\": \"strict\",\n    \"tests\": \"tests\"\n  },\n  \"status\": \"pass\"\n}\n",
+  "stderr": "",
+  "verifier_output": {
+    "change": 458,
+    "lanes": 24,
+    "portable": true,
+    "precleanup": false,
+    "profiles": 2,
+    "schema": "litchi-0458-verification-v1",
+    "sealed_files": 208,
+    "selected_gates": {
+      "bind": "bind",
+      "build": "build",
+      "derive": "derive",
+      "derive-profile": "derive-profile",
+      "doc": "doc",
+      "format": "format",
+      "matrix": "matrix",
+      "oracle-tests": "oracle-tests",
+      "profiles": "profiles",
+      "smoke": "smoke-r2",
+      "strict": "strict",
+      "tests": "tests"
+    },
+    "status": "pass"
+  },
+  "temporary_directory_absent": true,
+  "mode": "complete sealed change-0458 bundle copied to a fresh temporary directory"
+}

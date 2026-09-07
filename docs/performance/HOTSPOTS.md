@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## Change 0458: ordinary ODP commit and setup phase costs
+
+Commit is the largest individual ordinary append phase on large sources:
+45.64 / 45.55% of normal phase time, and 118,096,476 of 211,442,207 allocated
+bytes. Snapshot opening and transaction construction together account for
+about 53% of phase time. Append itself is about 1.55%; final sequential output
+about 0.03%. The next measurements should resolve internal commit work and
+repeated source setup while preserving readback, validation and patch semantics.
+
+The separate sampled recording contains 1,656 samples, all lacking resolved
+phase-marker ancestry. It cannot establish internal-stage dominance. Seven
+whole-process counters were available, but include setup and checks. The
+[source audit](results/change-0458/source-audit.md) supplies hypotheses for
+further measurement; it does not authorize skipping validation. See the
+[phase evidence and limitations](results/change-0458/README.md).
+
 ## Change 0457: source-tail ODP publication work remains specialized
 
 The ordinary `odp_existing_append_lifecycle` control is now a formal

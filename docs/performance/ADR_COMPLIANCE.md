@@ -1,5 +1,18 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0458: harness-only public API attribution
+
+Accepted ADR hashes match the carried-forward 0457 review. The new command
+observes existing Snapshot/Transaction/Commit/Patch boundaries and retains
+source/commit ownership at allocator endpoints. Production serializers,
+validation, source lineage and patch semantics are unchanged. Phase peaks are
+reported relative to each phase's entry and are not additive. Result checks
+occur outside clocks, with preflight patch/readback claims distinguished from
+per-sample byte checks. No new ADR or selector coverage promotion is implied.
+See the [ADR refresh](results/change-0458/adr-refresh.json),
+[harness review](results/change-0458/harness-review.md) and
+[scope and evidence](results/change-0458/README.md).
+
 ## Change 0457: bounded source-backed ODP publication obligations
 
 0457 keeps the accepted non-iWork ownership and publication boundaries intact.

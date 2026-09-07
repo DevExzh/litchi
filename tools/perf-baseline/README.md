@@ -1,5 +1,20 @@
 # OPC, CFB, OLE2 Office, OOXML, RTF, and ODF performance baseline
 
+The standalone `odp-append-attribution` command added in
+[0458](../../docs/performance/results/change-0458/README.md) measures the owned
+append lifecycle with either one clock or public API phase clocks. It is
+available in both normal and allocator binaries and does not add selectors.
+For example:
+
+```sh
+litchi-perf-baseline odp-append-attribution --mode phases --shape large --warmup 3 --samples 30 --repeat R1 --output phases.json
+```
+
+Use `--mode lifecycle` for the unsegmented comparison. Shape accepts `tiny`,
+`medium`, or `large`; all shown flags are required and output must not exist.
+Allocation counters are omitted in normal reports. Phase peak live bytes use
+each phase's own entry baseline and must not be added.
+
 The opt-in `odp_source_tail_append_lifecycle` selector added in
 [0457](../../docs/performance/results/change-0457/README.md) measures source-backed
 ODP opening, bounded tail-insertion planning, and sequential replay publication.
