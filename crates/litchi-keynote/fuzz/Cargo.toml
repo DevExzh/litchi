@@ -18,6 +18,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "keynote_slide_media_properties"
+path = "fuzz_targets/keynote_slide_media_properties.rs"
+test = false
+doc = false
+bench = false
+
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi-keynote = { path = ".." }

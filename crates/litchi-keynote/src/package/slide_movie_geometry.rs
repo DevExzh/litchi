@@ -244,6 +244,19 @@ impl GeometryBudget {
         )
     }
 
+    pub(crate) fn nesting(&mut self, depth: usize) -> Result<(), SlideMovieGeometryError> {
+        if depth > self.nesting {
+            let increase = depth - self.nesting;
+            Self::add(
+                &mut self.nesting,
+                increase,
+                self.max_nesting,
+                SlideMovieGeometryLimitKind::WireNesting,
+            )?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn preflight_output(&self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
         let observed = self
             .output
@@ -451,7 +464,7 @@ impl GeometryBudget {
         package.validate().map_err(map_read_error)
     }
 
-    fn residual(
+    pub(crate) fn residual(
         &self,
         package: &Package,
     ) -> Result<litchi_iwa_common::WireLimits, SlideMovieGeometryError> {
@@ -499,7 +512,7 @@ impl GeometryBudget {
             })
     }
 
-    fn remaining_output(&self) -> Result<usize, SlideMovieGeometryError> {
+    pub(crate) fn remaining_output(&self) -> Result<usize, SlideMovieGeometryError> {
         self.max_output
             .checked_sub(self.output)
             .filter(|value| *value > 0)
@@ -510,7 +523,7 @@ impl GeometryBudget {
             })
     }
 
-    fn remaining_allocations(&self) -> Result<usize, SlideMovieGeometryError> {
+    pub(crate) fn remaining_allocations(&self) -> Result<usize, SlideMovieGeometryError> {
         self.max_allocations
             .checked_sub(self.allocations)
             .filter(|value| *value > 0)
@@ -521,7 +534,7 @@ impl GeometryBudget {
             })
     }
 
-    fn remaining_retained(&self) -> Result<usize, SlideMovieGeometryError> {
+    pub(crate) fn remaining_retained(&self) -> Result<usize, SlideMovieGeometryError> {
         self.max_retained
             .checked_sub(self.retained)
             .filter(|value| *value > 0)
@@ -532,7 +545,7 @@ impl GeometryBudget {
             })
     }
 
-    fn remaining_scratch(&self) -> Result<usize, SlideMovieGeometryError> {
+    pub(crate) fn remaining_scratch(&self) -> Result<usize, SlideMovieGeometryError> {
         self.max_scratch
             .checked_sub(self.scratch)
             .filter(|value| *value > 0)
@@ -543,7 +556,7 @@ impl GeometryBudget {
             })
     }
 
-    fn remaining_references(&self) -> Result<usize, SlideMovieGeometryError> {
+    pub(crate) fn remaining_references(&self) -> Result<usize, SlideMovieGeometryError> {
         self.max_references
             .checked_sub(self.references)
             .filter(|value| *value > 0)

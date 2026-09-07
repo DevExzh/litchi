@@ -2810,6 +2810,241 @@ def _keynote_audio_position_focused_package_call(source: str, match: re.Match[st
         r"\b(?:package|focused_package|keynote_package)\s*\.\s*$", context
     ) is not None
 
+
+# The next focused Keynote media slice moves the four scalar drawable
+# properties shared by file movies and audio controls behind one selector-first
+# Package owner.  Keep this inventory independent from geometry and playback:
+# properties do not require a complete positive movie size, and the lock bit is
+# itself an editable property.  The owner is intentionally dormant until the
+# private Package module, semantic value, and neutral codec are all present.
+KEYNOTE_MEDIA_PROPERTIES_SEMANTIC_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "slide" / "media" / "properties.rs"
+)
+KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_media_properties.rs"
+)
+KEYNOTE_MEDIA_PROPERTIES_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_MEDIA_PROPERTIES_OWNER_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?slide_media_properties[ \t]*;"
+)
+KEYNOTE_MEDIA_PROPERTIES_PUBLIC_MODULE = re.compile(
+    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?:r#)?slide_media_properties\b"
+)
+KEYNOTE_MEDIA_PROPERTIES_CANONICAL_TYPES = frozenset(
+    {
+        "SlideMediaPropertiesCommit",
+        "SlideMediaPropertiesDiagnostics",
+        "SlideMediaPropertiesEdit",
+        "SlideMediaPropertiesError",
+        "SlideMediaPropertiesLimitKind",
+        "SlideMediaPropertiesPatch",
+    }
+)
+KEYNOTE_MEDIA_PROPERTIES_SEMANTIC_TYPES = frozenset({"MediaProperties"})
+KEYNOTE_MEDIA_PROPERTIES_SELECTOR_TYPES = frozenset(
+    {"SlideSelector", "MovieSelector"}
+)
+KEYNOTE_MEDIA_PROPERTIES_PACKAGE_METHODS = frozenset(
+    {
+        "slide_media_properties",
+        "edit_slide_media_properties",
+        "apply_slide_media_properties",
+    }
+)
+KEYNOTE_MEDIA_PROPERTIES_EDIT_METHODS = frozenset(
+    {"set", "commit"}
+)
+KEYNOTE_MEDIA_PROPERTIES_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/keynote_media_properties_codec.rs"
+)
+KEYNOTE_MEDIA_PROPERTIES_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+KEYNOTE_MEDIA_PROPERTIES_CODEC_MODULE = "keynote_media_properties_codec"
+KEYNOTE_MEDIA_PROPERTIES_CODEC_GENERATED_MODULE = (
+    "buffa_keynote_media_properties_generated"
+)
+KEYNOTE_MEDIA_PROPERTIES_CODEC_FUNCTIONS = frozenset(
+    {
+        "decode_movie_properties",
+        "decode_movie_properties_with_report",
+        "prepare_movie_properties_rewrite",
+        "rewrite_movie_properties",
+    }
+)
+KEYNOTE_MEDIA_PROPERTIES_CODEC_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeOptions",
+        "DecodeReport",
+        "MoviePropertiesSnapshot",
+        "MoviePropertiesWrite",
+        "PreparedMoviePropertiesRewrite",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+    }
+)
+KEYNOTE_MEDIA_PROPERTIES_CODEC_MARKER_GROUPS = {
+    "lazy Buffa ingress": (
+        ("buffa::DecodeOptions", "buffa", "decode_lazy_view", "decode_view"),
+    ),
+    "strict canonical ingress": (
+        ("preflight", "parse_message", "require_known_framing"),
+        ("duplicate",),
+        ("noncanonical", "non-canonical"),
+    ),
+    "unknown/raw preservation": (
+        ("unknown", "Unknown"),
+        ("raw", "Raw"),
+        ("preserv",),
+    ),
+    "bounded prepared rewrite": (
+        ("max_message_bytes", "max_input"),
+        ("max_fields",),
+        ("max_work_bytes", "max_work"),
+        ("execution_requirements", "RewriteExecutionRequirements"),
+        ("execute",),
+    ),
+    "drawable property fields": (
+        ("hyperlink", "hyperlink_url"),
+        ("locked",),
+        ("aspect_ratio_locked", "aspect"),
+        ("accessibility_description", "accessibility"),
+    ),
+}
+KEYNOTE_MEDIA_PROPERTIES_CODEC_EAGER_PATTERNS = (
+    re.compile(r"\bprost(?:_types)?\b"),
+    re.compile(r"\bMessage\s*::\s*(?:decode|encode)\s*\("),
+    re.compile(r"\b(?:to_owned_message|try_encode_to_vec|encode_to_vec)\s*\("),
+)
+KEYNOTE_MEDIA_PROPERTIES_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "Entry",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+KEYNOTE_MEDIA_PROPERTIES_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "DecodeReport",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "PreparedMoviePropertiesRewrite",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+        "RewriteReport",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_MEDIA_PROPERTIES_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "litchi_iwa_protos"}
+)
+KEYNOTE_MEDIA_PROPERTIES_RAW_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|movie|audio|native|archive|component|"
+    r"message|resource|entry|metadata|package|uuid)[A-Za-z_]*"
+    r"(?:id|identifier))[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u64|u32|usize|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_MEDIA_PROPERTIES_OWNER_MARKER_GROUPS = {
+    "aggregate transaction budget": (
+        re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*Budget\b"),
+        re.compile(r"\b(?:for_package|for_source|new)[ \t\r\n]*\("),
+    ),
+    "selector resolution": (
+        re.compile(r"\b(?:SlideSelector|MovieSelector)\b"),
+        re.compile(r"\b(?:select|resolve|movie|media)[A-Za-z_]*"),
+    ),
+    "candidate verification": (
+        re.compile(r"\b(?:candidate|reopen|readback|verify|verification)\b"),
+    ),
+    "exact source and inverse": (
+        re.compile(r"\b(?:ExactArtifacts|source_fingerprint|inverse|PatchConflict)\b"),
+    ),
+    "property locality and preservation": (
+        re.compile(r"(?:locality|unchanged|unknown|raw|preserv)"),
+    ),
+    "property decode accounting": (
+        re.compile(r"\bbudget_property_report\b"),
+    ),
+    "property rewrite accounting": (
+        re.compile(r"\bbudget_property_requirements\b"),
+    ),
+    "prepublication accounting": (
+        re.compile(
+            r"\b(?:codec_report|charge_codec|wire|fields|work|archive|snappy|"
+            r"zip|ZIP|output|preview)[A-Za-z_]*\b"
+        ),
+    ),
+}
+# Keep raw-host deletion behind an explicit native completion seam.  A focused
+# owner may be useful for source-built parity and still lack the real iWork
+# open/save/reopen proof needed to delete the compatibility methods.  The
+# marker is deliberately production-only: comments and cfg(test) fixtures are
+# masked before it is consulted.
+# Keep one explicit, reviewable native proof token for this migration seam.
+# The owner must add it only after a real iWork open/save/reopen fixture proves
+# parity; similarly named capability values are intentionally not activation
+# aliases because they could be introduced for source-built tests alone.
+KEYNOTE_MEDIA_PROPERTIES_COMPLETE_ACTIVATION = re.compile(
+    r"(?<![A-Za-z0-9_])MEDIA_PROPERTIES_NATIVE_VERIFIED(?![A-Za-z0-9_])"
+)
+KEYNOTE_MEDIA_PROPERTIES_HOST_METHODS = frozenset(
+    {
+        "slide_movie_properties",
+        "set_slide_movie_properties",
+        "slide_audio_properties",
+        "set_slide_audio_properties",
+        "set_movie_properties",
+    }
+)
+KEYNOTE_MEDIA_PROPERTIES_HOST_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_movie_properties|"
+    r"set_slide_movie_properties|slide_audio_properties|"
+    r"set_slide_audio_properties|set_movie_properties)"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+KEYNOTE_MEDIA_PROPERTIES_HOST_FALLBACK = re.compile(
+    r"(?<![A-Za-z0-9_])(?:movie_properties_for_identifier|"
+    r"audio_properties_for_identifier|movie_properties_from_identifier|"
+    r"audio_properties_from_identifier|read_movie_properties|"
+    r"read_audio_properties|set_movie_properties)"
+    r"(?![A-Za-z0-9_])"
+)
+
+
+def _keynote_media_properties_focused_package_call(
+    source: str, match: re.Match[str]
+) -> bool:
+    """Recognize same-named semantic calls retained in host tests/examples."""
+
+    context = source[max(0, match.start() - 180) : match.start()]
+    return re.search(
+        r"\b(?:package|focused_package|keynote_package)\s*\.\s*$", context
+    ) is not None
+
 # Wave122 moves replacement of already-materialized Keynote slide movie/audio
 # data into one selector-first package owner.  The owner deliberately covers
 # the shared media payload edge (movie content, movie poster, and audio
@@ -57398,6 +57633,454 @@ def audit_iwa_keynote_audio_position_source_topology(
     return sorted(set(violations))
 
 
+def _keynote_media_properties_owner_present(root: Path) -> bool:
+    """Return whether the focused media-properties owner crossed its seam."""
+
+    owner_path = root / KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE
+    codec_path = root / KEYNOTE_MEDIA_PROPERTIES_CODEC_SOURCE
+    package_path = root / KEYNOTE_MEDIA_PROPERTIES_EXPORT_SOURCES[0]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return (
+        owner_path.is_file()
+        and codec_path.is_file()
+        and KEYNOTE_MEDIA_PROPERTIES_OWNER_MODULE.search(package_source) is not None
+    )
+
+
+def audit_keynote_media_properties_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the archive-free selector-first media-properties facade.
+
+    This audit deliberately stays dormant until the focused owner, private
+    Package module, and neutral codec exist together.  A partially copied
+    source file must not turn the still-supported compatibility host into a
+    migration failure, while a claimed handoff receives the same strict
+    public-surface checks as the preceding Keynote verticals.
+    """
+
+    if not _keynote_media_properties_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_MEDIA_PROPERTIES_SEMANTIC_SOURCE
+    package_path, lib_path = (
+        root / path for path in KEYNOTE_MEDIA_PROPERTIES_EXPORT_SOURCES
+    )
+    sources = {
+        path: _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else ""
+        for path in (owner_path, semantic_path, package_path, lib_path)
+    }
+    code = {path: _mask_rust_non_code(source) for path, source in sources.items()}
+    owner = sources[owner_path]
+    owner_code = code[owner_path]
+    package = sources[package_path]
+    package_code = code[package_path]
+    library = sources[lib_path]
+    semantic = sources[semantic_path]
+    semantic_code = code[semantic_path]
+    violations: list[str] = []
+
+    if KEYNOTE_MEDIA_PROPERTIES_PUBLIC_MODULE.search(package_code + code[lib_path]):
+        violations.append(
+            "focused litchi-keynote media-properties owner module must remain private: "
+            f"{KEYNOTE_MEDIA_PROPERTIES_EXPORT_SOURCES[0]}"
+        )
+    if KEYNOTE_MEDIA_PROPERTIES_OWNER_MODULE.search(package_code) is None:
+        violations.append(
+            "focused litchi-keynote media-properties owner module is missing: "
+            f"{KEYNOTE_MEDIA_PROPERTIES_EXPORT_SOURCES[0]}"
+        )
+
+    for name in sorted(KEYNOTE_MEDIA_PROPERTIES_CANONICAL_TYPES):
+        for source, path in (
+            (owner, owner_path),
+            (package, package_path),
+            (library, lib_path),
+        ):
+            if name not in _rust_canonical_exports(
+                source, KEYNOTE_MEDIA_PROPERTIES_CANONICAL_TYPES
+            ):
+                violations.append(
+                    "focused litchi-keynote media-properties public API is missing canonical "
+                    f"type {name}: {path.relative_to(root)}"
+                )
+
+    semantic_exports = _rust_canonical_exports(
+        semantic, KEYNOTE_MEDIA_PROPERTIES_SEMANTIC_TYPES
+    )
+    if not semantic_exports:
+        violations.append(
+            "focused litchi-keynote media-properties semantic API is missing MediaProperties: "
+            f"{KEYNOTE_MEDIA_PROPERTIES_SEMANTIC_SOURCE}"
+        )
+    media_properties_struct = _rust_named_struct_body(semantic, "MediaProperties")
+    if media_properties_struct is None:
+        violations.append(
+            "focused litchi-keynote media-properties semantic value must be a private-field "
+            f"struct: {KEYNOTE_MEDIA_PROPERTIES_SEMANTIC_SOURCE}"
+        )
+    else:
+        media_properties_body, _offset = media_properties_struct
+        for field_name in (
+            "hyperlink_url",
+            "locked",
+            "aspect_ratio_locked",
+            "accessibility_description",
+        ):
+            if re.search(rf"\b{re.escape(field_name)}\b", media_properties_body) is None:
+                violations.append(
+                    "focused litchi-keynote media-properties semantic value is missing field "
+                    f"{field_name}: {KEYNOTE_MEDIA_PROPERTIES_SEMANTIC_SOURCE}"
+                )
+        if not re.search(r"\bOption\s*<\s*String\s*>", media_properties_body):
+            violations.append(
+                "focused litchi-keynote media-properties semantic value must retain optional "
+                f"string presence: {KEYNOTE_MEDIA_PROPERTIES_SEMANTIC_SOURCE}"
+            )
+        if not re.search(r"\bOption\s*<\s*bool\s*>", media_properties_body):
+            violations.append(
+                "focused litchi-keynote media-properties semantic value must retain optional "
+                f"boolean presence: {KEYNOTE_MEDIA_PROPERTIES_SEMANTIC_SOURCE}"
+            )
+
+    selector_exports = _rust_canonical_exports(
+        library, KEYNOTE_MEDIA_PROPERTIES_SELECTOR_TYPES
+    )
+    for selector in sorted(KEYNOTE_MEDIA_PROPERTIES_SELECTOR_TYPES - selector_exports):
+        violations.append(
+            "focused litchi-keynote media-properties public API is missing selector "
+            f"{selector}: {KEYNOTE_MEDIA_PROPERTIES_EXPORT_SOURCES[1]}"
+        )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line in _rust_public_methods_in_impl(owner, "Package")
+    }
+    for name in sorted(KEYNOTE_MEDIA_PROPERTIES_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote media-properties Package method is missing "
+                f"{name}: {KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+            )
+            continue
+        if name != "apply_slide_media_properties":
+            for selector in sorted(KEYNOTE_MEDIA_PROPERTIES_SELECTOR_TYPES):
+                if not re.search(rf"\b{re.escape(selector)}\b", declaration):
+                    violations.append(
+                        "focused litchi-keynote media-properties Package method must accept "
+                        f"selector-first {selector} ({name}): "
+                        f"{KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+                    )
+        if re.search(r"\b(?:u64|u32|usize)\b|&\s*\[\s*u8\s*\]", declaration):
+            violations.append(
+                "focused litchi-keynote media-properties Package method exposes a raw wire "
+                f"value: {KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+            )
+        for match in KEYNOTE_MEDIA_PROPERTIES_RAW_PARAMETER.finditer(declaration):
+            violations.append(
+                "focused litchi-keynote media-properties Package method exposes raw identifier "
+                f"{match.group(0).strip()}: {KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+            )
+    apply_declaration = owner_methods.get("apply_slide_media_properties")
+    if apply_declaration is not None and not re.search(
+        r"\b(?:SlideMediaPropertiesPatch|MediaPropertiesPatch)\b", apply_declaration
+    ):
+        violations.append(
+            "focused litchi-keynote media-properties apply method must accept its typed patch: "
+            f"{KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+        )
+
+    edit_methods = {
+        name
+        for name, _declaration, _line in _rust_public_methods_in_impl(
+            owner, "SlideMediaPropertiesEdit"
+        )
+    }
+    for name in sorted(KEYNOTE_MEDIA_PROPERTIES_EDIT_METHODS - edit_methods):
+        violations.append(
+            "focused litchi-keynote media-properties edit is missing "
+            f"{name}: {KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+        )
+
+    facade_names = (
+        KEYNOTE_MEDIA_PROPERTIES_CANONICAL_TYPES
+        | KEYNOTE_MEDIA_PROPERTIES_SEMANTIC_TYPES
+        | KEYNOTE_MEDIA_PROPERTIES_SELECTOR_TYPES
+        | KEYNOTE_MEDIA_PROPERTIES_PACKAGE_METHODS
+    )
+    for source, path in (
+        (owner, owner_path),
+        (semantic, semantic_path),
+        (package, package_path),
+        (library, lib_path),
+    ):
+        if not source:
+            continue
+        dedicated = path in {owner_path, semantic_path}
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated and not (identifiers & facade_names):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier in KEYNOTE_MEDIA_PROPERTIES_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_MEDIA_PROPERTIES_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif identifier == "wire" or identifier in KEYNOTE_MEDIA_PROPERTIES_WIRE_TYPES:
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote media-properties public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote media-properties public API retains a glob "
+                    f"re-export: {path.relative_to(root)}:{line_number}"
+                )
+            if RUST_BYTE_SLICE.search(declaration):
+                violations.append(
+                    "focused litchi-keynote media-properties public API exposes raw bytes: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_MEDIA_PROPERTIES_RAW_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-keynote media-properties public API exposes raw identifier "
+                    f"{match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_keynote_media_properties_codec_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the neutral lazy Buffa media-properties codec and private view."""
+
+    if not _keynote_media_properties_owner_present(root):
+        return []
+
+    codec_path = root / KEYNOTE_MEDIA_PROPERTIES_CODEC_SOURCE
+    raw = codec_path.read_text(encoding="utf-8")
+    source = _mask_rust_cfg_test_items(raw)
+    code = _mask_rust_non_code(source)
+    violations: list[str] = []
+    for function in sorted(KEYNOTE_MEDIA_PROPERTIES_CODEC_FUNCTIONS):
+        if re.search(
+            rf"\b(?:pub[ \t]+)?fn[ \t]+{re.escape(function)}\b", code
+        ) is None:
+            violations.append(
+                "focused Keynote media-properties codec is missing strict API "
+                f"{function}: {KEYNOTE_MEDIA_PROPERTIES_CODEC_SOURCE}"
+            )
+    for type_name in sorted(KEYNOTE_MEDIA_PROPERTIES_CODEC_TYPES):
+        if re.search(
+            rf"\b(?:pub[ \t]+)?(?:struct|enum|type|trait)[ \t]+"
+            rf"{re.escape(type_name)}\b",
+            code,
+        ) is None:
+            violations.append(
+                "focused Keynote media-properties codec is missing strict type "
+                f"{type_name}: {KEYNOTE_MEDIA_PROPERTIES_CODEC_SOURCE}"
+            )
+    for label, markers in KEYNOTE_MEDIA_PROPERTIES_CODEC_MARKER_GROUPS.items():
+        if not all(_keynote_lifecycle_marker_present(code, marker) for marker in markers):
+            violations.append(
+                "focused Keynote media-properties codec is missing "
+                f"{label}: {KEYNOTE_MEDIA_PROPERTIES_CODEC_SOURCE}"
+            )
+    for pattern in KEYNOTE_MEDIA_PROPERTIES_CODEC_EAGER_PATTERNS:
+        for match in pattern.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused Keynote media-properties codec must remain lazy/source-preserving; "
+                f"eager generated operation {match.group(0).strip()}: "
+                f"{KEYNOTE_MEDIA_PROPERTIES_CODEC_SOURCE}:{line_number}"
+            )
+    for marker in KEYNOTE_MEDIA_PROPERTIES_PHYSICAL_TYPES:
+        if re.search(rf"\b{re.escape(marker)}\b", code):
+            violations.append(
+                "focused Keynote media-properties codec must remain neutral and archive-free "
+                f"({marker}): {KEYNOTE_MEDIA_PROPERTIES_CODEC_SOURCE}"
+            )
+
+    public_path = root / KEYNOTE_MEDIA_PROPERTIES_CODEC_PUBLIC_SOURCE
+    public_source = (
+        _mask_rust_cfg_test_items(public_path.read_text(encoding="utf-8"))
+        if public_path.is_file()
+        else ""
+    )
+    if re.search(
+        rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+        rf"pub\s+mod\s+{re.escape(KEYNOTE_MEDIA_PROPERTIES_CODEC_MODULE)}\b",
+        public_source,
+    ) is None:
+        violations.append(
+            "focused Keynote media-properties codec is missing its hidden public module "
+            f"{KEYNOTE_MEDIA_PROPERTIES_CODEC_MODULE}: "
+            f"{KEYNOTE_MEDIA_PROPERTIES_CODEC_PUBLIC_SOURCE}"
+        )
+    if re.search(
+        rf"(?ms)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\].{{0,260}}?"
+        rf"^\s*mod\s+{re.escape(KEYNOTE_MEDIA_PROPERTIES_CODEC_GENERATED_MODULE)}\s*\{{",
+        public_source,
+    ) is None:
+        violations.append(
+            "focused Keynote media-properties generated Buffa view must remain private: "
+            f"{KEYNOTE_MEDIA_PROPERTIES_CODEC_PUBLIC_SOURCE}"
+        )
+    for marker in (
+        "buffa-keynote-media-properties",
+        "iwa_keynote_media_properties_buffa_protos.rs",
+    ):
+        if marker not in public_source:
+            violations.append(
+                "focused Keynote media-properties generated Buffa include is missing "
+                f"{marker}: {KEYNOTE_MEDIA_PROPERTIES_CODEC_PUBLIC_SOURCE}"
+            )
+    return sorted(set(violations))
+
+
+def audit_keynote_media_properties_resource_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require one exact-source, aggregate-budget properties transaction."""
+
+    if not _keynote_media_properties_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE
+    codec_path = root / KEYNOTE_MEDIA_PROPERTIES_CODEC_SOURCE
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    codec = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+    )
+    prepared = owner + "\n" + codec
+    violations: list[str] = []
+    budget_declarations = re.findall(
+        r"(?m)^\s*(?:pub(?:\([^()]*\))?[ \t]+)?struct\s+"
+        r"[A-Za-z_][A-Za-z0-9_]*Budget\b",
+        owner,
+    )
+    imported_budget = re.search(
+        r"\b(?:Media|Properties|Geometry|Transaction)Budget\b", owner
+    ) is not None
+    if len(budget_declarations) > 1 or (not budget_declarations and not imported_budget):
+        violations.append(
+            "focused litchi-keynote media-properties owner must use exactly one aggregate "
+            f"transaction budget: {KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+        )
+    for label, markers in KEYNOTE_MEDIA_PROPERTIES_OWNER_MARKER_GROUPS.items():
+        if not all(_keynote_lifecycle_marker_present(prepared, marker) for marker in markers):
+            violations.append(
+                "focused litchi-keynote media-properties owner is missing "
+                f"{label}: {KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+            )
+    if "decode_movie_properties_with_report" not in owner:
+        violations.append(
+            "focused litchi-keynote media-properties owner must route reads through the "
+            f"strict codec report: {KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+        )
+    if "prepare_movie_properties_rewrite" not in owner:
+        violations.append(
+            "focused litchi-keynote media-properties owner must route writes through a "
+            f"prepared codec rewrite: {KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+        )
+    if "execution_requirements" not in prepared:
+        violations.append(
+            "focused litchi-keynote media-properties transaction must consume prepared "
+            f"execution requirements: {KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+        )
+    if len(re.findall(r"\.[ \t\r\n]*execute\s*\(", owner)) != 1:
+        violations.append(
+            "focused litchi-keynote media-properties owner must execute exactly one prepared "
+            f"rewrite: {KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+        )
+    if re.search(r"\bsaturating_(?:add|sub|mul)\b", owner):
+        violations.append(
+            "focused litchi-keynote media-properties owner must use checked resource "
+            f"accounting: {KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_media_properties_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire raw Keynote movie/audio property readers and writers."""
+
+    if not _keynote_media_properties_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    if KEYNOTE_MEDIA_PROPERTIES_COMPLETE_ACTIVATION.search(owner) is None:
+        return []
+    source_roots = [root / IWA_KEYNOTE_SOURCE_ROOT]
+    examples = root / IWA_CORE_EXAMPLE_SOURCE_ROOT
+    if examples.is_dir():
+        source_roots.append(examples)
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    violations: list[str] = []
+    for source_root in source_roots:
+        if not source_root.is_dir():
+            continue
+        for path in sorted(source_root.rglob("*.rs")):
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            )
+            for match in declaration.finditer(source):
+                name = match.group(1)
+                if name not in KEYNOTE_MEDIA_PROPERTIES_HOST_METHODS:
+                    continue
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote media-properties method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_MEDIA_PROPERTIES_HOST_CALL.finditer(source):
+                line_start = source.rfind("\n", 0, match.start()) + 1
+                line_end = source.find("\n", match.end())
+                line_end = len(source) if line_end < 0 else line_end
+                line = source[line_start:line_end]
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b", line
+                ):
+                    continue
+                if _keynote_media_properties_focused_package_call(source, match):
+                    continue
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote media-properties call "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_MEDIA_PROPERTIES_HOST_FALLBACK.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote media-properties identifier fallback "
+                    f"{match.group(0)}: {path.relative_to(root)}:{line_number}"
+                )
+    return sorted(set(violations))
+
+
 def _keynote_slide_table_title_owner_present(root: Path) -> bool:
     """Return whether the Wave98 slide-table title owner is active."""
 
@@ -63887,6 +64570,10 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_audio_position_codec_source_topology()
         + audit_keynote_audio_position_completion_source_topology()
         + audit_keynote_audio_position_resource_source_topology()
+        + audit_iwa_keynote_media_properties_source_topology()
+        + audit_keynote_media_properties_facade_source_topology()
+        + audit_keynote_media_properties_codec_source_topology()
+        + audit_keynote_media_properties_resource_source_topology()
         + audit_iwa_keynote_slide_media_data_source_topology()
         + audit_keynote_slide_media_data_facade_source_topology()
         + audit_keynote_slide_media_data_codec_source_topology()

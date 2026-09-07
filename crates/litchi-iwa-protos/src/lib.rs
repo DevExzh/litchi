@@ -460,6 +460,44 @@ mod buffa_keynote_movie_geometry_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for selected Keynote movie drawable
+/// properties. The complete movie graph and all unrelated drawable fields
+/// remain caller-owned source bytes.
+#[doc(hidden)]
+mod buffa_keynote_media_properties_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated views are private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-media-properties/iwa_keynote_media_properties_buffa_protos.rs"
+    ));
+}
+
 /// Private scalar Buffa views for bounded media lifecycle wire parity.
 #[doc(hidden)]
 mod buffa_keynote_media_lifecycle_generated {
@@ -1856,6 +1894,11 @@ pub mod image_adjustments_codec;
 /// preservation authority.
 #[doc(hidden)]
 pub mod keynote_movie_geometry_codec;
+
+/// Internal strict source-preserving Keynote MovieArchive drawable-properties
+/// projection. Generated Buffa values remain private to this crate.
+#[doc(hidden)]
+pub mod keynote_media_properties_codec;
 
 /// Format-neutral strict chart-caption edge projection and wire rewrite.
 ///

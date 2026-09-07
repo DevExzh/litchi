@@ -19,7 +19,7 @@ use super::{Package, SlideMediaDataError, SlideMediaDataLimitKind};
 /// application.  The counters are deliberately private; callers can only
 /// charge named resource categories with bounded arithmetic.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct MediaBudget {
+pub(in crate::package) struct MediaBudget {
     max_input_bytes: usize,
     max_output_bytes: usize,
     max_entries: usize,
@@ -43,6 +43,22 @@ pub(super) struct MediaBudget {
     wire_nesting: usize,
     wire_work: usize,
     allocations: usize,
+}
+
+/// The portion of one replacement ledger that a sibling focused transaction
+/// can debit against its own operation budget.  ZIP-entry and aggregate
+/// physical counters stay private to the replacement owner; the media-data
+/// adapter only exports work that has a corresponding semantic ceiling in the
+/// consuming owner.
+#[derive(Debug, Clone, Copy, Default)]
+pub(in crate::package) struct MediaBudgetUsage {
+    pub(in crate::package) input_bytes: usize,
+    pub(in crate::package) fields: usize,
+    pub(in crate::package) nesting: usize,
+    pub(in crate::package) work: usize,
+    pub(in crate::package) references: usize,
+    pub(in crate::package) allocations: usize,
+    pub(in crate::package) media_bytes: usize,
 }
 
 impl MediaBudget {
@@ -92,6 +108,32 @@ impl MediaBudget {
             wire_work: 0,
             allocations: 0,
         })
+    }
+
+    /// Build the replacement ledger with ceilings reserved by a sibling
+    /// focused operation.  The physical package profile remains the hard
+    /// upper bound; caller caps can only tighten it.  This constructor is
+    /// intentionally private to the package so no public API can expose the
+    /// replacement owner's accounting vocabulary.
+    pub(in crate::package) fn for_package_with_caps(
+        package: &Package,
+        input_bytes: usize,
+        fields: usize,
+        nesting: usize,
+        work: usize,
+        references: usize,
+        allocations: usize,
+        media_bytes: usize,
+    ) -> Result<Self, SlideMediaDataError> {
+        let mut budget = Self::for_package(package)?;
+        budget.max_input_bytes = budget.max_input_bytes.min(input_bytes);
+        budget.max_wire_fields = budget.max_wire_fields.min(fields);
+        budget.max_wire_nesting = budget.max_wire_nesting.min(nesting);
+        budget.max_wire_work = budget.max_wire_work.min(work);
+        budget.max_references = budget.max_references.min(references);
+        budget.max_allocations = budget.max_allocations.min(allocations);
+        budget.max_media_bytes = budget.max_media_bytes.min(media_bytes);
+        Ok(budget)
     }
 
     /// Charge the retained physical catalog before any selected payload copy.
@@ -357,6 +399,24 @@ impl MediaBudget {
         self.media_bytes(requirements.scratch_bytes())?;
         self.media_bytes(requirements.retained_bytes())?;
         self.allocations_count(requirements.allocations())
+    }
+
+    /// Snapshot the bounded work retained by the lazy selector/metadata
+    /// passes.  The focused media-properties owner uses this to debit its
+    /// `GeometryBudget` without reimplementing the PackageMetadata closure.
+    pub(in crate::package) fn usage(&self) -> MediaBudgetUsage {
+        MediaBudgetUsage {
+            input_bytes: self.input_bytes,
+            fields: self.wire_fields,
+            nesting: self.wire_nesting,
+            work: self.wire_work,
+            references: self.references,
+            allocations: self.allocations,
+            // `media_bytes` covers the bounded string/vector/archive staging
+            // charged by the lazy reader.  The sibling adapter classifies
+            // this as scratch because its returned assets borrow the source.
+            media_bytes: self.media_bytes,
+        }
     }
 
     /// Charge fields from a bounded wire view.
