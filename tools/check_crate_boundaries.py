@@ -12030,6 +12030,42 @@ IWA_NUMBERS_TABLE_INFO_SOURCE = (
 # generated messages while it owns that separate operation.
 IWA_NUMBERS_MODEL_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "editor" / "model.rs"
 IWA_NUMBERS_STORAGE_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "editor" / "storage.rs"
+# Read-only table ownership discovery is moving through this small private
+# projection.  Keep its ratchet beside the older model/storage audit so the
+# generated decode that remains in mutation/creation paths is not treated as
+# a package-wide violation.
+IWA_NUMBERS_EDITOR_MODULE_SOURCE = Path("crates/litchi-iwa/src/numbers/editor.rs")
+IWA_NUMBERS_TABLE_INFO_PROJECTION_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "table_info_projection.rs"
+)
+IWA_NUMBERS_TABLE_INFO_PROJECTION_MODULE = re.compile(
+    r"(?m)^\s*mod\s+table_info_projection\s*;"
+)
+IWA_NUMBERS_TABLE_INFO_PROJECTION_CALL = re.compile(
+    r"\b(?:(?:crate|self|super)\s*::\s*)*table_info_projection\s*::\s*"
+    r"model_reference(?:_for_type)?\s*\("
+)
+IWA_NUMBERS_TABLE_INFO_PROJECTION_CODEC_CALL = re.compile(
+    r"\btable_info_codec\s*::\s*decode_table_model_reference\s*\("
+)
+IWA_NUMBERS_TABLE_INFO_PROJECTION_FORBIDDEN_GENERATED_DECODE = re.compile(
+    r"\b(?:[A-Za-z_][A-Za-z0-9_]*\s*::\s*)?TableInfoArchive\s*::\s*decode\s*\(|"
+    r"\bdecode_type\s*::<\s*(?:[^>]*::\s*)?TableInfoArchive\b|"
+    r"\bdecode_message\s*(?:::<[^;{}]+>)?\s*\("
+)
+IWA_NUMBERS_TABLE_INFO_PROJECTION_REQUIRED_MARKERS = (
+    "DecodeOptions",
+    "WireLimits",
+    "table_info_codec",
+    "decode_table_model_reference",
+    "model_reference_for_type",
+)
+IWA_NUMBERS_TABLE_CREATE_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "editor" / "table_create.rs"
+IWA_NUMBERS_TABLE_TEMPLATE_FUNCTION = "attached_table_templates"
+IWA_NUMBERS_TABLE_TEMPLATE_GENERATED_DECODE = re.compile(
+    r"\b(?:[A-Za-z_][A-Za-z0-9_]*\s*::\s*)?"
+    r"(?:TableInfoArchive|TableModelArchive)\s*::\s*decode\s*\("
+)
 IWA_NUMBERS_MODEL_LOOKUP_FUNCTIONS = (
     "decode_table_info",
     "find_table_owner",
@@ -43031,6 +43067,30 @@ def audit_iwa_numbers_model_storage_source_topology(
         production[path] = source
         code_by_path[path] = _mask_rust_non_code(source)
 
+    # The projection is a private read-only seam.  Keep this activation tied
+    # to a reachable module/call so an unintegrated worktree copy cannot make
+    # the legacy host fail before its callers have crossed the boundary.
+    projection_path = root / IWA_NUMBERS_TABLE_INFO_PROJECTION_SOURCE
+    editor_module_path = root / IWA_NUMBERS_EDITOR_MODULE_SOURCE
+    projection_code = ""
+    editor_module_code = ""
+    if projection_path.is_file():
+        projection_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(projection_path.read_text(encoding="utf-8"))
+        )
+    if editor_module_path.is_file():
+        editor_module_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(editor_module_path.read_text(encoding="utf-8"))
+        )
+    projection_active = (
+        IWA_NUMBERS_TABLE_INFO_PROJECTION_MODULE.search(editor_module_code)
+        is not None
+        or any(
+            IWA_NUMBERS_TABLE_INFO_PROJECTION_CALL.search(code) is not None
+            for code in code_by_path.values()
+        )
+    )
+
     # Keep historical/reduced fixtures dormant until the concrete migration
     # is present.  Once any strict marker lands, fail closed if the partner
     # functions are missing or route back through the old readers.
@@ -43141,7 +43201,17 @@ def audit_iwa_numbers_model_storage_source_topology(
 
     if attached_role_function is not None:
         body, offset = attached_role_function
-        for marker in IWA_NUMBERS_ATTACHED_ROLE_MARKERS:
+        role_markers = (
+            (
+                "TABLE_INFO_MESSAGE_TYPES",
+                "probe_candidate",
+                "CandidateProbe",
+                "model_reference_for_type",
+            )
+            if projection_active
+            else IWA_NUMBERS_ATTACHED_ROLE_MARKERS
+        )
+        for marker in role_markers:
             if re.search(rf"\b{re.escape(marker)}\b", body) is None:
                 violations.append(
                     "legacy iwa Numbers attached-table role resolver is missing "
@@ -43212,6 +43282,122 @@ def audit_iwa_numbers_model_storage_source_topology(
                 "legacy iwa Numbers storage lookup performs a direct archive parse "
                 f"in {name}: {IWA_NUMBERS_STORAGE_SOURCE}:{body_line(storage_path, offset, match)}"
             )
+
+    if projection_active:
+        projection_relative = IWA_NUMBERS_TABLE_INFO_PROJECTION_SOURCE
+        editor_relative = IWA_NUMBERS_EDITOR_MODULE_SOURCE
+        if not projection_path.is_file():
+            violations.append(
+                "legacy iwa Numbers table-info projection call has no private "
+                f"source: {projection_relative}"
+            )
+        else:
+            for marker in IWA_NUMBERS_TABLE_INFO_PROJECTION_REQUIRED_MARKERS:
+                if not re.search(rf"\b{re.escape(marker)}\b", projection_code):
+                    violations.append(
+                        "legacy iwa Numbers table-info projection is missing "
+                        f"Buffa marker {marker}: {projection_relative}"
+                    )
+            for match in IWA_NUMBERS_TABLE_INFO_PROJECTION_FORBIDDEN_GENERATED_DECODE.finditer(
+                projection_code
+            ):
+                line_number = projection_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "legacy iwa Numbers table-info projection retains generated "
+                    f"decode {match.group(0).strip()}: {projection_relative}:{line_number}"
+                )
+            if len(IWA_NUMBERS_TABLE_INFO_PROJECTION_CODEC_CALL.findall(projection_code)) < 1:
+                violations.append(
+                    "legacy iwa Numbers table-info projection must call the bounded "
+                    f"Buffa codec: {projection_relative}"
+                )
+
+        if (
+            not editor_module_path.is_file()
+            or IWA_NUMBERS_TABLE_INFO_PROJECTION_MODULE.search(editor_module_code)
+            is None
+        ):
+            violations.append(
+                "legacy iwa Numbers editor must wire the private table-info "
+                f"projection module: {editor_relative}"
+            )
+
+        if attached_role_function is None:
+            violations.append(
+                "legacy iwa Numbers table-info projection is not reachable from "
+                f"{IWA_NUMBERS_MODEL_SOURCE}"
+            )
+        else:
+            body, offset = attached_role_function
+            if IWA_NUMBERS_TABLE_INFO_PROJECTION_CALL.search(body) is None:
+                violations.append(
+                    "legacy iwa Numbers attached-table role resolver must delegate "
+                    "to the bounded private table-info projection: "
+                    f"{IWA_NUMBERS_MODEL_SOURCE}"
+                )
+            for match in IWA_NUMBERS_TABLE_INFO_PROJECTION_CODEC_CALL.finditer(body):
+                violations.append(
+                    "legacy iwa Numbers attached-table role resolver bypasses the "
+                    "private projection with a direct Buffa decode: "
+                    f"{IWA_NUMBERS_MODEL_SOURCE}:{body_line(model_path, offset, match)}"
+                )
+
+        table_create_path = root / IWA_NUMBERS_TABLE_CREATE_SOURCE
+        if not table_create_path.is_file():
+            violations.append(
+                "legacy iwa Numbers table-template discovery source is missing: "
+                f"{IWA_NUMBERS_TABLE_CREATE_SOURCE}"
+            )
+        else:
+            table_create_source = _mask_rust_cfg_test_items(
+                table_create_path.read_text(encoding="utf-8")
+            )
+            table_create_functions = _rust_top_level_function_bodies(table_create_source)
+            template_function = table_create_functions.get(
+                IWA_NUMBERS_TABLE_TEMPLATE_FUNCTION
+            )
+            if template_function is None:
+                violations.append(
+                    "legacy iwa Numbers table-template discovery is missing "
+                    f"{IWA_NUMBERS_TABLE_TEMPLATE_FUNCTION}: {IWA_NUMBERS_TABLE_CREATE_SOURCE}"
+                )
+            else:
+                body, offset = template_function
+                if re.search(
+                    r"\battached_table_info_model_identifier\s*\(", body
+                ) is None:
+                    violations.append(
+                        "legacy iwa Numbers table-template discovery must delegate "
+                        "TableInfo ownership to the strict role resolver: "
+                        f"{IWA_NUMBERS_TABLE_CREATE_SOURCE}"
+                    )
+                for match in IWA_NUMBERS_TABLE_TEMPLATE_GENERATED_DECODE.finditer(body):
+                    line_number = table_create_source.count(
+                        "\n", 0, offset + match.start()
+                    ) + 1
+                    violations.append(
+                        "legacy iwa Numbers table-template discovery retains a "
+                        f"generated decode: {IWA_NUMBERS_TABLE_CREATE_SOURCE}:"
+                        f"{line_number}"
+                    )
+
+        table_info_index = model_functions.get("table_info_message_index")
+        if table_info_index is None:
+            # ``table_info_message_index`` is the single model-discovery fan-in;
+            # callers must not grow an alternate raw-message probe.
+            if model_path.is_file():
+                violations.append(
+                    "legacy iwa Numbers strict model/storage route is missing "
+                    f"table_info_message_index: {IWA_NUMBERS_MODEL_SOURCE}"
+                )
+        else:
+            body, _offset = table_info_index
+            if re.search(r"\btable_info_model_identifier\s*\(", body) is None:
+                violations.append(
+                    "legacy iwa Numbers table-info message index must use the "
+                    "strict model-identifier route: "
+                    f"{IWA_NUMBERS_MODEL_SOURCE}"
+                )
 
     return sorted(set(violations))
 

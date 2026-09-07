@@ -68,7 +68,7 @@ fn malformed_presentation_roots_return_typed_errors() {
 
 #[test]
 fn malformed_presentation_children_are_reported_by_their_owner() {
-    let missing_size = format!(r#"<p:presentation xmlns:p="{PML}"/>"#);
+    let missing_size = format!(r#"<p:presentation xmlns:p="{PML}"><p:sldIdLst/></p:presentation>"#);
     let (references, size) = presentation_accessors(missing_size.as_bytes());
     assert!(references.is_ok());
     assert!(size.is_err());

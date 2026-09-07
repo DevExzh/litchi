@@ -638,54 +638,203 @@ fn assert_physical_locality(before: &[u8], after: &[u8]) -> TestResult {
     Ok(())
 }
 
-fn assert_saved_candidate_if_requested(expected: &MediaProperties) -> TestResult {
-    let Ok(path) = env::var("LITCHI_KEYNOTE_MEDIA_PROPERTIES_NATIVE_SAVED_PATH") else {
-        return Ok(());
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum CommentIdentity {
+    StorageUuid { lower: u64, upper: u64 },
+    Identifier(u64),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CommentSignature {
+    identity: CommentIdentity,
+    text: String,
+    has_author: bool,
+    replies: Vec<CommentIdentity>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CommentGraphSignature {
+    root: CommentIdentity,
+    nodes: Vec<CommentSignature>,
+}
+
+fn native_comment_graph_signature(
+    source: &[u8],
+    movie: usize,
+) -> TestResult<Option<CommentGraphSignature>> {
+    const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
+
+    let archives = native_archives(source)?;
+    let media_identifier = *native_media_ids(source)?
+        .get(movie)
+        .ok_or_else(|| io::Error::other("native package has no selected media"))?;
+    let movie = movie_archive(&archives, media_identifier)
+        .ok_or_else(|| io::Error::other("native package has no selected movie payload"))?;
+    let Some(root_identifier) = movie.super_.comment.map(|reference| reference.identifier) else {
+        return Ok(None);
     };
-    let saved = Package::from_bytes(&fs::read(path)?)?;
+
+    let mut pending = vec![root_identifier];
+    let mut nodes = BTreeMap::new();
+    while let Some(identifier) = pending.pop() {
+        if nodes.contains_key(&identifier) {
+            continue;
+        }
+        let object = native_object(source, identifier)?;
+        let message = object
+            .messages
+            .iter()
+            .find(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+            .ok_or_else(|| io::Error::other("native comment storage payload is missing"))?;
+        let comment = tsd::CommentStorageArchive::decode(message.data.as_slice())?;
+        let identity = comment
+            .storage_uuid
+            .as_ref()
+            .map(|uuid| CommentIdentity::StorageUuid {
+                lower: uuid.lower,
+                upper: uuid.upper,
+            })
+            .unwrap_or(CommentIdentity::Identifier(identifier));
+        let text = comment
+            .text
+            .ok_or_else(|| io::Error::other("native comment text is missing"))?;
+        let replies = comment
+            .replies
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>();
+        pending.extend(replies.iter().rev().copied());
+        nodes.insert(
+            identifier,
+            (identity, text, comment.author.is_some(), replies),
+        );
+    }
+
+    let root = nodes
+        .get(&root_identifier)
+        .map(|node| node.0.clone())
+        .ok_or_else(|| io::Error::other("native comment root is missing"))?;
+    let identities = nodes
+        .iter()
+        .map(|(identifier, (identity, _, _, _))| (*identifier, identity.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let mut signatures = nodes
+        .into_iter()
+        .map(|(_identifier, (identity, text, has_author, replies))| {
+            let replies = replies
+                .into_iter()
+                .map(|reply| {
+                    identities
+                        .get(&reply)
+                        .cloned()
+                        .ok_or_else(|| io::Error::other("native comment reply is missing"))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(CommentSignature {
+                identity,
+                text,
+                has_author,
+                replies,
+            })
+        })
+        .collect::<TestResult<Vec<_>>>()?;
+    signatures.sort_by(|left, right| left.identity.cmp(&right.identity));
+    Ok(Some(CommentGraphSignature {
+        root,
+        nodes: signatures,
+    }))
+}
+
+fn assert_media_properties_candidate(
+    saved_bytes: &[u8],
+    selected_movie: usize,
+    expected: &MediaProperties,
+    context: &str,
+) -> TestResult {
+    let saved = Package::from_bytes(saved_bytes)?;
     let baseline = Package::from_bytes(NATIVE_BASELINE)?;
+    baseline.validate()?;
     saved.validate()?;
-    assert_eq!(properties(&saved, 0)?, *expected);
     let baseline_movies = baseline.show()?.slides()[0].movies();
     let saved_movies = saved.show()?.slides()[0].movies();
-    assert_eq!(saved_movies.len(), baseline_movies.len());
-    for (index, (before, after)) in baseline_movies.iter().zip(saved_movies).enumerate() {
+    assert_eq!(
+        saved_movies.len(),
+        baseline_movies.len(),
+        "{context} changed the source-order media count"
+    );
+    assert_eq!(
+        properties(&saved, selected_movie)?,
+        *expected,
+        "{context} media properties differ at source-order movie {selected_movie}"
+    );
+    for movie in 0..baseline_movies.len() {
+        if movie != selected_movie {
+            assert_eq!(
+                properties(&saved, movie)?,
+                properties(&baseline, movie)?,
+                "{context} unselected media properties changed at source-order movie {movie}"
+            );
+        }
         assert_eq!(
-            after.kind(),
-            before.kind(),
-            "saved media kind changed at {index}"
+            saved_movies[movie].kind(),
+            baseline_movies[movie].kind(),
+            "{context} media kind changed at source-order movie {movie}"
         );
         assert_eq!(
-            after.position(),
-            before.position(),
-            "saved media position changed at {index}"
+            saved_movies[movie].position(),
+            baseline_movies[movie].position(),
+            "{context} media position changed at source-order movie {movie}"
         );
         assert_eq!(
-            after.size(),
-            before.size(),
-            "saved media size changed at {index}"
+            saved_movies[movie].size(),
+            baseline_movies[movie].size(),
+            "{context} media size changed at source-order movie {movie}"
         );
         assert_eq!(
-            after.original_size(),
-            before.original_size(),
-            "saved original media size changed at {index}"
+            saved_movies[movie].original_size(),
+            baseline_movies[movie].original_size(),
+            "{context} original media size changed at source-order movie {movie}"
         );
         assert_eq!(
-            after.natural_size(),
-            before.natural_size(),
-            "saved natural media size changed at {index}"
+            saved_movies[movie].natural_size(),
+            baseline_movies[movie].natural_size(),
+            "{context} natural media size changed at source-order movie {movie}"
         );
         assert_eq!(
-            after.playback(),
-            before.playback(),
-            "saved playback changed at {index}"
+            saved_movies[movie].playback(),
+            baseline_movies[movie].playback(),
+            "{context} playback changed at source-order movie {movie}"
+        );
+        assert_eq!(
+            native_comment_graph_signature(NATIVE_BASELINE, movie)?,
+            native_comment_graph_signature(saved_bytes, movie)?,
+            "{context} comment/reply graph changed at source-order movie {movie}"
         );
     }
+    assert_eq!(
+        native_media_ids(saved_bytes)?.len(),
+        baseline_movies.len(),
+        "{context} changed the slide-owned media count"
+    );
+    assert_eq!(
+        native_audio_ids(saved_bytes)?.len(),
+        native_audio_ids(NATIVE_BASELINE)?.len(),
+        "{context} changed the slide-owned audio count"
+    );
     assert_media_bytes_unchanged(&baseline, &saved)?;
-    for movie in 1..4 {
-        assert_eq!(properties(&saved, movie)?, properties(&baseline, movie)?);
-    }
     Ok(())
+}
+
+fn assert_saved_candidate_if_requested(
+    environment_variable: &str,
+    selected_movie: usize,
+    expected: &MediaProperties,
+) -> TestResult {
+    let Ok(path) = env::var(environment_variable) else {
+        return Ok(());
+    };
+    let saved_bytes = fs::read(path)?;
+    assert_media_properties_candidate(&saved_bytes, selected_movie, expected, "native-saved")
 }
 
 #[test]
@@ -761,11 +910,16 @@ fn native_audio_properties_do_not_require_positive_geometry_and_preserve_localit
     assert_eq!(properties(commit.package(), 1)?, properties(&package, 1)?);
     assert_media_bytes_unchanged(&package, commit.package())?;
     assert_physical_locality(NATIVE_BASELINE, &candidate)?;
+    assert_media_properties_candidate(&candidate, 0, &target, "generated transaction")?;
     assert!(commit.diagnostics().changed());
     assert!(commit.diagnostics().deleted_previews() > 0);
     export_candidate("media-properties-baseline.key", NATIVE_BASELINE)?;
     export_candidate("media-properties-audio-changed.key", &candidate)?;
-    assert_saved_candidate_if_requested(&target)?;
+    assert_saved_candidate_if_requested(
+        "LITCHI_KEYNOTE_MEDIA_PROPERTIES_NATIVE_SAVED_PATH",
+        0,
+        &target,
+    )?;
     Ok(())
 }
 
@@ -872,6 +1026,40 @@ fn native_media_properties_reject_duplicate_slide_owned_movie_references_atomica
         Err(SlideMediaPropertiesError::UnsupportedDependency)
     ));
     assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn media_properties_reject_merge_and_base_message_metadata_atomically() -> TestResult {
+    // Properties reuse the media-asset selector's metadata guard. Keep this
+    // end-to-end check so a future selector refactor cannot bypass that guard.
+    for movie in [0, 2] {
+        for merge_object in [false, true] {
+            let source = mutate_movie_header(NATIVE_BASELINE, movie, |object, index| {
+                if merge_object {
+                    object.archive_info.should_merge = Some(true);
+                } else {
+                    object.archive_info.message_infos[index].base_message_index = Some(0);
+                }
+                Ok(())
+            })?;
+            let package = Package::from_bytes(&source)?;
+            let before = exact_bytes(&package)?;
+            assert!(matches!(
+                package
+                    .slide_media_properties(SlideSelector::index(0), MovieSelector::index(movie)),
+                Err(SlideMediaPropertiesError::InvalidSource)
+            ));
+            assert!(matches!(
+                package.edit_slide_media_properties(
+                    SlideSelector::index(0),
+                    MovieSelector::index(movie)
+                ),
+                Err(SlideMediaPropertiesError::InvalidSource)
+            ));
+            assert_eq!(exact_bytes(&package)?, before);
+        }
+    }
     Ok(())
 }
 
@@ -1061,11 +1249,15 @@ fn native_file_media_properties_are_selector_typed_and_do_not_move_audio() -> Te
         .with_aspect_ratio_locked(Some(true))
         .with_accessibility_description(Some("File A — accessible 北区".to_owned()));
     let commit = edit_properties(&package, 2, file_target.clone())?;
+    let candidate = exact_bytes(commit.package())?;
     assert_eq!(properties(commit.package(), 2)?, file_target);
     assert_eq!(properties(commit.package(), 0)?, before_audio);
-    export_candidate(
-        "media-properties-file-changed.key",
-        &exact_bytes(commit.package())?,
+    export_candidate("media-properties-file-changed.key", &candidate)?;
+    assert_media_properties_candidate(&candidate, 2, &file_target, "generated transaction")?;
+    assert_saved_candidate_if_requested(
+        "LITCHI_KEYNOTE_MEDIA_PROPERTIES_NATIVE_SAVED_FILE_PATH",
+        2,
+        &file_target,
     )?;
     Ok(())
 }

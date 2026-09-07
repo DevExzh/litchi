@@ -70,6 +70,9 @@ fn parse_record_with(data: &[u8], preserve_defect: bool) -> Result<(Parsed, Opti
     if formula.is_empty() && !matches!(value, FormulaValue::StringPending) {
         return Err(invalid("Formula token stream cannot be empty"));
     }
+    if formula.is_empty() && formula_end != data.len() {
+        return Err(invalid("Formula ancillary bytes require a token stream"));
+    }
     let (mut metadata, defect) = if preserve_defect {
         decode_flags_preserving(flags, &formula)?
     } else {

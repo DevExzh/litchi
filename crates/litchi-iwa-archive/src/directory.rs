@@ -3192,6 +3192,11 @@ mod tests {
             .metadata_bytes
             .checked_add(sidecar_metadata)
             .ok_or_else(|| Error::InvalidBundle("test metadata total overflowed".to_owned()))?;
+        assert_eq!(
+            index.state.index_report.metadata_bytes,
+            index_metadata + crate::zip::ZIP_CENTRAL_FIXED_METADATA_BYTES,
+            "the index report follows the ZIP reader central-directory metadata charge",
+        );
         let exact_limits = Limits::default().with_derived_metadata_bytes(exact_metadata)?;
         assert!(FrozenDirectoryBundle::open_with_pages_metadata(temp.path(), exact_limits).is_ok());
         let one_under_limits = Limits::default().with_derived_metadata_bytes(exact_metadata - 1)?;

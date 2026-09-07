@@ -110,15 +110,7 @@ pub struct Presentation {
 
 #[cfg(all(feature = "odp", any(unix, windows)))]
 fn map_odp_error(error: Error, _operation: &str) -> Error {
-    match error {
-        error @ (Error::Io(_)
-        | Error::Allocation { .. }
-        | Error::ResourceLimit(_)
-        | Error::SourceChanged { .. }
-        | Error::InvalidFormat(_)
-        | Error::ParseError(_)) => error,
-        other => other,
-    }
+    error
 }
 
 #[cfg(all(test, feature = "odp"))]
@@ -694,7 +686,7 @@ impl Presentation {
                 crate::detection_smart::detected::PptxSourcePathError::Source(error) => error,
             })?;
             let detected = detected.ok_or(Error::NotOfficeFile)?;
-            return match detected {
+            match detected {
                 crate::detection_smart::detected::PptxSourcePathDetection::Pptx(presentation) => {
                     Self::from_source_backed_pptx(presentation)
                 },
@@ -725,7 +717,7 @@ impl Presentation {
                 crate::detection_smart::detected::PptxSourcePathDetection::Bytes(bytes) => {
                     Self::from_bytes_with_limits(bytes, limits)
                 },
-            };
+            }
         }
 
         #[cfg(not(any(unix, windows)))]

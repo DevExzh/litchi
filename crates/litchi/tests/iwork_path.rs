@@ -229,11 +229,23 @@ fn path_ingress_rejects_links_and_special_nodes_without_blocking() {
 }
 
 #[test]
-fn directory_index_input_limit_is_inclusive() {
+fn directory_semantic_input_limit_is_inclusive() {
     let directory = fixture("directory/pages/basic.pages");
-    let length = fs::metadata(directory.join("Index.zip"))
-        .unwrap_or_else(|error| panic!("read native index metadata: {error}"))
-        .len();
+    // Semantic ingress retains the index and these canonical metadata
+    // authorities. Previews remain outside the selected input budget.
+    let length = [
+        "Index.zip",
+        "Metadata/Properties.plist",
+        "Metadata/BuildVersionHistory.plist",
+        "Metadata/DocumentIdentifier",
+    ]
+    .iter()
+    .map(|name| {
+        fs::metadata(directory.join(name))
+            .unwrap_or_else(|error| panic!("read native semantic input {name}: {error}"))
+            .len()
+    })
+    .sum();
 
     Document::open_with_options(&directory, options_with_input_limit(length))
         .unwrap_or_else(|error| panic!("exact directory input limit must pass: {error}"));

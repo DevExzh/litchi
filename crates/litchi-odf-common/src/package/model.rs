@@ -227,6 +227,11 @@ impl ArchiveMetadata {
 pub(crate) type PreparedArchive = Arc<IndexedArchive<Arc<Vec<u8>>>>;
 
 /// A borrowed archive reader or an already-indexed owned archive.
+//
+// Keep the borrowed reader inline: `Archive::new` is the zero-copy hot path,
+// and boxing it would add a heap allocation to every borrowed package open.
+// The prepared path is already an `Arc`, so the size asymmetry is intentional
+// and localized to this private representation.
 #[allow(
     clippy::large_enum_variant,
     reason = "retain the existing inline borrowed reader to avoid an extra allocation on borrowed archive opens"

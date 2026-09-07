@@ -209,6 +209,52 @@ impl Limits {
         Ok(observed)
     }
 
+    /// Attribute a decompression refusal to the ceiling that constrained it.
+    ///
+    /// Semantic readers shrink the component profile to the aggregate bytes
+    /// still available. Only a strictly tighter aggregate ceiling changes the
+    /// error's resource and offsets its observation by retained components.
+    /// Original component/chunk limits, including ties, retain their evidence.
+    pub(crate) fn map_iwa_decode_error(
+        self,
+        error: litchi_iwa_core::Error,
+        retained_bytes: u64,
+    ) -> Error {
+        let (observed, maximum, original_maximum) = match &error {
+            litchi_iwa_core::Error::Limit {
+                kind: litchi_iwa_core::LimitKind::SnappyChunkBytes,
+                observed,
+                maximum,
+            } => (
+                *observed,
+                *maximum,
+                self.iwa_profile
+                    .max_archive_bytes()
+                    .min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
+            ),
+            litchi_iwa_core::Error::Limit {
+                kind: litchi_iwa_core::LimitKind::SnappyStreamBytes,
+                observed,
+                maximum,
+            } => (*observed, *maximum, self.iwa_profile.max_archive_bytes()),
+            _ => return Error::Iwa(error),
+        };
+        let Some(remaining) = self.max_total_bytes.checked_sub(retained_bytes) else {
+            return Error::Iwa(error);
+        };
+        if remaining < u64::try_from(original_maximum).unwrap_or(u64::MAX)
+            && remaining == u64::try_from(maximum).unwrap_or(u64::MAX)
+        {
+            return Error::Limit {
+                kind: LimitKind::IwaTotalBytes,
+                observed: retained_bytes
+                    .saturating_add(u64::try_from(observed).unwrap_or(u64::MAX)),
+                maximum: self.max_total_bytes,
+            };
+        }
+        Error::Iwa(error)
+    }
+
     pub(crate) fn validate(self) -> Result<Self> {
         if self.max_input_bytes == 0
             || self.max_entries == 0
@@ -310,6 +356,49 @@ impl Default for Limits {
 #[cfg(test)]
 mod tests {
     use super::Limits;
+    use crate::{Error, LimitKind};
+    use litchi_iwa_core::{SnappyLimits, SnappyStream};
+
+    #[test]
+    fn decompression_errors_identify_the_binding_component_or_aggregate_budget() {
+        for (size, component, aggregate, retained, aggregate_binds) in [
+            (100, 99, 1_000, 0, false),
+            (100, 1_000, 299, 200, true),
+            (100, 99, 299, 200, false),
+            (100_000, 99_999, 200_000, 0, false),
+            (100_000, 200_000, 199_999, 100_000, true),
+        ] {
+            let limits = Limits::new(
+                Limits::MAX_INPUT_BYTES,
+                Limits::MAX_ENTRIES,
+                Limits::MAX_ENTRY_BYTES,
+                aggregate,
+                component,
+            )
+            .expect("valid component and aggregate ceilings");
+            let maximum = component.min((aggregate - retained) as usize);
+            let profile =
+                SnappyLimits::new(maximum.min(SnappyStream::MAX_UNCOMPRESSED_CHUNK), maximum)
+                    .expect("valid derived decoder ceiling");
+            let compressed = SnappyStream::compress(&vec![0x42; size]).expect("valid stream");
+            let failure = SnappyStream::decompress_with_limits(&compressed, profile)
+                .expect_err("stream exceeds the selected ceiling");
+            let mapped = limits.map_iwa_decode_error(failure, retained);
+            if aggregate_binds {
+                assert!(matches!(
+                    mapped,
+                    Error::Limit { kind: LimitKind::IwaTotalBytes, observed, maximum }
+                        if observed == retained + size as u64 && maximum == aggregate
+                ));
+            } else {
+                assert!(matches!(
+                    mapped,
+                    Error::Iwa(litchi_iwa_core::Error::Limit { observed, maximum, .. })
+                        if observed == size && maximum == component
+                ));
+            }
+        }
+    }
 
     #[test]
     fn zip_policy_maps_every_backend_resource_ceiling() {

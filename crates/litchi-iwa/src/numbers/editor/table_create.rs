@@ -2,8 +2,6 @@
 
 use super::*;
 
-const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct EmptyTableGraph {
     pub(super) info_object_id: u64,
@@ -220,10 +218,11 @@ fn attached_table_templates(package: &IWorkPackage) -> Result<Vec<TableDescripto
                 continue;
             };
             for message in &info_object.messages {
-                let Ok(info) = tst::TableInfoArchive::decode(message.data.as_slice()) else {
+                let Some(model_id) =
+                    model::attached_table_info_model_identifier(info_object, message)?
+                else {
                     continue;
                 };
-                let model_id = info.table_model.identifier;
                 let Some(model_archive_name) = locations.get(&model_id) else {
                     continue;
                 };
@@ -231,13 +230,9 @@ fn attached_table_templates(package: &IWorkPackage) -> Result<Vec<TableDescripto
                 let Some(model_object) = model_archive.object(model_id) else {
                     continue;
                 };
-                let models = model_object
-                    .messages
-                    .iter()
-                    .filter(|message| TABLE_MODEL_MESSAGE_TYPES.contains(&message.type_))
-                    .filter_map(|message| TableModelArchive::decode(message.data.as_slice()).ok())
-                    .collect::<Vec<_>>();
-                let [model] = models.as_slice() else {
+                let Some(model) =
+                    model::decode_attached_table_model(model_object.messages.as_slice(), model_id)?
+                else {
                     continue;
                 };
                 if !seen_models.insert(model_id) {
@@ -248,11 +243,150 @@ fn attached_table_templates(package: &IWorkPackage) -> Result<Vec<TableDescripto
                 result.push(TableDescriptor {
                     object_id: model_id,
                     table_info_id: info_id,
-                    model: model.clone(),
+                    model,
                 });
                 break;
             }
         }
     }
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SPARSE_MODEL: &[u8] = &[0x22, 0x00, 0x30, 0x00, 0x38, 0x00, 0x42, 0x00];
+
+    fn sparse_model_with_rows(rows: u8) -> Vec<u8> {
+        vec![0x22, 0x00, 0x30, rows, 0x38, 0x00, 0x42, 0x00]
+    }
+
+    fn info_message(message_type: u32, model_id: u64) -> RawMessage {
+        let data = if message_type == 6_003 {
+            vec![0x12, 0x02, 0x08, u8::try_from(model_id).unwrap()]
+        } else {
+            tst::TableInfoArchive {
+                super_: tsd::DrawableArchive::default(),
+                table_model: tsp::Reference {
+                    identifier: model_id,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+            .encode_to_vec()
+        };
+        RawMessage {
+            type_: message_type,
+            data,
+        }
+    }
+
+    fn package_with_template(
+        info_messages: Vec<RawMessage>,
+        model_messages: Vec<RawMessage>,
+    ) -> IWorkPackage {
+        let archive = Archive {
+            objects: vec![
+                ArchiveObject::new(3, info_messages).unwrap(),
+                ArchiveObject::new(10, model_messages).unwrap(),
+            ],
+        };
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive("Index/Document.iwa", &archive)
+            .unwrap();
+        package
+    }
+
+    #[test]
+    fn template_discovery_accepts_typed_legacy_owner_and_ignores_untyped_owner() {
+        let model_messages = vec![RawMessage {
+            type_: 6_001,
+            data: SPARSE_MODEL.to_vec(),
+        }];
+        let package = package_with_template(
+            vec![info_message(9_999, 10), info_message(6_003, 10)],
+            model_messages.clone(),
+        );
+
+        let templates = attached_table_templates(&package).expect("template discovery");
+        assert_eq!(templates.len(), 1);
+        assert_eq!(templates[0].object_id, 10);
+        assert_eq!(templates[0].table_info_id, 3);
+
+        let untyped_only = package_with_template(vec![info_message(9_999, 10)], model_messages);
+        assert!(
+            attached_table_templates(&untyped_only)
+                .expect("untyped owners are ignored")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn template_discovery_prefers_canonical_model_over_legacy_alias() {
+        let package = package_with_template(
+            vec![info_message(6_000, 10)],
+            vec![
+                RawMessage {
+                    type_: 6_000,
+                    data: sparse_model_with_rows(2),
+                },
+                RawMessage {
+                    type_: 6_001,
+                    data: sparse_model_with_rows(1),
+                },
+            ],
+        );
+
+        let templates = attached_table_templates(&package).expect("template discovery");
+        assert_eq!(templates.len(), 1);
+        assert_eq!(templates[0].model.number_of_rows, 1);
+    }
+
+    #[test]
+    fn template_discovery_rejects_malformed_canonical_without_legacy_fallback() {
+        let package = package_with_template(
+            vec![info_message(6_003, 10)],
+            vec![
+                RawMessage {
+                    type_: 6_000,
+                    data: SPARSE_MODEL.to_vec(),
+                },
+                RawMessage {
+                    type_: 6_001,
+                    data: vec![0x80],
+                },
+            ],
+        );
+
+        let error = attached_table_templates(&package)
+            .expect_err("malformed canonical template must fail closed");
+        assert!(error.to_string().contains("malformed Numbers table model"));
+    }
+
+    #[test]
+    fn template_discovery_rejects_duplicate_canonical_models() {
+        let package = package_with_template(
+            vec![info_message(6_003, 10)],
+            vec![
+                RawMessage {
+                    type_: 6_001,
+                    data: sparse_model_with_rows(1),
+                },
+                RawMessage {
+                    type_: 6_001,
+                    data: sparse_model_with_rows(2),
+                },
+            ],
+        );
+
+        let error = attached_table_templates(&package)
+            .expect_err("duplicate canonical templates must fail closed");
+        assert!(
+            error
+                .to_string()
+                .contains("multiple Numbers table model payloads")
+        );
+    }
 }

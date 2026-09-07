@@ -258,7 +258,7 @@ fn read_components(
             continue;
         }
         let decompressed = SnappyStream::decompress_with_limits(&compressed, snappy_limits)
-            .map_err(|error| map_semantic_iwa_total_limit(error, total_iwa_bytes, limits))?;
+            .map_err(|error| limits.map_iwa_decode_error(error, total_iwa_bytes))?;
         let decompressed_bytes =
             u64::try_from(decompressed.as_bytes().len()).map_err(|_error| {
                 Error::InvalidBundle("decompressed IWA stream length does not fit u64".to_owned())
@@ -432,27 +432,6 @@ fn semantic_iwa_snappy_limits(limits: Limits, total_iwa_bytes: u64) -> Result<Sn
     let base = limits.snappy_limits()?;
     let stream = base.max_decompressed_stream().min(remaining);
     SnappyLimits::new(base.max_uncompressed_chunk().min(stream), stream).map_err(Error::Iwa)
-}
-
-fn map_semantic_iwa_total_limit(
-    error: litchi_iwa_core::Error,
-    current: u64,
-    limits: Limits,
-) -> Error {
-    let litchi_iwa_core::Error::Limit {
-        kind:
-            litchi_iwa_core::LimitKind::SnappyChunkBytes | litchi_iwa_core::LimitKind::SnappyStreamBytes,
-        observed,
-        ..
-    } = error
-    else {
-        return Error::Iwa(error);
-    };
-    Error::Limit {
-        kind: LimitKind::IwaTotalBytes,
-        observed: current.saturating_add(u64::try_from(observed).unwrap_or(u64::MAX)),
-        maximum: limits.max_total_bytes(),
-    }
 }
 
 fn selected_metadata<'a>(

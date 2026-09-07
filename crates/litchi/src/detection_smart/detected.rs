@@ -162,7 +162,7 @@ fn prepared_odf_ooxml_probe(
         if catalog == Some(false) {
             return Ok(false);
         }
-        return try_ooxml_probe_wins(bytes, limits);
+        try_ooxml_probe_wins(bytes, limits)
     }
     #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
     {
@@ -453,7 +453,7 @@ pub(crate) fn detect_docx_source_bytes(
         Err(error) => {
             #[cfg(feature = "odt")]
             if is_odt_mime {
-                if missing_ooxml_content_types_error(&error) {
+                if missing_ooxml_catalog_part_error(&error) {
                     drop(source);
                     return DocxSourceBytesDetection::Fallback(reclaim_docx_source_bytes(shared));
                 }
@@ -549,6 +549,23 @@ fn missing_ooxml_content_types_error(error: &crate::opc::OpcError) -> bool {
         crate::opc::OpcError::InvalidContentTypesManifest(_) => true,
         _ => false,
     }
+}
+
+/// Return whether an OPC probe failed because the content-types part is
+/// absent, rather than because the part was present but malformed.
+///
+/// The broad [`missing_ooxml_content_types_error`] policy is retained for
+/// generic format detection, where malformed ODF packages historically fall
+/// through to their native owner. DOCX arbitration is stricter: once an ODT
+/// package carries a content-types member, a malformed member must surface as
+/// an OPC error instead of being hidden by the lower-precedence ODT fallback.
+#[cfg(feature = "docx")]
+fn missing_ooxml_catalog_part_error(error: &crate::opc::OpcError) -> bool {
+    matches!(
+        error,
+        crate::opc::OpcError::PartNotFound(part)
+            if part == "[Content_Types].xml" || part == "/[Content_Types].xml"
+    )
 }
 
 /// Result of the private source-backed PPTX bytes probe.
@@ -1577,10 +1594,10 @@ pub(crate) fn detect_prepared_odp(
 ) -> std::result::Result<litchi_odf_common::PreparedPackage, Vec<u8>> {
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     {
-        return match detect_prepared_odp_with_limits(bytes, crate::opc::ReadLimits::default()) {
+        match detect_prepared_odp_with_limits(bytes, crate::opc::ReadLimits::default()) {
             Ok(result) => result,
             Err(error) => Err(error.bytes),
-        };
+        }
     }
     #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
     {
@@ -1990,6 +2007,10 @@ fn ordinary_odp_path_candidate(file: &mut std::fs::File) -> crate::opc::Result<b
 
 /// Result of the private source-backed PPTX path probe.
 #[cfg(all(feature = "pptx", any(unix, windows)))]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "this private one-shot handoff moves source metadata directly; boxing it would add an allocation to every valid presentation filesystem open"
+)]
 pub(crate) enum PptxSourcePathDetection {
     /// A validated, source-retaining PPTX owner.
     Pptx(crate::pptx::SourceBackedPresentation),
@@ -2079,6 +2100,10 @@ pub(crate) const UNIFIED_DOCUMENT_FALLBACK_MAX_INPUT_BYTES: u64 = 2 * 1024 * 102
 
 /// Result of one source-pinned unified document path probe.
 #[cfg(all(feature = "docx", any(unix, windows)))]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "this private one-shot handoff moves source metadata directly; boxing it would add an allocation to every valid document filesystem open"
+)]
 pub(crate) enum DocumentSourcePathDetection {
     #[cfg(feature = "odt")]
     Odt(OdtSourcePathCandidate),
@@ -2336,6 +2361,27 @@ pub(crate) fn detect_document_source_path_with_limits(
             .map_err(odf_probe_error_to_opc)
             .map_err(DocxSourcePathError::Opc)?;
         if catalog == Some(false) {
+            // An ODT package remains the content-derived owner even when a
+            // caller supplied an OOXML suffix. The suffix only selects the
+            // DOCX/OPC read policy; enforce its input ceiling before handing
+            // the ordinary package to the native ODT source owner.
+            if ooxml_extension {
+                let input_bytes = candidate
+                    .source_arc()
+                    .len()
+                    .map_err(crate::opc::OpcError::IoError)
+                    .map_err(DocxSourcePathError::Opc)?;
+                candidate
+                    .ensure_current_opc()
+                    .map_err(DocxSourcePathError::Opc)?;
+                if input_bytes > limits.max_input_bytes() {
+                    return Err(DocxSourcePathError::Opc(crate::opc::OpcError::ReadLimit {
+                        resource: crate::opc::ReadResource::InputBytes,
+                        actual: input_bytes,
+                        maximum: limits.max_input_bytes(),
+                    }));
+                }
+            }
             return Ok(DocumentSourcePathDetection::Odt(candidate));
         }
 
@@ -2618,7 +2664,7 @@ pub(crate) fn detect_docx_from_odt_source_candidate_with_limits(
     let package =
         match crate::opc::SourceBackedPackage::from_read_at_with_limits(source.clone(), limits) {
             Ok(package) => package,
-            Err(error) if missing_ooxml_content_types_error(&error) => {
+            Err(error) if missing_ooxml_catalog_part_error(&error) => {
                 candidate
                     .ensure_current_opc()
                     .map_err(DocxSourcePathError::Opc)?;
@@ -2796,8 +2842,7 @@ pub(crate) fn detect_pptx_source_path_with_limits(
         ensure_path_source_current(source.as_ref(), source_version)
             .map_err(pptx_path_core_error_to_opc)
             .map_err(PptxSourcePathError::Opc)?;
-        let odp = odp_result
-            .map_err(|error| PptxSourcePathError::Source(litchi_core::Error::from(error)))?;
+        let odp = odp_result.map_err(PptxSourcePathError::Source)?;
         return Ok(Some(PptxSourcePathDetection::Odp(odp)));
     }
     if !ooxml_candidate {
