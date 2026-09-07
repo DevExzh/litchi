@@ -3529,6 +3529,30 @@ def add_keynote_media_properties_canonical_scaffold(root: Path) -> None:
         encoding="utf-8",
     )
 
+    native_test = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_NATIVE_TEST_SOURCE
+    native_test.parent.mkdir(parents=True, exist_ok=True)
+    native_test.write_text(
+        "const NATIVE_AUDIO_FOCUSED: &[u8] = include_bytes!(\n"
+        '    "../../../test-data/iwork/keynote/media-properties-audio-focused-native.key"\n'
+        ");\n"
+        "const NATIVE_FILE_FOCUSED: &[u8] = include_bytes!(\n"
+        '    "../../../test-data/iwork/keynote/media-properties-file-focused-native.key"\n'
+        ");\n"
+        "#[test]\n"
+        "fn native_saved_audio_properties_focused_candidate_is_stable() {\n"
+        "    let _ = NATIVE_AUDIO_FOCUSED;\n"
+        "}\n"
+        "#[test]\n"
+        "fn native_saved_file_properties_focused_candidate_is_stable() {\n"
+        "    let _ = NATIVE_FILE_FOCUSED;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    for fixture, _test_name in boundaries.KEYNOTE_MEDIA_PROPERTIES_NATIVE_EVIDENCE:
+        fixture_path = root / fixture
+        fixture_path.parent.mkdir(parents=True, exist_ok=True)
+        fixture_path.write_bytes(b"synthetic-native-keynote-fixture")
+
 
 def add_keynote_movie_geometry_completion_scaffold(root: Path) -> None:
     """Activate the Wave111 geometry handoff with a complete fake bridge."""
@@ -6981,6 +7005,26 @@ def add_keynote_slide_audio_creation_scaffold(
         ),
         encoding="utf-8",
     )
+
+    native_test = root / boundaries.KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_TEST_SOURCE
+    native_test.parent.mkdir(parents=True, exist_ok=True)
+    native_test.write_text(
+        "const NATIVE_FOCUSED: &[u8] = include_bytes!(\n"
+        '    "../../../test-data/iwork/keynote/slide-audio-creation-focused-native.key"\n'
+        ");\n"
+        "#[test]\n"
+        "fn saved_keynote_audio_creation_appends_native_audio_and_start_build() {\n"
+        "    let _ = NATIVE_FOCUSED;\n"
+        "}\n"
+        "#[test]\n"
+        "fn audio_creation_from_saved_keynote_fixture_round_trips_exactly() {\n"
+        "    let _ = NATIVE_FOCUSED;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    fixture = root / boundaries.KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_FIXTURE
+    fixture.parent.mkdir(parents=True, exist_ok=True)
+    fixture.write_bytes(b"synthetic-native-keynote-audio-fixture")
 
 
 class BoundaryPolicyTests(unittest.TestCase):
@@ -19481,7 +19525,7 @@ fn rewrite_movie_title_operation(
         ):
             self.assertIn(expression, main_source)
 
-    def test_keynote_media_properties_audits_are_dormant_until_owner_activation(
+    def test_keynote_media_properties_owner_activates_retirement_and_requires_native_evidence(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -19508,23 +19552,17 @@ fn rewrite_movie_title_operation(
             add_keynote_media_properties_canonical_scaffold(root)
             for audit in audits[:-1]:
                 self.assertEqual(audit(root), [], audit.__name__)
-            # Owner wiring alone does not prove that native iWork parity has
-            # been established, so raw compatibility methods remain dormant.
-            self.assertEqual(
-                boundaries.audit_iwa_keynote_media_properties_source_topology(root), []
-            )
-            owner = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE
-            owner.write_text(
-                owner.read_text(encoding="utf-8")
-                + "const MEDIA_PROPERTIES_NATIVE_VERIFIED: () = ();\n",
-                encoding="utf-8",
-            )
             violations = boundaries.audit_iwa_keynote_media_properties_source_topology(root)
             self.assertTrue(any("slide_audio_properties" in item for item in violations), violations)
             self.assertTrue(
                 any("set_slide_audio_properties" in item for item in violations),
                 violations,
             )
+
+            fixture, _test_name = boundaries.KEYNOTE_MEDIA_PROPERTIES_NATIVE_EVIDENCE[0]
+            (root / fixture).unlink()
+            violations = boundaries.audit_iwa_keynote_media_properties_source_topology(root)
+            self.assertTrue(any("missing native fixture" in item for item in violations), violations)
 
     def test_keynote_media_properties_facade_rejects_raw_values_and_missing_contracts(
         self,
@@ -19643,29 +19681,6 @@ fn rewrite_movie_title_operation(
             )
 
             add_keynote_media_properties_canonical_scaffold(root)
-            # The focused owner is allowed to coexist with the compatibility
-            # methods until native open/save/reopen evidence activates the
-            # explicit deletion seam.
-            self.assertEqual(
-                boundaries.audit_iwa_keynote_media_properties_source_topology(root), []
-            )
-            owner = root / boundaries.KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE
-            owner.write_text(
-                owner.read_text(encoding="utf-8")
-                + "const MEDIA_PROPERTIES_COMPLETE: () = ();\n",
-                encoding="utf-8",
-            )
-            # Similar-looking source-built capability names do not prove a
-            # native open/save/reopen fixture and must leave retirement dormant.
-            self.assertEqual(
-                boundaries.audit_iwa_keynote_media_properties_source_topology(root), []
-            )
-            owner.write_text(
-                owner.read_text(encoding="utf-8").replace(
-                    "MEDIA_PROPERTIES_COMPLETE", "MEDIA_PROPERTIES_NATIVE_VERIFIED"
-                ),
-                encoding="utf-8",
-            )
             violations = boundaries.audit_iwa_keynote_media_properties_source_topology(root)
             self.assertTrue(any("slide_movie_properties" in item for item in violations), violations)
             self.assertTrue(any("set_movie_properties" in item for item in violations), violations)
@@ -19675,6 +19690,10 @@ fn rewrite_movie_title_operation(
                 "fn focused_edit() { package.edit_slide_media_properties(slide, movie, value); }\n",
                 encoding="utf-8",
             )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_media_properties_source_topology(root), []
+            )
+            host.write_text("fn physical_only() {}\n", encoding="utf-8")
             self.assertEqual(
                 boundaries.audit_iwa_keynote_media_properties_source_topology(root), []
             )
@@ -27713,6 +27732,110 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+    def test_iwa_keynote_slide_audio_creation_retires_raw_host_after_owner_and_native_evidence(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / "crates/litchi-iwa/src/keynote/editor/slide_audio.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "use super::slide_movies::graph::{audio_creation_values, audio_objects};\n"
+                "impl KeynoteEditor {\n"
+                "    pub fn add_slide_audio(&mut self) {}\n"
+                "}\n"
+                "fn create() { editor.add_slide_audio(); audio_creation_values(); audio_objects(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_audio_creation_source_topology(root),
+                [],
+            )
+
+            add_keynote_slide_audio_creation_scaffold(root)
+            violations = boundaries.audit_iwa_keynote_slide_audio_creation_source_topology(
+                root
+            )
+            self.assertTrue(any("method/helper add_slide_audio" in item for item in violations), violations)
+            self.assertTrue(any("call/helper audio_objects" in item for item in violations), violations)
+            self.assertTrue(any("graph helper import" in item for item in violations), violations)
+            self.assertTrue(any("call/helper audio_creation_values" in item for item in violations), violations)
+
+            host.write_text(
+                "fn focused() { package.add_slide_audio(slide, name, data, options); }\n"
+                "fn associated() { Package::add_slide_audio(package, slide, name, data, options); }\n",
+                encoding="utf-8",
+            )
+            integration = (
+                root
+                / boundaries.IWA_KEYNOTE_SLIDE_AUDIO_CREATION_TEST_ROOT
+                / "keynote_audio_creation.rs"
+            )
+            integration.parent.mkdir(parents=True, exist_ok=True)
+            integration.write_text(
+                "fn focused_helper() { package.add_slide_audio(slide, name, data, options); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_audio_creation_source_topology(root),
+                [],
+            )
+
+            host.write_text("fn physical_only() {}\n", encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_audio_creation_source_topology(root),
+                [],
+            )
+
+            host.write_text(
+                "fn raw() { editor.add_slide_audio(slide, name, data, options); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_audio_creation_source_topology(
+                root
+            )
+            self.assertTrue(any("call/helper add_slide_audio" in item for item in violations), violations)
+
+            fixture = root / boundaries.KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_FIXTURE
+            fixture.unlink()
+            violations = boundaries.audit_iwa_keynote_slide_audio_creation_source_topology(
+                root
+            )
+            self.assertTrue(any("missing native fixture" in item for item in violations), violations)
+
+    def test_iwa_keynote_slide_audio_creation_native_evidence_is_complete(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_audio_creation_scaffold(root)
+            test_source = root / boundaries.KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_TEST_SOURCE
+            fixture = root / boundaries.KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_FIXTURE
+            baseline = test_source.read_text(encoding="utf-8")
+
+            test_source.unlink()
+            violations = boundaries.audit_iwa_keynote_slide_audio_creation_source_topology(root)
+            self.assertTrue(any("missing its native integration test" in item for item in violations), violations)
+
+            test_source.write_text(
+                baseline.replace("include_bytes!", "bytes_from_fixture!"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_audio_creation_source_topology(root)
+            self.assertTrue(any("must include fixture" in item for item in violations), violations)
+
+            test_source.write_text(
+                baseline.replace(
+                    "fn audio_creation_from_saved_keynote_fixture_round_trips_exactly()",
+                    "fn missing_round_trip_test()",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_audio_creation_source_topology(root)
+            self.assertTrue(any("missing audio_creation_from_saved_keynote_fixture_round_trips_exactly" in item for item in violations), violations)
+
+            fixture.write_bytes(b"")
+            violations = boundaries.audit_iwa_keynote_slide_audio_creation_source_topology(root)
+            self.assertTrue(any("native fixture is empty" in item for item in violations), violations)
+
     def test_keynote_slide_audio_creation_audit_rejects_generated_owner_and_child(
         self,
     ) -> None:
@@ -27740,6 +27863,10 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_keynote_slide_audio_creation_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_iwa_keynote_slide_audio_creation_source_topology()",
             main_source,
         )
 

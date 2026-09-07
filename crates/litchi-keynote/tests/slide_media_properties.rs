@@ -21,10 +21,15 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const NATIVE_BASELINE: &[u8] =
     include_bytes!("../../../test-data/iwork/keynote/media-comments-baseline-native.key");
+const NATIVE_AUDIO_FOCUSED: &[u8] =
+    include_bytes!("../../../test-data/iwork/keynote/media-properties-audio-focused-native.key");
+const NATIVE_FILE_FOCUSED: &[u8] =
+    include_bytes!("../../../test-data/iwork/keynote/media-properties-file-focused-native.key");
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const OPAQUE_AUDIO_MESSAGE_TYPE: u32 = 65_000;
 const OPAQUE_AUDIO_MESSAGE: &[u8] = b"opaque Audio B extension";
+const NATIVE_MOVIE_DATA_MEMBER: &str = "Data/keynote-selfauthored-coral-mjpeg-9085.mov";
 
 fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
     let mut bytes = Vec::new();
@@ -55,6 +60,14 @@ fn changed_properties() -> MediaProperties {
         .with_accessibility_description(Some("Audio A — accessible 北区".to_owned()))
 }
 
+fn changed_file_properties() -> MediaProperties {
+    MediaProperties::new()
+        .with_hyperlink_url(Some("https://example.test/file-a".to_owned()))
+        .with_locked(Some(true))
+        .with_aspect_ratio_locked(Some(true))
+        .with_accessibility_description(Some("File A — accessible 北区".to_owned()))
+}
+
 fn explicit_defaults() -> MediaProperties {
     MediaProperties::new()
         .with_hyperlink_url(Some(String::new()))
@@ -78,6 +91,17 @@ fn catalog_entries(source: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
         .collect())
+}
+
+fn without_materialized_member(source: &[u8], member_name: &str) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    if !catalog.iter().any(|entry| entry.name() == member_name) {
+        return Err(io::Error::other(format!(
+            "native fixture is missing materialized member {member_name}"
+        ))
+        .into());
+    }
+    Ok(catalog.reassemble_with_deletions_to_bytes(&[], &[member_name], Limits::default())?)
 }
 
 fn native_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
@@ -838,6 +862,28 @@ fn assert_saved_candidate_if_requested(
 }
 
 #[test]
+fn native_saved_audio_properties_focused_candidate_is_stable() -> TestResult {
+    assert_media_properties_candidate(
+        NATIVE_AUDIO_FOCUSED,
+        0,
+        &changed_properties(),
+        "native audio-focused saved candidate",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn native_saved_file_properties_focused_candidate_is_stable() -> TestResult {
+    assert_media_properties_candidate(
+        NATIVE_FILE_FOCUSED,
+        2,
+        &changed_file_properties(),
+        "native file-focused saved candidate",
+    )?;
+    Ok(())
+}
+
+#[test]
 fn media_properties_retain_absence_explicit_defaults_and_unicode() -> TestResult {
     let omitted = MediaProperties::new();
     assert_eq!(omitted.hyperlink_url(), None);
@@ -877,6 +923,40 @@ fn native_media_properties_read_all_media_in_source_order_and_reject_wrong_selec
             .slide_media_properties(SlideSelector::index(0), MovieSelector::index(4))
             .is_err()
     );
+    Ok(())
+}
+
+#[test]
+fn native_media_properties_read_sparse_materialized_data_without_loading_content() -> TestResult {
+    let source = without_materialized_member(NATIVE_BASELINE, NATIVE_MOVIE_DATA_MEMBER)?;
+    let package = Package::from_bytes(&source)?;
+    let baseline = Package::from_bytes(NATIVE_BASELINE)?;
+    let before = exact_bytes(&package)?;
+
+    assert_eq!(properties(&package, 2)?, properties(&baseline, 2)?);
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn native_media_properties_edit_rejects_sparse_materialized_data_atomically() -> TestResult {
+    let source = without_materialized_member(NATIVE_BASELINE, NATIVE_MOVIE_DATA_MEMBER)?;
+    let package = Package::from_bytes(&source)?;
+    let before = exact_bytes(&package)?;
+    let error = package
+        .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.set(changed_file_properties()))
+        .and_then(|edit| edit.commit());
+
+    assert!(
+        matches!(
+            error,
+            Err(SlideMediaPropertiesError::InvalidSource)
+                | Err(SlideMediaPropertiesError::UnsupportedDependency)
+        ),
+        "editing a media item without its materialized Data member must be rejected"
+    );
+    assert_eq!(exact_bytes(&package)?, before);
     Ok(())
 }
 
@@ -1243,11 +1323,7 @@ fn native_media_properties_inverse_replay_double_inverse_and_conflict_are_exact(
 fn native_file_media_properties_are_selector_typed_and_do_not_move_audio() -> TestResult {
     let package = Package::from_bytes(NATIVE_BASELINE)?;
     let before_audio = properties(&package, 0)?;
-    let file_target = MediaProperties::new()
-        .with_hyperlink_url(Some("https://example.test/file-a".to_owned()))
-        .with_locked(Some(true))
-        .with_aspect_ratio_locked(Some(true))
-        .with_accessibility_description(Some("File A — accessible 北区".to_owned()));
+    let file_target = changed_file_properties();
     let commit = edit_properties(&package, 2, file_target.clone())?;
     let candidate = exact_bytes(commit.package())?;
     assert_eq!(properties(commit.package(), 2)?, file_target);

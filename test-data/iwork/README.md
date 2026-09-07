@@ -1381,3 +1381,35 @@ fuzz lock/artifact directories. `cargo clean` removed 16,005 files and 10.7 GiB,
 leaving approximately 62 GiB free. Both native position fixtures remain tracked.
 The monolith exit remains active; richer media properties/readers and creation
 still require focused owners.
+
+
+## Keynote focused media acceptance (2026-09-07)
+
+The following artifacts were generated through `litchi-keynote::Package`,
+opened in Keynote 14.4 (7043.0.93), saved with Cmd-S, actually closed to the
+theme chooser, reopened through the exact file path, inspected, and closed
+again. Computer Use used `node_repl` and `@oai/sky` against
+`/Applications/Keynote.app`. The copies below retain those final saved bytes.
+
+| Fixture | SHA-256 | Native observations |
+| --- | --- | --- |
+| [media-properties-audio-focused-native.key](keynote/media-properties-audio-focused-native.key) | `149ddd01333228905a20812cc39ee0ace63459a2324486733c068c472173751d` | Audio A remained locked and linked, with accessibility description “Audio A — accessible 北区”. |
+| [media-properties-file-focused-native.key](keynote/media-properties-file-focused-native.key) | `5312e8e63f3aa5369614985bc9b78a5670c39cb9c3ef4f8ded7e91a8bc9e734a` | File A remained locked and linked, with description “File A — accessible 北区”, its caption, and its comment marker. |
+| [slide-audio-creation-focused-native.key](keynote/slide-audio-creation-focused-native.key) | `8ed6722cc5d9d98db42b435b86ee1b39d3097e2e34dc692e8874bd7e0e6f88e4` | The appended `native-acceptance.wav` control retained a 0.100-second trim, Start audio on click, and exact Arrange steppers X 120.5, Y 240.25. |
+
+The source for all three transactions was `media-comments-baseline-native.key`.
+The two property artifacts independently edit source-order media positions 0
+(audio) and 2 (file movie); their hyperlink values are
+`https://example.test/audio-a` and `https://example.test/file-a`, respectively.
+Both set lock and aspect-ratio lock to explicit true. Mandatory property tests
+assert these values plus unchanged media bytes, posters, playback, positions,
+caption/comment graphs, and unselected properties.
+
+The creation input was a complete 1,644-byte mono 8 kHz, signed 16-bit PCM WAV:
+800 samples, each `((sample % 50 - 25) * 400)` in little-endian form. The focused
+options normalize 100 ms to the native `f32` value, exposed as 100.000001 ms.
+Native readback retains the exact WAV bytes, appended media position 4, five
+media controls, and five builds (the baseline has four of each). The play
+control was activated without an error appearing; no separate audible-output
+measurement is claimed. The native-saved file also retains the four existing
+media controls and their playback settings.

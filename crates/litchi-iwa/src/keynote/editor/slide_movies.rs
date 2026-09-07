@@ -1,10 +1,7 @@
 //! Standalone movie-object creation and editing for Keynote slides.
 
-use litchi_iwa_common::{
-    WireLimits, decode_varint_from_bytes, media::Type as MediaType, varint::encoded_len,
-    wire::RawWireFields,
-};
-use litchi_iwa_protos::{keynote_media_codec, keynote_media_properties_codec, pages_media_codec};
+use litchi_iwa_common::{WireLimits, media::Type as MediaType};
+use litchi_iwa_protos::keynote_media_codec;
 use litchi_keynote::slide::media::MovieKind;
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
@@ -17,14 +14,12 @@ use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 pub(in crate::keynote::editor) mod geometry;
 pub(in crate::keynote::editor) mod graph;
 
-use geometry::*;
 use graph::*;
 
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const MOVIE_DATA_FIELD: u32 = 14;
 const POSTER_IMAGE_DATA_FIELD: u32 = 15;
-const MOVIE_FLAGS_FIELD: u32 = 13;
 const MOVIE_MEDIA_PLACEHOLDER_FLAG: u32 = 1;
 
 pub(in crate::keynote::editor) fn movie_playback_wire_limits(
@@ -79,8 +74,6 @@ pub struct KeynoteSlideMovieInfo {
 }
 
 pub(in crate::keynote::editor) struct SlideMovieGraph {
-    pub(in crate::keynote::editor) archive_name: String,
-    pub(in crate::keynote::editor) info: KeynoteSlideMovieInfo,
     pub(in crate::keynote::editor) object_ids: Vec<u64>,
 }
 
@@ -239,58 +232,6 @@ impl KeynoteEditor {
         Ok(created)
     }
 
-    /// Read shared drawable properties for one ordinary file-backed slide movie.
-    pub fn slide_movie_properties(
-        &self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<DrawableProperties> {
-        decode_slide_movie_properties(self, slide_index, drawable_object_id)
-    }
-
-    /// Update movie accessibility, hyperlink, and lock properties.
-    ///
-    /// The typed update retains unknown native movie fields and supports both
-    /// clearing a property with `None` and encoding explicit boolean defaults.
-    pub fn set_slide_movie_properties(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        properties: DrawableProperties,
-    ) -> Result<()> {
-        let source = self.require_file_movie(slide_index, drawable_object_id)?;
-        let mut staged = self.package().clone();
-        set_movie_properties(
-            &mut staged,
-            &source.archive_name,
-            drawable_object_id,
-            &properties,
-        )?;
-        let verified = Self::from_package(staged)?;
-        if verified.slide_movie_properties(slide_index, drawable_object_id)? != properties {
-            return Err(Error::InvalidFormat(
-                "Keynote movie properties update failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
-    fn require_file_movie(
-        &self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<SlideMovieGraph> {
-        let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
-        if source.info.kind != MovieKind::File {
-            return Err(Error::ParseError(format!(
-                "Keynote movie {drawable_object_id} is {:?}, not an ordinary file-backed movie",
-                source.info.kind
-            )));
-        }
-        Ok(source)
-    }
-
     pub(in crate::keynote::editor) fn slide_movie_graph(
         &self,
         slide_index: usize,
@@ -334,153 +275,11 @@ impl KeynoteEditor {
                 "Keynote movie private graph reaches its owning slide".to_owned(),
             ));
         }
-        let info = movie_info(&graph, self.package(), slide_index, drawable_object_id)?;
-        Ok(SlideMovieGraph {
-            archive_name,
-            info,
-            object_ids,
-        })
+        // Retain the listing decoder's validation without storing a duplicate
+        // property/playback snapshot in the private graph result.
+        movie_info(&graph, self.package(), slide_index, drawable_object_id)?;
+        Ok(SlideMovieGraph { object_ids })
     }
-}
-
-/// Read the legacy raw-ID property API through the focused, source-bound
-/// property projection. The focused package transaction also validates media
-/// assets and the complete inbound graph, which would reject older sparse
-/// documents that the legacy reader has historically accepted. Keep the
-/// legacy ownership and ordinary-file checks here, then borrow the selected
-/// MovieArchive payload directly; this preserves that admission surface
-/// without serializing and reopening the complete package for each read.
-fn decode_slide_movie_properties(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<DrawableProperties> {
-    let slides = editor.slides()?;
-    let slide = slides.get(slide_index).ok_or_else(|| {
-        Error::ParseError(format!(
-            "Keynote slide index {slide_index} is out of range for {} slides",
-            slides.len()
-        ))
-    })?;
-    let slide_id = slide.native_ids()?.slide.get();
-    let graph = ObjectGraph::read(editor.package())?;
-    let native: kn::SlideArchive =
-        graph.decode_type(slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
-    if !native
-        .owned_drawables
-        .iter()
-        .any(|reference| reference.identifier == drawable_object_id)
-    {
-        return Err(Error::ParseError(format!(
-            "Keynote movie {drawable_object_id} is not owned by slide {slide_index}"
-        )));
-    }
-    let archive_name = graph.archive_name(slide_id)?;
-    if graph.archive_name(drawable_object_id)? != archive_name {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote movie {drawable_object_id} is outside slide component {archive_name}"
-        )));
-    }
-    let archive = editor.package().archive(archive_name)?;
-    let object_ids = slide_create::graph::private_clone_object_ids(
-        &archive,
-        [drawable_object_id],
-        "slide movie",
-    )?;
-    if object_ids.contains(&slide_id) {
-        return Err(Error::InvalidFormat(
-            "Keynote movie private graph reaches its owning slide".to_owned(),
-        ));
-    }
-    let source =
-        graph.message_data_type(drawable_object_id, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
-    if raw_movie_kind(source, drawable_object_id)? != MovieKind::File {
-        return Err(Error::ParseError(format!(
-            "Keynote movie {drawable_object_id} is not an ordinary file-backed movie"
-        )));
-    }
-    decode_movie_properties_payload(source, drawable_object_id)
-}
-
-fn raw_movie_kind(source: &[u8], identifier: u64) -> Result<MovieKind> {
-    let flags = pages_media_codec::decode_movie_media_flags(
-        source,
-        pages_media_codec::DecodeOptions::for_source(source),
-    )
-    .map_err(|error| {
-        Error::InvalidFormat(format!(
-            "Keynote movie {identifier} media flags projection failed: {error}"
-        ))
-    })?;
-    let placeholder_flags = raw_movie_flags(source, identifier)?;
-    Ok(if flags.is_live_video() == Some(true) {
-        MovieKind::LiveVideo
-    } else if flags.audio_only() == Some(true) {
-        MovieKind::Audio
-    } else if placeholder_flags & MOVIE_MEDIA_PLACEHOLDER_FLAG != 0 {
-        MovieKind::Placeholder
-    } else {
-        MovieKind::File
-    })
-}
-
-fn raw_movie_flags(source: &[u8], identifier: u64) -> Result<u32> {
-    let mut fields = RawWireFields::new(source);
-    let mut flags = None;
-    while let Some(field) = fields.next().map_err(|error| {
-        Error::InvalidFormat(format!(
-            "Keynote movie {identifier} flags wire projection failed: {error}"
-        ))
-    })? {
-        if !field.key_is_canonical() || !field.length_is_canonical() || !field.value_is_canonical()
-        {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote movie {identifier} has non-canonical wire framing"
-            )));
-        }
-        if field.number() != MOVIE_FLAGS_FIELD {
-            continue;
-        }
-        if flags.is_some() || field.wire_type() != 0 {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote movie {identifier} has an invalid or repeated flags field"
-            )));
-        }
-        let (value, width) = decode_varint_from_bytes(field.payload()).map_err(|error| {
-            Error::InvalidFormat(format!(
-                "Keynote movie {identifier} flags value is invalid: {error}"
-            ))
-        })?;
-        if width != field.payload().len() || width != encoded_len(value) {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote movie {identifier} flags value is not canonical"
-            )));
-        }
-        flags = Some(u32::try_from(value).map_err(|error| {
-            Error::InvalidFormat(format!(
-                "Keynote movie {identifier} flags value is out of range: {error}"
-            ))
-        })?);
-    }
-    Ok(flags.unwrap_or_default())
-}
-
-fn decode_movie_properties_payload(source: &[u8], identifier: u64) -> Result<DrawableProperties> {
-    let properties = keynote_media_properties_codec::decode_movie_properties(
-        source,
-        keynote_media_properties_codec::DecodeOptions::for_source(source),
-    )
-    .map_err(|error| {
-        Error::InvalidFormat(format!(
-            "Keynote movie {identifier} properties projection failed: {error}"
-        ))
-    })?;
-    Ok(DrawableProperties {
-        hyperlink_url: properties.hyperlink_url().map(str::to_owned),
-        locked: properties.locked(),
-        aspect_ratio_locked: properties.aspect_ratio_locked(),
-        accessibility_description: properties.accessibility_description().map(str::to_owned),
-    })
 }
 
 fn movie_info(
@@ -603,9 +402,7 @@ mod tests {
     use crate::archive::RawMessage;
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{DrawableFlipAxis, DrawablePoint};
-    use crate::wire::{
-        append_varint_field, patch_varint_field, remove_repeated_length_delimited_field_where,
-    };
+    use crate::wire::remove_repeated_length_delimited_field_where;
     use litchi_core::Position;
     use litchi_keynote::slide::audio::Options as SlideAudioOptions;
     use litchi_keynote::slide::media::geometry::MovieGeometry;
@@ -654,15 +451,30 @@ mod tests {
         *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
     }
 
+    fn add_audio(
+        editor: &mut KeynoteEditor,
+        preferred_filename: &str,
+        data: &[u8],
+        options: SlideAudioOptions,
+    ) -> KeynoteSlideAudioInfo {
+        let package = focused_movie_package(editor);
+        let commit = package
+            .add_slide_audio(SlideSelector::index(0), preferred_filename, data, options)
+            .unwrap();
+        replace_with_focused_movie_package(editor, commit.package());
+        editor.slide_audio(0).unwrap().into_iter().last().unwrap()
+    }
+
     fn remove_movie_poster(
         editor: &mut KeynoteEditor,
         drawable_object_id: u64,
         poster_data_identifier: MediaAssetId,
     ) {
-        let archive_name = editor
-            .slide_movie_graph(0, drawable_object_id)
+        let archive_name = ObjectGraph::read(editor.package())
             .unwrap()
-            .archive_name;
+            .archive_name(drawable_object_id)
+            .unwrap()
+            .to_owned();
         let mut package = editor.package().clone();
         package
             .update_archive(&archive_name, |archive| {
@@ -700,10 +512,11 @@ mod tests {
         drawable_object_id: u64,
         movie_data_identifier: MediaAssetId,
     ) {
-        let archive_name = editor
-            .slide_movie_graph(0, drawable_object_id)
+        let archive_name = ObjectGraph::read(editor.package())
             .unwrap()
-            .archive_name;
+            .archive_name(drawable_object_id)
+            .unwrap()
+            .to_owned();
         let mut package = editor.package().clone();
         package
             .update_archive(&archive_name, |archive| {
@@ -729,113 +542,6 @@ mod tests {
                 object.archive_info.message_infos[message_index]
                     .data_references
                     .retain(|identifier| *identifier != movie_data_identifier.get());
-                Ok(())
-            })
-            .unwrap();
-        let bytes = package.to_bytes().unwrap();
-        *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
-    }
-
-    fn append_movie_varint_field(
-        editor: &mut KeynoteEditor,
-        drawable_object_id: u64,
-        field_number: u32,
-        value: u64,
-    ) {
-        let archive_name = editor
-            .slide_movie_graph(0, drawable_object_id)
-            .unwrap()
-            .archive_name;
-        let mut package = editor.package().clone();
-        package
-            .update_archive(&archive_name, |archive| {
-                let object = archive.object_mut(drawable_object_id).unwrap();
-                let message_index = object
-                    .messages
-                    .iter()
-                    .position(|message| message.type_ == MOVIE_MESSAGE_TYPE)
-                    .unwrap();
-                let mut data = object.messages[message_index].data.clone();
-                append_varint_field(&mut data, field_number, value)?;
-                object.replace_message(
-                    message_index,
-                    RawMessage {
-                        type_: MOVIE_MESSAGE_TYPE,
-                        data,
-                    },
-                )?;
-                Ok(())
-            })
-            .unwrap();
-        let bytes = package.to_bytes().unwrap();
-        *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
-    }
-
-    fn replace_movie_varint_field(
-        editor: &mut KeynoteEditor,
-        drawable_object_id: u64,
-        field_number: u32,
-        value: u64,
-    ) {
-        let archive_name = editor
-            .slide_movie_graph(0, drawable_object_id)
-            .unwrap()
-            .archive_name;
-        let mut package = editor.package().clone();
-        package
-            .update_archive(&archive_name, |archive| {
-                let object = archive.object_mut(drawable_object_id).unwrap();
-                let message_index = object
-                    .messages
-                    .iter()
-                    .position(|message| message.type_ == MOVIE_MESSAGE_TYPE)
-                    .unwrap();
-                let data = patch_varint_field(
-                    &object.messages[message_index].data,
-                    field_number,
-                    true,
-                    Some(value),
-                )?;
-                object.replace_message(
-                    message_index,
-                    RawMessage {
-                        type_: MOVIE_MESSAGE_TYPE,
-                        data,
-                    },
-                )?;
-                Ok(())
-            })
-            .unwrap();
-        let bytes = package.to_bytes().unwrap();
-        *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
-    }
-
-    fn make_movie_graph_reach_slide(editor: &mut KeynoteEditor, drawable_object_id: u64) {
-        let slide_id = editor
-            .slides()
-            .unwrap()
-            .first()
-            .unwrap()
-            .native_ids()
-            .unwrap()
-            .slide
-            .get();
-        let archive_name = editor
-            .slide_movie_graph(0, drawable_object_id)
-            .unwrap()
-            .archive_name;
-        let mut package = editor.package().clone();
-        package
-            .update_archive(&archive_name, |archive| {
-                let object = archive.object_mut(drawable_object_id).unwrap();
-                let message_index = object
-                    .messages
-                    .iter()
-                    .position(|message| message.type_ == MOVIE_MESSAGE_TYPE)
-                    .unwrap();
-                object.archive_info.message_infos[message_index]
-                    .object_references
-                    .push(slide_id);
                 Ok(())
             })
             .unwrap();
@@ -938,13 +644,12 @@ mod tests {
         had_caption
     }
 
-    fn properties(description: &str) -> DrawableProperties {
-        DrawableProperties {
-            hyperlink_url: Some("https://example.test/keynote-movie".to_owned()),
-            locked: Some(true),
-            aspect_ratio_locked: Some(false),
-            accessibility_description: Some(description.to_owned()),
-        }
+    fn properties(description: &str) -> KeynoteMediaProperties {
+        KeynoteMediaProperties::new()
+            .with_hyperlink_url(Some("https://example.test/keynote-movie".to_owned()))
+            .with_locked(Some(true))
+            .with_aspect_ratio_locked(Some(false))
+            .with_accessibility_description(Some(description.to_owned()))
     }
 
     fn raw_properties(properties: &KeynoteMediaProperties) -> DrawableProperties {
@@ -956,139 +661,32 @@ mod tests {
         }
     }
 
-    fn assert_property_parity(
-        raw: &DrawableProperties,
-        focused: &KeynoteMediaProperties,
-        expected: &KeynoteMediaProperties,
-    ) {
-        assert_eq!(raw, &raw_properties(expected));
-        assert_eq!(raw.hyperlink_url.as_deref(), focused.hyperlink_url());
-        assert_eq!(raw.locked, focused.locked());
-        assert_eq!(raw.aspect_ratio_locked, focused.aspect_ratio_locked());
-        assert_eq!(
-            raw.accessibility_description.as_deref(),
-            focused.accessibility_description()
-        );
-        assert_eq!(focused, expected);
-    }
-
-    fn assert_movie_property_update_parity(
-        raw_editor: &mut KeynoteEditor,
-        focused_editor: &mut KeynoteEditor,
-        drawable_object_id: u64,
-        baseline: &KeynoteSlideMovieInfo,
-        expected: KeynoteMediaProperties,
-    ) {
-        let raw_expected = raw_properties(&expected);
-        raw_editor
-            .set_slide_movie_properties(0, drawable_object_id, raw_expected.clone())
-            .unwrap();
-
-        let package = focused_movie_package(focused_editor);
+    fn set_movie_properties(editor: &mut KeynoteEditor, properties: KeynoteMediaProperties) {
+        let package = focused_movie_package(editor);
         let commit = package
             .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
             .unwrap()
-            .set(expected.clone())
+            .set(properties)
             .unwrap()
             .commit()
             .unwrap();
-        replace_with_focused_movie_package(focused_editor, commit.package());
-
-        let raw_after = raw_editor
-            .slide_movie_properties(0, drawable_object_id)
-            .unwrap();
-        let focused_after = focused_movie_package(focused_editor)
-            .slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
-            .unwrap();
-        assert_property_parity(&raw_after, &focused_after, &expected);
-
-        let raw_movie = raw_editor
-            .slide_movies(0)
-            .unwrap()
-            .into_iter()
-            .find(|movie| movie.drawable_object_id == drawable_object_id)
-            .unwrap();
-        let focused_movie = focused_editor
-            .slide_movies(0)
-            .unwrap()
-            .into_iter()
-            .find(|movie| movie.drawable_object_id == drawable_object_id)
-            .unwrap();
-        assert_eq!(raw_movie.kind, baseline.kind);
-        assert_eq!(focused_movie.kind, baseline.kind);
-        assert_eq!(
-            raw_movie.movie_data_identifier,
-            baseline.movie_data_identifier
-        );
-        assert_eq!(
-            focused_movie.movie_data_identifier,
-            baseline.movie_data_identifier
-        );
-        assert_eq!(
-            raw_movie.poster_image_data_identifier,
-            baseline.poster_image_data_identifier
-        );
-        assert_eq!(
-            focused_movie.poster_image_data_identifier,
-            baseline.poster_image_data_identifier
-        );
-        assert_eq!(raw_movie.geometry, baseline.geometry);
-        assert_eq!(focused_movie.geometry, baseline.geometry);
-        assert_eq!(raw_movie.playback, baseline.playback);
-        assert_eq!(focused_movie.playback, baseline.playback);
-        assert_eq!(raw_movie.original_size, baseline.original_size);
-        assert_eq!(focused_movie.original_size, baseline.original_size);
-        assert_eq!(raw_movie.natural_size, baseline.natural_size);
-        assert_eq!(focused_movie.natural_size, baseline.natural_size);
-
-        let movie_data_identifier = baseline.movie_data_identifier.unwrap();
-        assert_eq!(
-            raw_editor.extract_media(movie_data_identifier).unwrap(),
-            focused_editor.extract_media(movie_data_identifier).unwrap()
-        );
-        if let Some(poster_data_identifier) = baseline.poster_image_data_identifier {
-            assert_eq!(
-                raw_editor.extract_media(poster_data_identifier).unwrap(),
-                focused_editor
-                    .extract_media(poster_data_identifier)
-                    .unwrap()
-            );
-        }
+        replace_with_focused_movie_package(editor, commit.package());
     }
 
     #[test]
-    fn source_built_movie_properties_match_raw_and_focused_updates() {
+    fn source_built_movie_properties_project_through_focused_updates() {
         let mut seed = KeynoteDocumentBuilder::new()
-            .title("Movie properties parity")
+            .title("Movie properties projection")
             .build()
             .unwrap();
-        let created = seed
-            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
+        seed.add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
             .unwrap();
-        let baseline_bytes = seed.to_bytes().unwrap();
-        let baseline_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
-        let baseline = baseline_editor.slide_movies(0).unwrap().remove(0);
-        let drawable_object_id = baseline.drawable_object_id;
-
-        let mut raw_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
-        let mut focused_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
-        let raw_before = raw_editor
-            .slide_movie_properties(0, drawable_object_id)
-            .unwrap();
-        let focused_before = focused_movie_package(&focused_editor)
+        let baseline = seed.slide_movies(0).unwrap().remove(0);
+        let mut editor = KeynoteEditor::from_bytes(&seed.to_bytes().unwrap()).unwrap();
+        let focused_before = focused_movie_package(&editor)
             .slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
             .unwrap();
-        assert_eq!(raw_before.hyperlink_url, None);
-        assert_eq!(raw_before.locked, Some(false));
-        assert_eq!(raw_before.aspect_ratio_locked, Some(true));
-        assert_eq!(raw_before.accessibility_description, None);
-        assert_property_parity(
-            &raw_before,
-            &focused_before,
-            &KeynoteMediaProperties::new()
-                .with_locked(Some(false))
-                .with_aspect_ratio_locked(Some(true)),
-        );
+        assert_eq!(baseline.properties, raw_properties(&focused_before));
 
         for expected in [
             KeynoteMediaProperties::new()
@@ -1108,20 +706,27 @@ mod tests {
                 .with_accessibility_description(Some("unlocked again".to_owned())),
             KeynoteMediaProperties::default(),
         ] {
-            assert_movie_property_update_parity(
-                &mut raw_editor,
-                &mut focused_editor,
-                drawable_object_id,
-                &baseline,
-                expected,
+            set_movie_properties(&mut editor, expected.clone());
+            let actual = editor.slide_movies(0).unwrap().remove(0);
+            assert_eq!(actual.properties, raw_properties(&expected));
+            assert_eq!(actual.kind, baseline.kind);
+            assert_eq!(actual.movie_data_identifier, baseline.movie_data_identifier);
+            assert_eq!(
+                actual.poster_image_data_identifier,
+                baseline.poster_image_data_identifier
             );
+            assert_eq!(actual.geometry, baseline.geometry);
+            assert_eq!(actual.playback, baseline.playback);
+            assert_eq!(actual.original_size, baseline.original_size);
+            assert_eq!(actual.natural_size, baseline.natural_size);
         }
 
         assert_eq!(
-            raw_editor.to_bytes().unwrap(),
-            focused_editor.to_bytes().unwrap()
+            editor
+                .extract_media(baseline.movie_data_identifier.unwrap())
+                .unwrap(),
+            MOVIE
         );
-        assert_eq!(created.kind, MovieKind::File);
     }
 
     #[test]
@@ -1140,12 +745,7 @@ mod tests {
             if info.kind != MovieKind::File {
                 continue;
             }
-            assert_eq!(
-                editor
-                    .slide_movie_properties(0, info.drawable_object_id)
-                    .unwrap(),
-                raw_properties(&focused_properties)
-            );
+            assert_eq!(info.properties, raw_properties(&focused_properties));
             file_count += 1;
         }
         assert!(file_count > 0);
@@ -1174,37 +774,20 @@ mod tests {
         assert_eq!(baseline.poster_image_data_identifier, None);
         assert!(baseline.movie_data_identifier.is_some());
 
-        let mut raw_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
-        let mut focused_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
+        let mut editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
         let expected = KeynoteMediaProperties::new()
             .with_hyperlink_url(Some("opaque target 日本語".to_owned()))
             .with_locked(Some(false))
             .with_aspect_ratio_locked(Some(true))
             .with_accessibility_description(Some("No poster 🎬".to_owned()));
-        assert_movie_property_update_parity(
-            &mut raw_editor,
-            &mut focused_editor,
-            baseline.drawable_object_id,
-            &baseline,
-            expected,
-        );
+        set_movie_properties(&mut editor, expected.clone());
 
-        let raw_after = raw_editor.slide_movies(0).unwrap().remove(0);
-        let focused_after = focused_editor.slide_movies(0).unwrap().remove(0);
-        assert_eq!(raw_after.poster_image_data_identifier, None);
-        assert_eq!(focused_after.poster_image_data_identifier, None);
-        assert_eq!(
-            raw_after.movie_data_identifier,
-            baseline.movie_data_identifier
-        );
-        assert_eq!(
-            focused_after.movie_data_identifier,
-            baseline.movie_data_identifier
-        );
-        assert_eq!(raw_after.playback, baseline.playback);
-        assert_eq!(focused_after.playback, baseline.playback);
-        assert_eq!(raw_after.geometry, baseline.geometry);
-        assert_eq!(focused_after.geometry, baseline.geometry);
+        let actual = editor.slide_movies(0).unwrap().remove(0);
+        assert_eq!(actual.poster_image_data_identifier, None);
+        assert_eq!(actual.movie_data_identifier, baseline.movie_data_identifier);
+        assert_eq!(actual.playback, baseline.playback);
+        assert_eq!(actual.geometry, baseline.geometry);
+        assert_eq!(actual.properties, raw_properties(&expected));
     }
 
     #[test]
@@ -1227,9 +810,7 @@ mod tests {
         assert_eq!(movie.kind, MovieKind::File);
         assert_eq!(movie.movie_data_identifier, None);
         assert_eq!(
-            editor
-                .slide_movie_properties(0, movie.drawable_object_id)
-                .unwrap(),
+            movie.properties,
             DrawableProperties {
                 hyperlink_url: None,
                 locked: Some(false),
@@ -1237,64 +818,28 @@ mod tests {
                 accessibility_description: None,
             }
         );
-    }
 
-    #[test]
-    fn source_built_movie_properties_accept_unknown_flags_and_reject_repeated_flags() {
-        let mut editor = KeynoteDocumentBuilder::new()
-            .title("Movie properties flags")
-            .build()
+        let focused = focused_movie_package(&editor);
+        let focused_properties = focused
+            .slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
             .unwrap();
-        let created = editor
-            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
-            .unwrap();
+        assert_eq!(movie.properties, raw_properties(&focused_properties));
 
-        // Bit 1 is currently unknown to the media-kind classifier. It must
-        // remain an ordinary file movie while the focused projection ignores
-        // the unknown flag value.
-        replace_movie_varint_field(
-            &mut editor,
-            created.drawable_object_id,
-            MOVIE_FLAGS_FIELD,
-            2,
-        );
-        assert_eq!(
-            editor
-                .slide_movie_properties(0, created.drawable_object_id)
-                .unwrap()
-                .locked,
-            Some(false)
-        );
-
-        append_movie_varint_field(
-            &mut editor,
-            created.drawable_object_id,
-            MOVIE_FLAGS_FIELD,
-            0,
-        );
-        assert!(
-            editor
-                .slide_movie_properties(0, created.drawable_object_id)
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn source_built_movie_properties_reject_a_private_graph_cycle() {
-        let mut editor = KeynoteDocumentBuilder::new()
-            .title("Movie properties graph cycle")
-            .build()
-            .unwrap();
-        let created = editor
-            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
-            .unwrap();
-        make_movie_graph_reach_slide(&mut editor, created.drawable_object_id);
-
-        assert!(
-            editor
-                .slide_movie_properties(0, created.drawable_object_id)
-                .is_err()
-        );
+        let mut before = Vec::new();
+        focused.write_to(&mut before).unwrap();
+        let rejected = focused
+            .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| {
+                edit.set(
+                    KeynoteMediaProperties::new()
+                        .with_accessibility_description(Some("missing content".to_owned())),
+                )
+            })
+            .and_then(|edit| edit.commit());
+        assert!(rejected.is_err());
+        let mut after = Vec::new();
+        focused.write_to(&mut after).unwrap();
+        assert_eq!(after, before);
     }
 
     #[test]
@@ -1388,27 +933,16 @@ mod tests {
         editor = KeynoteEditor::from_bytes(&bytes).unwrap();
 
         let changed_properties = properties("Accessible Keynote movie");
-        editor
-            .set_slide_movie_properties(0, created.drawable_object_id, changed_properties.clone())
-            .unwrap();
+        set_movie_properties(&mut editor, changed_properties.clone());
         assert_eq!(
-            editor
-                .slide_movie_properties(0, created.drawable_object_id)
-                .unwrap(),
-            changed_properties
+            editor.slide_movies(0).unwrap().first().unwrap().properties,
+            raw_properties(&changed_properties)
         );
-        editor
-            .set_slide_movie_properties(
-                0,
-                created.drawable_object_id,
-                DrawableProperties::default(),
-            )
-            .unwrap();
+        let cleared_properties = KeynoteMediaProperties::default();
+        set_movie_properties(&mut editor, cleared_properties.clone());
         assert_eq!(
-            editor
-                .slide_movie_properties(0, created.drawable_object_id)
-                .unwrap(),
-            DrawableProperties::default()
+            editor.slide_movies(0).unwrap().first().unwrap().properties,
+            raw_properties(&cleared_properties)
         );
 
         // Builder snapshots are not admitted by the focused movie-geometry
@@ -1470,9 +1004,7 @@ mod tests {
         );
 
         let duplicate_properties = properties("Duplicated Keynote movie");
-        editor
-            .set_slide_movie_properties(0, created.drawable_object_id, duplicate_properties.clone())
-            .unwrap();
+        set_movie_properties(&mut editor, duplicate_properties.clone());
 
         let duplicate = duplicate_movie(&mut editor, MovieSelector::index(0));
         assert_eq!(
@@ -1493,7 +1025,7 @@ mod tests {
         assert_eq!(duplicate.geometry.size, source_geometry.size);
         assert_eq!(duplicate.geometry.flags, source_geometry.flags);
         assert_eq!(duplicate.geometry.angle, source_geometry.angle);
-        assert_eq!(duplicate.properties, duplicate_properties);
+        assert_eq!(duplicate.properties, raw_properties(&duplicate_properties));
         let removed_original = remove_movie(&mut editor, MovieSelector::index(0));
         assert!(removed_original.is_empty());
         let removed_duplicate = remove_movie(&mut editor, MovieSelector::index(0));
@@ -1575,14 +1107,12 @@ mod tests {
             .title("Movie caption selector order")
             .build()
             .unwrap();
-        let audio = editor
-            .add_slide_audio(
-                0,
-                "audio.aiff",
-                AUDIO,
-                SlideAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap(),
-            )
-            .unwrap();
+        let audio = add_audio(
+            &mut editor,
+            "audio.aiff",
+            AUDIO,
+            SlideAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap(),
+        );
         let movie = editor
             .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
             .unwrap();

@@ -2,7 +2,6 @@
 
 use super::*;
 use litchi_iwa_protos::keynote_media_creation_codec;
-use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
@@ -57,22 +56,6 @@ pub(in crate::keynote::editor) fn movie_creation_values(
     let geometry = DrawableGeometry {
         position: Some(options.position()),
         size: Some(options.size()),
-        flags: Some(DEFAULT_DRAWABLE_FLAGS),
-        angle: Some(DEFAULT_MOVIE_ROTATION_DEGREES),
-    }
-    .validate()?;
-    Ok((geometry, options.duration_seconds()))
-}
-
-pub(in crate::keynote::editor) fn audio_creation_values(
-    options: SlideAudioOptions,
-) -> Result<(DrawableGeometry, f32)> {
-    let geometry = DrawableGeometry {
-        position: Some(options.position()),
-        size: Some(DrawableSize {
-            width: 0.0,
-            height: 0.0,
-        }),
         flags: Some(DEFAULT_DRAWABLE_FLAGS),
         angle: Some(DEFAULT_MOVIE_ROTATION_DEGREES),
     }
@@ -157,39 +140,9 @@ pub(in crate::keynote::editor) fn movie_objects(
         movie_data_identifier,
         geometry,
         duration_seconds,
-        MediaPayload::Movie {
-            poster_data_identifier,
-            natural_size,
-        },
+        poster_data_identifier,
+        natural_size,
     )
-}
-
-pub(in crate::keynote::editor) fn audio_objects(
-    ids: MovieObjectIds,
-    slide_id: u64,
-    style_id: u64,
-    audio_data_identifier: u64,
-    geometry: DrawableGeometry,
-    duration_seconds: f32,
-) -> Result<[ArchiveObject; 3]> {
-    media_objects(
-        ids,
-        slide_id,
-        style_id,
-        audio_data_identifier,
-        geometry,
-        duration_seconds,
-        MediaPayload::Audio,
-    )
-}
-
-#[derive(Debug, Clone, Copy)]
-enum MediaPayload {
-    Movie {
-        poster_data_identifier: u64,
-        natural_size: DrawableSize,
-    },
-    Audio,
 }
 
 fn media_objects(
@@ -199,7 +152,8 @@ fn media_objects(
     data_identifier: u64,
     geometry: DrawableGeometry,
     duration_seconds: f32,
-    payload: MediaPayload,
+    poster_data_identifier: u64,
+    natural_size: DrawableSize,
 ) -> Result<[ArchiveObject; 3]> {
     let position = geometry.position.ok_or_else(|| {
         Error::InvalidFormat("validated Keynote movie geometry has no position".to_owned())
@@ -213,38 +167,19 @@ fn media_objects(
         geometry.flags,
         geometry.angle,
     );
-    let (write, data_references) = match payload {
-        MediaPayload::Movie {
-            poster_data_identifier,
-            natural_size,
-        } => (
-            keynote_media_creation_codec::MediaArchiveWrite::movie(
-                slide_id,
-                style_id,
-                ids.title,
-                ids.caption,
-                data_identifier,
-                Some(poster_data_identifier),
-                geometry,
-                duration_seconds,
-                keynote_media_creation_codec::Size::new(natural_size.width, natural_size.height),
-                true,
-            ),
-            vec![poster_data_identifier, data_identifier],
-        ),
-        MediaPayload::Audio => (
-            keynote_media_creation_codec::MediaArchiveWrite::audio(
-                slide_id,
-                style_id,
-                ids.title,
-                ids.caption,
-                data_identifier,
-                geometry,
-                duration_seconds,
-            ),
-            vec![data_identifier],
-        ),
-    };
+    let write = keynote_media_creation_codec::MediaArchiveWrite::movie(
+        slide_id,
+        style_id,
+        ids.title,
+        ids.caption,
+        data_identifier,
+        Some(poster_data_identifier),
+        geometry,
+        duration_seconds,
+        keynote_media_creation_codec::Size::new(natural_size.width, natural_size.height),
+        true,
+    );
+    let data_references = vec![poster_data_identifier, data_identifier];
     let movie = keynote_media_creation_codec::encode_media_archive(
         &write,
         keynote_media_creation_codec::EncodeOptions::for_write(&write),

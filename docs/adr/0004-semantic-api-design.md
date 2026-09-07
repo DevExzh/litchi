@@ -229,6 +229,12 @@ the native finite `f32`-seconds domain. `litchi-iwa` retains
 `KeynoteSlideMovieInfo`, graph-aware CRUD, native media identifiers, and the
 mapping from native movie flags to this product value.
 
+Keynote media properties use `Package::{slide_media_properties,
+edit_slide_media_properties,apply_slide_media_properties}` with semantic slide
+and source-order media selectors. Audio and file movies share this selector
+space. Native save/close/reopen fixtures prove property retention for both
+kinds; the raw-ID host property methods and writer are retired.
+
 Keynote slide-audio creation uses the focused
 `litchi_keynote::slide::audio::Options` value. The fields are private, and
 construction validates finite placement plus a positive duration that fits
@@ -238,7 +244,8 @@ slide selector, preferred filename, borrowed audio bytes, and these options.
 Its commit exposes the candidate package, typed diagnostics, and an exact
 creation patch with inverse/replay support. Native identities and zero-size
 control geometry remain private to the focused package owner. The migration
-host's raw creation and info/removal values remain pending native acceptance. Shared
+host's raw audio-creation method is retired after native acceptance; its audio
+listing values remain separate migration work. Shared
 `MediaPlaybackSettings` optional fields, loop discriminants, and volume
 validation remain format-neutral IWA playback semantics until their own
 cross-format extraction.

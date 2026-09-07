@@ -1,7 +1,8 @@
 //! Compatibility coverage for the focused Keynote slide-audio position owner.
 //!
-//! Source-built host observations verify the focused package transaction
-//! through mixed source-order selectors after retirement of the raw setters.
+//! Focused package creation plus source-built host observations verify the
+//! selector transaction through mixed source-order media after raw creation
+//! and property APIs were retired.
 
 use std::{env, error::Error, fs, io, path::PathBuf, time::Duration};
 
@@ -80,6 +81,20 @@ fn package_bytes(package: &Package) -> TestResult<Vec<u8>> {
     Ok(bytes)
 }
 
+fn add_audio(
+    editor: &mut KeynoteEditor,
+    preferred_filename: &str,
+    data: &[u8],
+    options: SlideAudioOptions,
+) -> TestResult {
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit =
+        package.add_slide_audio(SlideSelector::index(0), preferred_filename, data, options)?;
+    let bytes = package_bytes(commit.package())?;
+    *editor = KeynoteEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
 fn source_fixture() -> TestResult<SourceFixture> {
     let mut editor = KeynoteDocumentBuilder::new()
         .title("Focused audio position")
@@ -100,8 +115,8 @@ fn source_fixture() -> TestResult<SourceFixture> {
             Duration::from_secs(8),
         ),
     )?;
-    editor.add_slide_audio(
-        0,
+    add_audio(
+        &mut editor,
         "position-audio-a.aiff",
         AUDIO_A,
         audio_options(HostPoint { x: 960.0, y: 540.0 }, Duration::from_secs(12)),
@@ -121,8 +136,8 @@ fn source_fixture() -> TestResult<SourceFixture> {
             Duration::from_secs(5),
         ),
     )?;
-    editor.add_slide_audio(
-        0,
+    add_audio(
+        &mut editor,
         "position-audio-b.aiff",
         AUDIO_B,
         audio_options(HostPoint { x: 240.0, y: 300.0 }, Duration::from_secs(7)),

@@ -889,6 +889,7 @@ impl KeynoteBuildSettings {
     }
 
     /// Native playback trigger attached to a newly inserted audio clip.
+    #[cfg(test)]
     pub(crate) fn audio_start() -> Self {
         Self {
             effect: "apple:audio-start".to_owned(),
