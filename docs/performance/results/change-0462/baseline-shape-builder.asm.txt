@@ -1,0 +1,920 @@
+
+/tmp/litchi-goal-0462/baseline/litchi-perf-baseline:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000001845a20 <<litchi_odp::codec::parser::codec::Parser>::shape_builder>:
+ 1845a20:	push   %rbp
+ 1845a21:	push   %r15
+ 1845a23:	push   %r14
+ 1845a25:	push   %r13
+ 1845a27:	push   %r12
+ 1845a29:	push   %rbx
+ 1845a2a:	sub    $0x578,%rsp
+ 1845a31:	mov    %ecx,%ebp
+ 1845a33:	mov    %rsi,%r12
+ 1845a36:	mov    %rdi,%rbx
+ 1845a39:	movq   $0x0,0x2f0(%rsp)
+ 1845a45:	movq   $0x8,0x2f8(%rsp)
+ 1845a51:	xorps  %xmm0,%xmm0
+ 1845a54:	movups %xmm0,0x300(%rsp)
+ 1845a5c:	movq   $0x8,0x310(%rsp)
+ 1845a68:	movups %xmm0,0x318(%rsp)
+ 1845a70:	movq   $0xffffffffffffffff,0x350(%rsp)
+ 1845a7c:	movq   $0x1,0x328(%rsp)
+ 1845a88:	movq   $0x0,0x330(%rsp)
+ 1845a94:	movq   $0xffffffffffffffff,0x380(%rsp)
+ 1845aa0:	movq   $0xffffffffffffffff,0x398(%rsp)
+ 1845aac:	movq   $0xffffffffffffffff,0x3b0(%rsp)
+ 1845ab8:	movq   $0xffffffffffffffff,0x3c8(%rsp)
+ 1845ac4:	movq   $0xffffffffffffffff,0x3e0(%rsp)
+ 1845ad0:	movq   $0xffffffffffffffff,0x3f8(%rsp)
+ 1845adc:	movq   $0xffffffffffffffff,0x410(%rsp)
+ 1845ae8:	movq   $0xffffffffffffffff,0x428(%rsp)
+ 1845af4:	movq   $0xffffffffffffffff,0x440(%rsp)
+ 1845b00:	movq   $0xffffffffffffffff,0x458(%rsp)
+ 1845b0c:	movl   $0xff020202,0x574(%rsp)
+ 1845b17:	movq   $0xffffffffffffffff,0x470(%rsp)
+ 1845b23:	movq   $0xffffffffffffffff,0x488(%rsp)
+ 1845b2f:	movq   $0xffffffffffffffff,0x4f0(%rsp)
+ 1845b3b:	movq   $0x0,0x338(%rsp)
+ 1845b47:	movq   $0x8,0x340(%rsp)
+ 1845b53:	movq   $0x0,0x348(%rsp)
+ 1845b5f:	movl   $0x0,0x570(%rsp)
+ 1845b6a:	movups 0x8(%rdx),%xmm1
+ 1845b6e:	mov    0x18(%rdx),%rax
+ 1845b72:	movq   $0x1,0x1e0(%rsp)
+ 1845b7e:	mov    %rax,0x1e8(%rsp)
+ 1845b86:	movq   $0x0,0x1f0(%rsp)
+ 1845b92:	movq   $0x8,0x1f8(%rsp)
+ 1845b9e:	movw   $0x100,0x228(%rsp)
+ 1845ba8:	movups %xmm0,0x200(%rsp)
+ 1845bb0:	movups %xmm1,0x230(%rsp)
+ 1845bb8:	movq   $0x0,0x240(%rsp)
+ 1845bc4:	movq   $0x8,0x248(%rsp)
+ 1845bd0:	movq   $0x0,0x250(%rsp)
+ 1845bdc:	movq   $0xffffffffffffffff,0x258(%rsp)
+ 1845be8:	movq   $0x5,(%rsp)
+ 1845bf0:	lea    -0x14dbb8e(%rip),%rcx        # 36a069 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x2e5e>
+ 1845bf7:	lea    -0x14db49a(%rip),%r9        # 36a764 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3559>
+ 1845bfe:	lea    0x8(%rsp),%rdi
+ 1845c03:	lea    0x1e0(%rsp),%rsi
+ 1845c0b:	mov    $0x36,%r8d
+ 1845c11:	mov    %r12,%rdx
+ 1845c14:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 1845c19:	mov    0x8(%rsp),%rax
+ 1845c1e:	mov    0x10(%rsp),%r14
+ 1845c23:	mov    0x18(%rsp),%r13
+ 1845c28:	mov    0x20(%rsp),%rcx
+ 1845c2d:	cmp    $0xffffffffffffffff,%rax
+ 1845c31:	je     1845c58 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x238>
+ 1845c33:	movups 0x28(%rsp),%xmm0
+ 1845c38:	movups %xmm0,0x28(%rbx)
+ 1845c3c:	mov    %r14,0x10(%rbx)
+ 1845c40:	mov    %r13,0x18(%rbx)
+ 1845c44:	mov    %rcx,0x20(%rbx)
+ 1845c48:	mov    %rax,0x8(%rbx)
+ 1845c4c:	movq   $0xffffffffffffffff,(%rbx)
+ 1845c53:	jmp    1846368 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x948>
+ 1845c58:	movzbl %bpl,%r15d
+ 1845c5c:	test   %r15b,%r15b
+ 1845c5f:	sete   0x571(%rsp)
+ 1845c67:	lea    -0x14db006(%rip),%rax        # 36ac68 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3a5d>
+ 1845c6e:	movzbl (%r15,%rax,1),%eax
+ 1845c73:	mov    %al,0x3f(%rsp)
+ 1845c77:	mov    %al,0x577(%rsp)
+ 1845c7e:	cmp    $0xffffffffffffffff,%r14
+ 1845c82:	setne  %al
+ 1845c85:	mov    %rcx,0x1a8(%rsp)
+ 1845c8d:	cmp    $0x5,%rcx
+ 1845c91:	sete   %cl
+ 1845c94:	test   %cl,%al
+ 1845c96:	je     1845cc7 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x2a7>
+ 1845c98:	mov    $0x6c746974,%eax
+ 1845c9d:	xor    0x0(%r13),%eax
+ 1845ca1:	movzbl 0x4(%r13),%ecx
+ 1845ca6:	xor    $0x65,%ecx
+ 1845ca9:	or     %eax,%ecx
+ 1845cab:	sete   %al
+ 1845cae:	mov    %al,0x572(%rsp)
+ 1845cb5:	mov    $0x2,%al
+ 1845cb7:	lea    -0x14dc702(%rip),%rcx        # 3695bc <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x23b1>
+ 1845cbe:	movslq (%rcx,%r15,4),%rdx
+ 1845cc2:	add    %rcx,%rdx
+ 1845cc5:	jmp    *%rdx
+ 1845cc7:	xor    %eax,%eax
+ 1845cc9:	mov    %al,0x572(%rsp)
+ 1845cd0:	mov    $0x2,%al
+ 1845cd2:	lea    -0x14dc71d(%rip),%rcx        # 3695bc <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x23b1>
+ 1845cd9:	movslq (%rcx,%r15,4),%rdx
+ 1845cdd:	add    %rcx,%rdx
+ 1845ce0:	jmp    *%rdx
+ 1845ce2:	mov    %al,0x576(%rsp)
+ 1845ce9:	movq   $0x4,(%rsp)
+ 1845cf1:	lea    -0x14dc5c2(%rip),%rcx        # 369736 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x252b>
+ 1845cf8:	lea    -0x1757383(%rip),%r9        # ee97c <anon.00d8f1b0e338825a23746b97ebb8b1dd.367.llvm.8934466594660332504>
+ 1845cff:	lea    0x8(%rsp),%rdi
+ 1845d04:	lea    0x1e0(%rsp),%rsi
+ 1845d0c:	mov    $0x31,%r8d
+ 1845d12:	mov    %r12,%rdx
+ 1845d15:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 1845d1a:	mov    0x8(%rsp),%rax
+ 1845d1f:	movups 0x10(%rsp),%xmm0
+ 1845d24:	movaps %xmm0,0x50(%rsp)
+ 1845d29:	mov    0x20(%rsp),%rcx
+ 1845d2e:	mov    %rcx,0x60(%rsp)
+ 1845d33:	cmp    $0xffffffffffffffff,%rax
+ 1845d37:	je     1845d55 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x335>
+ 1845d39:	movups 0x28(%rsp),%xmm0
+ 1845d3e:	movups %xmm0,0x28(%rbx)
+ 1845d42:	mov    0x60(%rsp),%rcx
+ 1845d47:	mov    %rcx,0x20(%rbx)
+ 1845d4b:	movaps 0x50(%rsp),%xmm0
+ 1845d50:	jmp    184633e <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x91e>
+ 1845d55:	mov    %r13,0x40(%rsp)
+ 1845d5a:	lea    0x380(%rsp),%r13
+ 1845d62:	mov    0x380(%rsp),%rsi
+ 1845d6a:	cmp    $0xffffffffffffffff,%rsi
+ 1845d6e:	je     1845d88 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x368>
+ 1845d70:	test   %rsi,%rsi
+ 1845d73:	je     1845d88 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x368>
+ 1845d75:	mov    0x388(%rsp),%rdi
+ 1845d7d:	mov    $0x1,%edx
+ 1845d82:	call   *0x14af308(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1845d88:	mov    0x60(%rsp),%rax
+ 1845d8d:	mov    %rax,0x10(%r13)
+ 1845d91:	movaps 0x50(%rsp),%xmm0
+ 1845d96:	movups %xmm0,0x0(%r13)
+ 1845d9b:	cmp    $0xd,%bpl
+ 1845d9f:	ja     1845ee9 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x4c9>
+ 1845da5:	mov    $0x2808,%eax
+ 1845daa:	bt     %r15d,%eax
+ 1845dae:	jae    1845ee9 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x4c9>
+ 1845db4:	movq   $0x2,(%rsp)
+ 1845dbc:	lea    -0x14dbb83(%rip),%rcx        # 36a240 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3035>
+ 1845dc3:	lea    -0x14db65c(%rip),%r9        # 36a76e <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3563>
+ 1845dca:	lea    0x8(%rsp),%rdi
+ 1845dcf:	lea    0x1e0(%rsp),%rsi
+ 1845dd7:	mov    $0x38,%r8d
+ 1845ddd:	mov    %r12,%rdx
+ 1845de0:	mov    0x40(%rsp),%r13
+ 1845de5:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 1845dea:	mov    0x8(%rsp),%rax
+ 1845def:	movups 0x10(%rsp),%xmm0
+ 1845df4:	movaps %xmm0,0x70(%rsp)
+ 1845df9:	mov    0x20(%rsp),%rcx
+ 1845dfe:	mov    %rcx,0x80(%rsp)
+ 1845e06:	cmp    $0xffffffffffffffff,%rax
+ 1845e0a:	je     1845e2b <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x40b>
+ 1845e0c:	movups 0x28(%rsp),%xmm0
+ 1845e11:	movups %xmm0,0x28(%rbx)
+ 1845e15:	mov    0x80(%rsp),%rcx
+ 1845e1d:	mov    %rcx,0x20(%rbx)
+ 1845e21:	movaps 0x70(%rsp),%xmm0
+ 1845e26:	jmp    184633e <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x91e>
+ 1845e2b:	mov    0x398(%rsp),%rsi
+ 1845e33:	cmp    $0xffffffffffffffff,%rsi
+ 1845e37:	je     1845e51 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x431>
+ 1845e39:	test   %rsi,%rsi
+ 1845e3c:	je     1845e51 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x431>
+ 1845e3e:	mov    0x3a0(%rsp),%rdi
+ 1845e46:	mov    $0x1,%edx
+ 1845e4b:	call   *0x14af23f(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1845e51:	mov    0x80(%rsp),%rax
+ 1845e59:	lea    0x398(%rsp),%rcx
+ 1845e61:	mov    %rax,0x10(%rcx)
+ 1845e65:	movaps 0x70(%rsp),%xmm0
+ 1845e6a:	movups %xmm0,(%rcx)
+ 1845e6d:	movq   $0x2,(%rsp)
+ 1845e75:	lea    -0x14dbc3c(%rip),%rcx        # 36a240 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3035>
+ 1845e7c:	lea    -0x14db713(%rip),%r9        # 36a770 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3565>
+ 1845e83:	lea    0x8(%rsp),%rdi
+ 1845e88:	lea    0x1e0(%rsp),%rsi
+ 1845e90:	mov    $0x38,%r8d
+ 1845e96:	mov    %r12,%rdx
+ 1845e99:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 1845e9e:	mov    0x8(%rsp),%rax
+ 1845ea3:	movups 0x10(%rsp),%xmm0
+ 1845ea8:	movaps %xmm0,0x90(%rsp)
+ 1845eb0:	mov    0x20(%rsp),%rcx
+ 1845eb5:	mov    %rcx,0xa0(%rsp)
+ 1845ebd:	cmp    $0xffffffffffffffff,%rax
+ 1845ec1:	je     1845f8b <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x56b>
+ 1845ec7:	movups 0x28(%rsp),%xmm0
+ 1845ecc:	movups %xmm0,0x28(%rbx)
+ 1845ed0:	mov    0xa0(%rsp),%rcx
+ 1845ed8:	mov    %rcx,0x20(%rbx)
+ 1845edc:	movaps 0x90(%rsp),%xmm0
+ 1845ee4:	jmp    184633e <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x91e>
+ 1845ee9:	movq   $0x1,(%rsp)
+ 1845ef1:	lea    -0x14dbcb8(%rip),%rcx        # 36a240 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3035>
+ 1845ef8:	lea    -0x14db789(%rip),%r9        # 36a776 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x356b>
+ 1845eff:	lea    0x8(%rsp),%rdi
+ 1845f04:	lea    0x1e0(%rsp),%rsi
+ 1845f0c:	mov    $0x38,%r8d
+ 1845f12:	mov    %r12,%rdx
+ 1845f15:	mov    0x40(%rsp),%r13
+ 1845f1a:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 1845f1f:	mov    0x8(%rsp),%rax
+ 1845f24:	movups 0x10(%rsp),%xmm0
+ 1845f29:	movaps %xmm0,0xd0(%rsp)
+ 1845f31:	mov    0x20(%rsp),%rcx
+ 1845f36:	mov    %rcx,0xe0(%rsp)
+ 1845f3e:	cmp    $0xffffffffffffffff,%rax
+ 1845f42:	je     1846047 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x627>
+ 1845f48:	movups 0x28(%rsp),%xmm0
+ 1845f4d:	movups %xmm0,0x28(%rbx)
+ 1845f51:	mov    0xe0(%rsp),%rcx
+ 1845f59:	mov    %rcx,0x20(%rbx)
+ 1845f5d:	movaps 0xd0(%rsp),%xmm0
+ 1845f65:	jmp    184633e <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x91e>
+ 1845f6a:	mov    $0x4,%al
+ 1845f6c:	jmp    1845ce2 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x2c2>
+ 1845f71:	mov    $0x5,%al
+ 1845f73:	jmp    1845ce2 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x2c2>
+ 1845f78:	mov    $0x6,%al
+ 1845f7a:	jmp    1845ce2 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x2c2>
+ 1845f7f:	cmp    $0xffffffffffffffff,%r14
+ 1845f83:	setne  %al
+ 1845f86:	jmp    1845ce2 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x2c2>
+ 1845f8b:	mov    0x3b0(%rsp),%rsi
+ 1845f93:	test   %rsi,%rsi
+ 1845f96:	jle    1845fab <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x58b>
+ 1845f98:	mov    0x3b8(%rsp),%rdi
+ 1845fa0:	mov    $0x1,%edx
+ 1845fa5:	call   *0x14af0e5(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1845fab:	mov    0xa0(%rsp),%rax
+ 1845fb3:	lea    0x398(%rsp),%rcx
+ 1845fbb:	mov    %rax,0x28(%rcx)
+ 1845fbf:	movaps 0x90(%rsp),%xmm0
+ 1845fc7:	movups %xmm0,0x18(%rcx)
+ 1845fcb:	movq   $0x2,(%rsp)
+ 1845fd3:	lea    -0x14dbd9a(%rip),%rcx        # 36a240 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3035>
+ 1845fda:	lea    -0x14db86f(%rip),%r9        # 36a772 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3567>
+ 1845fe1:	lea    0x8(%rsp),%rdi
+ 1845fe6:	lea    0x1e0(%rsp),%rsi
+ 1845fee:	mov    $0x38,%r8d
+ 1845ff4:	mov    %r12,%rdx
+ 1845ff7:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 1845ffc:	mov    0x8(%rsp),%rax
+ 1846001:	movups 0x10(%rsp),%xmm0
+ 1846006:	movaps %xmm0,0xb0(%rsp)
+ 184600e:	mov    0x20(%rsp),%rcx
+ 1846013:	mov    %rcx,0xc0(%rsp)
+ 184601b:	cmp    $0xffffffffffffffff,%rax
+ 184601f:	je     1846102 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x6e2>
+ 1846025:	movups 0x28(%rsp),%xmm0
+ 184602a:	movups %xmm0,0x28(%rbx)
+ 184602e:	mov    0xc0(%rsp),%rcx
+ 1846036:	mov    %rcx,0x20(%rbx)
+ 184603a:	movaps 0xb0(%rsp),%xmm0
+ 1846042:	jmp    184633e <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x91e>
+ 1846047:	mov    0x398(%rsp),%rsi
+ 184604f:	test   %rsi,%rsi
+ 1846052:	jle    1846067 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x647>
+ 1846054:	mov    0x3a0(%rsp),%rdi
+ 184605c:	mov    $0x1,%edx
+ 1846061:	call   *0x14af029(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846067:	mov    0xe0(%rsp),%rax
+ 184606f:	lea    0x398(%rsp),%rcx
+ 1846077:	mov    %rax,0x10(%rcx)
+ 184607b:	movaps 0xd0(%rsp),%xmm0
+ 1846083:	movups %xmm0,(%rcx)
+ 1846086:	movq   $0x1,(%rsp)
+ 184608e:	lea    -0x14dbe55(%rip),%rcx        # 36a240 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3035>
+ 1846095:	lea    -0x14db925(%rip),%r9        # 36a777 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x356c>
+ 184609c:	lea    0x8(%rsp),%rdi
+ 18460a1:	lea    0x1e0(%rsp),%rsi
+ 18460a9:	mov    $0x38,%r8d
+ 18460af:	mov    %r12,%rdx
+ 18460b2:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 18460b7:	mov    0x8(%rsp),%rax
+ 18460bc:	movups 0x10(%rsp),%xmm0
+ 18460c1:	movaps %xmm0,0xf0(%rsp)
+ 18460c9:	mov    0x20(%rsp),%rcx
+ 18460ce:	mov    %rcx,0x100(%rsp)
+ 18460d6:	cmp    $0xffffffffffffffff,%rax
+ 18460da:	je     18461be <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x79e>
+ 18460e0:	movups 0x28(%rsp),%xmm0
+ 18460e5:	movups %xmm0,0x28(%rbx)
+ 18460e9:	mov    0x100(%rsp),%rcx
+ 18460f1:	mov    %rcx,0x20(%rbx)
+ 18460f5:	movaps 0xf0(%rsp),%xmm0
+ 18460fd:	jmp    184633e <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x91e>
+ 1846102:	mov    0x3c8(%rsp),%rsi
+ 184610a:	test   %rsi,%rsi
+ 184610d:	jle    1846122 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x702>
+ 184610f:	mov    0x3d0(%rsp),%rdi
+ 1846117:	mov    $0x1,%edx
+ 184611c:	call   *0x14aef6e(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846122:	mov    0xc0(%rsp),%rax
+ 184612a:	lea    0x398(%rsp),%rcx
+ 1846132:	mov    %rax,0x40(%rcx)
+ 1846136:	movaps 0xb0(%rsp),%xmm0
+ 184613e:	movups %xmm0,0x30(%rcx)
+ 1846142:	movq   $0x2,(%rsp)
+ 184614a:	lea    -0x14dbf11(%rip),%rcx        # 36a240 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3035>
+ 1846151:	lea    -0x14db9e4(%rip),%r9        # 36a774 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3569>
+ 1846158:	lea    0x8(%rsp),%rdi
+ 184615d:	lea    0x1e0(%rsp),%rsi
+ 1846165:	mov    $0x38,%r8d
+ 184616b:	mov    %r12,%rdx
+ 184616e:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 1846173:	mov    0x8(%rsp),%rax
+ 1846178:	movups 0x10(%rsp),%xmm0
+ 184617d:	movaps %xmm0,0x270(%rsp)
+ 1846185:	mov    0x20(%rsp),%rcx
+ 184618a:	mov    %rcx,0x280(%rsp)
+ 1846192:	cmp    $0xffffffffffffffff,%rax
+ 1846196:	je     1846276 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x856>
+ 184619c:	movups 0x28(%rsp),%xmm0
+ 18461a1:	movups %xmm0,0x28(%rbx)
+ 18461a5:	mov    0x280(%rsp),%rcx
+ 18461ad:	mov    %rcx,0x20(%rbx)
+ 18461b1:	movaps 0x270(%rsp),%xmm0
+ 18461b9:	jmp    184633e <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x91e>
+ 18461be:	mov    0x3b0(%rsp),%rsi
+ 18461c6:	test   %rsi,%rsi
+ 18461c9:	jle    18461de <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x7be>
+ 18461cb:	mov    0x3b8(%rsp),%rdi
+ 18461d3:	mov    $0x1,%edx
+ 18461d8:	call   *0x14aeeb2(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18461de:	mov    0x100(%rsp),%rax
+ 18461e6:	lea    0x398(%rsp),%rcx
+ 18461ee:	mov    %rax,0x28(%rcx)
+ 18461f2:	movaps 0xf0(%rsp),%xmm0
+ 18461fa:	movups %xmm0,0x18(%rcx)
+ 18461fe:	movq   $0x5,(%rsp)
+ 1846206:	lea    -0x14dbfcd(%rip),%rcx        # 36a240 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3035>
+ 184620d:	lea    -0x14dba9c(%rip),%r9        # 36a778 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x356d>
+ 1846214:	lea    0x8(%rsp),%rdi
+ 1846219:	lea    0x1e0(%rsp),%rsi
+ 1846221:	mov    $0x38,%r8d
+ 1846227:	mov    %r12,%rdx
+ 184622a:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 184622f:	mov    0x8(%rsp),%rax
+ 1846234:	movups 0x10(%rsp),%xmm0
+ 1846239:	movaps %xmm0,0x110(%rsp)
+ 1846241:	mov    0x20(%rsp),%rcx
+ 1846246:	mov    %rcx,0x120(%rsp)
+ 184624e:	cmp    $0xffffffffffffffff,%rax
+ 1846252:	je     184628b <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x86b>
+ 1846254:	movups 0x28(%rsp),%xmm0
+ 1846259:	movups %xmm0,0x28(%rbx)
+ 184625d:	mov    0x120(%rsp),%rcx
+ 1846265:	mov    %rcx,0x20(%rbx)
+ 1846269:	movaps 0x110(%rsp),%xmm0
+ 1846271:	jmp    184633e <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x91e>
+ 1846276:	mov    0x3e0(%rsp),%rsi
+ 184627e:	lea    0x270(%rsp),%r15
+ 1846286:	jmp    18463a4 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x984>
+ 184628b:	mov    0x3c8(%rsp),%rsi
+ 1846293:	test   %rsi,%rsi
+ 1846296:	jle    18462ab <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x88b>
+ 1846298:	mov    0x3d0(%rsp),%rdi
+ 18462a0:	mov    $0x1,%edx
+ 18462a5:	call   *0x14aede5(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18462ab:	mov    0x120(%rsp),%rax
+ 18462b3:	lea    0x398(%rsp),%rcx
+ 18462bb:	mov    %rax,0x40(%rcx)
+ 18462bf:	movaps 0x110(%rsp),%xmm0
+ 18462c7:	movups %xmm0,0x30(%rcx)
+ 18462cb:	movq   $0x6,(%rsp)
+ 18462d3:	lea    -0x14dc09a(%rip),%rcx        # 36a240 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3035>
+ 18462da:	lea    -0x14dbb64(%rip),%r9        # 36a77d <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3572>
+ 18462e1:	lea    0x8(%rsp),%rdi
+ 18462e6:	lea    0x1e0(%rsp),%rsi
+ 18462ee:	mov    $0x38,%r8d
+ 18462f4:	mov    %r12,%rdx
+ 18462f7:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 18462fc:	mov    0x8(%rsp),%rax
+ 1846301:	movups 0x10(%rsp),%xmm0
+ 1846306:	movaps %xmm0,0x290(%rsp)
+ 184630e:	mov    0x20(%rsp),%rcx
+ 1846313:	mov    %rcx,0x2a0(%rsp)
+ 184631b:	cmp    $0xffffffffffffffff,%rax
+ 184631f:	je     1846394 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x974>
+ 1846321:	movups 0x28(%rsp),%xmm0
+ 1846326:	movups %xmm0,0x28(%rbx)
+ 184632a:	mov    0x2a0(%rsp),%rcx
+ 1846332:	mov    %rcx,0x20(%rbx)
+ 1846336:	movaps 0x290(%rsp),%xmm0
+ 184633e:	movups %xmm0,0x10(%rbx)
+ 1846342:	mov    %rax,0x8(%rbx)
+ 1846346:	movq   $0xffffffffffffffff,(%rbx)
+ 184634d:	lea    -0x1(%r14),%rax
+ 1846351:	cmp    $0xfffffffffffffffd,%rax
+ 1846355:	ja     1846368 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x948>
+ 1846357:	mov    $0x1,%edx
+ 184635c:	mov    %r13,%rdi
+ 184635f:	mov    %r14,%rsi
+ 1846362:	call   *0x14aed28(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846368:	lea    0x1e0(%rsp),%rdi
+ 1846370:	call   1829650 <core::ptr::drop_glue::<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>>
+ 1846375:	lea    0x2f0(%rsp),%rdi
+ 184637d:	call   1828940 <core::ptr::drop_glue::<litchi_odp::model::slide::Shape>>
+ 1846382:	add    $0x578,%rsp
+ 1846389:	pop    %rbx
+ 184638a:	pop    %r12
+ 184638c:	pop    %r13
+ 184638e:	pop    %r14
+ 1846390:	pop    %r15
+ 1846392:	pop    %rbp
+ 1846393:	ret
+ 1846394:	mov    0x3e0(%rsp),%rsi
+ 184639c:	lea    0x290(%rsp),%r15
+ 18463a4:	test   %rsi,%rsi
+ 18463a7:	jle    18463bc <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x99c>
+ 18463a9:	mov    0x3e8(%rsp),%rdi
+ 18463b1:	mov    $0x1,%edx
+ 18463b6:	call   *0x14aecd4(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18463bc:	lea    0x3e0(%rsp),%rax
+ 18463c4:	mov    0x10(%r15),%rcx
+ 18463c8:	mov    %rcx,0x10(%rax)
+ 18463cc:	movups (%r15),%xmm0
+ 18463d0:	movups %xmm0,(%rax)
+ 18463d3:	movq   $0xa,(%rsp)
+ 18463db:	lea    -0x14dccac(%rip),%rcx        # 369736 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x252b>
+ 18463e2:	lea    -0x14dccbd(%rip),%r9        # 36972c <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x2521>
+ 18463e9:	lea    0x8(%rsp),%rdi
+ 18463ee:	lea    0x1e0(%rsp),%rsi
+ 18463f6:	mov    $0x31,%r8d
+ 18463fc:	mov    %r12,%rdx
+ 18463ff:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 1846404:	mov    0x8(%rsp),%rax
+ 1846409:	mov    0x10(%rsp),%rbp
+ 184640e:	mov    0x18(%rsp),%rcx
+ 1846413:	mov    0x20(%rsp),%r15
+ 1846418:	cmp    $0xffffffffffffffff,%rax
+ 184641c:	je     1846438 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xa18>
+ 184641e:	movups 0x28(%rsp),%xmm0
+ 1846423:	movups %xmm0,0x28(%rbx)
+ 1846427:	mov    %rbp,0x10(%rbx)
+ 184642b:	mov    %rcx,0x18(%rbx)
+ 184642f:	mov    %r15,0x20(%rbx)
+ 1846433:	jmp    1846342 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x922>
+ 1846438:	mov    %rcx,0x48(%rsp)
+ 184643d:	movq   $0xa,(%rsp)
+ 1846445:	lea    -0x14dc3e3(%rip),%rcx        # 36a069 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x2e5e>
+ 184644c:	lea    -0x14dcd27(%rip),%r9        # 36972c <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x2521>
+ 1846453:	lea    0x8(%rsp),%rdi
+ 1846458:	lea    0x1e0(%rsp),%rsi
+ 1846460:	mov    $0x36,%r8d
+ 1846466:	mov    %r12,%rdx
+ 1846469:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 184646e:	mov    0x8(%rsp),%rax
+ 1846473:	mov    0x10(%rsp),%rsi
+ 1846478:	mov    0x18(%rsp),%rdi
+ 184647d:	mov    0x20(%rsp),%rcx
+ 1846482:	cmp    $0xffffffffffffffff,%rax
+ 1846486:	je     18464ce <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xaae>
+ 1846488:	movups 0x28(%rsp),%xmm0
+ 184648d:	movups %xmm0,0x28(%rbx)
+ 1846491:	mov    %rsi,0x10(%rbx)
+ 1846495:	mov    %rdi,0x18(%rbx)
+ 1846499:	mov    %rcx,0x20(%rbx)
+ 184649d:	mov    %rax,0x8(%rbx)
+ 18464a1:	movq   $0xffffffffffffffff,(%rbx)
+ 18464a8:	lea    -0x1(%rbp),%rax
+ 18464ac:	cmp    $0xfffffffffffffffd,%rax
+ 18464b0:	ja     184634d <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x92d>
+ 18464b6:	mov    $0x1,%edx
+ 18464bb:	mov    0x48(%rsp),%rdi
+ 18464c0:	mov    %rbp,%rsi
+ 18464c3:	call   *0x14aebc7(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18464c9:	jmp    184634d <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x92d>
+ 18464ce:	cmp    $0xffffffffffffffff,%rbp
+ 18464d2:	je     18464f0 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xad0>
+ 18464d4:	lea    -0x1(%rsi),%rax
+ 18464d8:	cmp    $0xfffffffffffffffd,%rax
+ 18464dc:	ja     18464e9 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xac9>
+ 18464de:	mov    $0x1,%edx
+ 18464e3:	call   *0x14aeba7(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18464e9:	mov    0x48(%rsp),%rax
+ 18464ee:	jmp    18464f9 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xad9>
+ 18464f0:	mov    %rcx,%r15
+ 18464f3:	mov    %rdi,%rax
+ 18464f6:	mov    %rsi,%rbp
+ 18464f9:	mov    0x3f8(%rsp),%rsi
+ 1846501:	test   %rsi,%rsi
+ 1846504:	jle    1846523 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xb03>
+ 1846506:	mov    0x400(%rsp),%rdi
+ 184650e:	mov    $0x1,%edx
+ 1846513:	mov    %rax,0x48(%rsp)
+ 1846518:	call   *0x14aeb72(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 184651e:	mov    0x48(%rsp),%rax
+ 1846523:	mov    %rbp,0x3f8(%rsp)
+ 184652b:	mov    %rax,0x400(%rsp)
+ 1846533:	mov    %r15,0x408(%rsp)
+ 184653b:	movq   $0x5,(%rsp)
+ 1846543:	lea    -0x14dce14(%rip),%rcx        # 369736 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x252b>
+ 184654a:	lea    -0x14dbdce(%rip),%r9        # 36a783 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3578>
+ 1846551:	lea    0x8(%rsp),%rdi
+ 1846556:	lea    0x1e0(%rsp),%rsi
+ 184655e:	mov    $0x31,%r8d
+ 1846564:	mov    %r12,%rdx
+ 1846567:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 184656c:	mov    0x8(%rsp),%rax
+ 1846571:	movups 0x10(%rsp),%xmm0
+ 1846576:	movaps %xmm0,0x130(%rsp)
+ 184657e:	mov    0x20(%rsp),%rcx
+ 1846583:	mov    %rcx,0x140(%rsp)
+ 184658b:	cmp    $0xffffffffffffffff,%rax
+ 184658f:	je     18465b3 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xb93>
+ 1846591:	movups 0x28(%rsp),%xmm0
+ 1846596:	movups %xmm0,0x28(%rbx)
+ 184659a:	mov    0x140(%rsp),%rcx
+ 18465a2:	mov    %rcx,0x20(%rbx)
+ 18465a6:	movaps 0x130(%rsp),%xmm0
+ 18465ae:	jmp    184633e <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x91e>
+ 18465b3:	lea    0x410(%rsp),%r15
+ 18465bb:	mov    0x410(%rsp),%rsi
+ 18465c3:	test   %rsi,%rsi
+ 18465c6:	jle    18465db <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xbbb>
+ 18465c8:	mov    0x418(%rsp),%rdi
+ 18465d0:	mov    $0x1,%edx
+ 18465d5:	call   *0x14aeab5(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18465db:	mov    0x140(%rsp),%rax
+ 18465e3:	mov    %rax,0x10(%r15)
+ 18465e7:	movaps 0x130(%rsp),%xmm0
+ 18465ef:	movups %xmm0,(%r15)
+ 18465f3:	movq   $0x7,(%rsp)
+ 18465fb:	lea    -0x14dcecc(%rip),%rcx        # 369736 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x252b>
+ 1846602:	lea    -0x14dbe81(%rip),%r9        # 36a788 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x357d>
+ 1846609:	lea    0x8(%rsp),%rdi
+ 184660e:	lea    0x1e0(%rsp),%rsi
+ 1846616:	mov    $0x31,%r8d
+ 184661c:	mov    %r12,%rdx
+ 184661f:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 1846624:	mov    0x8(%rsp),%rax
+ 1846629:	movups 0x10(%rsp),%xmm0
+ 184662e:	movaps %xmm0,0x150(%rsp)
+ 1846636:	mov    0x20(%rsp),%rcx
+ 184663b:	mov    %rcx,0x160(%rsp)
+ 1846643:	cmp    $0xffffffffffffffff,%rax
+ 1846647:	je     184666b <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xc4b>
+ 1846649:	movups 0x28(%rsp),%xmm0
+ 184664e:	movups %xmm0,0x28(%rbx)
+ 1846652:	mov    0x160(%rsp),%rcx
+ 184665a:	mov    %rcx,0x20(%rbx)
+ 184665e:	movaps 0x150(%rsp),%xmm0
+ 1846666:	jmp    184633e <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x91e>
+ 184666b:	lea    0x428(%rsp),%r15
+ 1846673:	mov    0x428(%rsp),%rsi
+ 184667b:	test   %rsi,%rsi
+ 184667e:	jle    1846693 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xc73>
+ 1846680:	mov    0x430(%rsp),%rdi
+ 1846688:	mov    $0x1,%edx
+ 184668d:	call   *0x14ae9fd(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846693:	mov    0x160(%rsp),%rax
+ 184669b:	mov    %rax,0x10(%r15)
+ 184669f:	movaps 0x150(%rsp),%xmm0
+ 18466a7:	movups %xmm0,(%r15)
+ 18466ab:	cmpq   $0xffffffffffffffff,0x428(%rsp)
+ 18466b4:	je     18466fd <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xcdd>
+ 18466b6:	mov    0x430(%rsp),%rsi
+ 18466be:	mov    0x438(%rsp),%rdx
+ 18466c6:	lea    0x8(%rsp),%rdi
+ 18466cb:	mov    0x40(%rsp),%r13
+ 18466d0:	call   18900c0 <litchi_odp::model::slide::validate_z_index>
+ 18466d5:	cmpq   $0xffffffffffffffff,0x8(%rsp)
+ 18466db:	je     18466fd <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xcdd>
+ 18466dd:	movups 0x8(%rsp),%xmm0
+ 18466e2:	movups 0x18(%rsp),%xmm1
+ 18466e7:	movups 0x28(%rsp),%xmm2
+ 18466ec:	movups %xmm2,0x28(%rbx)
+ 18466f0:	movups %xmm1,0x18(%rbx)
+ 18466f4:	movups %xmm0,0x8(%rbx)
+ 18466f8:	jmp    184677d <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xd5d>
+ 18466fd:	movq   $0x9,(%rsp)
+ 1846705:	lea    -0x14dcfd6(%rip),%rcx        # 369736 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x252b>
+ 184670c:	lea    -0x14dbf84(%rip),%r9        # 36a78f <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3584>
+ 1846713:	lea    0x8(%rsp),%rdi
+ 1846718:	lea    0x1e0(%rsp),%rsi
+ 1846720:	mov    $0x31,%r8d
+ 1846726:	mov    %r12,%rdx
+ 1846729:	mov    0x40(%rsp),%r13
+ 184672e:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 1846733:	mov    0x8(%rsp),%rax
+ 1846738:	movups 0x10(%rsp),%xmm0
+ 184673d:	movaps %xmm0,0x170(%rsp)
+ 1846745:	mov    0x20(%rsp),%rcx
+ 184674a:	mov    %rcx,0x180(%rsp)
+ 1846752:	cmp    $0xffffffffffffffff,%rax
+ 1846756:	je     184678e <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xd6e>
+ 1846758:	movups 0x28(%rsp),%xmm0
+ 184675d:	movups %xmm0,0x28(%rbx)
+ 1846761:	mov    0x180(%rsp),%rcx
+ 1846769:	mov    %rcx,0x20(%rbx)
+ 184676d:	movaps 0x170(%rsp),%xmm0
+ 1846775:	movups %xmm0,0x10(%rbx)
+ 1846779:	mov    %rax,0x8(%rbx)
+ 184677d:	movq   $0xffffffffffffffff,(%rbx)
+ 1846784:	mov    0x40(%rsp),%r13
+ 1846789:	jmp    184634d <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x92d>
+ 184678e:	lea    0x440(%rsp),%r15
+ 1846796:	mov    0x440(%rsp),%rsi
+ 184679e:	test   %rsi,%rsi
+ 18467a1:	jle    18467b6 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xd96>
+ 18467a3:	mov    0x448(%rsp),%rdi
+ 18467ab:	mov    $0x1,%edx
+ 18467b0:	call   *0x14ae8da(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18467b6:	mov    0x180(%rsp),%rax
+ 18467be:	mov    %rax,0x10(%r15)
+ 18467c2:	movaps 0x170(%rsp),%xmm0
+ 18467ca:	movups %xmm0,(%r15)
+ 18467ce:	mov    0x458(%rsp),%rsi
+ 18467d6:	test   %rsi,%rsi
+ 18467d9:	jle    18467ee <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xdce>
+ 18467db:	mov    0x460(%rsp),%rdi
+ 18467e3:	mov    $0x1,%edx
+ 18467e8:	call   *0x14ae8a2(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18467ee:	mov    %r14,0x458(%rsp)
+ 18467f6:	mov    0x40(%rsp),%rax
+ 18467fb:	mov    %rax,0x460(%rsp)
+ 1846803:	mov    0x1a8(%rsp),%rax
+ 184680b:	mov    %rax,0x468(%rsp)
+ 1846813:	movq   $0xb,(%rsp)
+ 184681b:	lea    -0x14dc7b9(%rip),%rcx        # 36a069 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x2e5e>
+ 1846822:	lea    -0x14dc091(%rip),%r9        # 36a798 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x358d>
+ 1846829:	lea    0x8(%rsp),%rdi
+ 184682e:	lea    0x1e0(%rsp),%rsi
+ 1846836:	mov    $0x36,%r8d
+ 184683c:	mov    %r12,%rdx
+ 184683f:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 1846844:	mov    0x8(%rsp),%rax
+ 1846849:	movups 0x10(%rsp),%xmm0
+ 184684e:	movaps %xmm0,0x2b0(%rsp)
+ 1846856:	mov    0x20(%rsp),%rcx
+ 184685b:	mov    %rcx,0x2c0(%rsp)
+ 1846863:	cmp    $0xffffffffffffffff,%rax
+ 1846867:	je     184688f <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xe6f>
+ 1846869:	movups 0x28(%rsp),%xmm0
+ 184686e:	movups %xmm0,0x28(%rbx)
+ 1846872:	mov    0x2c0(%rsp),%rcx
+ 184687a:	mov    %rcx,0x20(%rbx)
+ 184687e:	movaps 0x2b0(%rsp),%xmm0
+ 1846886:	movups %xmm0,0x10(%rbx)
+ 184688a:	jmp    1845c48 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x228>
+ 184688f:	lea    -0x14dc0f3(%rip),%rdx        # 36a7a3 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x3598>
+ 1846896:	lea    0x1b0(%rsp),%rdi
+ 184689e:	lea    0x2b0(%rsp),%rsi
+ 18468a6:	mov    $0x18,%ecx
+ 18468ab:	call   18348c0 <<litchi_odp::codec::parser::codec::Parser>::parse_optional_bool>
+ 18468b0:	mov    0x1b0(%rsp),%rcx
+ 18468b8:	movzbl 0x1b8(%rsp),%eax
+ 18468c0:	cmp    $0xffffffffffffffff,%rcx
+ 18468c4:	je     18468fd <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xedd>
+ 18468c6:	mov    0x1d8(%rsp),%rdx
+ 18468ce:	mov    %rdx,0x30(%rbx)
+ 18468d2:	movups 0x1b9(%rsp),%xmm0
+ 18468da:	movups 0x1c9(%rsp),%xmm1
+ 18468e2:	movups %xmm1,0x21(%rbx)
+ 18468e6:	movups %xmm0,0x11(%rbx)
+ 18468ea:	mov    %rcx,0x8(%rbx)
+ 18468ee:	mov    %al,0x10(%rbx)
+ 18468f1:	movq   $0xffffffffffffffff,(%rbx)
+ 18468f8:	jmp    1846368 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x948>
+ 18468fd:	mov    %al,0x574(%rsp)
+ 1846904:	movq   $0x10,(%rsp)
+ 184690c:	lea    -0x14dc8aa(%rip),%rcx        # 36a069 <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x2e5e>
+ 1846913:	lea    -0x174e72a(%rip),%r9        # f81f0 <anon.103ebcefd50f7734c452daecc9cccb3d.27.llvm.12279144853978716178+0x130>
+ 184691a:	lea    0x8(%rsp),%rdi
+ 184691f:	lea    0x1e0(%rsp),%rsi
+ 1846927:	mov    $0x36,%r8d
+ 184692d:	mov    %r12,%rdx
+ 1846930:	call   1872c10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>
+ 1846935:	mov    0x8(%rsp),%rax
+ 184693a:	movups 0x10(%rsp),%xmm0
+ 184693f:	movaps %xmm0,0x2d0(%rsp)
+ 1846947:	mov    0x20(%rsp),%rcx
+ 184694c:	mov    %rcx,0x2e0(%rsp)
+ 1846954:	cmp    $0xffffffffffffffff,%rax
+ 1846958:	je     184697c <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xf5c>
+ 184695a:	movups 0x28(%rsp),%xmm0
+ 184695f:	movups %xmm0,0x28(%rbx)
+ 1846963:	mov    0x2e0(%rsp),%rcx
+ 184696b:	mov    %rcx,0x20(%rbx)
+ 184696f:	movaps 0x2d0(%rsp),%xmm0
+ 1846977:	jmp    1846886 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xe66>
+ 184697c:	lea    -0x14dc1c8(%rip),%rdx        # 36a7bb <anon.6cd39ed1969f1bdf84b04fb61d78fcaa.399.llvm.11794069500322000382+0x35b0>
+ 1846983:	lea    0x1b0(%rsp),%rdi
+ 184698b:	lea    0x2d0(%rsp),%rsi
+ 1846993:	mov    $0x1d,%ecx
+ 1846998:	call   18348c0 <<litchi_odp::codec::parser::codec::Parser>::parse_optional_bool>
+ 184699d:	mov    0x1b0(%rsp),%rcx
+ 18469a5:	movzbl 0x1b8(%rsp),%eax
+ 18469ad:	cmp    $0xffffffffffffffff,%rcx
+ 18469b1:	jne    18468c6 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xea6>
+ 18469b7:	mov    %al,0x575(%rsp)
+ 18469be:	lea    0x8(%rsp),%rdi
+ 18469c3:	lea    0x1e0(%rsp),%rsi
+ 18469cb:	mov    %r12,%rdx
+ 18469ce:	call   1871d80 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::drawing_attributes>
+ 18469d3:	mov    0x8(%rsp),%rax
+ 18469d8:	movups 0x10(%rsp),%xmm0
+ 18469dd:	movaps %xmm0,0x190(%rsp)
+ 18469e5:	mov    0x20(%rsp),%rcx
+ 18469ea:	mov    %rcx,0x1a0(%rsp)
+ 18469f2:	cmp    $0xffffffffffffffff,%rax
+ 18469f6:	je     1846a1a <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xffa>
+ 18469f8:	movups 0x28(%rsp),%xmm0
+ 18469fd:	movups %xmm0,0x28(%rbx)
+ 1846a01:	mov    0x1a0(%rsp),%rcx
+ 1846a09:	mov    %rcx,0x20(%rbx)
+ 1846a0d:	movaps 0x190(%rsp),%xmm0
+ 1846a15:	jmp    1846886 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0xe66>
+ 1846a1a:	lea    0x2f0(%rsp),%rdi
+ 1846a22:	call   18279d0 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::model::slide::DrawingAttribute>>>
+ 1846a27:	mov    0x1a0(%rsp),%rcx
+ 1846a2f:	mov    %rcx,0x300(%rsp)
+ 1846a37:	movaps 0x190(%rsp),%xmm0
+ 1846a3f:	movaps %xmm0,0x2f0(%rsp)
+ 1846a47:	mov    0x2f8(%rsp),%rdx
+ 1846a4f:	movzbl 0x3f(%rsp),%esi
+ 1846a54:	lea    0x8(%rsp),%rdi
+ 1846a59:	call   1836a00 <<litchi_odp::codec::parser::codec::Parser>::validate_required_three_dimensional_attributes>
+ 1846a5e:	cmpq   $0xffffffffffffffff,0x8(%rsp)
+ 1846a64:	je     1846a8d <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x106d>
+ 1846a66:	movups 0x8(%rsp),%xmm0
+ 1846a6b:	movups 0x18(%rsp),%xmm1
+ 1846a70:	movups 0x28(%rsp),%xmm2
+ 1846a75:	movups %xmm2,0x28(%rbx)
+ 1846a79:	movups %xmm1,0x18(%rbx)
+ 1846a7d:	movups %xmm0,0x8(%rbx)
+ 1846a81:	movq   $0xffffffffffffffff,(%rbx)
+ 1846a88:	jmp    1846368 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x948>
+ 1846a8d:	lea    0x2f0(%rsp),%rsi
+ 1846a95:	mov    $0x288,%edx
+ 1846a9a:	mov    %rbx,%rdi
+ 1846a9d:	call   *0x14ae5a5(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 1846aa3:	lea    0x1e0(%rsp),%rdi
+ 1846aab:	call   1829650 <core::ptr::drop_glue::<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>>
+ 1846ab0:	jmp    1846382 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x962>
+ 1846ab5:	jmp    1846b00 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x10e0>
+ 1846ab7:	mov    %rax,%rbx
+ 1846aba:	lea    -0x1(%rbp),%rax
+ 1846abe:	cmp    $0xfffffffffffffffd,%rax
+ 1846ac2:	ja     1846ae1 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x10c1>
+ 1846ac4:	mov    $0x1,%edx
+ 1846ac9:	mov    0x48(%rsp),%rdi
+ 1846ace:	mov    %rbp,%rsi
+ 1846ad1:	call   *0x14ae5b9(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846ad7:	jmp    1846ae1 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x10c1>
+ 1846ad9:	mov    %r13,0x40(%rsp)
+ 1846ade:	mov    %rax,%rbx
+ 1846ae1:	lea    -0x1(%r14),%rax
+ 1846ae5:	cmp    $0xfffffffffffffffd,%rax
+ 1846ae9:	ja     1846b03 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x10e3>
+ 1846aeb:	mov    $0x1,%edx
+ 1846af0:	mov    0x40(%rsp),%rdi
+ 1846af5:	mov    %r14,%rsi
+ 1846af8:	call   *0x14ae592(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846afe:	jmp    1846b03 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x10e3>
+ 1846b00:	mov    %rax,%rbx
+ 1846b03:	lea    0x308(%rsp),%r14
+ 1846b0b:	lea    0x1e0(%rsp),%rdi
+ 1846b13:	call   1829650 <core::ptr::drop_glue::<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>>
+ 1846b18:	lea    0x2f0(%rsp),%rdi
+ 1846b20:	call   18279d0 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::model::slide::DrawingAttribute>>>
+ 1846b25:	mov    %r14,%rdi
+ 1846b28:	call   1827ba0 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::model::slide::Shape>>>
+ 1846b2d:	cmpq   $0xffffffffffffffff,0x350(%rsp)
+ 1846b36:	jne    1846c47 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x1227>
+ 1846b3c:	mov    0x320(%rsp),%rsi
+ 1846b44:	test   %rsi,%rsi
+ 1846b47:	jne    1846c65 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x1245>
+ 1846b4d:	mov    0x380(%rsp),%rsi
+ 1846b55:	test   %rsi,%rsi
+ 1846b58:	jg     1846c89 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x1269>
+ 1846b5e:	mov    0x398(%rsp),%rsi
+ 1846b66:	test   %rsi,%rsi
+ 1846b69:	jg     1846cad <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x128d>
+ 1846b6f:	mov    0x3b0(%rsp),%rsi
+ 1846b77:	test   %rsi,%rsi
+ 1846b7a:	jg     1846cd1 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x12b1>
+ 1846b80:	mov    0x3c8(%rsp),%rsi
+ 1846b88:	test   %rsi,%rsi
+ 1846b8b:	jg     1846cf5 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x12d5>
+ 1846b91:	mov    0x3e0(%rsp),%rsi
+ 1846b99:	test   %rsi,%rsi
+ 1846b9c:	jg     1846d19 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x12f9>
+ 1846ba2:	mov    0x3f8(%rsp),%rsi
+ 1846baa:	test   %rsi,%rsi
+ 1846bad:	jg     1846d3d <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x131d>
+ 1846bb3:	mov    0x410(%rsp),%rsi
+ 1846bbb:	test   %rsi,%rsi
+ 1846bbe:	jg     1846d61 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x1341>
+ 1846bc4:	mov    0x428(%rsp),%rsi
+ 1846bcc:	test   %rsi,%rsi
+ 1846bcf:	jg     1846d85 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x1365>
+ 1846bd5:	mov    0x440(%rsp),%rsi
+ 1846bdd:	test   %rsi,%rsi
+ 1846be0:	jg     1846da9 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x1389>
+ 1846be6:	mov    0x458(%rsp),%rsi
+ 1846bee:	test   %rsi,%rsi
+ 1846bf1:	jg     1846dcd <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x13ad>
+ 1846bf7:	mov    0x470(%rsp),%rsi
+ 1846bff:	test   %rsi,%rsi
+ 1846c02:	jg     1846df1 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x13d1>
+ 1846c08:	cmpq   $0xffffffffffffffff,0x488(%rsp)
+ 1846c11:	jne    1846e13 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x13f3>
+ 1846c17:	lea    0x338(%rsp),%r14
+ 1846c1f:	cmpq   $0xffffffffffffffff,0x4f0(%rsp)
+ 1846c28:	je     1846c37 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x1217>
+ 1846c2a:	lea    0x4f0(%rsp),%rdi
+ 1846c32:	call   1829260 <core::ptr::drop_glue::<litchi_odp::model::action::DrawingHyperlink>>
+ 1846c37:	mov    %r14,%rdi
+ 1846c3a:	call   1827d40 <core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::model::action::ShapeEventListener>>>
+ 1846c3f:	mov    %rbx,%rdi
+ 1846c42:	call   2c92b20 <_Unwind_Resume@plt>
+ 1846c47:	lea    0x350(%rsp),%rdi
+ 1846c4f:	call   1828700 <core::ptr::drop_glue::<litchi_odp::model::slide::EnhancedGeometry>>
+ 1846c54:	mov    0x320(%rsp),%rsi
+ 1846c5c:	test   %rsi,%rsi
+ 1846c5f:	je     1846b4d <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x112d>
+ 1846c65:	mov    0x328(%rsp),%rdi
+ 1846c6d:	mov    $0x1,%edx
+ 1846c72:	call   *0x14ae418(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846c78:	mov    0x380(%rsp),%rsi
+ 1846c80:	test   %rsi,%rsi
+ 1846c83:	jle    1846b5e <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x113e>
+ 1846c89:	mov    0x388(%rsp),%rdi
+ 1846c91:	mov    $0x1,%edx
+ 1846c96:	call   *0x14ae3f4(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846c9c:	mov    0x398(%rsp),%rsi
+ 1846ca4:	test   %rsi,%rsi
+ 1846ca7:	jle    1846b6f <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x114f>
+ 1846cad:	mov    0x3a0(%rsp),%rdi
+ 1846cb5:	mov    $0x1,%edx
+ 1846cba:	call   *0x14ae3d0(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846cc0:	mov    0x3b0(%rsp),%rsi
+ 1846cc8:	test   %rsi,%rsi
+ 1846ccb:	jle    1846b80 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x1160>
+ 1846cd1:	mov    0x3b8(%rsp),%rdi
+ 1846cd9:	mov    $0x1,%edx
+ 1846cde:	call   *0x14ae3ac(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846ce4:	mov    0x3c8(%rsp),%rsi
+ 1846cec:	test   %rsi,%rsi
+ 1846cef:	jle    1846b91 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x1171>
+ 1846cf5:	mov    0x3d0(%rsp),%rdi
+ 1846cfd:	mov    $0x1,%edx
+ 1846d02:	call   *0x14ae388(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846d08:	mov    0x3e0(%rsp),%rsi
+ 1846d10:	test   %rsi,%rsi
+ 1846d13:	jle    1846ba2 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x1182>
+ 1846d19:	mov    0x3e8(%rsp),%rdi
+ 1846d21:	mov    $0x1,%edx
+ 1846d26:	call   *0x14ae364(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846d2c:	mov    0x3f8(%rsp),%rsi
+ 1846d34:	test   %rsi,%rsi
+ 1846d37:	jle    1846bb3 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x1193>
+ 1846d3d:	mov    0x400(%rsp),%rdi
+ 1846d45:	mov    $0x1,%edx
+ 1846d4a:	call   *0x14ae340(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846d50:	mov    0x410(%rsp),%rsi
+ 1846d58:	test   %rsi,%rsi
+ 1846d5b:	jle    1846bc4 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x11a4>
+ 1846d61:	mov    0x418(%rsp),%rdi
+ 1846d69:	mov    $0x1,%edx
+ 1846d6e:	call   *0x14ae31c(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846d74:	mov    0x428(%rsp),%rsi
+ 1846d7c:	test   %rsi,%rsi
+ 1846d7f:	jle    1846bd5 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x11b5>
+ 1846d85:	mov    0x430(%rsp),%rdi
+ 1846d8d:	mov    $0x1,%edx
+ 1846d92:	call   *0x14ae2f8(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846d98:	mov    0x440(%rsp),%rsi
+ 1846da0:	test   %rsi,%rsi
+ 1846da3:	jle    1846be6 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x11c6>
+ 1846da9:	mov    0x448(%rsp),%rdi
+ 1846db1:	mov    $0x1,%edx
+ 1846db6:	call   *0x14ae2d4(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846dbc:	mov    0x458(%rsp),%rsi
+ 1846dc4:	test   %rsi,%rsi
+ 1846dc7:	jle    1846bf7 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x11d7>
+ 1846dcd:	mov    0x460(%rsp),%rdi
+ 1846dd5:	mov    $0x1,%edx
+ 1846dda:	call   *0x14ae2b0(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846de0:	mov    0x470(%rsp),%rsi
+ 1846de8:	test   %rsi,%rsi
+ 1846deb:	jle    1846c08 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x11e8>
+ 1846df1:	mov    0x478(%rsp),%rdi
+ 1846df9:	mov    $0x1,%edx
+ 1846dfe:	call   *0x14ae28c(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 1846e04:	cmpq   $0xffffffffffffffff,0x488(%rsp)
+ 1846e0d:	je     1846c17 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x11f7>
+ 1846e13:	lea    0x488(%rsp),%rdi
+ 1846e1b:	call   18285d0 <core::ptr::drop_glue::<litchi_odp::model::media::Reference>>
+ 1846e20:	lea    0x338(%rsp),%r14
+ 1846e28:	cmpq   $0xffffffffffffffff,0x4f0(%rsp)
+ 1846e31:	jne    1846c2a <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x120a>
+ 1846e37:	jmp    1846c37 <<litchi_odp::codec::parser::codec::Parser>::shape_builder+0x1217>
+ 1846e3c:	call   *0x14ae27e(%rip)        # 2cf50c0 <_DYNAMIC+0x2c8>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

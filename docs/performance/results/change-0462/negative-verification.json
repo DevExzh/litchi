@@ -1,0 +1,16 @@
+{
+  "schema": "litchi-0462-negative-v1",
+  "status": "pass",
+  "verifier_sha256": "1b2e81827aa69271b89412e483eaa512319032e115fea9c8ab5b0907a33e6b0d",
+  "mutation": "increment first lane p50 by one nanosecond and reseal copied bundle",
+  "exit_code": 1,
+  "verifier_output": {
+    "change": 462,
+    "error": "summary.json: recomputed JSON differs from retained file",
+    "portable": true,
+    "precleanup": false,
+    "schema": "litchi-0462-verification-v1",
+    "status": "fail"
+  },
+  "temporary_directory_absent": true
+}

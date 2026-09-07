@@ -1,0 +1,74 @@
+{
+  "schema": "litchi-0462-counters-v1",
+  "variant": "baseline",
+  "binding_sha256": "409e8973f2c90cc004101c422364fef7fc98a7847d354d3b98173c6051c9d1bd",
+  "driver_sha256": "3815e785edfd2290f062c3e79f6159212e18ee7f3ca83aacf1f4bbb45b36c5de",
+  "started_utc": "2026-09-07T16:53:56.405014+00:00",
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/counters/baseline/resource.log",
+    "taskset",
+    "-c",
+    "2",
+    "perf",
+    "stat",
+    "-x,",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/counters/baseline/counters.csv",
+    "-e",
+    "cycles,instructions,branches,branch-misses,cache-misses,page-faults,context-switches",
+    "--",
+    "/tmp/litchi-goal-0462/baseline/litchi-perf-baseline",
+    "odp-append-attribution",
+    "--mode",
+    "lifecycle",
+    "--shape",
+    "large",
+    "--warmup",
+    "3",
+    "--samples",
+    "100",
+    "--repeat",
+    "diagnostic",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/counters/baseline/report.json"
+  ],
+  "scope": "whole process including setup, warmups, checks and reporting",
+  "status": "pass",
+  "exit_code": 0,
+  "oracle": {
+    "status": "pass",
+    "rows": 100,
+    "phase_count": 0
+  },
+  "finished_utc": "2026-09-07T16:54:11.984117+00:00",
+  "artifacts": [
+    {
+      "path": "counters/baseline/counters.csv",
+      "bytes": 344,
+      "sha256": "08ac48e462983f9271619551549bcad1cac9539902acb65f48d6942f6928ad95"
+    },
+    {
+      "path": "counters/baseline/report.json",
+      "bytes": 107852,
+      "sha256": "878a19fa932133c055a41af96762856cb93068ed7c01fad38007df87c7043f64"
+    },
+    {
+      "path": "counters/baseline/resource.log",
+      "bytes": 1184,
+      "sha256": "9326cd3d0895decd90d3fb4650ab9070cc24ff4eac78ef666ec71833cfa79fe2"
+    },
+    {
+      "path": "counters/baseline/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "counters/baseline/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

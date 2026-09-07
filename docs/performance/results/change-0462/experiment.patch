@@ -1,0 +1,796 @@
+--- a/crates/litchi-odp/src/codec/parser/codec/xml/semantic.rs
++++ b/crates/litchi-odp/src/codec/parser/codec/xml/semantic.rs
+@@ -4,11 +4,11 @@
+     Actuate, AnimationKind, BytesStart, DRAW_NAMESPACE, Direction, DrawingHyperlink,
+     DrawingShapeKind, Element, Error, HashMap, HashSet, HyperlinkShow, Kind, NsClass, NsReader,
+     OFFICE_NAMESPACE, PRESENTATION_NAMESPACE, ParagraphText, Parameter, Parser, Reference, Result,
+-    SMIL_NAMESPACE, SVG_NAMESPACE, Shape, ShapeBuilder, ShapeElement, ShapeType, Show, Sound,
+-    SoundShow, Speed, Style, TEXT_NAMESPACE, Transition, TransitionStyleDefinition,
+-    TransitionStyles, Type, XLINK_NAMESPACE, XML_NAMESPACE,
++    SMIL_NAMESPACE, Shape, ShapeBuilder, ShapeElement, ShapeType, Show, Sound, SoundShow, Speed,
++    Style, TEXT_NAMESPACE, Transition, TransitionStyleDefinition, TransitionStyles, Type,
++    XLINK_NAMESPACE, XML_NAMESPACE,
+ };
+-use super::validation::ElementAttrs;
++use super::validation::{ElementAttrs, ShapeAttributeKey, ShapeAttrs};
+ 
+ impl Parser {
+     pub(super) fn classify(namespace: NsClass, local_name: &[u8]) -> Element {
+@@ -119,8 +119,9 @@
+         shape_element: ShapeElement,
+     ) -> Result<ShapeBuilder> {
+         let mut builder = ShapeBuilder::new();
+-        let mut attributes = ElementAttrs::new(element);
+-        let presentation_class = attributes.get(reader, PRESENTATION_NAMESPACE, b"class")?;
++        let mut attributes = ShapeAttrs::new(element);
++        let presentation_class =
++            attributes.get_known(reader, ShapeAttributeKey::PresentationClass)?;
+         let drawing_kind = Self::drawing_kind(shape_element);
+         builder.is_frame = matches!(shape_element, ShapeElement::Frame);
+         builder.drawing_kind = Some(drawing_kind);
+@@ -150,37 +151,37 @@
+             | ShapeElement::ThreeDimensionalExtrude
+             | ShapeElement::ThreeDimensionalRotate => ShapeType::AutoShape,
+         };
+-        builder.name = attributes.get(reader, DRAW_NAMESPACE, b"name")?;
++        builder.name = attributes.get_known(reader, ShapeAttributeKey::DrawingName)?;
+         if matches!(
+             shape_element,
+             ShapeElement::Line | ShapeElement::Connector | ShapeElement::Measure
+         ) {
+-            builder.x = attributes.get(reader, SVG_NAMESPACE, b"x1")?;
+-            builder.y = attributes.get(reader, SVG_NAMESPACE, b"y1")?;
+-            builder.width = attributes.get(reader, SVG_NAMESPACE, b"x2")?;
+-            builder.height = attributes.get(reader, SVG_NAMESPACE, b"y2")?;
++            builder.x = attributes.get_known(reader, ShapeAttributeKey::SvgX1)?;
++            builder.y = attributes.get_known(reader, ShapeAttributeKey::SvgY1)?;
++            builder.width = attributes.get_known(reader, ShapeAttributeKey::SvgX2)?;
++            builder.height = attributes.get_known(reader, ShapeAttributeKey::SvgY2)?;
+         } else {
+-            builder.x = attributes.get(reader, SVG_NAMESPACE, b"x")?;
+-            builder.y = attributes.get(reader, SVG_NAMESPACE, b"y")?;
+-            builder.width = attributes.get(reader, SVG_NAMESPACE, b"width")?;
+-            builder.height = attributes.get(reader, SVG_NAMESPACE, b"height")?;
++            builder.x = attributes.get_known(reader, ShapeAttributeKey::SvgX)?;
++            builder.y = attributes.get_known(reader, ShapeAttributeKey::SvgY)?;
++            builder.width = attributes.get_known(reader, ShapeAttributeKey::SvgWidth)?;
++            builder.height = attributes.get_known(reader, ShapeAttributeKey::SvgHeight)?;
+         }
+         builder.style_name = attributes
+-            .get(reader, DRAW_NAMESPACE, b"style-name")?
+-            .or(attributes.get(reader, PRESENTATION_NAMESPACE, b"style-name")?);
+-        builder.layer = attributes.get(reader, DRAW_NAMESPACE, b"layer")?;
+-        builder.z_index = attributes.get(reader, DRAW_NAMESPACE, b"z-index")?;
++            .get_known(reader, ShapeAttributeKey::DrawingStyleName)?
++            .or(attributes.get_known(reader, ShapeAttributeKey::PresentationStyleName)?);
++        builder.layer = attributes.get_known(reader, ShapeAttributeKey::DrawingLayer)?;
++        builder.z_index = attributes.get_known(reader, ShapeAttributeKey::DrawingZIndex)?;
+         if let Some(z_index) = &builder.z_index {
+             crate::model::slide::validate_z_index(z_index)?;
+         }
+-        builder.transform = attributes.get(reader, DRAW_NAMESPACE, b"transform")?;
++        builder.transform = attributes.get_known(reader, ShapeAttributeKey::DrawingTransform)?;
+         builder.presentation_class = presentation_class;
+         builder.presentation_placeholder = Self::parse_optional_bool(
+-            attributes.get(reader, PRESENTATION_NAMESPACE, b"placeholder")?,
++            attributes.get_known(reader, ShapeAttributeKey::PresentationPlaceholder)?,
+             "presentation:placeholder",
+         )?;
+         builder.presentation_user_transformed = Self::parse_optional_bool(
+-            attributes.get(reader, PRESENTATION_NAMESPACE, b"user-transformed")?,
++            attributes.get_known(reader, ShapeAttributeKey::PresentationUserTransformed)?,
+             "presentation:user-transformed",
+         )?;
+         builder.drawing_attributes = attributes.drawing_attributes(reader)?;
+--- a/crates/litchi-odp/src/codec/parser/codec/xml/validation.rs
++++ b/crates/litchi-odp/src/codec/parser/codec/xml/validation.rs
+@@ -3,8 +3,8 @@
+ use super::super::{
+     Attribute, Attributes, BytesStart, DR3D_NAMESPACE, DRAW_NAMESPACE, DrawingAttribute,
+     DrawingAttributeNamespace, DrawingShapeKind, Element, Error, HashSet, LocalName, Namespace,
+-    NsReader, Parser, RawAttribute, ResolveResult, Result, SVG_NAMESPACE, ShapeBuilder,
+-    TABLE_NAMESPACE, XLINK_NAMESPACE, XmlNamespace, XmlVersion,
++    NsReader, PRESENTATION_NAMESPACE, Parser, RawAttribute, ResolveResult, Result, SVG_NAMESPACE,
++    ShapeBuilder, TABLE_NAMESPACE, XLINK_NAMESPACE, XmlNamespace, XmlVersion,
+ };
+ 
+ impl Parser {
+@@ -316,6 +316,53 @@
+     local_name: LocalName<'event>,
+ }
+ 
++#[derive(Clone, Copy)]
++enum IndexedLookup {
++    Known(Option<usize>),
++    Generic,
++}
++
++trait AttributeIndex {
++    fn lookup(&self, namespace_uri: &[u8], local_name: &[u8]) -> IndexedLookup;
++
++    fn lookup_key(&self, key: ShapeAttributeKey) -> IndexedLookup;
++
++    fn record<'event, 'resolver>(
++        &mut self,
++        parsed_index: usize,
++        cached: &ResolvedAttribute<'event, 'resolver>,
++    );
++
++    fn finish_scan(&mut self);
++
++    fn exhausted(&self) -> bool;
++}
++
++struct NoAttributeIndex;
++
++impl AttributeIndex for NoAttributeIndex {
++    fn lookup(&self, _namespace_uri: &[u8], _local_name: &[u8]) -> IndexedLookup {
++        IndexedLookup::Generic
++    }
++
++    fn lookup_key(&self, _key: ShapeAttributeKey) -> IndexedLookup {
++        IndexedLookup::Generic
++    }
++
++    fn record<'event, 'resolver>(
++        &mut self,
++        _parsed_index: usize,
++        _cached: &ResolvedAttribute<'event, 'resolver>,
++    ) {
++    }
++
++    fn finish_scan(&mut self) {}
++
++    fn exhausted(&self) -> bool {
++        false
++    }
++}
++
+ /// Borrowed snapshot of one attribute key's [`ResolveResult`].
+ ///
+ /// [`ResolveResult`] borrows the reader's namespace stack, so it cannot be
+@@ -354,13 +401,46 @@
+         namespace_uri: &[u8],
+         local_name: &[u8],
+     ) -> Result<Option<String>> {
+-        for cached in &self.parsed {
+-            if let Some(value) = Self::lookup(reader, cached, namespace_uri, local_name)? {
++        let mut index = NoAttributeIndex;
++        self.get_with_index(reader, namespace_uri, local_name, None, &mut index)
++    }
++
++    fn get_with_index<I: AttributeIndex>(
++        &mut self,
++        reader: &'resolver NsReader<&[u8]>,
++        namespace_uri: &[u8],
++        local_name: &[u8],
++        known_key: Option<ShapeAttributeKey>,
++        index: &mut I,
++    ) -> Result<Option<String>> {
++        let indexed_lookup = known_key.map_or_else(
++            || index.lookup(namespace_uri, local_name),
++            |key| index.lookup_key(key),
++        );
++        if let IndexedLookup::Known(Some(parsed_index)) = indexed_lookup {
++            if let Some(value) = Self::lookup(
++                reader,
++                &self.parsed[parsed_index],
++                namespace_uri,
++                local_name,
++            )? {
+                 return Ok(Some(value));
+             }
+         }
++
++        let skip_cached_scan = matches!(indexed_lookup, IndexedLookup::Known(None));
++        if !skip_cached_scan {
++            for cached in &self.parsed {
++                if let Some(value) = Self::lookup(reader, cached, namespace_uri, local_name)? {
++                    return Ok(Some(value));
++                }
++            }
++        }
+         if let Some(message) = &self.malformed {
+             return Err(Error::InvalidFormat(message.clone()));
++        }
++        if skip_cached_scan && index.exhausted() {
++            return Ok(None);
+         }
+         for attribute_result in self.attributes.by_ref() {
+             let attribute = match attribute_result {
+@@ -373,11 +453,16 @@
+             };
+             let cached = Self::resolve_at_scan(reader, attribute);
+             if let Some(value) = Self::lookup(reader, &cached, namespace_uri, local_name)? {
++                let parsed_index = self.parsed.len();
+                 self.parsed.push(cached);
++                index.record(parsed_index, &self.parsed[parsed_index]);
+                 return Ok(Some(value));
+             }
++            let parsed_index = self.parsed.len();
+             self.parsed.push(cached);
+-        }
++            index.record(parsed_index, &self.parsed[parsed_index]);
++        }
++        index.finish_scan();
+         Ok(None)
+     }
+ 
+@@ -475,9 +560,19 @@
+     ///   without decoding, and every harvested attribute is decoded at the
+     ///   same position as in the fresh scan, so decode-error positions and
+     ///   messages are unchanged.
++    #[cfg(test)]
+     pub(super) fn drawing_attributes(
+         &mut self,
+         reader: &'resolver NsReader<&[u8]>,
++    ) -> Result<Vec<DrawingAttribute>> {
++        let mut index = NoAttributeIndex;
++        self.drawing_attributes_with_index(reader, &mut index)
++    }
++
++    fn drawing_attributes_with_index<I: AttributeIndex>(
++        &mut self,
++        reader: &'resolver NsReader<&[u8]>,
++        index: &mut I,
+     ) -> Result<Vec<DrawingAttribute>> {
+         let mut attributes = Vec::new();
+         for cached in &self.parsed {
+@@ -493,8 +588,11 @@
+             if let Some(attribute) = Self::harvest_drawing_attribute(reader, &cached)? {
+                 attributes.push(attribute);
+             }
++            let parsed_index = self.parsed.len();
+             self.parsed.push(cached);
+-        }
++            index.record(parsed_index, &self.parsed[parsed_index]);
++        }
++        index.finish_scan();
+         Ok(attributes)
+     }
+ 
+@@ -549,6 +647,225 @@
+     }
+ }
+ 
++#[derive(Clone, Copy)]
++pub(super) enum ShapeAttributeKey {
++    PresentationClass,
++    PresentationStyleName,
++    PresentationPlaceholder,
++    PresentationUserTransformed,
++    DrawingName,
++    DrawingStyleName,
++    DrawingLayer,
++    DrawingZIndex,
++    DrawingTransform,
++    SvgX,
++    SvgY,
++    SvgWidth,
++    SvgHeight,
++    SvgX1,
++    SvgY1,
++    SvgX2,
++    SvgY2,
++}
++
++impl ShapeAttributeKey {
++    const COUNT: usize = 17;
++
++    fn index(self) -> usize {
++        self as usize
++    }
++
++    fn target(self) -> (&'static [u8], &'static [u8]) {
++        match self {
++            Self::PresentationClass => (PRESENTATION_NAMESPACE, b"class"),
++            Self::PresentationStyleName => (PRESENTATION_NAMESPACE, b"style-name"),
++            Self::PresentationPlaceholder => (PRESENTATION_NAMESPACE, b"placeholder"),
++            Self::PresentationUserTransformed => (PRESENTATION_NAMESPACE, b"user-transformed"),
++            Self::DrawingName => (DRAW_NAMESPACE, b"name"),
++            Self::DrawingStyleName => (DRAW_NAMESPACE, b"style-name"),
++            Self::DrawingLayer => (DRAW_NAMESPACE, b"layer"),
++            Self::DrawingZIndex => (DRAW_NAMESPACE, b"z-index"),
++            Self::DrawingTransform => (DRAW_NAMESPACE, b"transform"),
++            Self::SvgX => (SVG_NAMESPACE, b"x"),
++            Self::SvgY => (SVG_NAMESPACE, b"y"),
++            Self::SvgWidth => (SVG_NAMESPACE, b"width"),
++            Self::SvgHeight => (SVG_NAMESPACE, b"height"),
++            Self::SvgX1 => (SVG_NAMESPACE, b"x1"),
++            Self::SvgY1 => (SVG_NAMESPACE, b"y1"),
++            Self::SvgX2 => (SVG_NAMESPACE, b"x2"),
++            Self::SvgY2 => (SVG_NAMESPACE, b"y2"),
++        }
++    }
++
++    fn from_target(namespace_uri: &[u8], local_name: &[u8]) -> Option<Self> {
++        if namespace_uri == PRESENTATION_NAMESPACE {
++            match local_name {
++                b"class" => Some(Self::PresentationClass),
++                b"style-name" => Some(Self::PresentationStyleName),
++                b"placeholder" => Some(Self::PresentationPlaceholder),
++                b"user-transformed" => Some(Self::PresentationUserTransformed),
++                _ => None,
++            }
++        } else if namespace_uri == DRAW_NAMESPACE {
++            match local_name {
++                b"name" => Some(Self::DrawingName),
++                b"style-name" => Some(Self::DrawingStyleName),
++                b"layer" => Some(Self::DrawingLayer),
++                b"z-index" => Some(Self::DrawingZIndex),
++                b"transform" => Some(Self::DrawingTransform),
++                _ => None,
++            }
++        } else if namespace_uri == SVG_NAMESPACE {
++            match local_name {
++                b"x" => Some(Self::SvgX),
++                b"y" => Some(Self::SvgY),
++                b"width" => Some(Self::SvgWidth),
++                b"height" => Some(Self::SvgHeight),
++                b"x1" => Some(Self::SvgX1),
++                b"y1" => Some(Self::SvgY1),
++                b"x2" => Some(Self::SvgX2),
++                b"y2" => Some(Self::SvgY2),
++                _ => None,
++            }
++        } else {
++            None
++        }
++    }
++
++    fn from_cached(cached: &ResolvedAttribute<'_, '_>) -> Option<Self> {
++        let local_name = cached.local_name.as_ref();
++        if cached.namespace.matches(PRESENTATION_NAMESPACE) {
++            match local_name {
++                b"class" => Some(Self::PresentationClass),
++                b"style-name" => Some(Self::PresentationStyleName),
++                b"placeholder" => Some(Self::PresentationPlaceholder),
++                b"user-transformed" => Some(Self::PresentationUserTransformed),
++                _ => None,
++            }
++        } else if cached.namespace.matches(DRAW_NAMESPACE) {
++            match local_name {
++                b"name" => Some(Self::DrawingName),
++                b"style-name" => Some(Self::DrawingStyleName),
++                b"layer" => Some(Self::DrawingLayer),
++                b"z-index" => Some(Self::DrawingZIndex),
++                b"transform" => Some(Self::DrawingTransform),
++                _ => None,
++            }
++        } else if cached.namespace.matches(SVG_NAMESPACE) {
++            match local_name {
++                b"x" => Some(Self::SvgX),
++                b"y" => Some(Self::SvgY),
++                b"width" => Some(Self::SvgWidth),
++                b"height" => Some(Self::SvgHeight),
++                b"x1" => Some(Self::SvgX1),
++                b"y1" => Some(Self::SvgY1),
++                b"x2" => Some(Self::SvgX2),
++                b"y2" => Some(Self::SvgY2),
++                _ => None,
++            }
++        } else {
++            None
++        }
++    }
++}
++
++struct ShapeAttributeIndex {
++    first: [Option<usize>; ShapeAttributeKey::COUNT],
++    exhausted: bool,
++}
++
++impl ShapeAttributeIndex {
++    fn new() -> Self {
++        Self {
++            first: [None; ShapeAttributeKey::COUNT],
++            exhausted: false,
++        }
++    }
++}
++
++impl AttributeIndex for ShapeAttributeIndex {
++    fn lookup(&self, namespace_uri: &[u8], local_name: &[u8]) -> IndexedLookup {
++        match ShapeAttributeKey::from_target(namespace_uri, local_name) {
++            Some(key) => IndexedLookup::Known(self.first[key.index()]),
++            None => IndexedLookup::Generic,
++        }
++    }
++
++    fn lookup_key(&self, key: ShapeAttributeKey) -> IndexedLookup {
++        IndexedLookup::Known(self.first[key.index()])
++    }
++
++    fn record<'event, 'resolver>(
++        &mut self,
++        parsed_index: usize,
++        cached: &ResolvedAttribute<'event, 'resolver>,
++    ) {
++        let Some(key) = ShapeAttributeKey::from_cached(cached) else {
++            return;
++        };
++        let first = &mut self.first[key.index()];
++        if first.is_none() {
++            *first = Some(parsed_index);
++        }
++    }
++
++    fn finish_scan(&mut self) {
++        self.exhausted = true;
++    }
++
++    fn exhausted(&self) -> bool {
++        self.exhausted
++    }
++}
++
++pub(super) struct ShapeAttrs<'event, 'resolver> {
++    attributes: ElementAttrs<'event, 'resolver>,
++    index: ShapeAttributeIndex,
++}
++
++impl<'event, 'resolver> ShapeAttrs<'event, 'resolver> {
++    pub(super) fn new(element: &'event BytesStart<'_>) -> Self {
++        Self {
++            attributes: ElementAttrs::new(element),
++            index: ShapeAttributeIndex::new(),
++        }
++    }
++
++    #[cfg(test)]
++    pub(super) fn get(
++        &mut self,
++        reader: &'resolver NsReader<&[u8]>,
++        namespace_uri: &[u8],
++        local_name: &[u8],
++    ) -> Result<Option<String>> {
++        self.attributes
++            .get_with_index(reader, namespace_uri, local_name, None, &mut self.index)
++    }
++
++    pub(super) fn get_known(
++        &mut self,
++        reader: &'resolver NsReader<&[u8]>,
++        key: ShapeAttributeKey,
++    ) -> Result<Option<String>> {
++        let (namespace_uri, local_name) = key.target();
++        self.attributes.get_with_index(
++            reader,
++            namespace_uri,
++            local_name,
++            Some(key),
++            &mut self.index,
++        )
++    }
++
++    pub(super) fn drawing_attributes(
++        &mut self,
++        reader: &'resolver NsReader<&[u8]>,
++    ) -> Result<Vec<DrawingAttribute>> {
++        self.attributes
++            .drawing_attributes_with_index(reader, &mut self.index)
++    }
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::super::super::{Event, PRESENTATION_NAMESPACE};
+@@ -1075,6 +1392,318 @@
+         attributes
+             .get(reader, PRESENTATION_NAMESPACE, b"user-transformed")
+             .unwrap();
++    }
++
++    fn shape_attribute_keys() -> [ShapeAttributeKey; ShapeAttributeKey::COUNT] {
++        [
++            ShapeAttributeKey::PresentationClass,
++            ShapeAttributeKey::PresentationStyleName,
++            ShapeAttributeKey::PresentationPlaceholder,
++            ShapeAttributeKey::PresentationUserTransformed,
++            ShapeAttributeKey::DrawingName,
++            ShapeAttributeKey::DrawingStyleName,
++            ShapeAttributeKey::DrawingLayer,
++            ShapeAttributeKey::DrawingZIndex,
++            ShapeAttributeKey::DrawingTransform,
++            ShapeAttributeKey::SvgX,
++            ShapeAttributeKey::SvgY,
++            ShapeAttributeKey::SvgWidth,
++            ShapeAttributeKey::SvgHeight,
++            ShapeAttributeKey::SvgX1,
++            ShapeAttributeKey::SvgY1,
++            ShapeAttributeKey::SvgX2,
++            ShapeAttributeKey::SvgY2,
++        ]
++    }
++
++    fn all_shape_attribute_lookups<'resolver>(
++        attributes: &mut ShapeAttrs<'_, 'resolver>,
++        reader: &'resolver NsReader<&[u8]>,
++    ) {
++        for key in shape_attribute_keys() {
++            attributes.get_known(reader, key).unwrap();
++        }
++    }
++
++    #[test]
++    fn shape_index_layout_diagnostic() {
++        println!(
++            "ElementAttrs={} ShapeAttrs={} ShapeAttributeIndex={} ResolvedAttribute={}",
++            size_of::<ElementAttrs<'static, 'static>>(),
++            size_of::<ShapeAttrs<'static, 'static>>(),
++            size_of::<ShapeAttributeIndex>(),
++            size_of::<ResolvedAttribute<'static, 'static>>(),
++        );
++        assert_eq!(ShapeAttributeKey::COUNT, 17);
++    }
++
++    #[test]
++    fn shape_index_matches_direct_lookup_for_all_known_keys() {
++        let xml = shape_element_xml(
++            "d:early=\"early\" p:class=\"title\" d:name=\"name\" svg:x=\"1\" \
++             svg:y=\"2\" svg:width=\"3\" svg:height=\"4\" svg:x1=\"5\" svg:y1=\"6\" \
++             svg:x2=\"7\" svg:y2=\"8\" d:style-name=\"draw-style\" \
++             p:style-name=\"presentation-style\" d:layer=\"layer\" d:z-index=\"7\" \
++             d:transform=\"transform\" p:placeholder=\"true\" \
++             p:user-transformed=\"false\" d:foo=\"harvest\"",
++        );
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        let element = first_element(&mut reader, &mut buf);
++        let mut attributes = ShapeAttrs::new(&element);
++        all_shape_attribute_lookups(&mut attributes, &reader);
++        for key in shape_attribute_keys() {
++            let (namespace_uri, local_name) = key.target();
++            let indexed = attributes.get_known(&reader, key).unwrap();
++            let fresh = direct_lookup(&reader, &element, namespace_uri, local_name).unwrap();
++            assert_eq!(indexed, fresh);
++        }
++        assert_eq!(
++            attributes.drawing_attributes(&reader).unwrap(),
++            oracle_drawing_attributes(&reader, &element).unwrap()
++        );
++    }
++
++    #[test]
++    fn shape_index_records_generic_scan_and_harvest_appends() {
++        let xml = shape_element_xml(
++            "p:class=\"title\" d:name=\"name\" d:layer=\"layer\" d:foo=\"harvest\"",
++        );
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        let element = first_element(&mut reader, &mut buf);
++        let mut attributes = ShapeAttrs::new(&element);
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::PresentationClass)
++                .unwrap(),
++            Some("title".to_string())
++        );
++        assert_eq!(
++            attributes.get(&reader, DRAW_NAMESPACE, b"unknown").unwrap(),
++            None
++        );
++        assert_eq!(
++            attributes.drawing_attributes(&reader).unwrap(),
++            oracle_drawing_attributes(&reader, &element).unwrap()
++        );
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            direct_lookup(&reader, &element, DRAW_NAMESPACE, b"name").unwrap()
++        );
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingLayer)
++                .unwrap(),
++            direct_lookup(&reader, &element, DRAW_NAMESPACE, b"layer").unwrap()
++        );
++    }
++
++    #[test]
++    fn shape_index_preserves_alias_rebinding_and_unqualified_namespace_rules() {
++        let xml = format!("<e xmlns:a=\"{}\" a:name=\"alias\"/>", draw_uri());
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        let element = first_element(&mut reader, &mut buf);
++        let mut attributes = ShapeAttrs::new(&element);
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            Some("alias".to_string())
++        );
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            direct_lookup(&reader, &element, DRAW_NAMESPACE, b"name").unwrap()
++        );
++
++        const SHADOW_URI: &[u8] = b"urn:example:shadow-shape";
++        let xml = format!(
++            "<root xmlns:d=\"{}\"><child xmlns:d=\"{}\" d:name=\"shadow\"/></root>",
++            draw_uri(),
++            std::str::from_utf8(SHADOW_URI).unwrap(),
++        );
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        match reader.read_resolved_event_into(&mut buf) {
++            Ok((_, Event::Start(_))) => {},
++            other => panic!("expected root start, got {other:?}"),
++        }
++        buf.clear();
++        let child = match reader.read_resolved_event_into(&mut buf) {
++            Ok((_, Event::Empty(element))) => element,
++            other => panic!("expected child empty element, got {other:?}"),
++        };
++        let mut attributes = ShapeAttrs::new(&child);
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            None
++        );
++        assert_eq!(
++            attributes.get(&reader, SHADOW_URI, b"name").unwrap(),
++            direct_lookup(&reader, &child, SHADOW_URI, b"name").unwrap()
++        );
++
++        let xml = format!("<e xmlns=\"{}\" name=\"unqualified\"/>", draw_uri());
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        let element = first_element(&mut reader, &mut buf);
++        let mut attributes = ShapeAttrs::new(&element);
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            None
++        );
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            direct_lookup(&reader, &element, DRAW_NAMESPACE, b"name").unwrap()
++        );
++    }
++
++    #[test]
++    fn shape_index_preserves_eager_style_fallback_error() {
++        let xml = shape_element_xml("d:style-name=\"draw\" broken");
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        let element = first_element(&mut reader, &mut buf);
++        let mut attributes = ShapeAttrs::new(&element);
++        let result = attributes
++            .get_known(&reader, ShapeAttributeKey::DrawingStyleName)
++            .and_then(|drawing| {
++                attributes
++                    .get_known(&reader, ShapeAttributeKey::PresentationStyleName)
++                    .map(|presentation| drawing.or(presentation))
++            });
++        let message = invalid_format_message(result);
++        assert!(message.starts_with("invalid XML attribute:"));
++    }
++
++    #[test]
++    fn shape_index_preserves_harvest_decode_and_foreign_skip_behavior() {
++        let xml = shape_element_xml("d:name=\"n\" text:skip=\"&bogus;\"");
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        let element = first_element(&mut reader, &mut buf);
++        let mut attributes = ShapeAttrs::new(&element);
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            Some("n".to_string())
++        );
++        assert_eq!(
++            attributes.drawing_attributes(&reader).unwrap(),
++            oracle_drawing_attributes(&reader, &element).unwrap()
++        );
++
++        let xml = shape_element_xml("d:name=\"n\" d:foo=\"&bogus;\"");
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        let element = first_element(&mut reader, &mut buf);
++        let mut attributes = ShapeAttrs::new(&element);
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            Some("n".to_string())
++        );
++        let harvested = harvest_error_message(attributes.drawing_attributes(&reader));
++        let fresh = harvest_error_message(oracle_drawing_attributes(&reader, &element));
++        assert_eq!(harvested, fresh);
++        assert!(harvested.starts_with("invalid ODP shape attribute value:"));
++    }
++
++    #[test]
++    fn shape_index_preserves_fresh_and_cached_decode_errors() {
++        let xml = shape_element_xml("d:name=\"&bogus;\" d:foo=\"ok\"");
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        let element = first_element(&mut reader, &mut buf);
++        let mut attributes = ShapeAttrs::new(&element);
++        let fresh =
++            invalid_format_message(direct_lookup(&reader, &element, DRAW_NAMESPACE, b"name"));
++        let scanned =
++            invalid_format_message(attributes.get_known(&reader, ShapeAttributeKey::DrawingName));
++        assert_eq!(scanned, fresh);
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            None
++        );
++
++        let xml = shape_element_xml("d:name=\"&bogus;\" d:foo=\"ok\"");
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        let element = first_element(&mut reader, &mut buf);
++        let mut attributes = ShapeAttrs::new(&element);
++        assert_eq!(
++            attributes.get(&reader, DRAW_NAMESPACE, b"foo").unwrap(),
++            Some("ok".to_string())
++        );
++        let fresh =
++            invalid_format_message(direct_lookup(&reader, &element, DRAW_NAMESPACE, b"name"));
++        let cached =
++            invalid_format_message(attributes.get_known(&reader, ShapeAttributeKey::DrawingName));
++        assert_eq!(cached, fresh);
++        assert_eq!(
++            cached,
++            invalid_format_message(attributes.get_known(&reader, ShapeAttributeKey::DrawingName,))
++        );
++    }
++
++    #[test]
++    fn shape_index_preserves_malformed_and_duplicate_timing() {
++        let xml = shape_element_xml("d:name=\"ok\" broken d:layer=\"layer\"");
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        let element = first_element(&mut reader, &mut buf);
++        let mut attributes = ShapeAttrs::new(&element);
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            Some("ok".to_string())
++        );
++        let message =
++            invalid_format_message(attributes.get_known(&reader, ShapeAttributeKey::DrawingLayer));
++        assert!(message.starts_with("invalid XML attribute:"));
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            Some("ok".to_string())
++        );
++
++        let xml = shape_element_xml("d:name=\"first\" d:name=\"second\"");
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        let element = first_element(&mut reader, &mut buf);
++        let mut attributes = ShapeAttrs::new(&element);
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            Some("first".to_string())
++        );
++        let message =
++            invalid_format_message(attributes.get_known(&reader, ShapeAttributeKey::DrawingLayer));
++        assert!(message.starts_with("invalid XML attribute:"));
++        assert_eq!(
++            attributes
++                .get_known(&reader, ShapeAttributeKey::DrawingName)
++                .unwrap(),
++            Some("first".to_string())
++        );
+     }
+ 
+     fn harvest_error_message(result: Result<Vec<DrawingAttribute>>) -> String {

@@ -1,0 +1,22 @@
+{
+  "schema": "litchi-0462-decision-v1",
+  "change": 462,
+  "status": "rejected",
+  "production_change_retained": false,
+  "summary_sha256": "fbf45a66197a7abee070d044be310e9564e5711c5c7c2675dd30c13ef6135c14",
+  "reason": "Both normal large repeats miss the frozen 3% practical improvement gate (2.6602% and 2.6279%). All allocation metrics are equal; the fixed index adds 280 bytes of shape state. No practical memory benefit justifies retention. No timing rerun or threshold change.",
+  "adverse_flags": [],
+  "allocation_increase_review_flags": [],
+  "restored_files": [
+    {
+      "path": "crates/litchi-odp/src/codec/parser/codec/xml/semantic.rs",
+      "sha256": "064e12d64cc99b2932a1de4f35f8c8725add0486ba6f8af70554d26b8e530fb1"
+    },
+    {
+      "path": "crates/litchi-odp/src/codec/parser/codec/xml/validation.rs",
+      "sha256": "0cbf4993e1516a633c63bcce8136dc7265f4fd00583684f993312562bfc26e29"
+    }
+  ],
+  "baseline_revision": "dbd2f8ecec2a31e71fac07e288d1e40b386312e0",
+  "assembly_heuristic_excluded": "known_cached_scan.eliminated is not proof; see manual source-review.md and assembly-review.md"
+}

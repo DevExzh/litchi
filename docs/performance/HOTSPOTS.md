@@ -1,5 +1,39 @@
 # Performance hotspot inventory
 
+## Change 0462: shape index bypasses the hot scan but misses the gate
+
+0462 adds a private seventeen-key first-occurrence index only to `ShapeAttrs`.
+Valid indexed typed hits bypass the cached linear loop; the defensive fallback
+still handles a cached-key predicate that does not validate. The fixed index
+adds 280 bytes per element (`ElementAttrs` 144 bytes, `ShapeAttrs` 424 bytes),
+and `shape_builder` grows from a 1,400-byte to a 1,688-byte stack frame. The
+generic `ElementAttrs::get` frame remains 328 bytes in both builds.
+
+Normal p50 deltas across 24 reports and 720 samples are -2.3623% / -3.0049%
+for tiny, -3.4649% / -3.1917% for medium, and -2.6602% / -2.6279% for large
+in R1/R2. Both large rows miss the predeclared 3% medium/large gate, so the
+candidate is rejected despite all normal confidence intervals remaining below
+zero. Allocation bytes, calls, reallocations, deallocations, regional peak and
+retained-live values are exactly unchanged; the R1 tiny allocator interval
+crosses zero. No retained speed or memory benefit follows.
+
+Supplementary public-API phase p50 deltas are transaction -1.2255% / -3.8972%,
+snapshot opening -3.9477% / -5.6825%, commit -3.6631% / -4.1715%, add +0.1066%
+/ +0.0797%, and publication -0.1857% / -0.2066% in R1/R2. These phase clocks
+exclude setup, warmups and checks; whole-process counter diagnostics include
+them and report instructions -3.3494%, cycles -3.0144%, branch misses +1.2247%
+and cache misses +1.2504%. Neither scope establishes causal API attribution.
+
+Manual assembly review confirms the indexed hit path and the retained fallback.
+The automatic `known_cached_scan.eliminated` field is a flawed direct-call
+heuristic and is not evidence that work disappeared. Candidate validation
+records 379 ODP tests and 387 harness tests passing (one ignored), with
+warning-denied Clippy. Both Rust files are restored byte-exact to `dbd2f8ece`;
+final Clippy/docs/format/boundaries, portable replay, tamper rejection and owned
+temporary cleanup pass. 0460 remains
+accepted, coverage remains 439/36, the full goal remains open, and iWork is
+outside scope.
+
 ## Change 0461: attribute-match split helps slightly but misses the gate
 
 0461 moves ODP attribute matching into a pure cached-key path and decodes values

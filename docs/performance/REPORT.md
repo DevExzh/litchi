@@ -1,5 +1,49 @@
 # Performance program phase report
 
+## Change 0462: reject ODP shape-attribute index on the practical gate
+
+0462 tests a private fixed seventeen-key first-occurrence index for shape
+parsing under the frozen A1/B1/B2/A2 lifecycle boundary: 24 reports, 720
+samples, two repeats, normal and allocator lanes, three warmups and 30 samples
+per lane on CPU 2 with one worker. Negative values are candidate-minus-baseline
+p50 deltas.
+
+| Shape | Normal p50 R1 / R2 | Bootstrap p50 CI R1 / R2 |
+|---|---:|---:|
+| Tiny, 64 slides | -2.3623% / -3.0049% | [-2.6879%, -2.0374%] / [-3.3797%, -2.5492%] |
+| Medium, 4,096 slides | -3.4649% / -3.1917% | [-3.7343%, -3.3210%] / [-3.4637%, -2.6071%] |
+| Large, 8,192 slides | -2.6602% / -2.6279% | [-2.9133%, -2.2252%] / [-2.8134%, -2.3899%] |
+
+The predeclared keep gate requires at least 3% normal p50 improvement for
+medium and large in both repeats. Medium passes that latency threshold, but
+both large rows fail it, so the candidate is rejected although all normal
+bootstrap upper bounds are below zero. Every allocation metric is exactly
+equal, no adverse >5% elapsed or process-RSS flag is present, and the R1 tiny
+allocator p50 interval crosses zero. The fixed index adds 280 bytes of
+per-element state, so the evidence retains no speed or memory benefit claim.
+
+Supplementary phase clocks are separate public-API calls and exclude setup,
+warmups and checks. Their p50 deltas in R1/R2 are transaction -1.2255% /
+-3.8972%, snapshot opening -3.9477% / -5.6825%, commit -3.6631% / -4.1715%,
+add +0.1066% / +0.0797%, and publication -0.1857% / -0.2066%. Whole-process
+counters include setup, warmups and checks: instructions -3.3494%, cycles
+-3.0144%, branch misses +1.2247%, cache misses +1.2504%, branches -2.7522%,
+context switches -2.4540% and page faults +2.1945%. These are diagnostic scopes,
+not causal API attribution.
+
+Manual assembly review records 17 baseline `ElementAttrs::get` static call sites in
+`shape_builder` with a 1,400-byte frame and 17 candidate `ShapeAttrs::get_known`
+call sites with a 1,688-byte frame. Generic `ElementAttrs::get` remains 328 bytes.
+Indexed hits bypass the cached loop, while a defensive fallback remains. The
+automatic elimination field is not evidence. Candidate validation records 379
+ODP tests and warning-denied owner Clippy passing; the initial compile failure
+is preserved. All 387 harness tests pass (one ignored); both Rust files are
+restored byte-exact to `dbd2f8ece`. Final Clippy/docs/format/boundaries, portable
+replay, tamper rejection and owned temporary cleanup pass. 0460 remains accepted; no coverage is added, registry
+counts remain 439/36, the full non-iWork goal remains open, and iWork is
+excluded. See the [comparison summary](results/change-0462/summary.json), [phase summary](results/change-0462/phase-summary.json),
+[source review](results/change-0462/source-review.md), and [assembly review](results/change-0462/assembly-review.md).
+
 ## Change 0461: reject ODP attribute-match split on the practical gate
 
 0461 tests a private ODP attribute-cache split with the same frozen A1/B1/B2/A2

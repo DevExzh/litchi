@@ -1,5 +1,40 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0462: rejected shape-local index preserves ADR boundaries
+
+0462 evaluates a private fixed first-occurrence index for the seventeen typed
+shape attributes. It is confined to `ShapeAttrs`; generic `ElementAttrs`
+retains its existing layout and lookup path. The index records the first raw
+attribute only after the existing resolution and decode/harvest obligations,
+and indexed hits preserve lazy decoding, exact URI matching, malformed and
+decode error reachability, iterator progress, eager style fallback and
+drawing-attribute order. The index adds 280 bytes of per-element state, so the
+practical evidence rejects it rather than treating the private optimization as
+an architecture exception.
+
+The 24-report, 720-sample matrix records normal p50 deltas of -2.3623% /
+-3.0049% for tiny, -3.4649% / -3.1917% for medium, and -2.6602% / -2.6279%
+for large in R1/R2. Both large rows fail the predeclared 3% medium/large gate;
+all normal p50 bootstrap upper bounds are negative. Allocation metrics are
+exactly unchanged, the R1 tiny allocator interval crosses zero, and no adverse
+>5% elapsed or process-RSS flag is present. No retained speed or memory claim
+follows.
+
+The phase clocks cover public API calls without setup, warmups or checks;
+whole-process counters include those activities. Both are diagnostic and do
+not establish causal API attribution. Manual assembly confirms the indexed
+known-key path and its retained defensive fallback: `shape_builder` grows from
+1,400 to 1,688 bytes, while generic `ElementAttrs::get` remains 328 bytes.
+The automatic direct-call elimination heuristic is explicitly not evidence.
+Candidate validation records 379 ODP tests and warning-denied owner Clippy as
+passing, plus 387 harness tests (one ignored). Both Rust files are restored
+byte-exact to `dbd2f8ece`; final Clippy/docs/format/boundaries, portable replay,
+tamper rejection and owned temporary cleanup pass. The rejected experiment makes no public API,
+dependency, executor, clock, pool, unsafe-policy, validation-bypass or iWork
+ownership change. 0460 remains accepted, coverage remains 439 selectors / 36
+defaults, and the full non-iWork goal remains open. See the [comparison summary](results/change-0462/summary.json),
+[source review](results/change-0462/source-review.md), and [assembly review](results/change-0462/assembly-review.md).
+
 ## Change 0461: rejected attribute-match split preserves ADR boundaries
 
 0461 tests a private ODP `ElementAttrs` match split: namespace-first matching

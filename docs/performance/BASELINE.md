@@ -1,5 +1,41 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0462: reject ODP shape-attribute index on the practical gate
+
+0462 measures a private fixed seventeen-key first-occurrence index for shape
+parsing. Generic `ElementAttrs` retains its existing layout; typed `ShapeAttrs`
+hits use the index while preserving lazy decoding and exact namespace, iterator,
+first-occurrence, malformed/error and drawing-harvest behavior. The frozen
+A1/B1/B2/A2 matrix retains 24 reports and 720 samples; negative values are
+candidate-minus-baseline p50 deltas.
+
+| Shape | Normal p50 R1 / R2 | 95% p50 CI upper bounds R1 / R2 |
+|---|---:|---:|
+| Tiny, 64 slides | -2.3623% / -3.0049% | -2.0374% / -2.5492% |
+| Medium, 4,096 slides | -3.4649% / -3.1917% | -3.3210% / -2.6071% |
+| Large, 8,192 slides | -2.6602% / -2.6279% | -2.2252% / -2.3899% |
+
+The predeclared 3% medium/large gate rejects the candidate because both large
+rows miss the threshold, even though every normal p50 interval is negative.
+All allocation metrics are exactly equal and no adverse >5% elapsed or
+process-RSS flag is present. The fixed index adds 280 bytes of per-element
+state (`ElementAttrs` 144 to `ShapeAttrs` 424), and the R1 tiny allocator
+interval crosses zero, so no speed or memory benefit is retained.
+
+The supplementary phase clocks cover public API calls and exclude setup,
+warmups and checks; whole-process counters include those activities. Assembly
+shows `shape_builder` moving from 1,400 to 1,688 bytes of stack while the
+generic `ElementAttrs::get` frame stays 328 bytes. Indexed known-key hits skip
+the cached loop, but the defensive fallback remains; the automatic elimination
+heuristic is not evidence. Candidate 379 tests and warning-denied Clippy pass;
+387 harness tests pass (one ignored). Both Rust files are restored byte-exact
+to `dbd2f8ece`; final Clippy/docs/format/boundaries, portable replay, tamper
+rejection and owned temporary cleanup pass. 0460's
+accepted optimization remains retained, coverage stays 439 selectors / 36
+defaults, the full non-iWork goal remains open, and iWork is untouched. See the
+[comparison](results/change-0462/summary.json), [phase summary](results/change-0462/phase-summary.json),
+[source review](results/change-0462/source-review.md), and [assembly review](results/change-0462/assembly-review.md).
+
 ## Change 0461: reject ODP attribute-match split on the practical gate
 
 0461 measures a private ODP attribute-cache split that keeps namespace-first
