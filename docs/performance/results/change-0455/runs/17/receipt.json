@@ -1,0 +1,90 @@
+{
+  "status": "pass",
+  "lane": 17,
+  "lane_definition": {
+    "build": "baseline",
+    "provider": "bytes",
+    "corpus": "media-rich",
+    "repeat": "R1",
+    "instrumentation": "allocator"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0455/runs/17/resource.log",
+    "/tmp/litchi-goal-0455/baseline-allocator",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "bytes",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "cf35acf048b33b9e0fdfc87ba032749da3a3bcc8",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0455/runs/17/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-09-07T07:48:53.322186+00:00",
+  "binary": {
+    "path": "/tmp/litchi-goal-0455/baseline-allocator",
+    "sha256": "f63bd7a55911722ec2c88612827eeaeb577d56d2908a2af38ae570f7a8f5c944",
+    "bytes": 57598232
+  },
+  "build_manifest": {
+    "path": "baseline-build.json",
+    "sha256": "022ebe2f709f8546b3985cfb836af914b48583c51fef8693dfcb22cea64e4ada",
+    "bytes": 729
+  },
+  "source_before": {
+    "path": "sources/c03d99b31629b3b16d46202a46836c9cdaa8b30799cf133e3e181d60f64885b5.json",
+    "sha256": "c03d99b31629b3b16d46202a46836c9cdaa8b30799cf133e3e181d60f64885b5",
+    "files": 6672
+  },
+  "protocol_sha256": "dbb0543fc9bea8088e53d7bc4bba1741a91a0b07f896af0adf3e0a0ba279fef6",
+  "capture_sha256": "c0b91bd04e9986cf4f7d45eff498b7adfd066c2f0a27d6883a9c3136a4f649a4",
+  "exit_code": 0,
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0455/verify-report.py",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0455/runs/17/report.json"
+  ],
+  "oracle_exit_code": 0,
+  "finished_utc": "2026-09-07T07:48:59.084372+00:00",
+  "source_after": {
+    "path": "sources/c03d99b31629b3b16d46202a46836c9cdaa8b30799cf133e3e181d60f64885b5.json",
+    "sha256": "c03d99b31629b3b16d46202a46836c9cdaa8b30799cf133e3e181d60f64885b5",
+    "files": 6672
+  },
+  "source_unchanged": true,
+  "artifacts": {
+    "report.json": {
+      "path": "runs/17/report.json",
+      "sha256": "656004d114b292b6792d711028a822faade1873d169fe988b8a3b8acfb215529",
+      "bytes": 1896695
+    },
+    "resource.log": {
+      "path": "runs/17/resource.log",
+      "sha256": "8e59c795b4a2bd4c06c41b483f3b2a98623f78cb845fa3df8fe12196a9bee995",
+      "bytes": 991
+    },
+    "workload.log": {
+      "path": "runs/17/workload.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "oracle.log": {
+      "path": "runs/17/oracle.log",
+      "sha256": "60a701c519f001a3154cff819525e2182d7445ca934f259a7943d17b27ae510c",
+      "bytes": 340
+    }
+  }
+}

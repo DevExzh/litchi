@@ -1,0 +1,333 @@
+{
+  "scope": "Controlled whole-process perf stat diagnostic with fixed glibc mmap thresholds; not ordinary timing lanes or API-attributed counters. Original uncontrolled counters remain adverse. Page-fault association is supported; exact historical allocation/map decisions were not traced.",
+  "rows": [
+    {
+      "lane": 0,
+      "build": "baseline",
+      "mmap_threshold": 131072,
+      "counters": {
+        "cycles": 30034405507,
+        "instructions": 56276101126,
+        "branches": 7894990985,
+        "branch-misses": 135674282,
+        "cache-misses": 56098976,
+        "page-faults": 1779322
+      },
+      "median_ns": {
+        "open_source_ns": 440069.0,
+        "open_destination_ns": 268376.5,
+        "open_ns": 711371.0,
+        "plan_ns": 16578549.5,
+        "publication_ns": 21325859.5,
+        "api_sum_ns": 38618916.5
+      }
+    },
+    {
+      "lane": 1,
+      "build": "candidate",
+      "mmap_threshold": 131072,
+      "counters": {
+        "cycles": 29983096729,
+        "instructions": 56244175684,
+        "branches": 7889359173,
+        "branch-misses": 135959625,
+        "cache-misses": 54076456,
+        "page-faults": 1779244
+      },
+      "median_ns": {
+        "open_source_ns": 442322.0,
+        "open_destination_ns": 271031.5,
+        "open_ns": 717028.0,
+        "plan_ns": 16599788.0,
+        "publication_ns": 21180964.5,
+        "api_sum_ns": 38510565.0
+      }
+    },
+    {
+      "lane": 2,
+      "build": "candidate",
+      "mmap_threshold": 131072,
+      "counters": {
+        "cycles": 30043430594,
+        "instructions": 56273983486,
+        "branches": 7898594753,
+        "branch-misses": 136420448,
+        "cache-misses": 54860301,
+        "page-faults": 1779234
+      },
+      "median_ns": {
+        "open_source_ns": 449047.5,
+        "open_destination_ns": 273562.0,
+        "open_ns": 723159.0,
+        "plan_ns": 16670445.5,
+        "publication_ns": 21198942.5,
+        "api_sum_ns": 38585217.0
+      }
+    },
+    {
+      "lane": 3,
+      "build": "baseline",
+      "mmap_threshold": 131072,
+      "counters": {
+        "cycles": 30026426721,
+        "instructions": 56328590762,
+        "branches": 7912616531,
+        "branch-misses": 135888195,
+        "cache-misses": 56037111,
+        "page-faults": 1779232
+      },
+      "median_ns": {
+        "open_source_ns": 448517.0,
+        "open_destination_ns": 271086.5,
+        "open_ns": 720569.0,
+        "plan_ns": 16662953.5,
+        "publication_ns": 21332736.5,
+        "api_sum_ns": 38761338.0
+      }
+    },
+    {
+      "lane": 4,
+      "build": "baseline",
+      "mmap_threshold": 33554432,
+      "counters": {
+        "cycles": 26279225369,
+        "instructions": 50594434054,
+        "branches": 6918968564,
+        "branch-misses": 132813924,
+        "cache-misses": 56020272,
+        "page-faults": 713336
+      },
+      "median_ns": {
+        "open_source_ns": 423752.0,
+        "open_destination_ns": 268211.5,
+        "open_ns": 701558.5,
+        "plan_ns": 11891954.5,
+        "publication_ns": 12780474.0,
+        "api_sum_ns": 25363422.0
+      }
+    },
+    {
+      "lane": 5,
+      "build": "candidate",
+      "mmap_threshold": 33554432,
+      "counters": {
+        "cycles": 25220701639,
+        "instructions": 49000046953,
+        "branches": 6643680283,
+        "branch-misses": 131816416,
+        "cache-misses": 53473100,
+        "page-faults": 443020
+      },
+      "median_ns": {
+        "open_source_ns": 425327.0,
+        "open_destination_ns": 264386.0,
+        "open_ns": 694428.5,
+        "plan_ns": 11906675.0,
+        "publication_ns": 12614438.0,
+        "api_sum_ns": 25182230.0
+      }
+    },
+    {
+      "lane": 6,
+      "build": "candidate",
+      "mmap_threshold": 33554432,
+      "counters": {
+        "cycles": 25218514707,
+        "instructions": 49000480981,
+        "branches": 6643918403,
+        "branch-misses": 131786285,
+        "cache-misses": 52489333,
+        "page-faults": 443222
+      },
+      "median_ns": {
+        "open_source_ns": 430392.0,
+        "open_destination_ns": 263331.0,
+        "open_ns": 693154.0,
+        "plan_ns": 11893044.0,
+        "publication_ns": 12626853.5,
+        "api_sum_ns": 25224156.5
+      }
+    },
+    {
+      "lane": 7,
+      "build": "baseline",
+      "mmap_threshold": 33554432,
+      "counters": {
+        "cycles": 25232096171,
+        "instructions": 49010477004,
+        "branches": 6642724989,
+        "branch-misses": 131904694,
+        "cache-misses": 55533437,
+        "page-faults": 443897
+      },
+      "median_ns": {
+        "open_source_ns": 420427.0,
+        "open_destination_ns": 261442.0,
+        "open_ns": 685378.5,
+        "plan_ns": 11877240.0,
+        "publication_ns": 12769824.5,
+        "api_sum_ns": 25347951.5
+      }
+    }
+  ],
+  "pairs": [
+    {
+      "baseline_lane": 0,
+      "candidate_lane": 1,
+      "mmap_threshold": 131072,
+      "counter_percent": {
+        "cycles": -0.17083333974445836,
+        "instructions": -0.056730017469619476,
+        "branches": -0.07133398898998555,
+        "branch-misses": 0.2103147300974939,
+        "cache-misses": -3.605270798525806,
+        "page-faults": -0.0043836922153484
+      },
+      "median_percent": {
+        "open_source_ns": 0.5119651690984828,
+        "open_destination_ns": 0.989281848447976,
+        "open_ns": 0.7952249951150625,
+        "plan_ns": 0.12810831249139287,
+        "publication_ns": -0.6794333424169796,
+        "api_sum_ns": -0.28056587242679676
+      }
+    },
+    {
+      "baseline_lane": 3,
+      "candidate_lane": 2,
+      "mmap_threshold": 131072,
+      "counter_percent": {
+        "cycles": 0.056629692097565076,
+        "instructions": -0.09694415440061332,
+        "branches": -0.17720785463399835,
+        "branch-misses": 0.3916845021011639,
+        "cache-misses": -2.100054729802181,
+        "page-faults": 0.00011240805022350031
+      },
+      "median_percent": {
+        "open_source_ns": 0.11827868285929632,
+        "open_destination_ns": 0.91317715932,
+        "open_ns": 0.35943816622696634,
+        "plan_ns": 0.044962017087790684,
+        "publication_ns": -0.6271769212543354,
+        "api_sum_ns": -0.4543728598842445
+      }
+    },
+    {
+      "baseline_lane": 4,
+      "candidate_lane": 5,
+      "mmap_threshold": 33554432,
+      "counter_percent": {
+        "cycles": -4.027986803784089,
+        "instructions": -3.151309290856563,
+        "branches": -3.978747387758763,
+        "branch-misses": -0.7510567943162294,
+        "cache-misses": -4.5468754596550305,
+        "page-faults": -37.894624692991805
+      },
+      "median_percent": {
+        "open_source_ns": 0.3716796616889173,
+        "open_destination_ns": -1.4262997671613653,
+        "open_ns": -1.0163086898669182,
+        "plan_ns": 0.12378537102541998,
+        "publication_ns": -1.2991380444888012,
+        "api_sum_ns": -0.7143830986213184
+      }
+    },
+    {
+      "baseline_lane": 7,
+      "candidate_lane": 6,
+      "mmap_threshold": 33554432,
+      "counter_percent": {
+        "cycles": -0.053826142338542216,
+        "instructions": -0.020395686006446923,
+        "branches": 0.017965729455560187,
+        "branch-misses": -0.08976860216968197,
+        "cache-misses": -5.481569599230818,
+        "page-faults": -0.15206230274140697
+      },
+      "median_percent": {
+        "open_source_ns": 2.370209334795348,
+        "open_destination_ns": 0.7225311923868327,
+        "open_ns": 1.1344826252938978,
+        "plan_ns": 0.1330612162421474,
+        "publication_ns": -1.1196003515944963,
+        "api_sum_ns": -0.4883826608236941
+      }
+    }
+  ],
+  "ordinary_process_faults": [
+    {
+      "path": "runs/1",
+      "build": "baseline",
+      "api_p50_ns": 25408588.5,
+      "minor_faults": 383915
+    },
+    {
+      "path": "runs/5",
+      "build": "candidate",
+      "api_p50_ns": 25073766.5,
+      "minor_faults": 385813
+    },
+    {
+      "path": "runs/10",
+      "build": "candidate",
+      "api_p50_ns": 25073785.0,
+      "minor_faults": 384282
+    },
+    {
+      "path": "runs/14",
+      "build": "baseline",
+      "api_p50_ns": 30509613.5,
+      "minor_faults": 942424
+    },
+    {
+      "path": "confirmation/runs/0",
+      "build": "baseline",
+      "api_p50_ns": 25218518.5,
+      "minor_faults": 381894
+    },
+    {
+      "path": "confirmation/runs/1",
+      "build": "candidate",
+      "api_p50_ns": 25156543.5,
+      "minor_faults": 381238
+    },
+    {
+      "path": "confirmation/runs/2",
+      "build": "candidate",
+      "api_p50_ns": 25048007.5,
+      "minor_faults": 384290
+    },
+    {
+      "path": "confirmation/runs/3",
+      "build": "baseline",
+      "api_p50_ns": 25235127.5,
+      "minor_faults": 381380
+    },
+    {
+      "path": "confirmation/runs/4",
+      "build": "baseline",
+      "api_p50_ns": 25198697.5,
+      "minor_faults": 384415
+    },
+    {
+      "path": "confirmation/runs/5",
+      "build": "candidate",
+      "api_p50_ns": 25038092.0,
+      "minor_faults": 385300
+    },
+    {
+      "path": "confirmation/runs/6",
+      "build": "candidate",
+      "api_p50_ns": 25088671.5,
+      "minor_faults": 384289
+    },
+    {
+      "path": "confirmation/runs/7",
+      "build": "baseline",
+      "api_p50_ns": 34827191.5,
+      "minor_faults": 1221860
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0455/formal/profile-stacks.py", line 13, in <module>
+    r=subprocess.run(['perf','report','--stdio','--stdio-color','never',option,'--percent-limit','0.5','-i',str(data)],capture_output=True,text=True);(directory/(name+'.txt')).write_text(r.stdout+r.stderr);assert r.returncode==0,r.stderr
+                                                                                                                                                                                                                     ^^^^^^^^^^^^^^^
+AssertionError

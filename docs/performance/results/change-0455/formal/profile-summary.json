@@ -1,0 +1,153 @@
+{
+  "scope": "separate whole-process counters including corpus generation, untimed output oracles and serialization; not API-attributed counters or ordinary timing samples",
+  "rows": [
+    {
+      "lane": 0,
+      "build": "baseline",
+      "counters": {
+        "cycles": {
+          "count": 25044398831,
+          "event_runtime_ns": 5610590912,
+          "running_percent": 100.0
+        },
+        "instructions": {
+          "count": 48727096212,
+          "event_runtime_ns": 5610590912,
+          "running_percent": 100.0
+        },
+        "branches": {
+          "count": 6596360508,
+          "event_runtime_ns": 5610590912,
+          "running_percent": 100.0
+        },
+        "branch-misses": {
+          "count": 131737842,
+          "event_runtime_ns": 5610590912,
+          "running_percent": 100.0
+        },
+        "cache-misses": {
+          "count": 55457703,
+          "event_runtime_ns": 5610590912,
+          "running_percent": 100.0
+        },
+        "page-faults": {
+          "count": 381362,
+          "event_runtime_ns": 5610590912,
+          "running_percent": 100.0
+        }
+      },
+      "ipc": 1.945628503235842
+    },
+    {
+      "lane": 1,
+      "build": "candidate",
+      "counters": {
+        "cycles": {
+          "count": 28072679263,
+          "event_runtime_ns": 6260803450,
+          "running_percent": 100.0
+        },
+        "instructions": {
+          "count": 53276450702,
+          "event_runtime_ns": 6260803450,
+          "running_percent": 100.0
+        },
+        "branches": {
+          "count": 7378883434,
+          "event_runtime_ns": 6260803450,
+          "running_percent": 100.0
+        },
+        "branch-misses": {
+          "count": 134368007,
+          "event_runtime_ns": 6260803450,
+          "running_percent": 100.0
+        },
+        "cache-misses": {
+          "count": 55185603,
+          "event_runtime_ns": 6260803450,
+          "running_percent": 100.0
+        },
+        "page-faults": {
+          "count": 1222902,
+          "event_runtime_ns": 6260803450,
+          "running_percent": 100.0
+        }
+      },
+      "ipc": 1.8978042745003951
+    },
+    {
+      "lane": 2,
+      "build": "candidate",
+      "counters": {
+        "cycles": {
+          "count": 28079100891,
+          "event_runtime_ns": 6267038980,
+          "running_percent": 100.0
+        },
+        "instructions": {
+          "count": 53174478995,
+          "event_runtime_ns": 6267038980,
+          "running_percent": 100.0
+        },
+        "branches": {
+          "count": 7354522318,
+          "event_runtime_ns": 6267038980,
+          "running_percent": 100.0
+        },
+        "branch-misses": {
+          "count": 134259088,
+          "event_runtime_ns": 6267038980,
+          "running_percent": 100.0
+        },
+        "cache-misses": {
+          "count": 54672798,
+          "event_runtime_ns": 6267038980,
+          "running_percent": 100.0
+        },
+        "page-faults": {
+          "count": 1211094,
+          "event_runtime_ns": 6267038980,
+          "running_percent": 100.0
+        }
+      },
+      "ipc": 1.8937386635497166
+    },
+    {
+      "lane": 3,
+      "build": "baseline",
+      "counters": {
+        "cycles": {
+          "count": 25091973394,
+          "event_runtime_ns": 5600347765,
+          "running_percent": 100.0
+        },
+        "instructions": {
+          "count": 48708679472,
+          "event_runtime_ns": 5600347765,
+          "running_percent": 100.0
+        },
+        "branches": {
+          "count": 6590916736,
+          "event_runtime_ns": 5600347765,
+          "running_percent": 100.0
+        },
+        "branch-misses": {
+          "count": 131826131,
+          "event_runtime_ns": 5600347765,
+          "running_percent": 100.0
+        },
+        "cache-misses": {
+          "count": 56201393,
+          "event_runtime_ns": 5600347765,
+          "running_percent": 100.0
+        },
+        "page-faults": {
+          "count": 381365,
+          "event_runtime_ns": 5600347765,
+          "running_percent": 100.0
+        }
+      },
+      "ipc": 1.941205608150662
+    }
+  ]
+}

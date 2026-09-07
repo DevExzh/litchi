@@ -1,5 +1,24 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0455: private ZIP transfer bound
+
+[0455](changes/0455-zip-preservation-transfer-chunks.md) changes only the private
+ZIP copy chunk from 32 to 64 KiB in the measured production delta. ZIP retains
+preparation/layout validation, exact-read loops and accepted-byte accounting;
+OPC/PPTX retain source identity, limits, cancellation and typed refusals. A
+smaller remaining output budget can refuse the larger requested write earlier;
+accepted partial output remains exact. No public API, dependency, worker or
+ownership bypass is introduced. Additional stack is fixed at 32 KiB per active
+publication; ODF's buffer and memory formula are unchanged.
+
+Matched source manifests include the same regression and benchmark instrumentation.
+The journal captures sink summaries after the timer and allocator region close;
+it does not expose or substitute for the ZIP raw accepted-byte counter. Release
+evidence covers 2,188 passing tests and 1,000 sanitizer fuzz runs. The accepted
+ADR tree is unchanged. Range improvement, all timing flags, adverse original
+CPU counters and diagnostic limits are retained in the
+[review](results/change-0455/review.md). The full non-iWork goal remains open.
+
 ## Change 0454: source-proven XML publication
 
 0454 preserves the accepted ownership and resource/error boundaries while

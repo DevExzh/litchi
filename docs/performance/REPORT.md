@@ -1,5 +1,23 @@
 # Performance program phase report
 
+## Change 0455: fewer bounded preservation transfers
+
+The [0455 batch](changes/0455-zip-preservation-transfer-chunks.md) retains a
+64 KiB ZIP copy buffer with exact short-read/partial-sink accounting tests and
+untimed PPTX sink summaries. Media range publication drops 256 requests while
+preserving byte counts and output; API medians improve 4.775%/4.449% across
+repeats. Stack cost increases by a fixed 32 KiB per active publication.
+
+The 720 formal samples retain all 19 timing flags. Separate 240-sample ordinary
+confirmation and 240-sample allocator-policy diagnostics investigate variable
+bytes-only timings and adverse original perf counters (+9.25% instructions,
++12.00% cycles). The evidence supports allocator paging variability across both
+builds; exact historical mapping decisions remain unresolved. No CPU gain is
+claimed. Release checks pass 2,188 tests (6 ignored), strict lint, rustdoc,
+formatting, workspace/boundaries and 1,000 sanitizer fuzz runs. The native QA
+self-pair preserves its exact previous output through both providers. Full
+non-iWork completion remains open; see the [bundle](results/change-0455/README.md).
+
 ## Change 0454: source-proven unnamed-slide PPTX copy
 
 0454 is a source-preservation capability phase. Three recorded refusal

@@ -1,0 +1,16 @@
+{
+  "status": "pass",
+  "verifier_sha256": "619da5fe218b57d8db0b2195d6d43f5b48401d15db32c24a8b1020dda52b4994",
+  "results": [
+    {
+      "largest_write": 1,
+      "status": "rejected",
+      "error": "sink largest write contradicts histogram"
+    },
+    {
+      "largest_write": 18446744073709551615,
+      "status": "rejected",
+      "error": "sink largest write contradicts histogram"
+    }
+  ]
+}

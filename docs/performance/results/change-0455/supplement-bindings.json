@@ -1,0 +1,12 @@
+{
+  "scope": "Final replay binding for separately declared investigation and cleanup drivers; does not alter frozen captures or earlier gate bindings.",
+  "files": {
+    "formal/allocator-regime.py": "0230c4e4217caa68b9794cc3b93ca4aa268fd4210cbc5f52bb978fade9203a17",
+    "formal/allocator-regime-protocol.json": "ad97c873af86502fd162f19d147a818443ee785ed144003e1422e18e8511f42f",
+    "formal/diagnostic-summary.py": "b819cf378b32829a7652a412b0019b13f36c01a7c8ce0d16d1b274466319224c",
+    "formal/profile-stacks-local.py": "449f33b188309b2abac4f287010985a18ffd6b293832017d1173f7741fbf3df4",
+    "formal/verify-final-negative.py": "8085a25673752d4bd08909458eaa7d391eaf211acb362c5f24523304bd05ad06",
+    "cleanup.py": "b500106a400a2e9d2779926d3b404611e9fbe54e779d84bfb30e9aed0d8409d6",
+    "portable-verify.py": "5cdd98736ca11ed7ee73d735cb91f7bd20ccf6da242a09dd300ea645afa6791a"
+  }
+}

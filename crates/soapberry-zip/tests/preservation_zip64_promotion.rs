@@ -36,7 +36,7 @@ const GENERATED_NAME: &str = "generated.bin";
 const GENERATED_PAYLOAD: &[u8] = b"generated after the ZIP64 offset";
 const ZIP64_EXTENSIBLE_DATA: &[u8] = &[0xa1, 0xb2, 0xc3, 0xd4];
 const ARCHIVE_COMMENT: &[u8] = b"sparse ZIP64 preservation comment";
-const COPY_CHUNK_SIZE: usize = 32 * 1024;
+const COPY_CHUNK_SIZE: usize = 64 * 1024;
 const MAX_LOCATOR_PROBE: u64 = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone)]

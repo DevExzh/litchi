@@ -1,5 +1,22 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0455: bounded ZIP transfer chunks
+
+[0455](changes/0455-zip-preservation-transfer-chunks.md) uses a 64 KiB unchanged
+ZIP transfer buffer. The 720-sample matched matrix retains identical output,
+transferred bytes and managed budgets. Media publication reads fall 833→577 and
+sink writes 1,023→767. Simulated range API medians improve 4.775%/4.449%; publication
+improves 9.227%/8.606%. Fixed stack grows 32 KiB per active publication; operation
+allocation counts and bytes are unchanged.
+
+All 19 formal timing flags remain visible, including source-open p99 +28.241%
+and combined-open p99 +12.929% in range/media R1. Original whole-process perf
+counters are adverse (+9.25% instructions, +12.00% cycles). Separate ordinary
+confirmation and fixed allocator-policy diagnostics show slow/high-page-fault
+regimes in both builds; exact historical mapping decisions remain untraced.
+No CPU or large bytes-only speedup is claimed. See the
+[bundle](results/change-0455/README.md) for retained diagnostics and release evidence.
+
 ## Change 0454: source-proven unnamed-slide PPTX copy
 
 0454 is a measured capability prerequisite. Its

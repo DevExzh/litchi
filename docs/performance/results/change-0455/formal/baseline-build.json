@@ -1,0 +1,21 @@
+{
+  "revision": "cf35acf048b33b9e0fdfc87ba032749da3a3bcc8",
+  "source_manifest": {
+    "path": "sources/19393c9634f9e382743258c46ae43b25d9758180f9098f1f972df177abca1ef4.json",
+    "sha256": "19393c9634f9e382743258c46ae43b25d9758180f9098f1f972df177abca1ef4",
+    "files": 6672
+  },
+  "build_receipt": "checks/baseline-build.json",
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0455/formal-baseline-normal",
+      "sha256": "51a54694b7ac375ed6b939d0f99e094eec7594cfd07f706e74c54389fb1ab1c3",
+      "bytes": 57784160
+    },
+    "allocator": {
+      "path": "/tmp/litchi-goal-0455/formal-baseline-allocator",
+      "sha256": "3ff064a43bd3cd7246aada04d55d5c7ef74eff01c3b756cc32e43bd54f9fb344",
+      "bytes": 57610176
+    }
+  }
+}

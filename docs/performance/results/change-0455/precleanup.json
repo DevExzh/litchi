@@ -1,0 +1,26 @@
+{
+  "status": "pass",
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0455/formal/verify.py",
+    "--precleanup"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "verifier_sha256": "619da5fe218b57d8db0b2195d6d43f5b48401d15db32c24a8b1020dda52b4994",
+  "source_before": {
+    "path": "sources/c65afdff205766047a72c447f4fb076009993073a5cce6f7befabb04f7d5612b.json",
+    "sha256": "c65afdff205766047a72c447f4fb076009993073a5cce6f7befabb04f7d5612b",
+    "files": 6672
+  },
+  "source_after": {
+    "path": "sources/c65afdff205766047a72c447f4fb076009993073a5cce6f7befabb04f7d5612b.json",
+    "sha256": "c65afdff205766047a72c447f4fb076009993073a5cce6f7befabb04f7d5612b",
+    "files": 6672
+  },
+  "started_utc": "2026-09-07T08:44:15.861869+00:00",
+  "finished_utc": "2026-09-07T08:44:19.286254+00:00",
+  "stdout": "{\"allocator_policy_diagnostic_samples\": 240, \"change\": 455, \"confirmation_samples\": 240, \"fuzz_gates\": 3, \"lanes\": 24, \"passed_tests\": 2188, \"required_release_gates\": 10, \"review_flags\": 19, \"samples\": 720, \"status\": \"pass\"}\n",
+  "stderr": ""
+}

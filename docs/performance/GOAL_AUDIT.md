@@ -1,6 +1,33 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current audit: 0454 evidence (2026-09-07)
+## Current audit: 0455 evidence (2026-09-07)
+
+The full non-iWork goal remains open. [0455](changes/0455-zip-preservation-transfer-chunks.md)
+retains a 64 KiB ZIP preservation buffer: 256 fewer media publication reads and
+sink writes, identical byte counts/output, and simulated range API median
+improvements 4.775%/4.449%. It adds 32 KiB fixed stack per active publication;
+operation allocation counts and bytes do not change.
+
+The evidence contains 720 formal samples, 240 separate ordinary confirmation
+samples and 240 fixed allocator-policy diagnostic samples. Original adverse
+whole-process CPU counters and all 19 formal timing flags remain disclosed.
+Slow/high-page-fault processes appear in both builds; controlled allocator
+policy supports paging variability without reconstructing historical mapping
+decisions. No CPU or large bytes-only gain is claimed. Release checks pass
+2,188 tests (6 ignored), strict lint, documentation, formatting, minimal workspace,
+boundaries and 1,000 sanitizer fuzz runs. The native self-pair produces its
+previous exact output via bytes/range; this adds no native-application roundtrip
+or distinct-package evidence.
+
+Coverage remains 438 selectors, 36 defaults, 15 categories, 33 representative
+mappings, 10 measured mappings and 23 correctness-only mappings. This transfer
+optimization promotes no coverage rows. Broader semantic CRUD, native application
+roundtrips, distinct-package pairs, physical cold I/O, bounded existing-document
+append/repackaging and representative worker scaling remain incomplete.
+See the [0455 bundle](results/change-0455/README.md) for capture custody,
+verification and owned cleanup. User-owned `docs/GOAL.md` remains unchanged.
+
+## Prior audit: 0454 evidence (2026-09-07)
 
 The full non-iWork goal remains open. The 0454 production source epoch
 implements three recorded boundary fixes: the baseline optional

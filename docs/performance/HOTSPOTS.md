@@ -1,5 +1,23 @@
 # Performance hotspot inventory
 
+## Change 0455: fewer unchanged destination requests
+
+[0455](changes/0455-zip-preservation-transfer-chunks.md) doubles the fixed ZIP
+copy buffer to 64 KiB, removing 256 media publication requests and sink writes.
+The range API median improves 4.775%/4.449%. Candidate R2 still spends about
+51.493 ms opening, 796.157 ms planning and 834.024 ms publishing (1,681.794 ms
+API sum). Publication source reads remain zero; destination reads are 577.
+Two roughly 16 MiB transfers at the simulated 25 MiB/s already imply about
+1.28 seconds of nominal transfer delay. This is not physical network evidence.
+
+Whole-process profiles are dominated by corpus compression and hashing. The
+original candidate counter increases remain adverse and cannot be attributed
+solely to the timed API. Slow/high-page-fault baseline processes and controlled
+glibc mmap-policy runs support substantial allocator variability; no CPU gain
+is claimed. Native application, distinct-package, physical cold-I/O, bounded
+existing-document append/repackaging and worker-scaling evidence remain open.
+See [diagnostic results](results/change-0455/formal/diagnostic-summary.md).
+
 ## Change 0454: source-proof publication and measured controls
 
 The immediate 0454 scope was capability refusal rather than measured CPU: the

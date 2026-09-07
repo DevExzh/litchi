@@ -18,7 +18,7 @@ use std::io::Write;
 use std::ops::Range;
 use std::sync::Arc;
 
-const COPY_CHUNK_SIZE: usize = 32 * 1024;
+const COPY_CHUNK_SIZE: usize = 64 * 1024;
 const CENTRAL_LOCAL_HEADER_OFFSET: Range<usize> = 42..46;
 const ZIP64_LOCATOR_SIZE: usize = 20;
 const ZIP64_EOCD_FIXED_SIZE: usize = 56;
@@ -2440,6 +2440,43 @@ mod tests {
         reads: RefCell<Vec<(u64, usize)>>,
     }
 
+    #[derive(Debug)]
+    struct ShortCountingReader {
+        data: Vec<u8>,
+        reads: RefCell<Vec<(u64, usize, usize)>>,
+        max_return: usize,
+    }
+
+    impl ShortCountingReader {
+        fn new(data: Vec<u8>, max_return: usize) -> Self {
+            assert!(max_return > 0);
+            Self {
+                data,
+                reads: RefCell::new(Vec::new()),
+                max_return,
+            }
+        }
+
+        fn clear_reads(&self) {
+            self.reads.borrow_mut().clear();
+        }
+
+        fn reads(&self) -> Vec<(u64, usize, usize)> {
+            self.reads.borrow().clone()
+        }
+    }
+
+    impl ReaderAt for ShortCountingReader {
+        fn read_at(&self, buffer: &mut [u8], offset: u64) -> io::Result<usize> {
+            let requested = buffer.len();
+            let bytes = self.data.get(offset as usize..).unwrap_or_default();
+            let returned = bytes.len().min(requested).min(self.max_return);
+            buffer[..returned].copy_from_slice(&bytes[..returned]);
+            self.reads.borrow_mut().push((offset, requested, returned));
+            Ok(returned)
+        }
+    }
+
     impl CountingReader {
         fn new(data: Vec<u8>) -> Self {
             Self {
@@ -2488,6 +2525,15 @@ mod tests {
             .unwrap();
         deflated_file(&mut writer, "second.bin", b"deflated data");
         writer.new_dir("folder/").create().unwrap();
+        writer.finish().unwrap()
+    }
+
+    fn large_stored_archive() -> Vec<u8> {
+        let payload = (0..(192 * 1024 + 17))
+            .map(|index| u8::try_from(index % 251).unwrap())
+            .collect::<Vec<_>>();
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        writer.write_stored_file("large.bin", &payload).unwrap();
         writer.finish().unwrap()
     }
 
@@ -3159,6 +3205,81 @@ mod tests {
         for (read, span) in reads.iter().zip(expected) {
             assert_eq!(*read, (span.start, (span.end - span.start) as usize));
         }
+    }
+
+    #[test]
+    fn copy_all_handles_short_reads_and_partial_sink_at_chunk_boundary() {
+        let data = large_stored_archive();
+        let end_offset = data.len() as u64;
+        let archive = crate::ZipLocator::new()
+            .locate_in_reader(
+                ShortCountingReader::new(data.clone(), 4096),
+                &mut [0; 64],
+                end_offset,
+            )
+            .unwrap();
+        let mut buffer = vec![0; crate::RECOMMENDED_BUFFER_SIZE];
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let local_span = index.entries()[0].local_span();
+        let local_span_len = usize::try_from(local_span.end - local_span.start).unwrap();
+        assert!(local_span_len > 128 * 1024);
+        archive.get_ref().clear_reads();
+
+        let mut accounting = ZipOperationAccounting::default();
+        let output = index
+            .write_to_with_accounting(
+                &PreservationPlan::copy_all(&index),
+                Vec::new(),
+                &mut accounting,
+            )
+            .unwrap();
+        let reads = archive.get_ref().reads();
+        assert_eq!(output, data);
+        assert!(
+            reads
+                .iter()
+                .any(|(_, requested, returned)| { *requested > *returned && *returned > 0 })
+        );
+        assert!(reads.iter().all(|(_, requested, returned)| {
+            *requested <= COPY_CHUNK_SIZE && *returned > 0 && *returned <= *requested
+        }));
+        assert_eq!(
+            reads
+                .iter()
+                .filter(|(_, requested, _)| *requested == COPY_CHUNK_SIZE)
+                .count(),
+            local_span_len / COPY_CHUNK_SIZE
+        );
+        let expected_raw = local_span_len as u64
+            + index
+                .entries()
+                .iter()
+                .map(|entry| {
+                    (entry.central_record().end - entry.central_record().start)
+                        - CENTRAL_LOCAL_HEADER_OFFSET.len() as u64
+                })
+                .sum::<u64>();
+        assert_eq!(
+            accounting.raw_unchanged_source_bytes_accepted(),
+            expected_raw
+        );
+
+        let fail_after = COPY_CHUNK_SIZE + 3;
+        let mut sink = PartialFailingSink::new(fail_after, 4096);
+        let mut partial_accounting = ZipOperationAccounting::default();
+        let error = index
+            .write_to_with_accounting(
+                &PreservationPlan::copy_all(&index),
+                &mut sink,
+                &mut partial_accounting,
+            )
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert_eq!(sink.bytes, data[..fail_after]);
+        assert_eq!(
+            partial_accounting.raw_unchanged_source_bytes_accepted(),
+            sink.bytes.len() as u64
+        );
     }
 
     #[test]

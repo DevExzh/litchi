@@ -261,6 +261,7 @@ struct LifecycleRow {
     output_sha256: String,
     output_bytes: usize,
     timings: TimingRecord,
+    publication_sink: crate::SinkSummary,
     phases: Vec<PhaseRecord>,
 }
 
@@ -886,13 +887,14 @@ fn run_lifecycle_iteration(
     let published = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
     let publication_ns = crate::elapsed_ns(publication_started.elapsed())?;
     let publication_allocation_metrics = publication_allocation_region.finish();
+    let publication_sink = sink.summary();
     if published.destination_slide_count() != corpus.destination_slide_count + 1
         || published.insertion_position() != corpus.insertion_position
         || published.name() != corpus.source_slide_name
         || sink.bytes != corpus.source_backed_expected_output
-        || sink.summary().accepted_bytes
+        || publication_sink.accepted_bytes
             != u64::try_from(corpus.source_backed_expected_output.len())?
-        || sink.summary().largest_write > pptx_cache_retention::MAX_WRITE
+        || publication_sink.largest_write > pptx_cache_retention::MAX_WRITE
     {
         return Err("provider lifecycle publication differs from exact output oracle".into());
     }
@@ -1060,6 +1062,7 @@ fn run_lifecycle_iteration(
             plan_allocation_metrics,
             publication_allocation_metrics,
         },
+        publication_sink,
         phases,
     })
 }

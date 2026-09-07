@@ -1,0 +1,15 @@
+{
+  "scope": "Final replay binding for auxiliary gate and analysis scripts; recorded after initial gate executions. No capture protocol or receipt was changed.",
+  "recorded_utc": "2026-09-07T08:14:27.770566+00:00",
+  "files": {
+    "run-checks.py": "806bd27a416bfccec71a84e792ea52fc3f2f518683f479e79c8ec86c3de282b7",
+    "run-fuzz.py": "da42ec47f9a0241bdf8b420cb90a1c0f6c34ed900555f42b357213e6ffab5167",
+    "native.py": "386945b08f42ddd04471837b11d11f0130b28f230a5348ad88b90a80eda47c1c",
+    "native-expected.json": "4073db260b900324ea80d1af678e3a9d92607ce658ddc3e21c011de0f25b504f",
+    "profile.py": "4e5bd02558b150fd997096a503796bd3fa4258f6b8b1c637362ddb557073ec6a",
+    "profile-summary.py": "392282ac8e8101da16c29a84d81a78d4d0c37f0fc5bd633cfb5296b98675e75f",
+    "allocation-summary.py": "0f734babdcba0740a7e83ef6732bac1f0041dd6bad79bd9688438f648eaebb2d",
+    "retain-build.py": "c98d7948af7fac3b76decaa294ea80cf1e822b18e6f0d7216e59b08f8513e763",
+    "verify-negative.py": "d7ce7a890ee36fc3abe8ca2ce2f8755c294b3bb65c0eb3cc8aa4eb01c7b1db6a"
+  }
+}

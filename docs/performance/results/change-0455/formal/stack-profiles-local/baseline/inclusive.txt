@@ -1,0 +1,240 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 973  of event 'instructions'
+# Event count (approx.): 48650000000
+#
+# Children      Self  Command          Shared Object           Symbol                                                                                                                                                                                                                                                                                                 
+# ........  ........  ...............  ......................  .......................................................................................................................................................................................................................................................................................................
+#
+    42.75%    42.75%  formal-baseline  formal-baseline-normal  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+    23.74%    23.74%  formal-baseline  formal-baseline-normal  [.] sha2::sha256::x86_sha::compress
+    12.23%    12.23%  formal-baseline  formal-baseline-normal  [.] zlib_rs::deflate::longest_match::longest_match
+     3.39%     1.54%  formal-baseline  libc.so.6               [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+               |          
+                --1.64%--0xffffffff8c800bb7
+                          0xffffffff8df1c2e3
+                          |          
+                           --1.23%--0xffffffff8cc1a38e
+                                     0xffffffff8d0004de
+                                     0xffffffff8d000153
+                                     |          
+                                      --1.13%--0xffffffff8cfffc80
+                                                |          
+                                                 --0.72%--0xffffffff8cffe882
+                                                           |          
+                                                            --0.62%--0xffffffff8cffe429
+                                                                      0xffffffff8d0807bb
+
+     3.39%     3.39%  formal-baseline  formal-baseline-normal  [.] litchi_perf_baseline::payload_bytes
+            |          
+             --0.62%--litchi_perf_baseline::payload_bytes
+
+     3.19%     3.19%  formal-baseline  formal-baseline-normal  [.] <zlib_rs::deflate::Heap>::pqdownheap
+     2.57%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8c800bb7
+            |
+            ---0xffffffff8c800bb7
+               0xffffffff8df1c2e3
+               |          
+                --2.16%--0xffffffff8cc1a38e
+                          0xffffffff8d0004de
+                          0xffffffff8d000153
+                          |          
+                           --2.06%--0xffffffff8cfffc80
+                                     |          
+                                     |--0.82%--0xffffffff8cffe882
+                                     |          |          
+                                     |           --0.72%--0xffffffff8cffe429
+                                     |                     0xffffffff8d0807bb
+                                     |          
+                                     |--0.62%--0xffffffff8cffea04
+                                     |          0xffffffff8cf9bccf
+                                     |          0xffffffff8cf9a679
+                                     |          
+                                      --0.62%--0xffffffff8cffe90a
+                                                |          
+                                                 --0.51%--0xffffffff8df2eb27
+
+     2.57%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8df1c2e3
+            |
+            ---0xffffffff8df1c2e3
+               |          
+                --2.16%--0xffffffff8cc1a38e
+                          0xffffffff8d0004de
+                          0xffffffff8d000153
+                          |          
+                           --2.06%--0xffffffff8cfffc80
+                                     |          
+                                     |--0.82%--0xffffffff8cffe882
+                                     |          |          
+                                     |           --0.72%--0xffffffff8cffe429
+                                     |                     0xffffffff8d0807bb
+                                     |          
+                                     |--0.62%--0xffffffff8cffea04
+                                     |          0xffffffff8cf9bccf
+                                     |          0xffffffff8cf9a679
+                                     |          
+                                      --0.62%--0xffffffff8cffe90a
+                                                |          
+                                                 --0.51%--0xffffffff8df2eb27
+
+     2.16%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8cc1a38e
+            |
+            ---0xffffffff8cc1a38e
+               0xffffffff8d0004de
+               0xffffffff8d000153
+               |          
+                --2.06%--0xffffffff8cfffc80
+                          |          
+                          |--0.82%--0xffffffff8cffe882
+                          |          |          
+                          |           --0.72%--0xffffffff8cffe429
+                          |                     0xffffffff8d0807bb
+                          |          
+                          |--0.62%--0xffffffff8cffea04
+                          |          0xffffffff8cf9bccf
+                          |          0xffffffff8cf9a679
+                          |          
+                           --0.62%--0xffffffff8cffe90a
+                                     |          
+                                      --0.51%--0xffffffff8df2eb27
+
+     2.16%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8d0004de
+            |
+            ---0xffffffff8d0004de
+               0xffffffff8d000153
+               |          
+                --2.06%--0xffffffff8cfffc80
+                          |          
+                          |--0.82%--0xffffffff8cffe882
+                          |          |          
+                          |           --0.72%--0xffffffff8cffe429
+                          |                     0xffffffff8d0807bb
+                          |          
+                          |--0.62%--0xffffffff8cffea04
+                          |          0xffffffff8cf9bccf
+                          |          0xffffffff8cf9a679
+                          |          
+                           --0.62%--0xffffffff8cffe90a
+                                     |          
+                                      --0.51%--0xffffffff8df2eb27
+
+     2.16%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8d000153
+            |
+            ---0xffffffff8d000153
+               |          
+                --2.06%--0xffffffff8cfffc80
+                          |          
+                          |--0.82%--0xffffffff8cffe882
+                          |          |          
+                          |           --0.72%--0xffffffff8cffe429
+                          |                     0xffffffff8d0807bb
+                          |          
+                          |--0.62%--0xffffffff8cffea04
+                          |          0xffffffff8cf9bccf
+                          |          0xffffffff8cf9a679
+                          |          
+                           --0.62%--0xffffffff8cffe90a
+                                     |          
+                                      --0.51%--0xffffffff8df2eb27
+
+     2.06%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8cfffc80
+            |
+            ---0xffffffff8cfffc80
+               |          
+               |--0.82%--0xffffffff8cffe882
+               |          |          
+               |           --0.72%--0xffffffff8cffe429
+               |                     0xffffffff8d0807bb
+               |          
+               |--0.62%--0xffffffff8cffea04
+               |          0xffffffff8cf9bccf
+               |          0xffffffff8cf9a679
+               |          
+                --0.62%--0xffffffff8cffe90a
+                          |          
+                           --0.51%--0xffffffff8df2eb27
+
+     1.75%     1.75%  formal-baseline  formal-baseline-normal  [.] crc32fast::specialized::pclmulqdq::calculate
+     1.54%     1.54%  formal-baseline  libc.so.6               [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+
+     1.03%     0.10%  formal-baseline  libc.so.6               [.] __memset_avx512_unaligned_erms
+            |
+            ---__memset_avx512_unaligned_erms
+               |          
+                --0.92%--0xffffffff8c800bb7
+                          0xffffffff8df1c2e3
+                          0xffffffff8cc1a38e
+                          0xffffffff8d0004de
+                          0xffffffff8d000153
+                          0xffffffff8cfffc80
+                          |          
+                           --0.51%--0xffffffff8cffea04
+                                     0xffffffff8cf9bccf
+                                     0xffffffff8cf9a679
+
+     0.82%     0.82%  formal-baseline  [unknown]               [k] 0xffffffff8c800ef0
+     0.82%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8cffe882
+            |
+            ---0xffffffff8cffe882
+               |          
+                --0.72%--0xffffffff8cffe429
+                          0xffffffff8d0807bb
+
+     0.72%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8cffe429
+            |
+            ---0xffffffff8cffe429
+               0xffffffff8d0807bb
+
+     0.72%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8d0807bb
+            |
+            ---0xffffffff8d0807bb
+
+     0.62%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8cffea04
+            |
+            ---0xffffffff8cffea04
+               0xffffffff8cf9bccf
+               0xffffffff8cf9a679
+
+     0.62%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8cf9bccf
+            |
+            ---0xffffffff8cf9bccf
+               0xffffffff8cf9a679
+
+     0.62%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8cf9a679
+            |
+            ---0xffffffff8cf9a679
+
+     0.62%     0.00%  formal-baseline  [unknown]               [.] 0xffffffff8cffe90a
+            |
+            ---0xffffffff8cffe90a
+               |          
+                --0.51%--0xffffffff8df2eb27
+
+     0.51%     0.00%  formal-baseline  libc.so.6               [.] _int_free_chunk
+            |
+            ---_int_free_chunk
+
+     0.51%     0.51%  formal-baseline  [unknown]               [k] 0xffffffff8df2eb27
+     0.51%     0.51%  formal-baseline  formal-baseline-normal  [.] zlib_rs::deflate::slide_hash::avx2::slide_hash_chain
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
+Warning:
+Kernel address maps (/proc/{kallsyms,modules}) were restricted.
+
+Check /proc/sys/kernel/kptr_restrict before running 'perf record'.
+
+As no suitable kallsyms nor vmlinux was found, kernel samples
+can't be resolved.
+
+Samples in kernel modules can't be resolved as well.
+

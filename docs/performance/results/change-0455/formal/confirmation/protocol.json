@@ -1,0 +1,103 @@
+{
+  "change": 455,
+  "status": "frozen",
+  "frozen_utc": "2026-09-07T08:09:46.180104+00:00",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "lanes": [
+    {
+      "build": "baseline",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "C1",
+      "instrumentation": "normal"
+    },
+    {
+      "build": "candidate",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "C1",
+      "instrumentation": "normal"
+    },
+    {
+      "build": "candidate",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "C2",
+      "instrumentation": "normal"
+    },
+    {
+      "build": "baseline",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "C2",
+      "instrumentation": "normal"
+    },
+    {
+      "build": "baseline",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "C3",
+      "instrumentation": "normal"
+    },
+    {
+      "build": "candidate",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "C3",
+      "instrumentation": "normal"
+    },
+    {
+      "build": "candidate",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "C4",
+      "instrumentation": "normal"
+    },
+    {
+      "build": "baseline",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "C4",
+      "instrumentation": "normal"
+    }
+  ],
+  "corpora": {
+    "plain": {
+      "source_archive_sha256": "8ab4513642f48d99fa46e83b2c2764e8b20d417d3933ce3d5efe0825b21f918e",
+      "source_archive_bytes": 31498,
+      "destination_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+      "destination_archive_bytes": 30539,
+      "expected_output_sha256": "ab5109b0584aacb070b9b33a5769f469464ede991c12fd4da7e9e7bce53f159b",
+      "expected_output_bytes": 31514
+    },
+    "media-rich": {
+      "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+      "source_archive_bytes": 16815621,
+      "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "destination_archive_bytes": 16814664,
+      "expected_output_sha256": "809c61728c9e059e7b30758fbd668d2f6bb161cb3bd5f5fbdf0c9465bc611cea",
+      "expected_output_bytes": 33599715
+    }
+  },
+  "range": {
+    "max_range_bytes": 65536,
+    "delay_us": 200,
+    "transfer_bytes_per_second": 26214400,
+    "transfer_delay_policy": "separate-sleeps",
+    "scope": "logical caller ReadAt simulation; no physical network, storage, or cold-cache claim"
+  },
+  "review_percent": 5,
+  "bound_files": {
+    "capture.py": "e3491ee71aa5eb9415c6d2858b98875707d9d44429f6d89dab27ae795623ff01",
+    "check.py": "4fae5b8ccb6e14a39322601dc84ed5e0d1f215d30bcb5b4bd69825bfb608eb92",
+    "verify-report.py": "b0505644bb6be304ac217889455539a6926bbdd7731974c2b1d0aaf85c77a629",
+    "lifecycle-oracle.py": "436e0f9a926e2713ff030c9b9ed9c32b4312d0a6734096729b631074c0872316",
+    "base-verify-report.py": "d8ec5862592192dbb3b3f08205f6faec19eba10c5f4b9d0a64d536a373474b00",
+    "allocation-scopes.json": "7c48b16e1ac61a8620063d05627b3670e502ca8991f14b2bbf6e6b3a7e2b01e7",
+    "derive.py": "2028e42faee66d51e58879c0d1cb51c8e8a74bdfd374323aca555eb39a256bf8"
+  },
+  "scope": "One fixed eight-lane, 240-sample bytes/media confirmation for the primary R2 drift. Separate descriptive population; no replacement of original lanes."
+}
