@@ -2999,17 +2999,22 @@ KEYNOTE_MEDIA_PROPERTIES_OWNER_MARKER_GROUPS = {
         ),
     ),
 }
-# Keep raw-host deletion behind an explicit native completion seam.  A focused
-# owner may be useful for source-built parity and still lack the real iWork
-# open/save/reopen proof needed to delete the compatibility methods.  The
-# marker is deliberately production-only: comments and cfg(test) fixtures are
-# masked before it is consulted.
-# Keep one explicit, reviewable native proof token for this migration seam.
-# The owner must add it only after a real iWork open/save/reopen fixture proves
-# parity; similarly named capability values are intentionally not activation
-# aliases because they could be introduced for source-built tests alone.
-KEYNOTE_MEDIA_PROPERTIES_COMPLETE_ACTIVATION = re.compile(
-    r"(?<![A-Za-z0-9_])MEDIA_PROPERTIES_NATIVE_VERIFIED(?![A-Za-z0-9_])"
+# Raw-host deletion is active once the focused owner is present.  Native
+# acceptance is part of the checked-in test seam, rather than an inert
+# production marker: both per-kind fixtures and their stable readback tests
+# must remain available while the compatibility routes are retired.
+KEYNOTE_MEDIA_PROPERTIES_NATIVE_TEST_SOURCE = Path(
+    "crates/litchi-keynote/tests/slide_media_properties.rs"
+)
+KEYNOTE_MEDIA_PROPERTIES_NATIVE_EVIDENCE = (
+    (
+        Path("test-data/iwork/keynote/media-properties-audio-focused-native.key"),
+        "native_saved_audio_properties_focused_candidate_is_stable",
+    ),
+    (
+        Path("test-data/iwork/keynote/media-properties-file-focused-native.key"),
+        "native_saved_file_properties_focused_candidate_is_stable",
+    ),
 )
 KEYNOTE_MEDIA_PROPERTIES_HOST_METHODS = frozenset(
     {
@@ -3044,6 +3049,52 @@ def _keynote_media_properties_focused_package_call(
     return re.search(
         r"\b(?:package|focused_package|keynote_package)\s*\.\s*$", context
     ) is not None
+
+
+def _audit_keynote_media_properties_native_evidence(root: Path) -> list[str]:
+    """Require both checked-in native property receipts and stable tests."""
+
+    test_path = root / KEYNOTE_MEDIA_PROPERTIES_NATIVE_TEST_SOURCE
+    if not test_path.is_file():
+        return [
+            "focused Keynote media-properties retirement is missing its native "
+            f"integration test: {KEYNOTE_MEDIA_PROPERTIES_NATIVE_TEST_SOURCE}"
+        ]
+
+    raw_test = test_path.read_text(encoding="utf-8")
+    code_test = _mask_rust_non_code(raw_test)
+    violations: list[str] = []
+    for fixture, test_name in KEYNOTE_MEDIA_PROPERTIES_NATIVE_EVIDENCE:
+        fixture_path = root / fixture
+        if not fixture_path.is_file():
+            violations.append(
+                "focused Keynote media-properties retirement is missing native "
+                f"fixture: {fixture}"
+            )
+        elif fixture_path.stat().st_size == 0:
+            violations.append(
+                "focused Keynote media-properties native fixture is empty: "
+                f"{fixture}"
+            )
+
+        if re.search(
+            rf"\binclude_bytes!\s*\([^)]*{re.escape(fixture.as_posix())}",
+            raw_test,
+        ) is None:
+            violations.append(
+                "focused Keynote media-properties native integration test must "
+                f"include fixture {fixture}: {KEYNOTE_MEDIA_PROPERTIES_NATIVE_TEST_SOURCE}"
+            )
+        if re.search(
+            rf"(?m)^\s*#\s*\[\s*test\s*\]\s*\n\s*fn\s+"
+            rf"{re.escape(test_name)}\b",
+            code_test,
+        ) is None:
+            violations.append(
+                "focused Keynote media-properties native integration test is missing "
+                f"{test_name}: {KEYNOTE_MEDIA_PROPERTIES_NATIVE_TEST_SOURCE}"
+            )
+    return sorted(set(violations))
 
 # Wave122 moves replacement of already-materialized Keynote slide movie/audio
 # data into one selector-first package owner.  The owner deliberately covers
@@ -14711,6 +14762,32 @@ KEYNOTE_SLIDE_AUDIO_CREATION_OWNER_SOURCE = Path(
 KEYNOTE_SLIDE_AUDIO_CREATION_CHILD_ROOT = Path(
     "crates/litchi-keynote/src/package/slide_audio_creation"
 )
+KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_TEST_SOURCE = Path(
+    "crates/litchi-keynote/tests/slide_audio_creation_native.rs"
+)
+KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_FIXTURE = Path(
+    "test-data/iwork/keynote/slide-audio-creation-focused-native.key"
+)
+KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_TESTS = (
+    "saved_keynote_audio_creation_appends_native_audio_and_start_build",
+    "audio_creation_from_saved_keynote_fixture_round_trips_exactly",
+)
+IWA_KEYNOTE_SLIDE_AUDIO_CREATION_TEST_ROOT = Path("crates/litchi-iwa/tests")
+IWA_KEYNOTE_SLIDE_AUDIO_CREATION_HOST_METHODS = frozenset(
+    {
+        "add_slide_audio",
+        "audio_creation_values",
+        "audio_objects",
+    }
+)
+IWA_KEYNOTE_SLIDE_AUDIO_CREATION_HOST_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>add_slide_audio|"
+    r"audio_creation_values|audio_objects)(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+IWA_KEYNOTE_SLIDE_AUDIO_CREATION_HOST_IMPORT = re.compile(
+    r"(?m)^[ \t]*(?:pub[ \t]+)?use[^;\n]*\b(?:audio_creation_values|"
+    r"audio_objects)\b"
+)
 KEYNOTE_SLIDE_AUDIO_CREATION_GENERATED_IMPORT = re.compile(
     r"(?s)\blitchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*(?:"
     r"(?:r#)?(?:kn|tn|tp|tsa|tsd|tsp|tss|tswp|"
@@ -14760,6 +14837,69 @@ KEYNOTE_SLIDE_AUDIO_CREATION_FORBIDDEN_SOURCE_PATTERNS = (
         ),
     ),
 )
+
+
+def _keynote_slide_audio_creation_focused_package_call(
+    source: str, match: re.Match[str]
+) -> bool:
+    """Recognize focused Package calls retained by host tests/helpers."""
+
+    context = source[max(0, match.start() - 220) : match.start()]
+    return re.search(
+        r"\b(?:package|focused_package|keynote_package)\s*\.\s*$|"
+        r"\b(?:Package|KeynotePackage)\s*::\s*$",
+        context,
+    ) is not None
+
+
+def _audit_keynote_slide_audio_creation_native_evidence(root: Path) -> list[str]:
+    """Require the checked-in native fresh-audio receipt and its tests."""
+
+    test_path = root / KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_TEST_SOURCE
+    if not test_path.is_file():
+        return [
+            "focused Keynote slide-audio creation retirement is missing its native "
+            f"integration test: {KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_TEST_SOURCE}"
+        ]
+
+    fixture_path = root / KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_FIXTURE
+    violations: list[str] = []
+    if not fixture_path.is_file():
+        violations.append(
+            "focused Keynote slide-audio creation retirement is missing native "
+            f"fixture: {KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_FIXTURE}"
+        )
+    elif fixture_path.stat().st_size == 0:
+        violations.append(
+            "focused Keynote slide-audio creation native fixture is empty: "
+            f"{KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_FIXTURE}"
+        )
+
+    raw_test = test_path.read_text(encoding="utf-8")
+    code_test = _mask_rust_non_code(raw_test)
+    if re.search(
+        rf"\binclude_bytes!\s*\([^)]*"
+        rf"{re.escape(KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_FIXTURE.as_posix())}",
+        raw_test,
+    ) is None:
+        violations.append(
+            "focused Keynote slide-audio creation native integration test must "
+            f"include fixture {KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_FIXTURE}: "
+            f"{KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_TEST_SOURCE}"
+        )
+    for test_name in KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_TESTS:
+        if re.search(
+            rf"(?m)^\s*#\s*\[\s*test\s*\]\s*\n\s*fn\s+"
+            rf"{re.escape(test_name)}\b",
+            code_test,
+        ) is None:
+            violations.append(
+                "focused Keynote slide-audio creation native integration test is "
+                f"missing {test_name}: {KEYNOTE_SLIDE_AUDIO_CREATION_NATIVE_TEST_SOURCE}"
+            )
+    return sorted(set(violations))
+
+
 PAGES_PACKAGE_TEST_MODULE = re.compile(
     r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]",
     re.MULTILINE,
@@ -48910,6 +49050,79 @@ def audit_keynote_slide_audio_creation_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_keynote_slide_audio_creation_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire raw host audio creation after the focused owner lands.
+
+    The Package owner is the activation seam.  Native acceptance remains
+    checked in through one saved fixture and two stable integration tests;
+    focused ``Package::add_slide_audio`` calls in host tests/helpers remain
+    valid, while the editor method and graph construction helpers are retired.
+    """
+
+    owner_path = root / KEYNOTE_SLIDE_AUDIO_CREATION_OWNER_SOURCE
+    if not owner_path.is_file():
+        return []
+
+    violations = _audit_keynote_slide_audio_creation_native_evidence(root)
+    source_roots = [
+        root / IWA_KEYNOTE_SOURCE_ROOT,
+        root / IWA_KEYNOTE_SLIDE_AUDIO_CREATION_TEST_ROOT,
+    ]
+    examples = root / IWA_CORE_EXAMPLE_SOURCE_ROOT
+    if examples.is_dir():
+        source_roots.append(examples)
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    for source_root in source_roots:
+        if not source_root.is_dir():
+            continue
+        for path in sorted(source_root.rglob("*.rs")):
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            )
+            relative = path.relative_to(root)
+            for match in IWA_KEYNOTE_SLIDE_AUDIO_CREATION_HOST_IMPORT.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote slide-audio creation graph helper import "
+                    f"{match.group(0).strip()}: {relative}:{line_number}"
+                )
+            for match in declaration.finditer(source):
+                name = match.group(1)
+                if name not in IWA_KEYNOTE_SLIDE_AUDIO_CREATION_HOST_METHODS:
+                    continue
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote slide-audio creation method/helper "
+                    f"{name}: {relative}:{line_number}"
+                )
+            for match in IWA_KEYNOTE_SLIDE_AUDIO_CREATION_HOST_CALL.finditer(source):
+                line_start = source.rfind("\n", 0, match.start()) + 1
+                line_end = source.find("\n", match.end())
+                line_end = len(source) if line_end < 0 else line_end
+                line = source[line_start:line_end]
+                method = match.group("method")
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(method)}\b", line
+                ):
+                    continue
+                if method == "add_slide_audio" and _keynote_slide_audio_creation_focused_package_call(
+                    source, match
+                ):
+                    continue
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote slide-audio creation call/helper "
+                    f"{method}: {relative}:{line_number}"
+                )
+    return sorted(set(violations))
+
+
 def audit_pages_package_no_eager_prost_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -59125,16 +59338,17 @@ def audit_keynote_media_properties_resource_source_topology(
 def audit_iwa_keynote_media_properties_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Retire raw Keynote movie/audio property readers and writers."""
+    """Retire raw Keynote movie/audio property readers and writers.
+
+    The focused owner is the activation seam.  Native acceptance is kept as
+    checked-in evidence beside the owner: both per-kind fixtures and their
+    stable integration tests must remain present while the host routes stay
+    retired.
+    """
 
     if not _keynote_media_properties_owner_present(root):
         return []
-    owner_path = root / KEYNOTE_MEDIA_PROPERTIES_OWNER_SOURCE
-    owner = _mask_rust_non_code(
-        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
-    )
-    if KEYNOTE_MEDIA_PROPERTIES_COMPLETE_ACTIVATION.search(owner) is None:
-        return []
+    violations = _audit_keynote_media_properties_native_evidence(root)
     source_roots = [root / IWA_KEYNOTE_SOURCE_ROOT]
     examples = root / IWA_CORE_EXAMPLE_SOURCE_ROOT
     if examples.is_dir():
@@ -59144,7 +59358,6 @@ def audit_iwa_keynote_media_properties_source_topology(
         r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
         r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
     )
-    violations: list[str] = []
     for source_root in source_roots:
         if not source_root.is_dir():
             continue
@@ -65811,6 +66024,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_media_creation_source_topology()
         + audit_keynote_media_creation_codec_source_topology()
         + audit_keynote_slide_audio_creation_source_topology()
+        + audit_iwa_keynote_slide_audio_creation_source_topology()
         + audit_pages_document_public_api()
         + audit_pages_package_output_api_source_topology()
         + audit_iwork_atomic_publication()

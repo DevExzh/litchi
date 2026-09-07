@@ -1372,7 +1372,7 @@ fn validate_media_closure(
     validated_media_record(package, catalog, selection, part, budget)
 }
 
-fn validate_selected_message_metadata(
+pub(super) fn validate_selected_message_metadata(
     object: &ArchiveObject,
     message_index: usize,
 ) -> Result<(), SlideMediaDataError> {

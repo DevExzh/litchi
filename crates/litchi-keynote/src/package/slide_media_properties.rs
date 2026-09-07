@@ -478,6 +478,11 @@ impl Package {
     /// order.  This keeps file movies and audio controls in one stable index
     /// and avoids an audio-only renumbering that would make a caller edit the
     /// wrong object after a producer changes sibling order.
+    ///
+    /// Reading validates ownership, references, and the selected property
+    /// fields without loading media assets. Properties therefore remain
+    /// readable when a sparse source omits media content. Editing additionally
+    /// requires valid, materialized media assets before publication.
     pub fn slide_media_properties<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
@@ -485,7 +490,8 @@ impl Package {
     ) -> Result<MediaProperties, SlideMediaPropertiesError> {
         let mut budget = GeometryBudget::new(self)?;
         budget.source(physical_catalog(self)?.source_bytes().len())?;
-        let selection = select_media_properties(self, slide.into(), movie.into(), &mut budget)?;
+        let selection =
+            select_media_property_fields(self, slide.into(), movie.into(), &mut budget)?;
         clone_properties(selection.before.as_ref(), &mut budget)
     }
 
@@ -717,6 +723,25 @@ fn select_media_properties(
     movie_selector: MovieSelector,
     budget: &mut GeometryBudget,
 ) -> Result<MediaPropertiesSelection, SlideMediaPropertiesError> {
+    let selection = select_media_property_fields(package, slide_selector, movie_selector, budget)?;
+    let assets = data::validate_selected_media_assets(
+        package,
+        selection.slide_position,
+        selection.movie_position,
+        budget,
+    )?;
+    if assets.content.is_empty() || assets.poster.is_some_and(|poster| poster.is_empty()) {
+        return Err(SlideMediaPropertiesError::UnsupportedDependency);
+    }
+    Ok(selection)
+}
+
+fn select_media_property_fields(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    movie_selector: MovieSelector,
+    budget: &mut GeometryBudget,
+) -> Result<MediaPropertiesSelection, SlideMediaPropertiesError> {
     let slide_position = resolve_slide_position(package, slide_selector, budget)?;
     let record = package
         .slide_record_at(slide_position.get())
@@ -770,6 +795,8 @@ fn select_media_properties(
         if !matches!(kind, MovieKind::File | MovieKind::Audio) {
             return Err(SlideMediaPropertiesError::WrongMediaKind);
         }
+        super::slide_media_replacement::validate_selected_message_metadata(object, message_index)
+            .map_err(|_| SlideMediaPropertiesError::InvalidSource)?;
         validate_selected_movie_references(
             package,
             component_name,
@@ -806,15 +833,6 @@ fn select_media_properties(
         limits,
         budget,
     )?;
-    let assets = data::validate_selected_media_assets(
-        package,
-        slide_position,
-        requested_movie_position,
-        budget,
-    )?;
-    if assets.content.is_empty() || assets.poster.is_some_and(|poster| poster.is_empty()) {
-        return Err(SlideMediaPropertiesError::UnsupportedDependency);
-    }
     Ok(MediaPropertiesSelection {
         slide_position,
         movie_position: requested_movie_position,

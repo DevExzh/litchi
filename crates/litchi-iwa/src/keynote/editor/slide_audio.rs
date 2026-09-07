@@ -1,18 +1,11 @@
-//! Independently positioned audio-object creation and editing for Keynote slides.
+//! Read-only projections of independently positioned Keynote slide audio.
 
 use std::time::Duration;
 
-use litchi_iwa_common::media::Type as MediaType;
-use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 use litchi_keynote::slide::media::MovieKind;
 
-use super::slide_movies::geometry::set_movie_properties;
-use super::slide_movies::graph::{
-    MovieObjectIds, audio_creation_values, audio_objects, movie_creation_context,
-};
 use super::slide_movies::movie_playback_wire_limits;
 use super::*;
-use crate::data_reference_registry::add_component_data_reference;
 use crate::media::MediaAssetId;
 use crate::shapes::{
     DrawablePoint, DrawableProperties, drawable_properties, geometry_from_drawable,
@@ -44,157 +37,6 @@ impl KeynoteEditor {
             .map(|media| audio_info(self, slide_index, media.drawable_object_id))
             .collect()
     }
-
-    /// Add an independently editable audio clip to a slide.
-    ///
-    /// The audio archive, title/caption stand-ins, automatic Start Audio build,
-    /// component registrations, UUIDs, and package media record are constructed
-    /// from typed values. No source drawable or package template is copied.
-    pub fn add_slide_audio(
-        &mut self,
-        slide_index: usize,
-        preferred_filename: &str,
-        data: &[u8],
-        options: SlideAudioOptions,
-    ) -> Result<KeynoteSlideAudioInfo> {
-        let (geometry, duration_seconds) = audio_creation_values(options)?;
-        let context = movie_creation_context(self, slide_index)?;
-        let ids = MovieObjectIds::allocate(next_object_identifier(self.package())?)?;
-
-        let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
-        let asset = media.insert_unreferenced(preferred_filename, data)?;
-        if asset.media_type != MediaType::Audio {
-            return Err(Error::ParseError(format!(
-                "Keynote slide audio requires audio data, not {}",
-                asset.media_type.name()
-            )));
-        }
-
-        let mut staged = media.into_package();
-        let objects = audio_objects(
-            ids,
-            context.slide_id,
-            context.style_id,
-            asset.data_identifier.get(),
-            geometry,
-            duration_seconds,
-        )?;
-        staged.update_archive(&context.archive_name, |archive| {
-            for object in objects {
-                archive.insert_object(object)?;
-            }
-            Ok(())
-        })?;
-        patch_slide_drawable_references(
-            &mut staged,
-            &context.archive_name,
-            context.slide_id,
-            None,
-            Some(ids.drawable),
-        )?;
-        add_component_object_uuids(&mut staged, context.component_id, &ids.all())?;
-        add_component_data_reference(
-            &mut staged,
-            context.component_id,
-            asset.data_identifier.get(),
-            ids.drawable,
-        )?;
-        add_component_external_reference(
-            &mut staged,
-            context.component_id,
-            context.stylesheet_component_id,
-            context.style_id,
-        )?;
-        set_package_last_object_identifier(&mut staged, ids.last())?;
-
-        let mut verified = Self::from_bytes(&staged.to_bytes()?)?;
-        let created = audio_info(&verified, slide_index, ids.drawable)?;
-        let created_graph = verified.slide_movie_graph(slide_index, ids.drawable)?;
-        let expected_duration = Duration::try_from_secs_f64(f64::from(duration_seconds))
-            .map_err(|error| Error::ParseError(error.to_string()))?;
-        if created.audio_data_identifier != asset.data_identifier
-            || created.position != options.position()
-            || created.duration != expected_duration
-            || created_graph.info.kind != MovieKind::Audio
-            || created_graph.object_ids != ids.all()
-            || verified.extract_media(asset.data_identifier)? != data
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote audio creation produced an inconsistent graph".to_owned(),
-            ));
-        }
-
-        let build = verified.add_slide_build(
-            slide_index,
-            ids.drawable,
-            KeynoteBuildSettings::audio_start(),
-        )?;
-        if build.drawable_object_id != ids.drawable || build.chunks.len() != 1 {
-            return Err(Error::InvalidFormat(
-                "Keynote audio creation produced an inconsistent playback build".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(created)
-    }
-
-    /// Read shared drawable properties for one slide-owned audio control.
-    pub fn slide_audio_properties(
-        &self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<DrawableProperties> {
-        Ok(require_audio(self, slide_index, drawable_object_id)?.properties)
-    }
-
-    /// Update audio accessibility, hyperlink, and lock properties.
-    ///
-    /// The typed update retains unknown native media fields and supports both
-    /// clearing a property with `None` and encoding explicit boolean defaults.
-    pub fn set_slide_audio_properties(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        properties: DrawableProperties,
-    ) -> Result<()> {
-        let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
-        if source.info.kind != MovieKind::Audio {
-            return Err(Error::ParseError(format!(
-                "Keynote media {drawable_object_id} is {:?}, not slide audio",
-                source.info.kind
-            )));
-        }
-        let mut staged = self.package().clone();
-        set_movie_properties(
-            &mut staged,
-            &source.archive_name,
-            drawable_object_id,
-            &properties,
-        )?;
-        let verified = Self::from_package(staged)?;
-        if verified.slide_audio_properties(slide_index, drawable_object_id)? != properties {
-            return Err(Error::InvalidFormat(
-                "Keynote audio properties update failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-}
-
-fn require_audio(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<KeynoteSlideAudioInfo> {
-    let graph = editor.slide_movie_graph(slide_index, drawable_object_id)?;
-    if graph.info.kind != MovieKind::Audio {
-        return Err(Error::ParseError(format!(
-            "Keynote media {drawable_object_id} is {:?}, not slide audio",
-            graph.info.kind
-        )));
-    }
-    audio_info(editor, slide_index, drawable_object_id)
 }
 
 fn audio_info(
@@ -272,13 +114,12 @@ mod tests {
     const POSITION: DrawablePoint = DrawablePoint { x: 960.0, y: 540.0 };
     const DUPLICATE_OFFSET: f32 = 10.0;
 
-    fn properties(description: &str) -> DrawableProperties {
-        DrawableProperties {
-            hyperlink_url: Some("https://example.test/keynote-audio".to_owned()),
-            locked: Some(true),
-            aspect_ratio_locked: Some(true),
-            accessibility_description: Some(description.to_owned()),
-        }
+    fn properties(description: &str) -> KeynoteMediaProperties {
+        KeynoteMediaProperties::new()
+            .with_hyperlink_url(Some("https://example.test/keynote-audio".to_owned()))
+            .with_locked(Some(true))
+            .with_aspect_ratio_locked(Some(true))
+            .with_accessibility_description(Some(description.to_owned()))
     }
 
     fn raw_properties(properties: &KeynoteMediaProperties) -> DrawableProperties {
@@ -290,126 +131,36 @@ mod tests {
         }
     }
 
-    fn assert_property_parity(
-        raw: &DrawableProperties,
-        focused: &KeynoteMediaProperties,
-        expected: &KeynoteMediaProperties,
-    ) {
-        assert_eq!(raw, &raw_properties(expected));
-        assert_eq!(raw.hyperlink_url.as_deref(), focused.hyperlink_url());
-        assert_eq!(raw.locked, focused.locked());
-        assert_eq!(raw.aspect_ratio_locked, focused.aspect_ratio_locked());
-        assert_eq!(
-            raw.accessibility_description.as_deref(),
-            focused.accessibility_description()
-        );
-        assert_eq!(focused, expected);
-    }
-
-    fn assert_audio_property_update_parity(
-        raw_editor: &mut KeynoteEditor,
-        focused_editor: &mut KeynoteEditor,
-        drawable_object_id: u64,
-        baseline: &KeynoteSlideAudioInfo,
-        expected: KeynoteMediaProperties,
-    ) {
-        let raw_expected = raw_properties(&expected);
-        raw_editor
-            .set_slide_audio_properties(0, drawable_object_id, raw_expected.clone())
-            .unwrap();
-
-        let package = focused_audio_package(focused_editor);
+    fn set_audio_properties(editor: &mut KeynoteEditor, properties: KeynoteMediaProperties) {
+        let package = focused_audio_package(editor);
         let commit = package
             .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
             .unwrap()
-            .set(expected.clone())
+            .set(properties)
             .unwrap()
             .commit()
             .unwrap();
-        replace_with_focused_audio_package(focused_editor, commit.package());
-
-        let raw_after = raw_editor
-            .slide_audio_properties(0, drawable_object_id)
-            .unwrap();
-        let focused_after = focused_audio_package(focused_editor)
-            .slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
-            .unwrap();
-        assert_property_parity(&raw_after, &focused_after, &expected);
-
-        let raw_audio = raw_editor
-            .slide_audio(0)
-            .unwrap()
-            .into_iter()
-            .find(|audio| audio.drawable_object_id == drawable_object_id)
-            .unwrap();
-        let focused_audio = focused_editor
-            .slide_audio(0)
-            .unwrap()
-            .into_iter()
-            .find(|audio| audio.drawable_object_id == drawable_object_id)
-            .unwrap();
-        assert_eq!(
-            raw_audio.audio_data_identifier,
-            baseline.audio_data_identifier
-        );
-        assert_eq!(
-            focused_audio.audio_data_identifier,
-            baseline.audio_data_identifier
-        );
-        assert_eq!(raw_audio.position, baseline.position);
-        assert_eq!(focused_audio.position, baseline.position);
-        assert_eq!(raw_audio.playback, baseline.playback);
-        assert_eq!(focused_audio.playback, baseline.playback);
-        assert_eq!(raw_audio.duration, baseline.duration);
-        assert_eq!(focused_audio.duration, baseline.duration);
-        assert_eq!(
-            raw_editor
-                .extract_media(baseline.audio_data_identifier)
-                .unwrap(),
-            focused_editor
-                .extract_media(baseline.audio_data_identifier)
-                .unwrap()
-        );
+        replace_with_focused_audio_package(editor, commit.package());
     }
 
     #[test]
-    fn source_built_audio_properties_match_raw_and_focused_updates() {
+    fn source_built_audio_properties_project_through_focused_updates() {
         let mut seed = KeynoteDocumentBuilder::new()
-            .title("Audio properties parity")
+            .title("Audio properties projection")
             .build()
             .unwrap();
-        let created = seed
-            .add_slide_audio(
-                0,
-                "audio.aiff",
-                AUDIO,
-                SlideAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap(),
-            )
-            .unwrap();
-        let baseline_bytes = seed.to_bytes().unwrap();
-        let baseline_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
-        let baseline = baseline_editor.slide_audio(0).unwrap().remove(0);
-        let drawable_object_id = baseline.drawable_object_id;
-
-        let mut raw_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
-        let mut focused_editor = KeynoteEditor::from_bytes(&baseline_bytes).unwrap();
-        let raw_before = raw_editor
-            .slide_audio_properties(0, drawable_object_id)
-            .unwrap();
-        let focused_before = focused_audio_package(&focused_editor)
+        let created = add_audio(
+            &mut seed,
+            "audio.aiff",
+            AUDIO,
+            SlideAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap(),
+        );
+        let baseline = seed.slide_audio(0).unwrap().remove(0);
+        let mut editor = KeynoteEditor::from_bytes(&seed.to_bytes().unwrap()).unwrap();
+        let focused_before = focused_audio_package(&editor)
             .slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))
             .unwrap();
-        assert_eq!(raw_before.hyperlink_url, None);
-        assert_eq!(raw_before.locked, Some(false));
-        assert_eq!(raw_before.aspect_ratio_locked, Some(true));
-        assert_eq!(raw_before.accessibility_description, None);
-        assert_property_parity(
-            &raw_before,
-            &focused_before,
-            &KeynoteMediaProperties::new()
-                .with_locked(Some(false))
-                .with_aspect_ratio_locked(Some(true)),
-        );
+        assert_eq!(baseline.properties, raw_properties(&focused_before));
 
         for expected in [
             KeynoteMediaProperties::new()
@@ -429,19 +180,15 @@ mod tests {
                 .with_accessibility_description(Some("unlocked again".to_owned())),
             KeynoteMediaProperties::default(),
         ] {
-            assert_audio_property_update_parity(
-                &mut raw_editor,
-                &mut focused_editor,
-                drawable_object_id,
-                &baseline,
-                expected,
-            );
+            set_audio_properties(&mut editor, expected.clone());
+            let actual = editor.slide_audio(0).unwrap().remove(0);
+            assert_eq!(actual.properties, raw_properties(&expected));
+            assert_eq!(actual.audio_data_identifier, baseline.audio_data_identifier);
+            assert_eq!(actual.position, baseline.position);
+            assert_eq!(actual.playback, baseline.playback);
+            assert_eq!(actual.duration, baseline.duration);
         }
 
-        assert_eq!(
-            raw_editor.to_bytes().unwrap(),
-            focused_editor.to_bytes().unwrap()
-        );
         assert_eq!(
             created.audio_data_identifier,
             baseline.audio_data_identifier
@@ -473,6 +220,20 @@ mod tests {
         let mut bytes = Vec::new();
         package.write_to(&mut bytes).unwrap();
         *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
+    }
+
+    fn add_audio(
+        editor: &mut KeynoteEditor,
+        preferred_filename: &str,
+        data: &[u8],
+        options: SlideAudioOptions,
+    ) -> KeynoteSlideAudioInfo {
+        let package = focused_audio_package(editor);
+        let commit = package
+            .add_slide_audio(SlideSelector::index(0), preferred_filename, data, options)
+            .unwrap();
+        replace_with_focused_audio_package(editor, commit.package());
+        editor.slide_audio(0).unwrap().into_iter().last().unwrap()
     }
 
     fn audio_position(editor: &KeynoteEditor, movie: MovieSelector) -> KeynotePoint {
@@ -543,9 +304,7 @@ mod tests {
             .unwrap();
         let options = SlideAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap();
 
-        let created = editor
-            .add_slide_audio(0, "audio.aiff", AUDIO, options)
-            .unwrap();
+        let created = add_audio(&mut editor, "audio.aiff", AUDIO, options);
         assert!(editor.slide_movies(0).unwrap().is_empty());
         assert_eq!(
             editor.slide_audio(0).unwrap(),
@@ -601,27 +360,16 @@ mod tests {
         editor = KeynoteEditor::from_bytes(&bytes).unwrap();
 
         let changed_properties = properties("Accessible Keynote audio");
-        editor
-            .set_slide_audio_properties(0, created.drawable_object_id, changed_properties.clone())
-            .unwrap();
+        set_audio_properties(&mut editor, changed_properties.clone());
         assert_eq!(
-            editor
-                .slide_audio_properties(0, created.drawable_object_id)
-                .unwrap(),
-            changed_properties
+            editor.slide_audio(0).unwrap().first().unwrap().properties,
+            raw_properties(&changed_properties)
         );
-        editor
-            .set_slide_audio_properties(
-                0,
-                created.drawable_object_id,
-                DrawableProperties::default(),
-            )
-            .unwrap();
+        let cleared_properties = KeynoteMediaProperties::default();
+        set_audio_properties(&mut editor, cleared_properties.clone());
         assert_eq!(
-            editor
-                .slide_audio_properties(0, created.drawable_object_id)
-                .unwrap(),
-            DrawableProperties::default()
+            editor.slide_audio(0).unwrap().first().unwrap().properties,
+            raw_properties(&cleared_properties)
         );
 
         let moved = DrawablePoint { x: 320.0, y: 240.0 };
@@ -669,18 +417,14 @@ mod tests {
             .subtitle("No embedded package")
             .build()
             .unwrap();
-        let source = editor
-            .add_slide_audio(
-                0,
-                "audio.aiff",
-                AUDIO,
-                SlideAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap(),
-            )
-            .unwrap();
+        let source = add_audio(
+            &mut editor,
+            "audio.aiff",
+            AUDIO,
+            SlideAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap(),
+        );
         let source_properties = properties("Duplicated Keynote audio");
-        editor
-            .set_slide_audio_properties(0, source.drawable_object_id, source_properties.clone())
-            .unwrap();
+        set_audio_properties(&mut editor, source_properties.clone());
 
         let duplicate = duplicate_audio(&mut editor, MovieSelector::index(0));
         assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
@@ -712,7 +456,7 @@ mod tests {
             }
         );
         assert_eq!(duplicate.duration, source.duration);
-        assert_eq!(duplicate.properties, source_properties);
+        assert_eq!(duplicate.properties, raw_properties(&source_properties));
         let duplicate_builds = editor
             .slide_builds(0)
             .unwrap()
@@ -817,14 +561,14 @@ mod tests {
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
         for result in [
-            editor.add_slide_audio(
-                0,
+            focused_audio_package(&editor).add_slide_audio(
+                SlideSelector::index(0),
                 "payload.bin",
                 b"not audio",
                 SlideAudioOptions::new(POSITION, Duration::from_secs(1)).unwrap(),
             ),
-            editor.add_slide_audio(
-                1,
+            focused_audio_package(&editor).add_slide_audio(
+                SlideSelector::index(1),
                 "audio.aiff",
                 AUDIO,
                 SlideAudioOptions::new(POSITION, Duration::from_secs(1)).unwrap(),
@@ -845,14 +589,12 @@ mod tests {
             .is_err()
         );
 
-        let audio = editor
-            .add_slide_audio(
-                0,
-                "audio.aiff",
-                AUDIO,
-                SlideAudioOptions::new(POSITION, Duration::from_secs(1)).unwrap(),
-            )
-            .unwrap();
+        let audio = add_audio(
+            &mut editor,
+            "audio.aiff",
+            AUDIO,
+            SlideAudioOptions::new(POSITION, Duration::from_secs(1)).unwrap(),
+        );
         let before = editor.to_bytes().unwrap();
         assert!(
             KeynotePackage::from_bytes(&before)

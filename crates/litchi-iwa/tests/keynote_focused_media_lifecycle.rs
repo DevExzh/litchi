@@ -1,9 +1,10 @@
 //! Compatibility coverage for selector-first Keynote media lifecycle edits.
 //!
-//! The fixture is produced entirely through the public source-built host
-//! editor.  The focused package then performs the lifecycle transaction using
-//! source-order selectors, and the candidate is reopened by the host editor
-//! before its semantic projection is compared with the expected state.
+//! The fixture uses focused package audio creation alongside the public
+//! source-built host movie editor. The focused package then performs the
+//! lifecycle transaction using source-order selectors, and the candidate is
+//! reopened by the host editor before its semantic projection is compared
+//! with the expected state.
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -83,6 +84,25 @@ fn package_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut bytes = Vec::new();
     package.write_to(&mut bytes)?;
     Ok(bytes)
+}
+
+fn add_audio(
+    editor: &mut KeynoteEditor,
+    preferred_filename: &str,
+    data: &[u8],
+    options: SlideAudioOptions,
+) -> Result<u64, Box<dyn Error>> {
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit =
+        package.add_slide_audio(SlideSelector::index(0), preferred_filename, data, options)?;
+    let bytes = package_bytes(commit.package())?;
+    *editor = KeynoteEditor::from_bytes(&bytes)?;
+    editor
+        .slide_audio(0)?
+        .into_iter()
+        .last()
+        .map(|audio| audio.drawable_object_id)
+        .ok_or_else(|| io::Error::other("focused audio creation produced no host audio").into())
 }
 
 fn package_watermark(bytes: &[u8]) -> Result<u64, Box<dyn Error>> {
@@ -222,8 +242,8 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
             Duration::from_secs(8),
         ),
     )?;
-    let audio_a = editor.add_slide_audio(
-        0,
+    let audio_a_id = add_audio(
+        &mut editor,
         "audio-a.aiff",
         AUDIO_A,
         audio_options(Point { x: 960.0, y: 540.0 }, Duration::from_secs(12)),
@@ -243,8 +263,8 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
             Duration::from_secs(5),
         ),
     )?;
-    editor.add_slide_audio(
-        0,
+    add_audio(
+        &mut editor,
         "audio-b.aiff",
         AUDIO_B,
         audio_options(Point { x: 240.0, y: 300.0 }, Duration::from_secs(7)),
@@ -294,7 +314,7 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
         bytes,
         movie_a_id: movie_a.drawable_object_id,
         movie_b_id: movie_b.drawable_object_id,
-        audio_a_id: audio_a.drawable_object_id,
+        audio_a_id,
     })
 }
 

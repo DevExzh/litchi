@@ -265,10 +265,16 @@ package. Fresh source-package creation now belongs to `litchi-keynote` through
 `Package::add_slide_audio`: it resolves semantic slide selectors, stages media,
 stand-ins, playback builds, metadata and cache updates, and publishes an exact
 reversible patch. Private Buffa media/build projections in `litchi-iwa-protos`
-own payload encoding. The retained migration host uses the same media writer;
-its raw creation and info/removal APIs remain until native acceptance permits
-retirement. Those legacy results still carry native IDs, drawable properties,
-playback presence, and package-GC results.
+own payload encoding. Native save/close/reopen acceptance permits retirement
+of the raw host audio-creation method and audio object constructors. The
+retained migration host uses the same media writer for file movies and retains
+audio listing values carrying native IDs, drawable properties, and playback
+presence; those remaining read routes are separate migration work.
+Keynote media-property reads and transactions belong to `litchi-keynote`.
+Native audio and file-movie fixtures establish save/close/reopen parity for
+hyperlinks, accessibility descriptions, lock, and aspect-ratio lock. The four
+raw-ID property methods and their shared host writer are retired; property
+values remain available in retained host listing projections.
 The shape-path value slice follows the same ownership boundary at
 `litchi-iwa-common::shape::path::{Preset, CornerRadius, PolygonSides,
 StarPoints, InnerRadiusRatio}`. These compact, copyable controls and the

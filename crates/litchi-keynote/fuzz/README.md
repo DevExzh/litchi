@@ -1,0 +1,20 @@
+# Keynote fuzz targets
+
+The `keynote_slide_audio_creation` target keeps the checked-in native
+`media-comments-baseline-native.key` package as its source fixture and uses
+the small `target-fresh-audio` corpus input to reach a successful creation
+transaction. It also mutates bounded selectors, filenames, placement,
+duration, and WAV payloads while checking exact source preservation, replay,
+inverse restoration, and double-inverse replay.
+
+Run a bounded smoke pass from this directory with:
+
+```sh
+cargo +nightly fuzz run keynote_slide_audio_creation -- -runs=256 -max_len=4096 -timeout=60 -rss_limit_mb=2048
+```
+
+The default fuzz build uses AddressSanitizer. Successful seed creation is
+mandatory, so a restrictive budget cannot turn the entire campaign into
+rejection-only coverage. Use a scratch corpus directory when preserving the
+checked-in seeds unchanged; remove generated artifacts and the standalone
+build directory after the campaign.

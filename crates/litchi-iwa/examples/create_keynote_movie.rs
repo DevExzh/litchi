@@ -53,9 +53,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Duration::try_from_secs_f64(duration_seconds)?,
         )?,
     )?;
-    let mut properties = editor.slide_movie_properties(0, created.drawable_object_id)?;
-    properties.accessibility_description = Some(format!("Embedded movie: {movie_filename}"));
-    editor.set_slide_movie_properties(0, created.drawable_object_id, properties)?;
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let properties = package
+        .slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))?
+        .with_accessibility_description(Some(format!("Embedded movie: {movie_filename}")));
+    let commit = package
+        .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))?
+        .set(properties)?
+        .commit()?;
+    let mut property_bytes = Vec::new();
+    commit.package().write_to(&mut property_bytes)?;
+    editor = KeynoteEditor::from_bytes(&property_bytes)?;
     let initial_playback = created
         .playback
         .ok_or("created Keynote movie has no playback settings")?;

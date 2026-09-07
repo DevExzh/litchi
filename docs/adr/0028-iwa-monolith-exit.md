@@ -10014,3 +10014,61 @@ Computer Use was attempted for Keynote, but ScreenCaptureKit returned `-3802`
 closed and reopened in Keynote. Native acceptance remains open, raw host
 creation APIs remain retained, and the eleven migration dependencies remain
 recorded. This increment does not complete the monolith exit.
+
+
+## 2026-09-07 native Keynote media acceptance and property retirement
+
+Computer Use became available again. Keynote 14.4 (7043.0.93) opened the
+focused audio-property, file-movie-property, and fresh-audio candidates. Each
+was saved, actually closed to the theme chooser, reopened from its exact path,
+inspected, and closed again. Three permanent fixtures and their SHA-256 values
+are recorded in `test-data/iwork/README.md`. The tracked source baseline was
+restored after an initial native inspection autosaved it; all acceptance
+transactions used independent scratch copies of its exact tracked bytes.
+
+Mandatory media-properties tests consume the actual saved fixtures for both
+media kinds. They verify all four requested properties, source-order siblings,
+geometry, playback, media/poster bytes, and caption/comment graphs. All twenty-two
+media-property integration cases pass. This supplies the missing native gate
+for `slide_movie_properties`, `set_slide_movie_properties`,
+`slide_audio_properties`, and `set_slide_audio_properties`. Their raw-ID routes
+and shared writer are removed; host listing projections retain property
+values, and host tests exercise focused transactions through semantic selectors.
+The boundary retirement audit is permanent and requires native fixture tests
+instead of an inert production completion marker.
+
+The fresh audio control appears as `native-acceptance.wav`, with a native
+0.100-second trim and Start audio on click enabled. Arrange reports exact
+coordinates (120.5, 240.25). Readback verifies appended source position 4, five
+media controls and builds, and the exact 1,644-byte input WAV. Duration uses
+the existing canonical `f32` representation (100.000001 ms), so native tests
+compare against validated options rather than an unnormalized `Duration`.
+
+The raw `KeynoteEditor::add_slide_audio` route and its private audio payload
+constructors are retired after this native acceptance. Host creation fixtures
+now call the focused semantic transaction, serialize its verified candidate,
+and use retained host listing APIs only for compatibility observations. File
+movie creation remains in the migration host and continues to use the neutral
+Buffa media writer. No raw-ID creation alias replaces the removed method.
+
+The new focused audio-creation fuzz target exercises arbitrary bounded package
+inputs and a mandatory native baseline success path, including refusal without
+publication, source immutability, semantic readback, exact replay, inverse,
+double inverse, and tight reference limits. An optimized AddressSanitizer smoke
+passes 256 runs in three seconds, reaching 12,050 edges and 12,480 features,
+with reported RSS 470 MB. This bounded smoke does not establish exhaustive
+fuzz coverage. The monolith and its eleven ordered dependencies remain active.
+
+Focused verification passes fourteen creation integration cases (including
+two mandatory native cases) and twenty-two media-properties cases. After the host
+cutover, all 1,742 host library tests, two focused audio-position compatibility
+tests, and six media-lifecycle compatibility tests pass. The native oracle
+follows Document -> Show -> first SlideTree entry -> SlideNode -> Slide; it
+does not mistake layout or master slide archives for the presentation slide.
+
+The final reader-parity audit also preserves sparse-file property reads. The
+focused reader shares bounded graph, ownership, header, and property selection
+with the edit owner, but does not materialize media merely to read properties.
+Edit preparation, commit verification, and patch replay still validate complete
+media assets. This carries forward the former raw reader's missing-content
+support while preventing a read-only success from authorizing an unsafe edit.
