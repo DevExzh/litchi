@@ -1,0 +1,14 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized] target(s) in 13.32s
+     Running tests/source_xml_publication.rs (target/release/deps/source_xml_publication-0bc1078890370ea9)
+
+running 6 tests
+test destination_depth_and_event_limits_refuse_source_xml_additions ... ok
+test managed_source_xml_honors_cancellation_and_releases_memory_gauge ... ok
+test ordinary_authored_xml_keeps_the_compactness_gate ... ok
+test source_provenance_rejects_foreign_lineage_and_stale_ranges_without_output ... ok
+test source_splice_rejects_reedit_and_overlapping_ranges_without_second_output ... ok
+test source_xml_publication_preserves_formatted_bytes_and_emits_checked_fragment ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,5 +1,36 @@
 # Performance hotspot inventory
 
+## Change 0454: source-proof publication and measured controls
+
+The immediate 0454 scope was capability refusal rather than measured CPU: the
+baseline met the optional producer-visible-name refusal; the name-only
+historical intermediate candidate then met the noncanonical relationship XML
+lexical refusal; and formatted `ppt/presentation.xml` met the ordinary
+authored compactness refusal. The source-owned
+`source_xml`/`checked_range`/splice path provides a bounded way through those
+boundaries while retaining exact source whitespace and literal namespace
+grammar. The final native inventory publishes four self-pair cases and leaves
+185 of 189 outcomes unchanged. It is an enabler; replacing refusal with
+success does not establish a speedup.
+
+The formal [measurements](results/change-0454/measurements.md) and
+[machine-readable rows](results/change-0454/measurements.json) show matched
+whole-API p50 movement within about 1.3% and no RSS comparison above 5%.
+Fifteen absolute review flags remain visible. Three positive flags are the
+range/media-rich R2 `open_source.p99` +5.84%, `open_destination.p99` +9.93%,
+and `open.p99` +7.87%; the range/media-rich R1 `open_source.p99` -8.97% does
+not repeat. Logical read/work counters are consistent across the matched
+lanes. Scheduler or sleep variability is plausible, but this evidence does
+not prove that cause or identify a CPU bottleneck.
+
+The next measurement scope is the unmeasured native-application roundtrip and
+distinct-package pair, followed by cold-cache/physical-I/O, allocator and
+scaling evidence. The external fixture remains candidate-only, so no speedup
+against the preserved baseline refusal is available. Core release gates pass
+with 497 OPC tests, 854 PPTX tests and 381 aggregate harness tests; the isolated
+ASAN fuzzer passes 1,000 runs. Final evidence verification and owned cleanup pass. The full non-iWork goal remains open;
+see the [0454 bundle](results/change-0454/README.md).
+
 ## Change 0453: duplicate staged decoded media removed from PPTX plans
 
 [0453](changes/0453-pptx-shared-decoded-payload.md) shares managed OPC decoded bytes after successful capture, eliminating

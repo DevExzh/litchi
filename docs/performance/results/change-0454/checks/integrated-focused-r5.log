@@ -1,0 +1,37 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error[E0369]: binary operation `==` cannot be applied to type `Result<PackURI, OpcError>`
+   --> crates/litchi-opc/tests/source_backed_topology.rs:757:5
+    |
+757 | /     assert_eq!(
+758 | |         relationships.get("rId1").unwrap().target_partname(),
+759 | |         Some(pack("/custom/existing.xml"))
+760 | |     );
+    | |     ^
+    | |     |
+    | |_____Result<PackURI, OpcError>
+    |       Option<PackURI>
+    |
+note: `Result<PackURI, OpcError>` does not implement `PartialEq<Option<PackURI>>`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:557:0
+    |
+    = note: `Result<PackURI, OpcError>` is defined in another crate
+
+error[E0369]: binary operation `==` cannot be applied to type `Result<PackURI, OpcError>`
+   --> crates/litchi-opc/tests/source_backed_topology.rs:761:5
+    |
+761 | /     assert_eq!(
+762 | |         relationships.get("rId2").unwrap().target_partname(),
+763 | |         Some(pack("/custom/new.xml"))
+764 | |     );
+    | |     ^
+    | |     |
+    | |_____Result<PackURI, OpcError>
+    |       Option<PackURI>
+    |
+note: `Result<PackURI, OpcError>` does not implement `PartialEq<Option<PackURI>>`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:557:0
+    |
+    = note: `Result<PackURI, OpcError>` is defined in another crate
+
+For more information about this error, try `rustc --explain E0369`.
+error: could not compile `litchi-opc` (test "source_backed_topology") due to 2 previous errors

@@ -1,0 +1,22 @@
+{
+  "status": "pass",
+  "before": {
+    "path": "sources/654d4be5da2408ce3ac62ce665322ae11ac1651f1d312327bfb2200bfa7d0dbf.json",
+    "sha256": "654d4be5da2408ce3ac62ce665322ae11ac1651f1d312327bfb2200bfa7d0dbf",
+    "files": 6672
+  },
+  "after": {
+    "path": "sources/c03d99b31629b3b16d46202a46836c9cdaa8b30799cf133e3e181d60f64885b5.json",
+    "sha256": "c03d99b31629b3b16d46202a46836c9cdaa8b30799cf133e3e181d60f64885b5",
+    "files": 6672
+  },
+  "allowed_changed_path": "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+  "changed_paths": [
+    "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs"
+  ],
+  "before_sha256": "9bc8d4be4d4aa387999d6664ed917ef959680080c4d74c25d5c3b37620303778",
+  "after_sha256": "579f6cead38e370d8d84bf84b13c9d996b6feeff0e8b317e37ea329f2257db2b",
+  "snapshot": "candidate/fuzz-amended-parse_opc.rs.txt",
+  "reason": "Accumulate the topology plan while borrowing parts; consume the package only after iteration. The standalone fuzz target is outside production binary dependencies.",
+  "recorded_utc": "2026-09-07T07:07:10.244902+00:00"
+}

@@ -1,0 +1,97 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling cfg-if v1.0.4
+   Compiling crossbeam-utils v0.8.23
+   Compiling serde_core v1.0.229
+   Compiling typenum v1.20.1
+   Compiling crossbeam-epoch v0.9.21
+   Compiling libc v0.2.189
+   Compiling autocfg v1.5.1
+   Compiling rand_core v0.10.1
+   Compiling syn v3.0.5
+   Compiling hybrid-array v0.4.14
+   Compiling getrandom v0.4.3
+   Compiling crossbeam-deque v0.8.8
+   Compiling num-traits v0.2.19
+   Compiling serde v1.0.229
+   Compiling memchr v2.8.3
+   Compiling cpufeatures v0.3.1
+   Compiling zmij v1.0.23
+   Compiling rayon-core v1.13.0
+   Compiling jobserver v0.1.35
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling serde_derive v1.0.229
+   Compiling zerocopy v0.8.56
+   Compiling thiserror v2.0.20
+   Compiling shlex v2.0.1
+   Compiling rustversion v1.0.23
+   Compiling crc32fast v1.5.1
+   Compiling serde_json v1.0.151
+   Compiling const-oid v0.10.2
+   Compiling rustix v1.1.4
+   Compiling find-msvc-tools v0.1.12
+   Compiling cc v1.4.5
+   Compiling digest v0.11.3
+   Compiling quick-xml v0.41.0
+   Compiling thiserror-impl v2.0.20
+   Compiling chacha20 v0.10.2
+   Compiling syn v2.0.119
+   Compiling itoa v1.0.18
+   Compiling either v1.18.0
+   Compiling bitflags v2.13.1
+   Compiling zlib-rs v0.6.7
+   Compiling iana-time-zone v0.1.65
+   Compiling linux-raw-sys v0.12.1
+   Compiling once_cell v1.21.4
+   Compiling chrono v0.4.45
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling rayon v1.12.0
+   Compiling flate2 v1.1.10
+   Compiling rand v0.10.2
+   Compiling libfuzzer-sys v0.4.13
+   Compiling sha2 v0.11.0
+   Compiling base64 v0.22.1
+   Compiling debug_unsafe v0.1.4
+   Compiling smallvec v1.16.0
+   Compiling fastrand v2.5.0
+   Compiling fast-float2 v0.2.4
+   Compiling tempfile v3.27.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling atoi_simd v0.18.1
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling arbitrary v1.4.2
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-opc-fuzz v0.0.0 (/tmp/litchi-goal-0454-opc-fuzz)
+error[E0505]: cannot move out of `package` because it is borrowed
+  --> fuzz_targets/parse_opc.rs:80:29
+   |
+36 |     if let Ok(package) = SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits) {
+   |               ------- binding `package` declared here
+37 |         let mut source_xml_mutated = false;
+38 |         for part in package.iter_parts() {
+   |                     ------- borrow of `package` occurs here
+...
+80 |                     let _ = package.write_topology_to_stream(std::io::sink(), topology);
+   |                             ^^^^^^^ move out of `package` occurs here
+
+error[E0382]: use of moved value: `package`
+  --> fuzz_targets/parse_opc.rs:98:21
+   |
+36 |     if let Ok(package) = SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits) {
+   |               ------- move occurs because `package` has type `SourceBackedPackage`, which does not implement the `Copy` trait
+37 |         let mut source_xml_mutated = false;
+38 |         for part in package.iter_parts() {
+   |         -------------------------------- inside of this loop
+...
+80 |                     let _ = package.write_topology_to_stream(std::io::sink(), topology);
+   |                             ------- value moved here, in previous iteration of loop
+...
+98 |             let _ = package.write_topology_to_stream(std::io::sink(), plan);
+   |                     ^^^^^^^ value used here after move
+
+Some errors have detailed explanations: E0382, E0505.
+For more information about an error, try `rustc --explain E0382`.
+error: could not compile `litchi-opc-fuzz` (bin "parse_opc") due to 2 previous errors

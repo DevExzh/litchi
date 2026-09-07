@@ -193,17 +193,18 @@
     "comparison": "descriptive candidate-only; preserved baseline has a typed unnamed-slide refusal and cannot supply a baseline timing pair"
   },
   "bound_files": {
-    "capture.py": "6b7c16480704deb348528a7d9b0c84d8887aa68b8ecee5510a2fba6629ca1640",
-    "derive.py": "8f1c035a9f15de914e27c8adad26cfe3b30a2932897c8f4279a08e60bb55bcf9",
+    "capture.py": "9df016f763e8dff9b9aa17f7a364b5ea6764c28ee8aaf8e36b48309a7f4cfcc0",
+    "derive.py": "316841a5e46e248c486bb2f7b4c16ae17eabc051539bdd2a67332ea2f4da4c3f",
     "machine.py": "bd5c8342cc3205b2e331a32554e532d920148ce7cc803f9c2bb2ec8d9138ee0a",
-    "protocol.md": "1e22785662948395e6c47476ed6a7e62e84e3600508f4b52475b9cdb9467823f",
+    "protocol.md": "3843c82ea70ba1a0dbd95b281790afb6c480a20c3fc13a60202cf37a9cfcdeca",
     "verify-report.py": "436e0f9a926e2713ff030c9b9ed9c32b4312d0a6734096729b631074c0872316",
-    "external-verifier.py": "d16a62597a2973a177cf7b6bc05e31c04f952b972c55a63278460ef13e3d77ca"
+    "external-verifier.py": "36db46e3e0d2dc44dca902be43dd5c12a663b02fd7be5568855bbf354a425073"
   },
   "allocation": {
     "status": "not_measured",
     "scope": "The preserved lifecycle and external binaries use the Rust system allocator without operation-scoped counters.",
     "limitation": "Process RSS is reported from /usr/bin/time -v, but allocation calls, allocated bytes, deallocation bytes, peak live bytes, and allocator-region peaks are unavailable and must not be inferred from RSS."
   },
-  "claims": "Provider lanes are matched warm synthetic lifecycle controls with descriptive baseline/candidate ABBA statistics. External fixture lanes are candidate-only descriptive bytes/range evidence; no speedup is claimed against the preserved refusal. No native application, cold-cache, physical-I/O, allocator, or scaling claim is authorized."
+  "claims": "Provider lanes are matched warm synthetic lifecycle controls with descriptive baseline/candidate ABBA statistics. External fixture lanes are candidate-only descriptive bytes/range evidence; no speedup is claimed against the preserved refusal. No native application, cold-cache, physical-I/O, allocator, or scaling claim is authorized.",
+  "oracle_correction_utc": "2026-09-07T06:39:03.152028+00:00"
 }

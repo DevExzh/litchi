@@ -1,0 +1,18 @@
+{
+  "status": "failed",
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/tmp/litchi-goal-0454-portable-l03refqb/docs/performance/results/change-0454/verify.py",
+    "--cleanup"
+  ],
+  "cwd": "/tmp/litchi-goal-0454-portable-l03refqb",
+  "exit_code": 1,
+  "started_utc": "2026-09-07T07:40:53.092443+00:00",
+  "finished_utc": "2026-09-07T07:41:27.827951+00:00",
+  "verifier_sha256": "e222e6e0d5e0ae9a8aede5dbbc0cf74d4d728aff36fb38f2d49e9dd7e628491b",
+  "mode": "separate evidence copy; original binaries, fixture, raw outputs and fuzz directory absent",
+  "stdout": "",
+  "stderr": "INVALID: checks/final-worktree-source.json: final receipt lacks source_before\n",
+  "temporary_directory_absent": true
+}

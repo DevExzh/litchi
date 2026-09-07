@@ -1,0 +1,16 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error[E0502]: cannot borrow `reader` as immutable because it is also borrowed as mutable
+   --> crates/litchi-opc/src/source_backed.rs:726:41
+    |
+725 |         let (resolved_namespace, event) = reader.read_resolved_event()?;
+    |                                           ------ mutable borrow occurs here
+726 |         let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+    |                                         ^^^^^^ immutable borrow occurs here
+...
+795 |                             &resolved_namespace,
+    |                             ------------------- mutable borrow later used here
+
+For more information about this error, try `rustc --explain E0502`.
+error: could not compile `litchi-opc` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-opc` (lib test) due to 1 previous error

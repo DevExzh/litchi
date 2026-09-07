@@ -1,0 +1,27 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized] target(s) in 13.31s
+     Running tests/source_xml_publication.rs (target/release/deps/source_xml_publication-0bc1078890370ea9)
+
+running 6 tests
+test destination_depth_and_event_limits_refuse_source_xml_additions ... ok
+test managed_source_xml_honors_cancellation_and_releases_memory_gauge ... ok
+test ordinary_authored_xml_keeps_the_compactness_gate ... FAILED
+test source_provenance_rejects_foreign_lineage_and_stale_ranges_without_output ... ok
+test source_splice_rejects_reedit_and_overlapping_ranges_without_second_output ... ok
+test source_xml_publication_preserves_formatted_bytes_and_emits_checked_fragment ... ok
+
+failures:
+
+---- ordinary_authored_xml_keeps_the_compactness_gate stdout ----
+
+thread 'ordinary_authored_xml_keeps_the_compactness_gate' (3494576) panicked at crates/litchi-opc/tests/source_xml_publication.rs:192:10:
+ordinary formatted authored XML must retain its refusal: ()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    ordinary_authored_xml_keeps_the_compactness_gate
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-opc --test source_xml_publication`

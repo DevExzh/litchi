@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "scope": "external-runs and external-pilots report.pptx siblings; archived failed external-pilot-attempts report.pptx siblings",
+  "raw_outputs_absent": true,
+  "files_removed": 7,
+  "bytes_removed": 300636,
+  "artifact_manifest_sha256": "ed88eb9df2f62a921332d3bd475234d5fe9454463279b3f3568d47edd760866e",
+  "driver_sha256": "065946e141539c420457cf5a475cdf8360b9165a0c53b7b2ca59e1de9664f364"
+}

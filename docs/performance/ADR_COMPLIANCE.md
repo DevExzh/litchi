@@ -1,5 +1,45 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0454: source-proven XML publication
+
+0454 preserves the accepted ownership and resource/error boundaries while
+providing a source-proof path for three historical refusal points: the
+baseline's optional producer-visible slide-name refusal, the name-only
+historical intermediate candidate's noncanonical relationship XML lexical
+refusal, and the ordinary authored-XML compactness refusal on formatted
+`ppt/presentation.xml` (with copied slide XML requiring the same source
+preservation). This is a capability enabler; it does not change the accepted
+ADR tree or claim a performance gain.
+
+OPC owns the opaque source bytes, provenance, checked source ranges, compact
+fragment audit, splice grammar and topology admission. PPTX retains slide
+selection, graph/semantic checks and source identity; the ZIP writer retains
+untouched-record preservation. Source splice output preserves original
+whitespace and literal namespace grammar, while ordinary authored XML keeps
+its existing compactness gate. Source freshness, Part identity/content type,
+XML validity, bounded fragment/topology counts, destination limits and
+cancellation are rechecked before publication. Memory, Objects and Depth
+remain live managed resources, and InputBytes, OutputBytes and Work remain
+owner-defined cumulative consumption. An exact empty/no-op topology plan keeps
+the source-copy path and does not force normalization.
+
+The final source/revision/binary bindings, focused gates, independent external
+preservation oracle and native inventory are recorded. Core release checks pass
+with 497 OPC tests, 854 PPTX tests and 381 aggregate harness tests. The isolated fuzz driver passed its sanitizer build, 1,000-run smoke, Clippy
+and formatting checks; final evidence verification and owned cleanup pass. No
+public cross-owner bypass, dependency, unsafe policy, executor or ambient I/O
+is added. The native proof is a self-pair inventory, not a native-application
+roundtrip or distinct-package result.
+
+The formal [measurements](results/change-0454/measurements.md) keep all 15
+absolute review flags. Matched whole-API p50 movement stays within about 1.3%
+and no RSS comparison exceeds 5%; three positive range/media-rich R2 open-tail
+flags are +5.84%, +9.93% and +7.87%, while the R1 source-tail flag is -8.97%
+and does not repeat. Logical read/work counters remain consistent; scheduler
+or sleep variability is only a plausible inference. The external fixture is
+candidate-only, so no speedup against the baseline refusal is claimed. The
+full non-iWork goal remains open; see the [0454 design and evidence](results/change-0454/README.md).
+
 ## Change 0453: managed decoded sharing and bounded lazy fallback
 
 [0453](changes/0453-pptx-shared-decoded-payload.md) retains OPC `PartData` ownership and its original memory/object reservations

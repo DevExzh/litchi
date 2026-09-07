@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "ownership": "xml_provenance agent confirmed obsolete canonical patch-generation intermediates",
+  "removed": [
+    {
+      "path": "/tmp/source_backed_0454.rs",
+      "bytes": 749711,
+      "sha256": "389f6e173acad4aac452f9b94625671b8d7c4ca0e4293378ab4a7ff95cecbe79"
+    },
+    {
+      "path": "/tmp/make_0454_patch.py",
+      "bytes": 18230,
+      "sha256": "5ac8ac260e66ccf684fca30bf8282837b668449e9eb082c03deda05edcce06c1"
+    }
+  ],
+  "removed_utc": "2026-09-07T06:25:23.996594+00:00"
+}

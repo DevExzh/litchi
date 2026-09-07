@@ -1,0 +1,24 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+error[E0308]: mismatched types
+    --> crates/litchi-pptx/src/presentation/source_cross_copy.rs:3314:5
+     |
+3313 | fn requires_source_xml_proof(part: &PartView<'_>, xml: &[u8]) -> Result<bool> {
+     |                                                                  ------------ expected `std::result::Result<bool, error::Error>` because of return type
+3314 |     authored_xml_requires_source_proof(part.partname(), part.content_type(), xml)
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<bool, Error>`, found `Result<bool, OpcError>`
+     |
+     = note: expected enum `std::result::Result<_, error::Error>`
+                found enum `std::result::Result<_, litchi_opc::OpcError>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+3314 |     Ok(authored_xml_requires_source_proof(part.partname(), part.content_type(), xml)?)
+     |     +++                                                                             ++
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `litchi-pptx` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-pptx` (lib) due to 1 previous error
+error: could not compile `litchi-pptx` (lib test) due to 1 previous error

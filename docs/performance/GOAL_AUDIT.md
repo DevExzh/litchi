@@ -1,6 +1,79 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0453
+## Current audit: 0454 evidence (2026-09-07)
+
+The full non-iWork goal remains open. The 0454 production source epoch
+implements three recorded boundary fixes: the baseline optional
+producer-visible-name refusal, the name-only historical intermediate
+candidate's noncanonical relationship XML refusal, and the ordinary
+authored-XML compactness refusal through OPC source XML proof. The opaque
+`source_xml`, `checked_range`, `AuthoredXmlFragment`, and splice publication
+path preserves source whitespace and literal namespace grammar while retaining
+source identity, limits, resource accounting, cancellation, and exact no-op
+copying. Ordinary authored XML remains strict. This capability evidence makes
+no baseline-refusal speedup claim.
+
+The final native inventory covers 588 files and 189 image-bearing direct-picture
+rows: four self-pair cases publish and 185 outcomes remain unchanged. Each
+case reopens the same unmodified archive independently as source and
+destination. The pinned LibreOffice QA fixture additionally passes the exact
+ZIP/XML preservation checks in its external bytes/range captures. This is a
+self-pair proof, not an independent package pair or a native-application
+roundtrip ([inventory](results/change-0454/final-native-inventory.json),
+[outcome comparison](results/change-0454/final-outcome-comparison.json)).
+
+The formal capture passes all 18 lanes, 16 provider plus 2 external, with 30
+samples each: 540 retained samples
+([measurements](results/change-0454/measurements.md),
+[machine-readable rows](results/change-0454/measurements.json)). The matched
+whole-API p50 movement stays within about 1.3%, no RSS comparison exceeds 5%,
+and all 15 absolute review flags remain retained, including the three positive
+range/media-rich R2 open p99 flags (+5.84%, +9.93%, +7.87%). The
+range/media-rich R1 open-source p99 flag is -8.97% and does not repeat.
+Logical read/work counters remain consistent; scheduler or sleep variability is
+a plausible inference for the tail behavior, not a proved cause.
+
+The core release epoch passes build, format, strict, harness, OPC, PPTX,
+documentation, workspace, boundary, oracle, and native checks: 497 OPC tests,
+854 PPTX tests, and 381 aggregate harness tests pass. The standalone amended
+ASAN fuzzer also passes its 1,000-run seed-454 smoke. The original fuzzer
+build failure is historical; `fuzz-source-amendment.json` records the only
+post-measurement source change, an isolated `parse_opc` harness bridge. The
+amended fuzzer source manifest is separate from the measured production
+manifest, which remains unchanged
+([amendment](results/change-0454/fuzz-source-amendment.json),
+[validation history](results/change-0454/validation-notes.md)).
+
+Custody corrections are disclosed. The Markdown-renderer correction temporarily
+rewrote `protocol_sha256` in all 18 formal receipts; the renderer-r1 restoration
+reconstructs those receipt bindings and retains the intermediate hashes, so
+custody is reconstructed rather than uninterrupted
+([restoration](results/change-0454/custody-corrections/renderer-r1/restoration.json)).
+Raw timing reports, sampling, statistics, and timing inputs remain unchanged.
+The separate derivation amendment records the corrected `derive-final.py`
+display lookup apart from the original `derive.py`; it does not create a new
+measurement ([derivation amendment](results/change-0454/derivation-amendment.json)).
+
+The coverage taxonomy remains 438 selectors, 36 defaults, 15 categories, 33
+representative mappings, 10 measured mappings, and 23 correctness-only
+mappings ([coverage index](crud-coverage-index-v1.json)). The 540 formal samples
+are one matched workload control and do not promote those coverage rows. Native
+application roundtrip, distinct-package, cold-cache/physical-I/O, allocator,
+scaling, and the broader semantic CRUD rows remain unmeasured or incomplete.
+
+Final precleanup and post-cleanup verification pass. Owned temporary binaries,
+fuzz build files, and all seven generated PPTX outputs have been removed; the
+retained evidence records their identities. No future measured hotspot is asserted.
+The next measurement scope is the 64 KiB destination pass-through hypothesis:
+compare a bounded 32-to-64 KiB or adaptive candidate with exact request
+histograms, timing, resource and sink gates. It remains a measurement scope,
+not an established bottleneck or performance claim. The full non-iWork goal
+remains open.
+
+The sections below retain historical audit records. Their older “current” labels
+refer to their original audit dates and must not override this section.
+
+## Historical evidence through 0453
 
 [0453](changes/0453-pptx-shared-decoded-payload.md) removes the duplicate staged decoded payload after successful PPTX image/chart
 capture. Both allocator repeats save 16,777,408 planning allocated/retained bytes;

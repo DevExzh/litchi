@@ -1,0 +1,99 @@
+{
+  "status": "pass",
+  "intermediate_protocol_sha256": "932d4ccb85820a460fe40ff5a43dd3eb0e1466182fe2cc4aaa0a84df8c868363",
+  "restored_protocol_sha256": "6c3ab253d2e6680d1beffe975fc0c8fce472d10f04304eff986264ddfdaaaa3b",
+  "receipts": [
+    {
+      "path": "provider-runs/0/receipt.json",
+      "intermediate_sha256": "1b337e41cf5d1e7d989d6cd7ff24855f16104994e78e8196239cfd6acfff7e7a",
+      "restored_sha256": "0feb2db7b82c790e7b706818cd1854f388da0f0fbff7942593a28ffaaa479bd8"
+    },
+    {
+      "path": "provider-runs/1/receipt.json",
+      "intermediate_sha256": "38083210678da3dd658b228f2a2d4bd8df56544687585d335463dd49ea863803",
+      "restored_sha256": "21cb252a73c71526b46b35a3b76c002ca76aaf01db4fd4d47c30941460770564"
+    },
+    {
+      "path": "provider-runs/2/receipt.json",
+      "intermediate_sha256": "1b73a81c35fd318d4b7a65b3f8c48bf31111faf843431c029dfedfba3c01b264",
+      "restored_sha256": "9602a148d6ebb6b9af40afd27cd8bf088698ec8aec42d2223591198655e7def7"
+    },
+    {
+      "path": "provider-runs/3/receipt.json",
+      "intermediate_sha256": "8d06a40218ff453338caa71524b51870f2fe7f670e224f733ef99e634474ed1f",
+      "restored_sha256": "585770644282e0b0534be643af00d6a486f57ca34218d10922a899111b357997"
+    },
+    {
+      "path": "provider-runs/4/receipt.json",
+      "intermediate_sha256": "61b1636f35c60d4329ffa25dbc8f7bf5e9354c11e76b41776556da561b8ab096",
+      "restored_sha256": "81ec9b042100fd83227db8f0bb417bfd8136416e88ee9010978cf2cb4504b984"
+    },
+    {
+      "path": "provider-runs/5/receipt.json",
+      "intermediate_sha256": "b5dd3753ce1d4585c6416a3ef4ee3d63460ed6bc1d867c1679c9bf138f57021a",
+      "restored_sha256": "2d7667fab1c3b3f62d458b66cf87176d4c51518fce2888d61dd97bd79bdd919f"
+    },
+    {
+      "path": "provider-runs/6/receipt.json",
+      "intermediate_sha256": "64558c9e1e1abbfe968321ea0f3ea533c1fdd1974a7a1821d758d99079afbe63",
+      "restored_sha256": "13a100b7368f3af14ed0a9fc6d61045692212013fa96db42b73c43d1982384ce"
+    },
+    {
+      "path": "provider-runs/7/receipt.json",
+      "intermediate_sha256": "e80cc786f93e8addc642981ea22130bc1849781094d2f9a50242328c9156de01",
+      "restored_sha256": "5e3df12ab883d593f8e46c97c50e32f978dd07531d5a60518bf6cbcee0854097"
+    },
+    {
+      "path": "provider-runs/8/receipt.json",
+      "intermediate_sha256": "10c9f730ad0d835ffd052146c65d9e8dd9afeb1fc19e671462219773eadc792d",
+      "restored_sha256": "c33ab52a5a4c514ee3b4f4660477a896cd1f95a4a637a233934add30a2347c89"
+    },
+    {
+      "path": "provider-runs/9/receipt.json",
+      "intermediate_sha256": "b79b48d3ed64a9ca71110eae6bed0e1918e876da1c08121b4eb41e711095bf6e",
+      "restored_sha256": "84485be1b770711b67edbd15c39fe485438c703da1dce62678379d2c8111dcff"
+    },
+    {
+      "path": "provider-runs/10/receipt.json",
+      "intermediate_sha256": "8388c3ee66bb34514e407370ecde85c9e00221092771b1886ca80310d5696fa3",
+      "restored_sha256": "00b3ff9d802345cff06bb8486334be4644405ec744c950bc5aac11e539ca5040"
+    },
+    {
+      "path": "provider-runs/11/receipt.json",
+      "intermediate_sha256": "3600659d7b998f3c1eed2d03ce096555adcb0822b0741a63c3ef73b55edec7cb",
+      "restored_sha256": "27bb5e4fa9bbf2708b65d92cf7d43ff87eec215757abc2cf5ad81153489197c4"
+    },
+    {
+      "path": "provider-runs/12/receipt.json",
+      "intermediate_sha256": "6cd6b33e44d900f159fd9ccd13a4c162a4770ca6b477e51a7eef4cdabba8a6e5",
+      "restored_sha256": "72ac7ac5b0f5008dc16f9ed858b7e0e6864f9fc9ece35e872279170991319503"
+    },
+    {
+      "path": "provider-runs/13/receipt.json",
+      "intermediate_sha256": "280e50cdea48c4a3c094412a8bae560624cbad0f27abf16ea140e110e93573f9",
+      "restored_sha256": "c64a8dc4de3a7aa1fc920fb74d629e8660906f1d46647db250d5123e7122b5a5"
+    },
+    {
+      "path": "provider-runs/14/receipt.json",
+      "intermediate_sha256": "b2411a7b6fb0403821f12d93235a8f253fa75a185bb92a29dbd361e1d0a21506",
+      "restored_sha256": "c51240a6673891b6362e43ffdf9ca080b53f30e3d3401f9841c32c4a5d49cee2"
+    },
+    {
+      "path": "provider-runs/15/receipt.json",
+      "intermediate_sha256": "a5f88653183f8b5e90b4f500b9a0bba1ccd421906de4e04d78700c57ba46c208",
+      "restored_sha256": "e4a1bbaff66731449dbd601181802c93a4d3eae1951044cddb196aaf772dbcaf"
+    },
+    {
+      "path": "external-runs/0/receipt.json",
+      "intermediate_sha256": "14f971bfd58a1708e2ab8dad776f1434379fed4a787c5855bc7493c388dba054",
+      "restored_sha256": "0fbcca7a26daf77f9ead75790c16fcc48631918ba7f967739869973b9193c6b3"
+    },
+    {
+      "path": "external-runs/1/receipt.json",
+      "intermediate_sha256": "f4cb4eb5e5ca715039a6d0825f50a4502cd55ece5d8b34fa132e9b09ac548dc8",
+      "restored_sha256": "8b623430816c169f8248343a569b14f3cddb3f2ddc307bab3a1b358acc365f55"
+    }
+  ],
+  "basis": "The capture coordinator acknowledged changing only protocol_sha256 in the 18 receipts. Root reconstructed that original field from the captured pilot protocol hash and the exact inverse protocol edit; all intermediate bytes are retained here. This record discloses reconstruction, not uninterrupted receipt custody.",
+  "recorded_utc": "2026-09-07T07:08:07.641482+00:00"
+}

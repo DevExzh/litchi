@@ -1,5 +1,46 @@
 # Performance program phase report
 
+## Change 0454: source-proven unnamed-slide PPTX copy
+
+0454 is a source-preservation capability phase. Three recorded refusal
+boundaries led to it: the baseline stopped at the optional producer-visible
+slide name, the name-only historical intermediate candidate stopped at a
+noncanonical relationship XML lexical form, and the ordinary authored-XML
+compactness gate stopped formatted `ppt/presentation.xml`
+(`FormattingWhitespace`, offset 55). The copied slide XML must preserve its
+own source spelling as well.
+
+The OPC-owned opaque source XML API now captures exact bytes, binds edits with
+checked source ranges and provenance, audits compact generated fragments, and
+publishes a validated splice. This preserves original whitespace and literal
+namespace grammar while retaining source identity, semantic graph checks,
+finite resource admissions, cancellation and exact no-op source copying.
+Ordinary authored XML remains strict. The final native inventory publishes
+four self-pair cases and leaves 185 of 189 outcomes unchanged; each case uses
+the same unmodified archive reopened independently as source and destination.
+This is no native-application roundtrip or distinct-package result. The slice
+enables the previously refused operation; it supplies no speedup claim.
+
+The formal [measurements](results/change-0454/measurements.md) and
+[machine-readable rows](results/change-0454/measurements.json) retain 30
+samples after 3 warmups per lane on CPU 2 with one worker. Matched whole-API
+p50 movement stays within about 1.3%, no RSS comparison exceeds 5%, and all
+15 absolute review flags remain visible. Three positive range/media-rich R2
+flags are `open_source.p99` +5.84%, `open_destination.p99` +9.93% and
+`open.p99` +7.87%; the range/media-rich R1 `open_source.p99` -8.97% does not
+repeat. Logical read/work counters remain consistent; scheduler or sleep
+variability is plausible, not proved. The baseline still refuses the compared
+input, so external observations are candidate-only and descriptive.
+
+The release-gate epoch passes build, format, strict, harness, OPC, PPTX,
+documentation, workspace, boundary, oracle and native checks, including 497
+OPC tests, 854 PPTX tests and 381 aggregate harness tests. The isolated ASAN
+fuzzer passes 1,000 runs; final evidence verification and owned cleanup pass. Native-app
+roundtrip, distinct-package, cold-cache/physical-I/O, allocator and scaling
+evidence remain unmeasured. The [0454 bundle](results/change-0454/README.md)
+retains the historical attempts and evidence boundaries. The full non-iWork
+goal remains open.
+
 ## Change 0437: bounded ODP creation with a measured CPU tradeoff
 
 [0437](changes/0437-odp-bounded-plain-slides.md) adds plain titled-slide source

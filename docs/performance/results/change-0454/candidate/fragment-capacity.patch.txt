@@ -1,0 +1,11 @@
+--- a/crates/litchi-opc/src/xml_splice.rs
++++ b/crates/litchi-opc/src/xml_splice.rs
+@@ -449,7 +449,7 @@ impl XmlSplicePublication {
+             })
+             .ok_or_else(|| invalid_source("XML source splice metadata size overflows"))?;
+         let edit_reservation =
+-            reserve_edit_memory(&self.source.source, fragment.bytes.len(), edit_metadata)?;
++            reserve_edit_memory(&self.source.source, fragment.bytes.capacity(), edit_metadata)?;
+         self.edits
+             .try_reserve(1)
+             .map_err(|source| OpcError::Allocation {

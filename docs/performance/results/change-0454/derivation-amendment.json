@@ -1,0 +1,10 @@
+{
+  "status": "pass",
+  "original_driver": "derive.py",
+  "original_sha256": "316841a5e46e248c486bb2f7b4c16ae17eabc051539bdd2a67332ea2f4da4c3f",
+  "corrected_driver": "derive-final.py",
+  "corrected_sha256": "2be514cfb04c4e21d80881a605040943da608347555611c70e9b213ec1999797",
+  "captured_protocol_sha256": "6c3ab253d2e6680d1beffe975fc0c8fce472d10f04304eff986264ddfdaaaa3b",
+  "reason": "Post-capture Markdown rendering used provider counter names for external rows. Only counter-key display lookup changed; sampling, statistics and timing inputs did not change.",
+  "recorded_utc": "2026-09-07T07:08:07.641482+00:00"
+}

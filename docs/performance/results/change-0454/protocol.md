@@ -2,9 +2,14 @@
 
 This bundle measures the unnamed-slide PPTX cross-copy path after the focused
 lossless relationship append work. The preserved lifecycle binary is bound by
-its source manifest and hash in `baseline-lifecycle-binary.json`; the current
-candidate binary and external probe are supplied by `build.py` in
-`candidate-build.json`. A revision label alone is not used as build identity.
+its original source manifest, revision and hash in
+`baseline-lifecycle-binary.json` (also retained in
+`baseline-lifecycle-origin.json`); the current candidate binary and external
+probe are supplied by `build.py` in `candidate-build.json`. A revision label
+alone is not used as build identity. Each capture receipt also binds the
+current checkout source manifest before and after the child process, so the
+historical baseline executable and the current candidate checkout have
+separate, explicit custody records.
 
 `protocol.json` is frozen before any lane is captured. The provider control is
 the existing `pptx_provider_lifecycle_v1` report over the unchanged plain and
@@ -21,9 +26,13 @@ descriptive lanes, one direct-bytes and one 256-byte/100-microsecond logical
 range adapter, with the same three warmups and 30 retained samples. The
 preserved baseline has a typed unnamed-slide refusal in the historical
 name-only outcome record, so this fixture has no baseline timing population.
-Its timings, output bytes, lexical prefix/suffix checks, exact copied payloads,
-semantic reopen and eager reopen are evidence of the accepted candidate path;
-they carry no speedup claim against a refusal.
+The external harness writes the first retained output beside its report;
+`external-verifier.py` independently reparses that artifact and the fixture,
+then binds the result to the frozen `external-expected.json` identity. The
+receipt retains the report, output artifact, oracle log and process resource
+log hashes. Timings, output bytes, lexical prefix/suffix checks, exact copied
+payloads, semantic reopen and eager reopen are evidence of the accepted
+candidate path; they carry no speedup claim against a refusal.
 
 `capture.py` wraps each workload in a fresh `taskset` child and GNU
 `/usr/bin/time -v`. The Rust report remains the authority for API phase clocks,

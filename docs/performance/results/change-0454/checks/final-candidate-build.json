@@ -1,0 +1,49 @@
+{
+  "change": 454,
+  "argv": [
+    "cargo",
+    "build",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline",
+    "--bin",
+    "pptx_external_cross_copy",
+    "--bin",
+    "pptx_native_copy_probe"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "b524ca57176b1dea082f4c04464e5754b0358149",
+  "driver_sha256": "40c711212b4e69dc862d9744c62e9a6175e96e80ca41973e2706fafe4765f01d",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-07T06:31:13.014273+00:00",
+  "source_before": {
+    "path": "sources/637af0780f25d68653d8f39a0552fbfb4e37042feb65201351466c36b0e20f47.json",
+    "sha256": "637af0780f25d68653d8f39a0552fbfb4e37042feb65201351466c36b0e20f47",
+    "files": 6672
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T06:33:14.140623+00:00",
+  "source_after": {
+    "path": "sources/637af0780f25d68653d8f39a0552fbfb4e37042feb65201351466c36b0e20f47.json",
+    "sha256": "637af0780f25d68653d8f39a0552fbfb4e37042feb65201351466c36b0e20f47",
+    "files": 6672
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/final-candidate-build.log",
+    "bytes": 962,
+    "sha256": "7f98b6c6d9311b6a92c2be6121e3d833f3d466e90dd3512d021b57d6360b1279"
+  }
+}

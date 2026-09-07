@@ -1,0 +1,99 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error: unnecessary qualification
+   --> crates/litchi-opc/src/xml_splice.rs:812:34
+    |
+812 |                     .xml_content(quick_xml::XmlVersion::Implicit1_0)
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+812 -                     .xml_content(quick_xml::XmlVersion::Implicit1_0)
+812 +                     .xml_content(XmlVersion::Implicit1_0)
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-opc/src/xml_splice.rs:828:34
+    |
+828 |                     .xml_content(quick_xml::XmlVersion::Implicit1_0)
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+828 -                     .xml_content(quick_xml::XmlVersion::Implicit1_0)
+828 +                     .xml_content(XmlVersion::Implicit1_0)
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-opc/src/xml_splice.rs:969:15
+    |
+969 |     element: &quick_xml::events::BytesStart<'_>,
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+969 -     element: &quick_xml::events::BytesStart<'_>,
+969 +     element: &BytesStart<'_>,
+    |
+
+error[E0599]: no method named `checked_add` found for enum `std::option::Option<T>` in the current scope
+   --> crates/litchi-opc/src/xml_splice.rs:427:14
+    |
+425 |           let edit_metadata = size_of::<XmlSpliceEdit>()
+    |                               --------------------------
+    |                               |
+    |  _____________________________method `checked_add` is available on `usize`
+    | |
+426 | |             .checked_add(capacity_metadata)
+427 | |             .checked_add(if self.edits.is_empty() {
+    | |             -^^^^^^^^^^^ method not found in `std::option::Option<usize>`
+    | |_____________|
+    |
+    |
+note: the method `checked_add` exists on the type `usize`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/num/uint_macros.rs:890:8
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/num/mod.rs:1449:4
+   ::: /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/num/mod.rs:1473:5
+    |
+    = note: in this macro invocation
+    = note: this error originates in the macro `uint_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: consider using `Option::expect` to unwrap the `usize` value, panicking if the value is an `Option::None`
+    |
+426 |             .checked_add(capacity_metadata).expect("REASON")
+    |                                            +++++++++++++++++
+
+error: use of deprecated method `quick_xml::events::attributes::Attribute::<'a>::unescape_value`: use `Self::normalized_value()`
+   --> crates/litchi-opc/src/xml_splice.rs:922:31
+    |
+922 |         let value = attribute.unescape_value().map_err(|error| {
+    |                               ^^^^^^^^^^^^^^
+    |
+    = note: `-D deprecated` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(deprecated)]`
+
+error[E0597]: `local` does not live long enough
+    --> crates/litchi-opc/src/xml_splice.rs:1056:44
+     |
+ 975 |     let mut seen_keys: Vec<&[u8]> = Vec::new();
+     |         ------------- variable `seen_keys` declared here
+...
+1033 |             let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+     |                             ----- binding `local` declared here
+...
+1043 |             if seen_expanded.iter().any(|(known_namespace, known_local)| {
+     |                ------------- borrow later used here
+...
+1056 |             seen_expanded.push((namespace, local.as_ref()));
+     |                                            ^^^^^ borrowed value does not live long enough
+1057 |         }
+     |         - `local` dropped here while still borrowed
+     |
+     = note: `seen_keys` is a collection that stores borrowed references, but `local` does not live long enough to be stored in it
+     = help: buffer reuse with borrowed references requires unsafe code or restructuring
+
+Some errors have detailed explanations: E0597, E0599.
+For more information about an error, try `rustc --explain E0597`.
+error: could not compile `litchi-opc` (lib) due to 6 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-opc` (lib) due to 6 previous errors
+error: could not compile `litchi-opc` (lib test) due to 6 previous errors

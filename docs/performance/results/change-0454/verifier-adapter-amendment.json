@@ -1,0 +1,13 @@
+{
+  "schema": "change-0454-verifier-adapter-amendment-v1",
+  "status": "pass",
+  "scope": "post-cleanup replay and cleanup receipt validation",
+  "changed_component": "relocated_external_evidence, check_cleanup_receipts, check_raw_output_cleanup, amendment validation",
+  "previous_verifier_sha256": "1779355b58ddd8dc5f3614dde5dcedaafccc0a430be82fa3a214588d6f42504e",
+  "current_verifier_sha256": "e222e6e0d5e0ae9a8aede5dbbc0cf74d4d728aff36fb38f2d49e9dd7e628491b",
+  "precleanup_receipt": "checks/precleanup.json",
+  "external_oracle_unchanged": true,
+  "capture_receipts_unchanged": true,
+  "reparsed": false,
+  "no_reparse_claim": "The outer verifier now makes the temporary replay output path absolute, excludes the precleanup attestation from cleanup-action receipts, and validates this amendment. Retained capture reports, receipts, and the frozen external oracle are unchanged; deleted raw outputs are not reparsed. The intermediate verifier is retained in candidate/verifier-before-cleanup-selection.py.txt. The raw-output cleanup receipt also uses a dedicated variable so iteration over capture receipts cannot replace its path. The preceding verifier is retained in candidate/verifier-after-cleanup-r4.py.txt."
+}

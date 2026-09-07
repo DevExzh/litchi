@@ -1,0 +1,10 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized] target(s) in 15.85s
+     Running tests/source_backed_topology.rs (target/release/deps/source_backed_topology-1eb65f7698bf44e1)
+
+running 2 tests
+test noncanonical_existing_relationship_replacements_are_refused_before_output ... ok
+test noncanonical_existing_relationships_allow_append_preserving_source ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 36 filtered out; finished in 0.00s
+

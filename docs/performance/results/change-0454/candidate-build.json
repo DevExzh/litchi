@@ -1,0 +1,25 @@
+{
+  "revision": "b524ca57176b1dea082f4c04464e5754b0358149",
+  "source_manifest": {
+    "path": "sources/654d4be5da2408ce3ac62ce665322ae11ac1651f1d312327bfb2200bfa7d0dbf.json",
+    "sha256": "654d4be5da2408ce3ac62ce665322ae11ac1651f1d312327bfb2200bfa7d0dbf",
+    "files": 6672
+  },
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0454-native-copy/candidate-normal",
+      "bytes": 57775824,
+      "sha256": "4d57d5d40f78e8188bbb8ccdeed3af6f74c26ff1ba92220ddd0970504c7695fd"
+    },
+    "external": {
+      "path": "/tmp/litchi-goal-0454-native-copy/candidate-external",
+      "bytes": 7682864,
+      "sha256": "389cbff44a31bad8979f93c8e1b2c4ffe47b38d2b7068e9814b87160fd6ecc1a"
+    },
+    "probe": {
+      "path": "/tmp/litchi-goal-0454-native-copy/candidate-probe",
+      "bytes": 3566536,
+      "sha256": "8c648cc82f9d646e1ecb34108f4d4405e20ea1b4586646db6f2bb3f43beb2926"
+    }
+  }
+}

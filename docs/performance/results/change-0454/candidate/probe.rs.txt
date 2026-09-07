@@ -1,0 +1,32 @@
+use litchi_pptx::{SourceBackedPresentation, SourceBackedPresentationEditor};
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.len() != 4 {
+        return Err(
+            "expected source-path source-position destination-path destination-position".into(),
+        );
+    }
+    let source = SourceBackedPresentation::from_path(&args[0])?;
+    let editor = SourceBackedPresentationEditor::from_path(&args[2])?;
+    let source_position = args[1].parse()?;
+    let destination_position = args[3].parse()?;
+    match editor.plan_cross_slide_copy(
+        &source,
+        source_position,
+        destination_position,
+        destination_position + 1,
+    ) {
+        Ok(plan) => {
+            let mut output = Vec::new();
+            let copied = editor.publish_cross_slide_copy_to_stream(&mut output, &plan)?;
+            println!(
+                "PUBLISHED bytes={} slides={} name={:?}",
+                output.len(),
+                copied.destination_slide_count(),
+                copied.name()
+            );
+        },
+        Err(error) => println!("REFUSED {error:?}"),
+    }
+    Ok(())
+}

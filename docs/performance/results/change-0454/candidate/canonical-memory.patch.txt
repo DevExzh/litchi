@@ -1,0 +1,366 @@
+--- a/crates/litchi-opc/src/source_backed.rs
++++ b/crates/litchi-opc/src/source_backed.rs
+@@ -919,17 +919,23 @@
+     declared_bytes: u64,
+     relationship_slots: usize,
+ ) -> Result<u64> {
+-    // The source payload is charged separately. This bound admits the
+-    // quick-xml 0.41 input buffer, namespace resolver binding Vec, opened
+-    // element state Vec, decoded attribute scratch, and the HashSet bucket
+-    // storage used to compare the source catalog. quick-xml keeps the first
+-    // two namespace bindings even for a namespace-free `<a/>`, so the fixed
+-    // term covers that minimum state; each input-derived slot uses a
+-    // conservative private-type footprint.
++    // The first source_bytes term below is the retained source payload and
++    // the second is the quick-xml input/transient buffer. Keeping both terms
++    // explicit is important: read_entry does not have a separate payload
++    // reservation on this path. The remaining terms cover the resolver's
++    // namespace binding Vec, opened-element state Vec, decoded attribute
++    // scratch, and the HashSet bucket storage used to compare the source
++    // catalog. quick-xml keeps the first two namespace bindings even for a
++    // namespace-free `<a/>`, so the fixed term covers that minimum state; each
++    // input-derived slot uses a conservative private-type footprint.
+     const FIXED_BYTES: usize = 4096;
+     const NAMESPACE_BINDING_BYTES: usize = 64;
+     const OPEN_ELEMENT_BYTES: usize = 2 * size_of::<usize>();
+-    const ATTRIBUTE_BYTES: usize = 4 * size_of::<usize>();
++    // Raw attribute keys (2 * usize), expanded-name bookkeeping
++    // (4 * usize), and quick-xml attribute ranges/positions (2 * usize),
++    // doubled for Vec growth/transient coexistence.
++    const ATTRIBUTE_BYTES: usize =
++        2 * (2 * size_of::<usize>() + 4 * size_of::<usize>() + 2 * size_of::<usize>());
+     const HASH_BUCKET_BYTES: usize = 64;
+     const MIN_NAMESPACE_DECLARATION_BYTES: usize = 7;
+     const MIN_OPEN_ELEMENT_BYTES: usize = 3;
+@@ -950,11 +956,12 @@
+         .and_then(|slots| slots.checked_add(1))
+         .ok_or_else(|| overlay_unavailable("relationship attribute bound overflows"))?;
+     let amount = FIXED_BYTES
+-        .checked_add(
+-            source_bytes
+-                .checked_mul(2)
+-                .ok_or_else(|| overlay_unavailable("relationship input bound overflows"))?,
+-        )
++        // Retained source payload: read_entry is performed after this
++        // reservation and no other source-payload charge covers it.
++        .checked_add(source_bytes)
++        // quick-xml's input/transient buffer, which may coexist with the
++        // retained source Vec while the source is audited.
++        .and_then(|amount| amount.checked_add(source_bytes))
+         .and_then(|amount| {
+             namespace_slots
+                 .checked_mul(NAMESPACE_BINDING_BYTES)
+@@ -1343,6 +1350,61 @@
+     Ok(length)
+ }
+ 
++const CANONICAL_RELATIONSHIPS_HEADER: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#;
++const CANONICAL_RELATIONSHIPS_FOOTER: &[u8] = b"</Relationships>";
++const CANONICAL_RELATIONSHIP_FIXED_MEMORY_BYTES: usize = 4096;
++
++fn canonical_relationship_xml_len(relationships: &Relationships) -> Result<usize> {
++    relationships.iter().try_fold(
++        CANONICAL_RELATIONSHIPS_HEADER
++            .len()
++            .checked_add(CANONICAL_RELATIONSHIPS_FOOTER.len())
++            .ok_or_else(|| overlay_unavailable("canonical relationship XML length overflows usize"))?,
++        |length, relationship| {
++            length
++                .checked_add(relationship_append_fragment_len(
++                    0,
++                    relationship.r_id(),
++                    relationship.reltype(),
++                    relationship.target_ref(),
++                    relationship.target_mode(),
++                )?)
++                .ok_or_else(|| {
++                    overlay_unavailable("canonical relationship XML length overflows usize")
++                })
++        },
++    )
++}
++
++fn canonical_relationship_serializer_memory_bound(
++    relationships: &Relationships,
++    serialized_len: usize,
++) -> Result<u64> {
++    // try_to_xml_bytes first materializes one pointer per relationship for
++    // sorting, then appends independently reserved literal/escaped fragments.
++    // Charge the exact final XML bytes, one equally sized transient allowance
++    // for Vec growth/coexisting old storage, the sorted reference Vec, and a
++    // fixed allocator/state allowance before invoking that serializer. A
++    // source relationship payload is charged separately by
++    // relationship_xml_working_memory_bound before this helper is called.
++    let reference_bytes = relationships
++        .len()
++        .checked_mul(size_of::<&crate::rel::Relationship>())
++        .ok_or_else(|| {
++            overlay_unavailable("canonical relationship reference storage overflows usize")
++        })?;
++    let amount = CANONICAL_RELATIONSHIP_FIXED_MEMORY_BYTES
++        .checked_add(serialized_len)
++        .and_then(|amount| amount.checked_add(serialized_len))
++        .and_then(|amount| amount.checked_add(reference_bytes))
++        .and_then(|amount| amount.checked_add(size_of::<Vec<&crate::rel::Relationship>>()))
++        .ok_or_else(|| {
++            overlay_unavailable("canonical relationship serializer memory overflows usize")
++        })?;
++    u64::try_from(amount)
++        .map_err(|_| overlay_unavailable("canonical relationship serializer memory exceeds u64"))
++}
++
+ fn append_relationship_fragment(
+     output: &mut Vec<u8>,
+     root_prefix: &[u8],
+@@ -6770,11 +6832,53 @@
+                     )));
+                 }
+                 let original_is_canonical = {
++                    let source_canonical_len = canonical_relationship_xml_len(source_relationships)?;
++                    let source_canonical_len_u64 = u64::try_from(source_canonical_len).map_err(|_| {
++                        overlay_unavailable("canonical relationship XML length exceeds u64")
++                    })?;
++                    self.limits.check(
++                        ReadResource::RelationshipXmlBytes,
++                        source_canonical_len_u64,
++                        self.limits.max_relationship_xml_bytes() as u64,
++                    )?;
++                    // Keep this reservation scoped to the comparison buffer.
++                    // The source payload/parser reservation remains retained
++                    // for the noncanonical splice or generated publication.
++                    let _source_serialization_memory = self.reserve_topology_memory(
++                        canonical_relationship_serializer_memory_bound(
++                            source_relationships,
++                            source_canonical_len,
++                        )?,
++                    )?;
+                     let canonical = source_relationships.try_to_xml_bytes()?;
++                    if canonical.len() != source_canonical_len {
++                        return Err(overlay_unavailable(
++                            "canonical relationship XML length changed during generation",
++                        ));
++                    }
+                     original.as_slice() == canonical.as_slice()
+                 };
+                 if original_is_canonical {
++                    let canonical_len = canonical_relationship_xml_len(&owner_relationships)?;
++                    let canonical_len_u64 = u64::try_from(canonical_len)
++                        .map_err(|_| overlay_unavailable("canonical relationship XML length exceeds u64"))?;
++                    self.limits.check(
++                        ReadResource::RelationshipXmlBytes,
++                        canonical_len_u64,
++                        self.limits.max_relationship_xml_bytes() as u64,
++                    )?;
++                    let canonical_memory_reservation = self.reserve_topology_memory(
++                        canonical_relationship_serializer_memory_bound(
++                            &owner_relationships,
++                            canonical_len,
++                        )?,
++                    )?;
+                     let xml = owner_relationships.try_to_xml_bytes()?;
++                    if xml.len() != canonical_len {
++                        return Err(overlay_unavailable(
++                            "canonical relationship XML length changed during generation",
++                        ));
++                    }
+                     self.limits.check(
+                         ReadResource::RelationshipXmlBytes,
+                         xml.len() as u64,
+@@ -6782,7 +6886,7 @@
+                     )?;
+                     validate_overlay_xml(relationship_uri.as_str(), &xml)?;
+                     let mut memory_reservations = Vec::new();
+-                    memory_reservations.try_reserve_exact(1).map_err(|source| {
++                    memory_reservations.try_reserve_exact(2).map_err(|source| {
+                         OpcError::Allocation {
+                             resource: "source-backed OPC canonical relationship reservations",
+                             source,
+@@ -6791,6 +6895,9 @@
+                     if let Some(reservation) = source_memory_reservation {
+                         memory_reservations.push(reservation);
+                     }
++                    if let Some(reservation) = canonical_memory_reservation {
++                        memory_reservations.push(reservation);
++                    }
+                     (xml, None, memory_reservations)
+                 } else {
+                     let append_only = relationships[group_start..group_end].iter().all(|change| {
+@@ -6963,14 +7070,43 @@
+                     (xml, Some(parsed.event_count), memory_reservations)
+                 }
+             } else {
++                let canonical_len = canonical_relationship_xml_len(&owner_relationships)?;
++                let canonical_len_u64 = u64::try_from(canonical_len)
++                    .map_err(|_| overlay_unavailable("canonical relationship XML length exceeds u64"))?;
++                self.limits.check(
++                    ReadResource::RelationshipXmlBytes,
++                    canonical_len_u64,
++                    self.limits.max_relationship_xml_bytes() as u64,
++                )?;
++                let canonical_memory_reservation = self.reserve_topology_memory(
++                    canonical_relationship_serializer_memory_bound(
++                        &owner_relationships,
++                        canonical_len,
++                    )?,
++                )?;
+                 let xml = owner_relationships.try_to_xml_bytes()?;
++                if xml.len() != canonical_len {
++                    return Err(overlay_unavailable(
++                        "canonical relationship XML length changed during generation",
++                    ));
++                }
+                 self.limits.check(
+                     ReadResource::RelationshipXmlBytes,
+                     xml.len() as u64,
+                     self.limits.max_relationship_xml_bytes() as u64,
+                 )?;
+                 validate_overlay_xml(relationship_uri.as_str(), &xml)?;
+-                (xml, None, Vec::new())
++                let mut memory_reservations = Vec::new();
++                memory_reservations.try_reserve_exact(1).map_err(|source| {
++                    OpcError::Allocation {
++                        resource: "source-backed OPC canonical relationship reservations",
++                        source,
++                    }
++                })?;
++                if let Some(reservation) = canonical_memory_reservation {
++                    memory_reservations.push(reservation);
++                }
++                (xml, None, memory_reservations)
+             };
+             relationship_publications.push(TopologyRelationshipPublication {
+                 member_name,
+@@ -7272,9 +7408,12 @@
+                     target: ChangedOverlayTarget::Member(publication.member_name.clone()),
+                     replacement: ChangedOverlayPayload::Owned(std::mem::take(&mut publication.xml)),
+                 });
+-                topology_relationship_memory_reservations
+-                    .append(&mut publication.memory_reservations);
+             }
++            // New relationship members retain their generated serializer
++            // reservation until the appended entry has been handed to the
++            // ZIP writer, just like changed existing members.
++            topology_relationship_memory_reservations
++                .append(&mut publication.memory_reservations);
+         }
+         if let Some(content_types) = &content_types_replacement {
+             changed.push(ChangedOverlay {
+@@ -12367,6 +12506,118 @@
+         relationships.try_to_xml_bytes().unwrap()
+     }
+ 
++    #[test]
++    fn canonical_relationship_length_matches_fallible_serializer() {
++        let owner = PackURI::new("/word/document.xml").unwrap();
++        let mut relationships = Relationships::for_source(&owner);
++        relationships
++            .try_add_relationship(
++                "urn:test:a&b".to_string(),
++                "https://example.invalid/?q=a&b=2".to_string(),
++                "rId2".to_string(),
++                TargetMode::External,
++            )
++            .unwrap();
++        relationships
++            .try_add_relationship(
++                "urn:internal".to_string(),
++                "target.xml".to_string(),
++                "rId1".to_string(),
++                TargetMode::Internal,
++            )
++            .unwrap();
++
++        let serialized = relationships.try_to_xml_bytes().unwrap();
++        assert_eq!(canonical_relationship_xml_len(&relationships).unwrap(), serialized.len());
++    }
++
++    #[test]
++    fn topology_canonical_relationship_publication_honors_memory_admission() {
++        const HYPERLINK: &str =
++            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
++        let source = topology_relationship_archive(&canonical_document_relationships(&[]));
++        let owner = PackURI::new("/word/document.xml").unwrap();
++        let mut plan = SourceTopologyPlan::new();
++        for index in 0..64 {
++            plan.try_add_external_relationship(
++                owner.clone(),
++                format!("rBudget{index}"),
++                HYPERLINK,
++                format!("https://example.invalid/{}", "x".repeat(2048)),
++            )
++            .unwrap();
++        }
++        let (_budget, _cancellation_source, context) =
++            managed_context_with_cancellation(64 * 1024);
++        let package = SourceBackedPackage::from_read_at_with_execution_context(
++            Arc::new(CountingSource::new(source)),
++            ReadLimits::default(),
++            context,
++        )
++        .unwrap();
++        let mut output = Vec::new();
++        let error = package
++            .write_topology_to_stream(&mut output, plan)
++            .unwrap_err();
++        assert!(matches!(
++            error,
++            OpcError::Execution(ExecutionError::ResourceLimit(limit))
++                if limit.resource == Resource::Memory
++        ));
++        assert!(output.is_empty());
++    }
++
++    #[test]
++    fn topology_canonical_relationship_publication_honors_tight_limit_before_output() {
++        const HYPERLINK: &str =
++            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
++        let source = topology_relationship_archive(&canonical_document_relationships(&[]));
++        let owner = PackURI::new("/word/document.xml").unwrap();
++        let mut expected = Relationships::for_source(&owner);
++        expected
++            .try_add_relationship(
++                HYPERLINK.to_string(),
++                "https://example.invalid/".to_string(),
++                "rLimit".to_string(),
++                TargetMode::External,
++            )
++            .unwrap();
++        let limit = canonical_relationship_xml_len(&expected)
++            .unwrap()
++            .checked_sub(1)
++            .expect("canonical relationship XML is nonempty");
++        let limits = ReadLimits::builder()
++            .max_relationship_xml_bytes(limit)
++            .unwrap()
++            .build()
++            .unwrap();
++        let package = SourceBackedPackage::from_read_at_with_limits(
++            Arc::new(CountingSource::new(source)),
++            limits,
++        )
++        .unwrap();
++        let mut plan = SourceTopologyPlan::new();
++        plan.try_add_external_relationship(
++            owner,
++            "rLimit",
++            HYPERLINK,
++            "https://example.invalid/",
++        )
++        .unwrap();
++        let mut output = Vec::new();
++        let error = package
++            .write_topology_to_stream(&mut output, plan)
++            .unwrap_err();
++        assert!(matches!(
++            error,
++            OpcError::ReadLimit {
++                resource: ReadResource::RelationshipXmlBytes,
++                ..
++            }
++        ));
++        assert!(output.is_empty());
++    }
++
+     fn noncanonical_document_relationships() -> &'static [u8] {
+         br#"<?xml version="1.0" encoding="UTF-8"?>
+ <!--preserve-before-->

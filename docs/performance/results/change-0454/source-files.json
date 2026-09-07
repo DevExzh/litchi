@@ -1,0 +1,12 @@
+[
+  "crates/litchi-opc/src/source_backed.rs",
+  "crates/litchi-pptx/src/presentation/source_cross_copy.rs",
+  "crates/litchi-pptx/tests/source_backed_cross_copy.rs",
+  "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+  "tools/perf-baseline/src/bin/pptx_external_cross_copy.rs",
+  "crates/litchi-opc/src/lib.rs",
+  "crates/litchi-opc/src/xml_splice.rs",
+  "crates/litchi-opc/tests/source_backed_topology.rs",
+  "tools/perf-baseline/src/bin/pptx_native_copy_probe.rs",
+  "crates/litchi-opc/tests/source_xml_publication.rs"
+]

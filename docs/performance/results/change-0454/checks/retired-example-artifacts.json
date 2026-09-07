@@ -1,0 +1,46 @@
+{
+  "status": "inventoried",
+  "artifacts": [
+    {
+      "path": "target/release/examples/native_cross_copy_probe_0454",
+      "bytes": 2149728,
+      "sha256": "e8a3fdec67edf299dbdf55ea1a4575ba7eeaa9ceaa904a9a749b98def6e6d370"
+    },
+    {
+      "path": "target/release/examples/native_cross_copy_probe_0454.d",
+      "bytes": 54183,
+      "sha256": "62ef2c106c1c3257a4868ac7a18325c652d0d80e0dc12f3684f6d85abe962651"
+    },
+    {
+      "path": "target/release/examples/native_cross_copy_probe_0454-6837d8f610535446",
+      "bytes": 2149728,
+      "sha256": "e8a3fdec67edf299dbdf55ea1a4575ba7eeaa9ceaa904a9a749b98def6e6d370"
+    },
+    {
+      "path": "target/release/examples/native_cross_copy_probe_0454-6837d8f610535446.d",
+      "bytes": 375,
+      "sha256": "f82e5cf52facf3096841b7d0fffab08567b8b51b1449e2fc9ad0a952cce0ba74"
+    },
+    {
+      "path": "target/release/.fingerprint/litchi-pptx-6837d8f610535446/example-native_cross_copy_probe_0454",
+      "bytes": 16,
+      "sha256": "f32d98291e427cb67b388a040193e81d323d74609a14ec22f92568ff11e5a0eb"
+    },
+    {
+      "path": "target/release/.fingerprint/litchi-pptx-6837d8f610535446/example-native_cross_copy_probe_0454.json",
+      "bytes": 1844,
+      "sha256": "e2ce526230ffcb4796f0533faf5fffb29741dcf7952af4b4e76c887acfba6049"
+    },
+    {
+      "path": "target/release/.fingerprint/litchi-pptx-6837d8f610535446/dep-example-native_cross_copy_probe_0454",
+      "bytes": 60,
+      "sha256": "32a1037b6bba0f2f9649b8345344ae4f2b4ce7c1b8a4415c34657485ec827be8"
+    },
+    {
+      "path": "target/release/.fingerprint/litchi-pptx-6837d8f610535446/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    }
+  ],
+  "driver_sha256": "b92a97fd177d7e271c39bf0cd902514952fb1ef26e76791a0b04ea45ba524588"
+}

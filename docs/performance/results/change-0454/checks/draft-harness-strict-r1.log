@@ -1,0 +1,52 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0277]: the trait bound `Array<u8, UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>>: LowerHex` is not satisfied
+  --> src/bin/pptx_external_cross_copy.rs:29:21
+   |
+29 |     format!("{:x}", Sha256::digest(bytes))
+   |              ----   ^^^^^^^^^^^^^^^^^^^^^ the trait `std::fmt::LowerHex` is not implemented for `Array<u8, UInt<UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>, ...>>`
+   |              |
+   |              required by this formatting parameter
+   |
+   = help: the following other types implement trait `std::fmt::LowerHex`:
+             &T
+             &mut T
+             base16ct::display::HexDisplay<'_>
+             compiler_builtins::math::libm_math::support::big::i256
+             compiler_builtins::math::libm_math::support::big::u256
+             compiler_builtins::math::libm_math::support::hex_float::hex_fmt::Hex<T>
+             crypto_bigint::limb::Limb
+             crypto_bigint::non_zero::NonZero<T>
+           and 111 others
+   = note: the full name for the type has been written to '/home/zhuhe/code/litchi/tools/perf-baseline/target/release/deps/pptx_external_cross_copy-866a4d5c59968f0c.long-type-1906502893843602068.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+
+error[E0308]: mismatched types
+   --> src/bin/pptx_external_cross_copy.rs:81:40
+    |
+ 81 |     let index = PreservationIndex::new(&archive, &mut scratch)?;
+    |                 ---------------------- ^^^^^^^^ expected `&ZipArchive<_>`, found `&ZipSliceArchive<&[u8]>`
+    |                 |
+    |                 arguments to this function are incorrect
+    |
+    = note: expected reference `&soapberry_zip::ZipArchive<_>`
+               found reference `&soapberry_zip::ZipSliceArchive<&[u8]>`
+note: associated function defined here
+   --> /home/zhuhe/code/litchi/crates/soapberry-zip/src/preserve.rs:335:12
+    |
+335 |     pub fn new(archive: &'source ZipArchive<R>, buffer: &mut [u8]) -> Result<Self, Error> {
+    |            ^^^
+
+Some errors have detailed explanations: E0277, E0308.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `litchi-perf-baseline` (bin "pptx_external_cross_copy" test) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

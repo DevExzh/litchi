@@ -1,0 +1,64 @@
+{
+  "status": "pass",
+  "task": "/tmp/litchi-goal-0454-native-copy",
+  "artifacts": [
+    {
+      "path": "baseline-lifecycle",
+      "bytes": 57560744,
+      "sha256": "c1c41042d3b440b2f6f1937676cbe10f828a7dbcc9bd63d91a0fbdb77957f4dd"
+    },
+    {
+      "path": "baseline-probe",
+      "bytes": 2127144,
+      "sha256": "c78c402f5147f43cb0413c373ce383f1128e3dee7e15baf7ce99d2d8b944159f"
+    },
+    {
+      "path": "candidate-external",
+      "bytes": 7682864,
+      "sha256": "389cbff44a31bad8979f93c8e1b2c4ffe47b38d2b7068e9814b87160fd6ecc1a"
+    },
+    {
+      "path": "candidate-normal",
+      "bytes": 57775824,
+      "sha256": "4d57d5d40f78e8188bbb8ccdeed3af6f74c26ff1ba92220ddd0970504c7695fd"
+    },
+    {
+      "path": "candidate-probe",
+      "bytes": 3566536,
+      "sha256": "8c648cc82f9d646e1ecb34108f4d4405e20ea1b4586646db6f2bb3f43beb2926"
+    },
+    {
+      "path": "external-smoketest.pptx",
+      "bytes": 29956,
+      "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44"
+    },
+    {
+      "path": "integrated-probe",
+      "bytes": 2149728,
+      "sha256": "e8a3fdec67edf299dbdf55ea1a4575ba7eeaa9ceaa904a9a749b98def6e6d370"
+    },
+    {
+      "path": "name-only-probe",
+      "bytes": 2127720,
+      "sha256": "cca3226d27128dcf3039a8f3ded1f7b4f375824c6c93a29d50369baa4b9cbcb0"
+    },
+    {
+      "path": "oracle-r1-candidate-external",
+      "bytes": 7682736,
+      "sha256": "18a9ae4c294981b89a1acd7c33e00d5c5381d81aea53696aee3547203551b7ab"
+    },
+    {
+      "path": "oracle-r1-candidate-normal",
+      "bytes": 57775824,
+      "sha256": "4d57d5d40f78e8188bbb8ccdeed3af6f74c26ff1ba92220ddd0970504c7695fd"
+    },
+    {
+      "path": "oracle-r1-candidate-probe",
+      "bytes": 3566536,
+      "sha256": "8c648cc82f9d646e1ecb34108f4d4405e20ea1b4586646db6f2bb3f43beb2926"
+    }
+  ],
+  "files": 11,
+  "bytes": 202045612,
+  "driver_sha256": "065946e141539c420457cf5a475cdf8360b9165a0c53b7b2ca59e1de9664f364"
+}

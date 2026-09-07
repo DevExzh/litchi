@@ -1,0 +1,5 @@
+{
+  "integrated-probe-corpus.py": "c4797316284cd8fdba61e33c814b14901e20cc11ce2a7c4265ff92b9605922ab",
+  "candidate/probe.rs.txt": "814bdb82f035b9ebe81b9312c200628a4627c0137cd8ee71dabc5a6517ae1576",
+  "purpose": "Final integrated probe; prior baseline and name-only driver bindings remain unchanged."
+}

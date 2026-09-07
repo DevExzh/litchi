@@ -1,0 +1,19 @@
+{
+  "files": 588,
+  "image_slides": 189,
+  "errors": 13,
+  "outcomes": {
+    "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source presentation contains an unsupported dependency surface\" }": 72,
+    "REFUSED SlideCopyPlan { kind: UnknownSemanticSurface, detail: \"source slide contains an unsupported dependency surface\" }": 55,
+    "Error: Opc(ContentTypeNotFound(\"/ppt/media/video.avi\"))": 2,
+    "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide contains a relationship-qualified attribute\" }": 6,
+    "Error: Opc(InvalidPackUri(\"PackURI contains a character outside RFC 3986 pchar, got '/ppt/media/Cort\u00e1zar.wav'\"))": 2,
+    "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source slide contains MCE\" }": 8,
+    "REFUSED SlideCopyPlan { kind: AmbiguousTopology, detail: \"destination slide name is missing or empty\" }": 4,
+    "REFUSED SlideCopyPlan { kind: MarkupCompatibility, detail: \"source presentation contains an MCE attribute\" }": 8,
+    "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"slide master contains a relationship-qualified attribute\" }": 5,
+    "REFUSED SlideCopyPlan { kind: UnsupportedRelationship, detail: \"source slide has unsupported or extra relationships\" }": 9,
+    "REFUSED Opc(SourceBackedOverlayUnavailable { reason: \"source ZIP archive has trailing bytes outside its located archive\" })": 17,
+    "REFUSED Invalid(\"source slide image event is not a start tag\")": 1
+  }
+}

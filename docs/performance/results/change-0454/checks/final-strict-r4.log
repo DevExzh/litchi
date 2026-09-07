@@ -1,0 +1,23 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+error[E0382]: use of moved value: `package`
+     --> crates/litchi-opc/src/source_backed.rs:12576:14
+      |
+12558 |         let package = SourceBackedPackage::from_read_at_with_execution_context(
+      |             ------- move occurs because `package` has type `source_backed::SourceBackedPackage`, which does not implement the `Copy` trait
+...
+12567 |             .write_topology_to_stream(&mut output, plan)
+      |              ------------------------------------------- `package` moved due to this method call
+...
+12576 |         drop(package);
+      |              ^^^^^^^ value used here after move
+      |
+note: `source_backed::SourceBackedPackage::write_topology_to_stream` takes ownership of the receiver `self`, which moves `package`
+     --> crates/litchi-opc/src/source_backed.rs:6283:9
+      |
+ 6283 |         self,
+      |         ^^^^
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `litchi-opc` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
