@@ -5,7 +5,8 @@ package LitchiIwaKeynoteMovieGeometryProjection;
 
 message PointSizeArchive {
   required bytes position = 1;
-  required bytes size = 2;
+  // Position-only edits intentionally admit sources without a size field.
+  optional bytes size = 2;
   optional uint32 flags = 3;
   optional float angle = 4;
 }

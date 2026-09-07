@@ -1100,6 +1100,70 @@ graph and Start Audio build that shares the embedded asset. Use
 source bytes can use `Package::from_bytes`, as shown above, instead of opening
 the filename directly.
 
+Position-only edits for existing slide audio also belong to the focused package
+API. The read and write selectors are semantic; no drawable ID or native
+geometry record crosses the boundary:
+
+```rust
+use litchi_keynote::slide::media::Point;
+use litchi_keynote::{MovieSelector, Package, SlideSelector};
+
+let package = Package::open("created-with-audio.key")?;
+let before = package.slide_audio_position(
+    SlideSelector::index(0),
+    MovieSelector::index(0),
+)?;
+let moved = package
+    .edit_slide_audio_position(SlideSelector::index(0), MovieSelector::index(0))?
+    .set(Point { x: 1_120.0, y: 420.0 })?
+    .commit()?;
+moved.package().save("created-with-audio-position.key")?;
+
+let restored = moved
+    .package()
+    .apply_slide_audio_position(&moved.patch().inverse())?;
+assert_eq!(
+    restored.package().slide_audio_position(
+        SlideSelector::index(0),
+        MovieSelector::index(0),
+    )?,
+    before,
+);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The edit contract changes only the semantic position and keeps zero-size and
+absent-size native states distinct. The focused position owner passes 13 cases,
+including native no-op and inverse checks, locked-audio movement with the lock
+preserved, absent/zero-size preservation, acceptance of negative finite
+coordinates, rejection of negative displayed sizes, and header/metadata
+rejection cases. Neutral codec validation passes 13 cases and its Clippy check
+passes. The focused helper is mandatory for the default fixture run; an
+environment override remains optional.
+
+The generated target opened in Keynote with Audio A at `(123.25, 456.5)` (the
+exact AX stepper value); Audio B remained unchanged, captions and Movie A's
+comment remained intact, and the package contained 2 audio and 2 movie objects.
+Cmd-S saved it; it was actually closed to the theme chooser, reopened from the
+exact path without alerts, and closed again. Strict native-saved readback passes
+for all playback, media assets, posters, non-position controls, and the comment
+graph.
+
+The permanent focused native fixture is
+`test-data/iwork/keynote/media-audio-position-focused-native.key` (SHA-256
+`b88b1b208dbed8942908b27fc0d244fd911fb04065337cfe6338d32f384f72ca`); the
+pre-rewrite generated candidate had SHA-256
+`d74fb100a669fd02e7284f4835df8f00fc371d025595608856ecc1665d9fb834`. The
+earlier UI-authored oracle remains
+`test-data/iwork/keynote/media-audio-position-ui-native.key`.
+Both source-built raw-oracle parity checks passed before deletion. The host
+`slide_audio_position` and `set_slide_audio_position` methods, the orphan
+private `set_movie_geometry` writer, and the obsolete position example were
+removed; all tests were migrated to semantic selectors. These focused and
+native proofs were recorded before the final deletion check. Normal hooks,
+fuzzing, and the full scanner remain pending; no broader host-retirement claim
+follows from this slice.
+
 All source-built media exposes its shared `DrawableProperties` without
 normalizing unrelated native fields. Read the current value, update only the
 field you need, then write it back—for example,

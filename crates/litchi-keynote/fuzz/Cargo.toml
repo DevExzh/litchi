@@ -1,0 +1,28 @@
+[package]
+name = "litchi-keynote-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[[bin]]
+name = "keynote_slide_audio_position"
+path = "fuzz_targets/keynote_slide_audio_position.rs"
+test = false
+doc = false
+bench = false
+
+[dependencies]
+libfuzzer-sys = "0.4"
+litchi-keynote = { path = ".." }
+
+[profile.release]
+debug = 1
+codegen-units = 1
+lto = "thin"

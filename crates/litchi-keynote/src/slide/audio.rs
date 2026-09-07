@@ -18,6 +18,14 @@ pub struct Options {
     duration_seconds: f32,
 }
 
+/// Package transaction types for an existing audio control's position.
+pub mod transaction {
+    pub use crate::{
+        SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,
+        SlideAudioPositionError, SlideAudioPositionLimitKind, SlideAudioPositionPatch,
+    };
+}
+
 impl Options {
     /// Validate and canonicalize slide-audio placement and duration.
     ///

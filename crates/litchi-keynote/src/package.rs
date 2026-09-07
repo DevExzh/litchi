@@ -13,6 +13,7 @@ mod limits;
 mod rendering_invalidation;
 mod save;
 pub(crate) mod show_settings;
+mod slide_audio_position;
 mod slide_background;
 mod slide_build_order;
 mod slide_chart_arrangement;
@@ -115,6 +116,10 @@ pub use limits::{
     ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError,
 };
 pub use save::SaveError;
+pub use slide_audio_position::{
+    SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,
+    SlideAudioPositionError, SlideAudioPositionLimitKind, SlideAudioPositionPatch,
+};
 pub use slide_background::{
     SlideBackgroundCommit, SlideBackgroundDiagnostics, SlideBackgroundEdit, SlideBackgroundError,
     SlideBackgroundLimitKind, SlideBackgroundPatch,

@@ -6,7 +6,7 @@ use litchi_iwa_common::media::Type as MediaType;
 use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 use litchi_keynote::slide::media::MovieKind;
 
-use super::slide_movies::geometry::{set_movie_geometry, set_movie_properties};
+use super::slide_movies::geometry::set_movie_properties;
 use super::slide_movies::graph::{
     MovieObjectIds, audio_creation_values, audio_objects, movie_creation_context,
 };
@@ -138,46 +138,6 @@ impl KeynoteEditor {
         Ok(created)
     }
 
-    /// Read the center position of one slide-owned audio control.
-    pub fn slide_audio_position(
-        &self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<DrawablePoint> {
-        Ok(require_audio(self, slide_index, drawable_object_id)?.position)
-    }
-
-    /// Move one slide-owned audio control while preserving its opaque media fields.
-    pub fn set_slide_audio_position(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        position: DrawablePoint,
-    ) -> Result<()> {
-        require_audio(self, slide_index, drawable_object_id)?;
-        let graph = self.slide_movie_graph(slide_index, drawable_object_id)?;
-        let geometry = DrawableGeometry {
-            position: Some(position),
-            ..graph.info.geometry
-        }
-        .validate()?;
-        let mut staged = self.package().clone();
-        set_movie_geometry(
-            &mut staged,
-            &graph.archive_name,
-            drawable_object_id,
-            geometry,
-        )?;
-        let verified = Self::from_package(staged)?;
-        if verified.slide_audio_position(slide_index, drawable_object_id)? != position {
-            return Err(Error::InvalidFormat(
-                "Keynote audio position update failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
     /// Read shared drawable properties for one slide-owned audio control.
     pub fn slide_audio_properties(
         &self,
@@ -302,6 +262,7 @@ mod tests {
     use litchi_keynote::slide::media::{
         MediaLoopMode as KeynoteMediaLoopMode,
         MediaPlaybackSettings as KeynoteMediaPlaybackSettings, MediaVolume as KeynoteMediaVolume,
+        Point as KeynotePoint,
     };
     use litchi_keynote::{MovieSelector, Package as KeynotePackage, SlideSelector};
 
@@ -344,6 +305,32 @@ mod tests {
         let mut bytes = Vec::new();
         package.write_to(&mut bytes).unwrap();
         *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
+    }
+
+    fn audio_position(editor: &KeynoteEditor, movie: MovieSelector) -> KeynotePoint {
+        focused_audio_package(editor)
+            .slide_audio_position(SlideSelector::index(0), movie)
+            .unwrap()
+    }
+
+    fn set_audio_position(
+        editor: &mut KeynoteEditor,
+        movie: MovieSelector,
+        position: DrawablePoint,
+    ) {
+        let package = focused_audio_package(editor);
+        let point = KeynotePoint {
+            x: position.x,
+            y: position.y,
+        };
+        let commit = package
+            .edit_slide_audio_position(SlideSelector::index(0), movie)
+            .unwrap()
+            .set(point)
+            .unwrap()
+            .commit()
+            .unwrap();
+        replace_with_focused_audio_package(editor, commit.package());
     }
 
     fn duplicate_audio(editor: &mut KeynoteEditor, movie: MovieSelector) -> KeynoteSlideAudioInfo {
@@ -470,13 +457,22 @@ mod tests {
         );
 
         let moved = DrawablePoint { x: 320.0, y: 240.0 };
-        editor
-            .set_slide_audio_position(0, created.drawable_object_id, moved)
-            .unwrap();
+        set_audio_position(&mut editor, MovieSelector::index(0), moved);
+        assert_eq!(
+            audio_position(&editor, MovieSelector::index(0)),
+            KeynotePoint {
+                x: moved.x,
+                y: moved.y,
+            }
+        );
         assert_eq!(
             editor
-                .slide_audio_position(0, created.drawable_object_id)
-                .unwrap(),
+                .slide_audio(0)
+                .unwrap()
+                .into_iter()
+                .find(|audio| audio.drawable_object_id == created.drawable_object_id)
+                .unwrap()
+                .position,
             moved
         );
         assert_eq!(
@@ -563,19 +559,39 @@ mod tests {
         assert_eq!(duplicate_builds[0].chunks.len(), 1);
 
         let moved_duplicate = DrawablePoint { x: 320.0, y: 240.0 };
-        editor
-            .set_slide_audio_position(0, duplicate.drawable_object_id, moved_duplicate)
-            .unwrap();
+        set_audio_position(&mut editor, MovieSelector::index(1), moved_duplicate);
+        assert_eq!(
+            audio_position(&editor, MovieSelector::index(0)),
+            KeynotePoint {
+                x: source.position.x,
+                y: source.position.y,
+            }
+        );
+        assert_eq!(
+            audio_position(&editor, MovieSelector::index(1)),
+            KeynotePoint {
+                x: moved_duplicate.x,
+                y: moved_duplicate.y,
+            }
+        );
         assert_eq!(
             editor
-                .slide_audio_position(0, source.drawable_object_id)
-                .unwrap(),
+                .slide_audio(0)
+                .unwrap()
+                .into_iter()
+                .find(|audio| audio.drawable_object_id == source.drawable_object_id)
+                .unwrap()
+                .position,
             source.position
         );
         assert_eq!(
             editor
-                .slide_audio_position(0, duplicate.drawable_object_id)
-                .unwrap(),
+                .slide_audio(0)
+                .unwrap()
+                .into_iter()
+                .find(|audio| audio.drawable_object_id == duplicate.drawable_object_id)
+                .unwrap()
+                .position,
             moved_duplicate
         );
         assert_eq!(
@@ -677,17 +693,21 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);
+        let focused_source = KeynotePackage::from_bytes(&before).unwrap();
+        let invalid_position = focused_source
+            .edit_slide_audio_position(SlideSelector::index(0), MovieSelector::index(0))
+            .unwrap()
+            .set(KeynotePoint {
+                x: f32::INFINITY,
+                y: 10.0,
+            });
+        assert!(invalid_position.is_err());
+        assert_eq!(editor.to_bytes().unwrap(), before);
         assert!(
-            editor
-                .set_slide_audio_position(
-                    0,
-                    audio.drawable_object_id,
-                    DrawablePoint {
-                        x: f32::INFINITY,
-                        y: 10.0,
-                    },
-                )
-                .is_err()
+            KeynotePackage::from_bytes(&before)
+                .unwrap()
+                .slide_audio_position(SlideSelector::index(0), MovieSelector::index(0))
+                .is_ok()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);
         assert!(

@@ -458,6 +458,10 @@ pub use package::{
     SlideMediaDataError, SlideMediaDataLimitKind, SlideMediaDataPatch,
 };
 pub use package::{
+    SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,
+    SlideAudioPositionError, SlideAudioPositionLimitKind, SlideAudioPositionPatch,
+};
+pub use package::{
     SlideMediaLifecycleCommit, SlideMediaLifecycleDiagnostics, SlideMediaLifecycleError,
     SlideMediaLifecycleLimitKind, SlideMediaLifecyclePatch,
 };
