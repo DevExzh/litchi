@@ -3223,6 +3223,99 @@ def add_keynote_movie_geometry_canonical_scaffold(root: Path) -> None:
         (root / corpus).mkdir(parents=True, exist_ok=True)
 
 
+def add_keynote_audio_position_canonical_scaffold(root: Path) -> None:
+    """Create the focused selector-first audio-position admission fixture."""
+
+    semantic = root / boundaries.KEYNOTE_AUDIO_POSITION_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub struct Point { pub x: f32, pub y: f32 }\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.KEYNOTE_AUDIO_POSITION_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES
+        )
+        + "struct AudioPositionBudget;\n"
+        + "fn position_budget_for_package() { let _budget = AudioPositionBudget::for_package(); }\n"
+        + "fn select_position(slide: SlideSelector, movie: MovieSelector) { let _ = (slide, movie); }\n"
+        + "fn candidate_reopen_readback_verify() { candidate; reopen; readback; verify; }\n"
+        + "fn exact_source_inverse() { ExactArtifacts; source_fingerprint; inverse; PatchConflict; }\n"
+        + "fn invalidate_previews_after_position_change() { preview; invalidate_preview; deleted_previews; }\n"
+        + "fn codec_position_route() { decode_movie_position_with_report; prepare_movie_position_rewrite; }\n"
+        + "fn execute_prepared() { let prepared = prepare_movie_position_rewrite(); let output = prepared.execute(); let _ = output; }\n"
+        + "impl Package {\n"
+        + "    pub fn slide_audio_position<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector) -> Result<Point, SlideAudioPositionError> { let _ = (slide, movie); todo!() }\n"
+        + "    pub fn edit_slide_audio_position<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, position: Point) -> Result<SlideAudioPositionEdit, SlideAudioPositionError> { let _ = (slide, movie, position); todo!() }\n"
+        + "    pub fn apply_slide_audio_position(&self, patch: &SlideAudioPositionPatch) -> Result<SlideAudioPositionCommit, SlideAudioPositionError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideAudioPositionEdit { pub fn set(self, value: Point) -> Self { let _ = value; self } pub fn commit(self) -> Result<SlideAudioPositionCommit, SlideAudioPositionError> { todo!() } }\n",
+        encoding="utf-8",
+    )
+    package_export = root / boundaries.KEYNOTE_AUDIO_POSITION_EXPORT_SOURCES[0]
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod slide_audio_position;\n"
+        "pub use slide_audio_position::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES))
+        + "};\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.KEYNOTE_AUDIO_POSITION_EXPORT_SOURCES[1]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub use package::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES))
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::movie::MovieSelector;\n"
+        "pub use slide::media::Point;\n",
+        encoding="utf-8",
+    )
+    codec = root / boundaries.KEYNOTE_AUDIO_POSITION_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::DecodeOptions;\n"
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_AUDIO_POSITION_CODEC_TYPES
+        )
+        + "pub fn decode_movie_position_with_report() {}\n"
+        + "pub fn prepare_movie_position_rewrite() {}\n"
+        + "pub fn decode_lazy_view() {}\n"
+        + "fn execute() { output_bytes; source; unknown; raw; max_message_bytes; max_fields; max_work_bytes; try_reserve; }\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.KEYNOTE_AUDIO_POSITION_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.KEYNOTE_AUDIO_POSITION_CODEC_MODULE};\n",
+        encoding="utf-8",
+    )
+    integration = root / boundaries.KEYNOTE_AUDIO_POSITION_TEST_SOURCE
+    integration.parent.mkdir(parents=True, exist_ok=True)
+    integration.write_text(
+        "#[test]\n"
+        "fn audio_position_round_trip_and_inverse_preview_atomic_limit() {\n"
+        "    slide_audio_position; edit_slide_audio_position; apply_slide_audio_position;\n"
+        "    inverse; preview; atomic; limit;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    fuzz = root / boundaries.KEYNOTE_AUDIO_POSITION_FUZZ_SOURCE
+    fuzz.parent.mkdir(parents=True, exist_ok=True)
+    fuzz.write_text(
+        "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+        "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+        encoding="utf-8",
+    )
+    (root / boundaries.KEYNOTE_AUDIO_POSITION_FUZZ_CORPUS).mkdir(parents=True, exist_ok=True)
+
+
 def add_keynote_movie_geometry_completion_scaffold(root: Path) -> None:
     """Activate the Wave111 geometry handoff with a complete fake bridge."""
 
@@ -18780,6 +18873,129 @@ fn rewrite_movie_title_operation(
             "+ audit_iwa_keynote_movie_playback_source_topology()",
             "+ audit_keynote_movie_playback_facade_source_topology()",
             "+ audit_keynote_movie_playback_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_audio_position_audits_are_dormant_until_owner_activation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            audits = (
+                boundaries.audit_keynote_audio_position_facade_source_topology,
+                boundaries.audit_keynote_audio_position_codec_source_topology,
+                boundaries.audit_keynote_audio_position_completion_source_topology,
+                boundaries.audit_keynote_audio_position_resource_source_topology,
+                boundaries.audit_iwa_keynote_audio_position_source_topology,
+            )
+            for audit in audits:
+                self.assertEqual(audit(root), [], audit.__name__)
+
+            add_keynote_audio_position_canonical_scaffold(root)
+            for audit in audits:
+                self.assertEqual(audit(root), [], audit.__name__)
+
+    def test_keynote_audio_position_facade_rejects_raw_values_and_codec_regression(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_audio_position_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_AUDIO_POSITION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_position(bytes: &[u8], audio_object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_audio_position_facade_source_topology(root)
+            self.assertTrue(any("raw bytes" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub fn raw_position(bytes: &[u8], audio_object_id: u64) {}\n", ""
+                ),
+                encoding="utf-8",
+            )
+            codec = root / boundaries.KEYNOTE_AUDIO_POSITION_CODEC_SOURCE
+            codec_source = codec.read_text(encoding="utf-8")
+            codec.write_text(
+                codec_source.replace("pub fn decode_movie_position_with_report() {}\n", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_audio_position_codec_source_topology(root)
+            self.assertTrue(any("decode_movie_position_with_report" in item for item in violations), violations)
+
+            codec.write_text(codec_source, encoding="utf-8")
+            fuzz = root / boundaries.KEYNOTE_AUDIO_POSITION_FUZZ_SOURCE
+            fuzz.unlink()
+            violations = boundaries.audit_keynote_audio_position_completion_source_topology(root)
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+    def test_keynote_audio_position_resource_guard_rejects_unbounded_or_unprepared_owner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_audio_position_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_AUDIO_POSITION_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                source.replace("fn execute_prepared()", "fn execute_prepared()")
+                + "fn unbounded() { saturating_add; }\n"
+                + "struct SecondBudget;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_audio_position_resource_source_topology(root)
+            self.assertTrue(any("exactly one aggregate" in item for item in violations), violations)
+            self.assertTrue(any("checked resource accounting" in item for item in violations), violations)
+
+    def test_keynote_audio_position_host_retirement_waits_for_owner_and_then_rejects_raw_surface(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            host = root / "crates/litchi-iwa/src/keynote/editor/slide_audio.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_audio_position(&self, slide_index: usize, audio_id: u64) {}\n"
+                "    pub fn set_slide_audio_position(&mut self, slide_index: usize, audio_id: u64, position: Point) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_audio_position_source_topology(root), []
+            )
+
+            add_keynote_audio_position_canonical_scaffold(root)
+            violations = boundaries.audit_iwa_keynote_audio_position_source_topology(root)
+            self.assertTrue(any("slide_audio_position" in item for item in violations), violations)
+            self.assertTrue(any("set_slide_audio_position" in item for item in violations), violations)
+
+            host.write_text(
+                "fn focused() { package.slide_audio_position(slide, movie); }\n"
+                "fn focused_edit() { package.edit_slide_audio_position(slide, movie, position); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_audio_position_source_topology(root), []
+            )
+            host.write_text(
+                "fn fallback() { audio_position_for_identifier(identifier); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_audio_position_source_topology(root)
+            self.assertTrue(any("identifier fallback" in item for item in violations), violations)
+
+    def test_keynote_audio_position_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_iwa_keynote_audio_position_source_topology()",
+            "+ audit_keynote_audio_position_facade_source_topology()",
+            "+ audit_keynote_audio_position_codec_source_topology()",
+            "+ audit_keynote_audio_position_completion_source_topology()",
+            "+ audit_keynote_audio_position_resource_source_topology()",
         ):
             self.assertIn(expression, main_source)
 

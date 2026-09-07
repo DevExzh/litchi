@@ -2452,6 +2452,8 @@ KEYNOTE_MOVIE_GEOMETRY_CODEC_TYPES = frozenset(
         "MovieGeometrySnapshot",
         "MovieGeometryWrite",
         "PreparedMovieGeometryRewrite",
+        "MoviePositionWrite",
+        "PreparedMoviePositionRewrite",
         "RewriteExecutionLimits",
         "RewriteExecutionRequirements",
     }
@@ -2625,6 +2627,188 @@ IWA_KEYNOTE_MOVIE_GEOMETRY_IDENTIFIER_POSITION_FALLBACK = re.compile(
 IWA_KEYNOTE_MOVIE_GEOMETRY_EXAMPLES = (
     Path("crates/litchi-iwa/examples/edit_keynote_movie_geometry.rs"),
 )
+
+# The existing host audio editor still exposes the raw-ID position reader and
+# writer.  Keep their retirement dormant until the focused owner is actually
+# wired into ``Package``: source presence alone is not an ownership handoff.
+# The owner intentionally reuses the movie-geometry wire projection because
+# audio controls carry the same ``MovieArchive.super.geometry.position`` edge;
+# this boundary therefore checks the position-specific codec seam without
+# inventing a second generated or eager protobuf surface.
+KEYNOTE_AUDIO_POSITION_SEMANTIC_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "media.rs"
+KEYNOTE_AUDIO_POSITION_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_audio_position.rs"
+)
+KEYNOTE_AUDIO_POSITION_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_AUDIO_POSITION_CODEC_SOURCE = KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE
+KEYNOTE_AUDIO_POSITION_CODEC_PUBLIC_SOURCE = KEYNOTE_MOVIE_GEOMETRY_CODEC_PUBLIC_SOURCE
+KEYNOTE_AUDIO_POSITION_CODEC_MODULE = KEYNOTE_MOVIE_GEOMETRY_CODEC_MODULE
+KEYNOTE_AUDIO_POSITION_OWNER_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?slide_audio_position[ \t]*;"
+)
+KEYNOTE_AUDIO_POSITION_PUBLIC_MODULE = re.compile(
+    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?:r#)?slide_audio_position\b"
+)
+KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES = frozenset(
+    {
+        "SlideAudioPositionCommit",
+        "SlideAudioPositionDiagnostics",
+        "SlideAudioPositionEdit",
+        "SlideAudioPositionError",
+        "SlideAudioPositionLimitKind",
+        "SlideAudioPositionPatch",
+    }
+)
+KEYNOTE_AUDIO_POSITION_SELECTOR_TYPES = frozenset({"SlideSelector", "MovieSelector"})
+KEYNOTE_AUDIO_POSITION_PACKAGE_METHODS = frozenset(
+    {
+        "slide_audio_position",
+        "edit_slide_audio_position",
+        "apply_slide_audio_position",
+    }
+)
+KEYNOTE_AUDIO_POSITION_EDIT_METHODS = frozenset({"set", "commit"})
+KEYNOTE_AUDIO_POSITION_CODEC_FUNCTIONS = frozenset(
+    {"decode_movie_position_with_report", "prepare_movie_position_rewrite"}
+)
+KEYNOTE_AUDIO_POSITION_CODEC_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeOptions",
+        "DecodeReport",
+        "MovieGeometrySnapshot",
+        "MovieGeometryWrite",
+        "PreparedMovieGeometryRewrite",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+    }
+)
+KEYNOTE_AUDIO_POSITION_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "Entry",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+KEYNOTE_AUDIO_POSITION_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "DecodeReport",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "PreparedMovieGeometryRewrite",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+        "RewriteReport",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_AUDIO_POSITION_RAW_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|movie|audio|native|archive|component|"
+    r"message|resource|entry|metadata|package|uuid)[A-Za-z_]*"
+    r"(?:id|identifier))[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u64|u32|usize|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_AUDIO_POSITION_CODEC_MARKER_GROUPS = {
+    "lazy Buffa ingress": (
+        "buffa::DecodeOptions",
+        "decode_lazy_view",
+    ),
+    "strict source accounting": (
+        "max_message_bytes",
+        "max_fields",
+        "max_work_bytes",
+        ("unknown", "raw"),
+    ),
+    "prepared source-preserving rewrite": (
+        "prepare_movie_position_rewrite",
+        "output_bytes",
+        "source",
+        "execute",
+    ),
+}
+KEYNOTE_AUDIO_POSITION_TEST_SOURCE = Path(
+    "crates/litchi-keynote/tests/slide_audio_position.rs"
+)
+KEYNOTE_AUDIO_POSITION_FUZZ_SOURCE = Path(
+    "crates/litchi-keynote/fuzz/fuzz_targets/keynote_slide_audio_position.rs"
+)
+KEYNOTE_AUDIO_POSITION_FUZZ_CORPUS = Path(
+    "crates/litchi-keynote/fuzz/corpus/keynote_slide_audio_position"
+)
+KEYNOTE_AUDIO_POSITION_TEST_MARKERS = (
+    "#[test]",
+    "slide_audio_position",
+    "edit_slide_audio_position",
+    "apply_slide_audio_position",
+    "inverse",
+    "preview",
+    "atomic",
+    "limit",
+)
+KEYNOTE_AUDIO_POSITION_OWNER_MARKER_GROUPS = {
+    "aggregate transaction budget": (
+        re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*Budget\b"),
+        re.compile(r"\b(?:for_package|for_source|new)[ \t\r\n]*\("),
+    ),
+    "selector resolution": (
+        re.compile(r"\b(?:SlideSelector|MovieSelector)\b"),
+        re.compile(r"\b(?:select|resolve|position)"),
+    ),
+    "candidate verification": (
+        re.compile(r"\b(?:candidate|reopen|readback|verify|verification)\b"),
+    ),
+    "exact source and inverse": (
+        re.compile(r"\b(?:ExactArtifacts|source_fingerprint|inverse|PatchConflict)\b"),
+    ),
+    "preview invalidation": (
+        re.compile(r"\b(?:preview|previews|invalidate_preview|deleted_previews)\b"),
+    ),
+}
+KEYNOTE_AUDIO_POSITION_HOST_METHODS = frozenset(
+    {"slide_audio_position", "set_slide_audio_position"}
+)
+KEYNOTE_AUDIO_POSITION_HOST_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_audio_position|"
+    r"set_slide_audio_position)(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+KEYNOTE_AUDIO_POSITION_HOST_FALLBACK = re.compile(
+    r"(?<![A-Za-z0-9_])(?:audio_position_for_identifier|"
+    r"audio_position_from_identifier|audio_index_for_identifier|"
+    r"audio_position_from_object|read_audio_position|set_audio_position)"
+    r"(?![A-Za-z0-9_])"
+)
+
+
+def _keynote_audio_position_focused_package_call(source: str, match: re.Match[str]) -> bool:
+    """Recognize the semantic same-named call from a host test/example."""
+
+    context = source[max(0, match.start() - 160) : match.start()]
+    return re.search(
+        r"\b(?:package|focused_package|keynote_package)\s*\.\s*$", context
+    ) is not None
 
 # Wave122 moves replacement of already-materialized Keynote slide movie/audio
 # data into one selector-first package owner.  The owner deliberately covers
@@ -56776,6 +56960,444 @@ def audit_keynote_movie_geometry_completion_source_topology(
     return sorted(set(violations))
 
 
+def _keynote_audio_position_owner_present(root: Path) -> bool:
+    """Return whether the focused audio-position owner crossed its wiring seam."""
+
+    owner_path = root / KEYNOTE_AUDIO_POSITION_OWNER_SOURCE
+    codec_path = root / KEYNOTE_AUDIO_POSITION_CODEC_SOURCE
+    package_path = root / KEYNOTE_AUDIO_POSITION_EXPORT_SOURCES[0]
+    package_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        )
+        if package_path.is_file()
+        else ""
+    )
+    return (
+        owner_path.is_file()
+        and codec_path.is_file()
+        and KEYNOTE_AUDIO_POSITION_OWNER_MODULE.search(package_source) is not None
+    )
+
+
+def _keynote_audio_position_marker_present(
+    source: str, marker: str | re.Pattern[str] | tuple[str, ...]
+) -> bool:
+    """Match one structural owner/codec marker or an accepted alternative."""
+
+    if isinstance(marker, tuple):
+        return any(_keynote_audio_position_marker_present(source, item) for item in marker)
+    if isinstance(marker, re.Pattern):
+        return marker.search(source) is not None
+    return marker in source
+
+
+def audit_keynote_audio_position_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free audio-position facade."""
+
+    if not _keynote_audio_position_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_AUDIO_POSITION_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_AUDIO_POSITION_SEMANTIC_SOURCE
+    package_path, lib_path = (
+        root / path for path in KEYNOTE_AUDIO_POSITION_EXPORT_SOURCES
+    )
+    owner = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    semantic = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    package = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    library = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    owner_code = _mask_rust_non_code(owner)
+    semantic_code = _mask_rust_non_code(semantic)
+    package_code = _mask_rust_non_code(package)
+    library_code = _mask_rust_non_code(library)
+    violations: list[str] = []
+
+    if KEYNOTE_AUDIO_POSITION_PUBLIC_MODULE.search(package + library):
+        violations.append(
+            "focused litchi-keynote audio-position owner module must remain private: "
+            f"{KEYNOTE_AUDIO_POSITION_EXPORT_SOURCES[0]}"
+        )
+    if KEYNOTE_AUDIO_POSITION_OWNER_MODULE.search(package) is None:
+        violations.append(
+            "focused litchi-keynote audio-position owner module is missing: "
+            f"{KEYNOTE_AUDIO_POSITION_EXPORT_SOURCES[0]}"
+        )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line in _rust_public_methods_in_impl(owner, "Package")
+    }
+    for name in sorted(KEYNOTE_AUDIO_POSITION_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote audio-position Package method is missing "
+                f"{name}: {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+            )
+            continue
+        if name != "apply_slide_audio_position":
+            for selector in sorted(KEYNOTE_AUDIO_POSITION_SELECTOR_TYPES):
+                if not re.search(rf"\b{re.escape(selector)}\b", declaration):
+                    violations.append(
+                        "focused litchi-keynote audio-position Package method must accept "
+                        f"selector-first {selector} ({name}): {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+                    )
+            if name == "slide_audio_position" and "Point" not in declaration:
+                violations.append(
+                    "focused litchi-keynote audio-position Package method must use the "
+                    f"semantic Point value ({name}): {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+                )
+        elif "SlideAudioPositionPatch" not in declaration:
+            violations.append(
+                "focused litchi-keynote audio-position apply method must accept "
+                f"SlideAudioPositionPatch: {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+            )
+        if re.search(r"\b(?:u64|u32|usize)\b|&\s*\[\s*u8\s*\]|Vec\s*<\s*u8\s*>", declaration):
+            violations.append(
+                "focused litchi-keynote audio-position Package method exposes a raw value: "
+                f"{KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+            )
+        for match in KEYNOTE_AUDIO_POSITION_RAW_PARAMETER.finditer(declaration):
+            violations.append(
+                "focused litchi-keynote audio-position Package method exposes raw identifier "
+                f"{match.group(0).strip()}: {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+            )
+
+    for name in sorted(KEYNOTE_AUDIO_POSITION_EDIT_METHODS):
+        if not re.search(
+            rf"\bpub[ \t]+fn[ \t]+{re.escape(name)}\b", owner_code
+        ):
+            violations.append(
+                "focused litchi-keynote audio-position edit is missing "
+                f"{name}: {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+            )
+
+    for path, source in (
+        (owner_path, owner),
+        (semantic_path, semantic),
+        (package_path, package),
+        (lib_path, library),
+    ):
+        if not source:
+            continue
+        dedicated = path in {owner_path, semantic_path}
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated and not (
+                identifiers
+                & (
+                    KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES
+                    | KEYNOTE_AUDIO_POSITION_SELECTOR_TYPES
+                    | KEYNOTE_AUDIO_POSITION_PACKAGE_METHODS
+                    | {"Point"}
+                )
+            ):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier in KEYNOTE_AUDIO_POSITION_WIRE_TYPES:
+                    reason = "wire type"
+                elif identifier in KEYNOTE_AUDIO_POSITION_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote audio-position public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote audio-position public API retains a glob "
+                    f"re-export: {path.relative_to(root)}:{line_number}"
+                )
+            if RUST_BYTE_SLICE.search(declaration):
+                violations.append(
+                    "focused litchi-keynote audio-position public API exposes raw bytes: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_AUDIO_POSITION_RAW_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-keynote audio-position public API exposes raw identifier "
+                    f"{match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+                )
+
+    for path, source, names in (
+        (owner_path, owner, KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES),
+        (package_path, package, KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES),
+        (lib_path, library, KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES),
+    ):
+        exported = _rust_canonical_exports(source, names)
+        for name in sorted(names - exported):
+            violations.append(
+                "focused litchi-keynote audio-position public API is missing canonical "
+                f"type {name}: {path.relative_to(root)}"
+            )
+    if not re.search(r"\bpub[ \t]+struct[ \t]+Point\b", semantic_code):
+        violations.append(
+            "focused litchi-keynote audio-position semantic API is missing Point: "
+            f"{KEYNOTE_AUDIO_POSITION_SEMANTIC_SOURCE}"
+        )
+    if not re.search(r"\b(?:source_fingerprint|ExactArtifacts|inverse|PatchConflict)\b", owner_code):
+        violations.append(
+            "focused litchi-keynote audio-position facade is missing exact-source patch/inverse "
+            f"markers: {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_keynote_audio_position_codec_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the position edge to use the existing lazy geometry codec seam."""
+
+    if not _keynote_audio_position_owner_present(root):
+        return []
+    codec_path = root / KEYNOTE_AUDIO_POSITION_CODEC_SOURCE
+    codec_raw = codec_path.read_text(encoding="utf-8")
+    codec = _mask_rust_cfg_test_items(codec_raw)
+    code = _mask_rust_non_code(codec)
+    violations: list[str] = []
+    for function in sorted(KEYNOTE_AUDIO_POSITION_CODEC_FUNCTIONS):
+        if re.search(rf"\b(?:pub[ \t]+)?fn[ \t]+{re.escape(function)}\b", code) is None:
+            violations.append(
+                "focused Keynote audio-position codec is missing strict API "
+                f"{function}: {KEYNOTE_AUDIO_POSITION_CODEC_SOURCE}"
+            )
+    for type_name in sorted(KEYNOTE_AUDIO_POSITION_CODEC_TYPES):
+        if re.search(
+            rf"\b(?:pub[ \t]+)?(?:struct|enum|type)[ \t]+{re.escape(type_name)}\b",
+            code,
+        ) is None:
+            violations.append(
+                "focused Keynote audio-position codec is missing strict type "
+                f"{type_name}: {KEYNOTE_AUDIO_POSITION_CODEC_SOURCE}"
+            )
+    for label, markers in KEYNOTE_AUDIO_POSITION_CODEC_MARKER_GROUPS.items():
+        if not all(_keynote_audio_position_marker_present(code, marker) for marker in markers):
+            violations.append(
+                "focused Keynote audio-position codec is missing "
+                f"{label}: {KEYNOTE_AUDIO_POSITION_CODEC_SOURCE}"
+            )
+    for pattern in (
+        re.compile(r"\bprost(?:_types)?\b"),
+        re.compile(r"\bMessage\s*::\s*(?:decode|encode)\s*\("),
+        re.compile(r"\b(?:to_owned_message|try_encode_to_vec|encode_to_vec)\s*\("),
+    ):
+        for match in pattern.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused Keynote audio-position codec must remain lazy/source-preserving; "
+                f"eager generated operation {match.group(0).strip()}: "
+                f"{KEYNOTE_AUDIO_POSITION_CODEC_SOURCE}:{line_number}"
+            )
+
+    public_path = root / KEYNOTE_AUDIO_POSITION_CODEC_PUBLIC_SOURCE
+    public_source = (
+        _mask_rust_cfg_test_items(public_path.read_text(encoding="utf-8"))
+        if public_path.is_file()
+        else ""
+    )
+    if re.search(
+        rf"\bpub\s+mod\s+{re.escape(KEYNOTE_AUDIO_POSITION_CODEC_MODULE)}\b",
+        public_source,
+    ) is None:
+        violations.append(
+            "focused Keynote audio-position codec is missing its hidden geometry codec module: "
+            f"{KEYNOTE_AUDIO_POSITION_CODEC_PUBLIC_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_keynote_audio_position_completion_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require focused integration and adversarial fuzz admission coverage."""
+
+    if not _keynote_audio_position_owner_present(root):
+        return []
+    violations: list[str] = []
+    test_path = root / KEYNOTE_AUDIO_POSITION_TEST_SOURCE
+    if not test_path.is_file():
+        violations.append(
+            "focused Keynote audio-position boundary is missing integration tests: "
+            f"{KEYNOTE_AUDIO_POSITION_TEST_SOURCE}"
+        )
+    else:
+        test_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(test_path.read_text(encoding="utf-8"))
+        )
+        for marker in KEYNOTE_AUDIO_POSITION_TEST_MARKERS:
+            if marker not in test_code and marker not in test_path.read_text(encoding="utf-8"):
+                violations.append(
+                    "focused Keynote audio-position integration tests are missing "
+                    f"{marker}: {KEYNOTE_AUDIO_POSITION_TEST_SOURCE}"
+                )
+
+    fuzz_path = root / KEYNOTE_AUDIO_POSITION_FUZZ_SOURCE
+    if not fuzz_path.is_file():
+        violations.append(
+            "focused Keynote audio-position boundary is missing fuzz target: "
+            f"{KEYNOTE_AUDIO_POSITION_FUZZ_SOURCE}"
+        )
+    elif "fuzz_target!" not in fuzz_path.read_text(encoding="utf-8"):
+        violations.append(
+            "focused Keynote audio-position fuzz target is missing fuzz_target! harness: "
+            f"{KEYNOTE_AUDIO_POSITION_FUZZ_SOURCE}"
+        )
+    if not (root / KEYNOTE_AUDIO_POSITION_FUZZ_CORPUS).is_dir():
+        violations.append(
+            "focused Keynote audio-position boundary is missing fuzz corpus: "
+            f"{KEYNOTE_AUDIO_POSITION_FUZZ_CORPUS}"
+        )
+    return sorted(set(violations))
+
+
+def audit_keynote_audio_position_resource_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require one bounded, source-bound transaction for audio-position edits."""
+
+    if not _keynote_audio_position_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_AUDIO_POSITION_OWNER_SOURCE
+    codec_path = root / KEYNOTE_AUDIO_POSITION_CODEC_SOURCE
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    codec = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+        )
+        if codec_path.is_file()
+        else ""
+    )
+    prepared = owner + "\n" + codec
+    violations: list[str] = []
+    budget_declarations = re.findall(
+        r"(?m)^\s*(?:pub(?:\([^()]*\))?\s+)?struct\s+"
+        r"[A-Za-z_][A-Za-z0-9_]*Budget\b",
+        owner,
+    )
+    shared_budget_import = re.search(
+        r"\b(?:use\s+[^;\n]*::\s*)?GeometryBudget\b", owner
+    ) is not None
+    if len(budget_declarations) > 1 or (
+        not budget_declarations and not shared_budget_import
+    ):
+        violations.append(
+            "focused litchi-keynote audio-position owner must use exactly one aggregate "
+            "transaction budget (local or shared GeometryBudget): "
+            f"{KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+        )
+    for label, markers in KEYNOTE_AUDIO_POSITION_OWNER_MARKER_GROUPS.items():
+        if not all(_keynote_audio_position_marker_present(prepared, marker) for marker in markers):
+            violations.append(
+                "focused litchi-keynote audio-position owner is missing "
+                f"{label}: {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+            )
+    if not (
+        "decode_movie_position_with_report" in owner
+        or "select_audio_with_budget" in owner
+    ):
+        violations.append(
+            "focused litchi-keynote audio-position owner must route position reads through "
+            f"the strict codec/selection helper: {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+        )
+    if "prepare_movie_position_rewrite" not in owner:
+        violations.append(
+            "focused litchi-keynote audio-position owner must route writes through a prepared "
+            f"codec rewrite: {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+        )
+    if len(re.findall(r"\.[ \t\r\n]*execute\s*\(", owner)) != 1:
+        violations.append(
+            "focused litchi-keynote audio-position owner must execute exactly one prepared "
+            f"rewrite: {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+        )
+    if re.search(r"\bsaturating_(?:add|sub|mul)\b", owner):
+        violations.append(
+            "focused litchi-keynote audio-position owner must use checked resource accounting: "
+            f"{KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_audio_position_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire host raw audio-position reads/writes after owner activation."""
+
+    if not _keynote_audio_position_owner_present(root):
+        return []
+    source_roots = [root / IWA_KEYNOTE_SOURCE_ROOT]
+    examples = root / IWA_CORE_EXAMPLE_SOURCE_ROOT
+    if examples.is_dir():
+        source_roots.append(examples)
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    violations: list[str] = []
+    for source_root in source_roots:
+        if not source_root.is_dir():
+            continue
+        for path in sorted(source_root.rglob("*.rs")):
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            )
+            for match in declaration.finditer(source):
+                name = match.group(1)
+                if name not in KEYNOTE_AUDIO_POSITION_HOST_METHODS:
+                    continue
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote audio-position method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_AUDIO_POSITION_HOST_CALL.finditer(source):
+                line_start = source.rfind("\n", 0, match.start()) + 1
+                line_end = source.find("\n", match.end())
+                line_end = len(source) if line_end < 0 else line_end
+                line = source[line_start:line_end]
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b", line
+                ):
+                    continue
+                # Focused package calls in host tests/examples are allowed to
+                # retain the semantic spelling.  Editor receivers are not.
+                if _keynote_audio_position_focused_package_call(source, match):
+                    continue
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote audio-position call "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_AUDIO_POSITION_HOST_FALLBACK.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote audio-position identifier fallback "
+                    f"{match.group(0)}: {path.relative_to(root)}:{line_number}"
+                )
+    return sorted(set(violations))
+
+
 def _keynote_slide_table_title_owner_present(root: Path) -> bool:
     """Return whether the Wave98 slide-table title owner is active."""
 
@@ -63260,6 +63882,11 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_movie_geometry_facade_source_topology()
         + audit_keynote_movie_geometry_resource_source_topology()
         + audit_keynote_movie_geometry_completion_source_topology()
+        + audit_iwa_keynote_audio_position_source_topology()
+        + audit_keynote_audio_position_facade_source_topology()
+        + audit_keynote_audio_position_codec_source_topology()
+        + audit_keynote_audio_position_completion_source_topology()
+        + audit_keynote_audio_position_resource_source_topology()
         + audit_iwa_keynote_slide_media_data_source_topology()
         + audit_keynote_slide_media_data_facade_source_topology()
         + audit_keynote_slide_media_data_codec_source_topology()

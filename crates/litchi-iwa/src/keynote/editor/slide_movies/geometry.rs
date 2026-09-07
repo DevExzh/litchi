@@ -2,16 +2,13 @@
 
 use super::*;
 use crate::shapes::{
-    DrawableFlipAxis, DrawableProperties, drawable_properties, patch_drawable_geometry,
-    patch_wrapped_drawable_properties,
+    DrawableFlipAxis, DrawableProperties, drawable_properties, patch_wrapped_drawable_properties,
 };
 use litchi_core::Position;
 use litchi_keynote::slide::media::geometry::{
     MovieFlipAxis as FocusedMovieFlipAxis, MovieGeometry,
 };
 use litchi_keynote::{MovieSelector, Package as KeynotePackage};
-
-const MOVIE_DRAWABLE_FIELD: u32 = 1;
 
 impl KeynoteEditor {
     /// Read the focused semantic geometry of one file-backed movie.
@@ -161,45 +158,6 @@ fn map_focused_movie_geometry_error(error: litchi_keynote::SlideMovieGeometryErr
     Error::InvalidFormat(format!(
         "focused Keynote movie geometry operation failed: {error}"
     ))
-}
-
-pub(in crate::keynote::editor) fn set_movie_geometry(
-    package: &mut IWorkPackage,
-    archive_name: &str,
-    movie_id: u64,
-    geometry: DrawableGeometry,
-) -> Result<()> {
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(movie_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Keynote movie object {movie_id} is missing"))
-        })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == MOVIE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [message_index] = indexes.as_slice() else {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote movie {movie_id} must have exactly one MovieArchive payload"
-            )));
-        };
-        let message_index = *message_index;
-        let data = transform_length_delimited_field(
-            object.messages[message_index].data.as_slice(),
-            MOVIE_DRAWABLE_FIELD,
-            |drawable| patch_drawable_geometry(drawable, geometry),
-        )?;
-        object.replace_message(
-            message_index,
-            RawMessage {
-                type_: MOVIE_MESSAGE_TYPE,
-                data,
-            },
-        )?;
-        Ok(())
-    })
 }
 
 pub(in crate::keynote::editor) fn set_movie_properties(

@@ -1420,8 +1420,8 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
         ),
         (
             "KNMovieGeometryArchive.proto",
-            428,
-            "4233567f983e0cd8221a77bda82e59c409e1d546db9f50a79b0deefab2bc8a45",
+            503,
+            "63e1be8a4d18de6fccb3c5760332109416f8d827455ce6260c900d41b69f0ae2",
         ),
         (
             "KNPlaceholderTextOwnerArchive.proto",
@@ -3411,7 +3411,7 @@ fn enforce_keynote_movie_geometry_projection_provenance(
 package LitchiIwaKeynoteMovieGeometryProjection;\n\
 message PointSizeArchive {\n\
 required bytes position = 1;\n\
-required bytes size = 2;\n\
+optional bytes size = 2;\n\
 optional uint32 flags = 3;\n\
 optional float angle = 4;\n\
 }\n\
@@ -3421,7 +3421,7 @@ required PointSizeArchive geometry = 1;\n\
 message MovieArchive {\n\
 required DrawableArchive super = 1;\n\
 }";
-    const ROUTER_DECLARATIONS: [&str; 8] = [
+    const ROUTER_DECLARATIONS: [&str; 11] = [
         "const MOVIE_SUPER_FIELD: u32 = 1;",
         "const DRAWABLE_GEOMETRY_FIELD: u32 = 1;",
         "const GEOMETRY_POSITION_FIELD: u32 = 1;",
@@ -3429,6 +3429,9 @@ required DrawableArchive super = 1;\n\
         "pub fn decode_movie_geometry(",
         "pub fn prepare_movie_geometry_rewrite",
         "pub fn rewrite_movie_geometry(",
+        "pub fn decode_movie_position(",
+        "pub fn prepare_movie_position_rewrite",
+        "pub fn rewrite_movie_position(",
         "fn parse_field(",
     ];
     const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [

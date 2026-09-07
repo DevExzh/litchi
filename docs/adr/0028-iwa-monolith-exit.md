@@ -9780,4 +9780,71 @@ The owned `/private/tmp/litchi-media-retirement-20260907w` directory was removed
 14 temporary files totaling 3,865,199 bytes. A full `cargo clean` removed
 14,001 files and 9.4 GiB, leaving approximately 62 GiB free. The two native
 fixtures remain tracked. The monolith exit remains active; creation, richer
-media properties/readers, and audio positioning still require focused owners.
+media properties/readers still require focused owners. Focused slide-audio positioning is
+published in the follow-up below, with its scoped verification recorded there.
+
+## 2026-09-07 follow-up: focused Keynote slide-audio position owner
+
+The focused `litchi_keynote::Package` API now publishes
+`slide_audio_position`, `edit_slide_audio_position`, and
+`apply_slide_audio_position`. Reads return the semantic
+`litchi_keynote::slide::media::Point`; edits use typed `SlideSelector` and
+`MovieSelector`, `edit.set(Point)?.commit()`, and exact-source patch inverse
+application. The position-only contract keeps zero-size and absent-size native
+states distinct.
+
+The permanent native UI oracle is
+`test-data/iwork/keynote/media-audio-position-ui-native.key` with SHA-256
+`70709b7614ec6b663047253c66852cdb3be1dc79887a9b0481427b203d499de1`.
+Starting from `media-comments-baseline-native.key`, Keynote selected Audio A in
+Arrange and moved its position from X `960.0`, Y `539.4513549804688` to X
+`1120.0`, Y `420.0`. Cmd-S saved the package; it was actually closed to the
+theme chooser and reopened from the exact path without alerts. The reopened
+artifact contains 2 audio and 2 movie objects and preserves the existing movie
+comment.
+
+The focused position owner passes 13 cases, including native no-op and inverse
+checks, locked-audio movement with the lock preserved, absent/zero-size
+preservation, acceptance of negative finite coordinates, rejection of negative
+displayed sizes, and header/metadata rejection cases. Neutral codec
+validation passes 13 cases and its Clippy check passes. The focused helper is
+mandatory for the default fixture run; an environment override remains
+optional.
+
+The generated target opened in Keynote with Audio A at X `123.25`, Y `456.5`
+(the exact AX stepper value). Audio B remained unchanged, captions and Movie A's
+comment remained intact, and the package contained 2 audio and 2 movie objects.
+Cmd-S saved it; it was actually closed to the theme chooser, reopened from the
+exact path without alerts, and closed again. Strict native-saved readback passes
+for all playback, media assets, posters, non-position controls, and the comment
+graph.
+
+The permanent focused fixture is
+`test-data/iwork/keynote/media-audio-position-focused-native.key` with SHA-256
+`b88b1b208dbed8942908b27fc0d244fd911fb04065337cfe6338d32f384f72ca`. The
+pre-rewrite generated candidate had SHA-256
+`d74fb100a669fd02e7284f4835df8f00fc371d025595608856ecc1665d9fb834`.
+Both source-built raw-oracle parity checks passed before deletion. The host
+`slide_audio_position` and `set_slide_audio_position` methods, the orphan
+private `set_movie_geometry` writer, and the obsolete position example were
+removed; all tests were migrated to semantic selectors. These focused and
+native proofs were recorded before the final deletion check.
+
+Final scoped verification reports 271 Keynote library cases, plus 13
+audio-position integration cases with the mandatory focused native fixture and
+27 existing file-movie geometry cases. The post-retirement host editor library
+passes 242 cases. Focused all-feature Clippy passes for Keynote and the host,
+Python verification passes 949 cases, and the full boundary scanner passes for
+64 packages, 238 internal dependency declarations, and 11 explicit migration
+debt items.
+
+The fuzz hardening rerun passes 256 ASAN runs in 11 seconds using the nightly
+native seed and mutations, with final coverage 7,831 edges and 13,621 features,
+and reported RSS 508 MB. Its mandatory native seed uses a tight 1 MiB
+arbitrary-input ceiling. The transaction's 4 MiB retained budget is refused
+when measured retention reaches 4,195,369 bytes. The harness separates the
+arbitrary-input cap of 1 MiB from the 8 MiB package allowance. Fuzzing found that `patch.inverse().inverse() != patch` because the
+deleted-preview count was lost; the private `restored_previews` swap was fixed
+and a mandatory integration assertion was added before this passing rerun.
+Normal hooks and cleanup remain pending. No broader host-retirement claim
+follows from this slice.

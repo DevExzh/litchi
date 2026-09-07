@@ -38,9 +38,11 @@ const MAX_RECURSION: u32 = 64;
 const BUFFA_LOGICAL_ALLOCATIONS: usize = 2;
 const TRANSFORM_EXECUTE_ALLOCATIONS: usize = 6;
 const GEOMETRY_EXECUTE_ALLOCATIONS: usize = 10;
+const POSITION_EXECUTE_ALLOCATIONS: usize = 8;
 const CANDIDATE_SCAN_ALLOCATIONS: usize = 5 + BUFFA_LOGICAL_ALLOCATIONS;
 const TRANSFORM_OUTPUT_BUFFERS: usize = 3;
 const GEOMETRY_OUTPUT_BUFFERS: usize = 5;
+const POSITION_OUTPUT_BUFFERS: usize = 5;
 
 /// Finite limits for one geometry payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -552,6 +554,48 @@ impl MovieGeometryWrite {
     }
 }
 
+/// Requested replacement for only `MovieArchive.super.geometry.position`.
+///
+/// The position transaction deliberately does not own the sibling `size`
+/// field.  A source may omit that field, or retain an explicit zero size, and
+/// the position rewrite preserves its complete source span either way.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MoviePositionWrite {
+    position: Point,
+}
+
+impl MoviePositionWrite {
+    /// Construct a position replacement from a validated-on-write point.
+    #[must_use]
+    pub const fn new(position: Point) -> Self {
+        Self { position }
+    }
+
+    /// Construct a position replacement from native coordinates.
+    #[must_use]
+    pub const fn from_values(x: f32, y: f32) -> Self {
+        Self::new(Point::new(x, y))
+    }
+
+    /// Return the requested position.
+    #[must_use]
+    pub const fn position(self) -> Point {
+        self.position
+    }
+
+    /// Return the requested x coordinate.
+    #[must_use]
+    pub const fn x(self) -> f32 {
+        self.position.x
+    }
+
+    /// Return the requested y coordinate.
+    #[must_use]
+    pub const fn y(self) -> f32 {
+        self.position.y
+    }
+}
+
 /// Exact successful source accounting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DecodeReport {
@@ -842,6 +886,86 @@ impl<'source> PreparedMovieGeometryRewrite<'source> {
     }
 }
 
+/// Prepared source rewrite for only the movie position.
+///
+/// Preparation performs strict source validation and complete output sizing;
+/// execution replays the exact requirements before allocating a candidate.
+/// The borrowed source remains the atomic failure boundary.
+#[derive(Debug, Clone, Copy)]
+pub struct PreparedMoviePositionRewrite<'source> {
+    source: &'source [u8],
+    write: MoviePositionWrite,
+    options: DecodeOptions,
+    requirements: RewriteExecutionRequirements,
+    source_report: DecodeReport,
+    candidate_fields: usize,
+    candidate_work: usize,
+    candidate_depth: u32,
+}
+
+impl<'source> PreparedMoviePositionRewrite<'source> {
+    /// Return strict source accounting captured during preparation.
+    #[must_use]
+    pub const fn prepare_report(self) -> DecodeReport {
+        self.source_report
+    }
+
+    /// Return the exact residual execution requirements.
+    #[must_use]
+    pub const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    /// Execute the prepared position rewrite with exact ceilings.
+    pub fn execute(self, limits: RewriteExecutionLimits) -> Result<RewriteOutput, DecodeError> {
+        check_limits(self.requirements, limits)?;
+        let output = emit_position_rewrite(
+            self.source,
+            self.write,
+            self.requirements.output_bytes,
+            self.options,
+        )?;
+        if output.len() != self.requirements.output_bytes {
+            return Err(DecodeError::plain(
+                "movie position rewrite size disagreed with preflight",
+            ));
+        }
+        let candidate_options = DecodeOptions::new(
+            output.len(),
+            self.requirements.fields,
+            self.requirements.work_bytes,
+            self.requirements.max_depth,
+        )
+        .with_max_output_bytes(self.requirements.output_bytes)
+        .with_max_allocations(self.requirements.allocations)
+        .with_max_retained_bytes(self.requirements.retained_bytes)
+        .with_max_scratch_bytes(self.requirements.scratch_bytes);
+        let (position, candidate_report) =
+            decode_movie_position_with_report(&output, candidate_options)?;
+        if candidate_report.fields() != self.candidate_fields
+            || candidate_report.work_bytes() != self.candidate_work
+            || candidate_report.max_depth() != self.candidate_depth
+            || position != self.write.position
+        {
+            return Err(DecodeError::plain(
+                "movie position rewrite candidate disagreed with preflight",
+            ));
+        }
+        let report = RewriteReport {
+            input_bytes: self.source.len(),
+            output_bytes: output.len(),
+            fields: self.requirements.fields,
+            work_bytes: self.requirements.work_bytes,
+            max_depth: self.requirements.max_depth,
+            allocations: self.requirements.allocations,
+            retained_bytes: self.requirements.retained_bytes,
+            scratch_bytes: self.requirements.scratch_bytes,
+            changed: output.as_slice() != self.source,
+        };
+        Ok(RewriteOutput { output, report })
+    }
+}
+
 /// Prepared optional transform rewrite.  Preparation performs strict source
 /// validation and output sizing; execution is the single candidate-producing
 /// step.
@@ -1006,6 +1130,78 @@ pub fn rewrite_movie_geometry(
         .into_output())
 }
 
+/// Decode only the strict movie position projection.
+///
+/// Unlike [`decode_movie_geometry`], this read does not require the sibling
+/// size field or validate its dimensions.  The native host position reader
+/// owns this narrower admission: the rooted geometry and position must be
+/// present and valid, while size remains source-authoritative.
+pub fn decode_movie_position(source: &[u8], options: DecodeOptions) -> Result<Point, DecodeError> {
+    Ok(decode_movie_position_with_report(source, options)?.0)
+}
+
+/// Decode the strict movie position and return exact source accounting.
+pub fn decode_movie_position_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(Point, DecodeReport), DecodeError> {
+    validate_input(source, options)?;
+    let (position, scan) = scan_document_position(source, options)?;
+    force_buffa(source, options)?;
+    Ok((position, scan_report(source, scan, options)?))
+}
+
+/// Prepare a rewrite of only `MovieArchive.super.geometry.position`.
+pub fn prepare_movie_position_rewrite<'source>(
+    source: &'source [u8],
+    write: MoviePositionWrite,
+    options: DecodeOptions,
+) -> Result<PreparedMoviePositionRewrite<'source>, DecodeError> {
+    validate_input(source, options)?;
+    validate_position_write(write)?;
+    let (_position, source_scan) = scan_document_position(source, options)?;
+    let source_report = scan_report(source, source_scan, options)?;
+    force_buffa(source, options)?;
+    let measurement_options = residual_options(options, source_report)?;
+    let output_measure =
+        measure_position_output(source, source_scan, measurement_options, options)?;
+    if output_measure.bytes > options.max_output_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Output {
+            observed: output_measure.bytes,
+            maximum: options.max_output_bytes,
+        }));
+    }
+    let requirements = position_rewrite_requirements(
+        source.len(),
+        source_scan,
+        output_measure,
+        options,
+        POSITION_EXECUTE_ALLOCATIONS,
+    )?;
+    Ok(PreparedMoviePositionRewrite {
+        source,
+        write,
+        options,
+        requirements,
+        source_report: combine_position_prepare_report(source_report, output_measure, options)?,
+        candidate_fields: output_measure.fields,
+        candidate_work: output_measure.work,
+        candidate_depth: output_measure.max_depth,
+    })
+}
+
+/// Rewrite only the movie position while preserving every other source span.
+pub fn rewrite_movie_position(
+    source: &[u8],
+    write: MoviePositionWrite,
+    options: DecodeOptions,
+) -> Result<Vec<u8>, DecodeError> {
+    let prepared = prepare_movie_position_rewrite(source, write, options)?;
+    Ok(prepared
+        .execute(prepared.execution_requirements().exact())?
+        .into_output())
+}
+
 /// Prepare an optional transform rewrite without allocating candidate output.
 pub fn prepare_movie_transform_rewrite<'source>(
     source: &'source [u8],
@@ -1094,6 +1290,10 @@ struct OutputMeasure {
     allocations: usize,
     retained_bytes: usize,
     scratch_bytes: usize,
+    measurement_fields: usize,
+    measurement_work: usize,
+    measurement_allocations: usize,
+    measurement_scratch: usize,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -1160,6 +1360,296 @@ fn scan_report(
         retained_bytes: source.len(),
         scratch_bytes,
     })
+}
+
+fn residual_options(
+    options: DecodeOptions,
+    consumed: DecodeReport,
+) -> Result<DecodeOptions, DecodeError> {
+    let fields = options
+        .max_fields
+        .checked_sub(consumed.fields)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Fields {
+                observed: options.max_fields.saturating_add(1),
+                maximum: options.max_fields,
+            })
+        })?;
+    let work_bytes = options
+        .max_work_bytes
+        .checked_sub(consumed.work_bytes)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Work {
+                observed: options.max_work_bytes.saturating_add(1),
+                maximum: options.max_work_bytes,
+            })
+        })?;
+    let allocations = options
+        .max_allocations
+        .checked_sub(consumed.allocations)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Allocations {
+                observed: options.max_allocations.saturating_add(1),
+                maximum: options.max_allocations,
+            })
+        })?;
+    let scratch_bytes = options
+        .max_scratch_bytes
+        .checked_sub(consumed.scratch_bytes)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: options.max_scratch_bytes.saturating_add(1),
+                maximum: options.max_scratch_bytes,
+            })
+        })?;
+    Ok(options
+        .with_resource_limits(fields, work_bytes)
+        .with_max_allocations(allocations)
+        .with_max_scratch_bytes(scratch_bytes))
+}
+
+fn combine_position_prepare_report(
+    source_report: DecodeReport,
+    measure: OutputMeasure,
+    options: DecodeOptions,
+) -> Result<DecodeReport, DecodeError> {
+    let fields = source_report
+        .fields
+        .checked_add(measure.measurement_fields)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Fields {
+                observed: usize::MAX,
+                maximum: options.max_fields,
+            })
+        })?;
+    let work_bytes = source_report
+        .work_bytes
+        .checked_add(measure.measurement_work)
+        .and_then(|value| value.checked_add(source_report.input_bytes))
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Work {
+                observed: usize::MAX,
+                maximum: options.max_work_bytes,
+            })
+        })?;
+    let allocations = source_report
+        .allocations
+        .checked_add(measure.measurement_allocations)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Allocations {
+                observed: usize::MAX,
+                maximum: options.max_allocations,
+            })
+        })?;
+    let scratch_bytes = source_report
+        .scratch_bytes
+        .checked_add(measure.measurement_scratch)
+        .and_then(|value| value.checked_add(source_report.input_bytes))
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: usize::MAX,
+                maximum: options.max_scratch_bytes,
+            })
+        })?;
+    let report = DecodeReport {
+        input_bytes: source_report.input_bytes,
+        fields,
+        work_bytes,
+        max_depth: source_report.max_depth.max(measure.max_depth),
+        allocations,
+        retained_bytes: source_report.retained_bytes,
+        scratch_bytes,
+    };
+    check_decode_report_limits(report, options)?;
+    Ok(report)
+}
+
+fn check_decode_report_limits(
+    report: DecodeReport,
+    options: DecodeOptions,
+) -> Result<(), DecodeError> {
+    for (observed, maximum, limit) in [
+        (
+            report.fields,
+            options.max_fields,
+            DecodeLimit::Fields {
+                observed: report.fields,
+                maximum: options.max_fields,
+            },
+        ),
+        (
+            report.work_bytes,
+            options.max_work_bytes,
+            DecodeLimit::Work {
+                observed: report.work_bytes,
+                maximum: options.max_work_bytes,
+            },
+        ),
+        (
+            report.allocations,
+            options.max_allocations,
+            DecodeLimit::Allocations {
+                observed: report.allocations,
+                maximum: options.max_allocations,
+            },
+        ),
+        (
+            report.scratch_bytes,
+            options.max_scratch_bytes,
+            DecodeLimit::Scratch {
+                observed: report.scratch_bytes,
+                maximum: options.max_scratch_bytes,
+            },
+        ),
+        (
+            report.retained_bytes,
+            options.max_retained_bytes,
+            DecodeLimit::Retained {
+                observed: report.retained_bytes,
+                maximum: options.max_retained_bytes,
+            },
+        ),
+    ] {
+        if observed > maximum {
+            return Err(DecodeError::limited(limit));
+        }
+    }
+    if report.max_depth > options.recursion_limit {
+        return Err(DecodeError::limited(DecodeLimit::Nesting {
+            observed: report.max_depth,
+            maximum: options.recursion_limit,
+        }));
+    }
+    Ok(())
+}
+
+fn position_rewrite_requirements(
+    source_bytes: usize,
+    source_scan: ScanAccounting,
+    output_measure: OutputMeasure,
+    options: DecodeOptions,
+    execute_allocations: usize,
+) -> Result<RewriteExecutionRequirements, DecodeError> {
+    let fields = source_scan
+        .fields
+        .checked_add(output_measure.fields)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Fields {
+                observed: usize::MAX,
+                maximum: options.max_fields,
+            })
+        })?;
+    let work_bytes = source_scan
+        .work
+        .checked_add(output_measure.work)
+        .and_then(|value| value.checked_add(source_bytes))
+        .and_then(|value| value.checked_add(output_measure.bytes))
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Work {
+                observed: usize::MAX,
+                maximum: options.max_work_bytes,
+            })
+        })?;
+    let candidate_scratch = output_measure
+        .scratch_bytes
+        .checked_sub(output_measure.measurement_scratch)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: usize::MAX,
+                maximum: options.max_scratch_bytes,
+            })
+        })?;
+    let scratch_bytes = source_scan
+        .scratch_bytes
+        .checked_add(candidate_scratch)
+        .and_then(|value| value.checked_add(source_bytes))
+        .and_then(|value| value.checked_add(output_measure.bytes))
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: usize::MAX,
+                maximum: options.max_scratch_bytes,
+            })
+        })?;
+    let allocations = source_scan
+        .allocations
+        .checked_add(execute_allocations)
+        .and_then(|value| value.checked_add(CANDIDATE_SCAN_ALLOCATIONS))
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Allocations {
+                observed: usize::MAX,
+                maximum: options.max_allocations,
+            })
+        })?;
+    let retained_bytes = source_bytes
+        .checked_add(output_measure.retained_bytes)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Retained {
+                observed: usize::MAX,
+                maximum: options.max_retained_bytes,
+            })
+        })?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes: output_measure.bytes,
+        fields,
+        work_bytes,
+        max_depth: output_measure.max_depth,
+        allocations,
+        retained_bytes,
+        scratch_bytes,
+    };
+    for (observed, maximum, limit) in [
+        (
+            requirements.fields,
+            options.max_fields,
+            DecodeLimit::Fields {
+                observed: requirements.fields,
+                maximum: options.max_fields,
+            },
+        ),
+        (
+            requirements.work_bytes,
+            options.max_work_bytes,
+            DecodeLimit::Work {
+                observed: requirements.work_bytes,
+                maximum: options.max_work_bytes,
+            },
+        ),
+        (
+            requirements.allocations,
+            options.max_allocations,
+            DecodeLimit::Allocations {
+                observed: requirements.allocations,
+                maximum: options.max_allocations,
+            },
+        ),
+        (
+            requirements.retained_bytes,
+            options.max_retained_bytes,
+            DecodeLimit::Retained {
+                observed: requirements.retained_bytes,
+                maximum: options.max_retained_bytes,
+            },
+        ),
+        (
+            requirements.scratch_bytes,
+            options.max_scratch_bytes,
+            DecodeLimit::Scratch {
+                observed: requirements.scratch_bytes,
+                maximum: options.max_scratch_bytes,
+            },
+        ),
+    ] {
+        if observed > maximum {
+            return Err(DecodeError::limited(limit));
+        }
+    }
+    if requirements.max_depth > options.recursion_limit {
+        return Err(DecodeError::limited(DecodeLimit::Nesting {
+            observed: requirements.max_depth,
+            maximum: options.recursion_limit,
+        }));
+    }
+    Ok(requirements)
 }
 
 fn rewrite_requirements(
@@ -1318,9 +1808,7 @@ fn validate_input(source: &[u8], options: DecodeOptions) -> Result<(), DecodeErr
 }
 
 fn validate_write(write: MovieGeometryWrite) -> Result<(), DecodeError> {
-    if !write.position.x.is_finite() || !write.position.y.is_finite() {
-        return Err(DecodeError::plain("movie geometry position must be finite"));
-    }
+    validate_position(write.position)?;
     if !write.size.width.is_finite()
         || !write.size.height.is_finite()
         || write.size.width <= 0.0
@@ -1329,6 +1817,17 @@ fn validate_write(write: MovieGeometryWrite) -> Result<(), DecodeError> {
         return Err(DecodeError::plain(
             "movie geometry size must be finite and positive",
         ));
+    }
+    Ok(())
+}
+
+fn validate_position_write(write: MoviePositionWrite) -> Result<(), DecodeError> {
+    validate_position(write.position)
+}
+
+fn validate_position(position: Point) -> Result<(), DecodeError> {
+    if !position.x.is_finite() || !position.y.is_finite() {
+        return Err(DecodeError::plain("movie geometry position must be finite"));
     }
     Ok(())
 }
@@ -1366,6 +1865,63 @@ fn scan_document(
 ) -> Result<(MovieGeometrySnapshot, ScanAccounting), DecodeError> {
     let (snapshot, _transform, scan) = scan_document_projection(source, options)?;
     Ok((snapshot, scan))
+}
+
+fn scan_document_position(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(Point, ScanAccounting), DecodeError> {
+    let (position, _transform, scan) = scan_document_position_projection(source, options)?;
+    Ok((position, scan))
+}
+
+fn scan_document_position_projection(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(Point, MovieTransformSnapshot, ScanAccounting), DecodeError> {
+    let mut budget = Budget::default();
+    let root = parse_message(source, options, &mut budget, 1)?;
+    let super_field = unique_known(&root, MOVIE_SUPER_FIELD, "MovieArchive.super")?;
+    require_wire(super_field, 2)?;
+    let drawable = &source[super_field.value_start..super_field.value_end];
+    let drawable_fields = parse_message(drawable, options, &mut budget, 2)?;
+    let geometry_field = unique_known(
+        &drawable_fields,
+        DRAWABLE_GEOMETRY_FIELD,
+        "DrawableArchive.geometry",
+    )?;
+    require_wire(geometry_field, 2)?;
+    let geometry = &drawable[geometry_field.value_start..geometry_field.value_end];
+    let geometry_fields = parse_message(geometry, options, &mut budget, 3)?;
+    let position_field = unique_known(
+        &geometry_fields,
+        GEOMETRY_POSITION_FIELD,
+        "Geometry.position",
+    )?;
+    require_wire(position_field, 2)?;
+    // Size is deliberately outside this transaction's semantic ownership.
+    // Still reject duplicate or wrong-wire known fields so the handwritten
+    // admission and the private Buffa view agree on the source envelope.
+    if let Some(size_field) = optional_known(&geometry_fields, GEOMETRY_SIZE_FIELD)? {
+        require_wire(size_field, 2)?;
+    }
+    let transform = parse_transform(&geometry_fields, geometry)?;
+    let position = parse_point(
+        &geometry[position_field.value_start..position_field.value_end],
+        options,
+        &mut budget,
+    )?;
+    Ok((
+        position,
+        transform,
+        ScanAccounting {
+            fields: budget.fields,
+            work: budget.work,
+            max_depth: budget.max_depth,
+            allocations: budget.allocations,
+            scratch_bytes: budget.scratch_bytes,
+        },
+    ))
 }
 
 fn scan_document_projection(
@@ -1906,6 +2462,105 @@ fn measure_output(
         allocations: budget.allocations,
         retained_bytes,
         scratch_bytes: scratch,
+        measurement_fields: budget.fields,
+        measurement_work: budget.work,
+        measurement_allocations: budget.allocations,
+        measurement_scratch: budget.scratch_bytes,
+    })
+}
+
+fn measure_position_output(
+    source: &[u8],
+    source_scan: ScanAccounting,
+    parse_options: DecodeOptions,
+    sizing_options: DecodeOptions,
+) -> Result<OutputMeasure, DecodeError> {
+    let mut budget = Budget::default();
+    let root = parse_message(source, parse_options, &mut budget, 1)?;
+    let super_field = unique_known(&root, MOVIE_SUPER_FIELD, "MovieArchive.super")?;
+    let drawable = &source[super_field.value_start..super_field.value_end];
+    let drawable_fields = parse_message(drawable, parse_options, &mut budget, 2)?;
+    let geometry_field = unique_known(
+        &drawable_fields,
+        DRAWABLE_GEOMETRY_FIELD,
+        "DrawableArchive.geometry",
+    )?;
+    let geometry = &drawable[geometry_field.value_start..geometry_field.value_end];
+    let geometry_fields = parse_message(geometry, parse_options, &mut budget, 3)?;
+    let position_field = unique_known(
+        &geometry_fields,
+        GEOMETRY_POSITION_FIELD,
+        "Geometry.position",
+    )?;
+    require_wire(position_field, 2)?;
+    if let Some(size_field) = optional_known(&geometry_fields, GEOMETRY_SIZE_FIELD)? {
+        require_wire(size_field, 2)?;
+    }
+    let _ = parse_transform(&geometry_fields, geometry)?;
+    let point = &geometry[position_field.value_start..position_field.value_end];
+    let point_fields = parse_message(point, parse_options, &mut budget, 4)?;
+    let point_len = encoded_fixed_pair_len(&point_fields, POINT_X_FIELD, POINT_Y_FIELD)?;
+    let new_geometry_len = replace_length(
+        geometry.len(),
+        field_span(position_field),
+        length_field_len(GEOMETRY_POSITION_FIELD, point_len),
+    )?;
+    let new_drawable_len = replace_length(
+        drawable.len(),
+        field_span(geometry_field),
+        length_field_len(DRAWABLE_GEOMETRY_FIELD, new_geometry_len),
+    )?;
+    let output_len = replace_length(
+        source.len(),
+        field_span(super_field),
+        length_field_len(MOVIE_SUPER_FIELD, new_drawable_len),
+    )?;
+    let candidate_fields = source_scan.fields;
+    let candidate_work = source_scan.work.checked_add(output_len).ok_or_else(|| {
+        DecodeError::limited(DecodeLimit::Work {
+            observed: usize::MAX,
+            maximum: sizing_options.max_work_bytes,
+        })
+    })?;
+    let candidate_parse_scratch = parsed_fields_scratch_envelope(output_len, sizing_options)?;
+    let output_scratch = output_len
+        .checked_mul(POSITION_OUTPUT_BUFFERS)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: usize::MAX,
+                maximum: sizing_options.max_scratch_bytes,
+            })
+        })?;
+    let scratch = budget
+        .scratch_bytes
+        .checked_add(candidate_parse_scratch)
+        .and_then(|value| value.checked_add(output_scratch))
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: usize::MAX,
+                maximum: sizing_options.max_scratch_bytes,
+            })
+        })?;
+    let retained_bytes = output_len
+        .checked_mul(POSITION_OUTPUT_BUFFERS)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Retained {
+                observed: usize::MAX,
+                maximum: sizing_options.max_retained_bytes,
+            })
+        })?;
+    Ok(OutputMeasure {
+        bytes: output_len,
+        fields: candidate_fields,
+        work: candidate_work,
+        max_depth: source_scan.max_depth,
+        allocations: budget.allocations,
+        retained_bytes,
+        scratch_bytes: scratch,
+        measurement_fields: budget.fields,
+        measurement_work: budget.work,
+        measurement_allocations: budget.allocations,
+        measurement_scratch: budget.scratch_bytes,
     })
 }
 
@@ -2074,6 +2729,10 @@ fn measure_transform_output(
         allocations: budget.allocations,
         retained_bytes,
         scratch_bytes: scratch,
+        measurement_fields: budget.fields,
+        measurement_work: budget.work,
+        measurement_allocations: budget.allocations,
+        measurement_scratch: budget.scratch_bytes,
     })
 }
 
@@ -2282,6 +2941,95 @@ fn emit_rewrite(
         return Err(DecodeError::plain(
             "geometry rewrite output sizing disagreed",
         ));
+    }
+    Ok(output)
+}
+
+fn emit_position_rewrite(
+    source: &[u8],
+    write: MoviePositionWrite,
+    expected: usize,
+    options: DecodeOptions,
+) -> Result<Vec<u8>, DecodeError> {
+    let mut budget = Budget::default();
+    let root = parse_message(source, options, &mut budget, 1)?;
+    let super_field = unique_known(&root, MOVIE_SUPER_FIELD, "MovieArchive.super")?;
+    let drawable = &source[super_field.value_start..super_field.value_end];
+    let drawable_fields = parse_message(drawable, options, &mut budget, 2)?;
+    let geometry_field = unique_known(
+        &drawable_fields,
+        DRAWABLE_GEOMETRY_FIELD,
+        "DrawableArchive.geometry",
+    )?;
+    let geometry = &drawable[geometry_field.value_start..geometry_field.value_end];
+    let geometry_fields = parse_message(geometry, options, &mut budget, 3)?;
+    let position_field = unique_known(
+        &geometry_fields,
+        GEOMETRY_POSITION_FIELD,
+        "Geometry.position",
+    )?;
+    require_wire(position_field, 2)?;
+    if let Some(size_field) = optional_known(&geometry_fields, GEOMETRY_SIZE_FIELD)? {
+        require_wire(size_field, 2)?;
+    }
+    let _ = parse_transform(&geometry_fields, geometry)?;
+    let point = &geometry[position_field.value_start..position_field.value_end];
+    let rewritten_point = rewrite_fixed_message(point, write.position, true, options)?;
+    let geometry_len = replace_length(
+        geometry.len(),
+        field_span(position_field),
+        length_field_len(GEOMETRY_POSITION_FIELD, rewritten_point.len()),
+    )?;
+    let mut new_geometry = Vec::new();
+    new_geometry
+        .try_reserve_exact(geometry_len)
+        .map_err(|_| DecodeError::plain("movie position geometry allocation failed"))?;
+    for field in geometry_fields.iter().copied() {
+        if field.number == GEOMETRY_POSITION_FIELD {
+            append_length_replacement(&mut new_geometry, geometry, field, &rewritten_point);
+        } else {
+            new_geometry.extend_from_slice(&geometry[field.start..field.end]);
+        }
+    }
+    if new_geometry.len() != geometry_len {
+        return Err(DecodeError::plain(
+            "movie position geometry sizing disagreed",
+        ));
+    }
+    let drawable_len = replace_length(
+        drawable.len(),
+        field_span(geometry_field),
+        length_field_len(DRAWABLE_GEOMETRY_FIELD, new_geometry.len()),
+    )?;
+    let mut new_drawable = Vec::new();
+    new_drawable
+        .try_reserve_exact(drawable_len)
+        .map_err(|_| DecodeError::plain("movie position drawable allocation failed"))?;
+    for field in drawable_fields.iter().copied() {
+        if field.number == DRAWABLE_GEOMETRY_FIELD {
+            append_length_replacement(&mut new_drawable, drawable, field, &new_geometry);
+        } else {
+            new_drawable.extend_from_slice(&drawable[field.start..field.end]);
+        }
+    }
+    if new_drawable.len() != drawable_len {
+        return Err(DecodeError::plain(
+            "movie position drawable sizing disagreed",
+        ));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(expected)
+        .map_err(|_| DecodeError::plain("movie position output allocation failed"))?;
+    for field in root.iter().copied() {
+        if field.number == MOVIE_SUPER_FIELD {
+            append_length_replacement(&mut output, source, field, &new_drawable);
+        } else {
+            output.extend_from_slice(&source[field.start..field.end]);
+        }
+    }
+    if output.len() != expected {
+        return Err(DecodeError::plain("movie position output sizing disagreed"));
     }
     Ok(output)
 }
@@ -2647,6 +3395,64 @@ mod tests {
         length(1, &drawable)
     }
 
+    fn position_source(size: Option<(f32, f32)>) -> Vec<u8> {
+        position_source_with_fields(size, true, true, true)
+    }
+
+    fn position_source_with_fields(
+        size: Option<(f32, f32)>,
+        include_position: bool,
+        include_x: bool,
+        include_y: bool,
+    ) -> Vec<u8> {
+        fn varint(mut value: usize) -> Vec<u8> {
+            let mut bytes = Vec::new();
+            while value >= 0x80 {
+                bytes.push((value as u8) | 0x80);
+                value >>= 7;
+            }
+            bytes.push(value as u8);
+            bytes
+        }
+        fn length(number: u8, payload: &[u8]) -> Vec<u8> {
+            let mut bytes = vec![number << 3 | 2];
+            bytes.extend(varint(payload.len()));
+            bytes.extend_from_slice(payload);
+            bytes
+        }
+        fn fixed(number: u8, value: f32) -> Vec<u8> {
+            let mut bytes = vec![number << 3 | 5];
+            bytes.extend_from_slice(&value.to_le_bytes());
+            bytes
+        }
+
+        let mut point = Vec::new();
+        if include_x {
+            point.extend(fixed(1, 3.25));
+        }
+        if include_y {
+            point.extend(fixed(2, -4.5));
+        }
+        point.extend([0x98, 0x06, 0x01]);
+        let mut geometry = Vec::new();
+        if include_position {
+            geometry.extend(length(1, &point));
+        }
+        if let Some((width, height)) = size {
+            let mut size = fixed(1, width);
+            size.extend(fixed(2, height));
+            geometry.extend(length(2, &size));
+        }
+        geometry.extend([0x18, 0x07]);
+        geometry.extend([0x25, 0x00, 0x00, 0x80, 0x3f]);
+        geometry.extend([0x98, 0x06, 0x02]);
+        let mut drawable = length(1, &geometry);
+        drawable.extend([0x10, 0x09]);
+        let mut source = length(1, &drawable);
+        source.extend([0x18, 0x01]);
+        source
+    }
+
     #[test]
     fn transform_projection_preserves_optional_presence_and_values() {
         let bytes = source();
@@ -2979,5 +3785,181 @@ mod tests {
         assert!(
             prepare_movie_geometry_rewrite(&bytes, nan, DecodeOptions::for_source(&bytes)).is_err()
         );
+    }
+
+    #[test]
+    fn position_read_and_rewrite_preserve_absent_or_zero_size_and_all_other_spans() {
+        for size in [None, Some((0.0, 0.0))] {
+            let bytes = position_source(size);
+            let options = DecodeOptions::for_source(&bytes);
+            assert_eq!(
+                decode_movie_position(&bytes, options).unwrap(),
+                Point::new(3.25, -4.5)
+            );
+            let output = rewrite_movie_position(
+                &bytes,
+                MoviePositionWrite::from_values(18.5, -22.25),
+                options,
+            )
+            .unwrap();
+            let mut expected = bytes.clone();
+            let old_x = 3.25f32.to_le_bytes();
+            let old_y = (-4.5f32).to_le_bytes();
+            let new_x = 18.5f32.to_le_bytes();
+            let new_y = (-22.25f32).to_le_bytes();
+            let x = expected
+                .windows(5)
+                .position(|window| window == [0x0d, old_x[0], old_x[1], old_x[2], old_x[3]])
+                .unwrap();
+            expected[x + 1..x + 5].copy_from_slice(&new_x);
+            let y = expected
+                .windows(5)
+                .position(|window| window == [0x15, old_y[0], old_y[1], old_y[2], old_y[3]])
+                .unwrap();
+            expected[y + 1..y + 5].copy_from_slice(&new_y);
+            assert_eq!(output, expected);
+            assert_eq!(
+                decode_movie_position(&output, DecodeOptions::for_source(&output)).unwrap(),
+                Point::new(18.5, -22.25)
+            );
+        }
+    }
+
+    #[test]
+    fn position_preparation_replays_complete_limits_and_exact_noop() {
+        let bytes = position_source(None);
+        let options = DecodeOptions::for_source(&bytes);
+        let prepared = prepare_movie_position_rewrite(
+            &bytes,
+            MoviePositionWrite::from_values(18.5, -22.25),
+            options,
+        )
+        .unwrap();
+        let requirements = prepared.execution_requirements();
+        let output = prepared.execute(requirements.exact()).unwrap();
+        assert!(output.report().changed());
+        assert_eq!(output.report().output_bytes(), bytes.len());
+        assert!(requirements.allocations > BUFFA_LOGICAL_ALLOCATIONS);
+        assert!(requirements.retained_bytes > requirements.output_bytes);
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_output_bytes(requirements.output_bytes.saturating_sub(1)),
+                )
+                .is_err()
+        );
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_fields(requirements.fields.saturating_sub(1)),
+                )
+                .is_err()
+        );
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_work_bytes(requirements.work_bytes.saturating_sub(1)),
+                )
+                .is_err()
+        );
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_max_depth(requirements.max_depth.saturating_sub(1)),
+                )
+                .is_err()
+        );
+        assert!(
+            prepare_movie_position_rewrite(
+                &bytes,
+                MoviePositionWrite::from_values(f32::NAN, 0.0),
+                options,
+            )
+            .is_err()
+        );
+        assert!(
+            prepare_movie_position_rewrite(
+                &bytes,
+                MoviePositionWrite::from_values(18.5, -22.25),
+                options,
+            )
+            .unwrap()
+            .execute(
+                requirements
+                    .exact()
+                    .with_allocations(requirements.allocations.saturating_sub(1)),
+            )
+            .is_err()
+        );
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_retained_bytes(requirements.retained_bytes.saturating_sub(1)),
+                )
+                .is_err()
+        );
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_scratch_bytes(requirements.scratch_bytes.saturating_sub(1)),
+                )
+                .is_err()
+        );
+
+        let noop =
+            rewrite_movie_position(&bytes, MoviePositionWrite::from_values(3.25, -4.5), options)
+                .unwrap();
+        assert_eq!(noop, bytes);
+        let prepared_noop = prepare_movie_position_rewrite(
+            &bytes,
+            MoviePositionWrite::from_values(3.25, -4.5),
+            options,
+        )
+        .unwrap();
+        let noop_output = prepared_noop
+            .execute(prepared_noop.execution_requirements().exact())
+            .unwrap();
+        assert!(!noop_output.report().changed());
+        assert_eq!(noop_output.output(), bytes.as_slice());
+    }
+
+    #[test]
+    fn position_rewrite_rejects_missing_position_without_mutating_source() {
+        for (include_position, include_x, include_y) in [
+            (false, true, true),
+            (true, false, true),
+            (true, true, false),
+        ] {
+            let missing = position_source_with_fields(
+                Some((0.0, 0.0)),
+                include_position,
+                include_x,
+                include_y,
+            );
+            let before = missing.clone();
+            let options = DecodeOptions::for_source(&missing);
+            assert!(decode_movie_position(&missing, options).is_err());
+            assert!(
+                rewrite_movie_position(
+                    &missing,
+                    MoviePositionWrite::from_values(1.0, 2.0),
+                    options,
+                )
+                .is_err()
+            );
+            assert_eq!(missing, before);
+        }
     }
 }

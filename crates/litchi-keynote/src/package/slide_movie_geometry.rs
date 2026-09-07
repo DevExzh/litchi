@@ -36,6 +36,11 @@ use crate::{MovieKind, MovieSelector, SlideSelector};
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const MOVIE_STANDIN_MESSAGE_TYPE: u32 = 3_097;
 const MOVIE_STYLE_MESSAGE_TYPE: u32 = 2_025;
+// Native Keynote media controls use this style archive, while source-built
+// fixtures historically used the shape-style archive above.  It is admitted
+// only for the audio position path; file-backed movie geometry keeps its
+// existing exact role contract.
+const MOVIE_AUDIO_STYLE_MESSAGE_TYPE: u32 = 3_016;
 const SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
@@ -135,7 +140,7 @@ pub enum SlideMovieGeometryError {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct GeometryBudget {
+pub(crate) struct GeometryBudget {
     max_input: usize,
     max_output: usize,
     max_fields: usize,
@@ -157,7 +162,7 @@ struct GeometryBudget {
 }
 
 impl GeometryBudget {
-    fn new(package: &Package) -> Result<Self, SlideMovieGeometryError> {
+    pub(crate) fn new(package: &Package) -> Result<Self, SlideMovieGeometryError> {
         std::hint::black_box(MOVIE_GEOMETRY_COMPLETE);
         let wire = package.wire_limits().map_err(map_wire_error)?;
         let source: usize = package
@@ -212,7 +217,7 @@ impl GeometryBudget {
         Ok(())
     }
 
-    fn source(&mut self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
+    pub(crate) fn source(&mut self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
         Self::add(
             &mut self.input,
             bytes,
@@ -221,7 +226,7 @@ impl GeometryBudget {
         )
     }
 
-    fn output(&mut self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
+    pub(crate) fn output(&mut self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
         Self::add(
             &mut self.output,
             bytes,
@@ -230,7 +235,7 @@ impl GeometryBudget {
         )
     }
 
-    fn fields(&mut self, amount: usize) -> Result<(), SlideMovieGeometryError> {
+    pub(crate) fn fields(&mut self, amount: usize) -> Result<(), SlideMovieGeometryError> {
         Self::add(
             &mut self.fields,
             amount,
@@ -239,7 +244,7 @@ impl GeometryBudget {
         )
     }
 
-    fn preflight_output(&self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
+    pub(crate) fn preflight_output(&self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
         let observed = self
             .output
             .checked_add(bytes)
@@ -254,7 +259,7 @@ impl GeometryBudget {
         Ok(())
     }
 
-    fn preflight_work(&self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
+    pub(crate) fn preflight_work(&self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
         let observed = self
             .work
             .checked_add(bytes)
@@ -269,7 +274,7 @@ impl GeometryBudget {
         Ok(())
     }
 
-    fn references(&mut self, amount: usize) -> Result<(), SlideMovieGeometryError> {
+    pub(crate) fn references(&mut self, amount: usize) -> Result<(), SlideMovieGeometryError> {
         Self::add(
             &mut self.references,
             amount,
@@ -278,7 +283,7 @@ impl GeometryBudget {
         )
     }
 
-    fn work(&mut self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
+    pub(crate) fn work(&mut self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
         Self::add(
             &mut self.work,
             bytes,
@@ -287,7 +292,7 @@ impl GeometryBudget {
         )
     }
 
-    fn allocations(&mut self, amount: usize) -> Result<(), SlideMovieGeometryError> {
+    pub(crate) fn allocations(&mut self, amount: usize) -> Result<(), SlideMovieGeometryError> {
         Self::add(
             &mut self.allocations,
             amount,
@@ -296,7 +301,7 @@ impl GeometryBudget {
         )
     }
 
-    fn retained(&mut self, amount: usize) -> Result<(), SlideMovieGeometryError> {
+    pub(crate) fn retained(&mut self, amount: usize) -> Result<(), SlideMovieGeometryError> {
         Self::add(
             &mut self.retained,
             amount,
@@ -305,7 +310,7 @@ impl GeometryBudget {
         )
     }
 
-    fn scratch(&mut self, amount: usize) -> Result<(), SlideMovieGeometryError> {
+    pub(crate) fn scratch(&mut self, amount: usize) -> Result<(), SlideMovieGeometryError> {
         Self::add(
             &mut self.scratch,
             amount,
@@ -314,7 +319,7 @@ impl GeometryBudget {
         )
     }
 
-    fn physical(&mut self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
+    pub(crate) fn physical(&mut self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
         self.source(bytes)?;
         self.work(bytes)?;
         self.output(
@@ -324,7 +329,7 @@ impl GeometryBudget {
         )
     }
 
-    fn reassembly(
+    pub(crate) fn reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
     ) -> Result<(), SlideMovieGeometryError> {
@@ -335,9 +340,115 @@ impl GeometryBudget {
         self.work(requirements.output_bytes())
     }
 
-    fn candidate_reopen(&mut self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
+    pub(crate) fn candidate_reopen(&mut self, bytes: usize) -> Result<(), SlideMovieGeometryError> {
         self.source(bytes)?;
         self.work(bytes)
+    }
+
+    /// Debit the complete package scan performed by semantic validation.
+    ///
+    /// Validation walks the retained physical source independently of the
+    /// focused graph selectors, so callers must account for that scan before
+    /// invoking [`Package::validate`].
+    pub(crate) fn validate_package(
+        &mut self,
+        package: &Package,
+    ) -> Result<(), SlideMovieGeometryError> {
+        let mut work = 0usize;
+        let mut allocations = 0usize;
+        let mut fields = 0usize;
+        let mut logical_bytes = 0usize;
+        let mut object_count = 0usize;
+        let mut message_count = 0usize;
+        for component in package.state.source.components().iter() {
+            let archive_bytes = component.archive().encoded_len().map_err(map_core_error)?;
+            work = work
+                .checked_add(component.name().len())
+                .and_then(|value| value.checked_add(archive_bytes))
+                .ok_or(SlideMovieGeometryError::InvalidSource)?;
+            logical_bytes = logical_bytes
+                .checked_add(component.name().len())
+                .and_then(|value| value.checked_add(archive_bytes))
+                .ok_or(SlideMovieGeometryError::InvalidSource)?;
+            allocations = allocations
+                .checked_add(1)
+                .ok_or(SlideMovieGeometryError::InvalidSource)?;
+            for object in &component.archive().objects {
+                object_count = object_count
+                    .checked_add(1)
+                    .ok_or(SlideMovieGeometryError::InvalidSource)?;
+                work = work
+                    .checked_add(1)
+                    .and_then(|value| value.checked_add(object.messages.len()))
+                    .and_then(|value| value.checked_add(object.archive_info.message_infos.len()))
+                    .ok_or(SlideMovieGeometryError::InvalidSource)?;
+                allocations = allocations
+                    .checked_add(1)
+                    .and_then(|value| value.checked_add(object.messages.len()))
+                    .and_then(|value| value.checked_add(object.archive_info.message_infos.len()))
+                    .ok_or(SlideMovieGeometryError::InvalidSource)?;
+                for (message_index, message) in object.messages.iter().enumerate() {
+                    message_count = message_count
+                        .checked_add(1)
+                        .ok_or(SlideMovieGeometryError::InvalidSource)?;
+                    work = work
+                        .checked_add(message.data.len())
+                        .ok_or(SlideMovieGeometryError::InvalidSource)?;
+                    logical_bytes = logical_bytes
+                        .checked_add(message.data.len())
+                        .ok_or(SlideMovieGeometryError::InvalidSource)?;
+                    let info = object
+                        .archive_info
+                        .message_infos
+                        .get(message_index)
+                        .ok_or(SlideMovieGeometryError::InvalidSource)?;
+                    fields = fields
+                        .checked_add(info.field_infos.len())
+                        .ok_or(SlideMovieGeometryError::InvalidSource)?;
+                    let mut references = info
+                        .object_references
+                        .len()
+                        .checked_add(info.data_references.len())
+                        .and_then(|value| value.checked_add(info.field_infos.len()))
+                        .ok_or(SlideMovieGeometryError::InvalidSource)?;
+                    for field in &info.field_infos {
+                        references = references
+                            .checked_add(field.path.path.len())
+                            .and_then(|value| value.checked_add(field.object_references.len()))
+                            .and_then(|value| value.checked_add(field.data_references.len()))
+                            .ok_or(SlideMovieGeometryError::InvalidSource)?;
+                    }
+                    work = work
+                        .checked_add(references)
+                        .ok_or(SlideMovieGeometryError::InvalidSource)?;
+                }
+            }
+        }
+        let object_storage = object_count
+            .checked_mul(size_of::<ArchiveObject>())
+            .ok_or(SlideMovieGeometryError::InvalidSource)?;
+        let message_storage = message_count
+            .checked_mul(size_of::<RawMessage>())
+            .ok_or(SlideMovieGeometryError::InvalidSource)?;
+        let semantic_bytes = logical_bytes
+            .checked_add(object_storage)
+            .and_then(|value| value.checked_add(message_storage))
+            .ok_or(SlideMovieGeometryError::InvalidSource)?;
+        // Source/candidate bytes are charged at the physical ingress and
+        // reopen seams.  This pass accounts for semantic traversal work and
+        // its known archive/message staging. Reference counts are deliberately
+        // not charged here: validation independently enforces the package-wide
+        // semantic reference ceiling, while repeated traversal is work above.
+        // Semantic wire fields and nesting are per-payload ceilings enforced
+        // by Package::validate's decoders. Opaque archive payload bytes are
+        // work/storage, not parsed fields; only the header inventory traversed
+        // above contributes to this operation's aggregate field ledger.
+        self.fields(fields)?;
+        self.work(work)?;
+        self.allocations(allocations)?;
+        self.retained(semantic_bytes)?;
+        self.scratch(semantic_bytes)?;
+        package.validate().map_err(map_read_error)
     }
 
     fn residual(
@@ -443,7 +554,7 @@ impl GeometryBudget {
             })
     }
 
-    fn codec_report(
+    pub(crate) fn codec_report(
         &mut self,
         report: keynote_movie_geometry_codec::DecodeReport,
     ) -> Result<(), SlideMovieGeometryError> {
@@ -472,7 +583,7 @@ impl GeometryBudget {
         Ok(())
     }
 
-    fn codec_requirements(
+    pub(crate) fn codec_requirements(
         &mut self,
         requirements: keynote_movie_geometry_codec::RewriteExecutionRequirements,
     ) -> Result<(), SlideMovieGeometryError> {
@@ -788,19 +899,26 @@ impl SlideMovieGeometryCommit {
 }
 
 #[derive(Clone, PartialEq)]
-struct GeometrySelection {
-    slide_position: Position,
-    movie_position: Position,
-    slide_identifier: u64,
-    node_identifier: u64,
-    movie_identifier: u64,
-    message_index: usize,
-    slide_component_name: Arc<str>,
-    before: Option<MovieGeometry>,
-    before_transform: Option<MovieTransform>,
-    native_flags: Option<u32>,
-    native_angle: Option<f32>,
-    locked: bool,
+pub(crate) struct GeometrySelection {
+    pub(crate) slide_position: Position,
+    pub(crate) movie_position: Position,
+    pub(crate) slide_identifier: u64,
+    pub(crate) node_identifier: u64,
+    pub(crate) movie_identifier: u64,
+    pub(crate) message_index: usize,
+    pub(crate) slide_component_name: Arc<str>,
+    pub(crate) before: Option<MovieGeometry>,
+    pub(crate) before_position: Option<Point>,
+    pub(crate) before_transform: Option<MovieTransform>,
+    pub(crate) native_flags: Option<u32>,
+    pub(crate) native_angle: Option<f32>,
+    pub(crate) locked: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum GeometryMediaKind {
+    FileMovie,
+    Audio,
 }
 
 #[derive(Clone, Copy)]
@@ -981,7 +1099,15 @@ fn commit_edit(
     {
         return Err(SlideMovieGeometryError::Verification);
     }
-    verify_locality(source, &candidate, selection, true, &mut budget)?;
+    verify_locality(
+        source,
+        &candidate,
+        selection.slide_component_name.as_ref(),
+        selection.movie_identifier,
+        selection.message_index,
+        true,
+        &mut budget,
+    )?;
     let source_bytes = catalog.shared_source();
     let target = physical_catalog(&candidate)?.shared_source();
     Ok(SlideMovieGeometryCommit {
@@ -1033,7 +1159,9 @@ fn reopen_target_patch(
     verify_locality(
         source,
         &candidate,
-        &patch.selection,
+        patch.selection.slide_component_name.as_ref(),
+        patch.selection.movie_identifier,
+        patch.selection.message_index,
         patch.target_previews_absent,
         budget,
     )?;
@@ -1047,23 +1175,60 @@ fn reopen_target_patch(
     })
 }
 
-fn is_movie_media_name(name: &str) -> bool {
+fn is_media_data_name(name: &str, media_kind: GeometryMediaKind) -> bool {
     let bytes = name.as_bytes();
     if bytes.len() < 5 || !bytes[..5].eq_ignore_ascii_case(b"data/") {
         return false;
     }
-    [b".mov".as_slice(), b".mp4", b".m4v", b".mpeg", b".mpg"]
-        .iter()
-        .any(|suffix| {
-            bytes.len() >= suffix.len()
-                && bytes[bytes.len() - suffix.len()..].eq_ignore_ascii_case(suffix)
-        })
+    if matches!(media_kind, GeometryMediaKind::Audio) {
+        // Audio data names are producer-defined and may have no reliable
+        // extension.  The selected movie's data references and metadata
+        // ownership remain the authoritative admission proof below.
+        return true;
+    }
+    debug_assert!(matches!(media_kind, GeometryMediaKind::FileMovie));
+    let suffixes: &[&[u8]] = &[b".mov".as_slice(), b".mp4", b".m4v", b".mpeg", b".mpg"];
+    suffixes.iter().any(|suffix| {
+        bytes.len() >= suffix.len()
+            && bytes[bytes.len() - suffix.len()..].eq_ignore_ascii_case(suffix)
+    })
 }
 
 fn select_movie_with_budget(
     package: &Package,
     slide_selector: SlideSelector<'_>,
     movie_selector: MovieSelector,
+    budget: &mut GeometryBudget,
+) -> Result<GeometrySelection, SlideMovieGeometryError> {
+    select_media_with_budget(
+        package,
+        slide_selector,
+        movie_selector,
+        GeometryMediaKind::FileMovie,
+        budget,
+    )
+}
+
+pub(crate) fn select_audio_with_budget(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    movie_selector: MovieSelector,
+    budget: &mut GeometryBudget,
+) -> Result<GeometrySelection, SlideMovieGeometryError> {
+    select_media_with_budget(
+        package,
+        slide_selector,
+        movie_selector,
+        GeometryMediaKind::Audio,
+        budget,
+    )
+}
+
+fn select_media_with_budget(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    movie_selector: MovieSelector,
+    media_kind: GeometryMediaKind,
     budget: &mut GeometryBudget,
 ) -> Result<GeometrySelection, SlideMovieGeometryError> {
     let catalog = physical_catalog(package)?;
@@ -1077,7 +1242,7 @@ fn select_movie_with_budget(
                 .and_then(|value| value.checked_add(1))
                 .ok_or(SlideMovieGeometryError::InvalidSource)?,
         )?;
-        if !entry.is_opaque() && is_movie_media_name(entry.name()) {
+        if !entry.is_opaque() && is_media_data_name(entry.name(), media_kind) {
             has_movie_media = true;
         }
     }
@@ -1139,6 +1304,24 @@ fn select_movie_with_budget(
         .try_reserve(ids.len())
         .map_err(|_| SlideMovieGeometryError::Allocation { amount: ids.len() })?;
     budget.allocations(ids.len())?;
+    let mut audio_data_witnesses = Vec::new();
+    if matches!(media_kind, GeometryMediaKind::Audio) {
+        let witness_capacity = ids
+            .len()
+            .checked_mul(2)
+            .ok_or(SlideMovieGeometryError::InvalidSource)?;
+        budget.allocations(witness_capacity)?;
+        let witness_bytes = witness_capacity
+            .checked_mul(size_of::<(u64, u64)>())
+            .ok_or(SlideMovieGeometryError::InvalidSource)?;
+        budget.retained(witness_bytes)?;
+        budget.scratch(witness_bytes)?;
+        audio_data_witnesses
+            .try_reserve_exact(witness_capacity)
+            .map_err(|_| SlideMovieGeometryError::Allocation {
+                amount: witness_capacity,
+            })?;
+    }
     for identifier in &ids {
         let (movie_component, object) = package
             .object_with_component(*identifier)
@@ -1173,8 +1356,33 @@ fn select_movie_with_budget(
             },
         )
         .map_err(map_read_error)?;
-        if info.kind() != MovieKind::File {
+        let kind = info.kind();
+        if matches!(media_kind, GeometryMediaKind::FileMovie) && kind != MovieKind::File {
             continue;
+        }
+        if matches!(media_kind, GeometryMediaKind::Audio) && kind != MovieKind::Audio {
+            // Audio selectors count every movie archive in slide source order.
+            // Keep non-audio siblings in the typed inventory so selecting one
+            // fails as a wrong-kind graph instead of silently renumbering the
+            // audio list.
+            movies.push((
+                *identifier,
+                message_index,
+                kind,
+                None,
+                None,
+                None,
+                preflight.geometry_flags,
+                preflight.geometry_angle,
+                preflight.locked.unwrap_or(false),
+            ));
+            continue;
+        }
+        if preflight.display_size_fields > 0
+            && (preflight.display_width.is_some_and(|width| width < 0.0)
+                || preflight.display_height.is_some_and(|height| height < 0.0))
+        {
+            return Err(SlideMovieGeometryError::InvalidSource);
         }
         if preflight.movie_data_fields != 1 || preflight.data_references == 0 {
             return Err(SlideMovieGeometryError::UnsupportedDependency);
@@ -1185,38 +1393,84 @@ fn select_movie_with_budget(
             *count = (*count)
                 .checked_add(1)
                 .ok_or(SlideMovieGeometryError::InvalidSource)?;
+            if matches!(media_kind, GeometryMediaKind::Audio) {
+                if audio_data_witnesses
+                    .iter()
+                    .any(|(known_data, known_movie)| {
+                        *known_data == data_identifier && *known_movie == *identifier
+                    })
+                {
+                    return Err(SlideMovieGeometryError::InvalidSource);
+                }
+                audio_data_witnesses.push((data_identifier, *identifier));
+            }
         }
         if movie_parent(payload, limits, budget)? != record.slide_identifier {
             return Err(SlideMovieGeometryError::InvalidSource);
         }
         let options = codec_options(package, payload, budget)?;
-        let (snapshot, report) =
-            keynote_movie_geometry_codec::decode_movie_geometry_with_report(payload, options)
-                .map_err(map_geometry_codec_error)?;
-        budget.codec_report(report)?;
-        let geometry = MovieGeometry::new(
-            Point {
-                x: snapshot.x(),
-                y: snapshot.y(),
+        let (geometry, before_position, transform, native_flags, native_angle) = match media_kind {
+            GeometryMediaKind::FileMovie => {
+                let (snapshot, report) =
+                    keynote_movie_geometry_codec::decode_movie_geometry_with_report(
+                        payload, options,
+                    )
+                    .map_err(map_geometry_codec_error)?;
+                budget.codec_report(report)?;
+                let geometry = MovieGeometry::new(
+                    Point {
+                        x: snapshot.x(),
+                        y: snapshot.y(),
+                    },
+                    Size {
+                        width: snapshot.width(),
+                        height: snapshot.height(),
+                    },
+                )
+                .map(Some)
+                .map_err(|_| SlideMovieGeometryError::InvalidSource)?;
+                let position = geometry
+                    .ok_or(SlideMovieGeometryError::InvalidSource)?
+                    .position();
+                let angle = preflight.geometry_angle.unwrap_or(0.0);
+                let reflected =
+                    preflight.geometry_flags.unwrap_or_default() & MOVIE_REFLECTION_FLAG != 0;
+                let transform = MovieTransform::new(angle, reflected)
+                    .map_err(|_| SlideMovieGeometryError::InvalidSource)?;
+                (
+                    geometry,
+                    position,
+                    Some(transform),
+                    preflight.geometry_flags,
+                    preflight.geometry_angle,
+                )
             },
-            Size {
-                width: snapshot.width(),
-                height: snapshot.height(),
+            GeometryMediaKind::Audio => {
+                let (snapshot, report) =
+                    keynote_movie_geometry_codec::decode_movie_position_with_report(
+                        payload, options,
+                    )
+                    .map_err(map_geometry_codec_error)?;
+                budget.codec_report(report)?;
+                let position = Point {
+                    x: snapshot.x(),
+                    y: snapshot.y(),
+                };
+                if !position.x.is_finite() || !position.y.is_finite() {
+                    return Err(SlideMovieGeometryError::InvalidSource);
+                }
+                (None, position, None, None, None)
             },
-        )
-        .map(Some)
-        .map_err(|_| SlideMovieGeometryError::InvalidSource)?;
-        let angle = preflight.geometry_angle.unwrap_or(0.0);
-        let reflected = preflight.geometry_flags.unwrap_or_default() & MOVIE_REFLECTION_FLAG != 0;
-        let transform = MovieTransform::new(angle, reflected)
-            .map_err(|_| SlideMovieGeometryError::InvalidSource)?;
+        };
         movies.push((
             *identifier,
             message_index,
+            kind,
             geometry,
+            Some(before_position),
             transform,
-            preflight.geometry_flags,
-            preflight.geometry_angle,
+            native_flags,
+            native_angle,
             preflight.locked.unwrap_or(false),
         ));
     }
@@ -1224,7 +1478,9 @@ fn select_movie_with_budget(
     let (
         movie_identifier,
         message_index,
+        movie_kind,
         before,
+        before_position,
         before_transform,
         native_flags,
         native_angle,
@@ -1234,6 +1490,10 @@ fn select_movie_with_budget(
             position: movie_position,
         },
     )?;
+    if matches!(media_kind, GeometryMediaKind::Audio) && movie_kind != MovieKind::Audio {
+        return Err(SlideMovieGeometryError::UnsupportedDependency);
+    }
+    let before_position = before_position.ok_or(SlideMovieGeometryError::UnsupportedDependency)?;
     ensure_unique_movie_identity(package, component_name, movie_identifier, budget)?;
     ensure_unique_movie_owner(
         package,
@@ -1280,6 +1540,7 @@ fn select_movie_with_budget(
         &movie_ref_ids,
         false,
         &[],
+        matches!(media_kind, GeometryMediaKind::Audio),
         budget,
     )?;
     for reference in &movie_refs {
@@ -1290,7 +1551,12 @@ fn select_movie_with_budget(
         let (_, referenced_object) = package
             .object_with_component(identifier)
             .ok_or(SlideMovieGeometryError::InvalidSource)?;
-        unique_message(referenced_object, reference.expected_message_type, budget)?;
+        unique_movie_reference_message(
+            referenced_object,
+            reference.expected_message_type,
+            media_kind,
+            budget,
+        )?;
         let owners = package
             .state
             .source
@@ -1303,14 +1569,17 @@ fn select_movie_with_budget(
             return Err(SlideMovieGeometryError::UnsupportedDependency);
         }
     }
-    if before.is_none() {
+    if before.is_none() && !matches!(media_kind, GeometryMediaKind::Audio) {
         return Err(SlideMovieGeometryError::UnsupportedDependency);
     }
-    let metadata_capacity = ids
-        .len()
-        .checked_add(z_order.len())
-        .and_then(|value| value.checked_add(1))
-        .ok_or(SlideMovieGeometryError::InvalidSource)?;
+    let metadata_capacity = if matches!(media_kind, GeometryMediaKind::Audio) {
+        2
+    } else {
+        ids.len()
+            .checked_add(z_order.len())
+            .and_then(|value| value.checked_add(1))
+            .ok_or(SlideMovieGeometryError::InvalidSource)?
+    };
     budget.allocations(metadata_capacity)?;
     budget.retained(
         metadata_capacity
@@ -1324,27 +1593,29 @@ fn select_movie_with_budget(
             amount: metadata_capacity,
         })?;
     metadata_targets.push(record.slide_identifier);
-    for identifier in ids.iter().chain(z_order.iter()) {
-        if !metadata_targets.contains(identifier) {
-            metadata_targets.push(*identifier);
+    if matches!(media_kind, GeometryMediaKind::Audio) {
+        if !metadata_targets.contains(&movie_identifier) {
+            metadata_targets.push(movie_identifier);
+        }
+    } else {
+        for identifier in ids.iter().chain(z_order.iter()) {
+            if !metadata_targets.contains(identifier) {
+                metadata_targets.push(*identifier);
+            }
         }
     }
-    validate_movie_metadata(
-        package,
+    let graph = MovieReferenceGraph {
         component_name,
-        &metadata_targets,
-        &movie_data_ids,
-        budget,
-    )?;
-    validate_global_movie_references(
-        package,
-        record.slide_identifier,
+        slide_identifier: record.slide_identifier,
         slide_message_index,
         movie_identifier,
-        message_index,
-        &movie_data_ids,
-        budget,
-    )?;
+        movie_message_index: message_index,
+        data_ids: &movie_data_ids,
+        audio_data_witnesses: &audio_data_witnesses,
+        media_kind,
+    };
+    validate_movie_metadata(package, &graph, &metadata_targets, budget)?;
+    validate_global_movie_references(package, &graph, budget)?;
     Ok(GeometrySelection {
         slide_position,
         movie_position,
@@ -1354,7 +1625,8 @@ fn select_movie_with_budget(
         message_index,
         slide_component_name: Arc::from(component_name),
         before,
-        before_transform: Some(before_transform),
+        before_position: Some(before_position),
+        before_transform,
         native_flags,
         native_angle,
         locked,
@@ -1368,10 +1640,80 @@ fn rewrite_movie(
     after_transform: MovieTransform,
     budget: &mut GeometryBudget,
 ) -> Result<(Package, usize), SlideMovieGeometryError> {
+    let geometry_changed = selection.before != Some(after);
+    let transform_changed = selection.before_transform != Some(after_transform);
+    rewrite_geometry_message(
+        source,
+        selection.slide_component_name.as_ref(),
+        selection.movie_identifier,
+        selection.message_index,
+        |original, budget| {
+            let mut rewritten = None;
+            if geometry_changed {
+                let options = codec_options(source, original, budget)?;
+                let write = keynote_movie_geometry_codec::MovieGeometryWrite::from_values(
+                    after.position().x,
+                    after.position().y,
+                    after.size().width,
+                    after.size().height,
+                );
+                let prepared = keynote_movie_geometry_codec::prepare_movie_geometry_rewrite(
+                    original, write, options,
+                )
+                .map_err(map_geometry_codec_error)?;
+                budget.codec_report(prepared.prepare_report())?;
+                let requirements = prepared.execution_requirements();
+                budget.codec_requirements(requirements)?;
+                rewritten = Some(
+                    prepared
+                        .execute(requirements.exact_limits())
+                        .map_err(map_geometry_codec_error)?
+                        .into_output(),
+                );
+            }
+            if transform_changed {
+                let transform_source = rewritten.as_deref().unwrap_or(original);
+                let options = codec_options(source, transform_source, budget)?;
+                let write = transform_write(selection, after_transform)?;
+                let prepared = keynote_movie_geometry_codec::prepare_movie_transform_rewrite(
+                    transform_source,
+                    write,
+                    options,
+                )
+                .map_err(map_geometry_codec_error)?;
+                budget.codec_report(prepared.prepare_report())?;
+                let requirements = prepared.execution_requirements();
+                budget.codec_requirements(requirements)?;
+                rewritten = Some(
+                    prepared
+                        .execute(requirements.exact_limits())
+                        .map_err(map_geometry_codec_error)?
+                        .into_output(),
+                );
+            }
+            rewritten.ok_or(SlideMovieGeometryError::InvalidSource)
+        },
+        budget,
+    )
+}
+
+/// Rewrite one selected movie/audio message while reusing the exact physical
+/// archive transaction, preview invalidation, and operation accounting.
+pub(crate) fn rewrite_geometry_message<F>(
+    source: &Package,
+    component_name: &str,
+    object_identifier: u64,
+    message_index: usize,
+    rewrite: F,
+    budget: &mut GeometryBudget,
+) -> Result<(Package, usize), SlideMovieGeometryError>
+where
+    F: FnOnce(&[u8], &mut GeometryBudget) -> Result<Vec<u8>, SlideMovieGeometryError>,
+{
     let catalog = physical_catalog(source)?;
     let entries = entry_index(catalog.package(), budget)?;
     let entry = entries
-        .get(selection.slide_component_name.as_ref())
+        .get(component_name)
         .copied()
         .ok_or(SlideMovieGeometryError::InvalidSource)?;
     let physical_limits = source.state.options.archive();
@@ -1383,10 +1725,6 @@ fn rewrite_movie(
     let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
         .map_err(map_core_error)?;
     budget.physical(stream.as_bytes().len())?;
-    // Archive parsing retains the decompressed member and creates the object
-    // graph before the parser can report its inventory.  Reserve a logical
-    // envelope first so that this pass participates in the same operation
-    // ledger as selection and candidate verification.
     budget.allocations(1)?;
     budget.retained(stream.as_bytes().len())?;
     budget.scratch(stream.as_bytes().len())?;
@@ -1394,11 +1732,11 @@ fn rewrite_movie(
         Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     charge_archive_inventory(&archive, budget)?;
     let object = archive
-        .object(selection.movie_identifier)
+        .object(object_identifier)
         .ok_or(SlideMovieGeometryError::InvalidSource)?;
     let original = object
         .messages
-        .get(selection.message_index)
+        .get(message_index)
         .ok_or(SlideMovieGeometryError::InvalidSource)?
         .data
         .as_slice();
@@ -1436,56 +1774,12 @@ fn rewrite_movie(
     budget.allocations(1)?;
     budget.retained(encoded_bound)?;
     budget.scratch(encoded_bound)?;
-    let geometry_changed = selection.before != Some(after);
-    let transform_changed = selection.before_transform != Some(after_transform);
-    let mut rewritten = None;
-    if geometry_changed {
-        let options = codec_options(source, original, budget)?;
-        let write = keynote_movie_geometry_codec::MovieGeometryWrite::from_values(
-            after.position().x,
-            after.position().y,
-            after.size().width,
-            after.size().height,
-        );
-        let prepared =
-            keynote_movie_geometry_codec::prepare_movie_geometry_rewrite(original, write, options)
-                .map_err(map_geometry_codec_error)?;
-        budget.codec_report(prepared.prepare_report())?;
-        let requirements = prepared.execution_requirements();
-        budget.codec_requirements(requirements)?;
-        rewritten = Some(
-            prepared
-                .execute(requirements.exact_limits())
-                .map_err(map_geometry_codec_error)?
-                .into_output(),
-        );
-    }
-    if transform_changed {
-        let transform_source = rewritten.as_deref().unwrap_or(original);
-        let options = codec_options(source, transform_source, budget)?;
-        let write = transform_write(selection, after_transform)?;
-        let prepared = keynote_movie_geometry_codec::prepare_movie_transform_rewrite(
-            transform_source,
-            write,
-            options,
-        )
-        .map_err(map_geometry_codec_error)?;
-        budget.codec_report(prepared.prepare_report())?;
-        let requirements = prepared.execution_requirements();
-        budget.codec_requirements(requirements)?;
-        rewritten = Some(
-            prepared
-                .execute(requirements.exact_limits())
-                .map_err(map_geometry_codec_error)?
-                .into_output(),
-        );
-    }
-    let rewritten = rewritten.ok_or(SlideMovieGeometryError::InvalidSource)?;
+    let rewritten = rewrite(original, budget)?;
     archive
-        .object_mut(selection.movie_identifier)
+        .object_mut(object_identifier)
         .ok_or(SlideMovieGeometryError::InvalidSource)?
         .replace_message_preserving_header_with_limits(
-            selection.message_index,
+            message_index,
             RawMessage {
                 type_: MOVIE_MESSAGE_TYPE,
                 data: rewritten,
@@ -1504,10 +1798,7 @@ fn rewrite_movie(
     let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
     let previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
         .map_err(|_| SlideMovieGeometryError::InvalidSource)?;
-    let edit = EntryEdit::new(
-        selection.slide_component_name.as_ref(),
-        compressed.as_slice(),
-    );
+    let edit = EntryEdit::new(component_name, compressed.as_slice());
     let edits = [edit];
     let plan_units = previews
         .len()
@@ -1576,7 +1867,7 @@ fn transform_write(
     Ok(keynote_movie_geometry_codec::MovieTransformWrite::with_updates(flags, angle))
 }
 
-fn codec_options(
+pub(crate) fn codec_options(
     package: &Package,
     payload: &[u8],
     budget: &GeometryBudget,
@@ -1600,7 +1891,7 @@ fn codec_options(
     .with_max_scratch_bytes(scratch))
 }
 
-fn map_geometry_codec_error(
+pub(crate) fn map_geometry_codec_error(
     error: keynote_movie_geometry_codec::DecodeError,
 ) -> SlideMovieGeometryError {
     if let Some(limit) = error.resource_limit() {
@@ -1642,10 +1933,12 @@ fn map_geometry_codec_error(
     SlideMovieGeometryError::InvalidSource
 }
 
-fn verify_locality(
+pub(crate) fn verify_locality(
     source: &Package,
     candidate: &Package,
-    selection: &GeometrySelection,
+    component_name: &str,
+    object_identifier: u64,
+    message_index: usize,
     target_previews_absent: bool,
     budget: &mut GeometryBudget,
 ) -> Result<(), SlideMovieGeometryError> {
@@ -1676,7 +1969,7 @@ fn verify_locality(
         }
         let other = candidate_entry.ok_or(SlideMovieGeometryError::Verification)?;
         budget.work(other.data().len())?;
-        if entry.name() != selection.slide_component_name.as_ref() && entry.data() != other.data() {
+        if entry.name() != component_name && entry.data() != other.data() {
             return Err(SlideMovieGeometryError::Verification);
         }
     }
@@ -1688,10 +1981,8 @@ fn verify_locality(
         }
     }
 
-    let source_archive =
-        component_archive(source, selection.slide_component_name.as_ref(), budget)?;
-    let candidate_archive =
-        component_archive(candidate, selection.slide_component_name.as_ref(), budget)?;
+    let source_archive = component_archive(source, component_name, budget)?;
+    let candidate_archive = component_archive(candidate, component_name, budget)?;
     if source_archive.objects.len() != candidate_archive.objects.len() {
         return Err(SlideMovieGeometryError::Verification);
     }
@@ -1716,14 +2007,14 @@ fn verify_locality(
             .get(&identifier)
             .copied()
             .ok_or(SlideMovieGeometryError::Verification)?;
-        if identifier == selection.movie_identifier {
+        if identifier == object_identifier {
             let source_message = source_object
                 .messages
-                .get(selection.message_index)
+                .get(message_index)
                 .ok_or(SlideMovieGeometryError::Verification)?;
             let candidate_message = candidate_object
                 .messages
-                .get(selection.message_index)
+                .get(message_index)
                 .ok_or(SlideMovieGeometryError::Verification)?;
             if source_message.type_ != candidate_message.type_ {
                 return Err(SlideMovieGeometryError::Verification);
@@ -1731,7 +2022,7 @@ fn verify_locality(
             let mut expected = source_object.clone();
             expected
                 .replace_message_preserving_header_with_limits(
-                    selection.message_index,
+                    message_index,
                     candidate_message.clone(),
                     archive_limits,
                 )
@@ -1951,6 +2242,55 @@ fn unique_message<'a>(
     selected.ok_or(SlideMovieGeometryError::InvalidSource)
 }
 
+fn unique_movie_reference_message<'a>(
+    object: &'a ArchiveObject,
+    message_type: u32,
+    media_kind: GeometryMediaKind,
+    budget: &mut GeometryBudget,
+) -> Result<(usize, &'a [u8]), SlideMovieGeometryError> {
+    if !matches!(media_kind, GeometryMediaKind::Audio) || message_type != MOVIE_STYLE_MESSAGE_TYPE {
+        return unique_message(object, message_type, budget);
+    }
+
+    if object.messages.len() != object.archive_info.message_infos.len() {
+        return Err(SlideMovieGeometryError::InvalidSource);
+    }
+
+    let mut selected = None;
+    for (index, message) in object.messages.iter().enumerate() {
+        budget.work(
+            message
+                .data
+                .len()
+                .checked_add(1)
+                .ok_or(SlideMovieGeometryError::InvalidSource)?,
+        )?;
+        let info = object
+            .archive_info
+            .message_infos
+            .get(index)
+            .ok_or(SlideMovieGeometryError::InvalidSource)?;
+        if message.type_ != info.type_
+            || usize::try_from(info.length).ok() != Some(message.data.len())
+        {
+            return Err(SlideMovieGeometryError::InvalidSource);
+        }
+
+        let is_style = matches!(
+            message.type_,
+            MOVIE_STYLE_MESSAGE_TYPE | MOVIE_AUDIO_STYLE_MESSAGE_TYPE
+        );
+        if is_known_movie_role(message.type_) && !is_style {
+            return Err(SlideMovieGeometryError::UnsupportedDependency);
+        }
+        if is_style && selected.replace((index, message.data.as_slice())).is_some() {
+            return Err(SlideMovieGeometryError::InvalidSource);
+        }
+    }
+
+    selected.ok_or(SlideMovieGeometryError::InvalidSource)
+}
+
 fn validate_drawable_message_headers(
     object: &ArchiveObject,
     budget: &mut GeometryBudget,
@@ -2152,6 +2492,7 @@ fn validate_archive_info_references(
     expected: &[u64],
     allow_unselected: bool,
     allowed_field_paths: &[u32],
+    order_insensitive: bool,
     budget: &mut GeometryBudget,
 ) -> Result<(), SlideMovieGeometryError> {
     let info = object
@@ -2210,8 +2551,18 @@ fn validate_archive_info_references(
     {
         return Err(SlideMovieGeometryError::InvalidSource);
     }
-    if !allow_unselected && info.object_references.as_slice() != expected {
-        return Err(SlideMovieGeometryError::InvalidSource);
+    if !allow_unselected {
+        let exact_order = info.object_references.as_slice() == expected;
+        let exact_set = order_insensitive
+            && info.object_references.len() == expected.len()
+            && expected_set.len() == expected.len()
+            && info
+                .object_references
+                .iter()
+                .all(|identifier| expected_set.contains(identifier));
+        if !exact_order && !exact_set {
+            return Err(SlideMovieGeometryError::InvalidSource);
+        }
     }
 
     let max_field_references = info
@@ -2303,6 +2654,7 @@ fn validate_slide_archive_info_references(
         &expected,
         true,
         &[SLIDE_OWNED_DRAWABLES_FIELD, SLIDE_Z_ORDER_FIELD],
+        false,
         budget,
     )?;
     let info = object
@@ -2481,14 +2833,66 @@ fn validate_movie_data_dependencies(
     Ok(())
 }
 
+#[derive(Clone, Copy)]
+struct MovieReferenceGraph<'a> {
+    component_name: &'a str,
+    slide_identifier: u64,
+    slide_message_index: usize,
+    movie_identifier: u64,
+    movie_message_index: usize,
+    data_ids: &'a [u64],
+    audio_data_witnesses: &'a [(u64, u64)],
+    media_kind: GeometryMediaKind,
+}
+
 fn validate_movie_metadata(
     package: &Package,
-    component_name: &str,
+    graph: &MovieReferenceGraph<'_>,
     target_ids: &[u64],
-    data_ids: &[u64],
     budget: &mut GeometryBudget,
 ) -> Result<(), SlideMovieGeometryError> {
+    let MovieReferenceGraph {
+        component_name,
+        data_ids,
+        audio_data_witnesses,
+        media_kind,
+        movie_identifier: selected_movie_identifier,
+        ..
+    } = *graph;
     let metadata = metadata_payload(package, budget)?;
+    if matches!(media_kind, GeometryMediaKind::Audio) {
+        // A metadata record consumes at least a key and a value byte. Bound
+        // callback storage and witness lookups before the visitor allocates;
+        // the maps themselves grow fallibly only as records are encountered.
+        let units = (metadata.len() / 2)
+            .checked_add(
+                target_ids
+                    .len()
+                    .checked_mul(3)
+                    .ok_or(SlideMovieGeometryError::InvalidSource)?,
+            )
+            .and_then(|value| value.checked_add(data_ids.len().checked_mul(2)?))
+            .and_then(|value| value.checked_add(audio_data_witnesses.len()))
+            .ok_or(SlideMovieGeometryError::InvalidSource)?;
+        let bytes = units
+            .checked_mul(size_of::<(u64, u64, usize)>())
+            .ok_or(SlideMovieGeometryError::InvalidSource)?;
+        let lookup_width = audio_data_witnesses
+            .len()
+            .checked_add(target_ids.len())
+            .and_then(|value| value.checked_add(data_ids.len()))
+            .and_then(|value| value.checked_add(2))
+            .ok_or(SlideMovieGeometryError::InvalidSource)?;
+        budget.allocations(units)?;
+        budget.retained(bytes)?;
+        budget.scratch(bytes)?;
+        budget.work(
+            metadata
+                .len()
+                .checked_mul(lookup_width)
+                .ok_or(SlideMovieGeometryError::InvalidSource)?,
+        )?;
+    }
     let limits = budget.residual(package)?;
     let components = WireView::parse_with_limits(metadata, limits)
         .map_err(map_wire_error)?
@@ -2509,7 +2913,17 @@ fn validate_movie_metadata(
         references,
     );
     budget.allocations(target_ids.len())?;
-    let mut visitor = MovieMetadataAuthorityVisitor::new(target_ids, component_name, data_ids)?;
+    if matches!(media_kind, GeometryMediaKind::Audio) {
+        budget.allocations(audio_data_witnesses.len())?;
+    }
+    let mut visitor = MovieMetadataAuthorityVisitor::new(
+        target_ids,
+        component_name,
+        data_ids,
+        audio_data_witnesses,
+        matches!(media_kind, GeometryMediaKind::Audio),
+        selected_movie_identifier,
+    )?;
     let inspection = package_metadata_codec::inspect_package_metadata_with_visitor(
         metadata,
         options,
@@ -2517,7 +2931,19 @@ fn validate_movie_metadata(
     )
     .map_err(map_metadata_error)?;
     budget.metadata_report(inspection.report())?;
-    if visitor.invalid || visitor.target_counts.iter().any(|count| *count != 1) {
+    let audio_data_owners_valid = !matches!(media_kind, GeometryMediaKind::Audio)
+        || data_ids.iter().all(|identifier| {
+            let parent_count = visitor
+                .audio_data_parent_counts
+                .get(identifier)
+                .copied()
+                .unwrap_or(0);
+            parent_count == 0 || visitor.audio_data_owner_counts.get(identifier).copied() == Some(1)
+        });
+    if visitor.invalid
+        || visitor.target_counts.iter().any(|count| *count != 1)
+        || !audio_data_owners_valid
+    {
         return Err(SlideMovieGeometryError::UnsupportedDependency);
     }
     Ok(())
@@ -2576,9 +3002,15 @@ struct MovieMetadataAuthorityVisitor<'a> {
     target_ids: &'a [u64],
     component_name: &'a str,
     data_ids: &'a [u64],
+    audio_data_witnesses: &'a [(u64, u64)],
     target_counts: Vec<usize>,
     target_pairs: Vec<Option<(u64, u64)>>,
     seen_pairs: HashMap<(u64, u64), u64>,
+    allow_audio_data_owners: bool,
+    selected_movie_identifier: u64,
+    audio_data_parent_counts: HashMap<u64, usize>,
+    audio_data_owner_counts: HashMap<u64, usize>,
+    audio_data_explicit_owners: HashSet<(u64, u64)>,
     invalid: bool,
 }
 
@@ -2587,6 +3019,9 @@ impl<'a> MovieMetadataAuthorityVisitor<'a> {
         target_ids: &'a [u64],
         component_name: &'a str,
         data_ids: &'a [u64],
+        audio_data_witnesses: &'a [(u64, u64)],
+        allow_audio_data_owners: bool,
+        selected_movie_identifier: u64,
     ) -> Result<Self, SlideMovieGeometryError> {
         let mut target_counts = Vec::new();
         target_counts
@@ -2608,13 +3043,39 @@ impl<'a> MovieMetadataAuthorityVisitor<'a> {
                 amount: target_ids.len(),
             }
         })?;
+        let mut audio_data_owner_counts = HashMap::new();
+        let mut audio_data_parent_counts = HashMap::new();
+        let mut audio_data_explicit_owners = HashSet::new();
+        if allow_audio_data_owners {
+            audio_data_parent_counts
+                .try_reserve(data_ids.len())
+                .map_err(|_| SlideMovieGeometryError::Allocation {
+                    amount: data_ids.len(),
+                })?;
+            audio_data_owner_counts
+                .try_reserve(data_ids.len())
+                .map_err(|_| SlideMovieGeometryError::Allocation {
+                    amount: data_ids.len(),
+                })?;
+            audio_data_explicit_owners
+                .try_reserve(audio_data_witnesses.len())
+                .map_err(|_| SlideMovieGeometryError::Allocation {
+                    amount: audio_data_witnesses.len(),
+                })?;
+        }
         Ok(Self {
             target_ids,
             component_name,
             data_ids,
+            audio_data_witnesses,
             target_counts,
             target_pairs,
             seen_pairs,
+            allow_audio_data_owners,
+            selected_movie_identifier,
+            audio_data_parent_counts,
+            audio_data_owner_counts,
+            audio_data_explicit_owners,
             invalid: false,
         })
     }
@@ -2623,6 +3084,19 @@ impl<'a> MovieMetadataAuthorityVisitor<'a> {
         self.target_ids
             .iter()
             .position(|target| *target == identifier)
+    }
+
+    fn expected_audio_owner_count(&self, data_identifier: u64) -> usize {
+        self.audio_data_witnesses
+            .iter()
+            .filter(|(identifier, _)| *identifier == data_identifier)
+            .count()
+    }
+
+    fn expected_audio_owner(&self, data_identifier: u64, object_identifier: u64) -> bool {
+        self.audio_data_witnesses.iter().any(|(identifier, owner)| {
+            *identifier == data_identifier && *owner == object_identifier
+        })
     }
 }
 
@@ -2634,6 +3108,11 @@ impl package_metadata_codec::PackageMetadataVisitor for MovieMetadataAuthorityVi
         let object_identifier = binding.object_identifier();
         let uuid = binding.uuid();
         let pair = (uuid.lower(), uuid.upper());
+        if !self.seen_pairs.contains_key(&pair) {
+            self.seen_pairs
+                .try_reserve(1)
+                .map_err(|_| package_metadata_codec::RewriteError::allocation(1))?;
+        }
         if let Some(previous) = self.seen_pairs.insert(pair, object_identifier) {
             if previous != object_identifier
                 && (self.target_index(previous).is_some()
@@ -2686,6 +3165,20 @@ impl package_metadata_codec::PackageMetadataVisitor for MovieMetadataAuthorityVi
         {
             self.invalid = true;
         }
+        if self.allow_audio_data_owners && self.data_ids.contains(&reference.data_identifier()) {
+            let data_identifier = reference.data_identifier();
+            let parent_count = self.expected_audio_owner_count(data_identifier);
+            if self
+                .audio_data_parent_counts
+                .insert(data_identifier, reference.owner_count())
+                .is_some()
+            {
+                self.invalid = true;
+            }
+            if reference.owner_count() != 0 && reference.owner_count() != parent_count {
+                self.invalid = true;
+            }
+        }
         Ok(())
     }
 
@@ -2693,7 +3186,35 @@ impl package_metadata_codec::PackageMetadataVisitor for MovieMetadataAuthorityVi
         &mut self,
         owner: package_metadata_codec::DataReferenceOwnerDescriptor<'_>,
     ) -> Result<(), package_metadata_codec::RewriteError> {
-        if self.target_index(owner.object_identifier()).is_some() {
+        let audio_owner = self.allow_audio_data_owners
+            && self.data_ids.contains(&owner.data_identifier())
+            && self.expected_audio_owner(owner.data_identifier(), owner.object_identifier())
+            && owner.count() == 1
+            && owner.component().is_current()
+            && metadata_component_matches_physical(
+                owner.component().effective_locator(),
+                self.component_name,
+            );
+        if audio_owner {
+            if !self
+                .audio_data_explicit_owners
+                .insert((owner.data_identifier(), owner.object_identifier()))
+            {
+                self.invalid = true;
+            }
+            if owner.object_identifier() == self.selected_movie_identifier {
+                let count = self
+                    .audio_data_owner_counts
+                    .entry(owner.data_identifier())
+                    .or_insert(0);
+                *count = count.saturating_add(1);
+                if *count != 1 {
+                    self.invalid = true;
+                }
+            }
+        } else if self.target_index(owner.object_identifier()).is_some()
+            || (self.allow_audio_data_owners && self.data_ids.contains(&owner.data_identifier()))
+        {
             self.invalid = true;
         }
         Ok(())
@@ -2724,13 +3245,19 @@ impl package_metadata_codec::PackageMetadataVisitor for MovieMetadataAuthorityVi
 
 fn validate_global_movie_references(
     package: &Package,
-    slide_identifier: u64,
-    slide_message_index: usize,
-    movie_identifier: u64,
-    movie_message_index: usize,
-    data_ids: &[u64],
+    graph: &MovieReferenceGraph<'_>,
     budget: &mut GeometryBudget,
 ) -> Result<(), SlideMovieGeometryError> {
+    let MovieReferenceGraph {
+        component_name,
+        slide_identifier,
+        slide_message_index,
+        movie_identifier,
+        movie_message_index,
+        data_ids,
+        audio_data_witnesses,
+        media_kind,
+    } = *graph;
     let archive_limits = package
         .state
         .options
@@ -2776,6 +3303,9 @@ fn validate_global_movie_references(
         movie_identifier,
         movie_message_index,
         data_ids,
+        audio_data_witnesses,
+        component_name,
+        allow_audio_shared_data: matches!(media_kind, GeometryMediaKind::Audio),
         movie_references: 0,
         data_references: 0,
         invalid: false,
@@ -2829,6 +3359,13 @@ fn validate_global_movie_references(
             )?;
             budget.retained(message_bytes)?;
             budget.scratch(message_bytes)?;
+            if matches!(media_kind, GeometryMediaKind::Audio) {
+                budget.work(
+                    references
+                        .checked_mul(audio_data_witnesses.len())
+                        .ok_or(SlideMovieGeometryError::InvalidSource)?,
+                )?;
+            }
             object
                 .inspect_references_with_policy_and_limits(
                     &mut visitor,
@@ -2854,6 +3391,9 @@ struct MovieInboundReferenceVisitor<'a> {
     movie_identifier: u64,
     movie_message_index: usize,
     data_ids: &'a [u64],
+    audio_data_witnesses: &'a [(u64, u64)],
+    component_name: &'a str,
+    allow_audio_shared_data: bool,
     movie_references: usize,
     data_references: usize,
     invalid: bool,
@@ -2875,7 +3415,12 @@ impl ArchiveReferenceVisitor for MovieInboundReferenceVisitor<'_> {
                     .object_with_component(occurrence.referenced_identifier)
                     .is_none()
                 {
-                    self.invalid = true;
+                    let selected_scope = occurrence.object_identifier == self.slide_identifier
+                        || occurrence.object_identifier == self.movie_identifier
+                        || occurrence.referenced_identifier == self.movie_identifier;
+                    if !self.allow_audio_shared_data || selected_scope {
+                        self.invalid = true;
+                    }
                 }
                 if occurrence.referenced_identifier == self.movie_identifier {
                     if occurrence.object_identifier != self.slide_identifier
@@ -2893,12 +3438,31 @@ impl ArchiveReferenceVisitor for MovieInboundReferenceVisitor<'_> {
                 {
                     self.invalid = true;
                 } else if self.data_ids.contains(&occurrence.referenced_identifier) {
-                    if occurrence.object_identifier != self.movie_identifier
-                        || occurrence.message_index != self.movie_message_index
-                    {
-                        self.invalid = true;
-                    } else {
+                    let selected_movie_reference = occurrence.object_identifier
+                        == self.movie_identifier
+                        && occurrence.message_index == self.movie_message_index;
+                    let shared_audio_reference = self.allow_audio_shared_data
+                        && self.audio_data_witnesses.iter().any(
+                            |(data_identifier, movie_identifier)| {
+                                *data_identifier == occurrence.referenced_identifier
+                                    && *movie_identifier == occurrence.object_identifier
+                            },
+                        )
+                        && self
+                            .package
+                            .object_with_component(occurrence.object_identifier)
+                            .is_some_and(|(component, object)| {
+                                component == self.component_name
+                                    && object
+                                        .archive_info
+                                        .message_infos
+                                        .get(occurrence.message_index)
+                                        .is_some_and(|info| info.type_ == MOVIE_MESSAGE_TYPE)
+                            });
+                    if selected_movie_reference {
                         self.data_references = self.data_references.saturating_add(1);
+                    } else if !shared_audio_reference {
+                        self.invalid = true;
                     }
                 }
             },
@@ -2966,7 +3530,7 @@ fn ensure_unique_movie_owner(
     Ok(())
 }
 
-fn physical_catalog(
+pub(crate) fn physical_catalog(
     package: &Package,
 ) -> Result<&litchi_iwa_archive::SourceCatalog, SlideMovieGeometryError> {
     match &package.state.source {
@@ -2975,7 +3539,7 @@ fn physical_catalog(
     }
 }
 
-fn previews_absent(package: &Package) -> Result<bool, SlideMovieGeometryError> {
+pub(crate) fn previews_absent(package: &Package) -> Result<bool, SlideMovieGeometryError> {
     let catalog = physical_catalog(package)?;
     super::rendering_invalidation::root_previews_absent(catalog.package())
         .map_err(|_| SlideMovieGeometryError::Verification)
@@ -3139,5 +3703,59 @@ fn map_core_error(error: litchi_iwa_core::Error) -> SlideMovieGeometryError {
             SlideMovieGeometryError::Allocation { amount: requested }
         },
         _ => SlideMovieGeometryError::InvalidSource,
+    }
+}
+
+#[cfg(test)]
+mod validation_budget_tests {
+    use super::{GeometryBudget, Package, SlideMovieGeometryError, SlideMovieGeometryLimitKind};
+
+    #[test]
+    fn semantic_validation_charges_inventory_before_decoding() {
+        let source = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/iwork/keynote/media-comments-baseline-native.key"
+        ));
+        let package = Package::from_bytes(source).unwrap();
+        let payload_bytes: usize = package
+            .state
+            .source
+            .components()
+            .iter()
+            .flat_map(|component| &component.archive().objects)
+            .flat_map(|object| &object.messages)
+            .map(|message| message.data.len())
+            .sum();
+        let mut measured = GeometryBudget::new(&package).unwrap();
+        measured.validate_package(&package).unwrap();
+        assert!(payload_bytes > 0);
+        let header_fields: usize = package
+            .state
+            .source
+            .components()
+            .iter()
+            .flat_map(|component| &component.archive().objects)
+            .flat_map(|object| &object.archive_info.message_infos)
+            .map(|info| info.field_infos.len())
+            .sum();
+        assert!(header_fields > 0);
+        assert_eq!(measured.fields, header_fields);
+        assert!(measured.work >= payload_bytes);
+        assert!(measured.retained >= payload_bytes);
+        assert!(measured.scratch >= payload_bytes);
+
+        let mut exact = GeometryBudget::new(&package).unwrap();
+        exact.max_fields = measured.fields;
+        exact.validate_package(&package).unwrap();
+        let mut short = GeometryBudget::new(&package).unwrap();
+        short.max_fields = measured.fields - 1;
+        assert!(matches!(
+            short.validate_package(&package),
+            Err(SlideMovieGeometryError::LimitExceeded {
+                kind: SlideMovieGeometryLimitKind::WireFields,
+                ..
+            })
+        ));
+        assert_eq!(package.source_bytes(), source);
     }
 }
