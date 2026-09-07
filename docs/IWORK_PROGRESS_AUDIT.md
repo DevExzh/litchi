@@ -981,3 +981,15 @@ anchor belongs to a chart sheet, excluded by the worksheet-only API under
 ADR 0307. Per-fixture inventory counts preserve all six anchors, and all five
 worksheet transfers still save and reopen. All nine workbook-structure tests
 pass. No XLSB production behavior changed.
+
+Final receipt: commit `7daa3bd75` passed the normal formatting, workspace lint,
+all-feature workspace library/integration tests, and all-feature workspace
+doctest hooks. No hook was bypassed. The final boundary scanner also passes for
+64 crates, 238 internal dependency declarations, and the same 11 explicit debt
+items. Native media-properties verification and monolith retirement remain
+open; this commit does not claim either gate is complete.
+
+Post-commit cleanup removed 29,802 build files (26.8 GiB) with `cargo clean`,
+plus ten parent-owned verification logs. Agent-owned candidate documents and
+inspection probes were removed. The pre-existing untracked `.codex/` directory
+was preserved.
