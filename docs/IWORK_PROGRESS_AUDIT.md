@@ -993,3 +993,30 @@ Post-commit cleanup removed 29,802 build files (26.8 GiB) with `cargo clean`,
 plus ten parent-owned verification logs. Agent-owned candidate documents and
 inspection probes were removed. The pre-existing untracked `.codex/` directory
 was preserved.
+
+
+## Bounded migration-host read follow-up (2026-09-07)
+
+Container/group index discovery now performs bounded strict validation and
+lazy Buffa parity before publishing parent/child references. Generated
+source-built oracles and malformed-tail cases cover edge selection and atomic
+refusal. The checked-in native corpus contains no type-3003/type-3008 objects;
+there is no native container/group parity receipt for this increment.
+Numbers storage reuses its bounded table-info projection with the legacy
+sparse-envelope and recursion-two contract. Pages graph/caption discovery
+borrows root facts instead of materializing a generated document archive.
+Keynote movie-property reads borrow the selected payload and preserve the
+existing ownership/cycle checks and sparse-movie compatibility.
+
+The redundant Numbers comment-reply example is removed; semantic focused
+reply APIs and their integration tests remain. All eleven migration debts
+remain open. Computer Use is still blocked by ScreenCaptureKit error `-3802`,
+so no additional native acceptance or host API retirement is claimed.
+
+Verification: the strict container/group codec passes eight tests. Boundary
+policy passes 967 unit tests and the complete 64-package, 238-dependency scan
+with 11 recorded debts. Strict workspace all-feature library Clippy passes
+with warnings denied. Workspace all-feature library/integration testing passes
+21,705 cases across 929 targets, with 12 existing ignored cases; workspace
+all-feature doctests also pass. This is source-level validation and does not
+supply the missing native container/group or media-properties acceptance.

@@ -113,7 +113,7 @@ impl PagesEditor {
         size: DrawableSize,
     ) -> Result<PagesDrawableTextInfo> {
         let geometry = validate_text_box_geometry(position, size)?;
-        let root = root_document(self.package())?;
+        let root = pages_document_root_facts(self.package())?;
         let body: StorageArchive = decode_typed_package_object(
             self.package(),
             self.body_storage_id.get(),
@@ -123,8 +123,8 @@ impl PagesEditor {
         let style_id = text_box_style_id(self.package(), &root)?;
         let storage = body_text_storage(text, &body);
         let first_identifier = next_object_identifier(self.package())?;
-        let (creates_z_order, z_order_id) = if let Some(z_order) = &root.drawables_zorder {
-            (false, z_order.identifier)
+        let (creates_z_order, z_order_id) = if let Some(z_order) = root.drawables_zorder {
+            (false, z_order)
         } else {
             (true, first_identifier)
         };
@@ -222,12 +222,10 @@ fn validate_text_box_geometry(
     .validate()
 }
 
-fn text_box_style_id(package: &IWorkPackage, root: &DocumentArchive) -> Result<u64> {
+fn text_box_style_id(package: &IWorkPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
     let theme_id = root
         .theme
-        .as_ref()
-        .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?
-        .identifier;
+        .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?;
     let archive_name = find_object_archive(package, theme_id)?;
     let archive = package.archive(&archive_name)?;
     let object = archive
@@ -578,8 +576,8 @@ mod tests {
             .unwrap();
 
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        let root = root_document(reopened.package()).unwrap();
-        let z_order_id = root.drawables_zorder.unwrap().identifier;
+        let root = pages_document_root_facts(reopened.package()).unwrap();
+        let z_order_id = root.drawables_zorder.unwrap();
         let z_order: tp::DrawablesZOrderArchive = decode_typed_package_object(
             reopened.package(),
             z_order_id,

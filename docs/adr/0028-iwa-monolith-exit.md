@@ -9914,3 +9914,50 @@ save/actual-close/exact-reopen receipt was produced. All four raw host APIs
 and their private helper remain retained. `MEDIA_PROPERTIES_NATIVE_VERIFIED`
 is absent, so this increment records source ownership and does not retire
 those routes or complete the monolith exit.
+
+
+## 2026-09-07 bounded migration-host read projections
+
+The legacy object-index fallback now reads native TSD container (3003) and
+group (3008) parent/child edges through a private Buffa projection. A bounded
+strict preflight completes before any candidate edge is published. It checks
+selected references and lazy-view parity, accepts an absent drawable parent,
+and filters encoded null identifiers only when publishing compact nonzero
+references. Duplicate selected singular fields, missing required reference
+identifiers, and malformed trailing children refuse the complete projection;
+this deliberately tightens malformed-input admission. Unrelated payload fields
+remain opaque and source bytes are never rewritten. Generated container/group
+decoders remain source-built differential oracles in codec tests. The 701-byte
+projection contains only four messages. A read-only scan of the checked-in
+Pages, Numbers, and Keynote fixture directories found no type-3003/type-3008
+objects; native parity for these routes therefore remains an evidence gap.
+
+Numbers storage shares the existing table-info projection, preserving canonical
+type 6000, the sparse type-6003 compatibility envelope, and storage's nesting
+limit of two. Pages graph, caption, and creation-discovery reads borrow the
+existing document-root projection; they retain scalar references and bounded
+language text, and collect page-template identifiers only for reachability.
+The Keynote raw movie-property reader uses the bounded property projection
+without serializing/reopening the package. Its existing same-component,
+slide-ownership, ordinary-file, and private-graph cycle checks remain; sparse
+movies without materialized data retain their historical read support.
+
+The obsolete Numbers comment-reply example is removed because focused semantic
+reply transactions already cover its behavior. No API retirement or native
+reply acceptance claim follows. Source/build boundary ratchets prevent the two
+index sites from returning to generated container/group decoding. The eleven
+ordered migration dependencies remain open, including fresh Keynote media
+creation. This increment does not complete the monolith exit.
+
+Computer Use was attempted for Keynote, but ScreenCaptureKit again returned
+`-3802` (`Stream failed to start`). No new native artifact or application
+save/actual-close/exact-reopen receipt was produced; media-properties native
+acceptance and its host retirement remain withheld.
+
+Verification: the strict container/group codec passes eight tests. Boundary
+policy passes 967 unit tests and the complete 64-package, 238-dependency scan
+with 11 recorded debts. Strict workspace all-feature library Clippy passes
+with warnings denied. Workspace all-feature library/integration testing passes
+21,705 cases across 929 targets, with 12 existing ignored cases; workspace
+all-feature doctests also pass. This is source-level validation and does not
+supply the missing native container/group or media-properties acceptance.

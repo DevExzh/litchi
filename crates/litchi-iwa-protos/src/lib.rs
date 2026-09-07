@@ -1566,6 +1566,43 @@ mod buffa_drawable_parent_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for native container/group parent and
+/// child edges. Complete drawable and extension graphs remain caller-owned.
+#[doc(hidden)]
+mod buffa_drawable_container_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated output is private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-drawable-container/iwa_drawable_container_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for the Pages movie caption metadata
 /// edge. The strict codec validates selected fields before forcing this view;
 /// caller-owned source bytes remain the preservation representation.
@@ -2020,6 +2057,11 @@ pub mod pages_media_codec;
 /// private and the caller-owned drawable payload remains authoritative.
 #[doc(hidden)]
 pub mod drawable_parent_codec;
+
+/// Internal strict TSD container/group edge projection. Generated types
+/// remain private and caller-owned drawable payloads remain authoritative.
+#[doc(hidden)]
+pub mod drawable_container_codec;
 
 /// Internal strict Pages movie-caption metadata projection. Generated types
 /// remain private and caller-owned raw bytes remain authoritative.

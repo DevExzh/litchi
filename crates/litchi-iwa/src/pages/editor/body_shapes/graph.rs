@@ -41,12 +41,10 @@ pub(super) fn new_shape_geometry(
     .validate()
 }
 
-pub(super) fn shape_style_id(package: &IWorkPackage, root: &DocumentArchive) -> Result<u64> {
+pub(super) fn shape_style_id(package: &IWorkPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
     let theme_id = root
         .theme
-        .as_ref()
-        .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?
-        .identifier;
+        .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?;
     let archive_name = find_object_archive(package, theme_id)?;
     let archive = package.archive(&archive_name)?;
     let object = archive

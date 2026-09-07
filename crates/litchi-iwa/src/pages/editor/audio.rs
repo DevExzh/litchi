@@ -67,11 +67,11 @@ impl PagesEditor {
         options: PagesAudioOptions,
     ) -> Result<PagesAudioInfo> {
         let (geometry, duration_seconds) = audio_creation_values(options)?;
-        let root = root_document(self.package())?;
+        let root = pages_document_root_facts(self.package())?;
         let style_id = audio_style_id(self.package(), &root)?;
         let first_identifier = next_object_identifier(self.package())?;
-        let (creates_z_order, z_order_id) = if let Some(z_order) = &root.drawables_zorder {
-            (false, z_order.identifier)
+        let (creates_z_order, z_order_id) = if let Some(z_order) = root.drawables_zorder {
+            (false, z_order)
         } else {
             (true, first_identifier)
         };
@@ -186,7 +186,7 @@ impl PagesEditor {
             ..source.geometry
         }
         .validate()?;
-        let left_margin = root_document(self.package())?
+        let left_margin = pages_document_root_facts(self.package())?
             .left_margin
             .unwrap_or_default();
         let mut staged = self.package().clone();

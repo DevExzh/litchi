@@ -1,0 +1,25 @@
+// Wire-only Buffa projection for TSD.ContainerArchive and TSD.GroupArchive.
+// The complete native drawable/container payload remains caller-owned.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message DrawableArchive {
+  optional .LitchiIwaProjection.Reference parent = 2;
+}
+
+message ContainerArchive {
+  optional .LitchiIwaProjection.Reference parent = 2;
+  repeated .LitchiIwaProjection.Reference children = 3;
+}
+
+message GroupArchive {
+  required .LitchiIwaProjection.DrawableArchive super = 1;
+  repeated .LitchiIwaProjection.Reference children = 2;
+}

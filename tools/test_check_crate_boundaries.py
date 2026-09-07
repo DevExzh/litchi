@@ -6715,6 +6715,134 @@ def add_pages_footnote_lifecycle_canonical_scaffold(root: Path) -> None:
     footnote_export.write_text("pub mod body;\n", encoding="utf-8")
 
 
+def add_iwa_drawable_container_scaffold(
+    root: Path,
+    *,
+    reference_generated_decode: bool = False,
+    codec_generated_decode: bool = False,
+    missing_projection: bool = False,
+    missing_build_route: bool = False,
+) -> None:
+    """Create the focused TSD container/group projection topology fixture."""
+
+    reference = root / boundaries.IWA_DRAWABLE_CONTAINER_REFERENCE_SOURCE
+    reference.parent.mkdir(parents=True, exist_ok=True)
+    unrelated_decode = (
+        "    let _ = crate::protobuf::tsd::ShapeArchive::decode(bytes);\n"
+        if reference_generated_decode
+        else ""
+    )
+    reference.write_text(
+        "use litchi_iwa_protos::drawable_container_codec;\n"
+        "fn extract(msg_type: u32, bytes: &[u8]) {\n"
+        "    match msg_type {\n"
+        "        3003 => {\n"
+        "            if let Ok(container) = drawable_container_codec::decode_container(bytes) {\n"
+        "                let _ = container;\n"
+        "            }\n"
+        "        },\n"
+        "        3004 => {\n"
+        f"{unrelated_decode}"
+        "        },\n"
+        "        3008 => {\n"
+        "            if let Ok(group) = drawable_container_codec::decode_group(bytes) {\n"
+        "                let _ = group;\n"
+        "            }\n"
+        "        },\n"
+        "        _ => {}\n"
+        "    }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    codec = root / boundaries.IWA_DRAWABLE_CONTAINER_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    generated = (
+        "fn legacy_probe(source: &[u8]) {\n"
+        "    let _ = tsd::ContainerArchive::decode(source);\n"
+        "}\n"
+        if codec_generated_decode
+        else ""
+    )
+    codec.write_text(
+        "use crate::buffa_drawable_container_generated::LitchiIwaProjection as projection;\n"
+        "const CONTAINER_PARENT_FIELD: u32 = 2;\n"
+        "const CONTAINER_CHILDREN_FIELD: u32 = 3;\n"
+        "const GROUP_SUPER_FIELD: u32 = 1;\n"
+        "const GROUP_CHILDREN_FIELD: u32 = 2;\n"
+        "pub struct ReferenceSnapshot;\n"
+        "pub struct ContainerArchive;\n"
+        "pub struct GroupArchive;\n"
+        "pub struct DecodeOptions;\n"
+        "fn preflight_reference(source: &[u8]) { let _ = source; }\n"
+        "pub fn decode_container_references(source: &[u8]) -> Result<ContainerArchive, ()> {\n"
+        "    let _ = (source, projection::ContainerArchive, DecodeOptions, preflight_reference);\n"
+        "    options.decode_lazy_view(source);\n"
+        "    Ok(ContainerArchive)\n"
+        "}\n"
+        "pub fn decode_group_references(source: &[u8]) -> Result<GroupArchive, ()> {\n"
+        "    let _ = (source, projection::GroupArchive, DecodeOptions, preflight_reference);\n"
+        "    options.decode_lazy_view(source);\n"
+        "    Ok(GroupArchive)\n"
+        "}\n"
+        "fn parent_children(parent: u64, children: &[u64]) { let _ = (parent, children); }\n"
+        f"{generated}",
+        encoding="utf-8",
+    )
+
+    if not missing_projection:
+        projection = root / boundaries.IWA_DRAWABLE_CONTAINER_PROJECTION_SOURCE
+        projection.parent.mkdir(parents=True, exist_ok=True)
+        projection.write_text(
+            'syntax = "proto2";\n'
+            "package LitchiIwaProjection;\n"
+            "message Reference { required uint64 identifier = 1; }\n"
+            "message DrawableArchive { optional .LitchiIwaProjection.Reference parent = 2; }\n"
+            "message ContainerArchive {\n"
+            "  optional .LitchiIwaProjection.Reference parent = 2;\n"
+            "  repeated .LitchiIwaProjection.Reference children = 3;\n"
+            "}\n"
+            "message GroupArchive {\n"
+            "  required .LitchiIwaProjection.DrawableArchive super = 1;\n"
+            "  repeated .LitchiIwaProjection.Reference children = 2;\n"
+            "}\n",
+            encoding="utf-8",
+        )
+
+    public = root / boundaries.IWA_DRAWABLE_CONTAINER_CODEC_PUBLIC_SOURCE
+    public.parent.mkdir(parents=True, exist_ok=True)
+    public.write_text(
+        "#[doc(hidden)]\n"
+        "mod buffa_drawable_container_generated {\n"
+        "    include!(concat!(env!(\"OUT_DIR\"), "
+        "\"/buffa-drawable-container/iwa_drawable_container_buffa_protos.rs\"));\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    build = root / boundaries.IWA_DRAWABLE_CONTAINER_BUILD_SOURCE
+    build.parent.mkdir(parents=True, exist_ok=True)
+    if not missing_build_route:
+        build.write_text(
+            "let buffa_drawable_container_out_directory = out.join(\"buffa-drawable-container\");\n"
+            "buffa_build::Config::new()\n"
+            "    .files(&[buffa_projection_directory.join(\"TSDDrawableContainerArchive.proto\")])\n"
+            "    .includes(&[buffa_projection_directory])\n"
+            "    .out_dir(&buffa_drawable_container_out_directory)\n"
+            "    .include_file(\"iwa_drawable_container_buffa_protos.rs\")\n"
+            "    .generate_views(true)\n"
+            "    .lazy_views(true)\n"
+            "    .preserve_unknown_fields(false)\n"
+            "    .compile();\n"
+            "fn enforce_drawable_container_projection_provenance(_proto: &str, _projection: &str) {}\n"
+            "enforce_drawable_container_projection_provenance(proto_directory, buffa_projection_directory)?;\n"
+            "enforce_drawable_container_projection_budget(&buffa_drawable_container_out_directory);\n",
+            encoding="utf-8",
+        )
+    else:
+        build.write_text("fn unrelated_build_step() {}\n", encoding="utf-8")
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -27352,6 +27480,98 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_iwa_pages_drawable_order_read_source_topology()",
+            main_source,
+        )
+
+    def test_iwa_drawable_container_projection_accepts_focused_routes_and_legacy_rest(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_drawable_container_scaffold(
+                root,
+                reference_generated_decode=True,
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_drawable_container_reference_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_drawable_container_codec_source_topology(root),
+                [],
+            )
+
+    def test_iwa_drawable_container_reference_rejects_generated_decodes_only_in_scope(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_drawable_container_scaffold(root)
+            source = root / boundaries.IWA_DRAWABLE_CONTAINER_REFERENCE_SOURCE
+            source.write_text(
+                source.read_text(encoding="utf-8").replace(
+                    "drawable_container_codec::decode_container(bytes)",
+                    "tsd::ContainerArchive::decode(bytes)",
+                ),
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_drawable_container_reference_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("generated ContainerArchive decode" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must route TSD ContainerArchive" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_drawable_container_codec_rejects_eager_decode_and_missing_ownership(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_drawable_container_scaffold(root, codec_generated_decode=True)
+            (root / boundaries.IWA_DRAWABLE_CONTAINER_PROJECTION_SOURCE).unlink()
+
+            violations = boundaries.audit_iwa_drawable_container_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("generated archive decode" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing private Buffa projection" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_drawable_container_codec_rejects_missing_build_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_drawable_container_scaffold(root, missing_build_route=True)
+
+            violations = boundaries.audit_iwa_drawable_container_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing its dedicated route" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_drawable_container_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_drawable_container_reference_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_iwa_drawable_container_codec_source_topology()",
             main_source,
         )
 

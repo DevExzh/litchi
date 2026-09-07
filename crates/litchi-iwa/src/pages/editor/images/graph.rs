@@ -117,12 +117,10 @@ pub(super) fn image_creation_values(options: PagesImageOptions) -> Result<Drawab
     .validate()
 }
 
-pub(super) fn image_style_id(package: &IWorkPackage, root: &DocumentArchive) -> Result<u64> {
+pub(super) fn image_style_id(package: &IWorkPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
     let theme_id = root
         .theme
-        .as_ref()
-        .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?
-        .identifier;
+        .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?;
     let archive_name = find_object_archive(package, theme_id)?;
     let archive = package.archive(&archive_name)?;
     let object = archive
@@ -145,13 +143,11 @@ pub(super) fn image_style_id(package: &IWorkPackage, root: &DocumentArchive) -> 
 
 pub(super) fn image_caption_theme(
     package: &IWorkPackage,
-    root: &DocumentArchive,
+    root: &PagesDocumentRootFacts,
 ) -> Result<(CaptionThemeStyle, Option<String>)> {
     let theme_id = root
         .theme
-        .as_ref()
-        .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?
-        .identifier;
+        .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?;
     let archive_name = find_object_archive(package, theme_id)?;
     let archive = package.archive(&archive_name)?;
     let object = archive
@@ -188,7 +184,7 @@ pub(super) fn image_caption_theme(
             stylesheet_id,
             paragraph_style_id,
         },
-        root.super_.document_language.clone(),
+        root.document_language.clone(),
     ))
 }
 

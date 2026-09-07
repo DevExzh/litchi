@@ -2630,9 +2630,9 @@ empty; creating and saving one comment in Numbers primes that identity.
 Comment-only empty cells and tables that did not yet have a comment list are
 created transactionally. Adding that list patches only the nested
 `DataStore.commentStorageTable` reference instead of re-encoding the table
-model, so unknown table-model and data-store extensions remain intact. The
-`edit_numbers_comment_reply` example exercises the remaining
-compatibility-host direct-reply thread layer.
+model, so unknown table-model and data-store extensions remain intact. Direct
+reply editing is available through the semantic `litchi_numbers::Package`
+comment-reply transactions; the obsolete host wrapper example was removed.
 
 Direct drawable comments use the shared `IWorkDrawableCommentEditor` across
 Pages, Numbers, and Keynote protobufs. It resolves every supported nesting of

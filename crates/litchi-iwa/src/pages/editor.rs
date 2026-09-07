@@ -10,6 +10,7 @@ use litchi_iwa_common::comment::{
 };
 use litchi_iwa_protos::pages_body_codec::{
     self as pages_body_codec, DecodeOptions as PagesBodyDecodeOptions, DocumentBodySnapshot,
+    DocumentRootSnapshot,
 };
 use litchi_iwa_protos::pages_drawable_order_codec::{
     self as pages_drawable_order_codec, DecodeError as PagesDrawableOrderDecodeError,
@@ -2777,17 +2778,14 @@ impl PagesEditor {
     }
 
     fn reachable_drawable_ids(&self) -> Result<HashSet<u64>> {
-        let document = root_document(self.package())?;
+        let (document, page_template_ids) = pages_document_root_with_templates(self.package())?;
         let mut reachable =
             metadata_reachable_objects(self.package(), [1, self.body_storage_id.get()])?;
 
         if let Some(reference) = document.floating_drawables {
-            reachable.insert(reference.identifier);
-            let floating: tp::FloatingDrawablesArchive = decode_package_object(
-                self.package(),
-                reference.identifier,
-                "TP.FloatingDrawablesArchive",
-            )?;
+            reachable.insert(reference);
+            let floating: tp::FloatingDrawablesArchive =
+                decode_package_object(self.package(), reference, "TP.FloatingDrawablesArchive")?;
             for group in floating.page_groups {
                 for entry in group
                     .background_drawables
@@ -2811,17 +2809,14 @@ impl PagesEditor {
         }
 
         if let Some(reference) = document.drawables_zorder {
-            reachable.insert(reference.identifier);
-            extend_reachable_drawable_order(self.package(), reference.identifier, &mut reachable)?;
+            reachable.insert(reference);
+            extend_reachable_drawable_order(self.package(), reference, &mut reachable)?;
         }
 
-        for reference in document.page_templates {
-            reachable.insert(reference.identifier);
-            let template: tp::PageTemplateArchive = decode_package_object(
-                self.package(),
-                reference.identifier,
-                "TP.PageTemplateArchive",
-            )?;
+        for reference in page_template_ids {
+            reachable.insert(reference);
+            let template: tp::PageTemplateArchive =
+                decode_package_object(self.package(), reference, "TP.PageTemplateArchive")?;
             reachable.extend(
                 template
                     .section_template_drawables
@@ -2966,13 +2961,13 @@ impl PagesEditor {
             )));
         }
 
-        let document = root_document(self.package())?;
+        let document = pages_document_root_facts(self.package())?;
         let zorder_id = document.drawables_zorder.ok_or_else(|| {
             Error::InvalidFormat("Pages document has no drawable z-order object".to_owned())
         })?;
         let zorder: tp::DrawablesZOrderArchive = decode_typed_package_object(
             self.package(),
-            zorder_id.identifier,
+            zorder_id,
             10015,
             "TP.DrawablesZOrderArchive",
         )?;
@@ -3071,14 +3066,16 @@ struct DiscoveredPagesSectionTemplate {
 /// The root facts consumed by body-anchored Pages graph discovery.
 ///
 /// Keep this projection deliberately small: graph reads need only the
-/// drawable z-order and theme identifiers plus the optional body-margin scalar.
-/// Creation, mutation, and reachability paths continue to use the complete
-/// `DocumentArchive` projection where they need its other fields.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// drawable, theme, and floating-drawable identifiers plus the optional
+/// body-margin scalar. Reachability streams page-template identifiers through
+/// the same focused source callback when it needs the repeated field.
+#[derive(Debug, Clone, PartialEq)]
 struct PagesDocumentRootFacts {
+    floating_drawables: Option<u64>,
     drawables_zorder: Option<u64>,
     theme: Option<u64>,
     left_margin: Option<f32>,
+    document_language: Option<String>,
 }
 
 impl PagesSectionGraph {
@@ -4027,19 +4024,19 @@ fn patch_pages_zorder(
     removed: Option<u64>,
     added: Option<u64>,
 ) -> Result<()> {
-    let zorder_reference = root_document(package)?.drawables_zorder.ok_or_else(|| {
-        Error::InvalidFormat("Pages document has no drawable z-order object".to_owned())
-    })?;
-    let archive_name = find_object_archive(package, zorder_reference.identifier)?;
+    let zorder_reference = pages_document_root_facts(package)?
+        .drawables_zorder
+        .ok_or_else(|| {
+            Error::InvalidFormat("Pages document has no drawable z-order object".to_owned())
+        })?;
+    let archive_name = find_object_archive(package, zorder_reference)?;
     package.update_archive(&archive_name, |archive| {
-        let object = archive
-            .object_mut(zorder_reference.identifier)
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Pages drawable z-order object {} is missing",
-                    zorder_reference.identifier
-                ))
-            })?;
+        let object = archive.object_mut(zorder_reference).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Pages drawable z-order object {} is missing",
+                zorder_reference
+            ))
+        })?;
         let indexes = object
             .messages
             .iter()
@@ -5016,6 +5013,63 @@ fn root_document_body(package: &IWorkPackage) -> Result<DocumentBodySnapshot> {
 /// image, audio, movie, chart, or shape graph read while retaining the
 /// complete Prost route for mutation and broader reachability operations.
 fn pages_document_root_facts(package: &IWorkPackage) -> Result<PagesDocumentRootFacts> {
+    with_pages_document_root(package, pages_document_root_facts_from_snapshot)
+}
+
+#[cfg(test)]
+fn pages_document_root_facts_from_payload(
+    source: &[u8],
+    limits: PackageLimits,
+) -> Result<PagesDocumentRootFacts> {
+    let snapshot = pages_body_codec::decode_document_root(
+        source,
+        pages_document_root_decode_options(limits, source),
+    )
+    .map_err(|error| Error::InvalidFormat(format!("Invalid Pages root graph facts: {error}")))?;
+    pages_document_root_facts_from_snapshot(snapshot)
+}
+
+fn pages_document_root_facts_from_snapshot(
+    snapshot: DocumentRootSnapshot<'_>,
+) -> Result<PagesDocumentRootFacts> {
+    let document_language = snapshot
+        .document_language()
+        .map(|language| {
+            let mut owned = String::new();
+            owned.try_reserve_exact(language.len()).map_err(|_error| {
+                Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                    resource: "Pages document language",
+                    amount: language.len(),
+                })
+            })?;
+            owned.push_str(language);
+            Ok::<String, Error>(owned)
+        })
+        .transpose()?;
+    Ok(PagesDocumentRootFacts {
+        floating_drawables: snapshot
+            .floating_drawables()
+            .map(|reference| reference.identifier().get()),
+        drawables_zorder: snapshot
+            .drawables_zorder()
+            .map(|reference| reference.identifier().get()),
+        theme: snapshot
+            .theme()
+            .map(|reference| reference.identifier().get()),
+        left_margin: snapshot.left_margin(),
+        document_language,
+    })
+}
+
+/// Borrow and validate the focused Pages root projection for one operation.
+///
+/// The callback runs while the parsed component owns the source payload, so a
+/// caller can inspect streamed repeated references without cloning the root or
+/// constructing the generated `TP.DocumentArchive` message.
+fn with_pages_document_root<T>(
+    package: &IWorkPackage,
+    read: impl for<'source> FnOnce(DocumentRootSnapshot<'source>) -> Result<T>,
+) -> Result<T> {
     let limits = package.limits();
     package.with_parsed_archive(DOCUMENT_ARCHIVE_NAME, |archive| {
         let object = archive.object(DOCUMENT_OBJECT_ID).ok_or_else(|| {
@@ -5029,27 +5083,41 @@ fn pages_document_root_facts(package: &IWorkPackage) -> Result<PagesDocumentRoot
             .ok_or_else(|| {
                 Error::InvalidFormat("Pages root has no TP.DocumentArchive payload".to_owned())
             })?;
-        pages_document_root_facts_from_payload(payload, limits)
+        let snapshot = pages_body_codec::decode_document_root(
+            payload,
+            pages_document_root_decode_options(limits, payload),
+        )
+        .map_err(|error| {
+            Error::InvalidFormat(format!("Invalid Pages root graph facts: {error}"))
+        })?;
+        read(snapshot)
     })
 }
 
-fn pages_document_root_facts_from_payload(
-    source: &[u8],
-    limits: PackageLimits,
-) -> Result<PagesDocumentRootFacts> {
-    let snapshot = pages_body_codec::decode_document_root(
-        source,
-        pages_document_root_decode_options(limits, source),
-    )
-    .map_err(|error| Error::InvalidFormat(format!("Invalid Pages root graph facts: {error}")))?;
-    Ok(PagesDocumentRootFacts {
-        drawables_zorder: snapshot
-            .drawables_zorder()
-            .map(|reference| reference.identifier().get()),
-        theme: snapshot
-            .theme()
-            .map(|reference| reference.identifier().get()),
-        left_margin: snapshot.left_margin(),
+fn pages_document_root_with_templates(
+    package: &IWorkPackage,
+) -> Result<(PagesDocumentRootFacts, Vec<u64>)> {
+    with_pages_document_root(package, |snapshot| {
+        let template_count = snapshot.page_template_count();
+        let mut templates = Vec::new();
+        templates
+            .try_reserve_exact(template_count)
+            .map_err(|_error| {
+                Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                    resource: "Pages document page-template references",
+                    amount: template_count,
+                })
+            })?;
+        for reference in snapshot.page_templates() {
+            let reference = reference.map_err(|error| {
+                Error::InvalidFormat(format!("Invalid Pages page-template reference: {error}"))
+            })?;
+            templates.push(reference.identifier().get());
+        }
+        Ok((
+            pages_document_root_facts_from_snapshot(snapshot)?,
+            templates,
+        ))
     })
 }
 
@@ -5081,21 +5149,6 @@ fn pages_document_root_decode_options(
         max_work_bytes,
         PAGES_DOCUMENT_ROOT_RECURSION_LIMIT,
     )
-}
-
-fn root_document(package: &IWorkPackage) -> Result<DocumentArchive> {
-    let archive = package.archive(DOCUMENT_ARCHIVE_NAME)?;
-    let object = archive.object(DOCUMENT_OBJECT_ID).ok_or_else(|| {
-        Error::InvalidFormat(format!("Pages root object {DOCUMENT_OBJECT_ID} is missing"))
-    })?;
-    object
-        .messages
-        .iter()
-        .find(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)
-        .and_then(|message| DocumentArchive::decode(message.data.as_slice()).ok())
-        .ok_or_else(|| {
-            Error::InvalidFormat("Pages root has no TP.DocumentArchive payload".to_owned())
-        })
 }
 
 fn discover_structure(
@@ -5616,6 +5669,26 @@ mod document_root_facts_tests {
         append_length_delimited(&mut source, 20, &[0x08, 0x00]);
 
         assert!(pages_document_root_facts_from_payload(&source, PackageLimits::default()).is_err());
+    }
+
+    #[test]
+    fn root_facts_ignore_large_opaque_extensions() {
+        let mut source = root().encode_to_vec();
+        append_length_delimited(&mut source, 90, &vec![0x5a; 96 * 1024]);
+
+        let facts = pages_document_root_facts_from_payload(&source, PackageLimits::default())
+            .expect("opaque root extensions remain readable");
+
+        assert_eq!(
+            facts,
+            PagesDocumentRootFacts {
+                floating_drawables: None,
+                drawables_zorder: None,
+                theme: None,
+                left_margin: None,
+                document_language: None,
+            }
+        );
     }
 }
 
