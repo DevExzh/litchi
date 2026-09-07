@@ -1,0 +1,75 @@
+{
+  "schema": "litchi-0462-capture-v1",
+  "change": 462,
+  "variant": "baseline",
+  "lane": {
+    "id": "R2-normal-tiny-lifecycle",
+    "repeat": "R2",
+    "instrumentation": "normal",
+    "shape": "tiny",
+    "scope": "lifecycle"
+  },
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/runs/baseline/R2-normal-tiny-lifecycle/resource.log",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0462/baseline/litchi-perf-baseline",
+    "odp-append-attribution",
+    "--mode",
+    "lifecycle",
+    "--shape",
+    "tiny",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--repeat",
+    "R2",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/runs/baseline/R2-normal-tiny-lifecycle/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "protocol_sha256": "c45593b9d4591acb0cc08c9d2e40bb544d1e24d8c9eadd6bdc6da63baf726de7",
+  "binary_binding_sha256": "409e8973f2c90cc004101c422364fef7fc98a7847d354d3b98173c6051c9d1bd",
+  "environment_fixed": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "DEBUGINFOD_URLS": "",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "allocator_environment": {},
+  "started_utc": "2026-09-07T16:53:50.240513+00:00",
+  "exit_code": 0,
+  "oracle": {
+    "status": "pass",
+    "rows": 30,
+    "phase_count": 0
+  },
+  "status": "pass",
+  "finished_utc": "2026-09-07T16:53:50.346415+00:00",
+  "artifacts": [
+    {
+      "path": "runs/baseline/R2-normal-tiny-lifecycle/report.json",
+      "bytes": 33887,
+      "sha256": "9ba7d32945856962cfa1280de7449f3ab9dfcaf078648a5b78208f82da7dec09"
+    },
+    {
+      "path": "runs/baseline/R2-normal-tiny-lifecycle/resource.log",
+      "bytes": 990,
+      "sha256": "a4aa7532fad0d45249617572fba1388747e53f8aa75993a33d226706e15c44b1"
+    },
+    {
+      "path": "runs/baseline/R2-normal-tiny-lifecycle/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "runs/baseline/R2-normal-tiny-lifecycle/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "schema": "litchi-0462-phase-diagnostic-v1",
+  "lane": {
+    "id": "baseline-R2",
+    "repeat": "R2",
+    "instrumentation": "normal",
+    "shape": "large",
+    "scope": "phases"
+  },
+  "variant": "baseline",
+  "binding_sha256": "409e8973f2c90cc004101c422364fef7fc98a7847d354d3b98173c6051c9d1bd",
+  "driver_sha256": "fedd4060b1884a079cebc6a4af89eddda6ecbd08b0f086d2ec7741658b91ac82",
+  "protocol_sha256": "c45593b9d4591acb0cc08c9d2e40bb544d1e24d8c9eadd6bdc6da63baf726de7",
+  "started_utc": "2026-09-07T16:54:48.908693+00:00",
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/phase-diagnostic/baseline-R2/resource.log",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0462/baseline/litchi-perf-baseline",
+    "odp-append-attribution",
+    "--mode",
+    "phases",
+    "--shape",
+    "large",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--repeat",
+    "R2",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/phase-diagnostic/baseline-R2/report.json"
+  ],
+  "status": "pass",
+  "exit_code": 0,
+  "oracle": {
+    "status": "pass",
+    "rows": 30,
+    "phase_count": 5
+  },
+  "finished_utc": "2026-09-07T16:54:54.462773+00:00",
+  "artifacts": [
+    {
+      "path": "phase-diagnostic/baseline-R2/report.json",
+      "bytes": 49505,
+      "sha256": "83d646ce314fa5746a6ae2a615da3b4f3704716e5a2af866065e1b0d824d4f8d"
+    },
+    {
+      "path": "phase-diagnostic/baseline-R2/resource.log",
+      "bytes": 981,
+      "sha256": "643ac8b7c829fc7839ad92115e27a2ba5ad4d5f560285cb2d881cc3792db5068"
+    },
+    {
+      "path": "phase-diagnostic/baseline-R2/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "phase-diagnostic/baseline-R2/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

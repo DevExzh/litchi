@@ -1,0 +1,75 @@
+{
+  "schema": "litchi-0462-capture-v1",
+  "change": 462,
+  "variant": "candidate",
+  "lane": {
+    "id": "R1-normal-tiny-lifecycle",
+    "repeat": "R1",
+    "instrumentation": "normal",
+    "shape": "tiny",
+    "scope": "lifecycle"
+  },
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/runs/candidate/R1-normal-tiny-lifecycle/resource.log",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0462/candidate/litchi-perf-baseline",
+    "odp-append-attribution",
+    "--mode",
+    "lifecycle",
+    "--shape",
+    "tiny",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--repeat",
+    "R1",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/runs/candidate/R1-normal-tiny-lifecycle/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "protocol_sha256": "c45593b9d4591acb0cc08c9d2e40bb544d1e24d8c9eadd6bdc6da63baf726de7",
+  "binary_binding_sha256": "811ebfb20709208cf1b9aeeec2851182fe70798052f1bd9192d64e9af84ad935",
+  "environment_fixed": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "DEBUGINFOD_URLS": "",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "allocator_environment": {},
+  "started_utc": "2026-09-07T16:52:20.352124+00:00",
+  "exit_code": 0,
+  "oracle": {
+    "status": "pass",
+    "rows": 30,
+    "phase_count": 0
+  },
+  "status": "pass",
+  "finished_utc": "2026-09-07T16:52:20.455407+00:00",
+  "artifacts": [
+    {
+      "path": "runs/candidate/R1-normal-tiny-lifecycle/report.json",
+      "bytes": 33887,
+      "sha256": "0243ace8f7c561b75a83e50ab86a58a7246bf9822e024d7005a527d659b1e1fa"
+    },
+    {
+      "path": "runs/candidate/R1-normal-tiny-lifecycle/resource.log",
+      "bytes": 991,
+      "sha256": "2ee439753b6f6ca4441fb89caf6372986b4fdae3122b90b4bf94b845671a759d"
+    },
+    {
+      "path": "runs/candidate/R1-normal-tiny-lifecycle/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "runs/candidate/R1-normal-tiny-lifecycle/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

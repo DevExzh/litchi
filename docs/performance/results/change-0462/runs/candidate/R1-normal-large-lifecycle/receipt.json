@@ -1,0 +1,75 @@
+{
+  "schema": "litchi-0462-capture-v1",
+  "change": 462,
+  "variant": "candidate",
+  "lane": {
+    "id": "R1-normal-large-lifecycle",
+    "repeat": "R1",
+    "instrumentation": "normal",
+    "shape": "large",
+    "scope": "lifecycle"
+  },
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/runs/candidate/R1-normal-large-lifecycle/resource.log",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0462/candidate/litchi-perf-baseline",
+    "odp-append-attribution",
+    "--mode",
+    "lifecycle",
+    "--shape",
+    "large",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--repeat",
+    "R1",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/runs/candidate/R1-normal-large-lifecycle/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "protocol_sha256": "c45593b9d4591acb0cc08c9d2e40bb544d1e24d8c9eadd6bdc6da63baf726de7",
+  "binary_binding_sha256": "811ebfb20709208cf1b9aeeec2851182fe70798052f1bd9192d64e9af84ad935",
+  "environment_fixed": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "DEBUGINFOD_URLS": "",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "allocator_environment": {},
+  "started_utc": "2026-09-07T16:52:23.107873+00:00",
+  "exit_code": 0,
+  "oracle": {
+    "status": "pass",
+    "rows": 30,
+    "phase_count": 0
+  },
+  "status": "pass",
+  "finished_utc": "2026-09-07T16:52:28.455047+00:00",
+  "artifacts": [
+    {
+      "path": "runs/candidate/R1-normal-large-lifecycle/report.json",
+      "bytes": 34202,
+      "sha256": "8218fa0385b45cbf97fd7d504aae58c3dfaa6908c3651e0893fceec6890f4926"
+    },
+    {
+      "path": "runs/candidate/R1-normal-large-lifecycle/resource.log",
+      "bytes": 996,
+      "sha256": "5cc0eabb0997e3eeb8bb153b061d9d977f18f7b79349e95ceed9140de95fdaa8"
+    },
+    {
+      "path": "runs/candidate/R1-normal-large-lifecycle/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "runs/candidate/R1-normal-large-lifecycle/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

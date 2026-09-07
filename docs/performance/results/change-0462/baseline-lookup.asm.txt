@@ -1,0 +1,124 @@
+
+/tmp/litchi-goal-0462/baseline/litchi-perf-baseline:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000001873160 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup>:
+ 1873160:	push   %r15
+ 1873162:	push   %r14
+ 1873164:	push   %r13
+ 1873166:	push   %r12
+ 1873168:	push   %rbx
+ 1873169:	sub    $0x70,%rsp
+ 187316d:	mov    %rdi,%rbx
+ 1873170:	cmpq   $0x0,(%rsi)
+ 1873174:	jne    18731b3 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x53>
+ 1873176:	mov    %rsi,%r14
+ 1873179:	cmp    %rcx,0x10(%rsi)
+ 187317d:	jne    18731b3 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x53>
+ 187317f:	mov    %r9,%r15
+ 1873182:	mov    %r8,%r12
+ 1873185:	mov    0x8(%r14),%rdi
+ 1873189:	mov    %rdx,%rsi
+ 187318c:	mov    %rcx,%rdx
+ 187318f:	call   *0x148211b(%rip)        # 2cf52b0 <bcmp@GLIBC_2.2.5>
+ 1873195:	test   %eax,%eax
+ 1873197:	jne    18731b3 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x53>
+ 1873199:	cmp    %r15,0x48(%r14)
+ 187319d:	jne    18731b3 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x53>
+ 187319f:	mov    0x40(%r14),%rdi
+ 18731a3:	mov    %r12,%rsi
+ 18731a6:	mov    %r15,%rdx
+ 18731a9:	call   *0x1482101(%rip)        # 2cf52b0 <bcmp@GLIBC_2.2.5>
+ 18731af:	test   %eax,%eax
+ 18731b1:	je     18731c9 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x69>
+ 18731b3:	pcmpeqd %xmm0,%xmm0
+ 18731b7:	movdqu %xmm0,(%rbx)
+ 18731bb:	add    $0x70,%rsp
+ 18731bf:	pop    %rbx
+ 18731c0:	pop    %r12
+ 18731c2:	pop    %r13
+ 18731c4:	pop    %r14
+ 18731c6:	pop    %r15
+ 18731c8:	ret
+ 18731c9:	add    $0x18,%r14
+ 18731cd:	mov    %rsp,%rdi
+ 18731d0:	mov    %r14,%rsi
+ 18731d3:	xor    %edx,%edx
+ 18731d5:	call   *0x148345d(%rip)        # 2cf6638 <_DYNAMIC+0x1840>
+ 18731db:	mov    (%rsp),%rax
+ 18731df:	cmp    $0xffffffffffffffff,%rax
+ 18731e3:	je     1873262 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x102>
+ 18731e5:	movups 0x8(%rsp),%xmm0
+ 18731ea:	mov    0x18(%rsp),%rcx
+ 18731ef:	movups 0x20(%rsp),%xmm1
+ 18731f4:	movups %xmm1,0x60(%rsp)
+ 18731f9:	movups %xmm0,0x48(%rsp)
+ 18731fe:	mov    %rcx,0x58(%rsp)
+ 1873203:	mov    %rax,0x40(%rsp)
+ 1873208:	lea    0x40(%rsp),%rax
+ 187320d:	mov    %rax,0x30(%rsp)
+ 1873212:	mov    0x1482c7f(%rip),%rax        # 2cf5e98 <_DYNAMIC+0x10a0>
+ 1873219:	mov    %rax,0x38(%rsp)
+ 187321e:	lea    -0x17923dd(%rip),%rsi        # e0e48 <anon.2957d7ee93234eed421d773b92e6d019.27.llvm.7516300491334773737+0xff>
+ 1873225:	mov    %rsp,%rdi
+ 1873228:	lea    0x30(%rsp),%rdx
+ 187322d:	call   *0x148206d(%rip)        # 2cf52a0 <_DYNAMIC+0x4a8>
+ 1873233:	mov    0x10(%rsp),%rax
+ 1873238:	mov    %rax,0x18(%rbx)
+ 187323c:	movdqu (%rsp),%xmm0
+ 1873241:	movdqu %xmm0,0x8(%rbx)
+ 1873246:	movabs $0x8000000000000002,%rax
+ 1873250:	mov    %rax,(%rbx)
+ 1873253:	lea    0x40(%rsp),%rdi
+ 1873258:	call   186e2d0 <core::ptr::drop_glue::<quick_xml::errors::Error>>
+ 187325d:	jmp    18731bb <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x5b>
+ 1873262:	mov    0x8(%rsp),%rax
+ 1873267:	mov    0x10(%rsp),%r15
+ 187326c:	mov    0x18(%rsp),%r14
+ 1873271:	cmp    $0xffffffffffffffff,%rax
+ 1873275:	je     187328f <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x12f>
+ 1873277:	mov    %rax,0x8(%rbx)
+ 187327b:	mov    %r15,0x10(%rbx)
+ 187327f:	mov    %r14,0x18(%rbx)
+ 1873283:	movq   $0xffffffffffffffff,(%rbx)
+ 187328a:	jmp    18731bb <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x5b>
+ 187328f:	test   %r14,%r14
+ 1873292:	jns    18732a3 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x143>
+ 1873294:	xor    %r12d,%r12d
+ 1873297:	mov    %r12,%rdi
+ 187329a:	mov    %r14,%rsi
+ 187329d:	call   *0x1481e05(%rip)        # 2cf50a8 <_DYNAMIC+0x2b0>
+ 18732a3:	je     18732de <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x17e>
+ 18732a5:	call   *0x1481dd5(%rip)        # 2cf5080 <_DYNAMIC+0x288>
+ 18732ab:	mov    $0x1,%r12d
+ 18732b1:	mov    $0x1,%esi
+ 18732b6:	mov    %r14,%rdi
+ 18732b9:	call   *0x1481dc9(%rip)        # 2cf5088 <_DYNAMIC+0x290>
+ 18732bf:	test   %rax,%rax
+ 18732c2:	je     1873297 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x137>
+ 18732c4:	mov    %rax,%r13
+ 18732c7:	mov    %rax,%rdi
+ 18732ca:	mov    %r15,%rsi
+ 18732cd:	mov    %r14,%rdx
+ 18732d0:	call   *0x1481d72(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18732d6:	mov    %r14,%rax
+ 18732d9:	mov    %r13,%r15
+ 18732dc:	jmp    1873277 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x117>
+ 18732de:	mov    $0x1,%r15d
+ 18732e4:	xor    %eax,%eax
+ 18732e6:	xor    %r14d,%r14d
+ 18732e9:	jmp    1873277 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup+0x117>
+ 18732eb:	mov    %rax,%rbx
+ 18732ee:	lea    0x40(%rsp),%rdi
+ 18732f3:	call   186e2d0 <core::ptr::drop_glue::<quick_xml::errors::Error>>
+ 18732f8:	mov    %rbx,%rdi
+ 18732fb:	call   2c92b20 <_Unwind_Resume@plt>
+ 1873300:	call   *0x1481dba(%rip)        # 2cf50c0 <_DYNAMIC+0x2c8>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

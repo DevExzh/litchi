@@ -1,0 +1,6 @@
+R1-normal-tiny-lifecycle pass
+R1-normal-medium-lifecycle pass
+R1-normal-large-lifecycle pass
+R1-allocator-tiny-lifecycle pass
+R1-allocator-medium-lifecycle pass
+R1-allocator-large-lifecycle pass

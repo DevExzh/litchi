@@ -1,0 +1,32 @@
+{
+  "schema": "litchi-0462-source-delta-v1",
+  "change": 462,
+  "files": [
+    {
+      "path": "crates/litchi-odp/src/codec/parser/codec/xml/semantic.rs",
+      "baseline": {
+        "path": "source-artifacts/baseline/crates/litchi-odp/src/codec/parser/codec/xml/semantic.rs.txt",
+        "bytes": 23546,
+        "sha256": "064e12d64cc99b2932a1de4f35f8c8725add0486ba6f8af70554d26b8e530fb1"
+      },
+      "candidate": {
+        "path": "source-artifacts/candidate/crates/litchi-odp/src/codec/parser/codec/xml/semantic.rs.txt",
+        "bytes": 23755,
+        "sha256": "a870dfa5b4e94fc8c4851054f2b7746681a6ff33346d0954ececbcf5557821d6"
+      }
+    },
+    {
+      "path": "crates/litchi-odp/src/codec/parser/codec/xml/validation.rs",
+      "baseline": {
+        "path": "source-artifacts/baseline/crates/litchi-odp/src/codec/parser/codec/xml/validation.rs.txt",
+        "bytes": 54929,
+        "sha256": "0cbf4993e1516a633c63bcce8136dc7265f4fd00583684f993312562bfc26e29"
+      },
+      "candidate": {
+        "path": "source-artifacts/candidate/crates/litchi-odp/src/codec/parser/codec/xml/validation.rs.txt",
+        "bytes": 77512,
+        "sha256": "776465f34bb6806568074ed84db107a9306599f5ee1b6ab2e40a4c9fdde269f9"
+      }
+    }
+  ]
+}

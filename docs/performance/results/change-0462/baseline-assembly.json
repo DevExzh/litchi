@@ -1,0 +1,199 @@
+{
+  "change": 462,
+  "variant": "baseline",
+  "driver_sha256": "4e731c63fffd31a242ca66da12576580848ffc6af428213d96b69c48c1dcb920",
+  "binding_sha256": "409e8973f2c90cc004101c422364fef7fc98a7847d354d3b98173c6051c9d1bd",
+  "binary_sha256": "5426137c597a212882df4a139ae940c9f1ed119b23df8db7307ed36f32414974",
+  "targets": [
+    {
+      "id": "get",
+      "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get",
+      "command": [
+        "objdump",
+        "-d",
+        "--demangle",
+        "--no-show-raw-insn",
+        "--disassemble=<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get",
+        "/tmp/litchi-goal-0462/baseline/litchi-perf-baseline"
+      ],
+      "status": "present",
+      "artifact": {
+        "path": "baseline-get.asm.txt",
+        "bytes": 12437,
+        "sha256": "e5cc1d8b0a1a01f01fb815d70411b3f80a5ef4e81cc742595d99bde851871760"
+      },
+      "instruction_count": 285,
+      "stack_frame_bytes": 328,
+      "calls": [
+        "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup",
+        "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::resolve_at_scan",
+        "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next",
+        "_DYNAMIC+0x298",
+        "_DYNAMIC+0x3c0",
+        "_DYNAMIC+0x4a8",
+        "_DYNAMIC+0x6cc0",
+        "_Unwind_Resume@plt"
+      ]
+    },
+    {
+      "id": "lookup",
+      "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup",
+      "command": [
+        "objdump",
+        "-d",
+        "--demangle",
+        "--no-show-raw-insn",
+        "--disassemble=<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup",
+        "/tmp/litchi-goal-0462/baseline/litchi-perf-baseline"
+      ],
+      "status": "present",
+      "artifact": {
+        "path": "baseline-lookup.asm.txt",
+        "bytes": 5229,
+        "sha256": "fdf4109844731690476abeca63bfad54fb7ba2048f44150651009a7813888dd4"
+      },
+      "instruction_count": 111,
+      "stack_frame_bytes": 112,
+      "calls": [
+        "_DYNAMIC+0x1840",
+        "_DYNAMIC+0x288",
+        "_DYNAMIC+0x290",
+        "_DYNAMIC+0x2b0",
+        "_DYNAMIC+0x2c8",
+        "_DYNAMIC+0x4a8",
+        "_Unwind_Resume@plt",
+        "bcmp@GLIBC_2.2.5",
+        "core::ptr::drop_glue::<quick_xml::errors::Error>",
+        "memcpy@GLIBC_2.14"
+      ]
+    },
+    {
+      "id": "get-known",
+      "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ShapeAttrs>::get_known",
+      "command": [
+        "objdump",
+        "-d",
+        "--demangle",
+        "--no-show-raw-insn",
+        "--disassemble=<litchi_odp::codec::parser::codec::xml::validation::ShapeAttrs>::get_known",
+        "/tmp/litchi-goal-0462/baseline/litchi-perf-baseline"
+      ],
+      "status": "missing_or_inlined",
+      "artifact": {
+        "path": "baseline-get-known.asm.txt",
+        "bytes": 207,
+        "sha256": "38f4776a78c8cd23f7d2e3ee42a9b5b8b459e0a08733c7f05c892e51dc9e0a8b"
+      },
+      "instruction_count": 0,
+      "stack_frame_bytes": null,
+      "calls": []
+    },
+    {
+      "id": "shape-builder",
+      "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder",
+      "command": [
+        "objdump",
+        "-d",
+        "--demangle",
+        "--no-show-raw-insn",
+        "--disassemble=<litchi_odp::codec::parser::codec::Parser>::shape_builder",
+        "/tmp/litchi-goal-0462/baseline/litchi-perf-baseline"
+      ],
+      "status": "present",
+      "artifact": {
+        "path": "baseline-shape-builder.asm.txt",
+        "bytes": 43476,
+        "sha256": "2d092810e9132f001739af6b180aedb41960e49068c2f383a66e69918fc8ee3a"
+      },
+      "instruction_count": 907,
+      "stack_frame_bytes": 1400,
+      "calls": [
+        "<litchi_odp::codec::parser::codec::Parser>::parse_optional_bool",
+        "<litchi_odp::codec::parser::codec::Parser>::validate_required_three_dimensional_attributes",
+        "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::drawing_attributes",
+        "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get",
+        "_DYNAMIC+0x298",
+        "_DYNAMIC+0x2c8",
+        "_Unwind_Resume@plt",
+        "core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::model::action::ShapeEventListener>>",
+        "core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::model::slide::DrawingAttribute>>",
+        "core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::model::slide::Shape>>",
+        "core::ptr::drop_glue::<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>",
+        "core::ptr::drop_glue::<litchi_odp::model::action::DrawingHyperlink>",
+        "core::ptr::drop_glue::<litchi_odp::model::media::Reference>",
+        "core::ptr::drop_glue::<litchi_odp::model::slide::EnhancedGeometry>",
+        "core::ptr::drop_glue::<litchi_odp::model::slide::Shape>",
+        "litchi_odp::model::slide::validate_z_index",
+        "memcpy@GLIBC_2.14"
+      ]
+    }
+  ],
+  "commands": [
+    [
+      "objdump",
+      "-d",
+      "--demangle",
+      "--no-show-raw-insn",
+      "--disassemble=<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get",
+      "/tmp/litchi-goal-0462/baseline/litchi-perf-baseline"
+    ],
+    [
+      "objdump",
+      "-d",
+      "--demangle",
+      "--no-show-raw-insn",
+      "--disassemble=<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup",
+      "/tmp/litchi-goal-0462/baseline/litchi-perf-baseline"
+    ],
+    [
+      "objdump",
+      "-d",
+      "--demangle",
+      "--no-show-raw-insn",
+      "--disassemble=<litchi_odp::codec::parser::codec::xml::validation::ShapeAttrs>::get_known",
+      "/tmp/litchi-goal-0462/baseline/litchi-perf-baseline"
+    ],
+    [
+      "objdump",
+      "-d",
+      "--demangle",
+      "--no-show-raw-insn",
+      "--disassemble=<litchi_odp::codec::parser::codec::Parser>::shape_builder",
+      "/tmp/litchi-goal-0462/baseline/litchi-perf-baseline"
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "baseline-get.asm.txt",
+      "bytes": 12437,
+      "sha256": "e5cc1d8b0a1a01f01fb815d70411b3f80a5ef4e81cc742595d99bde851871760"
+    },
+    {
+      "path": "baseline-lookup.asm.txt",
+      "bytes": 5229,
+      "sha256": "fdf4109844731690476abeca63bfad54fb7ba2048f44150651009a7813888dd4"
+    },
+    {
+      "path": "baseline-get-known.asm.txt",
+      "bytes": 207,
+      "sha256": "38f4776a78c8cd23f7d2e3ee42a9b5b8b459e0a08733c7f05c892e51dc9e0a8b"
+    },
+    {
+      "path": "baseline-shape-builder.asm.txt",
+      "bytes": 43476,
+      "sha256": "2d092810e9132f001739af6b180aedb41960e49068c2f383a66e69918fc8ee3a"
+    }
+  ],
+  "generated_code_evidence": {
+    "known_cached_scan": {
+      "old_lookup_symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup",
+      "shape_builder_calls_old_lookup": false,
+      "known_path_calls_old_lookup": false,
+      "eliminated": true
+    },
+    "stack_cost": {
+      "shape_builder_bytes": 1400,
+      "shape_attrs_get_known_bytes": null
+    }
+  }
+}

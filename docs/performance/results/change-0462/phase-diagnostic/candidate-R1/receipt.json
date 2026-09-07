@@ -1,0 +1,68 @@
+{
+  "schema": "litchi-0462-phase-diagnostic-v1",
+  "lane": {
+    "id": "candidate-R1",
+    "repeat": "R1",
+    "instrumentation": "normal",
+    "shape": "large",
+    "scope": "phases"
+  },
+  "variant": "candidate",
+  "binding_sha256": "811ebfb20709208cf1b9aeeec2851182fe70798052f1bd9192d64e9af84ad935",
+  "driver_sha256": "fedd4060b1884a079cebc6a4af89eddda6ecbd08b0f086d2ec7741658b91ac82",
+  "protocol_sha256": "c45593b9d4591acb0cc08c9d2e40bb544d1e24d8c9eadd6bdc6da63baf726de7",
+  "started_utc": "2026-09-07T16:54:38.196590+00:00",
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/phase-diagnostic/candidate-R1/resource.log",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0462/candidate/litchi-perf-baseline",
+    "odp-append-attribution",
+    "--mode",
+    "phases",
+    "--shape",
+    "large",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--repeat",
+    "R1",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0462/phase-diagnostic/candidate-R1/report.json"
+  ],
+  "status": "pass",
+  "exit_code": 0,
+  "oracle": {
+    "status": "pass",
+    "rows": 30,
+    "phase_count": 5
+  },
+  "finished_utc": "2026-09-07T16:54:43.525731+00:00",
+  "artifacts": [
+    {
+      "path": "phase-diagnostic/candidate-R1/report.json",
+      "bytes": 49505,
+      "sha256": "9a3679c45911e6aaecf96145fe4584926279d437a336879053c1f7c5b9b73bba"
+    },
+    {
+      "path": "phase-diagnostic/candidate-R1/resource.log",
+      "bytes": 983,
+      "sha256": "70a98964c0dce5227d7adb4d01ae2694266ba23addd87b193ee0021b205dfba3"
+    },
+    {
+      "path": "phase-diagnostic/candidate-R1/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "phase-diagnostic/candidate-R1/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

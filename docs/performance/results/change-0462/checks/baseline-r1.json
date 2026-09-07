@@ -1,0 +1,39 @@
+{
+  "change": 462,
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import json,pathlib,sys; root=pathlib.Path(\"docs/performance/results/change-0462\"); sys.path.insert(0,str(root)); import oracle; protocol=json.loads((root/\"protocol.json\").read_text()); lanes=[lane for lane in protocol[\"order\"] if lane[\"repeat\"]==\"R1\"]; assert len(lanes)==6; [(oracle.validate(root/\"runs\"/\"baseline\"/lane[\"id\"]/\"report.json\",lane,protocol)) for lane in lanes]; assert all(json.loads((root/\"runs\"/\"baseline\"/lane[\"id\"]/\"receipt.json\").read_text())[\"status\"]==\"pass\" for lane in lanes); print(\"Verified existing baseline R1 captures: 6 reports, 180 samples; no measurement rerun\")"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "dbd2f8ecec2a31e71fac07e288d1e40b386312e0",
+  "driver_sha256": "6a86762ea5f7e3c583316efb154c1dd755f840759186ec272d90c47e24eba087",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-07T16:38:22.695732+00:00",
+  "source_before": {
+    "path": "sources/86ba39387a89cb9f80ed1ba98d42ca955842f3848f6bd7d8a50cea138bfb92b2.json",
+    "sha256": "86ba39387a89cb9f80ed1ba98d42ca955842f3848f6bd7d8a50cea138bfb92b2",
+    "files": 7030
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T16:38:22.888228+00:00",
+  "source_after": {
+    "path": "sources/86ba39387a89cb9f80ed1ba98d42ca955842f3848f6bd7d8a50cea138bfb92b2.json",
+    "sha256": "86ba39387a89cb9f80ed1ba98d42ca955842f3848f6bd7d8a50cea138bfb92b2",
+    "files": 7030
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/baseline-r1.log",
+    "bytes": 85,
+    "sha256": "5f17b7c23a9a20299fa2a86202b1dcaeb1694af4475b2c786f67c67abb1d6eb1"
+  }
+}

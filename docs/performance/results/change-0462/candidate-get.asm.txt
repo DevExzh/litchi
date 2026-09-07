@@ -1,0 +1,296 @@
+
+/tmp/litchi-goal-0462/candidate/litchi-perf-baseline:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000186af10 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get>:
+ 186af10:	push   %rbp
+ 186af11:	push   %r15
+ 186af13:	push   %r14
+ 186af15:	push   %r13
+ 186af17:	push   %r12
+ 186af19:	push   %rbx
+ 186af1a:	sub    $0x148,%rsp
+ 186af21:	mov    %r9,0x48(%rsp)
+ 186af26:	mov    %r8,%r13
+ 186af29:	mov    %rcx,%rbp
+ 186af2c:	mov    %rdx,0xb0(%rsp)
+ 186af34:	mov    %rdi,(%rsp)
+ 186af38:	mov    %rsi,0x8(%rsp)
+ 186af3d:	mov    0x70(%rsi),%rax
+ 186af41:	test   %rax,%rax
+ 186af44:	je     186afc5 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0xb5>
+ 186af46:	mov    0x8(%rsp),%rcx
+ 186af4b:	mov    0x68(%rcx),%rbx
+ 186af4f:	shl    $0x4,%rax
+ 186af53:	lea    (%rax,%rax,4),%r14
+ 186af57:	lea    0x60(%rsp),%r12
+ 186af5c:	lea    0x50(%rsp),%r15
+ 186af61:	data16 data16 data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+ 186af70:	mov    %r15,%rdi
+ 186af73:	mov    %rbx,%rsi
+ 186af76:	mov    %rbp,%rdx
+ 186af79:	mov    %r13,%rcx
+ 186af7c:	mov    0x48(%rsp),%r8
+ 186af81:	mov    0x180(%rsp),%r9
+ 186af89:	call   186b440 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup>
+ 186af8e:	mov    0x50(%rsp),%rcx
+ 186af93:	mov    0x58(%rsp),%rax
+ 186af98:	movdqu (%r12),%xmm0
+ 186af9e:	movdqa %xmm0,0xd0(%rsp)
+ 186afa7:	cmp    $0xffffffffffffffff,%rcx
+ 186afab:	jne    186b175 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x265>
+ 186afb1:	cmp    $0xffffffffffffffff,%rax
+ 186afb5:	jne    186b199 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x289>
+ 186afbb:	add    $0x50,%rbx
+ 186afbf:	add    $0xffffffffffffffb0,%r14
+ 186afc3:	jne    186af70 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x60>
+ 186afc5:	mov    0x8(%rsp),%r12
+ 186afca:	lea    0x78(%r12),%rsi
+ 186afcf:	cmpq   $0xffffffffffffffff,0x78(%r12)
+ 186afd5:	je     186aff7 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0xe7>
+ 186afd7:	mov    (%rsp),%r14
+ 186afdb:	lea    0x8(%r14),%rdi
+ 186afdf:	call   *0x148a693(%rip)        # 2cf5678 <_DYNAMIC+0x3c0>
+ 186afe5:	movabs $0x8000000000000002,%rax
+ 186afef:	mov    %rax,(%r14)
+ 186aff2:	jmp    186b1b5 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x2a5>
+ 186aff7:	mov    %rsi,0xa0(%rsp)
+ 186afff:	lea    0x60(%r12),%rax
+ 186b004:	mov    %rax,0xa8(%rsp)
+ 186b00c:	jmp    186b062 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x152>
+ 186b00e:	xchg   %ax,%ax
+ 186b010:	mov    0x68(%r12),%rax
+ 186b015:	lea    (%r14,%r14,4),%rcx
+ 186b019:	shl    $0x4,%rcx
+ 186b01d:	movups 0x50(%rsp),%xmm0
+ 186b022:	mov    0x60(%rsp),%rdx
+ 186b027:	mov    %rdx,0x10(%rax,%rcx,1)
+ 186b02c:	movups %xmm0,(%rax,%rcx,1)
+ 186b030:	mov    %rbx,0x18(%rax,%rcx,1)
+ 186b035:	mov    %r15,0x20(%rax,%rcx,1)
+ 186b03a:	movdqa 0x10(%rsp),%xmm0
+ 186b040:	movaps 0x20(%rsp),%xmm1
+ 186b045:	movdqu %xmm0,0x28(%rax,%rcx,1)
+ 186b04b:	movups %xmm1,0x38(%rax,%rcx,1)
+ 186b050:	mov    0x30(%rsp),%rdx
+ 186b055:	mov    %rdx,0x48(%rax,%rcx,1)
+ 186b05a:	inc    %r14
+ 186b05d:	mov    %r14,0x70(%r12)
+ 186b062:	lea    0xf8(%rsp),%rdi
+ 186b06a:	mov    %r12,%rsi
+ 186b06d:	call   187b460 <<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next>
+ 186b072:	mov    0xf8(%rsp),%rax
+ 186b07a:	cmp    $0xfffffffffffffffe,%rax
+ 186b07e:	je     186b1d9 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x2c9>
+ 186b084:	cmp    $0xfffffffffffffffd,%rax
+ 186b088:	je     186b1ca <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x2ba>
+ 186b08e:	mov    0x118(%rsp),%rcx
+ 186b096:	mov    %rax,0x120(%rsp)
+ 186b09e:	lea    0x100(%rsp),%rdx
+ 186b0a6:	mov    0x10(%rdx),%rax
+ 186b0aa:	lea    0x128(%rsp),%rsi
+ 186b0b2:	mov    %rax,0x10(%rsi)
+ 186b0b6:	movups (%rdx),%xmm0
+ 186b0b9:	movups %xmm0,(%rsi)
+ 186b0bc:	mov    %rcx,0x140(%rsp)
+ 186b0c4:	lea    0x50(%rsp),%rbx
+ 186b0c9:	mov    %rbx,%rdi
+ 186b0cc:	mov    0xb0(%rsp),%rsi
+ 186b0d4:	lea    0x120(%rsp),%rdx
+ 186b0dc:	call   186a4c0 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::resolve_at_scan>
+ 186b0e1:	lea    0x10(%rsp),%rdi
+ 186b0e6:	mov    %rbx,%rsi
+ 186b0e9:	mov    %rbp,%rdx
+ 186b0ec:	mov    %r13,%rcx
+ 186b0ef:	mov    0x48(%rsp),%r8
+ 186b0f4:	mov    0x180(%rsp),%r9
+ 186b0fc:	call   186b440 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup>
+ 186b101:	mov    0x10(%rsp),%rax
+ 186b106:	mov    0x18(%rsp),%r15
+ 186b10b:	mov    0x20(%rsp),%rcx
+ 186b110:	mov    0x28(%rsp),%rbx
+ 186b115:	cmp    $0xffffffffffffffff,%rax
+ 186b119:	jne    186b2b5 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x3a5>
+ 186b11f:	mov    0x70(%r12),%r14
+ 186b124:	cmp    $0xffffffffffffffff,%r15
+ 186b128:	jne    186b2ff <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x3ef>
+ 186b12e:	mov    0x68(%rsp),%rbx
+ 186b133:	mov    0x70(%rsp),%r15
+ 186b138:	lea    0x78(%rsp),%rcx
+ 186b13d:	mov    0x20(%rcx),%rax
+ 186b141:	mov    %rax,0x30(%rsp)
+ 186b146:	movups (%rcx),%xmm0
+ 186b149:	movups 0x10(%rcx),%xmm1
+ 186b14d:	movaps %xmm1,0x20(%rsp)
+ 186b152:	movaps %xmm0,0x10(%rsp)
+ 186b157:	lea    0x60(%r12),%rax
+ 186b15c:	cmp    (%rax),%r14
+ 186b15f:	jne    186b010 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x100>
+ 186b165:	lea    0x60(%r12),%rdi
+ 186b16a:	call   *0x1490f20(%rip)        # 2cfc090 <_DYNAMIC+0x6dd8>
+ 186b170:	jmp    186b010 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x100>
+ 186b175:	movups 0x70(%rsp),%xmm0
+ 186b17a:	mov    (%rsp),%r14
+ 186b17e:	movups %xmm0,0x20(%r14)
+ 186b183:	movaps 0xd0(%rsp),%xmm0
+ 186b18b:	movups %xmm0,0x10(%r14)
+ 186b190:	mov    %rcx,(%r14)
+ 186b193:	mov    %rax,0x8(%r14)
+ 186b197:	jmp    186b1b5 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x2a5>
+ 186b199:	mov    (%rsp),%r14
+ 186b19d:	mov    %rax,0x8(%r14)
+ 186b1a1:	movaps 0xd0(%rsp),%xmm0
+ 186b1a9:	movups %xmm0,0x10(%r14)
+ 186b1ae:	movq   $0xffffffffffffffff,(%r14)
+ 186b1b5:	mov    %r14,%rax
+ 186b1b8:	add    $0x148,%rsp
+ 186b1bf:	pop    %rbx
+ 186b1c0:	pop    %r12
+ 186b1c2:	pop    %r13
+ 186b1c4:	pop    %r14
+ 186b1c6:	pop    %r15
+ 186b1c8:	pop    %rbp
+ 186b1c9:	ret
+ 186b1ca:	pcmpeqd %xmm0,%xmm0
+ 186b1ce:	mov    (%rsp),%r14
+ 186b1d2:	movdqu %xmm0,(%r14)
+ 186b1d7:	jmp    186b1b5 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x2a5>
+ 186b1d9:	lea    0x100(%rsp),%rcx
+ 186b1e1:	mov    0x10(%rcx),%rax
+ 186b1e5:	mov    %rax,0xf0(%rsp)
+ 186b1ed:	movdqu (%rcx),%xmm0
+ 186b1f1:	movdqa %xmm0,0xe0(%rsp)
+ 186b1fa:	lea    0xe0(%rsp),%rax
+ 186b202:	mov    %rax,0x50(%rsp)
+ 186b207:	mov    0x148b8f2(%rip),%rax        # 2cf6b00 <_DYNAMIC+0x1848>
+ 186b20e:	mov    %rax,0x58(%rsp)
+ 186b213:	lea    -0x179ea03(%rip),%rsi        # cc817 <anon.d5dd5fde55e5afe63a1cea73b366f647.579.llvm.907010997458146417+0x1c7>
+ 186b21a:	lea    0xb8(%rsp),%rbx
+ 186b222:	lea    0x50(%rsp),%rdx
+ 186b227:	mov    %rbx,%rdi
+ 186b22a:	call   *0x148a530(%rip)        # 2cf5760 <_DYNAMIC+0x4a8>
+ 186b230:	lea    0x50(%rsp),%rdi
+ 186b235:	mov    %rbx,%rsi
+ 186b238:	call   *0x148a43a(%rip)        # 2cf5678 <_DYNAMIC+0x3c0>
+ 186b23e:	mov    0x60(%rsp),%rax
+ 186b243:	mov    %rax,0x20(%rsp)
+ 186b248:	movups 0x50(%rsp),%xmm0
+ 186b24d:	movaps %xmm0,0x10(%rsp)
+ 186b252:	lea    0x78(%r12),%rcx
+ 186b257:	mov    (%rcx),%rsi
+ 186b25a:	cmp    $0xffffffffffffffff,%rsi
+ 186b25e:	mov    (%rsp),%r14
+ 186b262:	je     186b284 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x374>
+ 186b264:	test   %rsi,%rsi
+ 186b267:	je     186b284 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x374>
+ 186b269:	mov    0x80(%r12),%rdi
+ 186b271:	mov    $0x1,%edx
+ 186b276:	call   *0x148a2d4(%rip)        # 2cf5550 <_DYNAMIC+0x298>
+ 186b27c:	mov    0xa0(%rsp),%rcx
+ 186b284:	mov    0x20(%rsp),%rax
+ 186b289:	mov    %rax,0x10(%rcx)
+ 186b28d:	movaps 0x10(%rsp),%xmm0
+ 186b292:	movups %xmm0,(%rcx)
+ 186b295:	mov    0xc8(%rsp),%rax
+ 186b29d:	mov    %rax,0x18(%r14)
+ 186b2a1:	movdqu 0xb8(%rsp),%xmm0
+ 186b2aa:	movdqu %xmm0,0x8(%r14)
+ 186b2b0:	jmp    186afe5 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0xd5>
+ 186b2b5:	movups 0x30(%rsp),%xmm0
+ 186b2ba:	mov    (%rsp),%r14
+ 186b2be:	movups %xmm0,0x20(%r14)
+ 186b2c3:	mov    %rcx,0x10(%r14)
+ 186b2c7:	mov    %rbx,0x18(%r14)
+ 186b2cb:	mov    %rax,(%r14)
+ 186b2ce:	mov    %r15,0x8(%r14)
+ 186b2d2:	mov    0x68(%rsp),%rsi
+ 186b2d7:	cmp    $0xffffffffffffffff,%rsi
+ 186b2db:	je     186b1b5 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x2a5>
+ 186b2e1:	test   %rsi,%rsi
+ 186b2e4:	je     186b1b5 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x2a5>
+ 186b2ea:	mov    0x70(%rsp),%rdi
+ 186b2ef:	mov    $0x1,%edx
+ 186b2f4:	call   *0x148a256(%rip)        # 2cf5550 <_DYNAMIC+0x298>
+ 186b2fa:	jmp    186b1b5 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x2a5>
+ 186b2ff:	mov    %rcx,%rbp
+ 186b302:	mov    0x68(%rsp),%r12
+ 186b307:	mov    0x70(%rsp),%r13
+ 186b30c:	lea    0x78(%rsp),%rcx
+ 186b311:	mov    0x20(%rcx),%rax
+ 186b315:	mov    %rax,0x30(%rsp)
+ 186b31a:	movups (%rcx),%xmm0
+ 186b31d:	movups 0x10(%rcx),%xmm1
+ 186b321:	movaps %xmm1,0x20(%rsp)
+ 186b326:	movaps %xmm0,0x10(%rsp)
+ 186b32b:	mov    0xa8(%rsp),%rdi
+ 186b333:	cmp    (%rdi),%r14
+ 186b336:	jne    186b33e <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x42e>
+ 186b338:	call   *0x1490d52(%rip)        # 2cfc090 <_DYNAMIC+0x6dd8>
+ 186b33e:	mov    0x8(%rsp),%rsi
+ 186b343:	mov    0x68(%rsi),%rax
+ 186b347:	lea    (%r14,%r14,4),%rcx
+ 186b34b:	shl    $0x4,%rcx
+ 186b34f:	movups 0x50(%rsp),%xmm0
+ 186b354:	mov    0x60(%rsp),%rdx
+ 186b359:	mov    %rdx,0x10(%rax,%rcx,1)
+ 186b35e:	movups %xmm0,(%rax,%rcx,1)
+ 186b362:	mov    %r12,0x18(%rax,%rcx,1)
+ 186b367:	mov    %r13,0x20(%rax,%rcx,1)
+ 186b36c:	movdqa 0x10(%rsp),%xmm0
+ 186b372:	movaps 0x20(%rsp),%xmm1
+ 186b377:	movdqu %xmm0,0x28(%rax,%rcx,1)
+ 186b37d:	movups %xmm1,0x38(%rax,%rcx,1)
+ 186b382:	mov    0x30(%rsp),%rdx
+ 186b387:	mov    %rdx,0x48(%rax,%rcx,1)
+ 186b38c:	inc    %r14
+ 186b38f:	mov    %r14,0x70(%rsi)
+ 186b393:	mov    (%rsp),%r14
+ 186b397:	mov    %r15,0x8(%r14)
+ 186b39b:	mov    %rbp,0x10(%r14)
+ 186b39f:	mov    %rbx,0x18(%r14)
+ 186b3a3:	jmp    186b1ae <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x29e>
+ 186b3a8:	mov    %rax,%r14
+ 186b3ab:	lea    -0x1(%r12),%rax
+ 186b3b0:	cmp    $0xfffffffffffffffd,%rax
+ 186b3b4:	ja     186b3c7 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x4b7>
+ 186b3b6:	mov    $0x1,%edx
+ 186b3bb:	mov    %r13,%rdi
+ 186b3be:	mov    %r12,%rsi
+ 186b3c1:	call   *0x148a189(%rip)        # 2cf5550 <_DYNAMIC+0x298>
+ 186b3c7:	test   %r15,%r15
+ 186b3ca:	je     186b42a <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x51a>
+ 186b3cc:	mov    $0x1,%edx
+ 186b3d1:	mov    %rbp,%rdi
+ 186b3d4:	mov    %r15,%rsi
+ 186b3d7:	jmp    186b424 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x514>
+ 186b3d9:	mov    %rax,%r14
+ 186b3dc:	mov    0xb8(%rsp),%rsi
+ 186b3e4:	test   %rsi,%rsi
+ 186b3e7:	je     186b42a <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x51a>
+ 186b3e9:	mov    0xc0(%rsp),%rdi
+ 186b3f1:	jmp    186b41f <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x50f>
+ 186b3f3:	mov    %rax,%r14
+ 186b3f6:	lea    -0x1(%rbx),%rax
+ 186b3fa:	cmp    $0xfffffffffffffffd,%rax
+ 186b3fe:	ja     186b42a <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x51a>
+ 186b400:	mov    $0x1,%edx
+ 186b405:	mov    %r15,%rdi
+ 186b408:	mov    %rbx,%rsi
+ 186b40b:	jmp    186b424 <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x514>
+ 186b40d:	mov    %rax,%r14
+ 186b410:	mov    0x68(%rsp),%rsi
+ 186b415:	test   %rsi,%rsi
+ 186b418:	jle    186b42a <<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x51a>
+ 186b41a:	mov    0x70(%rsp),%rdi
+ 186b41f:	mov    $0x1,%edx
+ 186b424:	call   *0x148a126(%rip)        # 2cf5550 <_DYNAMIC+0x298>
+ 186b42a:	mov    %r14,%rdi
+ 186b42d:	call   2c92eb0 <_Unwind_Resume@plt>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

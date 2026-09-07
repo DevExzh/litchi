@@ -1,0 +1,330 @@
+    Checking litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+error[E0425]: cannot find value `PRESENTATION_NAMESPACE` in this scope
+   --> crates/litchi-odp/src/codec/parser/codec/xml/validation.rs:679:41
+    |
+679 |             Self::PresentationClass => (PRESENTATION_NAMESPACE, b"class"),
+    |                                         ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+note: these constants exist but are inaccessible
+   --> crates/litchi-odp/src/authoring/mutable.rs:27:1
+    |
+ 27 | const PRESENTATION_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::authoring::mutable::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/codec/content_source/mod.rs:27:1
+    |
+ 27 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::codec::content_source::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/declaration.rs:13:1
+    |
+ 13 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::declaration::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/page_metadata.rs:14:1
+    |
+ 14 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::page_metadata::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/settings.rs:13:1
+    |
+ 13 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::settings::PRESENTATION_NAMESPACE`: not accessible
+help: consider importing one of these constants
+    |
+  3 + use crate::animation::PRESENTATION_NAMESPACE;
+    |
+  3 + use crate::codec::parser::codec::PRESENTATION_NAMESPACE;
+    |
+
+error[E0425]: cannot find value `PRESENTATION_NAMESPACE` in this scope
+   --> crates/litchi-odp/src/codec/parser/codec/xml/validation.rs:680:45
+    |
+680 |             Self::PresentationStyleName => (PRESENTATION_NAMESPACE, b"style-name"),
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+note: these constants exist but are inaccessible
+   --> crates/litchi-odp/src/authoring/mutable.rs:27:1
+    |
+ 27 | const PRESENTATION_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::authoring::mutable::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/codec/content_source/mod.rs:27:1
+    |
+ 27 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::codec::content_source::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/declaration.rs:13:1
+    |
+ 13 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::declaration::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/page_metadata.rs:14:1
+    |
+ 14 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::page_metadata::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/settings.rs:13:1
+    |
+ 13 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::settings::PRESENTATION_NAMESPACE`: not accessible
+help: consider importing one of these constants
+    |
+  3 + use crate::animation::PRESENTATION_NAMESPACE;
+    |
+  3 + use crate::codec::parser::codec::PRESENTATION_NAMESPACE;
+    |
+
+error[E0425]: cannot find value `PRESENTATION_NAMESPACE` in this scope
+   --> crates/litchi-odp/src/codec/parser/codec/xml/validation.rs:681:47
+    |
+681 |             Self::PresentationPlaceholder => (PRESENTATION_NAMESPACE, b"placeholder"),
+    |                                               ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+note: these constants exist but are inaccessible
+   --> crates/litchi-odp/src/authoring/mutable.rs:27:1
+    |
+ 27 | const PRESENTATION_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::authoring::mutable::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/codec/content_source/mod.rs:27:1
+    |
+ 27 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::codec::content_source::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/declaration.rs:13:1
+    |
+ 13 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::declaration::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/page_metadata.rs:14:1
+    |
+ 14 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::page_metadata::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/settings.rs:13:1
+    |
+ 13 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::settings::PRESENTATION_NAMESPACE`: not accessible
+help: consider importing one of these constants
+    |
+  3 + use crate::animation::PRESENTATION_NAMESPACE;
+    |
+  3 + use crate::codec::parser::codec::PRESENTATION_NAMESPACE;
+    |
+
+error[E0425]: cannot find value `PRESENTATION_NAMESPACE` in this scope
+   --> crates/litchi-odp/src/codec/parser/codec/xml/validation.rs:682:51
+    |
+682 |             Self::PresentationUserTransformed => (PRESENTATION_NAMESPACE, b"user-transformed"),
+    |                                                   ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+note: these constants exist but are inaccessible
+   --> crates/litchi-odp/src/authoring/mutable.rs:27:1
+    |
+ 27 | const PRESENTATION_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::authoring::mutable::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/codec/content_source/mod.rs:27:1
+    |
+ 27 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::codec::content_source::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/declaration.rs:13:1
+    |
+ 13 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::declaration::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/page_metadata.rs:14:1
+    |
+ 14 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::page_metadata::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/settings.rs:13:1
+    |
+ 13 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::settings::PRESENTATION_NAMESPACE`: not accessible
+help: consider importing one of these constants
+    |
+  3 + use crate::animation::PRESENTATION_NAMESPACE;
+    |
+  3 + use crate::codec::parser::codec::PRESENTATION_NAMESPACE;
+    |
+
+error[E0425]: cannot find value `PRESENTATION_NAMESPACE` in this scope
+   --> crates/litchi-odp/src/codec/parser/codec/xml/validation.rs:700:29
+    |
+700 |         if namespace_uri == PRESENTATION_NAMESPACE {
+    |                             ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+note: these constants exist but are inaccessible
+   --> crates/litchi-odp/src/authoring/mutable.rs:27:1
+    |
+ 27 | const PRESENTATION_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::authoring::mutable::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/codec/content_source/mod.rs:27:1
+    |
+ 27 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::codec::content_source::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/declaration.rs:13:1
+    |
+ 13 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::declaration::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/page_metadata.rs:14:1
+    |
+ 14 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::page_metadata::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/settings.rs:13:1
+    |
+ 13 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::settings::PRESENTATION_NAMESPACE`: not accessible
+help: consider importing one of these constants
+    |
+  3 + use crate::animation::PRESENTATION_NAMESPACE;
+    |
+  3 + use crate::codec::parser::codec::PRESENTATION_NAMESPACE;
+    |
+
+error[E0425]: cannot find value `PRESENTATION_NAMESPACE` in this scope
+   --> crates/litchi-odp/src/codec/parser/codec/xml/validation.rs:736:37
+    |
+736 |         if cached.namespace.matches(PRESENTATION_NAMESPACE) {
+    |                                     ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+note: these constants exist but are inaccessible
+   --> crates/litchi-odp/src/authoring/mutable.rs:27:1
+    |
+ 27 | const PRESENTATION_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::authoring::mutable::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/codec/content_source/mod.rs:27:1
+    |
+ 27 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::codec::content_source::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/declaration.rs:13:1
+    |
+ 13 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::declaration::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/page_metadata.rs:14:1
+    |
+ 14 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::page_metadata::PRESENTATION_NAMESPACE`: not accessible
+    |
+   ::: crates/litchi-odp/src/model/settings.rs:13:1
+    |
+ 13 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::settings::PRESENTATION_NAMESPACE`: not accessible
+help: consider importing one of these constants
+    |
+  3 + use crate::animation::PRESENTATION_NAMESPACE;
+    |
+  3 + use crate::codec::parser::codec::PRESENTATION_NAMESPACE;
+    |
+
+error: unused import: `SVG_NAMESPACE`
+ --> crates/litchi-odp/src/codec/parser/codec/xml/semantic.rs:7:21
+  |
+7 |     SMIL_NAMESPACE, SVG_NAMESPACE, Shape, ShapeBuilder, ShapeElement, ShapeType, Show, Sound,
+  |                     ^^^^^^^^^^^^^
+  |
+  = note: `-D unused-imports` implied by `-D unused`
+  = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/codec/parser/codec/xml/validation.rs:1430:13
+     |
+1430 |             std::mem::size_of::<ElementAttrs<'static, 'static>>(),
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+     |
+1430 -             std::mem::size_of::<ElementAttrs<'static, 'static>>(),
+1430 +             size_of::<ElementAttrs<'static, 'static>>(),
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/codec/parser/codec/xml/validation.rs:1431:13
+     |
+1431 |             std::mem::size_of::<ShapeAttrs<'static, 'static>>(),
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+1431 -             std::mem::size_of::<ShapeAttrs<'static, 'static>>(),
+1431 +             size_of::<ShapeAttrs<'static, 'static>>(),
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/codec/parser/codec/xml/validation.rs:1432:13
+     |
+1432 |             std::mem::size_of::<ShapeAttributeIndex>(),
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+1432 -             std::mem::size_of::<ShapeAttributeIndex>(),
+1432 +             size_of::<ShapeAttributeIndex>(),
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-odp/src/codec/parser/codec/xml/validation.rs:1433:13
+     |
+1433 |             std::mem::size_of::<ResolvedAttribute<'static, 'static>>(),
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+1433 -             std::mem::size_of::<ResolvedAttribute<'static, 'static>>(),
+1433 +             size_of::<ResolvedAttribute<'static, 'static>>(),
+     |
+
+error[E0369]: binary operation `==` cannot be applied to type `std::result::Result<std::option::Option<std::string::String>, litchi_core::Error>`
+    --> crates/litchi-odp/src/codec/parser/codec/xml/validation.rs:1515:9
+     |
+1515 | /         assert_eq!(
+1516 | |             attributes.get_known(&reader, ShapeAttributeKey::DrawingName),
+1517 | |             direct_lookup(&reader, &element, DRAW_NAMESPACE, b"name")
+1518 | |         );
+     | |         ^
+     | |         |
+     | |_________std::result::Result<std::option::Option<std::string::String>, litchi_core::Error>
+     |           std::result::Result<std::option::Option<std::string::String>, litchi_core::Error>
+     |
+note: `litchi_core::Error` does not implement `std::cmp::PartialEq`
+    --> crates/litchi-core/src/error/types.rs:14:1
+     |
+  14 | pub enum Error {
+     | ^^^^^^^^^^^^^^ `litchi_core::Error` is defined in another crate
+
+error[E0369]: binary operation `==` cannot be applied to type `std::result::Result<std::option::Option<std::string::String>, litchi_core::Error>`
+    --> crates/litchi-odp/src/codec/parser/codec/xml/validation.rs:1560:9
+     |
+1560 | /         assert_eq!(
+1561 | |             attributes.get_known(&reader, ShapeAttributeKey::DrawingName),
+1562 | |             direct_lookup(&reader, &element, DRAW_NAMESPACE, b"name")
+1563 | |         );
+     | |         ^
+     | |         |
+     | |_________std::result::Result<std::option::Option<std::string::String>, litchi_core::Error>
+     |           std::result::Result<std::option::Option<std::string::String>, litchi_core::Error>
+     |
+note: `litchi_core::Error` does not implement `std::cmp::PartialEq`
+    --> crates/litchi-core/src/error/types.rs:14:1
+     |
+  14 | pub enum Error {
+     | ^^^^^^^^^^^^^^ `litchi_core::Error` is defined in another crate
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `litchi-odp` (lib) due to 7 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-odp` (lib) due to 7 previous errors
+Some errors have detailed explanations: E0369, E0425.
+For more information about an error, try `rustc --explain E0369`.
+error: could not compile `litchi-odp` (lib test) due to 13 previous errors
