@@ -1,8 +1,8 @@
-//! Private canonical playback-build authoring for fresh slide audio.
+//! Private canonical playback-build authoring for fresh slide audio and movies.
 //!
 //! The package owner allocates identities and owns the surrounding slide
 //! transaction.  This adapter only turns those checked identities into the
-//! two native playback objects and rewrites the slide-node scalar cache.  All
+//! two native playback objects and rewrites the slide-node scalar cache. All
 //! payload bytes come from the neutral Buffa writer in `litchi-iwa-protos`.
 
 #![allow(
@@ -24,33 +24,74 @@ use crate::slide::audio::creation::{SlideAudioCreationError, SlideAudioCreationL
 const BUILD_MESSAGE_TYPE: u32 = 8;
 const BUILD_CHUNK_MESSAGE_TYPE: u32 = 153;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StartPlaybackKind {
+    Audio,
+    Movie,
+}
+
+enum StartPlaybackWrite {
+    Audio(build_codec::StartAudioBuildWrite),
+    Movie(build_codec::StartMovieBuildWrite),
+}
+
 /// Author the native build and chunk objects for a fresh audio-start event.
 pub(super) fn prepare_start_audio_builds(
     ids: &CreationIds,
     context: &CreationContext,
     budget: &mut CreationBudget,
 ) -> Result<[ArchiveObject; 2], SlideAudioCreationError> {
+    prepare_start_builds(ids, context, budget, StartPlaybackKind::Audio)
+}
+
+/// Author the native build and chunk objects for a fresh movie-start event.
+pub(super) fn prepare_start_movie_builds(
+    ids: &CreationIds,
+    context: &CreationContext,
+    budget: &mut CreationBudget,
+) -> Result<[ArchiveObject; 2], SlideAudioCreationError> {
+    prepare_start_builds(ids, context, budget, StartPlaybackKind::Movie)
+}
+
+fn prepare_start_builds(
+    ids: &CreationIds,
+    context: &CreationContext,
+    budget: &mut CreationBudget,
+    kind: StartPlaybackKind,
+) -> Result<[ArchiveObject; 2], SlideAudioCreationError> {
     ids.validate()?;
     context.validate()?;
 
-    let write = build_codec::StartAudioBuildWrite::new(
-        ids.drawable,
-        ids.build,
-        ids.chunk,
-        ids.build_uuid.lower(),
-        ids.build_uuid.upper(),
-        ids.random_number_seed,
-    );
+    let write = match kind {
+        StartPlaybackKind::Audio => {
+            StartPlaybackWrite::Audio(build_codec::StartAudioBuildWrite::new(
+                ids.drawable,
+                ids.build,
+                ids.chunk,
+                ids.build_uuid.lower(),
+                ids.build_uuid.upper(),
+                ids.random_number_seed,
+            ))
+        },
+        StartPlaybackKind::Movie => {
+            StartPlaybackWrite::Movie(build_codec::StartMovieBuildWrite::new(
+                ids.drawable,
+                ids.build,
+                ids.chunk,
+                ids.build_uuid.lower(),
+                ids.build_uuid.upper(),
+                ids.random_number_seed,
+            ))
+        },
+    };
     let options = build_encode_options(&write, context.wire_limits, budget);
-    let build =
-        build_codec::encode_start_audio_build(&write, options).map_err(map_build_encode_error)?;
+    let build = encode_start_build(&write, options).map_err(map_build_encode_error)?;
     charge_build_report(budget, build.report())?;
     // The build payload consumed part of the operation-wide ledger.  Rebuild
     // the policy before encoding its sibling so all residual byte, field,
     // work, and allocation ceilings are enforced by the second preflight.
     let options = build_encode_options(&write, context.wire_limits, budget);
-    let chunk =
-        build_codec::encode_start_audio_chunk(&write, options).map_err(map_build_encode_error)?;
+    let chunk = encode_start_chunk(&write, options).map_err(map_build_encode_error)?;
     charge_build_report(budget, chunk.report())?;
 
     let build_payload = build.into_bytes();
@@ -76,6 +117,26 @@ pub(super) fn prepare_start_audio_builds(
     .map_err(map_archive_error)?;
     set_object_reference(&mut chunk_object, ids.build, budget)?;
     Ok([build_object, chunk_object])
+}
+
+fn encode_start_build(
+    write: &StartPlaybackWrite,
+    options: build_codec::EncodeOptions,
+) -> Result<build_codec::EncodeOutput, build_codec::EncodeError> {
+    match write {
+        StartPlaybackWrite::Audio(write) => build_codec::encode_start_audio_build(write, options),
+        StartPlaybackWrite::Movie(write) => build_codec::encode_start_movie_build(write, options),
+    }
+}
+
+fn encode_start_chunk(
+    write: &StartPlaybackWrite,
+    options: build_codec::EncodeOptions,
+) -> Result<build_codec::EncodeOutput, build_codec::EncodeError> {
+    match write {
+        StartPlaybackWrite::Audio(write) => build_codec::encode_start_audio_chunk(write, options),
+        StartPlaybackWrite::Movie(write) => build_codec::encode_start_movie_chunk(write, options),
+    }
 }
 
 fn set_object_reference(
@@ -131,11 +192,15 @@ pub(super) fn rewrite_node_cache(
 }
 
 fn build_encode_options(
-    write: &build_codec::StartAudioBuildWrite,
+    write: &StartPlaybackWrite,
     limits: WireLimits,
     budget: &CreationBudget,
 ) -> build_codec::EncodeOptions {
-    build_codec::EncodeOptions::for_write(write)
+    let options = match write {
+        StartPlaybackWrite::Audio(write) => build_codec::EncodeOptions::for_write(write),
+        StartPlaybackWrite::Movie(write) => build_codec::EncodeOptions::for_movie_write(write),
+    };
+    options
         .with_max_output_bytes(limits.max_output_bytes().min(budget.remaining_output()))
         .with_max_fields(limits.max_fields().min(budget.remaining_wire_fields()))
         .with_max_work_bytes(limits.max_rewrite_work().min(budget.remaining_work()))

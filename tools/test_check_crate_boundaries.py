@@ -7027,6 +7027,81 @@ def add_keynote_slide_audio_creation_scaffold(
     fixture.write_bytes(b"synthetic-native-keynote-audio-fixture")
 
 
+def add_keynote_slide_movie_creation_scaffold(
+    root: Path,
+    *,
+    owner_generated_source: bool = False,
+    child_generated_source: bool = False,
+    owner_raw_api: bool = False,
+) -> None:
+    """Create the shared-owner/file-movie boundary fixture.
+
+    The fixture deliberately uses the same private owner path as audio.  The
+    explicit typed enum marker is what activates the movie-specific audit;
+    this proves that generalizing the audio ledger does not widen the host or
+    generated-schema boundary by accident.
+    """
+
+    owner = root / boundaries.KEYNOTE_SLIDE_MOVIE_CREATION_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "enum CreationOptions { Movie(movie::Options) }\n"
+        "fn plan(options: CreationOptions) {\n"
+        "    let CreationOptions::Movie(_) = options;\n"
+        "    keynote_media_creation_codec::encode_media_archive(&write, options);\n"
+        "    value.try_encoded_len(); value.try_encode_bounded();\n"
+        "    output.try_reserve_exact(1);\n"
+        "}\n"
+        + (
+            "pub fn add_slide_movie(object_id: u64) { let _ = object_id; }\n"
+            if owner_raw_api
+            else ""
+        )
+        + (
+            "use prost::Message as _;\n"
+            "use litchi_iwa_protos::tsd;\n"
+            "fn legacy() { tsd::MovieArchive::decode(bytes); }\n"
+            if owner_generated_source
+            else ""
+        ),
+        encoding="utf-8",
+    )
+
+    child = root / boundaries.KEYNOTE_SLIDE_MOVIE_CREATION_CHILD_ROOT / "metadata.rs"
+    child.parent.mkdir(parents=True, exist_ok=True)
+    child.write_text(
+        "use litchi_iwa_protos::package_metadata_codec;\n"
+        "fn plan_metadata() { package_metadata_codec::decode_package_metadata(); }\n"
+        + ("use prost::Message as _;\n" if child_generated_source else ""),
+        encoding="utf-8",
+    )
+
+    native_test = root / boundaries.KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_TEST_SOURCE
+    native_test.parent.mkdir(parents=True, exist_ok=True)
+    native_test.write_text(
+        "const NATIVE_FOCUSED: &[u8] = include_bytes!(\n"
+        '    "../../../test-data/iwork/keynote/slide-movie-creation-focused-native.key"\n'
+        ");\n"
+        "const NATIVE_FRESH: &[u8] = include_bytes!(\n"
+        '    "../../../test-data/iwork/keynote/slide-movie-creation-fresh-focused-native.key"\n'
+        ");\n"
+        "#[test]\n"
+        "fn native_saved_file_movie_creation_reuse_candidate_is_stable() {\n"
+        "    let _ = NATIVE_FOCUSED;\n"
+        "}\n"
+        "#[test]\n"
+        "fn native_saved_file_movie_creation_fresh_candidate_is_stable() {\n"
+        "    let _ = NATIVE_FRESH;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    fixture = root / boundaries.KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_FIXTURE
+    fixture.parent.mkdir(parents=True, exist_ok=True)
+    fixture.write_bytes(b"synthetic-native-keynote-file-movie-fixture")
+    fresh_fixture = root / boundaries.KEYNOTE_SLIDE_MOVIE_CREATION_FRESH_NATIVE_FIXTURE
+    fresh_fixture.write_bytes(b"synthetic-native-keynote-fresh-file-movie-fixture")
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -27867,6 +27942,172 @@ fn rewrite_movie_title_operation(
         )
         self.assertIn(
             "+ audit_iwa_keynote_slide_audio_creation_source_topology()",
+            main_source,
+        )
+
+    def test_keynote_slide_movie_creation_audit_is_dormant_without_movie_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_movie_creation_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_movie_creation_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_keynote_slide_movie_creation_accepts_shared_typed_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_movie_creation_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_movie_creation_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_movie_creation_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_keynote_slide_movie_creation_rejects_generated_and_raw_api_drift(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_movie_creation_scaffold(
+                root,
+                owner_generated_source=True,
+                child_generated_source=True,
+                owner_raw_api=True,
+            )
+            violations = boundaries.audit_keynote_slide_movie_creation_source_topology(
+                root
+            )
+            self.assertTrue(any("prost import" in item for item in violations), violations)
+            self.assertTrue(
+                any("generated protobuf import" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("generated protobuf decode" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("raw identifier parameter" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_keynote_slide_movie_creation_retirement_requires_native_evidence(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.KEYNOTE_SLIDE_MOVIE_CREATION_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "enum CreationOptions { Movie(movie::Options) }\n"
+                "fn plan() {\n"
+                "    let _ = CreationOptions::Movie(movie::Options::default());\n"
+                "    keynote_media_creation_codec::encode_media_archive();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            host = root / "crates/litchi-iwa/src/keynote/editor.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn add_slide_movie(&mut self) {}\n"
+                "}\n"
+                "fn create() { editor.add_slide_movie(); }\n",
+                encoding="utf-8",
+            )
+            # The route is permanently active: source-only migration reports
+            # missing evidence while still detecting the raw host method/call.
+            violations = boundaries.audit_iwa_keynote_slide_movie_creation_source_topology(
+                root
+            )
+            self.assertTrue(any("missing its native integration test" in item for item in violations), violations)
+            self.assertTrue(any("method/helper add_slide_movie" in item for item in violations), violations)
+            self.assertTrue(any("call/helper add_slide_movie" in item for item in violations), violations)
+
+            add_keynote_slide_movie_creation_scaffold(root)
+            violations = boundaries.audit_iwa_keynote_slide_movie_creation_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("method/helper add_slide_movie" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("call/helper add_slide_movie" in item for item in violations),
+                violations,
+            )
+
+            fixture = root / boundaries.KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_FIXTURE
+            fixture.unlink()
+            violations = boundaries.audit_iwa_keynote_slide_movie_creation_source_topology(
+                root
+            )
+            self.assertTrue(any("missing native fixture" in item for item in violations), violations)
+            self.assertTrue(any("method/helper add_slide_movie" in item for item in violations), violations)
+            self.assertTrue(any("call/helper add_slide_movie" in item for item in violations), violations)
+
+    def test_iwa_keynote_slide_movie_creation_missing_test_keeps_raw_detection_active(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_movie_creation_scaffold(root)
+            test_source = root / boundaries.KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_TEST_SOURCE
+            test_source.unlink()
+            host = root / "crates/litchi-iwa/src/keynote/editor.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn add_slide_movie(&mut self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_movie_creation_source_topology(
+                root
+            )
+            self.assertTrue(any("missing its native integration test" in item for item in violations), violations)
+            self.assertTrue(any("method/helper add_slide_movie" in item for item in violations), violations)
+
+    def test_iwa_keynote_slide_movie_creation_allows_focused_package_call(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_movie_creation_scaffold(root)
+            host = root / "crates/litchi-iwa/tests/keynote_movie_creation.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn focused_helper() {\n"
+                "    package.add_slide_movie(slide, movie, poster, options);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_movie_creation_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_keynote_slide_movie_creation_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_keynote_slide_movie_creation_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_iwa_keynote_slide_movie_creation_source_topology()",
             main_source,
         )
 

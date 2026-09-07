@@ -33,11 +33,15 @@ const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
 const CAPTION_PLACEMENT_MESSAGE_TYPE: u32 = 634;
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 const SHAPE_STYLE_MESSAGE_TYPE: u32 = 2_025;
+const SLIDE_MESSAGE_TYPE: u32 = 5;
+const BUILD_MESSAGE_TYPE: u32 = 8;
+const SLIDE_BUILDS_FIELD: u32 = 2;
 const METADATA_ROOT_UNKNOWN_FIELD: u32 = 4_001;
 const METADATA_COMPONENT_UNKNOWN_FIELD: u32 = 4_002;
 const METADATA_UNKNOWN_MARKER: &[u8] = b"movie-caption metadata extension";
 const STORAGE_UNKNOWN_FIELD: u32 = 4_003;
 const STORAGE_UNKNOWN_MARKER: &[u8] = b"movie-caption storage extension";
+const TEST_BUILD: u64 = 170;
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -492,6 +496,69 @@ fn replace_document_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8
         entries,
         Limits::default(),
     )?)
+}
+
+fn movie_start_build_payload(target: u64, include_effect: bool) -> TestResult<Vec<u8>> {
+    let target = reference(target).encode_to_vec();
+    let mut payload = Vec::new();
+    append_length_delimited_field(&mut payload, 1, &target)?;
+    if include_effect {
+        let mut animation = Vec::new();
+        append_length_delimited_field(&mut animation, 2, b"apple:movie-start")?;
+        let mut attributes = Vec::new();
+        append_length_delimited_field(&mut attributes, 18, &animation)?;
+        append_length_delimited_field(&mut payload, 4, &attributes)?;
+    }
+    Ok(payload)
+}
+
+fn with_movie_build(
+    source: &[u8],
+    build_identifier: u64,
+    build_payload: Vec<u8>,
+    build_references: Vec<u64>,
+    slide_builds: &[u64],
+) -> TestResult<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let slide = archive
+        .object_mut(SLIDE)
+        .ok_or_else(|| io::Error::other("missing synthetic slide"))?;
+    let slide_message = slide
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == SLIDE_MESSAGE_TYPE)
+        .ok_or_else(|| io::Error::other("missing synthetic slide message"))?;
+    for identifier in slide_builds {
+        append_length_delimited_field(
+            &mut slide_message.data,
+            SLIDE_BUILDS_FIELD,
+            &reference(*identifier).encode_to_vec(),
+        )?;
+    }
+    let slide_length = u32::try_from(slide_message.data.len())?;
+    slide.archive_info.message_infos[0].length = slide_length;
+    archive.objects.push(object_with_references(
+        build_identifier,
+        BUILD_MESSAGE_TYPE,
+        build_payload,
+        build_references,
+    )?);
+    replace_document_stream(source, archive)
+}
+
+fn assert_movie_caption_edit_rejected(source: &[u8]) -> TestResult<()> {
+    let package = Package::from_bytes(source)?;
+    let result = package
+        .edit_slide_movie_caption(0usize, 0usize)
+        .and_then(|edit| edit.set("forged build"))
+        .and_then(|edit| edit.commit());
+    assert!(matches!(
+        result,
+        Err(SlideMovieCaptionError::UnsupportedDependency)
+            | Err(SlideMovieCaptionError::InvalidSource)
+    ));
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
 }
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
@@ -1553,6 +1620,69 @@ fn aggregate_and_field_info_caption_owners_fail_closed() -> TestResult<()> {
     assert!(package.slide_movie_caption(0usize, 0usize).is_err());
     assert_eq!(exact_bytes(&package)?, field_owner);
     Ok(())
+}
+
+#[test]
+fn registered_movie_build_with_forged_payload_target_is_rejected() -> TestResult<()> {
+    let source =
+        synthetic_metadata_package_with_captions([Some("North"), None], METADATA_LAST_IDENTIFIER)?;
+    let hostile = with_movie_build(
+        &source,
+        TEST_BUILD,
+        // The header claims an inbound edge from movie 0, while the bounded
+        // build projection names movie 1.
+        movie_start_build_payload(MOVIES[1], false)?,
+        vec![MOVIES[0]],
+        &[TEST_BUILD],
+    )?;
+    assert_movie_caption_edit_rejected(&hostile)
+}
+
+#[test]
+fn unrelated_registered_build_does_not_require_movie_start_effect() -> TestResult<()> {
+    let source =
+        synthetic_metadata_package_with_captions([Some("North"), None], METADATA_LAST_IDENTIFIER)?;
+    let source = with_movie_build(
+        &source,
+        TEST_BUILD,
+        movie_start_build_payload(MOVIES[1], false)?,
+        vec![MOVIES[1]],
+        &[TEST_BUILD],
+    )?;
+    let package = Package::from_bytes(&source)?;
+    let _edit = package
+        .edit_slide_movie_caption(0usize, 0usize)?
+        .set("Updated")?;
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+#[test]
+fn unregistered_movie_build_header_edge_is_rejected() -> TestResult<()> {
+    let source =
+        synthetic_metadata_package_with_captions([Some("North"), None], METADATA_LAST_IDENTIFIER)?;
+    let hostile = with_movie_build(
+        &source,
+        TEST_BUILD,
+        movie_start_build_payload(MOVIES[0], true)?,
+        vec![MOVIES[0]],
+        &[],
+    )?;
+    assert_movie_caption_edit_rejected(&hostile)
+}
+
+#[test]
+fn duplicate_movie_build_registration_is_rejected() -> TestResult<()> {
+    let source =
+        synthetic_metadata_package_with_captions([Some("North"), None], METADATA_LAST_IDENTIFIER)?;
+    let hostile = with_movie_build(
+        &source,
+        TEST_BUILD,
+        movie_start_build_payload(MOVIES[0], true)?,
+        vec![MOVIES[0]],
+        &[TEST_BUILD, TEST_BUILD],
+    )?;
+    assert_movie_caption_edit_rejected(&hostile)
 }
 
 #[test]

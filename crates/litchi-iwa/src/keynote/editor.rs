@@ -901,6 +901,7 @@ impl KeynoteBuildSettings {
     }
 
     /// Native playback trigger attached to a newly inserted movie.
+    #[cfg(test)]
     pub(crate) fn movie_start() -> Self {
         Self {
             effect: "apple:movie-start".to_owned(),

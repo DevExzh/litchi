@@ -31,8 +31,48 @@ use super::{CreationBudget, CreationContext, CreationIds};
 
 const METADATA_COMPONENT: &str = "Index/Metadata.iwa";
 const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
+const DATA_METADATA_MAP_MESSAGE_TYPE: u32 = 11_015;
 const SHA1_BYTES: usize = 20;
 const MAX_NAME_ATTEMPTS: u64 = 1_024;
+const MAX_MEDIA_ASSETS: usize = 2;
+
+/// One borrowed media asset admitted by the bounded PackageMetadata planner.
+///
+/// The first asset is the primary media payload (audio for the legacy audio
+/// path, or video for a movie). A second asset may be supplied for a movie's
+/// poster image. Keeping this vocabulary here lets both creation engines
+/// share one metadata scan and one atomic identity/media rewrite.
+#[derive(Debug, Clone, Copy)]
+pub(in crate::package) struct MediaAssetInput<'source> {
+    pub(in crate::package) filename: &'source str,
+    pub(in crate::package) bytes: &'source [u8],
+    pub(in crate::package) media_type: MediaType,
+}
+
+impl<'source> MediaAssetInput<'source> {
+    pub(in crate::package) const fn new(
+        filename: &'source str,
+        bytes: &'source [u8],
+        media_type: MediaType,
+    ) -> Self {
+        Self {
+            filename,
+            bytes,
+            media_type,
+        }
+    }
+}
+
+/// One ordered data record produced by a metadata plan.
+#[derive(Debug)]
+pub(in crate::package) struct PlannedAsset {
+    pub(in crate::package) data_identifier: u64,
+    pub(in crate::package) digest: [u8; SHA1_BYTES],
+    /// Full package member name (`Data/<leaf>`) when this transaction creates
+    /// the member. A reused or deduplicated asset has no insertion name.
+    pub(in crate::package) data_entry_name: Option<Box<str>>,
+    pub(in crate::package) created_data: usize,
+}
 
 /// Metadata and data-member work staged for the package transaction.
 ///
@@ -40,12 +80,15 @@ const MAX_NAME_ATTEMPTS: u64 = 1_024;
 /// be inserted without copying the payload; a reused digest has no data
 /// insertion at all.
 #[derive(Debug)]
-pub(super) struct MetadataPlan {
-    pub(super) data_identifier: u64,
-    pub(super) digest: [u8; SHA1_BYTES],
-    pub(super) compressed: Vec<u8>,
-    pub(super) data_entry_name: Option<Box<str>>,
-    pub(super) created_data: usize,
+pub(in crate::package) struct MetadataPlan {
+    pub(in crate::package) data_identifier: u64,
+    pub(in crate::package) digest: [u8; SHA1_BYTES],
+    pub(in crate::package) compressed: Vec<u8>,
+    pub(in crate::package) data_entry_name: Option<Box<str>>,
+    pub(in crate::package) created_data: usize,
+    /// Optional second asset in input order. Movie creation uses this for the
+    /// poster image; audio creation leaves it absent.
+    pub(in crate::package) poster: Option<PlannedAsset>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -58,9 +101,9 @@ struct DataRecord {
 #[derive(Debug, Default)]
 struct MediaFacts {
     data: Vec<DataRecord>,
-    matching_name: Option<Box<str>>,
-    matching_identifier: Option<u64>,
-    duplicate_match: bool,
+    matching_name: [Option<Box<str>>; MAX_MEDIA_ASSETS],
+    matching_identifier: [Option<u64>; MAX_MEDIA_ASSETS],
+    duplicate_match: [bool; MAX_MEDIA_ASSETS],
     slide_component: ComponentMatch,
     node_component: ComponentMatch,
     stylesheet_component: ComponentMatch,
@@ -79,6 +122,28 @@ struct ExistingExternalReference {
     target_component_identifier: u64,
     object_identifier: u64,
     matches: usize,
+}
+
+/// A validated borrowed DataMetadataMap and the bounded decode policy used
+/// to stream its keys into the data-identifier allocator.
+#[derive(Debug, Clone, Copy)]
+struct DataMetadataMapFacts<'source> {
+    source: media_codec::DataMetadataMapSource<'source>,
+    options: media_codec::DecodeOptions,
+}
+
+struct DataMetadataMapIdentifierCollector<'used> {
+    used: &'used mut HashSet<u64>,
+}
+
+impl media_codec::DataMetadataMapVisitor for DataMetadataMapIdentifierCollector<'_> {
+    fn visit_entry(
+        &mut self,
+        entry: media_codec::DataMetadataMapEntry,
+    ) -> Result<(), media_codec::DecodeError> {
+        self.used.insert(entry.data_identifier());
+        Ok(())
+    }
 }
 
 impl identity_codec::PackageMetadataVisitor for ExistingExternalReference {
@@ -102,7 +167,8 @@ impl identity_codec::PackageMetadataVisitor for ExistingExternalReference {
 }
 
 struct MediaVisitor<'expected, 'budget> {
-    target_digest: [u8; SHA1_BYTES],
+    target_digests: [[u8; SHA1_BYTES]; MAX_MEDIA_ASSETS],
+    target_count: usize,
     slide_locator: &'expected str,
     node_locator: &'expected str,
     stylesheet_locator: &'expected str,
@@ -164,11 +230,13 @@ impl media_codec::PackageMetadataMediaVisitor for MediaVisitor<'_, '_> {
             digest,
             materialized_length: data_info.materialized_length(),
         });
-        if digest == self.target_digest {
-            if self.facts.matching_identifier.is_some() {
-                self.facts.duplicate_match = true;
-            } else {
-                self.facts.matching_identifier = Some(data_info.identifier());
+        for target_index in 0..self.target_count {
+            if digest == self.target_digests[target_index] {
+                if self.facts.matching_identifier[target_index].is_some() {
+                    self.facts.duplicate_match[target_index] = true;
+                    continue;
+                }
+                self.facts.matching_identifier[target_index] = Some(data_info.identifier());
                 let name_bytes = current_name.len();
                 if let Err(error) = self.budget.charge_allocations(name_bytes) {
                     return Err(self.reject(error));
@@ -180,7 +248,7 @@ impl media_codec::PackageMetadataMediaVisitor for MediaVisitor<'_, '_> {
                     );
                 }
                 name.push_str(current_name);
-                self.facts.matching_name = Some(name.into_boxed_str());
+                self.facts.matching_name[target_index] = Some(name.into_boxed_str());
             }
         }
         Ok(())
@@ -208,7 +276,7 @@ fn record_component(
 /// combined with native archive edits by the caller.  No source bytes or
 /// package members are changed if either metadata codec refuses the staged
 /// identity/media closure.
-pub(super) fn plan_and_rewrite(
+pub(in crate::package) fn plan_and_rewrite(
     source: &Package,
     ctx: &CreationContext,
     ids: &CreationIds,
@@ -216,9 +284,56 @@ pub(super) fn plan_and_rewrite(
     bytes: &[u8],
     budget: &mut CreationBudget,
 ) -> Result<MetadataPlan, SlideAudioCreationError> {
+    let asset = MediaAssetInput::new(filename, bytes, MediaType::Audio);
+    plan_and_rewrite_media(source, ctx, ids, std::slice::from_ref(&asset), budget)
+}
+
+/// Plan one fresh slide-owned file movie metadata transaction.
+///
+/// Content and poster are scanned, matched, and rewritten as one bounded
+/// operation. The resulting plan keeps the primary content in the legacy
+/// fields and exposes the poster through [`MetadataPlan::poster`], so the
+/// existing audio engine can continue to consume its exact result shape.
+pub(in crate::package) fn plan_and_rewrite_movie(
+    source: &Package,
+    ctx: &CreationContext,
+    ids: &CreationIds,
+    content_filename: &str,
+    content_bytes: &[u8],
+    poster_filename: &str,
+    poster_bytes: &[u8],
+    budget: &mut CreationBudget,
+) -> Result<MetadataPlan, SlideAudioCreationError> {
+    let assets = [
+        MediaAssetInput::new(content_filename, content_bytes, MediaType::Video),
+        MediaAssetInput::new(poster_filename, poster_bytes, MediaType::Image),
+    ];
+    plan_and_rewrite_media(source, ctx, ids, &assets, budget)
+}
+
+/// Plan one fresh metadata transaction for one or two materialized assets.
+///
+/// This is the shared seam for audio and file-movie creation. It performs one
+/// PackageMetadata media scan, one identity rewrite, and one media rewrite;
+/// all phases debit the caller's operation-wide [`CreationBudget`]. Asset
+/// records are returned in input order, with the first record represented by
+/// the historical [`MetadataPlan`] fields and an optional second record in
+/// [`MetadataPlan::poster`].
+pub(in crate::package) fn plan_and_rewrite_media(
+    source: &Package,
+    ctx: &CreationContext,
+    ids: &CreationIds,
+    assets: &[MediaAssetInput<'_>],
+    budget: &mut CreationBudget,
+) -> Result<MetadataPlan, SlideAudioCreationError> {
     ctx.validate()?;
     ids.validate()?;
-    validate_audio_input(filename, bytes, budget)?;
+    if assets.is_empty() || assets.len() > MAX_MEDIA_ASSETS {
+        return Err(SlideAudioCreationError::InvalidSource);
+    }
+    for asset in assets {
+        validate_media_input(asset, budget)?;
+    }
 
     let catalog = match &source.state.source {
         PhysicalSource::Package(catalog) if catalog.source_is_exact() => catalog,
@@ -242,13 +357,23 @@ pub(super) fn plan_and_rewrite(
         .object_with_component(ctx.slide_node_identifier)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
     let node_locator = component_locator(node_component_name)?;
-    // SHA-1 is a full input traversal. Debit that work before touching the
-    // caller's bytes so a depleted operation ledger rejects the transaction
-    // without beginning the media scan.
-    budget.charge_work(bytes.len())?;
+    // SHA-1 is a full input traversal. Debit the complete input traversal
+    // before touching caller bytes so a depleted operation ledger rejects the
+    // transaction without beginning the media scan.
+    let hash_work = assets.iter().try_fold(0usize, |total, asset| {
+        total
+            .checked_add(asset.bytes.len())
+            .ok_or(SlideAudioCreationError::InvalidSource)
+    })?;
+    budget.charge_work(hash_work)?;
+    let mut target_digests = [[0; SHA1_BYTES]; MAX_MEDIA_ASSETS];
+    for (index, asset) in assets.iter().enumerate() {
+        target_digests[index] = Sha1::digest(asset.bytes).into();
+    }
     let source_media_options = media_options(payload, ctx, budget)?;
     let mut visitor = MediaVisitor {
-        target_digest: Sha1::digest(bytes).into(),
+        target_digests,
+        target_count: assets.len(),
         slide_locator,
         node_locator,
         stylesheet_locator,
@@ -259,7 +384,6 @@ pub(super) fn plan_and_rewrite(
     let media_result =
         media_codec::visit_package_metadata_media(payload, source_media_options, &mut visitor);
     let allocation_failure = visitor.allocation_failure.take();
-    let digest = visitor.target_digest;
     let facts = std::mem::take(&mut visitor.facts);
     drop(visitor);
     if let Some(error) = allocation_failure {
@@ -271,8 +395,16 @@ pub(super) fn plan_and_rewrite(
     budget.charge_work(media_report.work_bytes())?;
     budget.charge_nesting(media_report.max_depth() as usize)?;
 
-    let (data_identifier, data_entry_name, data_leaf_name, reused_existing, created_data) =
-        resolve_data(catalog, &facts, &digest, filename, bytes, ids, budget)?;
+    let map_facts = data_metadata_map_facts(source, media_report, ctx, budget)?;
+    let resolved = resolve_data(
+        catalog,
+        &facts,
+        assets,
+        &target_digests,
+        map_facts,
+        ids,
+        budget,
+    )?;
 
     let slide_component = resolve_component(&facts.slide_component, slide_locator)?;
     let node_component = resolve_component(&facts.node_component, node_locator)?;
@@ -373,40 +505,81 @@ pub(super) fn plan_and_rewrite(
         .map_err(map_identity_error)?;
     let identity_bytes = identity_output.into_bytes();
 
-    let owner_addition = media_codec::DataReferenceOwnerAddition::new(
-        media_codec::ComponentSelector::new(slide_component.identifier, slide_component.locator),
-        data_identifier,
-        ids.drawable,
-        1,
-    );
-    let mut data_addition = None;
-    if !reused_existing {
-        if data_entry_name.is_none() {
-            return Err(SlideAudioCreationError::InvalidSource);
-        }
-        let leaf = data_leaf_name
-            .as_deref()
+    let component_selector =
+        media_codec::ComponentSelector::new(slide_component.identifier, slide_component.locator);
+    let mut data_additions = Vec::new();
+    let data_addition_count = resolved
+        .iter()
+        .filter(|asset| !asset.reused_existing)
+        .count();
+    if data_addition_count != 0 {
+        let data_addition_capacity = data_addition_count
+            .checked_mul(size_of::<media_codec::DataInfoAddition<'_>>())
             .ok_or(SlideAudioCreationError::InvalidSource)?;
-        data_addition = Some(
-            media_codec::DataInfoAddition::new(data_identifier, &digest, filename)
+        budget.charge_allocations(data_addition_capacity)?;
+        budget.charge_allocation_events(1)?;
+        data_additions
+            .try_reserve_exact(data_addition_count)
+            .map_err(|_| SlideAudioCreationError::Allocation {
+                amount: data_addition_capacity,
+            })?;
+    }
+    let mut owner_data = [0u64; MAX_MEDIA_ASSETS];
+    let mut owner_counts = [0u32; MAX_MEDIA_ASSETS];
+    let mut owner_len = 0usize;
+    for (asset_index, resolved_asset) in resolved.iter().enumerate() {
+        if !resolved_asset.reused_existing {
+            let leaf = resolved_asset
+                .data_leaf_name
+                .as_deref()
+                .ok_or(SlideAudioCreationError::InvalidSource)?;
+            data_additions.push(
+                media_codec::DataInfoAddition::new(
+                    resolved_asset.data_identifier,
+                    &resolved_asset.digest,
+                    assets[asset_index].filename,
+                )
                 .with_file_name(leaf)
                 .with_materialized_length(
-                    u64::try_from(bytes.len())
+                    u64::try_from(assets[asset_index].bytes.len())
                         .map_err(|_| SlideAudioCreationError::InvalidSource)?,
                 ),
+            );
+        }
+        let owner_index = owner_data[..owner_len]
+            .iter()
+            .position(|identifier| *identifier == resolved_asset.data_identifier);
+        if let Some(owner_index) = owner_index {
+            owner_counts[owner_index] = owner_counts[owner_index]
+                .checked_add(1)
+                .ok_or(SlideAudioCreationError::InvalidSource)?;
+        } else {
+            if owner_len == MAX_MEDIA_ASSETS {
+                return Err(SlideAudioCreationError::InvalidSource);
+            }
+            owner_data[owner_len] = resolved_asset.data_identifier;
+            owner_counts[owner_len] = 1;
+            owner_len += 1;
+        }
+    }
+    let mut owner_additions: [media_codec::DataReferenceOwnerAddition<'_>; MAX_MEDIA_ASSETS] =
+        std::array::from_fn(|_| {
+            media_codec::DataReferenceOwnerAddition::new(component_selector, 0, 0, 0)
+        });
+    for owner_index in 0..owner_len {
+        owner_additions[owner_index] = media_codec::DataReferenceOwnerAddition::new(
+            component_selector,
+            owner_data[owner_index],
+            ids.drawable,
+            owner_counts[owner_index],
         );
     }
-    let mut data_additions = Vec::new();
-    if let Some(data_addition) = data_addition {
-        budget.charge_allocations(size_of::<media_codec::DataInfoAddition<'_>>())?;
-        data_additions
-            .try_reserve_exact(1)
-            .map_err(|_| SlideAudioCreationError::Allocation { amount: 1 })?;
-        data_additions.push(data_addition);
-    }
-    let owner_additions = [owner_addition];
-    let media_batch =
-        media_codec::MediaRewriteBatch::new(&data_additions, &[], &owner_additions, &[]);
+    let media_batch = media_codec::MediaRewriteBatch::new(
+        &data_additions,
+        &[],
+        &owner_additions[..owner_len],
+        &[],
+    );
     let identity_media_options = media_options(&identity_bytes, ctx, budget)?;
     let prepared_media = media_codec::prepare_package_metadata_media_rewrite(
         &identity_bytes,
@@ -453,16 +626,42 @@ pub(super) fn plan_and_rewrite(
         SnappyStream::compress(&serialized).map_err(|_| SlideAudioCreationError::InvalidSource)?;
     budget.charge_entry_bytes(compressed.len())?;
 
+    drop(data_additions);
+    let mut resolved = resolved.into_iter();
+    let first = resolved
+        .next()
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    let poster = resolved.next().map(|asset| PlannedAsset {
+        data_identifier: asset.data_identifier,
+        digest: asset.digest,
+        data_entry_name: asset.data_entry_name,
+        created_data: asset.created_data,
+    });
+    if resolved.next().is_some() {
+        return Err(SlideAudioCreationError::InvalidSource);
+    }
+
     // The data bytes remain owned by the caller.  The package owner copies
     // them into its staged ZIP insertion only when this plan created a new
     // DataInfo record.
     Ok(MetadataPlan {
-        data_identifier,
-        digest,
+        data_identifier: first.data_identifier,
+        digest: first.digest,
         compressed,
-        data_entry_name,
-        created_data,
+        data_entry_name: first.data_entry_name,
+        created_data: first.created_data,
+        poster,
     })
+}
+
+#[derive(Debug)]
+struct ResolvedAsset {
+    data_identifier: u64,
+    digest: [u8; SHA1_BYTES],
+    data_entry_name: Option<Box<str>>,
+    data_leaf_name: Option<Box<str>>,
+    reused_existing: bool,
+    created_data: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -497,40 +696,53 @@ fn resolve_component<'source>(
     })
 }
 
-fn validate_audio_input(
-    filename: &str,
-    bytes: &[u8],
+fn validate_media_input(
+    asset: &MediaAssetInput<'_>,
     budget: &mut CreationBudget,
 ) -> Result<(), SlideAudioCreationError> {
-    if filename.is_empty()
-        || filename.len() > MAX_FILENAME_BYTES
-        || filename
+    if asset.filename.is_empty()
+        || asset.filename.len() > MAX_FILENAME_BYTES
+        || asset
+            .filename
             .bytes()
             .any(|byte| byte == 0 || byte.is_ascii_control())
-        || filename.contains(['/', '\\'])
-        || Path::new(filename)
+        || asset.filename.contains(['/', '\\'])
+        || Path::new(asset.filename)
             .components()
             .any(|component| !matches!(component, Component::Normal(_)))
     {
         return Err(SlideAudioCreationError::InvalidFilename);
     }
-    let extension = filename
+    let extension = asset
+        .filename
         .rsplit_once('.')
         .map(|(_, extension)| extension)
         .filter(|extension| !extension.is_empty())
         .ok_or(SlideAudioCreationError::InvalidFilename)?;
-    if MediaType::from_extension(extension) != MediaType::Audio {
-        return Err(SlideAudioCreationError::InvalidFilename);
+    if MediaType::from_extension(extension) != asset.media_type {
+        return Err(if asset.media_type == MediaType::Audio {
+            SlideAudioCreationError::InvalidFilename
+        } else {
+            SlideAudioCreationError::InvalidSource
+        });
     }
-    if bytes.is_empty() {
-        return Err(SlideAudioCreationError::UnsupportedAudio);
+    if asset.bytes.is_empty() {
+        return Err(if asset.media_type == MediaType::Audio {
+            SlideAudioCreationError::UnsupportedAudio
+        } else {
+            SlideAudioCreationError::InvalidSource
+        });
     }
-    if MediaType::from_bytes(bytes) != MediaType::Audio {
-        return Err(SlideAudioCreationError::UnsupportedAudio);
+    if MediaType::from_bytes(asset.bytes) != asset.media_type {
+        return Err(if asset.media_type == MediaType::Audio {
+            SlideAudioCreationError::UnsupportedAudio
+        } else {
+            SlideAudioCreationError::InvalidSource
+        });
     }
-    budget.charge_input(bytes.len())?;
-    budget.charge_entry_bytes(bytes.len())?;
-    budget.charge_total(bytes.len())?;
+    budget.charge_input(asset.bytes.len())?;
+    budget.charge_entry_bytes(asset.bytes.len())?;
+    budget.charge_total(asset.bytes.len())?;
     Ok(())
 }
 
@@ -671,61 +883,228 @@ fn residual_wire_allowances(
     Ok((fields, work, output))
 }
 
-fn resolve_data(
-    catalog: &SourceCatalog,
-    facts: &MediaFacts,
-    digest: &[u8; SHA1_BYTES],
-    filename: &str,
-    bytes: &[u8],
-    ids: &CreationIds,
+fn data_metadata_map_facts<'source>(
+    package: &'source Package,
+    report: media_codec::DecodeReport,
+    ctx: &CreationContext,
     budget: &mut CreationBudget,
-) -> Result<(u64, Option<Box<str>>, Option<Box<str>>, bool, usize), SlideAudioCreationError> {
-    if facts.duplicate_match {
+) -> Result<Option<DataMetadataMapFacts<'source>>, SlideAudioCreationError> {
+    if !report.data_metadata_map_present() {
+        return Ok(None);
+    }
+    let identifier = report
+        .data_metadata_map_identifier()
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    let (_component, object) = package
+        .object_with_component(identifier)
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    if object.archive_info.identifier != Some(identifier)
+        || object.archive_info.should_merge == Some(true)
+        || object.messages.len() != object.archive_info.message_infos.len()
+    {
         return Err(SlideAudioCreationError::InvalidSource);
     }
-    if let (Some(identifier), Some(name)) =
-        (facts.matching_identifier, facts.matching_name.as_deref())
+
+    let mut map_payload = None;
+    for (message_index, (message, info)) in object
+        .messages
+        .iter()
+        .zip(&object.archive_info.message_infos)
+        .enumerate()
     {
-        let record = facts
-            .data
-            .iter()
-            .find(|record| record.identifier == identifier && &record.digest == digest)
-            .ok_or(SlideAudioCreationError::InvalidSource)?;
-        let name = valid_data_name(name)?;
-        let full_name = data_member_name(name, budget)?;
-        let mut entries = catalog
-            .package()
-            .iter()
-            .filter(|entry| entry.name() == full_name);
-        let entry = entries
-            .next()
-            .ok_or(SlideAudioCreationError::InvalidSource)?;
-        if entries.next().is_some()
-            || entry.is_opaque()
-            || record.materialized_length
-                != Some(
-                    u64::try_from(bytes.len())
-                        .map_err(|_| SlideAudioCreationError::InvalidSource)?,
-                )
-            || entry.data() != bytes
-            || MediaType::from_bytes(entry.data()) != MediaType::Audio
+        if message.type_ != info.type_
+            || usize::try_from(info.length).ok() != Some(message.data.len())
+            || info.base_message_index.is_some()
+            || !info.diff_merge_version.is_empty()
+            || info.diff_field_path.is_some()
+            || !info.fields_to_remove.is_empty()
+            || !info.diff_read_version.is_empty()
         {
             return Err(SlideAudioCreationError::InvalidSource);
         }
-        return Ok((record.identifier, None, None, true, 0));
+        if message.type_ != DATA_METADATA_MAP_MESSAGE_TYPE {
+            continue;
+        }
+        if map_payload
+            .replace((message_index, message.data.as_slice()))
+            .is_some()
+        {
+            return Err(SlideAudioCreationError::InvalidSource);
+        }
+    }
+    let (_message_index, map_payload) =
+        map_payload.ok_or(SlideAudioCreationError::InvalidSource)?;
+    budget.charge_work(map_payload.len())?;
+    let options = media_options(map_payload, ctx, budget)?;
+    let source = media_codec::DataMetadataMapSource::from_source(identifier, map_payload, options)
+        .map_err(|error| map_media_error(error, SlideAudioCreationLimitKind::WireWork))?;
+    budget.charge_wire_fields(source.fields())?;
+    budget.charge_work(source.work_bytes())?;
+    budget.charge_nesting(source.max_depth() as usize)?;
+    budget.charge_references(source.entries())?;
+    if source.scratch_bytes() != 0 {
+        budget.charge_allocations(source.scratch_bytes())?;
+    }
+    Ok(Some(DataMetadataMapFacts { source, options }))
+}
+
+fn resolve_data(
+    catalog: &SourceCatalog,
+    facts: &MediaFacts,
+    assets: &[MediaAssetInput<'_>],
+    target_digests: &[[u8; SHA1_BYTES]; MAX_MEDIA_ASSETS],
+    map_facts: Option<DataMetadataMapFacts<'_>>,
+    ids: &CreationIds,
+    budget: &mut CreationBudget,
+) -> Result<Vec<ResolvedAsset>, SlideAudioCreationError> {
+    if assets.is_empty() || assets.len() > MAX_MEDIA_ASSETS {
+        return Err(SlideAudioCreationError::InvalidSource);
+    }
+    for index in 0..assets.len() {
+        if facts.duplicate_match[index] {
+            return Err(SlideAudioCreationError::InvalidSource);
+        }
     }
 
-    let identifier = allocate_data_identifier(catalog, facts, ids, budget)?;
-    let name = generated_name(filename, identifier, catalog, budget)?;
-    let full_name = data_member_name(&name, budget)?.into_boxed_str();
-    budget.charge_entries(1)?;
-    Ok((
-        identifier,
-        Some(full_name),
-        Some(name.into_boxed_str()),
-        false,
-        1,
-    ))
+    // Resolve exact duplicate inputs once. Equality is a potentially full
+    // byte traversal, so charge its worst-case work before comparing and
+    // reuse the result for both reservation sizing and staged records.
+    let mut previous_indices = [None; MAX_MEDIA_ASSETS];
+    for index in 0..assets.len() {
+        for previous_index in 0..index {
+            if assets[previous_index].bytes.len() == assets[index].bytes.len() {
+                budget.charge_work(assets[index].bytes.len())?;
+                if assets[previous_index].bytes == assets[index].bytes {
+                    previous_indices[index] = Some(previous_index);
+                    break;
+                }
+            }
+        }
+    }
+
+    let mut missing_count = 0usize;
+    for (index, previous_index) in previous_indices.iter().enumerate().take(assets.len()) {
+        if facts.matching_identifier[index].is_none() && previous_index.is_none() {
+            missing_count = missing_count
+                .checked_add(1)
+                .ok_or(SlideAudioCreationError::InvalidSource)?;
+        }
+    }
+    let mut allocator = if missing_count == 0 {
+        None
+    } else {
+        Some(DataIdentifierAllocator::new(
+            catalog,
+            facts,
+            ids,
+            missing_count,
+            map_facts,
+            budget,
+        )?)
+    };
+    let mut resolved: Vec<ResolvedAsset> = Vec::new();
+    let resolved_capacity = assets
+        .len()
+        .checked_mul(size_of::<ResolvedAsset>())
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    budget.charge_allocations(resolved_capacity)?;
+    budget.charge_allocation_events(1)?;
+    resolved
+        .try_reserve_exact(assets.len())
+        .map_err(|_| SlideAudioCreationError::Allocation {
+            amount: assets.len().saturating_mul(size_of::<ResolvedAsset>()),
+        })?;
+    let mut planned_names: Vec<Box<str>> = Vec::new();
+    let planned_name_capacity = missing_count
+        .checked_mul(size_of::<Box<str>>())
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    budget.charge_allocations(planned_name_capacity)?;
+    budget.charge_allocation_events(1)?;
+    planned_names
+        .try_reserve_exact(missing_count)
+        .map_err(|_| SlideAudioCreationError::Allocation {
+            amount: missing_count,
+        })?;
+
+    for (index, asset) in assets.iter().enumerate() {
+        let digest = target_digests[index];
+        if let Some(previous_index) = previous_indices[index] {
+            let previous = resolved
+                .get(previous_index)
+                .ok_or(SlideAudioCreationError::InvalidSource)?;
+            resolved.push(ResolvedAsset {
+                data_identifier: previous.data_identifier,
+                digest,
+                data_entry_name: None,
+                data_leaf_name: None,
+                reused_existing: true,
+                created_data: 0,
+            });
+            continue;
+        }
+
+        if let Some(identifier) = facts.matching_identifier[index] {
+            let name = facts.matching_name[index]
+                .as_deref()
+                .ok_or(SlideAudioCreationError::InvalidSource)?;
+            let record = facts
+                .data
+                .iter()
+                .find(|record| record.identifier == identifier && record.digest == digest)
+                .ok_or(SlideAudioCreationError::InvalidSource)?;
+            let name = valid_data_name(name)?;
+            let full_name = data_member_name(name, budget)?;
+            let mut entries = catalog
+                .package()
+                .iter()
+                .filter(|entry| entry.name() == full_name);
+            let entry = entries
+                .next()
+                .ok_or(SlideAudioCreationError::InvalidSource)?;
+            let materialized_length = u64::try_from(asset.bytes.len())
+                .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+            if entries.next().is_some()
+                || entry.is_opaque()
+                || record.materialized_length != Some(materialized_length)
+                || MediaType::from_bytes(entry.data()) != asset.media_type
+            {
+                return Err(SlideAudioCreationError::InvalidSource);
+            }
+            budget.charge_work(asset.bytes.len())?;
+            if entry.data() != asset.bytes {
+                return Err(SlideAudioCreationError::InvalidSource);
+            }
+            resolved.push(ResolvedAsset {
+                data_identifier: identifier,
+                digest,
+                data_entry_name: None,
+                data_leaf_name: None,
+                reused_existing: true,
+                created_data: 0,
+            });
+            continue;
+        }
+
+        let identifier = allocator
+            .as_mut()
+            .ok_or(SlideAudioCreationError::InvalidSource)?
+            .next()?;
+        let name = generated_name(asset.filename, identifier, catalog, &planned_names, budget)?;
+        let full_name = data_member_name(&name, budget)?.into_boxed_str();
+        let leaf_name = name.into_boxed_str();
+        budget.charge_allocations(full_name.len())?;
+        planned_names.push(full_name.clone());
+        budget.charge_entries(1)?;
+        resolved.push(ResolvedAsset {
+            data_identifier: identifier,
+            digest,
+            data_entry_name: Some(full_name),
+            data_leaf_name: Some(leaf_name),
+            reused_existing: false,
+            created_data: 1,
+        });
+    }
+    Ok(resolved)
 }
 
 fn valid_data_name(name: &str) -> Result<&str, SlideAudioCreationError> {
@@ -761,77 +1140,119 @@ fn data_member_name(
     Ok(full)
 }
 
-fn allocate_data_identifier(
-    catalog: &SourceCatalog,
-    facts: &MediaFacts,
-    ids: &CreationIds,
-    budget: &mut CreationBudget,
-) -> Result<u64, SlideAudioCreationError> {
-    let mut capacity = facts
-        .data
-        .len()
-        .checked_add(5)
-        .ok_or(SlideAudioCreationError::InvalidSource)?;
-    for component in catalog.components().iter() {
-        for object in &component.archive().objects {
+struct DataIdentifierAllocator {
+    used: HashSet<u64>,
+    candidate: u64,
+}
+
+impl DataIdentifierAllocator {
+    fn new(
+        catalog: &SourceCatalog,
+        facts: &MediaFacts,
+        ids: &CreationIds,
+        additional: usize,
+        map_facts: Option<DataMetadataMapFacts<'_>>,
+        budget: &mut CreationBudget,
+    ) -> Result<Self, SlideAudioCreationError> {
+        let mut capacity = facts
+            .data
+            .len()
+            .checked_add(5)
+            .and_then(|value| value.checked_add(additional))
+            .ok_or(SlideAudioCreationError::InvalidSource)?;
+        if let Some(map_facts) = map_facts {
             capacity = capacity
-                .checked_add(usize::from(object.archive_info.identifier.is_some()))
+                .checked_add(map_facts.source.entries())
                 .ok_or(SlideAudioCreationError::InvalidSource)?;
-            for info in &object.archive_info.message_infos {
-                capacity = capacity
-                    .checked_add(info.data_references.len())
-                    .and_then(|value| value.checked_add(info.object_references.len()))
-                    .ok_or(SlideAudioCreationError::InvalidSource)?;
-                for field in &info.field_infos {
-                    capacity = capacity
-                        .checked_add(field.data_references.len())
-                        .and_then(|value| value.checked_add(field.object_references.len()))
-                        .ok_or(SlideAudioCreationError::InvalidSource)?;
-                }
-            }
         }
-    }
-    budget.charge_allocations(capacity)?;
-    let mut used = HashSet::new();
-    used.try_reserve(capacity)
-        .map_err(|_| SlideAudioCreationError::Allocation { amount: capacity })?;
-    for component in catalog.components().iter() {
-        for object in &component.archive().objects {
-            if let Some(identifier) = object.archive_info.identifier {
-                used.insert(identifier);
-            }
-            for info in &object.archive_info.message_infos {
-                for identifier in info.data_references.iter().chain(&info.object_references) {
-                    used.insert(*identifier);
-                }
-                for field in &info.field_infos {
-                    for identifier in field.data_references.iter().chain(&field.object_references) {
-                        used.insert(*identifier);
+        for component in catalog.components().iter() {
+            for object in &component.archive().objects {
+                capacity = capacity
+                    .checked_add(usize::from(object.archive_info.identifier.is_some()))
+                    .ok_or(SlideAudioCreationError::InvalidSource)?;
+                for info in &object.archive_info.message_infos {
+                    capacity = capacity
+                        .checked_add(info.data_references.len())
+                        .and_then(|value| value.checked_add(info.object_references.len()))
+                        .ok_or(SlideAudioCreationError::InvalidSource)?;
+                    for field in &info.field_infos {
+                        capacity = capacity
+                            .checked_add(field.data_references.len())
+                            .and_then(|value| value.checked_add(field.object_references.len()))
+                            .ok_or(SlideAudioCreationError::InvalidSource)?;
                     }
                 }
             }
         }
-    }
-    for record in &facts.data {
-        used.insert(record.identifier);
-    }
-    for identifier in ids.object_identifiers() {
-        used.insert(identifier);
-    }
-    let mut candidate = facts
-        .data
-        .iter()
-        .map(|record| record.identifier)
-        .max()
-        .unwrap_or(0)
-        .checked_add(1)
-        .ok_or(SlideAudioCreationError::InvalidSource)?;
-    while candidate == 0 || used.contains(&candidate) {
-        candidate = candidate
+        let set_bytes = capacity
+            .checked_mul(size_of::<u64>())
+            .ok_or(SlideAudioCreationError::InvalidSource)?;
+        budget.charge_allocations(set_bytes)?;
+        budget.charge_allocation_events(1)?;
+        let mut used = HashSet::new();
+        used.try_reserve(capacity)
+            .map_err(|_| SlideAudioCreationError::Allocation { amount: set_bytes })?;
+        for component in catalog.components().iter() {
+            for object in &component.archive().objects {
+                if let Some(identifier) = object.archive_info.identifier {
+                    used.insert(identifier);
+                }
+                for info in &object.archive_info.message_infos {
+                    for identifier in info.data_references.iter().chain(&info.object_references) {
+                        used.insert(*identifier);
+                    }
+                    for field in &info.field_infos {
+                        for identifier in
+                            field.data_references.iter().chain(&field.object_references)
+                        {
+                            used.insert(*identifier);
+                        }
+                    }
+                }
+            }
+        }
+        for record in &facts.data {
+            used.insert(record.identifier);
+        }
+        for identifier in ids.object_identifiers() {
+            used.insert(identifier);
+        }
+        if let Some(map_facts) = map_facts {
+            let mut collector = DataMetadataMapIdentifierCollector { used: &mut used };
+            let report = map_facts
+                .source
+                .visit_entries(map_facts.options, &mut collector)
+                .map_err(|error| map_media_error(error, SlideAudioCreationLimitKind::WireWork))?;
+            budget.charge_wire_fields(report.fields())?;
+            budget.charge_work(report.work_bytes())?;
+            budget.charge_nesting(report.max_depth() as usize)?;
+        }
+        let candidate = facts
+            .data
+            .iter()
+            .map(|record| record.identifier)
+            .max()
+            .unwrap_or(0)
             .checked_add(1)
             .ok_or(SlideAudioCreationError::InvalidSource)?;
+        Ok(Self { used, candidate })
     }
-    Ok(candidate)
+
+    fn next(&mut self) -> Result<u64, SlideAudioCreationError> {
+        while self.candidate == 0 || self.used.contains(&self.candidate) {
+            self.candidate = self
+                .candidate
+                .checked_add(1)
+                .ok_or(SlideAudioCreationError::InvalidSource)?;
+        }
+        let identifier = self.candidate;
+        self.used.insert(identifier);
+        self.candidate = self
+            .candidate
+            .checked_add(1)
+            .ok_or(SlideAudioCreationError::InvalidSource)?;
+        Ok(identifier)
+    }
 }
 
 fn decimal_len(mut value: u64) -> usize {
@@ -847,6 +1268,7 @@ fn generated_name(
     source_name: &str,
     identifier: u64,
     catalog: &SourceCatalog,
+    planned_names: &[Box<str>],
     budget: &mut CreationBudget,
 ) -> Result<String, SlideAudioCreationError> {
     let (stem, extension) = source_name
@@ -862,24 +1284,22 @@ fn generated_name(
         .ok_or(SlideAudioCreationError::InvalidSource)?;
     let fallback = normal_length > MAX_FILENAME_BYTES;
     for attempt in 0..MAX_NAME_ATTEMPTS {
-        let (candidate_length, candidate_stem) = if attempt == 0 {
-            if fallback {
-                (
-                    "litchi"
-                        .len()
-                        .checked_add(1)
-                        .and_then(|length| length.checked_add(identifier_digits))
-                        .and_then(|length| length.checked_add(1))
-                        .and_then(|length| length.checked_add(extension.len()))
-                        .ok_or(SlideAudioCreationError::InvalidSource)?,
-                    "litchi",
-                )
-            } else {
-                (normal_length, stem)
-            }
+        // Once the preferred stem is too long, keep the short fallback stem
+        // for every collision attempt. Reusing the original stem here would
+        // make a valid `litchi-<id>-1.ext` fallback unreachable whenever the
+        // first short candidate is occupied.
+        let candidate_stem = if fallback { "litchi" } else { stem };
+        let candidate_length = if attempt == 0 {
+            candidate_stem
+                .len()
+                .checked_add(1)
+                .and_then(|length| length.checked_add(identifier_digits))
+                .and_then(|length| length.checked_add(1))
+                .and_then(|length| length.checked_add(extension.len()))
+                .ok_or(SlideAudioCreationError::InvalidSource)?
         } else {
             let attempt_digits = decimal_len(attempt);
-            let length = stem
+            candidate_stem
                 .len()
                 .checked_add(1)
                 .and_then(|length| length.checked_add(identifier_digits))
@@ -887,8 +1307,7 @@ fn generated_name(
                 .and_then(|length| length.checked_add(attempt_digits))
                 .and_then(|length| length.checked_add(1))
                 .and_then(|length| length.checked_add(extension.len()))
-                .ok_or(SlideAudioCreationError::InvalidSource)?;
-            (length, stem)
+                .ok_or(SlideAudioCreationError::InvalidSource)?
         };
         if candidate_length > MAX_FILENAME_BYTES {
             continue;
@@ -911,7 +1330,8 @@ fn generated_name(
             .map_err(|_| SlideAudioCreationError::InvalidSource)?;
         }
         let full = data_member_name(&candidate, budget)?;
-        let present = catalog.package().iter().any(|entry| entry.name() == full);
+        let present = catalog.package().iter().any(|entry| entry.name() == full)
+            || planned_names.iter().any(|name| name.as_ref() == full);
         if !present {
             return Ok(candidate);
         }
@@ -958,7 +1378,7 @@ fn charge_media_requirements(
     budget.charge_nesting(prepared.source_report().max_depth() as usize)
 }
 
-fn map_identity_error(error: identity_codec::RewriteError) -> SlideAudioCreationError {
+pub(super) fn map_identity_error(error: identity_codec::RewriteError) -> SlideAudioCreationError {
     if let Some(amount) = error.allocation_request() {
         return SlideAudioCreationError::Allocation { amount };
     }
@@ -999,7 +1419,7 @@ fn map_identity_error(error: identity_codec::RewriteError) -> SlideAudioCreation
     SlideAudioCreationError::InvalidSource
 }
 
-fn map_media_error(
+pub(super) fn map_media_error(
     error: media_codec::DecodeError,
     fallback: SlideAudioCreationLimitKind,
 ) -> SlideAudioCreationError {

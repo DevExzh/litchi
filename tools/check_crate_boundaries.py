@@ -14838,6 +14838,95 @@ KEYNOTE_SLIDE_AUDIO_CREATION_FORBIDDEN_SOURCE_PATTERNS = (
     ),
 )
 
+# File-backed movie creation shares the audio transaction's private planning
+# owner.  Keep a separate operation ratchet so a future ``CreationOptions::Movie``
+# branch cannot silently delegate back to the migration host or materialize a
+# generated schema value.  The standalone movie owner and shared audio owner
+# are both scanned because the latter contains the reusable graph/metadata
+# helpers; the operation marker below activates the audit.
+KEYNOTE_SLIDE_MOVIE_CREATION_OWNER_SOURCE = Path(
+    "crates/litchi-keynote/src/package/slide_movie_creation.rs"
+)
+KEYNOTE_SLIDE_MOVIE_CREATION_SHARED_OWNER_SOURCE = KEYNOTE_SLIDE_AUDIO_CREATION_OWNER_SOURCE
+KEYNOTE_SLIDE_MOVIE_CREATION_CHILD_ROOT = KEYNOTE_SLIDE_AUDIO_CREATION_CHILD_ROOT
+KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_TEST_SOURCE = Path(
+    "crates/litchi-keynote/tests/slide_movie_creation_native.rs"
+)
+KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_FIXTURE = Path(
+    "test-data/iwork/keynote/slide-movie-creation-focused-native.key"
+)
+KEYNOTE_SLIDE_MOVIE_CREATION_FRESH_NATIVE_FIXTURE = Path(
+    "test-data/iwork/keynote/slide-movie-creation-fresh-focused-native.key"
+)
+KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_EVIDENCE = (
+    (
+        KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_FIXTURE,
+        "native_saved_file_movie_creation_reuse_candidate_is_stable",
+    ),
+    (
+        KEYNOTE_SLIDE_MOVIE_CREATION_FRESH_NATIVE_FIXTURE,
+        "native_saved_file_movie_creation_fresh_candidate_is_stable",
+    ),
+)
+KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_TESTS = tuple(
+    test_name for _, test_name in KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_EVIDENCE
+)
+IWA_KEYNOTE_SLIDE_MOVIE_CREATION_TEST_ROOT = Path("crates/litchi-iwa/tests")
+IWA_KEYNOTE_SLIDE_MOVIE_CREATION_HOST_METHODS = frozenset(
+    {
+        "add_slide_movie",
+        "movie_creation_values",
+        "movie_objects",
+        "media_objects",
+    }
+)
+IWA_KEYNOTE_SLIDE_MOVIE_CREATION_HOST_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>add_slide_movie|"
+    r"movie_creation_values|movie_objects|media_objects)(?![A-Za-z0-9_])"
+    r"[ \t\r\n]*\("
+)
+IWA_KEYNOTE_SLIDE_MOVIE_CREATION_HOST_IMPORT = re.compile(
+    r"(?m)^[ \t]*(?:pub[ \t]+)?use[^;\n]*\b(?:movie_creation_values|"
+    r"movie_objects|media_objects)\b"
+)
+
+# The focused owner may use archive/source-catalog primitives to publish the
+# transaction.  These patterns therefore match only generated schemas,
+# eager protobuf operations, and explicit calls back into the legacy editor.
+KEYNOTE_SLIDE_MOVIE_CREATION_FORBIDDEN_SOURCE_PATTERNS = (
+    *KEYNOTE_SLIDE_AUDIO_CREATION_FORBIDDEN_SOURCE_PATTERNS,
+    (
+        "legacy editor delegation",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:KeynoteEditor|IWorkPackage)"
+            r"(?:[ \t\r\n]*::|[ \t\r\n]*\.)|"
+            r"(?<![A-Za-z0-9_#])(?:editor|host|legacy_editor)"
+            r"[ \t\r\n]*\.[ \t\r\n]*add_slide_movie\b"
+        ),
+    ),
+)
+KEYNOTE_SLIDE_MOVIE_CREATION_ROUTE = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:CreationOptions|MediaCreationOptions)"
+    r"[ \t\r\n]*::[ \t\r\n]*Movie\b|"
+    r"(?<![A-Za-z0-9_#])(?:pub[ \t]+)?fn[ \t\r\n]+add_slide_movie\b|"
+    r"(?<![A-Za-z0-9_#])make_movie_objects\b|"
+    r"(?<![A-Za-z0-9_#])SlideMovieCreation(?:Commit|Patch|Error|Diagnostics)\b"
+)
+KEYNOTE_SLIDE_MOVIE_CREATION_CODEC_ROUTE = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
+    r"(?:keynote_media_creation_codec|media_creation_codec)"
+    r"[ \t\r\n]*::[ \t\r\n]*"
+    r"encode_media_archive(?:_with_report)?[ \t\r\n]*\("
+)
+KEYNOTE_SLIDE_MOVIE_CREATION_RAW_API_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:object_id|native_id|archive_id|component_id|"
+    r"drawable_id|movie_id|raw_id)[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u64|u32|usize|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
+)
+KEYNOTE_SLIDE_MOVIE_CREATION_RAW_API_TYPE = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:ArchiveObject|RawMessage|KeynoteEditor|IWorkPackage)\b"
+)
+
 
 def _keynote_slide_audio_creation_focused_package_call(
     source: str, match: re.Match[str]
@@ -48830,10 +48919,11 @@ def audit_iwa_keynote_media_creation_source_topology(
     path = root / IWA_KEYNOTE_MEDIA_CREATION_SOURCE
     codec_path = root / KEYNOTE_MEDIA_CREATION_CODEC_SOURCE
     if not path.is_file():
-        return [] if not codec_path.is_file() else [
-            "litchi-iwa Keynote media-creation host source is missing: "
-            f"{IWA_KEYNOTE_MEDIA_CREATION_SOURCE}"
-        ]
+        # The migration host route is retired once focused movie/audio
+        # creation owns publication.  The independent codec audit below still
+        # verifies the neutral Buffa source; a missing host file is therefore
+        # a completed handoff rather than a topology violation.
+        return []
 
     masked_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
     source = _mask_rust_non_code(masked_source)
@@ -49118,6 +49208,235 @@ def audit_iwa_keynote_slide_audio_creation_source_topology(
                 line_number = source.count("\n", 0, match.start("method")) + 1
                 violations.append(
                     "retired litchi-iwa Keynote slide-audio creation call/helper "
+                    f"{method}: {relative}:{line_number}"
+                )
+    return sorted(set(violations))
+
+
+def _keynote_slide_movie_creation_owner_paths(root: Path) -> list[Path]:
+    """Return the shared movie-creation owner and its private Rust children."""
+
+    owner = root / KEYNOTE_SLIDE_MOVIE_CREATION_OWNER_SOURCE
+    shared_owner = root / KEYNOTE_SLIDE_MOVIE_CREATION_SHARED_OWNER_SOURCE
+    child_root = root / KEYNOTE_SLIDE_MOVIE_CREATION_CHILD_ROOT
+    paths = [
+        path
+        for path in (owner, shared_owner)
+        if path.is_file()
+    ] + (
+        sorted(child_root.rglob("*.rs")) if child_root.is_dir() else []
+    )
+    return list(dict.fromkeys(paths))
+
+
+def _keynote_slide_movie_creation_route_source(root: Path) -> str:
+    """Return masked focused sources when the shared owner has a movie route."""
+
+    paths = _keynote_slide_movie_creation_owner_paths(root)
+    if not paths:
+        return ""
+    source = "\n".join(
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        for path in paths
+        if path.name not in KEYNOTE_TEST_ONLY_SOURCE_NAMES
+    )
+    return source if KEYNOTE_SLIDE_MOVIE_CREATION_ROUTE.search(source) else ""
+
+
+def _audit_keynote_slide_movie_creation_native_evidence(root: Path) -> list[str]:
+    """Require both saved native movie receipts and their stable tests."""
+
+    test_path = root / KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_TEST_SOURCE
+    if not test_path.is_file():
+        return [
+            "focused Keynote file-movie creation retirement is missing its native "
+            f"integration test: {KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_TEST_SOURCE}"
+        ]
+
+    raw_test = test_path.read_text(encoding="utf-8")
+    code_test = _mask_rust_non_code(raw_test)
+    violations: list[str] = []
+    for fixture, test_name in KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_EVIDENCE:
+        fixture_path = root / fixture
+        if not fixture_path.is_file():
+            violations.append(
+                "focused Keynote file-movie creation retirement is missing native "
+                f"fixture: {fixture}"
+            )
+        elif fixture_path.stat().st_size == 0:
+            violations.append(
+                "focused Keynote file-movie creation native fixture is empty: "
+                f"{fixture}"
+            )
+        if re.search(
+            rf"\binclude_bytes!\s*\([^)]*{re.escape(fixture.as_posix())}",
+            raw_test,
+        ) is None:
+            violations.append(
+                "focused Keynote file-movie creation native integration test must "
+                f"include fixture {fixture}: {KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_TEST_SOURCE}"
+            )
+        if re.search(
+            rf"(?m)^\s*#\s*\[\s*test\s*\]\s*\n\s*fn\s+"
+            rf"{re.escape(test_name)}\b",
+            code_test,
+        ) is None:
+            violations.append(
+                "focused Keynote file-movie creation native integration test is "
+                f"missing {test_name}: {KEYNOTE_SLIDE_MOVIE_CREATION_NATIVE_TEST_SOURCE}"
+            )
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_movie_creation_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the focused file-movie route typed and neutral.
+
+    The shared audio owner is allowed to contain physical archive transaction
+    code.  This operation-specific audit activates only after an explicit
+    ``CreationOptions::Movie`` (or equivalent typed enum) route appears, then
+    requires the bounded neutral media codec and rejects generated schemas,
+    eager protobuf operations, and direct legacy-editor delegation.  Raw
+    native identifiers are checked only on the public movie-creation function
+    signature so private archive bookkeeping remains available to the owner.
+    """
+
+    route_source = _keynote_slide_movie_creation_route_source(root)
+    if not route_source:
+        return []
+
+    violations: list[str] = []
+    if KEYNOTE_SLIDE_MOVIE_CREATION_CODEC_ROUTE.search(route_source) is None:
+        violations.append(
+            "focused litchi-keynote file-movie creation must route payloads through "
+            f"the bounded neutral media codec: {KEYNOTE_SLIDE_MOVIE_CREATION_OWNER_SOURCE}"
+        )
+    if re.search(r"\b(?:try_encoded_len|try_encode_bounded|try_reserve_exact)\b", route_source) is None:
+        violations.append(
+            "focused litchi-keynote file-movie creation is missing bounded encoding "
+            f"preflight: {KEYNOTE_SLIDE_MOVIE_CREATION_OWNER_SOURCE}"
+        )
+
+    for path in _keynote_slide_movie_creation_owner_paths(root):
+        if path.name in KEYNOTE_TEST_ONLY_SOURCE_NAMES:
+            continue
+        raw_source = path.read_text(encoding="utf-8")
+        production_source = _mask_rust_cfg_test_items(raw_source)
+        production_code = _mask_rust_non_code(production_source)
+        for label, pattern in KEYNOTE_SLIDE_MOVIE_CREATION_FORBIDDEN_SOURCE_PATTERNS:
+            for match in pattern.finditer(production_code):
+                line_number = production_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "focused litchi-keynote file-movie creation production source "
+                    f"uses {label}: {path.relative_to(root)}:{line_number}"
+                )
+
+        # Keep raw-ID rejection local to a semantic entry point.  The shared
+        # owner necessarily uses u64 references while staging the archive.
+        function = _rust_named_function_body(production_source, "add_slide_movie")
+        if function is not None:
+            body, body_offset = function
+            signature = production_code[:body_offset]
+            signature_start = signature.rfind("fn add_slide_movie")
+            if signature_start >= 0:
+                signature = signature[max(0, signature_start - 240) :]
+                for match in KEYNOTE_SLIDE_MOVIE_CREATION_RAW_API_PARAMETER.finditer(
+                    signature
+                ):
+                    line_number = production_code.count(
+                        "\n", 0, body_offset - len(signature) + match.start()
+                    ) + 1
+                    violations.append(
+                        "focused litchi-keynote file-movie creation public API exposes "
+                        f"a raw identifier parameter: {path.relative_to(root)}:{line_number}"
+                    )
+                for match in KEYNOTE_SLIDE_MOVIE_CREATION_RAW_API_TYPE.finditer(
+                    signature
+                ):
+                    line_number = production_code.count(
+                        "\n", 0, body_offset - len(signature) + match.start()
+                    ) + 1
+                    violations.append(
+                        "focused litchi-keynote file-movie creation public API exposes "
+                        f"a raw object type {match.group(0)}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_slide_movie_creation_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire raw host movie creation only after native saved-file evidence.
+
+    The owner is the permanent activation seam.  Native receipts are checked
+    in as required evidence and missing/deleted evidence is reported while
+    the raw editor method and graph helpers remain rejected.  Focused
+    ``Package::add_slide_movie`` calls stay legal in compatibility tests.
+    """
+
+    if not _keynote_slide_movie_creation_route_source(root):
+        return []
+
+    violations = _audit_keynote_slide_movie_creation_native_evidence(root)
+    source_roots = [
+        root / IWA_KEYNOTE_SOURCE_ROOT,
+        root / IWA_KEYNOTE_SLIDE_MOVIE_CREATION_TEST_ROOT,
+    ]
+    examples = root / IWA_CORE_EXAMPLE_SOURCE_ROOT
+    if examples.is_dir():
+        source_roots.append(examples)
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    for source_root in source_roots:
+        if not source_root.is_dir():
+            continue
+        for path in sorted(source_root.rglob("*.rs")):
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            )
+            relative = path.relative_to(root)
+            for match in IWA_KEYNOTE_SLIDE_MOVIE_CREATION_HOST_IMPORT.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote file-movie creation graph helper import "
+                    f"{match.group(0).strip()}: {relative}:{line_number}"
+                )
+            for match in declaration.finditer(source):
+                name = match.group(1)
+                if name not in IWA_KEYNOTE_SLIDE_MOVIE_CREATION_HOST_METHODS:
+                    continue
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote file-movie creation method/helper "
+                    f"{name}: {relative}:{line_number}"
+                )
+            for match in IWA_KEYNOTE_SLIDE_MOVIE_CREATION_HOST_CALL.finditer(source):
+                line_start = source.rfind("\n", 0, match.start()) + 1
+                line_end = source.find("\n", match.end())
+                line_end = len(source) if line_end < 0 else line_end
+                line = source[line_start:line_end]
+                method = match.group("method")
+                if re.search(rf"\bfn[ \t\r\n]+{re.escape(method)}\b", line):
+                    continue
+                if method == "add_slide_movie":
+                    context = source[max(0, match.start() - 220) : match.start()]
+                    if re.search(
+                        r"\b(?:package|focused_package|keynote_package)\s*\.\s*$|"
+                        r"\b(?:Package|KeynotePackage)\s*::\s*$",
+                        context,
+                    ):
+                        continue
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote file-movie creation call/helper "
                     f"{method}: {relative}:{line_number}"
                 )
     return sorted(set(violations))
@@ -66025,6 +66344,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_media_creation_codec_source_topology()
         + audit_keynote_slide_audio_creation_source_topology()
         + audit_iwa_keynote_slide_audio_creation_source_topology()
+        + audit_keynote_slide_movie_creation_source_topology()
+        + audit_iwa_keynote_slide_movie_creation_source_topology()
         + audit_pages_document_public_api()
         + audit_pages_package_output_api_source_topology()
         + audit_iwork_atomic_publication()

@@ -1,8 +1,8 @@
 //! Compatibility coverage for the focused Keynote slide-audio position owner.
 //!
-//! Focused package creation plus source-built host observations verify the
-//! selector transaction through mixed source-order media after raw creation
-//! and property APIs were retired.
+//! Focused package creation plus host observations verify the selector
+//! transaction through mixed source-order media after raw creation and
+//! property APIs were retired.
 
 use std::{env, error::Error, fs, io, path::PathBuf, time::Duration};
 
@@ -95,13 +95,40 @@ fn add_audio(
     Ok(())
 }
 
+fn add_movie(
+    editor: &mut KeynoteEditor,
+    preferred_movie_filename: &str,
+    movie_data: &[u8],
+    preferred_poster_filename: &str,
+    poster_data: &[u8],
+    options: SlideMovieOptions,
+) -> TestResult<u64> {
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package.add_slide_movie(
+        SlideSelector::index(0),
+        preferred_movie_filename,
+        movie_data,
+        preferred_poster_filename,
+        poster_data,
+        options,
+    )?;
+    let bytes = package_bytes(commit.package())?;
+    *editor = KeynoteEditor::from_bytes(&bytes)?;
+    editor
+        .slide_movies(0)?
+        .into_iter()
+        .last()
+        .map(|movie| movie.drawable_object_id)
+        .ok_or_else(|| io::Error::other("focused movie creation produced no host movie").into())
+}
+
 fn source_fixture() -> TestResult<SourceFixture> {
     let mut editor = KeynoteDocumentBuilder::new()
         .title("Focused audio position")
         .subtitle("Source-built selector compatibility")
         .build()?;
-    let movie_a = editor.add_slide_movie(
-        0,
+    let movie_a_id = add_movie(
+        &mut editor,
         "position-movie-a.mov",
         MOVIE_A,
         "position-poster-a.png",
@@ -121,8 +148,8 @@ fn source_fixture() -> TestResult<SourceFixture> {
         AUDIO_A,
         audio_options(HostPoint { x: 960.0, y: 540.0 }, Duration::from_secs(12)),
     )?;
-    editor.add_slide_movie(
-        0,
+    add_movie(
+        &mut editor,
         "position-movie-b.mov",
         MOVIE_B,
         "position-poster-b.png",
@@ -146,11 +173,11 @@ fn source_fixture() -> TestResult<SourceFixture> {
     let source_build = editor
         .slide_builds(0)?
         .into_iter()
-        .find(|build| build.drawable_object_id == movie_a.drawable_object_id)
-        .ok_or_else(|| io::Error::other("source-built movie has no automatic build"))?;
+        .find(|build| build.drawable_object_id == movie_a_id)
+        .ok_or_else(|| io::Error::other("created movie has no automatic build"))?;
     let mut second_build = source_build.settings;
     second_build.set_start(BuildStart::AfterPrevious)?;
-    editor.add_slide_build(0, movie_a.drawable_object_id, second_build)?;
+    editor.add_slide_build(0, movie_a_id, second_build)?;
 
     let movie_b_id = editor
         .slide_movies(0)?

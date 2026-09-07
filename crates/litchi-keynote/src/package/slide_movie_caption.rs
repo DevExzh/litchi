@@ -31,6 +31,8 @@ const CAPTION_PLACEMENT_MESSAGE_TYPE: u32 = 634;
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 const SHAPE_STYLE_MESSAGE_TYPE: u32 = 2_025;
 const SLIDE_MESSAGE_TYPE: u32 = 5;
+const BUILD_MESSAGE_TYPE: u32 = 8;
+const SLIDE_BUILDS_FIELD: u32 = 2;
 const SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
 const MOVIE_SUPER_FIELD: u32 = 1;
 const DRAWABLE_PARENT_FIELD: u32 = 2;
@@ -895,7 +897,12 @@ pub(super) fn select_movie_text(
         return Err(SlideMovieCaptionError::InvalidSource);
     }
     if mutation_guards {
-        prove_exclusive_movie_drawable(package, record.slide_identifier, movie_identifier)?;
+        prove_exclusive_movie_drawable(
+            package,
+            record.slide_identifier,
+            component_name,
+            movie_identifier,
+        )?;
     }
     let empty = |reference_identifier| MovieCaptionSelection {
         slide_position,
@@ -1106,9 +1113,17 @@ fn movie_parent_identifier(
 fn prove_exclusive_movie_drawable(
     package: &Package,
     slide_identifier: u64,
+    slide_component_name: &str,
     movie_identifier: u64,
 ) -> Result<(), SlideMovieCaptionError> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
+    let selected_build_identifiers = selected_movie_build_identifiers(
+        package,
+        slide_identifier,
+        slide_component_name,
+        movie_identifier,
+        limits,
+    )?;
     let mut payload_occurrences = 0usize;
     let mut aggregate_occurrences = 0usize;
     let mut field_occurrences = 0usize;
@@ -1126,6 +1141,9 @@ fn prove_exclusive_movie_drawable(
                     .ok_or(SlideMovieCaptionError::InvalidSource)?;
                 let canonical_slide =
                     owner_identifier == slide_identifier && message.type_ == SLIDE_MESSAGE_TYPE;
+                let selected_build = component.name() == slide_component_name
+                    && message.type_ == BUILD_MESSAGE_TYPE
+                    && selected_build_identifiers.contains(&owner_identifier);
 
                 if message.type_ == SLIDE_MESSAGE_TYPE {
                     let local =
@@ -1155,7 +1173,7 @@ fn prove_exclusive_movie_drawable(
                     return Err(SlideMovieCaptionError::UnsupportedDependency);
                 }
                 if aggregate_count != 0 {
-                    if !canonical_slide || aggregate_count != 1 {
+                    if aggregate_count != 1 || (!canonical_slide && !selected_build) {
                         return Err(SlideMovieCaptionError::UnsupportedDependency);
                     }
                     aggregate_occurrences = aggregate_occurrences
@@ -1195,11 +1213,119 @@ fn prove_exclusive_movie_drawable(
             }
         }
     }
-    if payload_occurrences == 1 && aggregate_occurrences == 1 && field_occurrences <= 1 {
+    let expected_aggregate_occurrences = 1usize
+        .checked_add(selected_build_identifiers.len())
+        .ok_or(SlideMovieCaptionError::InvalidSource)?;
+    if payload_occurrences == 1
+        && aggregate_occurrences == expected_aggregate_occurrences
+        && field_occurrences <= 1
+    {
         Ok(())
     } else {
         Err(SlideMovieCaptionError::InvalidSource)
     }
+}
+
+/// Resolve the only additional inbound edge authored by a fresh movie
+/// creation: a same-component movie-start build registered by the selected
+/// slide.  Header membership alone is insufficient because an unregistered
+/// build (or a build whose payload names another drawable) must remain a
+/// rejected cross-graph dependency.
+fn selected_movie_build_identifiers(
+    package: &Package,
+    slide_identifier: u64,
+    slide_component_name: &str,
+    movie_identifier: u64,
+    limits: litchi_iwa_common::WireLimits,
+) -> Result<Vec<u64>, SlideMovieCaptionError> {
+    let slide = package
+        .object(slide_identifier)
+        .ok_or(SlideMovieCaptionError::InvalidSource)?;
+    let slide_payload =
+        super::unique_payload(&slide.messages, &[SLIDE_MESSAGE_TYPE], "Keynote slide")
+            .map_err(map_read_error)?;
+    let build_identifiers = repeated_references(slide_payload, SLIDE_BUILDS_FIELD, limits)?;
+    let mut selected = Vec::new();
+    selected
+        .try_reserve_exact(build_identifiers.len())
+        .map_err(|_| SlideMovieCaptionError::Allocation {
+            amount: build_identifiers.len(),
+        })?;
+    for (index, identifier) in build_identifiers.iter().copied().enumerate() {
+        if build_identifiers[..index].contains(&identifier) {
+            return Err(SlideMovieCaptionError::UnsupportedDependency);
+        }
+        let (component, object) = package
+            .object_with_component(identifier)
+            .ok_or(SlideMovieCaptionError::InvalidSource)?;
+        if component != slide_component_name {
+            continue;
+        }
+        let mut build_message = None;
+        for (message_index, message) in object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == BUILD_MESSAGE_TYPE)
+        {
+            if build_message.replace((message_index, message)).is_some() {
+                return Err(SlideMovieCaptionError::UnsupportedDependency);
+            }
+        }
+        let Some((message_index, message)) = build_message else {
+            continue;
+        };
+        let info = object
+            .archive_info
+            .message_infos
+            .get(message_index)
+            .ok_or(SlideMovieCaptionError::InvalidSource)?;
+        if info.type_ != BUILD_MESSAGE_TYPE
+            || usize::try_from(info.length).ok() != Some(message.data.len())
+        {
+            return Err(SlideMovieCaptionError::InvalidSource);
+        }
+        let payload = message.data.as_slice();
+        if build_target_identifier(payload, limits)? != movie_identifier {
+            continue;
+        }
+        validate_movie_start_build(payload, limits)?;
+        match info.object_references.as_slice() {
+            [] => {},
+            [reference] if *reference == movie_identifier => selected.push(identifier),
+            _ => return Err(SlideMovieCaptionError::UnsupportedDependency),
+        }
+    }
+    Ok(selected)
+}
+
+/// Require the canonical movie-start target/effect projection from one build
+/// payload.  The generated native build model is deliberately not used at
+/// this ingress boundary; this keeps the guard on the bounded wire view.
+fn build_target_identifier(
+    payload: &[u8],
+    limits: litchi_iwa_common::WireLimits,
+) -> Result<u64, SlideMovieCaptionError> {
+    let drawable = unique_length_delimited_payload(payload, 1, limits)?
+        .ok_or(SlideMovieCaptionError::InvalidSource)?;
+    super::validate_reference_payload(drawable, limits, "Keynote movie build")
+        .map_err(map_wire_error)
+}
+
+fn validate_movie_start_build(
+    payload: &[u8],
+    limits: litchi_iwa_common::WireLimits,
+) -> Result<(), SlideMovieCaptionError> {
+    let attributes = unique_length_delimited_payload(payload, 4, limits)?
+        .ok_or(SlideMovieCaptionError::UnsupportedDependency)?;
+    let animation = unique_length_delimited_payload(attributes, 18, limits)?
+        .ok_or(SlideMovieCaptionError::UnsupportedDependency)?;
+    let effect = unique_length_delimited_payload(animation, 2, limits)?
+        .ok_or(SlideMovieCaptionError::UnsupportedDependency)?;
+    if effect != b"apple:movie-start" {
+        return Err(SlideMovieCaptionError::UnsupportedDependency);
+    }
+    Ok(())
 }
 
 fn require_private_object(

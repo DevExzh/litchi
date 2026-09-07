@@ -28,6 +28,7 @@ mod slide_media_lifecycle;
 mod slide_media_properties;
 mod slide_media_replacement;
 mod slide_movie_caption;
+mod slide_movie_creation;
 mod slide_movie_geometry;
 mod slide_movie_playback;
 mod slide_movie_title;

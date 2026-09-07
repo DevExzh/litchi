@@ -266,10 +266,15 @@ package. Fresh source-package creation now belongs to `litchi-keynote` through
 stand-ins, playback builds, metadata and cache updates, and publishes an exact
 reversible patch. Private Buffa media/build projections in `litchi-iwa-protos`
 own payload encoding. Native save/close/reopen acceptance permits retirement
-of the raw host audio-creation method and audio object constructors. The
-retained migration host uses the same media writer for file movies and retains
-audio listing values carrying native IDs, drawable properties, and playback
-presence; those remaining read routes are separate migration work.
+of the raw host audio-creation method and audio object constructors. Focused
+file-movie creation now shares its bounded source discovery, identity allocator,
+metadata planner, graph witness, and exact publication path. A single metadata
+transaction handles video and poster assets, and the neutral Buffa build codec
+shares typed movie/audio sizing and encoding. Native acceptance covers both
+reused assets and two newly inserted assets; the raw movie-creation route and
+payload constructors are retired. The migration host retains media listing
+values carrying native IDs, drawable properties, and playback presence; those
+remaining read routes are separate migration work.
 Keynote media-property reads and transactions belong to `litchi-keynote`.
 Native audio and file-movie fixtures establish save/close/reopen parity for
 hyperlinks, accessibility descriptions, lock, and aspect-ratio lock. The four

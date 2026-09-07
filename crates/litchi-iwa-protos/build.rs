@@ -7870,15 +7870,18 @@ fn enforce_keynote_build_creation_projection_provenance(
     projection_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
     const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\npackage LitchiIwaProjection;\nmessage Reference {\nrequired uint64 identifier = 1;\n}\nmessage UUID {\nrequired uint64 lower = 1;\nrequired uint64 upper = 2;\n}\nmessage AnimationAttributesArchive {\noptional string animation_type = 1;\noptional string effect = 2;\noptional double duration = 3;\noptional double delay = 5;\noptional uint32 random_number_seed = 11;\noptional bool writing_direction_is_rtl = 16;\n}\nmessage BuildAttributesArchive {\noptional .LitchiIwaProjection.AnimationAttributesArchive animation_attributes = 18;\noptional uint32 event_trigger = 4;\noptional double chart_rotation_3_d = 17;\n}\nmessage BuildArchive {\noptional .LitchiIwaProjection.Reference drawable = 1;\nrequired string delivery = 2;\noptional double duration = 3;\nrequired .LitchiIwaProjection.BuildAttributesArchive attributes = 4;\noptional int32 chunk_id_seed = 5;\n}\nmessage BuildChunkIdentifierArchive {\noptional .LitchiIwaProjection.UUID build_id = 1;\noptional int32 build_chunk_id = 2;\n}\nmessage BuildChunkArchive {\noptional .LitchiIwaProjection.Reference build = 1;\noptional double delay = 3;\noptional double duration = 4;\noptional bool automatic = 5;\noptional bool referent = 6;\noptional .LitchiIwaProjection.BuildChunkIdentifierArchive build_chunk_identifier = 7;\noptional .LitchiIwaProjection.UUID build_id = 8;\n}";
-    const CODEC_MARKERS: [&str; 9] = [
+    const CODEC_MARKERS: [&str; 12] = [
         "pub fn encode_start_audio_build(",
         "pub fn encode_start_audio_chunk(",
+        "pub fn encode_start_movie_build(",
+        "pub fn encode_start_movie_chunk(",
         "use buffa::ViewEncode;",
         "try_encoded_len",
         "try_encode_bounded",
         "crate::buffa_keynote_build_creation_generated::",
         "fn validate_write(",
         "pub struct StartAudioBuildWrite",
+        "pub struct StartMovieBuildWrite",
         "pub enum EncodeLimit",
     ];
     let projection =

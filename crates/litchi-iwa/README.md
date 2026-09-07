@@ -360,8 +360,8 @@ slide movie title/caption CRUD is owned by the focused
 `litchi_keynote::Package` methods
 `{slide_movie_title,edit_slide_movie_title,apply_slide_movie_title,slide_movie_caption,edit_slide_movie_caption,apply_slide_movie_caption}`
 with `SlideSelector` and `MovieSelector`; the migration host no longer exposes
-wrappers for those operations. See `create_keynote_movie.rs` for the focused
-package workflow. Movie labels remain independent through duplicate, delete,
+wrappers for those operations. See the focused package movie workflow below.
+Movie labels remain independent through duplicate, delete,
 and package round-trip operations.
 
 Body and sheet movies likewise expose `flip_body_movie` and `flip_sheet_movie`,
@@ -1013,7 +1013,7 @@ keynote.save("created-with-image.key")?;
 positioned on the same slide, while its media data stays shared with the source.
 Replacing either image's bytes updates both images.
 
-File-backed movies use the same source-built path. The video, poster, media
+File-backed movies use the focused package path. The video, poster, media
 style, stand-ins, component registrations, and Keynote's automatic playback
 build and timing chunk are generated from typed values:
 
@@ -1027,9 +1027,10 @@ use litchi_keynote::{MovieSelector, Package, SlideSelector};
 
 let movie = fs::read("demo.mov")?;
 let poster = fs::read("demo-poster.png")?;
-let mut keynote = KeynoteDocumentBuilder::new().build()?;
-keynote.add_slide_movie(
-    0,
+let source = KeynoteDocumentBuilder::new().build()?;
+let package = Package::from_bytes(&source.to_bytes()?)?;
+let commit = package.add_slide_movie(
+    SlideSelector::index(0),
     "demo.mov",
     &movie,
     "demo-poster.png",
@@ -1040,7 +1041,7 @@ keynote.add_slide_movie(
         Duration::from_secs(8),
     )?,
 )?;
-keynote.save("created-with-movie-source.key")?;
+commit.package().save("created-with-movie-source.key")?;
 
 let package = Package::open("created-with-movie-source.key")?;
 let duplicate = package.duplicate_slide_movie(
@@ -1051,8 +1052,8 @@ duplicate.package().save("created-with-movie.key")?;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-The builder remains the host's creation path. The lifecycle handoff reopens the
-saved artifact through `litchi_keynote::Package`, where the typed
+The builder supplies an empty source package. Creation and the lifecycle handoff
+run through `litchi_keynote::Package`, where the typed
 `SlideSelector` and `MovieSelector` address the source-order movie without
 exposing drawable IDs, native object IDs, or data keys. The verified commit
 returned by `Package::duplicate_slide_movie` creates the new movie graph and

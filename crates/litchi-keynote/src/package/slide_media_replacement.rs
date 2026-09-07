@@ -323,6 +323,17 @@ struct MediaRecord {
     unknown_fields: bool,
 }
 
+/// The two materialized assets rooted by one file-backed movie.
+///
+/// The graph selection and metadata codec walk are shared for both records.
+/// The records themselves remain owned so the borrowed ZIP bytes can only be
+/// returned after every metadata and ownership check has completed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct MediaSelectionPair {
+    content: MediaRecord,
+    poster: MediaRecord,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct OwnerRecord {
     component_identifier: u64,
@@ -1099,6 +1110,70 @@ pub(super) fn select_media(
     part: MediaPart,
     budget: &mut MediaBudget,
 ) -> Result<MediaSelection, SlideMediaDataError> {
+    let mut selection = select_media_graph(package, slide_selector, movie_selector, part, budget)?;
+    let record = validate_media_closure(package, &selection, part, budget)?;
+    selection.record = Some(record);
+    Ok(selection)
+}
+
+/// Select both materialized assets with one graph walk and one metadata codec
+/// inspection.  Each record still receives the complete physical closure
+/// checks before either borrowed ZIP member is exposed to the caller.
+pub(super) fn select_media_pair(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    movie_selector: MovieSelector,
+    budget: &mut MediaBudget,
+) -> Result<MediaSelectionPair, SlideMediaDataError> {
+    let selection = select_media_graph(
+        package,
+        slide_selector,
+        movie_selector,
+        MediaPart::Poster,
+        budget,
+    )?;
+    let content_identifier = selection
+        .identifier(MediaPart::Content)
+        .ok_or(SlideMediaDataError::InvalidSource)?;
+    let poster_identifier = selection
+        .identifier(MediaPart::Poster)
+        .ok_or(SlideMediaDataError::InvalidSource)?;
+    let catalog = physical_catalog(package)?;
+    let facts = metadata_facts_for_ids(
+        package,
+        catalog,
+        &selection,
+        MetadataIdentifiers::Pair(content_identifier, poster_identifier),
+        budget,
+    )?;
+    let content = validated_media_record_with_facts(
+        package,
+        catalog,
+        &selection,
+        MediaPart::Content,
+        content_identifier,
+        &facts,
+        budget,
+    )?;
+    let poster = validated_media_record_with_facts(
+        package,
+        catalog,
+        &selection,
+        MediaPart::Poster,
+        poster_identifier,
+        &facts,
+        budget,
+    )?;
+    Ok(MediaSelectionPair { content, poster })
+}
+
+fn select_media_graph(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    movie_selector: MovieSelector,
+    part: MediaPart,
+    budget: &mut MediaBudget,
+) -> Result<MediaSelection, SlideMediaDataError> {
     budget.slides(1)?;
     let slide_position = resolve_slide_position(package, slide_selector)?;
     let record = package
@@ -1216,9 +1291,6 @@ pub(super) fn select_media(
         poster_identifier,
         record: None,
     };
-    let record = validate_media_closure(package, &selection, part, budget)?;
-    let mut selection = selection;
-    selection.record = Some(record);
     Ok(selection)
 }
 
@@ -1412,6 +1484,25 @@ pub(super) fn read_selected_media<'a>(
         .as_ref()
         .ok_or(SlideMediaDataError::InvalidSource)?;
     let _ = part;
+    read_media_record(catalog, record, budget)
+}
+
+pub(super) fn read_selected_media_pair<'a>(
+    package: &'a Package,
+    pair: &MediaSelectionPair,
+    budget: &mut MediaBudget,
+) -> Result<(&'a [u8], &'a [u8]), SlideMediaDataError> {
+    let catalog = physical_catalog(package)?;
+    let content = read_media_record(catalog, &pair.content, budget)?;
+    let poster = read_media_record(catalog, &pair.poster, budget)?;
+    Ok((content, poster))
+}
+
+fn read_media_record<'a>(
+    catalog: &'a SourceCatalog,
+    record: &MediaRecord,
+    budget: &mut MediaBudget,
+) -> Result<&'a [u8], SlideMediaDataError> {
     let mut matches = catalog.package().iter().filter(|entry| {
         entry
             .name()
@@ -1450,6 +1541,20 @@ fn validated_media_record(
         }
     })?;
     let facts = metadata_facts(package, catalog, selection, identifier, budget)?;
+    validated_media_record_with_facts(
+        package, catalog, selection, part, identifier, &facts, budget,
+    )
+}
+
+fn validated_media_record_with_facts(
+    package: &Package,
+    catalog: &SourceCatalog,
+    selection: &MediaSelection,
+    part: MediaPart,
+    identifier: u64,
+    facts: &OwnedMetadataFacts,
+    budget: &mut MediaBudget,
+) -> Result<MediaRecord, SlideMediaDataError> {
     let locator = selection
         .component_name
         .strip_prefix("Index/")
@@ -1753,11 +1858,33 @@ fn metadata_stream_profile(
     Ok((stream_capacity, snappy_limits, archive_limits))
 }
 
+#[derive(Debug, Clone, Copy)]
+enum MetadataIdentifiers {
+    One(u64),
+    Pair(u64, u64),
+}
+
 fn metadata_facts(
     package: &Package,
     catalog: &SourceCatalog,
     selection: &MediaSelection,
     identifier: u64,
+    budget: &mut MediaBudget,
+) -> Result<OwnedMetadataFacts, SlideMediaDataError> {
+    metadata_facts_for_ids(
+        package,
+        catalog,
+        selection,
+        MetadataIdentifiers::One(identifier),
+        budget,
+    )
+}
+
+fn metadata_facts_for_ids(
+    package: &Package,
+    catalog: &SourceCatalog,
+    selection: &MediaSelection,
+    identifiers: MetadataIdentifiers,
     budget: &mut MediaBudget,
 ) -> Result<OwnedMetadataFacts, SlideMediaDataError> {
     let metadata_archive = catalog
@@ -1887,9 +2014,24 @@ fn metadata_facts(
         return Err(SlideMediaDataError::InvalidSource);
     }
     let MetadataVisitor { facts, budget } = visitor;
-    closure::validate_selected_media_closure(
-        package, payload, &facts, selection, identifier, budget,
-    )?;
+    match identifiers {
+        MetadataIdentifiers::One(identifier) => {
+            closure::validate_selected_media_closure(
+                package, payload, &facts, selection, identifier, budget,
+            )?;
+        },
+        MetadataIdentifiers::Pair(content_identifier, poster_identifier) => {
+            let identifiers = [content_identifier, poster_identifier];
+            closure::validate_selected_media_closures(
+                package,
+                payload,
+                &facts,
+                selection,
+                &identifiers,
+                budget,
+            )?;
+        },
+    }
     Ok(facts)
 }
 
