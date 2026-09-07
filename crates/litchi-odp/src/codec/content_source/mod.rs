@@ -17,7 +17,7 @@ mod scanner_reference;
 use litchi_core::{Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
 
-use scanner::Scanner;
+pub(crate) use scanner::Scanner;
 
 /// OASIS `office` namespace.
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -175,9 +175,55 @@ impl ContentSource {
         // `quick-xml` reports byte positions relative to the text after any
         // byte-order mark, so the mark is split off here and re-emitted
         // verbatim when the document is written back.
-        let body = xml.strip_prefix(BYTE_ORDER_MARK).unwrap_or(xml);
-        let has_byte_order_mark = body.len() != xml.len();
+        let (body, has_byte_order_mark) = Self::source_body(xml);
         let mut scanner = Scanner::new(body);
+        let mut reader = quick_xml::reader::NsReader::from_str(body);
+        reader.config_mut().check_end_names = true;
+        reader.config_mut().trim_text(false);
+        loop {
+            let event = reader
+                .read_event()
+                .map_err(|error| invalid(format!("invalid presentation content.xml: {error}")))?;
+            if matches!(event, quick_xml::events::Event::Eof) {
+                break;
+            }
+            let end = usize::try_from(reader.buffer_position()).map_err(|_error| {
+                invalid("presentation content.xml position exceeds platform limits")
+            })?;
+            scanner.step(&reader, &event, end)?;
+        }
+        scanner.finish(has_byte_order_mark)
+    }
+
+    /// Split a leading UTF-8 byte-order mark from the source used by the
+    /// namespace reader. The scanner's byte spans are relative to this body;
+    /// [`ContentSource`] retains the fact that the mark was present.
+    pub(crate) fn source_body(xml: &str) -> (&str, bool) {
+        let body = xml.strip_prefix(BYTE_ORDER_MARK).unwrap_or(xml);
+        (body, body.len() != xml.len())
+    }
+
+    /// Return the source-fragment size error without making it the metadata
+    /// traversal's immediate error. The combined staging path reports this
+    /// only after all metadata scanners have finished.
+    pub(crate) fn source_limit_error(xml: &str) -> Option<Error> {
+        (xml.len() > MAX_XML_BYTES).then(|| {
+            invalid(format!(
+                "presentation content.xml exceeds {MAX_XML_BYTES} bytes"
+            ))
+        })
+    }
+
+    /// Run the preserved pre-refactor source scanner for differential tests.
+    #[cfg(test)]
+    pub(crate) fn parse_reference(xml: &str) -> Result<Option<Self>> {
+        if xml.len() > MAX_XML_BYTES {
+            return Err(invalid(format!(
+                "presentation content.xml exceeds {MAX_XML_BYTES} bytes"
+            )));
+        }
+        let (body, has_byte_order_mark) = Self::source_body(xml);
+        let mut scanner = scanner_reference::Scanner::new(body);
         scanner.run()?;
         Ok(scanner.finish(body, has_byte_order_mark))
     }

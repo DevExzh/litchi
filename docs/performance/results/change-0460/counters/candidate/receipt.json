@@ -1,0 +1,74 @@
+{
+  "schema": "litchi-0460-counters-v1",
+  "variant": "candidate",
+  "binding_sha256": "cbd2fbf31c596facd5f5f2c17160290475674ab3d490a79158b2f6372b019a8d",
+  "driver_sha256": "c7dcacbcad68b25dacdb96ef6a2d5d65c0edec3427030e9cd3f1762fbbc50991",
+  "started_utc": "2026-09-07T15:49:44.144905+00:00",
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0460/counters/candidate/resource.log",
+    "taskset",
+    "-c",
+    "2",
+    "perf",
+    "stat",
+    "-x,",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0460/counters/candidate/counters.csv",
+    "-e",
+    "cycles,instructions,branches,branch-misses,cache-misses,page-faults,context-switches",
+    "--",
+    "/tmp/litchi-goal-0460/candidate/litchi-perf-baseline",
+    "odp-append-attribution",
+    "--mode",
+    "lifecycle",
+    "--shape",
+    "large",
+    "--warmup",
+    "3",
+    "--samples",
+    "100",
+    "--repeat",
+    "diagnostic",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0460/counters/candidate/report.json"
+  ],
+  "scope": "whole process including setup, warmups, checks and reporting",
+  "status": "pass",
+  "exit_code": 0,
+  "oracle": {
+    "status": "pass",
+    "rows": 100,
+    "phase_count": 0
+  },
+  "finished_utc": "2026-09-07T15:49:59.869771+00:00",
+  "artifacts": [
+    {
+      "path": "counters/candidate/counters.csv",
+      "bytes": 344,
+      "sha256": "107fa4b57f91ecca5b1053a1199ac3aa0d66dda3923e1c7dcd2f07d99d1a71a1"
+    },
+    {
+      "path": "counters/candidate/report.json",
+      "bytes": 107852,
+      "sha256": "b153f09641dfee92487dcbf757a14f3bfd661bcd0f778c2720f927d6ca840e78"
+    },
+    {
+      "path": "counters/candidate/resource.log",
+      "bytes": 1187,
+      "sha256": "edc0f1470a88ee7c9f5efb7113e7679facd0a51c9e9de17c892de48a3d673f89"
+    },
+    {
+      "path": "counters/candidate/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "counters/candidate/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

@@ -1,5 +1,41 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0460: retained fused ODP staging and source scanning
+
+0460 retains the private ODP staging optimization after the frozen A1/B1/B2/A2
+matrix: 24 reports and 720 samples, two repeats, normal and allocator lanes,
+three warmups, 30 samples per lane, CPU 2 and one worker. Negative values below
+are candidate minus baseline p50 deltas.
+
+| Shape | Normal p50 R1 / R2 | 95% p50 CI upper bounds R1 / R2 |
+|---|---:|---:|
+| Tiny, 64 slides | -3.5430% / -3.8257% | diagnostic only |
+| Medium, 4,096 slides | -6.0849% / -5.0679% | -5.8855% / -4.8589% |
+| Large, 8,192 slides | -5.4732% / -5.8268% | -5.2903% / -5.5514% |
+
+The keep gate requires at least 3% normal p50 improvement for medium and large
+in both repeats, with both bootstrap upper bounds below zero; all four gated
+targets pass. No adverse >5% elapsed or process-RSS flags are present. The
+allocator lanes improve p50 by -4.7840% / -4.1309% for tiny, -7.3100% /
+-6.7785% for medium, and -7.3197% / -6.9282% for large. Each allocator lane
+reduces allocated bytes by 4,642, allocation calls by 16, reallocations by 12,
+and deallocations by 4; regional peak above entry and retained-live deltas are
+unchanged.
+
+The [0460 comparison](results/change-0460/summary.json) and [phase summary](results/change-0460/phase-summary.json)
+keep lifecycle timing separate from supplementary phase clocks and whole-process
+counters. Transaction phase p50 falls 24.2681% / 24.0697% in R1/R2. The
+counter deltas are instructions -6.1959%, cycles -4.9100% and branch misses
++0.5503%; setup, warmups and checks are included, so these are not operation-only
+or causal counts. The corrected owner retry passes 371 tests and warning-denied
+all-target Clippy passes. All builds, 387 harness tests (one ignored), documentation, boundaries,
+portable verification and owned temporary cleanup pass.
+
+The fused reader preserves the existing state machines, error order, BOM-relative
+spans, source ownership and readback/patch/no-op contracts. No selector or corpus
+coverage is added; the registry remains 439 selectors / 36 defaults, the full
+non-iWork goal remains open, and iWork is untouched.
+
 ## Change 0459: rejected lookup experiment and resolved profiles
 
 A matched A1/B1/B2/A2 ordinary ODP append experiment retains 24 reports and 720

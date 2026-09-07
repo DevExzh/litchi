@@ -26,9 +26,8 @@ struct Frame {
 }
 
 /// Incremental scanner that records the spans a save needs to reuse.
-pub(super) struct Scanner<'input> {
+pub(crate) struct Scanner<'input> {
     xml: &'input str,
-    reader: NsReader<&'input [u8]>,
     stack: Vec<Frame>,
     root_open: Option<XmlSpan>,
     prologue_start: Option<usize>,
@@ -50,12 +49,9 @@ pub(super) struct Scanner<'input> {
 }
 
 impl<'input> Scanner<'input> {
-    pub(super) fn new(xml: &'input str) -> Self {
-        let mut reader = NsReader::from_str(xml);
-        reader.config_mut().check_end_names = true;
+    pub(crate) fn new(xml: &'input str) -> Self {
         Self {
             xml,
-            reader,
             stack: Vec::new(),
             root_open: None,
             prologue_start: None,
@@ -73,68 +69,66 @@ impl<'input> Scanner<'input> {
         }
     }
 
-    pub(super) fn run(&mut self) -> Result<()> {
-        loop {
-            let (kind, event) = {
-                let (resolved, event) = self.reader.read_resolved_event().map_err(|error| {
-                    invalid(format!("invalid presentation content.xml: {error}"))
-                })?;
-                let kind = match &event {
-                    Event::Start(element) | Event::Empty(element) => {
-                        classify(&resolved, element.local_name().as_ref())
-                    },
-                    _ => ElementKind::Other,
-                };
-                (kind, event)
-            };
-            let end = usize::try_from(self.reader.buffer_position()).map_err(|_error| {
-                invalid("presentation content.xml position exceeds platform limits")
-            })?;
-            match event {
-                Event::Start(element) => {
-                    let start = event_start(self.xml, end)?;
-                    if self.stack.is_empty() {
-                        self.collect_root_namespaces(&element)?;
-                    }
-                    self.on_open(kind, start, end, false)?;
-                    if self.styles_depth.is_some() && kind == ElementKind::Style {
-                        self.record_style_name(&element)?;
-                    }
-                    if self.stack.len() >= MAX_DEPTH {
-                        return Err(invalid(format!(
-                            "presentation content.xml nests deeper than {MAX_DEPTH} elements"
-                        )));
-                    }
-                    self.stack.push(Frame { kind, start });
-                },
-                Event::Empty(element) => {
-                    let start = event_start(self.xml, end)?;
-                    if self.styles_depth.is_some() && kind == ElementKind::Style {
-                        self.record_style_name(&element)?;
-                    }
-                    self.on_open(kind, start, end, true)?;
-                    self.on_close(kind, start, start, end);
-                },
-                Event::End(_) => {
-                    let close_start = event_start(self.xml, end)?;
-                    let frame = self
-                        .stack
-                        .pop()
-                        .ok_or_else(|| invalid("presentation content.xml depth underflow"))?;
-                    self.on_close(frame.kind, frame.start, close_start, end);
-                },
-                Event::Eof => break,
-                Event::Text(_)
-                | Event::CData(_)
-                | Event::Comment(_)
-                | Event::Decl(_)
-                | Event::PI(_)
-                | Event::DocType(_)
-                | Event::GeneralRef(_) => {},
-            }
-        }
-        if !self.stack.is_empty() {
-            return Err(invalid("unterminated presentation content.xml element"));
+    /// Consume one event from a caller-owned namespace-aware reader.
+    ///
+    /// The reader and its event buffer are deliberately borrowed here so a
+    /// metadata traversal can feed this source-fragment state machine without
+    /// creating a second tokenizer or namespace stack. `end` is the reader's
+    /// current absolute byte position immediately after `event`.
+    pub(crate) fn step(
+        &mut self,
+        reader: &NsReader<&[u8]>,
+        event: &Event<'_>,
+        end: usize,
+    ) -> Result<()> {
+        let kind = match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let (resolved, local) = reader.resolver().resolve_element(element.name());
+                classify(&resolved, local.as_ref())
+            },
+            _ => ElementKind::Other,
+        };
+        match event {
+            Event::Start(element) => {
+                let start = event_start(self.xml, end)?;
+                if self.stack.is_empty() {
+                    self.collect_root_namespaces(reader, element)?;
+                }
+                self.on_open(kind, start, end, false)?;
+                if self.styles_depth.is_some() && kind == ElementKind::Style {
+                    self.record_style_name(reader, element)?;
+                }
+                if self.stack.len() >= MAX_DEPTH {
+                    return Err(invalid(format!(
+                        "presentation content.xml nests deeper than {MAX_DEPTH} elements"
+                    )));
+                }
+                self.stack.push(Frame { kind, start });
+            },
+            Event::Empty(element) => {
+                let start = event_start(self.xml, end)?;
+                if self.styles_depth.is_some() && kind == ElementKind::Style {
+                    self.record_style_name(reader, element)?;
+                }
+                self.on_open(kind, start, end, true)?;
+                self.on_close(kind, start, start, end);
+            },
+            Event::End(_) => {
+                let close_start = event_start(self.xml, end)?;
+                let frame = self
+                    .stack
+                    .pop()
+                    .ok_or_else(|| invalid("presentation content.xml depth underflow"))?;
+                self.on_close(frame.kind, frame.start, close_start, end);
+            },
+            Event::Eof => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         Ok(())
     }
@@ -241,7 +235,11 @@ impl<'input> Scanner<'input> {
     }
 
     /// Record every namespace binding declared on the root element.
-    fn collect_root_namespaces(&mut self, element: &BytesStart<'_>) -> Result<()> {
+    fn collect_root_namespaces(
+        &mut self,
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<()> {
         for raw_attribute in element.attributes() {
             let attribute = raw_attribute.map_err(|error| {
                 invalid(format!(
@@ -259,14 +257,18 @@ impl<'input> Scanner<'input> {
                 continue;
             };
             let value = attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, self.reader.decoder())
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                 .map_err(|error| invalid(format!("invalid namespace declaration: {error}")))?;
             self.root_namespaces.insert(prefix, value.into_owned());
         }
         Ok(())
     }
 
-    fn record_style_name(&mut self, element: &BytesStart<'_>) -> Result<()> {
+    fn record_style_name(
+        &mut self,
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<()> {
         if self.style_names.len() >= MAX_STYLE_NAMES {
             return Err(invalid(format!(
                 "presentation content.xml declares more than {MAX_STYLE_NAMES} automatic styles"
@@ -275,14 +277,14 @@ impl<'input> Scanner<'input> {
         for raw_attribute in element.attributes() {
             let attribute = raw_attribute
                 .map_err(|error| invalid(format!("invalid style attribute: {error}")))?;
-            let (namespace, local) = self.reader.resolver().resolve_attribute(attribute.key);
+            let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
             if local.as_ref() != STYLE_NAME_ATTRIBUTE
                 || !matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == STYLE_NAMESPACE)
             {
                 continue;
             }
             let value = attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, self.reader.decoder())
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                 .map_err(|error| invalid(format!("invalid style:name value: {error}")))?;
             self.style_names.insert(value.into_owned());
         }
@@ -290,26 +292,37 @@ impl<'input> Scanner<'input> {
     }
 
     /// Assemble the retained skeleton, or `None` when the shape is unexpected.
-    pub(super) fn finish(self, xml: &str, has_byte_order_mark: bool) -> Option<ContentSource> {
-        let root_open = self.root_open?;
-        let body_open = self.body_open?;
-        let presentation_open = self.presentation_open?;
-        let prologue_start = self.prologue_start?;
+    pub(crate) fn finish(self, has_byte_order_mark: bool) -> Result<Option<ContentSource>> {
+        if !self.stack.is_empty() {
+            return Err(invalid("unterminated presentation content.xml element"));
+        }
+        let Some(root_open) = self.root_open else {
+            return Ok(None);
+        };
+        let Some(body_open) = self.body_open else {
+            return Ok(None);
+        };
+        let Some(presentation_open) = self.presentation_open else {
+            return Ok(None);
+        };
+        let Some(prologue_start) = self.prologue_start else {
+            return Ok(None);
+        };
         if body_open.start < prologue_start {
-            return None;
+            return Ok(None);
         }
         let (splice, styles_site) = self
             .styles_site
             .unwrap_or((body_open.start, AutomaticStylesSite::Missing));
         if splice < prologue_start || splice > body_open.start {
-            return None;
+            return Ok(None);
         }
         let tail_start = match styles_site {
             AutomaticStylesSite::Empty { span, .. } => span.end,
             AutomaticStylesSite::Content | AutomaticStylesSite::Missing => splice,
         };
-        Some(ContentSource {
-            xml: xml.to_owned(),
+        Ok(Some(ContentSource {
+            xml: self.xml.to_owned(),
             prolog: XmlSpan {
                 start: 0,
                 end: root_open.start,
@@ -332,7 +345,7 @@ impl<'input> Scanner<'input> {
             style_names: self.style_names,
             root_namespaces: self.root_namespaces,
             has_byte_order_mark,
-        })
+        }))
     }
 }
 

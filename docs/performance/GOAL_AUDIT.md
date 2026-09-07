@@ -1,5 +1,35 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0460 evidence (2026-09-07)
+
+0460 retains the private ODP fused staging/source-scanning optimization. The
+authoritative A1/B1/B2/A2 lifecycle matrix contains 24 reports and 720 samples.
+Normal p50 candidate-minus-baseline deltas are -3.5430% / -3.8257% for tiny,
+-6.0849% / -5.0679% for medium, and -5.4732% / -5.8268% for large in R1/R2.
+All four medium/large rows pass the predeclared 3% improvement gate with
+negative independent bootstrap upper bounds; no adverse >5% elapsed or RSS
+flags are present.
+
+Allocator p50 deltas are -4.7840% / -4.1309% for tiny, -7.3100% / -6.7785%
+for medium, and -7.3197% / -6.9282% for large. Every allocator lane reduces
+allocated bytes by 4,642, allocation calls by 16, reallocations by 12 and
+deallocations by 4, while regional peak and retained-live deltas are unchanged.
+Supplementary phase clocks show transaction p50 reductions of -24.2681% /
+-24.0697%; whole-process counters show instructions -6.1959%, cycles -4.9100%
+and branch misses +0.5503%. Those supplementary scopes include setup, warmups
+and checks and do not establish causal API attribution.
+
+The source review finds the fused namespace-aware traversal preserves state
+machines, error precedence, BOM-relative spans, limits, source ownership and
+readback/patch/no-op contracts. The corrected owner retry passes 371 tests and
+all-target warning-denied Clippy passes. The optimization is retained under
+this scoped evidence; no selector or corpus coverage is added, counts remain
+439 selectors / 36 defaults, the full non-iWork goal remains open, and iWork is
+untouched. All builds, 387 harness tests (one ignored), documentation, boundaries,
+portable verification and owned temporary cleanup pass. See the [0460 comparison
+summary](results/change-0460/summary.json), [phase summary](results/change-0460/phase-summary.json),
+and [source review](results/change-0460/source-review.md).
+
 ## Current audit: 0459 evidence (2026-09-07)
 
 0459 makes measurement progress: it repairs sampled phase ancestry and rejects

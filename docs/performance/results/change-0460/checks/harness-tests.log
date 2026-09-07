@@ -1,0 +1,469 @@
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `release` profile [optimized] target(s) in 1m 21s
+     Running unittests src/lib.rs (tools/perf-baseline/target/release/deps/litchi_perf_baseline-a3a4432e929aeba9)
+
+running 350 tests
+test allocation_metrics::tests::checked_difference_turns_counter_wrap_into_overflow_status ... ok
+test allocation_metrics::tests::concurrent_allocations_retain_the_exact_overlapping_peak ... ok
+test allocation_metrics::tests::concurrent_begin_race_grants_one_region_and_marks_others_unavailable ... ok
+test allocation_metrics::tests::counter_arithmetic_overflow_and_live_underflow_are_sticky ... ok
+test allocation_metrics::tests::disabled_region_publishes_no_sample ... ok
+test allocation_metrics::tests::failed_allocation_does_not_change_live_or_peak_bytes ... ok
+test allocation_metrics::tests::multi_step_counter_state_matches_an_independent_live_reference ... ok
+test allocation_metrics::tests::nested_callback_entry_is_suppressed_and_invalidates_future_regions ... ok
+test allocation_metrics::tests::one_allocation_then_deallocation_retains_peak_live_bytes ... ok
+test allocation_metrics::tests::poisoned_observer_is_recovered_as_unavailable ... ok
+test allocation_metrics::tests::reallocation_growth_and_shrink_update_live_bytes_without_losing_peak ... ok
+test allocation_metrics::tests::reentrant_callback_makes_active_and_future_regions_unavailable ... ok
+test allocation_metrics::tests::region_counts_cross_thread_totals_without_resetting_absolute_counters ... ok
+test allocation_metrics::tests::region_guard_rejects_overlap_without_heap_scope_state ... ok
+test allocation_metrics::tests::region_peak_includes_concurrent_callbacks_before_finish ... ok
+test allocation_metrics::tests::region_peak_is_separate_from_historical_process_peak ... ok
+test allocation_metrics::tests::region_peak_retains_an_entry_allocation_after_it_is_freed ... ok
+test allocation_metrics::tests::region_reallocation_growth_shrink_and_failed_allocations_are_ordered ... ok
+test allocation_metrics::tests::repeated_boundaries_and_dropped_regions_release_only_the_owner ... ok
+test allocation_metrics::tests::sample_status_serialization_is_explicit ... ok
+test cold_verified::tests::block_filesystem_allowlist_is_conservative ... ok
+test cold_verified::tests::fincore_method_has_no_implicit_fallback ... ok
+test cold_verified::tests::fincore_report_provenance_omits_paths_and_stderr_contents ... ok
+test cold_verified::tests::page_alignment_preserves_zip_eocd_and_cfb_prefix ... ok
+test cold_verified::tests::process_read_bytes_gate_requires_a_positive_delta ... ok
+test cold_verified::tests::process_snapshot_failure_is_explicitly_ineligible ... ok
+test cold_verified::tests::residency_dirty_and_writeback_states_fail_closed_independently ... ok
+test cold_verified::tests::strict_fincore_json_accepts_requested_columns ... ok
+test cold_verified::tests::strict_fincore_json_rejects_multiple_or_empty_records ... ok
+test cold_verified::tests::strict_fincore_json_rejects_unknown_and_duplicate_fields ... ok
+test cold_verified::tests::zip_alignment_rejects_missing_eocd_and_oversized_page ... ok
+test corpus_manifest::tests::catalog_hash_is_independent_of_record_order ... ok
+test corpus_manifest::tests::duplicate_case_binding_is_rejected ... ok
+test corpus_manifest::tests::known_family_map_enriches_without_source_hashes ... ok
+test corpus_manifest::tests::migration_preserves_legacy_projection ... ok
+test docx_story_hyperlink_publication::tests::corpus_is_deterministic_and_covers_every_story_kind ... ok
+test docx_story_hyperlink_publication::tests::noop_and_redaction_publishers_emit_end_to_end_gated_evidence ... ok
+test docx_story_hyperlink_publication::tests::phase_sum_is_checked_without_saturation ... ok
+test docx_story_hyperlink_publication::tests::publication_failure_is_captured_after_the_region_and_before_error_propagation ... ok
+test docx_story_hyperlink_publication::tests::sample_vectors_reorder_by_elapsed_then_original_index_and_retain_ties ... ok
+test docx_story_hyperlinks::tests::corpus_is_bounded_deterministic_and_out_of_default ... ok
+test docx_story_hyperlinks::tests::runner_keeps_plan_timing_separate_from_correctness_gates ... ok
+test filesystem::tests::cache_selection_is_explicit_and_additive ... ok
+test filesystem::tests::child_output_keeps_allocation_sample_additive_and_omits_error_path_absence ... ok
+test filesystem::tests::cold_state_labels_are_distinct_from_warm_and_unsupported ... ok
+test filesystem::tests::counting_source_does_not_call_one_range_sequential ... ok
+test filesystem::tests::counting_source_marks_concurrent_observations_unknown ... ok
+test filesystem::tests::counting_source_marks_counter_overflow_unavailable ... ok
+test filesystem::tests::counting_source_marks_noncontiguous_ranges_random_and_short_reads_unknown ... ok
+test filesystem::tests::counting_source_poisoned_metrics_fail_closed ... ok
+test filesystem::tests::counting_source_records_exact_sizes_and_sequential_pattern ... ok
+test filesystem::tests::counting_source_records_failed_attempt_as_requested_only ... ok
+test filesystem::tests::counting_source_rejects_invalid_range_arithmetic ... ok
+test filesystem::tests::counting_source_rejects_over_return_before_recording_returned_bytes ... ok
+test filesystem::tests::docx_replay_coverage_tracks_each_payload_class ... ok
+test filesystem::tests::docx_root_operation_scopes_are_explicit ... ok
+test filesystem::tests::executing_failing_child_exits_without_success_json ... ok
+test filesystem::tests::failing_child_probe ... ok
+test filesystem::tests::filesystem_case_names_are_explicit_and_parseable ... ok
+test filesystem::tests::host_evidence_is_non_path_and_reports_same_device_probe ... ok
+test filesystem::tests::owned_cfb_operation_marks_immutable_ingress_without_read_counters ... ok
+test filesystem::tests::padded_docx_archive_keeps_semantic_corpus_identity ... ok
+test filesystem::tests::padded_xlsx_archive_keeps_typed_semantics_and_reports_aligned_hash ... ok
+test filesystem::tests::pinned_filesystem_hash_literals_are_complete ... ok
+test filesystem::tests::pptx_replay_overlap_accounting_is_exact_and_disjoint ... ok
+test filesystem::tests::pptx_root_operation_scopes_are_explicit ... ok
+test filesystem::tests::prepared_query_controls_are_not_cold_verified ... ok
+test filesystem::tests::read_size_buckets_are_fixed_and_boundary_stable ... ok
+test filesystem::tests::source_hash_guard_rejects_mutation_between_samples ... ok
+test filesystem::tests::verified_digest_is_requested_only_for_eligible_save_operations ... ok
+test filesystem::tests::xlsx_filesystem_operations_preserve_open_vs_lifecycle_scopes ... ok
+test filesystem::tests::xlsx_repeated_store_selectors_roundtrip_structural_control_scope ... ok
+test filesystem::tests::xlsx_semantic_oracle_hash_is_deterministic ... ok
+test odp_append_attribution::tests::lifecycle_capture_has_no_phase_rows_and_exact_output ... ok
+test odp_append_attribution::tests::parser_rejects_missing_and_invalid_controls ... ok
+test odp_append_attribution::tests::phase_order_and_frozen_identities_are_stable ... ok
+test odp_append_attribution::tests::phases_capture_has_checked_output_and_sum_gap ... ok
+test odp_buffered_create::content_structure::tests::fixed_content_gate_rejects_structural_and_semantic_mutations ... ok
+test odp_buffered_create::tests::buffered_oracle_rejects_manifest_binding_mutation ... ok
+test odp_buffered_create::tests::buffered_oracle_rejects_semantic_content_mutation ... ok
+test odp_buffered_create::tests::buffered_tiny_archive_has_exact_package_and_semantic_oracle ... ok
+test odp_buffered_create::tests::mime_header_gate_rejects_extra_fields_descriptors_and_reordered_members ... ok
+test odp_buffered_create::tests::oversized_titled_deck_preserves_the_default_xml_attribute_refusal ... ok
+test odp_buffered_create::tests::slide_text_projection_scales_with_stable_distinct_hashes ... ok
+test odp_existing_append::tests::opaque_fixture_uses_authoritative_formula ... ok
+test odp_existing_append::tests::output_oracle_rejects_missing_append_and_changed_opaque_member ... ok
+test odp_existing_append::tests::runner_is_opt_in_and_binds_actual_commit_bytes_to_sink ... ok
+test odp_existing_append::tests::tiny_append_fixture_has_exact_output_and_patch_gates ... ok
+test odp_source_tail_append::tests::runner_binds_source_reads_and_publication_report_to_candidate ... ok
+test odp_source_tail_append::tests::source_tail_append_is_opt_in_and_has_independent_candidate_gates ... ok
+test odp_streaming_create::tests::streaming_tiny_report_matches_shared_fixture ... ok
+test odp_streaming_create::tests::streaming_tiny_runner_binds_raw_sink_input_and_fixed_window ... ok
+test odt_streaming_create::tests::buffered_oracle_rejects_manifest_binding_mutation ... ok
+test odt_streaming_create::tests::buffered_text_projection_scales_with_stable_distinct_hashes ... ok
+test odt_streaming_create::tests::buffered_tiny_archive_has_exact_package_and_semantic_oracle ... ok
+test odt_streaming_create::tests::streaming_tiny_corpus_reuses_semantic_and_package_gates ... ok
+test opc_part_add::tests::opc_part_add_fixture_and_all_refusal_gates_are_deterministic ... ok
+test opc_part_add::tests::opc_part_add_lifecycle_reports_observed_source_and_discard_sink ... ok
+test opc_part_add::tests::opc_part_add_oracle_rejects_added_payload_and_untouched_part_changes ... ok
+test opc_part_add::tests::plain_and_observed_lifecycles_match_without_fabricating_plain_reads ... ok
+test operation_metrics::opc_zip_tests::opc_zip_vectors_follow_elapsed_order_and_preserve_zeroes ... ok
+test operation_metrics::source_and_sink_tests::source_and_sink_observations_align_ties_without_inventing_codec_counters ... ok
+test operation_metrics::tests::allocation_overflow_omits_numeric_vectors ... ok
+test operation_metrics::tests::allocation_status_scope_and_cardinality_are_strict ... ok
+test operation_metrics::tests::allocation_unavailable_omits_region_peak_vector_with_explicit_scope ... ok
+test operation_metrics::tests::allocation_vectors_are_aligned_and_absolute_live_counts_are_retained ... ok
+test operation_metrics::tests::asymmetric_option_fails_closed ... ok
+test operation_metrics::tests::cfb_phase_metrics_are_aligned_and_fail_closed ... ok
+test operation_metrics::tests::duplicate_sample_identity_fails_closed ... ok
+test operation_metrics::tests::eager_opc_scope_omits_uninstrumented_fs_read_zeroes ... ok
+test operation_metrics::tests::exact_cardinality_is_required ... ok
+test operation_metrics::tests::filesystem_xlsx_scope_is_explicitly_not_applicable ... ok
+test operation_metrics::tests::immutable_owned_slice_scope_is_not_applicable ... ok
+test operation_metrics::tests::in_process_materialization_observations_align_ties_and_publish_evidence_scope ... ok
+test operation_metrics::tests::in_process_observations_mark_procfs_unavailable_without_values ... ok
+test operation_metrics::tests::in_process_observations_publish_aligned_resource_vectors_and_json ... ok
+test operation_metrics::tests::measured_source_pattern_is_required_for_each_sample ... ok
+test operation_metrics::tests::measured_zero_is_not_unavailable ... ok
+test operation_metrics::tests::not_applicable_scope_omits_zero_read_vectors ... ok
+test operation_metrics::tests::sink_observation_is_accepted_boundary_and_aligned ... ok
+test operation_metrics::tests::sink_observation_requires_nonempty_samples ... ok
+test operation_metrics::tests::status_and_max_value_serialize_without_null_numeric_placeholders ... ok
+test operation_metrics::tests::tied_elapsed_samples_keep_stable_sample_identity_alignment ... ok
+test operation_metrics::tests::unavailable_procfs_metrics_omit_values_and_keep_status ... ok
+test operation_metrics::tests::unknown_scope_is_unavailable_instead_of_a_measured_zero ... ok
+test operation_metrics::tests::warm_and_cold_partitioning_is_exact_and_sorted_like_elapsed ... ok
+test parallel_metrics::tests::collect_validates_typed_shape_and_reorders_chunk_evidence ... ok
+test parallel_metrics::tests::extracts_typed_range_simulation_counter ... ok
+test parallel_metrics::tests::leaves_ambiguous_chunk_sources_unavailable ... ok
+test parallel_metrics::tests::never_converts_waiter_counts_or_bytes_into_lock_or_chunk_metrics ... ok
+test parallel_metrics::tests::records_explicit_worker_budget_and_logical_tasks_only ... ok
+test parallel_metrics::tests::records_one_explicit_opc_worker_team_as_local_observation ... ok
+test parallel_metrics::tests::records_opc_direct_lock_wait_p50_when_producer_exposes_it ... ok
+test parallel_metrics::tests::records_range_simulator_request_chunks_per_retained_sample ... ok
+test parallel_metrics::tests::rejects_chunk_vectors_that_cannot_align_to_retained_samples ... ok
+test parallel_metrics::tests::rejects_opc_lock_wait_vector_with_wrong_sample_count ... ok
+test parallel_metrics::tests::rejects_result_worker_width_outside_configured_budget ... ok
+test parallel_metrics::tests::rejects_unsorted_or_duplicate_worker_budget ... ok
+test parallel_metrics::tests::treats_multiple_worker_teams_as_ambiguous ... ok
+test parallel_metrics::tests::treats_serial_zero_team_as_not_applicable ... ok
+test pptx_cache_retention::tests::config_accepts_lifecycle_both_corpora_and_rejects_near_plain ... ok
+test pptx_cache_retention::tests::config_accepts_near_media_and_repeated_plain ... ok
+test pptx_cache_retention::tests::config_rejects_non_lowercase_revision_duplicates_and_bounds ... ok
+test pptx_cache_retention::tests::event_interval_uses_checked_counter_delta ... ok
+test pptx_cache_retention::tests::unavailable_cache_points_do_not_fabricate_counters ... ok
+test pptx_native_image::tests::config_accepts_each_provider_and_requires_range_controls ... ok
+test pptx_native_image::tests::config_rejects_duplicates_bounds_and_invalid_revision ... ok
+test pptx_native_image::tests::config_rejects_range_controls_for_direct_providers ... ok
+test pptx_native_image::tests::native_image_payload_survives_owner_drops_across_providers ... ok
+test pptx_native_image::tests::shapes_original_and_resaved_keep_their_typed_refusals ... ok
+test pptx_provider_lifecycle::tests::explicit_delay_policy_requires_rate_and_rejects_unknown_or_duplicate_values ... ok
+test pptx_provider_lifecycle::tests::parser_rejects_unknown_duplicate_and_mismatched_arguments ... ok
+test pptx_provider_lifecycle::tests::parser_requires_range_controls_only_for_range_provider ... ok
+test pptx_provider_lifecycle::tests::plain_lifecycle_output_identity_matches_all_providers ... ok
+test pptx_provider_lifecycle::tests::provider_adapter_preserves_exact_bytes_and_records_zero_delay ... ok
+test pptx_provider_lifecycle::tests::transfer_rate_requires_range_provider_and_explicit_bounded_nonzero_value ... ok
+test pptx_range_source::tests::checked_delta_rejects_counter_regression ... ok
+test pptx_range_source::tests::delay_policies_preserve_nominal_counters_and_short_read_bytes ... ok
+test pptx_range_source::tests::empty_buffer_and_eof_have_distinct_call_semantics ... ok
+test pptx_range_source::tests::failed_reads_do_not_accrue_transfer_pacing ... ok
+test pptx_range_source::tests::forwards_length_and_version ... ok
+test pptx_range_source::tests::logical_counter_overflow_fails_closed_without_wrapping ... ok
+test pptx_range_source::tests::minimum_service_wait_credits_elapsed_work_and_checks_duration_overflow ... ok
+test pptx_range_source::tests::mixed_request_sizes_fill_the_fixed_histogram ... ok
+test pptx_range_source::tests::request_size_histogram_overflow_fails_closed_without_wrapping ... ok
+test pptx_range_source::tests::short_reads_reconstruct_the_exact_source ... ok
+test pptx_range_source::tests::transfer_counter_overflow_and_delta_regression_fail_closed ... ok
+test pptx_range_source::tests::transfer_delay_rounds_up_and_refuses_overflow ... ok
+test pptx_range_source::tests::transfer_pacing_counts_returned_chunks_and_excludes_empty_eof_and_zero_cap ... ok
+test pptx_retention::tests::config_bounds_source_revision_and_output_are_strict ... ok
+test pptx_retention::tests::config_rejects_missing_required_flags_and_numeric_overflow ... ok
+test pptx_retention::tests::config_requires_each_flag_and_rejects_duplicates_and_unknowns ... ok
+test pptx_retention::tests::counter_validation_rejects_nonmonotonic_and_unbalanced_points ... ok
+test pptx_retention::tests::region_validation_rejects_missing_numeric_endpoint_and_intermediate_peak ... ok
+test pptx_retention::tests::snapshot_validation_rejects_flags_underflow_and_low_peak ... ok
+test pptx_slide_boundaries::tests::corpus_is_bounded_and_opt_in ... ok
+test pptx_slide_boundaries::tests::selectors_emit_phases_and_all_boundary_gates ... ok
+test process_metrics::tests::delta_saturates_counters_and_keeps_after_clock_rate ... ok
+test process_metrics::tests::delta_serializes_cpu_units_explicitly ... ok
+test process_metrics::tests::parses_rss_kib ... ok
+test process_metrics::tests::parses_stat_after_parenthesized_command ... ok
+test process_metrics::tests::parses_status_keys_around_parenthesized_values ... ok
+test process_metrics::tests::rejects_overflowing_proc_counter ... ok
+test security_corpus::real_producer_security_corpus_is_bounded_and_deterministic ... ignored, opt-in correctness-only real-producer security corpus
+test tests::bounded_validation_cases_exclude_warmups_and_preserve_topology ... ok
+test tests::cfb_cases_run_against_tiny_smoke_corpus ... ok
+test tests::cfb_corpus_generation_is_deterministic_and_targets_last_root_stream ... ok
+test tests::cfb_open_stream_current_candidate_concurrent_accepts_d_or_dd ... ok
+test tests::cfb_open_stream_current_candidate_records_exact_minifat_ranges ... ok
+test tests::cfb_open_stream_extended_selectors_preserve_payloads ... ok
+test tests::cfb_open_stream_simulation_records_zero_cache_hits_without_losing_events ... ok
+test tests::cfb_open_stream_target_aware_formulas_are_exact ... ok
+test tests::corpus_generation_is_deterministic ... ok
+test tests::counting_sink_rejects_writes_before_mutating_counters ... ok
+test tests::current_executable_identity_is_content_addressed_and_profile_explicit ... ok
+test tests::default_matrix_case_and_result_counts_are_stable ... ok
+test tests::detection_selectors_are_opt_in_with_exact_oracles ... ok
+test tests::doc_body_snapshot_case_is_deterministic_and_semantic ... ok
+test tests::doc_body_text_fnv1a_harness_reference_is_stable ... ok
+test tests::doc_owner_public_phase_case_is_opt_in_and_checked ... ok
+test tests::doc_owner_public_phase_case_supports_payload_heavy_corpus ... ok
+test tests::docx_root_filesystem_matrix_is_opt_in_and_complete ... ok
+test tests::docx_section_layout_selector_is_fixed_and_emits_phase_evidence ... ok
+test tests::docx_semantic_paragraph_selectors_have_distinct_opt_in_mappings ... ok
+test tests::docx_source_edit_is_deterministic_and_emits_complete_evidence ... ok
+test tests::execution_worker_selection_is_capped_deduplicated_and_sorted ... ok
+test tests::explicit_scaling_cases_record_exact_work_units ... ok
+test tests::fresh_writer_corpora_are_deterministic_and_identify_the_packaged_stream ... ok
+test tests::large_odt_repeated_text_selectors_are_matched_and_source_fresh ... ok
+test tests::large_odt_source_backed_catalog_selectors_are_opt_in_and_have_oracles ... ok
+test tests::large_odt_unified_root_filesystem_selectors_are_opt_in_and_matched ... ok
+test tests::large_writer_corpora_are_bounded_and_deterministic ... ok
+test tests::media_rich_odp_corpus_is_deterministic_and_preserved_by_text_box_edit ... ok
+test tests::media_rich_odp_repeated_text_selectors_are_matched_and_source_fresh ... ok
+test tests::media_rich_odp_scalar_and_batch_text_box_replacements_are_matched ... ok
+test tests::media_rich_odp_source_backed_catalog_selectors_are_opt_in_and_have_oracles ... ok
+test tests::media_rich_odp_source_selectors_have_matched_semantic_and_media_evidence ... ok
+test tests::media_rich_odp_unified_root_file_selectors_are_matched_and_lazy ... ok
+test tests::media_rich_ods_cell_batch_sweep_selectors_are_matched_and_source_lazy ... ok
+test tests::media_rich_ods_cell_sweep_selectors_are_matched_and_source_lazy ... ok
+test tests::media_rich_ods_corpus_is_deterministic_and_preserved_by_one_cell_edit ... ok
+test tests::media_rich_ods_unified_root_file_selectors_are_matched_and_lazy ... ok
+test tests::media_rich_odt_append_hyperlink_is_deterministic_and_preserves_untouched_members ... ok
+test tests::media_rich_odt_append_run_is_deterministic_and_preserves_untouched_members ... ok
+test tests::media_rich_odt_corpus_is_deterministic_and_preserved_by_paragraph_edit ... ok
+test tests::media_rich_odt_line_break_is_deterministic_and_preserves_untouched_members ... ok
+test tests::media_rich_odt_scalar_and_batch_resource_replacements_are_matched ... ok
+test tests::media_rich_odt_structural_paragraph_edits_are_deterministic_and_preserve_members ... ok
+test tests::native_doc_paragraph_selectors_have_distinct_opt_in_mappings ... ok
+test tests::native_ole2_tiny_corpora_exercise_all_semantic_cases ... ok
+test tests::native_ppt_repeated_selected_queries_have_matched_semantic_evidence ... ok
+test tests::odf_content_cow_selectors_are_opt_in_and_parse_to_stable_names ... ok
+test tests::odf_content_cow_selectors_execute_with_exact_bounded_evidence ... ok
+test tests::odf_repair_case_is_deterministic_reversible_and_forward_only ... ok
+test tests::odp_buffered_creation_is_opt_in_and_reports_slide_shape_evidence ... ok
+test tests::odp_streaming_creation_is_opt_in_and_binds_shared_semantics ... ok
+test tests::ods_buffered_creation_accepts_tiny_and_large_scalar_corpora ... ok
+test tests::ods_buffered_creation_preserves_the_existing_xml_audit_ceiling ... ok
+test tests::ods_buffered_oracle_rejects_mutated_content_and_extra_members ... ok
+test tests::ods_source_cell_selectors_parse_and_execute_on_media_rich_corpus ... ok
+test tests::ods_source_repeated_edit_selector_parses_and_executes_on_media_rich_corpus ... ok
+test tests::ods_streaming_selector_uses_role_local_corpus_and_matches_buffered_semantics ... ok
+test tests::odt_buffered_creation_is_opt_in_and_reports_semantic_scaling_evidence ... ok
+test tests::odt_streaming_creation_is_opt_in_and_reports_provider_window_evidence ... ok
+test tests::ole_common_heavy_edit_is_deterministic_and_preserves_unchanged_streams ... ok
+test tests::ooxml_tracker_selectors_are_opt_in_and_nsreader_verified ... ok
+test tests::opc_casefold_lookup_selectors_are_opt_in_and_have_fixed_oracles ... ok
+test tests::opc_casefold_owned_open_selector_is_opt_in_and_reports_owned_scope ... ok
+test tests::opc_relationship_selector_is_opt_in_and_cross_checks_exact_identity ... ok
+test tests::opc_serial_eager_open_fixed_matrix_is_deterministic_and_gated ... ok
+test tests::opc_serial_eager_open_preflight_rejects_wrong_fixed_identity ... ok
+test tests::opc_serial_eager_open_selector_is_opt_in_and_fixed ... ok
+test tests::opc_source_cache_budget_boundary_emits_exact_accounting_evidence ... ok
+test tests::opc_source_cache_contention_matrix_is_gated_and_mode_explicit ... ok
+test tests::opc_source_cache_lock_diagnostics_are_explicit_and_sample_aligned ... ok
+test tests::opc_source_materialization_oracle_rejects_payload_metadata_and_main_target_changes ... ok
+test tests::opc_source_materialize_selector_is_opt_in_and_operation_scoped ... ok
+test tests::opc_source_overlay_multi_part_matrix_is_opt_in_and_phase_scoped ... ok
+test tests::opc_source_overlay_save_is_deterministic_and_emits_complete_evidence ... ok
+test tests::owned_cfb_filesystem_selector_is_opt_in_and_round_trips ... ok
+test tests::payload_families_are_distinct_and_repeatable ... ok
+test tests::payload_heavy_writer_corpora_fill_the_primary_stream_deterministically ... ok
+test tests::ppt_picture_selectors_preserve_semantics_and_phase_read_evidence ... ok
+test tests::pptx_batch_controls_are_deterministic_and_materialization_matched ... ok
+test tests::pptx_cross_copy_lifecycle_selectors_measure_owned_end_to_end ... ok
+test tests::pptx_cross_copy_selectors_emit_separated_phase_evidence_and_gates ... ok
+test tests::pptx_multi_slide_controls_are_deterministic_and_equivalent ... ok
+test tests::pptx_root_filesystem_lifecycle_matrix_is_opt_in_and_complete ... ok
+test tests::pptx_slide_name_index_selectors_have_exact_output_and_error_oracles ... ok
+test tests::pptx_source_backed_cross_copy_lifecycles_cover_plain_and_media_oracles ... ok
+test tests::pptx_source_backed_cross_copy_media_lifecycle_gate_rejects_tampered_media_relationship_geometry_and_count ... ok
+test tests::pptx_source_backed_cross_copy_plain_emits_counter_only_evidence ... ok
+test tests::pptx_source_edit_is_deterministic_and_emits_complete_evidence ... ok
+test tests::pptx_source_image_queries_are_opt_in_and_exactly_evidenced ... ok
+test tests::range_simulator_chunks_and_reports_a_deterministic_distribution ... ok
+test tests::range_simulator_delay_arithmetic_is_exact ... ok
+test tests::range_simulators_account_short_and_eof_requests_without_rejecting_empty_reads ... ok
+test tests::range_source_cases_emit_physical_metrics_and_preserve_xlsx_deferral ... ok
+test tests::rtf_paragraph_split_merge_selectors_are_opt_in_bounded_and_gate_complete ... ok
+test tests::rtf_picture_crud_selectors_are_opt_in_bounded_and_gate_complete ... ok
+test tests::selectable_case_count_matches_current_enumeration ... ok
+test tests::selectable_case_registry_has_complete_name_and_parse_mappings ... ok
+test tests::selective_cfb_corpora_are_bounded_and_deterministic ... ok
+test tests::selective_cfb_minifat_boundary_exposes_request_amplification ... ok
+test tests::selective_cfb_read_records_exact_payload_and_io_stages ... ok
+test tests::semantic_docx_and_pptx_tiny_corpora_are_deterministic_and_editable ... ok
+test tests::semantic_docx_medium_one_percent_edit_exercises_batch_publication ... ok
+test tests::semantic_odf_tiny_corpora_are_deterministic_and_editable ... ok
+test tests::semantic_odp_text_sink_is_opt_in_and_deterministic ... ok
+test tests::semantic_ods_medium_one_percent_edit_exercises_atomic_cell_batches ... ok
+test tests::semantic_ods_text_sink_is_opt_in_and_deterministic ... ok
+test tests::semantic_odt_medium_one_percent_edit_exercises_repeated_publication ... ok
+test tests::semantic_odt_mixed_controls_report_matched_publication_counters ... ok
+test tests::semantic_odt_mixed_operation_shapes_are_deterministic_and_bounded ... ok
+test tests::semantic_odt_text_sink_is_opt_in_and_deterministic ... ok
+test tests::semantic_rtf_large_evidence_output_hashes_are_stable ... ok
+test tests::semantic_rtf_lifecycle_cases_are_matched_durable_and_transport_bounded ... ok
+test tests::semantic_rtf_logical_tail_is_bounded_reopenable_and_reversible ... ok
+test tests::semantic_rtf_medium_one_percent_batch_is_atomic_reopenable_and_reversible ... ok
+test tests::semantic_rtf_text_sink_is_utf8_bounded_and_transport_independent ... ok
+test tests::semantic_rtf_tiny_variants_are_deterministic_and_capability_bounded ... ok
+test tests::simulated_selective_cfb_records_bounded_service_and_control_invariants ... ok
+test tests::sink_accounting_overflow_is_checked_and_transactional ... ok
+test tests::sink_write_size_buckets_are_serializable_and_boundary_stable ... ok
+test tests::source_backed_opc_cases_prove_deferred_cached_and_single_flight_reads ... ok
+test tests::statistics_include_tails_dispersion_and_confidence_interval ... ok
+test tests::streaming_creation_evidence_is_fixed_window_and_reopen_verified ... ok
+test tests::streaming_xlsx_oracle_rejects_unexpected_cells_and_members ... ok
+test tests::summarized_sinks_cover_zero_partial_limit_and_seek_accounting ... ok
+test tests::unified_rtf_owned_byte_selectors_are_opt_in_and_native_oracles_are_exact ... ok
+test tests::xls_comment_controls_are_deterministic_bounded_and_source_evidenced ... ok
+test tests::xls_owned_source_lifecycle_is_dedicated_and_has_no_source_counters ... ok
+test tests::xls_range_catalog_coalescing_preserves_multiplicity_and_locality ... ok
+test tests::xls_source_backed_lifecycle_selectors_are_matched_and_local ... ok
+test tests::xls_source_family_dispatch_is_dedicated_and_rejects_overrides ... ok
+test tests::xls_visibility_controls_are_deterministic_bounded_and_source_evidenced ... ok
+test tests::xlsb_lifecycle_selectors_are_opt_in_and_hash_stable ... ok
+test tests::xlsx_auto_filter_edit_controls_are_deterministic_and_equivalent ... ok
+test tests::xlsx_calculation_edit_controls_are_deterministic_and_equivalent ... ok
+test tests::xlsx_cell_lifecycle_clear_and_remove_controls_are_matched_and_bounded ... ok
+test tests::xlsx_cell_values_matched_controls_are_deterministic_and_bounded ... ok
+test tests::xlsx_cell_values_range_accounting_identity_is_source_backed_only ... ok
+test tests::xlsx_conditional_formatting_edit_controls_are_deterministic_and_equivalent ... ok
+test tests::xlsx_data_validation_edit_controls_are_deterministic_and_equivalent ... ok
+test tests::xlsx_defined_name_edit_controls_are_deterministic_and_equivalent ... ok
+test tests::xlsx_dense_wide_shape_preserves_the_narrow_range_contrast ... ok
+test tests::xlsx_edit_composition_selectors_are_opt_in_and_gate_complete ... ok
+test tests::xlsx_merge_and_unmerge_cases_are_deterministic_and_reversible ... ok
+test tests::xlsx_named_sheet_selectors_are_opt_in_and_cover_catalog_oracle ... ok
+test tests::xlsx_page_break_edit_controls_are_deterministic_and_equivalent ... ok
+test tests::xlsx_page_margin_edit_controls_are_deterministic_and_equivalent ... ok
+test tests::xlsx_page_setup_edit_controls_are_deterministic_and_equivalent ... ok
+test tests::xlsx_print_options_edit_controls_are_deterministic_and_equivalent ... ok
+test tests::xlsx_repeated_page_break_selectors_match_the_exact_oracle ... ok
+test tests::xlsx_repeated_store_selectors_are_in_usage_and_roundtrip ... ok
+test tests::xlsx_row_visibility_matched_controls_cover_single_and_bounded_batch ... ok
+test tests::xlsx_sheet_protection_edit_controls_are_deterministic_and_equivalent ... ok
+test tests::xlsx_tiny_corpus_is_deterministic_and_all_xlsx_cases_smoke ... ok
+test tests::xlsx_unified_bytes_selectors_use_facade_bytes_lifecycle ... ok
+test tests::xlsx_unified_root_selectors_are_fresh_filesystem_cases ... ok
+test tests::xlsx_vendor_extension_cell_crud_shape_is_opt_in_and_preserved ... ok
+test tests::zip_index_rejects_manifest_count_drift ... ok
+test tests::zip_index_retains_member_count_oracle_and_actual_samples ... ok
+test xls_numeric::tests::packed_corpus_is_deterministic_and_runs_one_sample ... ok
+test xls_numeric::tests::selectors_are_opt_in_and_have_stable_families ... ok
+test xlsx_cell_crud_oracle_tests::calc_chain_closure_removes_only_relationship_part_and_override ... ok
+test xlsx_cell_crud_oracle_tests::calc_chain_relationship_matching_is_exact_for_both_canonical_uris ... ok
+test xlsx_cell_crud_oracle_tests::current_no_chain_workbook_shape_has_exact_calc_pr_closure ... ok
+test xlsx_cell_crud_oracle_tests::duplicate_normalized_zip_member_names_are_rejected ... ok
+test xlsx_cell_crud_oracle_tests::unexpected_untouched_workbook_mutation_is_not_normalized_away ... ok
+
+test result: ok. 349 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 185.48s
+
+     Running unittests src/bin/docx_source_selected_paragraph.rs (tools/perf-baseline/target/release/deps/docx_source_selected_paragraph-d2ca3e000a4fce6f)
+
+running 12 tests
+test tests::bounded_streaming_hash_counts_and_enforces_limits ... ok
+test tests::byte_accounting_reconciles_structural_residual_ranges ... ok
+test tests::cargo_lock_path_is_package_local ... ok
+test tests::checked_read_delta_rejects_counter_regression ... ok
+test tests::deterministic_corpus_shape_is_pinned_without_hashes ... ok
+test tests::git_status_parser_reports_actual_dirtiness ... ok
+test tests::non_authoritative_modes_cannot_authorize_claims ... ok
+test tests::overlap_is_bounded_and_empty_at_edges ... ok
+test tests::owned_temp_file_is_removed_only_after_successful_creation ... ok
+test tests::pinned_identity_rejects_archive_mismatch ... ok
+test tests::schema_and_scope_are_statistics_free ... ok
+test tests::toolchain_pin_mismatch_is_not_authorized ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (tools/perf-baseline/target/release/deps/litchi_perf_baseline-bf2dc7d067237c9f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/litchi-perf-baseline-alloc.rs (tools/perf-baseline/target/release/deps/litchi_perf_baseline_alloc-e232ec54cef7f595)
+
+running 5 tests
+test allocator::tests::global_allocator_records_a_failed_allocation ... ok
+test allocator::tests::global_allocator_records_a_failed_realloc_without_losing_old_allocation ... ok
+test allocator::tests::global_allocator_records_realloc_grow_and_shrink ... ok
+test allocator::tests::global_allocator_records_successful_alloc_and_dealloc_with_live_peak ... ok
+test allocator::tests::global_allocator_records_zeroed_alloc_and_zeroes_memory ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/odp_native_tail_append_probe.rs (tools/perf-baseline/target/release/deps/odp_native_tail_append_probe-4b8a37d1cc866d86)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/pptx_external_cross_copy.rs (tools/perf-baseline/target/release/deps/pptx_external_cross_copy-9e307900df40fd27)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/pptx_native_copy_probe.rs (tools/perf-baseline/target/release/deps/pptx_native_copy_probe-e6fc15ffebe94e2a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xls_source_attribution.rs (tools/perf-baseline/target/release/deps/xls_source_attribution-c0149036a50ea5a1)
+
+running 9 tests
+test tests::cell_projection_and_mode_limits_are_explicit ... ok
+test tests::facade_parity_is_limited_to_source_open_and_list ... ok
+test tests::metrics_delta_excludes_untimed_oracle_work ... ok
+test tests::parses_mode_operation_and_coordinates ... ok
+test tests::range_union_reports_unique_bytes ... ok
+test tests::sample_iteration_overflow_is_rejected_before_allocation ... ok
+test tests::staged_input_is_identity_bound_read_only_and_removed_on_drop ... ok
+test tests::timing_scopes_for_incomparable_families_are_distinct ... ok
+test tests::zero_warmups_or_samples_are_rejected ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xlsb_crud.rs (tools/perf-baseline/target/release/deps/xlsb_crud-4835581d89825bbd)
+
+running 6 tests
+test tests::deterministic_public_fixture_identity ... ok
+test tests::exact_noop_identity_and_edit_readback_are_preserved ... ok
+test tests::malformed_and_tight_limits_are_refused ... ok
+test tests::parses_every_case_and_all ... ok
+test tests::rejects_malformed_case_and_arguments ... ok
+test tests::sparse_iteration_does_not_expand_to_rectangle ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running unittests src/bin/xlsx_cell_values_abba.rs (tools/perf-baseline/target/release/deps/xlsx_cell_values_abba-95b63dd4702d16a3)
+
+running 2 tests
+test xlsx_cell_values_abba_identity_tests::pinned_current_shape_identities_are_exact ... ok
+test xlsx_cell_values_abba_identity_tests::pinned_current_shape_untouched_counts_are_exact ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xlsx_merge_source_abba.rs (tools/perf-baseline/target/release/deps/xlsx_merge_source_abba-734397c7fcaf8c3c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_filesystem.rs (tools/perf-baseline/target/release/deps/xlsx_filesystem-9779c167aa34792d)
+
+running 4 tests
+test xlsx_file_cold_verified_is_eligible_or_explicitly_ineligible ... ok
+test xlsx_file_selected_cell_runs_in_fresh_child_and_marks_cold_ineligible ... ok
+test xlsx_file_selectors_run_as_two_samples_in_distinct_fresh_children ... ok
+test xlsx_repeated_store_reacquisition_controls_report_structural_scope ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.17s
+
+   Doc-tests litchi_perf_baseline
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
