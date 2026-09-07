@@ -1,0 +1,209 @@
+{
+  "change": 463,
+  "variant": "candidate",
+  "driver_sha256": "b9379ff0abf3601bec67faae1dfbbcf5022c1c83b929411ea648624216c0ebf0",
+  "binding_sha256": "70a419eada68387982959d486995c222fd5d94052add25fd2b52078da91b07c5",
+  "binary_sha256": "ef9f88dcc6019456a3a6816d05e45b871f619d2bce12862d96c6373a54dd7576",
+  "targets": [
+    {
+      "id": "transaction-commit",
+      "symbol": "<litchi_odp::authoring::edit::Transaction>::commit",
+      "command": [
+        "objdump",
+        "-d",
+        "--demangle",
+        "--no-show-raw-insn",
+        "--disassemble=<litchi_odp::authoring::edit::Transaction>::commit",
+        "/tmp/litchi-goal-0463/candidate/litchi-perf-baseline"
+      ],
+      "status": "present",
+      "artifact": {
+        "path": "candidate-transaction-commit.asm.txt",
+        "bytes": 152647,
+        "sha256": "61e8eb1366e5d1fd0af7712fee883c392a585d719299537d32dd03f70aab3ee6"
+      },
+      "instruction_count": 3395,
+      "stack_frame_bytes": 4096,
+      "calls": [
+        "<alloc::sync::Arc<[litchi_odp::authoring::edit::Domain]> as core::convert::From<alloc::vec::Vec<litchi_odp::authoring::edit::Domain>>>::from",
+        "<litchi_odf_common::core::package::OwnedPackage as core::clone::Clone>::clone",
+        "<litchi_odf_common::rdf::model::Graph as core::slice::cmp::SlicePartialEq<litchi_odf_common::rdf::model::Graph>>::equal_same_length",
+        "<litchi_odp::authoring::edit::Snapshot as core::clone::Clone>::clone",
+        "<litchi_odp::authoring::edit::Snapshot>::from_owned_package",
+        "<litchi_odp::authoring::edit::Transaction>::commit::{closure#6}",
+        "<litchi_odp::authoring::edit::Transaction>::commit::{closure#7}",
+        "<litchi_odp::authoring::mutable::MutablePresentation>::to_owned_package_bounded",
+        "<litchi_odp::authoring::mutable::MutablePresentation>::verify_embedded_media",
+        "<litchi_odp::authoring::mutable::MutablePresentation>::verify_removed_media",
+        "<litchi_odp::authoring::mutable::PublicationAuditProof>::covers",
+        "<litchi_odp::model::page_layout::Layout as core::slice::cmp::SlicePartialEq<litchi_odp::model::page_layout::Layout>>::equal_same_length",
+        "<litchi_odp::model::slide::Slide as core::slice::cmp::SlicePartialEq<litchi_odp::model::slide::Slide>>::equal_same_length",
+        "_DYNAMIC+0x288",
+        "_DYNAMIC+0x290",
+        "_DYNAMIC+0x298",
+        "_DYNAMIC+0x2a8",
+        "_DYNAMIC+0x2b0",
+        "_DYNAMIC+0x2c8",
+        "_DYNAMIC+0x3c0",
+        "_DYNAMIC+0x6938",
+        "_DYNAMIC+0x6940",
+        "_DYNAMIC+0x6948",
+        "_DYNAMIC+0x6950",
+        "_DYNAMIC+0x6958",
+        "_DYNAMIC+0x6960",
+        "_DYNAMIC+0x6968",
+        "_DYNAMIC+0x6980",
+        "_DYNAMIC+0x69a0",
+        "_DYNAMIC+0x69d0",
+        "_DYNAMIC+0x6e10",
+        "_DYNAMIC+0x6e18",
+        "_DYNAMIC+0x6e20",
+        "_DYNAMIC+0x6e28",
+        "_DYNAMIC+0x6e40",
+        "_DYNAMIC+0x6e48",
+        "_DYNAMIC+0x778",
+        "_DYNAMIC+0x7e0",
+        "_DYNAMIC+0x9e0",
+        "_DYNAMIC+0xb30",
+        "_DYNAMIC+0xd88",
+        "_Unwind_Resume@plt",
+        "bcmp@GLIBC_2.2.5",
+        "core::ptr::drop_glue::<alloc::vec::Vec<litchi_odf_common::rdf::model::Graph>>",
+        "core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::annotation::model::Info>>",
+        "core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::package::layout_master::MasterPage>>",
+        "core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::AnnotationDraft>>",
+        "core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::ChartDraft>>",
+        "core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::ContentDraft>>",
+        "core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::DesignDraft>>",
+        "core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::edit::RdfDraft>>",
+        "core::ptr::drop_glue::<core::option::Option<litchi_odp::authoring::mutable::PublicationAuditProof>>",
+        "core::ptr::drop_glue::<litchi_odf_common::core::package::OwnedPackage>",
+        "core::ptr::drop_glue::<litchi_odp::authoring::edit::Snapshot>",
+        "core::ptr::drop_glue::<litchi_odp::authoring::mutable::MutablePresentation>",
+        "core::ptr::drop_glue::<litchi_odp::charts::snapshot::Snapshot>",
+        "core::ptr::drop_glue::<litchi_odp::model::page_layout::Collection>",
+        "core::ptr::drop_glue::<litchi_odp::model::page_metadata::Collection>",
+        "core::ptr::drop_glue::<litchi_odp::package::presentation::Presentation>",
+        "litchi_odp::annotation::codec::add",
+        "litchi_odp::annotation::codec::annotations",
+        "litchi_odp::annotation::codec::remove",
+        "litchi_odp::annotation::codec::replace",
+        "litchi_odp::authoring::edit::apply_chart_operation",
+        "litchi_odp::authoring::edit::apply_design_operation",
+        "litchi_odp::authoring::edit::invalid::<litchi_odp::authoring::edit::Commit, &str>",
+        "litchi_odp::authoring::edit::root_annotations_equal",
+        "litchi_odp::authoring::edit::root_charts_equal",
+        "litchi_odp::authoring::edit::root_design_pages_equal",
+        "litchi_odp::authoring::edit::root_masters_equal",
+        "litchi_odp::authoring::edit::validate_compact_xml_parts_against",
+        "litchi_odp::content::apply",
+        "memcpy@GLIBC_2.14"
+      ]
+    },
+    {
+      "id": "to-bytes-bounded",
+      "symbol": "<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded",
+      "command": [
+        "objdump",
+        "-d",
+        "--demangle",
+        "--no-show-raw-insn",
+        "--disassemble=<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded",
+        "/tmp/litchi-goal-0463/candidate/litchi-perf-baseline"
+      ],
+      "status": "missing_or_inlined",
+      "artifact": {
+        "path": "candidate-to-bytes-bounded.asm.txt",
+        "bytes": 208,
+        "sha256": "0713541b78db0a33d4f1d6abfd620403c4e3cc5ef86cf28fbe694d75062ecbc2"
+      },
+      "instruction_count": 0,
+      "stack_frame_bytes": null,
+      "calls": []
+    },
+    {
+      "id": "validate-compact-xml-parts-against",
+      "symbol": "litchi_odp::authoring::edit::validate_compact_xml_parts_against",
+      "command": [
+        "objdump",
+        "-d",
+        "--demangle",
+        "--no-show-raw-insn",
+        "--disassemble=litchi_odp::authoring::edit::validate_compact_xml_parts_against",
+        "/tmp/litchi-goal-0463/candidate/litchi-perf-baseline"
+      ],
+      "status": "present",
+      "artifact": {
+        "path": "candidate-validate-compact-xml-parts-against.asm.txt",
+        "bytes": 26478,
+        "sha256": "bf81f955bd8790cb47e75de5b8b950eb884e5c883f4082b539e3afbb3e484c9b"
+      },
+      "instruction_count": 570,
+      "stack_frame_bytes": 536,
+      "calls": [
+        "<alloc::vec::into_iter::IntoIter<alloc::string::String> as core::ops::drop::Drop>::drop",
+        "_DYNAMIC+0x288",
+        "_DYNAMIC+0x290",
+        "_DYNAMIC+0x298",
+        "_DYNAMIC+0x2b0",
+        "_DYNAMIC+0x2c8",
+        "_DYNAMIC+0x35d0",
+        "_DYNAMIC+0x4a8",
+        "_DYNAMIC+0x65f8",
+        "_DYNAMIC+0x6610",
+        "_DYNAMIC+0x69a0",
+        "_DYNAMIC+0x6ec8",
+        "_DYNAMIC+0x6ed0",
+        "_DYNAMIC+0xb00",
+        "_Unwind_Resume@plt",
+        "bcmp@GLIBC_2.2.5",
+        "core::ptr::drop_glue::<core::result::Result<litchi_odf_common::core::xml_splice::XmlSplicePublication, litchi_core::error::types::Error>>",
+        "core::ptr::drop_glue::<litchi_core::error::types::Error>",
+        "core::ptr::drop_glue::<litchi_odf_common::core::xml_splice::XmlSourcePart>"
+      ]
+    }
+  ],
+  "commands": [
+    [
+      "objdump",
+      "-d",
+      "--demangle",
+      "--no-show-raw-insn",
+      "--disassemble=<litchi_odp::authoring::edit::Transaction>::commit",
+      "/tmp/litchi-goal-0463/candidate/litchi-perf-baseline"
+    ],
+    [
+      "objdump",
+      "-d",
+      "--demangle",
+      "--no-show-raw-insn",
+      "--disassemble=<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded",
+      "/tmp/litchi-goal-0463/candidate/litchi-perf-baseline"
+    ],
+    [
+      "objdump",
+      "-d",
+      "--demangle",
+      "--no-show-raw-insn",
+      "--disassemble=litchi_odp::authoring::edit::validate_compact_xml_parts_against",
+      "/tmp/litchi-goal-0463/candidate/litchi-perf-baseline"
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "candidate-transaction-commit.asm.txt",
+      "bytes": 152647,
+      "sha256": "61e8eb1366e5d1fd0af7712fee883c392a585d719299537d32dd03f70aab3ee6"
+    },
+    {
+      "path": "candidate-to-bytes-bounded.asm.txt",
+      "bytes": 208,
+      "sha256": "0713541b78db0a33d4f1d6abfd620403c4e3cc5ef86cf28fbe694d75062ecbc2"
+    },
+    {
+      "path": "candidate-validate-compact-xml-parts-against.asm.txt",
+      "bytes": 26478,
+      "sha256": "bf81f955bd8790cb47e75de5b8b950eb884e5c883f4082b539e3afbb3e484c9b"
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmup": 3,
+  "argv": [
+    "{binary}",
+    "odp-append-attribution",
+    "--mode",
+    "{scope}",
+    "--shape",
+    "{shape}",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--repeat",
+    "{repeat}",
+    "--output",
+    "{report}"
+  ],
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "DEBUGINFOD_URLS": "",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "order": [
+    {
+      "id": "R1-normal-tiny-lifecycle",
+      "repeat": "R1",
+      "instrumentation": "normal",
+      "shape": "tiny",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R1-normal-medium-lifecycle",
+      "repeat": "R1",
+      "instrumentation": "normal",
+      "shape": "medium",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R1-normal-large-lifecycle",
+      "repeat": "R1",
+      "instrumentation": "normal",
+      "shape": "large",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R1-allocator-tiny-lifecycle",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "shape": "tiny",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R1-allocator-medium-lifecycle",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "shape": "medium",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R1-allocator-large-lifecycle",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "shape": "large",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R2-allocator-large-lifecycle",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "shape": "large",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R2-allocator-medium-lifecycle",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "shape": "medium",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R2-allocator-tiny-lifecycle",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "shape": "tiny",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R2-normal-large-lifecycle",
+      "repeat": "R2",
+      "instrumentation": "normal",
+      "shape": "large",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R2-normal-medium-lifecycle",
+      "repeat": "R2",
+      "instrumentation": "normal",
+      "shape": "medium",
+      "scope": "lifecycle"
+    },
+    {
+      "id": "R2-normal-tiny-lifecycle",
+      "repeat": "R2",
+      "instrumentation": "normal",
+      "shape": "tiny",
+      "scope": "lifecycle"
+    }
+  ],
+  "reports_per_variant": 12,
+  "retained_samples": 720,
+  "sequence": [
+    "baseline-R1",
+    "candidate-R1",
+    "candidate-R2",
+    "baseline-R2"
+  ],
+  "schema": "litchi-0463-protocol-v1",
+  "change": 463,
+  "hypothesis": "Reuse a private successful serialization audit proof at ordinary ODP commit final validation. Bind exact candidate and source archive identities, prove every emitted XML part either passes equal-or-stricter authored limits or is exact-source copied, and conservatively bound all authored XML bytes/count so final aggregate limits cannot fail. Matching eligible proofs avoid repeated final XML loads/splice/audit work; missing, mismatched or ineligible proofs retain the existing validator. Keep full candidate package reopen, semantic readback and all media/domain/no-op/patch checks unchanged. No public API, dependency, ambient state or validation-policy relaxation.",
+  "keep_gate": "Require at least 3% normal p50 improvement for medium and large shapes in both repeats, with each independent bootstrap median-delta 95% upper bound below zero. Review every >5% adverse elapsed quantile or RSS and any allocation or peak increase. Otherwise reject unless a separately quantified practical memory benefit justifies retention.",
+  "claims": "Owned ODP append lifecycle on deterministic corpus; no cold/range/worker-scaling claim",
+  "capture_sha256": "e2cde6299b9f22b1aabecbf8fcd99bde29a9c0794fc1250ef3942abf44be8d57",
+  "oracle_sha256": "6d8c440db698acc21056d96dfc927ea0be47daa8f34357ad1a4178a812f11286",
+  "host_sha256": "03e4a8693e274f02341b5e8df5fd79f0a71d4370c8321d8d32f1ab2f81d11b39",
+  "baseline_binding_sha256": "8f29df892bd241e291a339af6314ac2664eed2dd06f50555cd39ac98ac64fac8",
+  "prior_control_binding_sha256": "7897115d35da533db7bb51240c70164a35e0af8317b31f6edcb8f7029e074b4b"
+}

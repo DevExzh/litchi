@@ -2222,18 +2222,17 @@ impl Transaction {
         {
             return Ok(Commit::unchanged(self.source));
         }
-        let (mut bytes, mut package, slide_candidate) = if self.changed {
-            let package =
-                OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)?;
+        let (mut bytes, mut package, slide_candidate, mut audit_proof) = if self.changed {
+            let (package, audit_proof) = self.draft.to_owned_package_bounded(MAX_PACKAGE_BYTES)?;
             let bytes = package.shared_bytes();
             let candidate = Snapshot::from_owned_package(package.clone())?;
             if candidate.slides() != self.draft.slides() {
                 return invalid("ODP transaction readback differs from the staged slide model");
             }
-            (bytes, package, Some(candidate))
+            (bytes, package, Some(candidate), audit_proof)
         } else {
             let package = self.source.package.clone();
-            (package.shared_bytes(), package, None)
+            (package.shared_bytes(), package, None, None)
         };
         if let Some(design) = &self.design
             && !design.operations.is_empty()
@@ -2246,10 +2245,12 @@ impl Transaction {
                     }
                     package = OwnedPackage::from_bytes(output)?;
                     bytes = package.shared_bytes();
+                    audit_proof = None;
                 }
             } else {
                 package = design.package.clone();
                 bytes = package.shared_bytes();
+                audit_proof = None;
             }
         }
         if let Some(annotations) = &self.annotations
@@ -2265,10 +2266,12 @@ impl Transaction {
                     }
                     package = OwnedPackage::from_bytes(output)?;
                     bytes = package.shared_bytes();
+                    audit_proof = None;
                 }
             } else {
                 package = annotations.package.clone();
                 bytes = package.shared_bytes();
+                audit_proof = None;
             }
         }
         if let Some(rdf) = &self.rdf
@@ -2282,10 +2285,12 @@ impl Transaction {
                     }
                     package = OwnedPackage::from_bytes(output)?;
                     bytes = package.shared_bytes();
+                    audit_proof = None;
                 }
             } else {
                 package = rdf.package.clone();
                 bytes = package.shared_bytes();
+                audit_proof = None;
             }
         }
         if let Some(charts) = &self.charts
@@ -2299,10 +2304,12 @@ impl Transaction {
                     }
                     package = OwnedPackage::from_bytes(output)?;
                     bytes = package.shared_bytes();
+                    audit_proof = None;
                 }
             } else {
                 package = charts.package.clone();
                 bytes = package.shared_bytes();
+                audit_proof = None;
             }
         }
         if let Some(content) = &self.content
@@ -2323,10 +2330,12 @@ impl Transaction {
                     }
                     package = OwnedPackage::from_bytes(output)?;
                     bytes = package.shared_bytes();
+                    audit_proof = None;
                 }
             } else {
                 package = content.package.clone();
                 bytes = package.shared_bytes();
+                audit_proof = None;
             }
         }
         let reopened = package;
@@ -2334,7 +2343,31 @@ impl Transaction {
         if !content_changed {
             validate_raw_preserved_referenced_xml_parts(&source_package, &source_package)?;
         }
-        validate_compact_xml_parts(&reopened, &source_package)?;
+        let compact_limits = audit::Limits::new(
+            MAX_PACKAGE_BYTES,
+            512,
+            1_000_000,
+            250_000,
+            MAX_TEXT_BYTES,
+            MAX_PACKAGE_BYTES,
+        )
+        .ok();
+        let proof_covers = compact_limits.is_some_and(|limits| {
+            audit_proof.as_ref().is_some_and(|proof| {
+                proof.covers(
+                    &reopened,
+                    &source_package,
+                    limits,
+                    MAX_PACKAGE_BYTES,
+                    MAX_XML_PARTS,
+                )
+            })
+        });
+        #[cfg(test)]
+        let publication_audit_hit = proof_covers;
+        if !proof_covers {
+            validate_compact_xml_parts(&reopened, &source_package)?;
+        }
         self.draft.verify_embedded_media(&reopened)?;
         self.draft.verify_removed_media(&reopened)?;
         if let Some(rdf) = &self.rdf
@@ -2392,6 +2425,8 @@ impl Transaction {
             snapshot,
             patch,
             changed: true,
+            #[cfg(test)]
+            publication_audit_hit,
         })
     }
 
@@ -2864,6 +2899,8 @@ pub struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     changed: bool,
+    #[cfg(test)]
+    publication_audit_hit: bool,
 }
 
 impl Commit {
@@ -2877,6 +2914,8 @@ impl Commit {
             snapshot,
             patch,
             changed: false,
+            #[cfg(test)]
+            publication_audit_hit: false,
         }
     }
 
@@ -2902,6 +2941,11 @@ impl Commit {
     #[must_use]
     pub fn into_snapshot(self) -> Snapshot {
         self.snapshot
+    }
+
+    #[cfg(test)]
+    fn publication_audit_hit(&self) -> bool {
+        self.publication_audit_hit
     }
 }
 
@@ -3981,8 +4025,10 @@ fn unsupported<T>(message: impl Into<String>) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::{
-        MAX_PACKAGE_BYTES, bounded_candidate, projected_size, read_bounded, validate_package_size,
+        MAX_PACKAGE_BYTES, Snapshot, bounded_candidate, projected_size, read_bounded,
+        validate_package_size,
     };
+    use crate::Builder;
     use litchi_core::Result;
 
     #[test]
@@ -4008,6 +4054,40 @@ mod tests {
     fn owned_package_size_gate_accepts_n_and_rejects_n_plus_one() -> Result<()> {
         validate_package_size(MAX_PACKAGE_BYTES)?;
         assert!(validate_package_size(MAX_PACKAGE_BYTES + 1).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn changed_slide_commit_reports_the_authored_audit_fast_path() -> Result<()> {
+        let mut builder = Builder::new();
+        builder.add_slide_with_title("Original", "Body")?;
+        let source = Snapshot::from_bytes(builder.build()?)?;
+        let mut transaction = source.transaction()?;
+        transaction.add("Added", "Body")?;
+        let commit = transaction.commit()?;
+        assert!(commit.publication_audit_hit());
+        Ok(())
+    }
+
+    #[test]
+    fn later_rdf_rewrite_clears_the_serialization_audit_proof() -> Result<()> {
+        let mut builder = Builder::new();
+        builder.add_slide_with_title("Original", "Body")?;
+        let source = Snapshot::from_bytes(builder.build()?)?;
+        let mut transaction = source.transaction()?;
+        transaction.add("Added", "Body")?;
+        let triple = crate::rdf::Triple {
+            subject: crate::rdf::Subject::Iri("urn:litchi:test-subject".to_string()),
+            predicate: "https://example.test/predicate".to_string(),
+            object: crate::rdf::Object::Literal {
+                value: "value".to_string(),
+                datatype: None,
+                language: None,
+            },
+        };
+        transaction.add_rdf_graph(None, &[triple])?;
+        let commit = transaction.commit()?;
+        assert!(!commit.publication_audit_hit());
         Ok(())
     }
 }

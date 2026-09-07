@@ -1,5 +1,48 @@
 # Performance hotspot inventory
 
+## Change 0463: writer-origin proof removes repeated commit audit work
+
+0463 reuses a private proof minted by the ODP serializer only after the
+existing common `PackageWriter` audit path has accepted each authored XML
+payload and the exact candidate bytes have been reopened. `PackageWriter`
+itself is unchanged, and exact source members retain their source-origin
+treatment. The eligible commit path skips only the final
+`validate_compact_xml_parts` pass; a missing or stale proof, identity mismatch,
+conservative-bound failure, or later package replacement uses the existing
+validator.
+
+Normal p50 deltas across 24 reports and 720 samples are -10.0491% / -8.9678%
+for tiny, -6.9642% / -7.3050% for medium, and -7.3657% / -6.8199% for large
+in R1/R2. All normal and allocator bootstrap upper bounds are negative, all
+four medium/large rows clear the 3% gate, and no adverse >5% elapsed or RSS
+flag is present. Allocator p50 elapsed deltas are -9.2947% / -8.8357% for
+tiny, -3.6356% / -3.6243% for medium, and -4.0327% / -2.8299% for large.
+
+Allocated bytes fall by 2,087,682 / 11,072,106 / 20,202,090 for tiny/medium/
+large in both repeats. Every lane reduces allocation calls by 1,039,
+reallocations by 93 and deallocations by 946; peak above entry changes are
+0 / -49,674 / -15,438 bytes and retained-live deltas remain zero. This is
+operation-scoped allocator evidence, not a claim about unmeasured I/O or
+compression work.
+
+The separate public-API phase clocks show commit -12.6863% / -13.0797%,
+transaction -3.8135% / -2.2023%, snapshot opening +0.9812% / +0.4743%, add
++3.7947% / +1.2462%, and publication -0.0322% / +0.0312%. Only commit is
+changed by the proof; the other phase movement is diagnostic. Whole-process
+counters include setup, warmups and checks and show instructions -5.6821%,
+cycles -6.4241%, branch misses -5.2313% and branches -5.3523%.
+
+The source review confirms exact owner binding, conservative default-limit
+coverage, proof invalidation after package replacement, and unchanged semantic
+readback/error order. Candidate validation records 381 ODP tests and
+warning-denied Clippy passing. The harness and final gates are complete: 387
+harness tests pass with one ignored, for 768 passed ODP/harness tests in total.
+Warning-denied rustdoc, scoped formatting, boundaries, precleanup and source
+replay, fresh-copy portable replay, resealed +1ns tamper rejection, and owned
+cleanup of four executables totaling 233,058,712 bytes pass. 0460 remains
+accepted, coverage remains 439/36, the full goal remains open, and iWork is
+outside scope.
+
 ## Change 0462: shape index bypasses the hot scan but misses the gate
 
 0462 adds a private seventeen-key first-occurrence index only to `ShapeAttrs`.

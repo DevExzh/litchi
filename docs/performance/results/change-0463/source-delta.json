@@ -1,0 +1,32 @@
+{
+  "schema": "litchi-0463-source-delta-v1",
+  "change": 463,
+  "files": [
+    {
+      "path": "crates/litchi-odp/src/authoring/edit.rs",
+      "baseline": {
+        "path": "source-artifacts/baseline/crates/litchi-odp/src/authoring/edit.rs.txt",
+        "bytes": 146665,
+        "sha256": "bfdcff540b16e78d5bddb248331ffb40e0662b26d2b345ae52fcc80e3c0af881"
+      },
+      "candidate": {
+        "path": "source-artifacts/candidate/crates/litchi-odp/src/authoring/edit.rs.txt",
+        "bytes": 149457,
+        "sha256": "94e874830b70688bcea3226f1612ed7fedd36ea4594e3150fc87ad4b5ad4fb41"
+      }
+    },
+    {
+      "path": "crates/litchi-odp/src/authoring/mutable.rs",
+      "baseline": {
+        "path": "source-artifacts/baseline/crates/litchi-odp/src/authoring/mutable.rs.txt",
+        "bytes": 110286,
+        "sha256": "9c042d86c5e973119342b7d04739c6aca658010de99415582b5a02b00d7d48d1"
+      },
+      "candidate": {
+        "path": "source-artifacts/candidate/crates/litchi-odp/src/authoring/mutable.rs.txt",
+        "bytes": 129635,
+        "sha256": "a6f7ddce99e70b910bc091a1ba99751a7299309a38131f495149907db8ef9cb7"
+      }
+    }
+  ]
+}

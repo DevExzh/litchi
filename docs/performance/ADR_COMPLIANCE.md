@@ -1,5 +1,43 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0463: retained private publication proof stays within ADR boundaries
+
+0463 retains a private `PublicationAuditProof` beside one successful bounded
+serialization. The private ODP serializer records accounting around the
+existing common `PackageWriter` audit path; `PackageWriter` itself is
+unchanged. The serializer accepts every authored XML-classified payload only
+under the strict default profile, records checked byte/part bounds, and binds the
+exact source and candidate archive owners. Commit skips only the final
+`validate_compact_xml_parts` pass after candidate reopen/readback; a missing or
+stale proof, source/candidate `Arc` mismatch, overflow, narrower final limit or
+later package replacement falls through to the existing validator. Exact
+source copies keep their prior source-equality treatment.
+
+The 24-report, 720-sample matrix passes the predeclared gate: normal p50
+deltas are -10.0491% / -8.9678% for tiny, -6.9642% / -7.3050% for medium,
+and -7.3657% / -6.8199% for large in R1/R2, with all normal and allocator
+bootstrap upper bounds below zero. No adverse >5% flag or allocation-increase
+flag is present. Allocated bytes fall by 2,087,682 / 11,072,106 / 20,202,090
+for tiny/medium/large, each lane reduces calls/reallocations/deallocations by
+1,039/93/946, peak changes are 0/-49,674/-15,438 bytes, and retained-live
+deltas are zero. The phase and counter receipts remain diagnostic scopes; only
+commit is changed by the proof mechanism.
+
+The source review finds no semantic blocker and retains candidate reopen,
+source-reference precheck, media/domain checks, exact no-op and reversible
+patch behavior. The final source epoch passes 381 ODP tests and warning-denied
+all-target Clippy. The harness and final gates are complete: 387 harness tests
+pass with one ignored, for 768 passed ODP/harness tests in total.
+Warning-denied rustdoc, scoped formatting, boundaries, precleanup and source
+replay, fresh-copy portable replay, resealed +1ns tamper rejection, and owned
+cleanup of four executables totaling 233,058,712 bytes pass. No public API,
+dependency, executor, ambient
+state, unsafe policy, validation bypass, selector/corpus coverage or iWork
+ownership change is asserted. 0460 remains accepted, the registry remains 439
+selectors / 36 defaults, and the full non-iWork goal remains open. See the
+[comparison summary](results/change-0463/summary.json), [phase summary](results/change-0463/phase-summary.json),
+[source review](results/change-0463/source-review.md), and [ADR refresh](results/change-0463/adr-refresh.json).
+
 ## Change 0462: rejected shape-local index preserves ADR boundaries
 
 0462 evaluates a private fixed first-occurrence index for the seventeen typed

@@ -1,0 +1,1875 @@
+{
+  "adverse_5pct_flags": [],
+  "all_allocation_metrics_equal": false,
+  "allocation_increase_review_flags": [],
+  "comparisons": [
+    {
+      "elapsed_delta_pct": {
+        "p50": -10.04905131448498,
+        "p95": -9.187990221425224,
+        "p99": -9.122359640840827
+      },
+      "lane": {
+        "id": "R1-normal-tiny-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "p50_delta_95pct_interval": {
+        "high": -9.689741677698827,
+        "low": -10.365133171912833,
+        "method": "independent median ratio bootstrap; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 463
+      },
+      "process_lifetime_maxrss_delta_pct": -0.16474464579900872
+    },
+    {
+      "elapsed_delta_pct": {
+        "p50": -6.964245320130336,
+        "p95": -6.913435250823586,
+        "p99": -6.893987520998124
+      },
+      "lane": {
+        "id": "R1-normal-medium-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "p50_delta_95pct_interval": {
+        "high": -6.689070016543952,
+        "low": -7.2276531980403735,
+        "method": "independent median ratio bootstrap; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 464
+      },
+      "process_lifetime_maxrss_delta_pct": -0.7620271759089192
+    },
+    {
+      "elapsed_delta_pct": {
+        "p50": -7.36565059645754,
+        "p95": -7.659239664741369,
+        "p99": -7.553572661288433
+      },
+      "lane": {
+        "id": "R1-normal-large-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "p50_delta_95pct_interval": {
+        "high": -7.198678377803125,
+        "low": -7.58614569197924,
+        "method": "independent median ratio bootstrap; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 465
+      },
+      "process_lifetime_maxrss_delta_pct": -2.0304830793076767
+    },
+    {
+      "allocation_equal": false,
+      "allocation_p50_delta": {
+        "allocated_bytes": -2087682.0,
+        "allocation_calls": -1039.0,
+        "deallocation_calls": -946.0,
+        "peak_above_entry_bytes": 0.0,
+        "reallocation_calls": -93.0,
+        "retained_live_delta_bytes": 0.0
+      },
+      "allocation_p50_delta_pct": {
+        "allocated_bytes": -19.678885552960523,
+        "allocation_calls": -8.615971473588191,
+        "deallocation_calls": -9.6530612244898,
+        "peak_above_entry_bytes": 0.0,
+        "reallocation_calls": -4.776579352850541,
+        "retained_live_delta_bytes": 0.0
+      },
+      "elapsed_delta_pct": {
+        "p50": -9.294723349088507,
+        "p95": -9.552834416190503,
+        "p99": -8.210239354665482
+      },
+      "lane": {
+        "id": "R1-allocator-tiny-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "p50_delta_95pct_interval": {
+        "high": -9.077146684777325,
+        "low": -9.503300957797888,
+        "method": "independent median ratio bootstrap; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 466
+      },
+      "process_lifetime_maxrss_delta_pct": -1.0194015126603118
+    },
+    {
+      "allocation_equal": false,
+      "allocation_p50_delta": {
+        "allocated_bytes": -11072106.0,
+        "allocation_calls": -1039.0,
+        "deallocation_calls": -946.0,
+        "peak_above_entry_bytes": -49674.0,
+        "reallocation_calls": -93.0,
+        "retained_live_delta_bytes": 0.0
+      },
+      "allocation_p50_delta_pct": {
+        "allocated_bytes": -10.045326652940545,
+        "allocation_calls": -0.21121320539925215,
+        "deallocation_calls": -0.24585732997900456,
+        "peak_above_entry_bytes": -0.27554465471992806,
+        "reallocation_calls": -0.10253131063679977,
+        "retained_live_delta_bytes": 0.0
+      },
+      "elapsed_delta_pct": {
+        "p50": -3.635620890214364,
+        "p95": -3.6728559024093776,
+        "p99": -3.809544212328253
+      },
+      "lane": {
+        "id": "R1-allocator-medium-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "p50_delta_95pct_interval": {
+        "high": -3.4112977003325606,
+        "low": -3.8100043706801423,
+        "method": "independent median ratio bootstrap; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 467
+      },
+      "process_lifetime_maxrss_delta_pct": 1.3025958204479382
+    },
+    {
+      "allocation_equal": false,
+      "allocation_p50_delta": {
+        "allocated_bytes": -20202090.0,
+        "allocation_calls": -1039.0,
+        "deallocation_calls": -946.0,
+        "peak_above_entry_bytes": -15438.0,
+        "reallocation_calls": -93.0,
+        "retained_live_delta_bytes": 0.0
+      },
+      "allocation_p50_delta_pct": {
+        "allocated_bytes": -9.554636140460659,
+        "allocation_calls": -0.10609044951105373,
+        "deallocation_calls": -0.12354643569838508,
+        "peak_above_entry_bytes": -0.042932959063679554,
+        "reallocation_calls": -0.051430941518038065,
+        "retained_live_delta_bytes": 0.0
+      },
+      "elapsed_delta_pct": {
+        "p50": -4.03268117621357,
+        "p95": -3.6129078021347794,
+        "p99": -3.496043978695018
+      },
+      "lane": {
+        "id": "R1-allocator-large-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "p50_delta_95pct_interval": {
+        "high": -3.8039792210731393,
+        "low": -4.1661369631205485,
+        "method": "independent median ratio bootstrap; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 468
+      },
+      "process_lifetime_maxrss_delta_pct": -0.6875557654962505
+    },
+    {
+      "allocation_equal": false,
+      "allocation_p50_delta": {
+        "allocated_bytes": -20202090.0,
+        "allocation_calls": -1039.0,
+        "deallocation_calls": -946.0,
+        "peak_above_entry_bytes": -15438.0,
+        "reallocation_calls": -93.0,
+        "retained_live_delta_bytes": 0.0
+      },
+      "allocation_p50_delta_pct": {
+        "allocated_bytes": -9.554636140460659,
+        "allocation_calls": -0.10609044951105373,
+        "deallocation_calls": -0.12354643569838508,
+        "peak_above_entry_bytes": -0.042932959063679554,
+        "reallocation_calls": -0.051430941518038065,
+        "retained_live_delta_bytes": 0.0
+      },
+      "elapsed_delta_pct": {
+        "p50": -2.829873882329681,
+        "p95": -3.040478102434896,
+        "p99": -3.0076230607262833
+      },
+      "lane": {
+        "id": "R2-allocator-large-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "p50_delta_95pct_interval": {
+        "high": -2.5765982977737134,
+        "low": -2.9762710746210397,
+        "method": "independent median ratio bootstrap; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 469
+      },
+      "process_lifetime_maxrss_delta_pct": 1.7079919123124343
+    },
+    {
+      "allocation_equal": false,
+      "allocation_p50_delta": {
+        "allocated_bytes": -11072106.0,
+        "allocation_calls": -1039.0,
+        "deallocation_calls": -946.0,
+        "peak_above_entry_bytes": -49674.0,
+        "reallocation_calls": -93.0,
+        "retained_live_delta_bytes": 0.0
+      },
+      "allocation_p50_delta_pct": {
+        "allocated_bytes": -10.045326652940545,
+        "allocation_calls": -0.21121320539925215,
+        "deallocation_calls": -0.24585732997900456,
+        "peak_above_entry_bytes": -0.27554465471992806,
+        "reallocation_calls": -0.10253131063679977,
+        "retained_live_delta_bytes": 0.0
+      },
+      "elapsed_delta_pct": {
+        "p50": -3.6242764799344074,
+        "p95": -3.8128482481470494,
+        "p99": -3.4151855766140438
+      },
+      "lane": {
+        "id": "R2-allocator-medium-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "p50_delta_95pct_interval": {
+        "high": -3.4813194476232545,
+        "low": -3.9373762843101123,
+        "method": "independent median ratio bootstrap; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 470
+      },
+      "process_lifetime_maxrss_delta_pct": -1.2125138837467575
+    },
+    {
+      "allocation_equal": false,
+      "allocation_p50_delta": {
+        "allocated_bytes": -2087682.0,
+        "allocation_calls": -1039.0,
+        "deallocation_calls": -946.0,
+        "peak_above_entry_bytes": 0.0,
+        "reallocation_calls": -93.0,
+        "retained_live_delta_bytes": 0.0
+      },
+      "allocation_p50_delta_pct": {
+        "allocated_bytes": -19.678885552960523,
+        "allocation_calls": -8.615971473588191,
+        "deallocation_calls": -9.6530612244898,
+        "peak_above_entry_bytes": 0.0,
+        "reallocation_calls": -4.776579352850541,
+        "retained_live_delta_bytes": 0.0
+      },
+      "elapsed_delta_pct": {
+        "p50": -8.835716699984797,
+        "p95": -8.477397830215283,
+        "p99": -8.142051244597791
+      },
+      "lane": {
+        "id": "R2-allocator-tiny-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "p50_delta_95pct_interval": {
+        "high": -8.152814505374973,
+        "low": -9.099543567777701,
+        "method": "independent median ratio bootstrap; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 471
+      },
+      "process_lifetime_maxrss_delta_pct": 0.06624710168929848
+    },
+    {
+      "elapsed_delta_pct": {
+        "p50": -6.819926351318372,
+        "p95": -6.986354293480734,
+        "p99": -6.6596600685538965
+      },
+      "lane": {
+        "id": "R2-normal-large-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "p50_delta_95pct_interval": {
+        "high": -6.539980682904833,
+        "low": -7.132929892795814,
+        "method": "independent median ratio bootstrap; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 472
+      },
+      "process_lifetime_maxrss_delta_pct": 0.8553736356003316
+    },
+    {
+      "elapsed_delta_pct": {
+        "p50": -7.305048754395916,
+        "p95": -7.640960938432418,
+        "p99": -7.56930747819996
+      },
+      "lane": {
+        "id": "R2-normal-medium-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "p50_delta_95pct_interval": {
+        "high": -7.128589715928713,
+        "low": -7.438510108411056,
+        "method": "independent median ratio bootstrap; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 473
+      },
+      "process_lifetime_maxrss_delta_pct": -0.8927766254847147
+    },
+    {
+      "elapsed_delta_pct": {
+        "p50": -8.967818285595907,
+        "p95": -9.082515738871589,
+        "p99": -9.235229317098192
+      },
+      "lane": {
+        "id": "R2-normal-tiny-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "p50_delta_95pct_interval": {
+        "high": -8.294449060087972,
+        "low": -9.615191834000903,
+        "method": "independent median ratio bootstrap; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 474
+      },
+      "process_lifetime_maxrss_delta_pct": -1.4681892332789603
+    }
+  ],
+  "counters": {
+    "delta_pct": {
+      "branch-misses": -5.231272935586784,
+      "branches": -5.352261412060944,
+      "cache-misses": -2.058730785721563,
+      "context-switches": -6.338028169014088,
+      "cycles": -6.424059298406282,
+      "instructions": -5.682071471647909,
+      "page-faults": -24.194080756958957
+    },
+    "scope": "separate whole-process runs including setup, warmups and checks; perf scaling retained; not operation-only counters",
+    "values": {
+      "baseline": {
+        "branch-misses": {
+          "event_runtime": "15520597849",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "125296827"
+        },
+        "branches": {
+          "event_runtime": "15520597849",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "67833169748"
+        },
+        "cache-misses": {
+          "event_runtime": "15520597849",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "68728316"
+        },
+        "context-switches": {
+          "event_runtime": "15520597849",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "142"
+        },
+        "cycles": {
+          "event_runtime": "15520597849",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "69617044010"
+        },
+        "instructions": {
+          "event_runtime": "15520597849",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "290048594412"
+        },
+        "page-faults": {
+          "event_runtime": "15520597849",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "27267"
+        }
+      },
+      "candidate": {
+        "branch-misses": {
+          "event_runtime": "14487663946",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "118742208"
+        },
+        "branches": {
+          "event_runtime": "14487663946",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "64202561179"
+        },
+        "cache-misses": {
+          "event_runtime": "14487663946",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "67313385"
+        },
+        "context-switches": {
+          "event_runtime": "14487663946",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "133"
+        },
+        "cycles": {
+          "event_runtime": "14487663946",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "65144803821"
+        },
+        "instructions": {
+          "event_runtime": "14487663946",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "273567825975"
+        },
+        "page-faults": {
+          "event_runtime": "14487663946",
+          "running_pct": "100.00",
+          "unit": "",
+          "value": "20670"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "lane": {
+        "id": "R1-normal-tiny-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 1876828,
+        "mean": 1832088.0333333334,
+        "min": 1817037,
+        "p50": 1828187.5,
+        "p95": 1875938,
+        "p99": 1876828
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 550.3465256899007,
+        "mean": 545.8576560988258,
+        "min": 532.8138753258157,
+        "p50": 546.9898621778354,
+        "p95": 550.058938815294,
+        "p99": 550.3465256899007
+      },
+      "process_lifetime_maxrss_kib": 12140,
+      "report_sha256": "e14c3973380334093f62d1a78036038bb227b62772c49d6c5cce70ba024e82eb",
+      "variant": "baseline"
+    },
+    {
+      "lane": {
+        "id": "R1-normal-medium-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 71412923,
+        "mean": 70890441.33333333,
+        "min": 70276878,
+        "p50": 70884105.5,
+        "p95": 71409333,
+        "p99": 71412923
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 14.229431193571234,
+        "mean": 14.106547265173134,
+        "min": 14.003067764079619,
+        "p50": 14.107535026065325,
+        "p95": 14.205300514694972,
+        "p99": 14.229431193571234
+      },
+      "process_lifetime_maxrss_kib": 43568,
+      "report_sha256": "db692905bc61f33d7c95effb027973c9e71396a2857dea270be3ffbb0c52a183",
+      "variant": "baseline"
+    },
+    {
+      "lane": {
+        "id": "R1-normal-large-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 143483865,
+        "mean": 142378225.6,
+        "min": 141529339,
+        "p50": 142286657.0,
+        "p95": 143473236,
+        "p99": 143483865
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 7.065672793116062,
+        "mean": 7.023632849950176,
+        "min": 6.969424750302063,
+        "p50": 7.028066148319324,
+        "p95": 7.0561262628878385,
+        "p99": 7.065672793116062
+      },
+      "process_lifetime_maxrss_kib": 77420,
+      "report_sha256": "ba67e7f97bbee6fecfdc8f2d48ec46a43ebd7c982c6dcd92fc6321573166b3a6",
+      "variant": "baseline"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 10608741,
+          "mean": 10608741,
+          "min": 10608741,
+          "p50": 10608741.0,
+          "p95": 10608741,
+          "p99": 10608741
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 12059,
+          "mean": 12059,
+          "min": 12059,
+          "p50": 12059.0,
+          "p95": 12059,
+          "p99": 12059
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 9800,
+          "mean": 9800,
+          "min": 9800,
+          "p50": 9800.0,
+          "p95": 9800,
+          "p99": 9800
+        },
+        "peak_above_entry_bytes": {
+          "count": 30,
+          "max": 781342,
+          "mean": 781342,
+          "min": 781342,
+          "p50": 781342.0,
+          "p95": 781342,
+          "p99": 781342
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 1947,
+          "mean": 1947,
+          "min": 1947,
+          "p50": 1947.0,
+          "p95": 1947,
+          "p99": 1947
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 73324,
+          "mean": 73324,
+          "min": 73324,
+          "p50": 73324.0,
+          "p95": 73324,
+          "p99": 73324
+        }
+      },
+      "lane": {
+        "id": "R1-allocator-tiny-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 2040988,
+        "mean": 1991314.9666666666,
+        "min": 1976377,
+        "p50": 1988553.0,
+        "p95": 2030277,
+        "p99": 2040988
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 505.97633953441067,
+        "mean": 502.2043599753892,
+        "min": 489.9587846670338,
+        "p50": 502.87822519411054,
+        "p95": 505.92488634397426,
+        "p99": 505.97633953441067
+      },
+      "process_lifetime_maxrss_kib": 12164,
+      "report_sha256": "b2798ed99e52d49a90d86623a6c4188403a24b5cf4f359106f264ac360342ad2",
+      "variant": "baseline"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 110221463,
+          "mean": 110221463,
+          "min": 110221463,
+          "p50": 110221463.0,
+          "p95": 110221463,
+          "p99": 110221463
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 491920,
+          "mean": 491920,
+          "min": 491920,
+          "p50": 491920.0,
+          "p95": 491920,
+          "p99": 491920
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 384776,
+          "mean": 384776,
+          "min": 384776,
+          "p50": 384776.0,
+          "p95": 384776,
+          "p99": 384776
+        },
+        "peak_above_entry_bytes": {
+          "count": 30,
+          "max": 18027568,
+          "mean": 18027568,
+          "min": 18027568,
+          "p50": 18027568.0,
+          "p95": 18027568,
+          "p99": 18027568
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 90704,
+          "mean": 90704,
+          "min": 90704,
+          "p50": 90704.0,
+          "p95": 90704,
+          "p99": 90704
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 4041249,
+          "mean": 4041249,
+          "min": 4041249,
+          "p50": 4041249.0,
+          "p95": 4041249,
+          "p99": 4041249
+        }
+      },
+      "lane": {
+        "id": "R1-allocator-medium-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 77113582,
+        "mean": 76521114.63333334,
+        "min": 76010628,
+        "p50": 76536610.5,
+        "p95": 76956082,
+        "p99": 77113582
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 13.156054966418644,
+        "mean": 13.068484423860815,
+        "min": 12.967884178950474,
+        "p50": 13.065642647080644,
+        "p95": 13.14661822505956,
+        "p99": 13.156054966418644
+      },
+      "process_lifetime_maxrss_kib": 42684,
+      "report_sha256": "3cc340365d90c96190bf6e5285834c7e8c0e0139c72a6d0dcf1f20b27f304b93",
+      "variant": "baseline"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 211437565,
+          "mean": 211437565,
+          "min": 211437565,
+          "p50": 211437565.0,
+          "p95": 211437565,
+          "p99": 211437565
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 979353,
+          "mean": 979353,
+          "min": 979353,
+          "p50": 979353.0,
+          "p95": 979353,
+          "p99": 979353
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 765704,
+          "mean": 765704,
+          "min": 765704,
+          "p50": 765704.0,
+          "p95": 765704,
+          "p99": 765704
+        },
+        "peak_above_entry_bytes": {
+          "count": 30,
+          "max": 35958388,
+          "mean": 35958388,
+          "min": 35958388,
+          "p50": 35958388.0,
+          "p95": 35958388,
+          "p99": 35958388
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 180825,
+          "mean": 180825,
+          "min": 180825,
+          "p50": 180825.0,
+          "p95": 180825,
+          "p99": 180825
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 8074341,
+          "mean": 8074341,
+          "min": 8074341,
+          "p50": 8074341.0,
+          "p95": 8074341,
+          "p99": 8074341
+        }
+      },
+      "lane": {
+        "id": "R1-allocator-large-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 156080302,
+        "mean": 155033124.8,
+        "min": 153914964,
+        "p50": 155091358.0,
+        "p95": 156034372,
+        "p99": 156080302
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 6.497094070723364,
+        "mean": 6.450315940134309,
+        "min": 6.406958387356273,
+        "p50": 6.44781263925567,
+        "p95": 6.484151841328914,
+        "p99": 6.497094070723364
+      },
+      "process_lifetime_maxrss_kib": 76212,
+      "report_sha256": "e0921cb84d4b5e75010a8d345a717c97ea3fd3f0892e40641f3394a7d7bc0925",
+      "variant": "baseline"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 211437565,
+          "mean": 211437565,
+          "min": 211437565,
+          "p50": 211437565.0,
+          "p95": 211437565,
+          "p99": 211437565
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 979353,
+          "mean": 979353,
+          "min": 979353,
+          "p50": 979353.0,
+          "p95": 979353,
+          "p99": 979353
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 765704,
+          "mean": 765704,
+          "min": 765704,
+          "p50": 765704.0,
+          "p95": 765704,
+          "p99": 765704
+        },
+        "peak_above_entry_bytes": {
+          "count": 30,
+          "max": 35958388,
+          "mean": 35958388,
+          "min": 35958388,
+          "p50": 35958388.0,
+          "p95": 35958388,
+          "p99": 35958388
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 180825,
+          "mean": 180825,
+          "min": 180825,
+          "p50": 180825.0,
+          "p95": 180825,
+          "p99": 180825
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 8074341,
+          "mean": 8074341,
+          "min": 8074341,
+          "p50": 8074341.0,
+          "p95": 8074341,
+          "p99": 8074341
+        }
+      },
+      "lane": {
+        "id": "R2-allocator-large-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 153990640,
+        "mean": 152894846.9,
+        "min": 152052753,
+        "p50": 152924288.5,
+        "p95": 153806370,
+        "p99": 153990640
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 6.576664876301187,
+        "mean": 6.540517416924973,
+        "min": 6.493901187760502,
+        "p50": 6.539183698088083,
+        "p95": 6.571383619409539,
+        "p99": 6.576664876301187
+      },
+      "process_lifetime_maxrss_kib": 75176,
+      "report_sha256": "8c06b6a3b2d321050331a3c0d9ab1c0ba94337f541a14d4891fc7f8ea8ed566b",
+      "variant": "baseline"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 110221463,
+          "mean": 110221463,
+          "min": 110221463,
+          "p50": 110221463.0,
+          "p95": 110221463,
+          "p99": 110221463
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 491920,
+          "mean": 491920,
+          "min": 491920,
+          "p50": 491920.0,
+          "p95": 491920,
+          "p99": 491920
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 384776,
+          "mean": 384776,
+          "min": 384776,
+          "p50": 384776.0,
+          "p95": 384776,
+          "p99": 384776
+        },
+        "peak_above_entry_bytes": {
+          "count": 30,
+          "max": 18027568,
+          "mean": 18027568,
+          "min": 18027568,
+          "p50": 18027568.0,
+          "p95": 18027568,
+          "p99": 18027568
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 90704,
+          "mean": 90704,
+          "min": 90704,
+          "p50": 90704.0,
+          "p95": 90704,
+          "p99": 90704
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 4041249,
+          "mean": 4041249,
+          "min": 4041249,
+          "p50": 4041249.0,
+          "p95": 4041249,
+          "p99": 4041249
+        }
+      },
+      "lane": {
+        "id": "R2-allocator-medium-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 77703918,
+        "mean": 77118726.56666666,
+        "min": 76425233,
+        "p50": 77084075.0,
+        "p95": 77698188,
+        "p99": 77703918
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 13.084683693407909,
+        "mean": 12.967254036862604,
+        "min": 12.869363936063044,
+        "p50": 12.972848227343388,
+        "p95": 13.07940573929294,
+        "p99": 13.084683693407909
+      },
+      "process_lifetime_maxrss_kib": 43216,
+      "report_sha256": "365ee2677340b54ffde42ecc51f685531e12907fb4ac75f0ce8c743977f8e2ca",
+      "variant": "baseline"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 10608741,
+          "mean": 10608741,
+          "min": 10608741,
+          "p50": 10608741.0,
+          "p95": 10608741,
+          "p99": 10608741
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 12059,
+          "mean": 12059,
+          "min": 12059,
+          "p50": 12059.0,
+          "p95": 12059,
+          "p99": 12059
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 9800,
+          "mean": 9800,
+          "min": 9800,
+          "p50": 9800.0,
+          "p95": 9800,
+          "p99": 9800
+        },
+        "peak_above_entry_bytes": {
+          "count": 30,
+          "max": 781342,
+          "mean": 781342,
+          "min": 781342,
+          "p50": 781342.0,
+          "p95": 781342,
+          "p99": 781342
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 1947,
+          "mean": 1947,
+          "min": 1947,
+          "p50": 1947.0,
+          "p95": 1947,
+          "p99": 1947
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 73324,
+          "mean": 73324,
+          "min": 73324,
+          "p50": 73324.0,
+          "p95": 73324,
+          "p99": 73324
+        }
+      },
+      "lane": {
+        "id": "R2-allocator-tiny-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 2040137,
+        "mean": 1996321.1,
+        "min": 1971707,
+        "p50": 1989657.5,
+        "p95": 2035778,
+        "p99": 2040137
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 507.1747475664488,
+        "mean": 500.96200610853083,
+        "min": 490.1631606112727,
+        "p50": 502.5990658817412,
+        "p95": 506.16304118952365,
+        "p99": 507.1747475664488
+      },
+      "process_lifetime_maxrss_kib": 12076,
+      "report_sha256": "6cab4c6edd4d67910a198c4defecc794d1ac3d04d694b2a16a910d371007ee35",
+      "variant": "baseline"
+    },
+    {
+      "lane": {
+        "id": "R2-normal-large-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 144325865,
+        "mean": 142832207.33333334,
+        "min": 141462684,
+        "p50": 142729642.5,
+        "p95": 144242513,
+        "p99": 144325865
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 7.069002027418057,
+        "mean": 7.001386125806033,
+        "min": 6.928764986095874,
+        "p50": 7.0062531170131965,
+        "p95": 7.06608708453466,
+        "p99": 7.069002027418057
+      },
+      "process_lifetime_maxrss_kib": 76224,
+      "report_sha256": "3ab2d2e937cf52727c9b285729e78c18a09474aed8c2d74665b4bc8dd19ebda3",
+      "variant": "baseline"
+    },
+    {
+      "lane": {
+        "id": "R2-normal-medium-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 71928205,
+        "mean": 71339036.3,
+        "min": 70802031,
+        "p50": 71301468.0,
+        "p95": 71906126,
+        "p99": 71928205
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 14.12388862121766,
+        "mean": 14.017812347897722,
+        "min": 13.902752056721004,
+        "p50": 14.0249569148666,
+        "p95": 14.118261419121612,
+        "p99": 14.12388862121766
+      },
+      "process_lifetime_maxrss_kib": 44356,
+      "report_sha256": "8304deb51a7b1fc4aafa7a6a20fa137a6d4b95d31bd37b7fec5ed268682c6e66",
+      "variant": "baseline"
+    },
+    {
+      "lane": {
+        "id": "R2-normal-tiny-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 1875438,
+        "mean": 1820265.2,
+        "min": 1806458,
+        "p50": 1815068.0,
+        "p95": 1870528,
+        "p99": 1875438
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 553.5694713079407,
+        "mean": 549.4175650796101,
+        "min": 533.208775763315,
+        "p50": 550.9435813031866,
+        "p95": 553.3366754868533,
+        "p99": 553.5694713079407
+      },
+      "process_lifetime_maxrss_kib": 12260,
+      "report_sha256": "77cf12c080e0431b159e351600a14d1fc3b02884fe05d838b96a5845ddf4eb8b",
+      "variant": "baseline"
+    },
+    {
+      "lane": {
+        "id": "R1-normal-tiny-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 1705617,
+        "mean": 1653188.1666666667,
+        "min": 1629717,
+        "p50": 1644472.0,
+        "p95": 1703577,
+        "p99": 1705617
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 613.6034661232594,
+        "mean": 604.9870607989061,
+        "min": 586.2980962314517,
+        "p50": 608.0979734565909,
+        "p95": 613.2798389772455,
+        "p99": 613.6034661232594
+      },
+      "process_lifetime_maxrss_kib": 12120,
+      "report_sha256": "4f6f8bba96eacddfb21701aa3409d5e5bd9d56f8e07c586edd4d9612ebdfa8bb",
+      "variant": "candidate"
+    },
+    {
+      "lane": {
+        "id": "R1-normal-medium-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 66489725,
+        "mean": 65961888.46666667,
+        "min": 65417231,
+        "p50": 65947562.5,
+        "p95": 66472495,
+        "p99": 66489725
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 15.286492331049597,
+        "mean": 15.160518089167509,
+        "min": 15.039917821889022,
+        "p50": 15.163562754012222,
+        "p95": 15.267121729692832,
+        "p99": 15.286492331049597
+      },
+      "process_lifetime_maxrss_kib": 43236,
+      "report_sha256": "0a7010b76b9cd995fbb1da766bc872c77ace93609a10dc2c65c1fc05fa1a06de",
+      "variant": "candidate"
+    },
+    {
+      "lane": {
+        "id": "R1-normal-large-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 132645707,
+        "mean": 131747881.23333333,
+        "min": 130937321,
+        "p50": 131806319.0,
+        "p95": 132484277,
+        "p99": 132645707
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 7.637241944181827,
+        "mean": 7.590349030800797,
+        "min": 7.538879490461007,
+        "p50": 7.586890367390917,
+        "p95": 7.630543024847368,
+        "p99": 7.637241944181827
+      },
+      "process_lifetime_maxrss_kib": 75848,
+      "report_sha256": "707c8f6ac327b5b5f118d90749344e887ecce61bf454799224efbfddc6b40a93",
+      "variant": "candidate"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 8521059,
+          "mean": 8521059,
+          "min": 8521059,
+          "p50": 8521059.0,
+          "p95": 8521059,
+          "p99": 8521059
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 11020,
+          "mean": 11020,
+          "min": 11020,
+          "p50": 11020.0,
+          "p95": 11020,
+          "p99": 11020
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 8854,
+          "mean": 8854,
+          "min": 8854,
+          "p50": 8854.0,
+          "p95": 8854,
+          "p99": 8854
+        },
+        "peak_above_entry_bytes": {
+          "count": 30,
+          "max": 781342,
+          "mean": 781342,
+          "min": 781342,
+          "p50": 781342.0,
+          "p95": 781342,
+          "p99": 781342
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 1854,
+          "mean": 1854,
+          "min": 1854,
+          "p50": 1854.0,
+          "p95": 1854,
+          "p99": 1854
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 73324,
+          "mean": 73324,
+          "min": 73324,
+          "p50": 73324.0,
+          "p95": 73324,
+          "p99": 73324
+        }
+      },
+      "lane": {
+        "id": "R1-allocator-tiny-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 1873418,
+        "mean": 1807019.1666666667,
+        "min": 1793807,
+        "p50": 1803722.5,
+        "p95": 1836328,
+        "p99": 1873418
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 557.4735743588915,
+        "mean": 553.4348043575437,
+        "min": 533.7837044375575,
+        "p50": 554.409073601038,
+        "p95": 557.358610661044,
+        "p99": 557.4735743588915
+      },
+      "process_lifetime_maxrss_kib": 12040,
+      "report_sha256": "cce987249989defb1464c405de907451776c9257355e0b32426deaefc873e31a",
+      "variant": "candidate"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 99149357,
+          "mean": 99149357,
+          "min": 99149357,
+          "p50": 99149357.0,
+          "p95": 99149357,
+          "p99": 99149357
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 490881,
+          "mean": 490881,
+          "min": 490881,
+          "p50": 490881.0,
+          "p95": 490881,
+          "p99": 490881
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 383830,
+          "mean": 383830,
+          "min": 383830,
+          "p50": 383830.0,
+          "p95": 383830,
+          "p99": 383830
+        },
+        "peak_above_entry_bytes": {
+          "count": 30,
+          "max": 17977894,
+          "mean": 17977894,
+          "min": 17977894,
+          "p50": 17977894.0,
+          "p95": 17977894,
+          "p99": 17977894
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 90611,
+          "mean": 90611,
+          "min": 90611,
+          "p50": 90611.0,
+          "p95": 90611,
+          "p99": 90611
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 4041249,
+          "mean": 4041249,
+          "min": 4041249,
+          "p50": 4041249.0,
+          "p95": 4041249,
+          "p99": 4041249
+        }
+      },
+      "lane": {
+        "id": "R1-allocator-medium-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 74175906,
+        "mean": 73791986.5,
+        "min": 73500473,
+        "p50": 73754029.5,
+        "p95": 74129596,
+        "p99": 74175906
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 13.605354621323322,
+        "mean": 13.551691115405154,
+        "min": 13.48146660992587,
+        "p50": 13.558581231738959,
+        "p95": 13.60487317850135,
+        "p99": 13.605354621323322
+      },
+      "process_lifetime_maxrss_kib": 43240,
+      "report_sha256": "f3c1425969a3b515e2b4193fa39c5dd3590ae5d38e71b73e401f757b17f34936",
+      "variant": "candidate"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 191235475,
+          "mean": 191235475,
+          "min": 191235475,
+          "p50": 191235475.0,
+          "p95": 191235475,
+          "p99": 191235475
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 978314,
+          "mean": 978314,
+          "min": 978314,
+          "p50": 978314.0,
+          "p95": 978314,
+          "p99": 978314
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 764758,
+          "mean": 764758,
+          "min": 764758,
+          "p50": 764758.0,
+          "p95": 764758,
+          "p99": 764758
+        },
+        "peak_above_entry_bytes": {
+          "count": 30,
+          "max": 35942950,
+          "mean": 35942950,
+          "min": 35942950,
+          "p50": 35942950.0,
+          "p95": 35942950,
+          "p99": 35942950
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 180732,
+          "mean": 180732,
+          "min": 180732,
+          "p50": 180732.0,
+          "p95": 180732,
+          "p99": 180732
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 8074341,
+          "mean": 8074341,
+          "min": 8074341,
+          "p50": 8074341.0,
+          "p95": 8074341,
+          "p99": 8074341
+        }
+      },
+      "lane": {
+        "id": "R1-allocator-large-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 150623666,
+        "mean": 148855917.76666668,
+        "min": 147031608,
+        "p50": 148837018.0,
+        "p95": 150396994,
+        "p99": 150623666
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 6.801258679018188,
+        "mean": 6.718112828824847,
+        "min": 6.639062947784049,
+        "p50": 6.718758669590208,
+        "p95": 6.79076435403927,
+        "p99": 6.801258679018188
+      },
+      "process_lifetime_maxrss_kib": 75688,
+      "report_sha256": "14d99eabf811c6ba8d978dbc5dc267679d9526816c3c3ad295ef7e08871dceef",
+      "variant": "candidate"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 191235475,
+          "mean": 191235475,
+          "min": 191235475,
+          "p50": 191235475.0,
+          "p95": 191235475,
+          "p99": 191235475
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 978314,
+          "mean": 978314,
+          "min": 978314,
+          "p50": 978314.0,
+          "p95": 978314,
+          "p99": 978314
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 764758,
+          "mean": 764758,
+          "min": 764758,
+          "p50": 764758.0,
+          "p95": 764758,
+          "p99": 764758
+        },
+        "peak_above_entry_bytes": {
+          "count": 30,
+          "max": 35942950,
+          "mean": 35942950,
+          "min": 35942950,
+          "p50": 35942950.0,
+          "p95": 35942950,
+          "p99": 35942950
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 180732,
+          "mean": 180732,
+          "min": 180732,
+          "p50": 180732.0,
+          "p95": 180732,
+          "p99": 180732
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 8074341,
+          "mean": 8074341,
+          "min": 8074341,
+          "p50": 8074341.0,
+          "p95": 8074341,
+          "p99": 8074341
+        }
+      },
+      "lane": {
+        "id": "R2-allocator-large-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 149359182,
+        "mean": 148593759.1,
+        "min": 147788735,
+        "p50": 148596724.0,
+        "p95": 149129921,
+        "p99": 149359182
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 6.766415586411237,
+        "mean": 6.72978555810431,
+        "min": 6.695269662095498,
+        "p50": 6.729623492785017,
+        "p95": 6.748960430629029,
+        "p99": 6.766415586411237
+      },
+      "process_lifetime_maxrss_kib": 76460,
+      "report_sha256": "bd43a783a1172cbe837f1989168a9ccb5785afa78b7fbbe6a24b64b40ab94074",
+      "variant": "candidate"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 99149357,
+          "mean": 99149357,
+          "min": 99149357,
+          "p50": 99149357.0,
+          "p95": 99149357,
+          "p99": 99149357
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 490881,
+          "mean": 490881,
+          "min": 490881,
+          "p50": 490881.0,
+          "p95": 490881,
+          "p99": 490881
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 383830,
+          "mean": 383830,
+          "min": 383830,
+          "p50": 383830.0,
+          "p95": 383830,
+          "p99": 383830
+        },
+        "peak_above_entry_bytes": {
+          "count": 30,
+          "max": 17977894,
+          "mean": 17977894,
+          "min": 17977894,
+          "p50": 17977894.0,
+          "p95": 17977894,
+          "p99": 17977894
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 90611,
+          "mean": 90611,
+          "min": 90611,
+          "p50": 90611.0,
+          "p95": 90611,
+          "p99": 90611
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 4041249,
+          "mean": 4041249,
+          "min": 4041249,
+          "p50": 4041249.0,
+          "p95": 4041249,
+          "p99": 4041249
+        }
+      },
+      "lane": {
+        "id": "R2-allocator-medium-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 75050185,
+        "mean": 74284762.96666667,
+        "min": 73922640,
+        "p50": 74290335.0,
+        "p95": 74735674,
+        "p99": 75050185
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 13.527655397588614,
+        "mean": 13.461828360887218,
+        "min": 13.324417521422498,
+        "p50": 13.460701233070594,
+        "p95": 13.518363500440179,
+        "p99": 13.527655397588614
+      },
+      "process_lifetime_maxrss_kib": 42692,
+      "report_sha256": "8e4f96074096de0087a4e79f31eabd736acb0ae5dba4de5e9bf51726088e942d",
+      "variant": "candidate"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 8521059,
+          "mean": 8521059,
+          "min": 8521059,
+          "p50": 8521059.0,
+          "p95": 8521059,
+          "p99": 8521059
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 11020,
+          "mean": 11020,
+          "min": 11020,
+          "p50": 11020.0,
+          "p95": 11020,
+          "p99": 11020
+        },
+        "deallocation_calls": {
+          "count": 30,
+          "max": 8854,
+          "mean": 8854,
+          "min": 8854,
+          "p50": 8854.0,
+          "p95": 8854,
+          "p99": 8854
+        },
+        "peak_above_entry_bytes": {
+          "count": 30,
+          "max": 781342,
+          "mean": 781342,
+          "min": 781342,
+          "p50": 781342.0,
+          "p95": 781342,
+          "p99": 781342
+        },
+        "reallocation_calls": {
+          "count": 30,
+          "max": 1854,
+          "mean": 1854,
+          "min": 1854,
+          "p50": 1854.0,
+          "p95": 1854,
+          "p99": 1854
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 73324,
+          "mean": 73324,
+          "min": 73324,
+          "p50": 73324.0,
+          "p95": 73324,
+          "p99": 73324
+        }
+      },
+      "lane": {
+        "id": "R2-allocator-tiny-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 1874028,
+        "mean": 1823958.3666666667,
+        "min": 1797407,
+        "p50": 1813857.0,
+        "p95": 1863197,
+        "p99": 1874028
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 556.3570187497879,
+        "mean": 548.3305196528353,
+        "min": 533.6099567349047,
+        "p50": 551.3113899437654,
+        "p95": 554.5490490315633,
+        "p99": 556.3570187497879
+      },
+      "process_lifetime_maxrss_kib": 12084,
+      "report_sha256": "1646493a3eb42d2cf4af892574805c165c8199b81da3aaa3ae7675741065ae5c",
+      "variant": "candidate"
+    },
+    {
+      "lane": {
+        "id": "R2-normal-large-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 134714253,
+        "mean": 133010645.36666666,
+        "min": 131589160,
+        "p50": 132995586.0,
+        "p95": 134165220,
+        "p99": 134714253
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 7.599410164180697,
+        "mean": 7.5184110629631755,
+        "min": 7.4231195120831055,
+        "p50": 7.519046536561933,
+        "p95": 7.593686730351374,
+        "p99": 7.599410164180697
+      },
+      "process_lifetime_maxrss_kib": 76876,
+      "report_sha256": "63700b1ccd24beca75718f4a761a4f3eea4fd90648d92e998bcee2485a56e0d5",
+      "variant": "candidate"
+    },
+    {
+      "lane": {
+        "id": "R2-normal-medium-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 66483738,
+        "mean": 66119161.233333334,
+        "min": 65856085,
+        "p50": 66092861.0,
+        "p95": 66411807,
+        "p99": 66483738
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 15.184625687967937,
+        "mean": 15.124303006964421,
+        "min": 15.04127219802232,
+        "p50": 15.130227270710026,
+        "p95": 15.184471205725213,
+        "p99": 15.184625687967937
+      },
+      "process_lifetime_maxrss_kib": 43960,
+      "report_sha256": "9dd73e97c3e3c1f1ed209aa10d42efa2be33582e1f74976c19da169f2b782c64",
+      "variant": "candidate"
+    },
+    {
+      "lane": {
+        "id": "R2-normal-tiny-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 1702237,
+        "mean": 1658206.7666666666,
+        "min": 1622226,
+        "p50": 1652296.0,
+        "p95": 1700637,
+        "p99": 1702237
+      },
+      "operations_per_second": {
+        "count": 30,
+        "max": 616.4369206263492,
+        "mean": 603.1906764875399,
+        "min": 587.4622628928875,
+        "p50": 605.2190029520298,
+        "p95": 615.2801124239821,
+        "p99": 616.4369206263492
+      },
+      "process_lifetime_maxrss_kib": 12080,
+      "report_sha256": "0854dc12ca589563d00bb07413a4628816fa31262d3275c3c943cbcab757034c",
+      "variant": "candidate"
+    }
+  ],
+  "predeclared_latency_gate_pass": true,
+  "quantiles": "p50 midpoint median; p95/p99 nearest rank",
+  "reports": 24,
+  "samples": 720,
+  "schema": "litchi-0463-comparison-v1",
+  "scope": "unsegmented owned ODP append lifecycle; same flags, corpus and instrumentation; API phases only in separate diagnostic profiles"
+}

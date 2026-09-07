@@ -1,0 +1,2595 @@
+
+/tmp/litchi-goal-0463/baseline/litchi-perf-baseline:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000018f2300 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded>:
+ 18f2300:	push   %rbp
+ 18f2301:	push   %r15
+ 18f2303:	push   %r14
+ 18f2305:	push   %r13
+ 18f2307:	push   %r12
+ 18f2309:	push   %rbx
+ 18f230a:	sub    $0xcb8,%rsp
+ 18f2311:	mov    %rsi,%r14
+ 18f2314:	mov    %rdi,0x68(%rsp)
+ 18f2319:	lea    0x9a8(%rsp),%rdi
+ 18f2321:	mov    %rdx,%rsi
+ 18f2324:	call   *0x14090d6(%rip)        # 2cfb400 <_DYNAMIC+0x6608>
+ 18f232a:	lea    0x2f0(%r14),%rax
+ 18f2331:	mov    %rax,0x130(%rsp)
+ 18f2339:	mov    0x2f0(%r14),%rax
+ 18f2340:	mov    $0xffffffffffffffff,%rbx
+ 18f2347:	mov    %rax,0x4f0(%rsp)
+ 18f234f:	cmp    $0xfffffffffffffffe,%rax
+ 18f2353:	mov    %r14,0x28(%rsp)
+ 18f2358:	je     18f2420 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x120>
+ 18f235e:	lea    0x1b0(%rsp),%rdi
+ 18f2366:	lea    0x2f0(%r14),%rsi
+ 18f236d:	call   *0x14035bd(%rip)        # 2cf5930 <_DYNAMIC+0xb38>
+ 18f2373:	mov    0x1b0(%rsp),%rbx
+ 18f237b:	movups 0x1b8(%rsp),%xmm0
+ 18f2383:	movaps %xmm0,0xc0(%rsp)
+ 18f238b:	movups 0x1c8(%rsp),%xmm0
+ 18f2393:	movaps %xmm0,0xd0(%rsp)
+ 18f239b:	movups 0x1d8(%rsp),%xmm0
+ 18f23a3:	movaps %xmm0,0xe0(%rsp)
+ 18f23ab:	lea    0x1e8(%rsp),%rsi
+ 18f23b3:	lea    0x510(%rsp),%rdi
+ 18f23bb:	mov    $0x170,%edx
+ 18f23c0:	call   *0x1402c82(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f23c6:	movaps 0xc0(%rsp),%xmm0
+ 18f23ce:	movaps 0xd0(%rsp),%xmm1
+ 18f23d6:	movaps 0xe0(%rsp),%xmm2
+ 18f23de:	movaps %xmm0,0x180(%rsp)
+ 18f23e6:	movaps %xmm1,0x190(%rsp)
+ 18f23ee:	movaps %xmm2,0x1a0(%rsp)
+ 18f23f6:	cmp    $0xffffffffffffffff,%rbx
+ 18f23fa:	je     18f2675 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x375>
+ 18f2400:	lea    0x838(%rsp),%rdi
+ 18f2408:	lea    0x510(%rsp),%rsi
+ 18f2410:	mov    $0x170,%edx
+ 18f2415:	call   *0x1402c2d(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f241b:	mov    0x28(%rsp),%r14
+ 18f2420:	movaps 0x180(%rsp),%xmm0
+ 18f2428:	movaps 0x190(%rsp),%xmm1
+ 18f2430:	movaps 0x1a0(%rsp),%xmm2
+ 18f2438:	movaps %xmm0,0x150(%rsp)
+ 18f2440:	movaps %xmm1,0x160(%rsp)
+ 18f2448:	movaps %xmm2,0x170(%rsp)
+ 18f2450:	lea    0x6c8(%rsp),%rdi
+ 18f2458:	lea    0x838(%rsp),%rsi
+ 18f2460:	mov    $0x170,%edx
+ 18f2465:	call   *0x1402bdd(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f246b:	movaps 0x150(%rsp),%xmm0
+ 18f2473:	movaps 0x160(%rsp),%xmm1
+ 18f247b:	movaps 0x170(%rsp),%xmm2
+ 18f2483:	movups %xmm0,0x698(%rsp)
+ 18f248b:	movups %xmm1,0x6a8(%rsp)
+ 18f2493:	movups %xmm2,0x6b8(%rsp)
+ 18f249b:	mov    %rbx,0x690(%rsp)
+ 18f24a3:	mov    0x138(%r14),%rdx
+ 18f24aa:	mov    0x140(%r14),%rcx
+ 18f24b1:	lea    0x1b0(%rsp),%rdi
+ 18f24b9:	lea    0x9a8(%rsp),%rsi
+ 18f24c1:	call   1852f80 <<litchi_odf_common::core::writer::PackageWriter<litchi_odf_common::core::writer::BoundedBytes>>::set_mimetype>
+ 18f24c6:	cmpq   $0xffffffffffffffff,0x1b0(%rsp)
+ 18f24cf:	je     18f24fe <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1fe>
+ 18f24d1:	movups 0x1b0(%rsp),%xmm0
+ 18f24d9:	movups 0x1c0(%rsp),%xmm1
+ 18f24e1:	movups 0x1d0(%rsp),%xmm2
+ 18f24e9:	mov    0x68(%rsp),%rax
+ 18f24ee:	movups %xmm2,0x20(%rax)
+ 18f24f2:	movups %xmm1,0x10(%rax)
+ 18f24f6:	movups %xmm0,(%rax)
+ 18f24f9:	jmp    18f33db <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x10db>
+ 18f24fe:	movq   $0x0,0x100(%rsp)
+ 18f250a:	movq   $0x0,0x110(%rsp)
+ 18f2516:	mov    0x28(%rsp),%rax
+ 18f251b:	mov    0x120(%rax),%r15
+ 18f2522:	mov    0x128(%rax),%rax
+ 18f2529:	mov    %rax,0x38(%rsp)
+ 18f252e:	imul   $0x170,%rax,%rcx
+ 18f2535:	add    %r15,%rcx
+ 18f2538:	mov    %rcx,0x70(%rsp)
+ 18f253d:	test   %rax,%rax
+ 18f2540:	mov    %r15,0x88(%rsp)
+ 18f2548:	je     18f26ba <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3ba>
+ 18f254e:	lea    0x1b0(%rsp),%r14
+ 18f2556:	lea    0xc0(%rsp),%rbx
+ 18f255e:	mov    0x20(%r15),%r13
+ 18f2562:	mov    0x28(%r15),%rax
+ 18f2566:	movq   $0x0,0xc0(%rsp)
+ 18f2572:	test   %rax,%rax
+ 18f2575:	je     18f25ea <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2ea>
+ 18f2577:	imul   $0x38,%rax,%r12
+ 18f257b:	nopl   0x0(%rax,%rax,1)
+ 18f2580:	cmpb   $0x8,0x30(%r13)
+ 18f2585:	je     18f2bc5 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x8c5>
+ 18f258b:	mov    $0x1,%edx
+ 18f2590:	mov    %r14,%rdi
+ 18f2593:	mov    %r13,%rsi
+ 18f2596:	mov    %rbx,%rcx
+ 18f2599:	call   1887d80 <<litchi_odp::model::animation::Node>::validate>
+ 18f259e:	mov    0x1b0(%rsp),%rbp
+ 18f25a6:	cmp    $0xffffffffffffffff,%rbp
+ 18f25aa:	jne    18f2c23 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x923>
+ 18f25b0:	add    $0x38,%r13
+ 18f25b4:	add    $0xffffffffffffffc8,%r12
+ 18f25b8:	jne    18f2580 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x280>
+ 18f25ba:	mov    0x28(%r15),%rax
+ 18f25be:	test   %rax,%rax
+ 18f25c1:	je     18f25ea <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2ea>
+ 18f25c3:	mov    0x20(%r15),%r13
+ 18f25c7:	imul   $0x38,%rax,%r12
+ 18f25cb:	nopl   0x0(%rax,%rax,1)
+ 18f25d0:	mov    %r13,%rdi
+ 18f25d3:	lea    0x100(%rsp),%rsi
+ 18f25db:	call   1887cd0 <<litchi_odp::model::animation::Node>::collect_extension_namespaces>
+ 18f25e0:	add    $0x38,%r13
+ 18f25e4:	add    $0xffffffffffffffc8,%r12
+ 18f25e8:	jne    18f25d0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2d0>
+ 18f25ea:	cmpq   $0xffffffffffffffff,0x78(%r15)
+ 18f25ef:	je     18f2649 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x349>
+ 18f25f1:	cmpb   $0x0,0xa8(%r15)
+ 18f25f9:	jne    18f30c8 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xdc8>
+ 18f25ff:	lea    0x78(%r15),%r13
+ 18f2603:	movq   $0x0,0x510(%rsp)
+ 18f260f:	mov    $0x1,%edx
+ 18f2614:	mov    %r14,%rdi
+ 18f2617:	mov    %r13,%rsi
+ 18f261a:	lea    0x510(%rsp),%rcx
+ 18f2622:	call   1876090 <<litchi_odp::model::legacy_animation::Node>::validate>
+ 18f2627:	mov    0x1b0(%rsp),%rbp
+ 18f262f:	cmp    $0xffffffffffffffff,%rbp
+ 18f2633:	jne    18f313c <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xe3c>
+ 18f2639:	mov    %r13,%rdi
+ 18f263c:	lea    0x100(%rsp),%rsi
+ 18f2644:	call   1875fe0 <<litchi_odp::model::legacy_animation::Node>::collect_extension_namespaces>
+ 18f2649:	add    $0x170,%r15
+ 18f2650:	cmp    0x70(%rsp),%r15
+ 18f2655:	jne    18f255e <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x25e>
+ 18f265b:	mov    0x100(%rsp),%rdx
+ 18f2663:	mov    0x108(%rsp),%rcx
+ 18f266b:	mov    0x110(%rsp),%rax
+ 18f2673:	jmp    18f26be <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3be>
+ 18f2675:	movaps 0x180(%rsp),%xmm0
+ 18f267d:	movaps 0x190(%rsp),%xmm1
+ 18f2685:	movaps 0x1a0(%rsp),%xmm2
+ 18f268d:	movaps %xmm0,0x150(%rsp)
+ 18f2695:	movaps %xmm1,0x160(%rsp)
+ 18f269d:	movaps %xmm2,0x170(%rsp)
+ 18f26a5:	mov    0x68(%rsp),%rax
+ 18f26aa:	movups %xmm2,0x20(%rax)
+ 18f26ae:	movups %xmm1,0x10(%rax)
+ 18f26b2:	movups %xmm0,(%rax)
+ 18f26b5:	jmp    18f33f2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x10f2>
+ 18f26ba:	xor    %eax,%eax
+ 18f26bc:	xor    %edx,%edx
+ 18f26be:	xor    %esi,%esi
+ 18f26c0:	test   %rdx,%rdx
+ 18f26c3:	setne  %sil
+ 18f26c7:	cmove  %rdx,%rax
+ 18f26cb:	mov    %rsi,0x1b0(%rsp)
+ 18f26d3:	movq   $0x0,0x1b8(%rsp)
+ 18f26df:	mov    %rdx,0x1c0(%rsp)
+ 18f26e7:	mov    %rcx,0x1c8(%rsp)
+ 18f26ef:	mov    %rsi,0x1d0(%rsp)
+ 18f26f7:	movq   $0x0,0x1d8(%rsp)
+ 18f2703:	mov    %rdx,0x1e0(%rsp)
+ 18f270b:	mov    %rcx,0x1e8(%rsp)
+ 18f2713:	mov    %rax,0x1f0(%rsp)
+ 18f271b:	movq   $0x0,0x1f8(%rsp)
+ 18f2727:	lea    0x138(%rsp),%rdi
+ 18f272f:	lea    0x1b0(%rsp),%rsi
+ 18f2737:	call   18514c0 <<alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::string::String> as core::iter::traits::collect::FromIterator<(alloc::string::String, alloc::string::String)>>::from_iter::<core::iter::adapters::map::Map<core::iter::adapters::enumerate::Enumerate<alloc::collections::btree::set::IntoIter<alloc::string::String>>, <litchi_odp::authoring::mutable::MutablePresentation>::generate_content_xml::{closure#0}>>>
+ 18f273c:	movq   $0x0,0x48(%rsp)
+ 18f2745:	movq   $0x1,0x50(%rsp)
+ 18f274e:	movq   $0x0,0x58(%rsp)
+ 18f2757:	mov    0x138(%rsp),%rax
+ 18f275f:	mov    0x148(%rsp),%r13
+ 18f2767:	test   %rax,%rax
+ 18f276a:	setne  %cl
+ 18f276d:	test   %r13,%r13
+ 18f2770:	setne  %dl
+ 18f2773:	and    %cl,%dl
+ 18f2775:	cmp    $0x1,%dl
+ 18f2778:	jne    18f2b96 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x896>
+ 18f277e:	mov    0x140(%rsp),%rdx
+ 18f2786:	mov    %rdx,0x8(%rsp)
+ 18f278b:	xor    %r14d,%r14d
+ 18f278e:	xor    %ebp,%ebp
+ 18f2790:	test   $0x1,%cl
+ 18f2793:	je     18f5145 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2e45>
+ 18f2799:	test   %rbp,%rbp
+ 18f279c:	mov    0x8(%rsp),%rdx
+ 18f27a1:	je     18f27c0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x4c0>
+ 18f27a3:	movzwl 0x21a(%rbp),%ecx
+ 18f27aa:	cmp    %rcx,%rdx
+ 18f27ad:	jae    18f2880 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x580>
+ 18f27b3:	mov    %rbp,%r12
+ 18f27b6:	mov    %rdx,%rcx
+ 18f27b9:	jmp    18f28a5 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x5a5>
+ 18f27be:	xchg   %ax,%ax
+ 18f27c0:	test   %rdx,%rdx
+ 18f27c3:	je     18f2802 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x502>
+ 18f27c5:	mov    %rdx,%rcx
+ 18f27c8:	mov    %rax,%rbp
+ 18f27cb:	and    $0x7,%rcx
+ 18f27cf:	je     18f2807 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x507>
+ 18f27d1:	xor    %edx,%edx
+ 18f27d3:	data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+ 18f27e0:	mov    0x220(%rbp),%rbp
+ 18f27e7:	inc    %rdx
+ 18f27ea:	cmp    %rdx,%rcx
+ 18f27ed:	jne    18f27e0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x4e0>
+ 18f27ef:	mov    0x8(%rsp),%rcx
+ 18f27f4:	mov    %rcx,%rax
+ 18f27f7:	sub    %rdx,%rax
+ 18f27fa:	cmp    $0x8,%rcx
+ 18f27fe:	jae    18f2820 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x520>
+ 18f2800:	jmp    18f285e <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x55e>
+ 18f2802:	mov    %rax,%rbp
+ 18f2805:	jmp    18f285e <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x55e>
+ 18f2807:	mov    %rdx,%rax
+ 18f280a:	mov    %rdx,%rcx
+ 18f280d:	cmp    $0x8,%rcx
+ 18f2811:	jb     18f285e <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x55e>
+ 18f2813:	data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+ 18f2820:	mov    0x220(%rbp),%rcx
+ 18f2827:	mov    0x220(%rcx),%rcx
+ 18f282e:	mov    0x220(%rcx),%rcx
+ 18f2835:	mov    0x220(%rcx),%rcx
+ 18f283c:	mov    0x220(%rcx),%rcx
+ 18f2843:	mov    0x220(%rcx),%rcx
+ 18f284a:	mov    0x220(%rcx),%rcx
+ 18f2851:	mov    0x220(%rcx),%rbp
+ 18f2858:	add    $0xfffffffffffffff8,%rax
+ 18f285c:	jne    18f2820 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x520>
+ 18f285e:	xor    %edx,%edx
+ 18f2860:	xor    %eax,%eax
+ 18f2862:	movzwl 0x21a(%rbp),%ecx
+ 18f2869:	cmp    %rcx,%rdx
+ 18f286c:	jb     18f27b3 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x4b3>
+ 18f2872:	data16 data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+ 18f2880:	mov    0x0(%rbp),%r12
+ 18f2884:	test   %r12,%r12
+ 18f2887:	je     18f50ff <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2dff>
+ 18f288d:	inc    %rax
+ 18f2890:	movzwl 0x218(%rbp),%ecx
+ 18f2897:	mov    %r12,%rbp
+ 18f289a:	cmp    0x21a(%r12),%cx
+ 18f28a3:	jae    18f2880 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x580>
+ 18f28a5:	test   %rax,%rax
+ 18f28a8:	je     18f2950 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x650>
+ 18f28ae:	lea    (%r12,%rcx,8),%rdx
+ 18f28b2:	add    $0x228,%rdx
+ 18f28b9:	mov    %rax,%rsi
+ 18f28bc:	and    $0x7,%rsi
+ 18f28c0:	je     18f2ad0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x7d0>
+ 18f28c6:	xor    %edi,%edi
+ 18f28c8:	nopl   0x0(%rax,%rax,1)
+ 18f28d0:	mov    (%rdx),%rbp
+ 18f28d3:	lea    0x220(%rbp),%rdx
+ 18f28da:	inc    %rdi
+ 18f28dd:	cmp    %rdi,%rsi
+ 18f28e0:	jne    18f28d0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x5d0>
+ 18f28e2:	mov    %rax,%rsi
+ 18f28e5:	sub    %rdi,%rsi
+ 18f28e8:	cmp    $0x8,%rax
+ 18f28ec:	jb     18f2931 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x631>
+ 18f28ee:	xchg   %ax,%ax
+ 18f28f0:	mov    (%rdx),%rax
+ 18f28f3:	mov    0x220(%rax),%rax
+ 18f28fa:	mov    0x220(%rax),%rax
+ 18f2901:	mov    0x220(%rax),%rax
+ 18f2908:	mov    0x220(%rax),%rax
+ 18f290f:	mov    0x220(%rax),%rax
+ 18f2916:	mov    0x220(%rax),%rax
+ 18f291d:	mov    0x220(%rax),%rbp
+ 18f2924:	lea    0x220(%rbp),%rdx
+ 18f292b:	add    $0xfffffffffffffff8,%rsi
+ 18f292f:	jne    18f28f0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x5f0>
+ 18f2931:	movq   $0x0,0x8(%rsp)
+ 18f293a:	lea    (%rcx,%rcx,2),%r15
+ 18f293e:	cmpq   $0x0,0x18(%r12,%r15,8)
+ 18f2944:	jne    18f296c <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x66c>
+ 18f2946:	jmp    18f2d1f <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xa1f>
+ 18f294b:	nopl   0x0(%rax,%rax,1)
+ 18f2950:	lea    0x1(%rcx),%rax
+ 18f2954:	mov    %rax,0x8(%rsp)
+ 18f2959:	mov    %r12,%rbp
+ 18f295c:	lea    (%rcx,%rcx,2),%r15
+ 18f2960:	cmpq   $0x0,0x18(%r12,%r15,8)
+ 18f2966:	je     18f2d1f <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xa1f>
+ 18f296c:	mov    0x48(%rsp),%rax
+ 18f2971:	sub    %r14,%rax
+ 18f2974:	cmp    $0x6,%rax
+ 18f2978:	jbe    18f2ae2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x7e2>
+ 18f297e:	lea    (%r12,%r15,8),%rcx
+ 18f2982:	add    $0x110,%rcx
+ 18f2989:	mov    0x50(%rsp),%rax
+ 18f298e:	movl   $0x3a736e6c,0x3(%rax,%r14,1)
+ 18f2997:	movl   $0x6c6d7820,(%rax,%r14,1)
+ 18f299f:	mov    0x48(%rsp),%rax
+ 18f29a4:	mov    0x58(%rsp),%rsi
+ 18f29a9:	add    $0x7,%rsi
+ 18f29ad:	mov    %rsi,0x58(%rsp)
+ 18f29b2:	mov    0x8(%rcx),%r14
+ 18f29b6:	mov    0x10(%rcx),%rbx
+ 18f29ba:	mov    %rax,%rcx
+ 18f29bd:	sub    %rsi,%rcx
+ 18f29c0:	cmp    %rcx,%rbx
+ 18f29c3:	ja     18f2b09 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x809>
+ 18f29c9:	test   %rbx,%rbx
+ 18f29cc:	je     18f29ec <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x6ec>
+ 18f29ce:	add    0x50(%rsp),%rsi
+ 18f29d3:	mov    %rsi,%rdi
+ 18f29d6:	mov    %r14,%rsi
+ 18f29d9:	mov    %rbx,%rdx
+ 18f29dc:	call   *0x1402666(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f29e2:	mov    0x48(%rsp),%rax
+ 18f29e7:	mov    0x58(%rsp),%rsi
+ 18f29ec:	add    %rbx,%rsi
+ 18f29ef:	mov    %rsi,0x58(%rsp)
+ 18f29f4:	sub    %rsi,%rax
+ 18f29f7:	cmp    $0x1,%rax
+ 18f29fb:	jbe    18f2b2b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x82b>
+ 18f2a01:	mov    0x50(%rsp),%rax
+ 18f2a06:	movw   $0x223d,(%rax,%rsi,1)
+ 18f2a0c:	addq   $0x2,0x58(%rsp)
+ 18f2a12:	lea    (%r12,%r15,8),%rax
+ 18f2a16:	add    $0x8,%rax
+ 18f2a1a:	mov    0x8(%rax),%rsi
+ 18f2a1e:	mov    0x10(%rax),%rdx
+ 18f2a22:	lea    0x1b0(%rsp),%rdi
+ 18f2a2a:	call   18f9870 <litchi_core::xml::escape::escape_xml>
+ 18f2a2f:	mov    0x1b8(%rsp),%rbx
+ 18f2a37:	mov    0x1c0(%rsp),%r12
+ 18f2a3f:	mov    0x48(%rsp),%rax
+ 18f2a44:	mov    0x58(%rsp),%r14
+ 18f2a49:	sub    %r14,%rax
+ 18f2a4c:	cmp    %rax,%r12
+ 18f2a4f:	ja     18f2b4f <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x84f>
+ 18f2a55:	test   %r12,%r12
+ 18f2a58:	je     18f2a73 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x773>
+ 18f2a5a:	add    0x50(%rsp),%r14
+ 18f2a5f:	mov    %r14,%rdi
+ 18f2a62:	mov    %rbx,%rsi
+ 18f2a65:	mov    %r12,%rdx
+ 18f2a68:	call   *0x14025da(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f2a6e:	mov    0x58(%rsp),%r14
+ 18f2a73:	add    %r12,%r14
+ 18f2a76:	mov    %r14,0x58(%rsp)
+ 18f2a7b:	mov    0x1b0(%rsp),%rsi
+ 18f2a83:	test   %rsi,%rsi
+ 18f2a86:	je     18f2a9b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x79b>
+ 18f2a88:	mov    $0x1,%edx
+ 18f2a8d:	mov    %rbx,%rdi
+ 18f2a90:	call   *0x14025fa(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f2a96:	mov    0x58(%rsp),%r14
+ 18f2a9b:	cmp    %r14,0x48(%rsp)
+ 18f2aa0:	je     18f2b74 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x874>
+ 18f2aa6:	dec    %r13
+ 18f2aa9:	mov    0x50(%rsp),%rax
+ 18f2aae:	movb   $0x22,(%rax,%r14,1)
+ 18f2ab3:	inc    %r14
+ 18f2ab6:	mov    %r14,0x58(%rsp)
+ 18f2abb:	mov    $0x1,%cl
+ 18f2abd:	mov    $0x0,%eax
+ 18f2ac2:	test   %r13,%r13
+ 18f2ac5:	jne    18f2790 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x490>
+ 18f2acb:	jmp    18f2b96 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x896>
+ 18f2ad0:	mov    %rax,%rsi
+ 18f2ad3:	cmp    $0x8,%rax
+ 18f2ad7:	jb     18f2931 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x631>
+ 18f2add:	jmp    18f28f0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x5f0>
+ 18f2ae2:	mov    $0x7,%edx
+ 18f2ae7:	mov    $0x1,%ecx
+ 18f2aec:	mov    $0x1,%r8d
+ 18f2af2:	lea    0x48(%rsp),%rdi
+ 18f2af7:	mov    %r14,%rsi
+ 18f2afa:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f2aff:	mov    0x58(%rsp),%r14
+ 18f2b04:	jmp    18f297e <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x67e>
+ 18f2b09:	mov    $0x1,%ecx
+ 18f2b0e:	mov    $0x1,%r8d
+ 18f2b14:	lea    0x48(%rsp),%rdi
+ 18f2b19:	mov    %rbx,%rdx
+ 18f2b1c:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f2b21:	mov    0x58(%rsp),%rsi
+ 18f2b26:	jmp    18f29ce <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x6ce>
+ 18f2b2b:	mov    $0x2,%edx
+ 18f2b30:	mov    $0x1,%ecx
+ 18f2b35:	mov    $0x1,%r8d
+ 18f2b3b:	lea    0x48(%rsp),%rdi
+ 18f2b40:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f2b45:	mov    0x58(%rsp),%rsi
+ 18f2b4a:	jmp    18f2a01 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x701>
+ 18f2b4f:	mov    $0x1,%ecx
+ 18f2b54:	mov    $0x1,%r8d
+ 18f2b5a:	lea    0x48(%rsp),%rdi
+ 18f2b5f:	mov    %r14,%rsi
+ 18f2b62:	mov    %r12,%rdx
+ 18f2b65:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f2b6a:	mov    0x58(%rsp),%r14
+ 18f2b6f:	jmp    18f2a5a <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x75a>
+ 18f2b74:	mov    $0x1,%edx
+ 18f2b79:	mov    $0x1,%ecx
+ 18f2b7e:	mov    $0x1,%r8d
+ 18f2b84:	lea    0x48(%rsp),%rdi
+ 18f2b89:	mov    %r14,%rsi
+ 18f2b8c:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f2b91:	jmp    18f2aa6 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x7a6>
+ 18f2b96:	mov    0x38(%rsp),%r12
+ 18f2b9b:	test   %r12,%r12
+ 18f2b9e:	je     18f2cc3 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x9c3>
+ 18f2ba4:	mov    %r12d,%eax
+ 18f2ba7:	and    $0x3,%eax
+ 18f2baa:	cmp    $0x4,%r12
+ 18f2bae:	mov    0x88(%rsp),%r15
+ 18f2bb6:	jae    18f2d8b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xa8b>
+ 18f2bbc:	xor    %edx,%edx
+ 18f2bbe:	xor    %ecx,%ecx
+ 18f2bc0:	jmp    18f2dcd <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xacd>
+ 18f2bc5:	call   *0x14024b5(%rip)        # 2cf5080 <_DYNAMIC+0x288>
+ 18f2bcb:	mov    $0x2b,%r14d
+ 18f2bd1:	mov    $0x2b,%edi
+ 18f2bd6:	mov    $0x1,%esi
+ 18f2bdb:	call   *0x14024a7(%rip)        # 2cf5088 <_DYNAMIC+0x290>
+ 18f2be1:	test   %rax,%rax
+ 18f2be4:	je     18f51a3 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2ea3>
+ 18f2bea:	mov    %rax,%r13
+ 18f2bed:	movabs $0x8000000000000002,%rbp
+ 18f2bf7:	movups -0x1584f03(%rip),%xmm0        # 36dcfb <anon.27ebc01334d26e52e912787017a60f97.131.llvm.17599591043162483340+0x1b>
+ 18f2bfe:	movups %xmm0,0x1b(%rax)
+ 18f2c02:	movups -0x1584f19(%rip),%xmm0        # 36dcf0 <anon.27ebc01334d26e52e912787017a60f97.131.llvm.17599591043162483340+0x10>
+ 18f2c09:	movups %xmm0,0x10(%rax)
+ 18f2c0d:	movups -0x1584f34(%rip),%xmm0        # 36dce0 <anon.27ebc01334d26e52e912787017a60f97.131.llvm.17599591043162483340>
+ 18f2c14:	movups %xmm0,(%rax)
+ 18f2c17:	mov    $0x2b,%eax
+ 18f2c1c:	mov    %rax,0x8(%rsp)
+ 18f2c21:	jmp    18f2c50 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x950>
+ 18f2c23:	mov    0x1b8(%rsp),%rax
+ 18f2c2b:	mov    %rax,0x8(%rsp)
+ 18f2c30:	mov    0x1c0(%rsp),%r13
+ 18f2c38:	mov    0x1c8(%rsp),%r14
+ 18f2c40:	movups 0x1d0(%rsp),%xmm0
+ 18f2c48:	movaps %xmm0,0x510(%rsp)
+ 18f2c50:	movaps 0x510(%rsp),%xmm0
+ 18f2c58:	movaps %xmm0,0x90(%rsp)
+ 18f2c60:	mov    0x100(%rsp),%rcx
+ 18f2c68:	test   %rcx,%rcx
+ 18f2c6b:	je     18f317a <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xe7a>
+ 18f2c71:	mov    0x108(%rsp),%rdx
+ 18f2c79:	mov    0x110(%rsp),%rax
+ 18f2c81:	movq   $0x0,0x1b8(%rsp)
+ 18f2c8d:	mov    %rcx,0x1c0(%rsp)
+ 18f2c95:	mov    %rdx,0x1c8(%rsp)
+ 18f2c9d:	movq   $0x0,0x1d8(%rsp)
+ 18f2ca9:	mov    %rcx,0x1e0(%rsp)
+ 18f2cb1:	mov    %rdx,0x1e8(%rsp)
+ 18f2cb9:	mov    $0x1,%ecx
+ 18f2cbe:	jmp    18f317e <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xe7e>
+ 18f2cc3:	xor    %eax,%eax
+ 18f2cc5:	xor    %edx,%edx
+ 18f2cc7:	xor    %ecx,%ecx
+ 18f2cc9:	add    %rdx,%rax
+ 18f2ccc:	mov    %r12,%r15
+ 18f2ccf:	shl    $0x7,%r15
+ 18f2cd3:	add    %rax,%r15
+ 18f2cd6:	add    %rcx,%r15
+ 18f2cd9:	add    $0x100,%r15
+ 18f2ce0:	jns    18f2cf5 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x9f5>
+ 18f2ce2:	xor    %ebx,%ebx
+ 18f2ce4:	mov    %rbx,%rdi
+ 18f2ce7:	mov    %r15,%rsi
+ 18f2cea:	call   *0x14023b8(%rip)        # 2cf50a8 <_DYNAMIC+0x2b0>
+ 18f2cf0:	jmp    18f5302 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3002>
+ 18f2cf5:	je     18f2ea9 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xba9>
+ 18f2cfb:	call   *0x140237f(%rip)        # 2cf5080 <_DYNAMIC+0x288>
+ 18f2d01:	mov    $0x1,%ebx
+ 18f2d06:	mov    $0x1,%esi
+ 18f2d0b:	mov    %r15,%rdi
+ 18f2d0e:	call   *0x1402374(%rip)        # 2cf5088 <_DYNAMIC+0x290>
+ 18f2d14:	test   %rax,%rax
+ 18f2d17:	jne    18f2eae <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xbae>
+ 18f2d1d:	jmp    18f2ce4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x9e4>
+ 18f2d1f:	call   *0x140235b(%rip)        # 2cf5080 <_DYNAMIC+0x288>
+ 18f2d25:	mov    $0x31,%r15d
+ 18f2d2b:	mov    $0x1,%ebx
+ 18f2d30:	mov    $0x31,%edi
+ 18f2d35:	mov    $0x1,%esi
+ 18f2d3a:	call   *0x1402348(%rip)        # 2cf5088 <_DYNAMIC+0x290>
+ 18f2d40:	test   %rax,%rax
+ 18f2d43:	je     18f2ce4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x9e4>
+ 18f2d45:	mov    %rax,%r13
+ 18f2d48:	movabs $0x8000000000000002,%rbp
+ 18f2d52:	movups -0x1581777(%rip),%xmm0        # 3715e2 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xdf8>
+ 18f2d59:	movups %xmm0,0x20(%rax)
+ 18f2d5d:	movups -0x1581792(%rip),%xmm0        # 3715d2 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xde8>
+ 18f2d64:	movups %xmm0,0x10(%rax)
+ 18f2d68:	movups -0x15817ad(%rip),%xmm0        # 3715c2 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xdd8>
+ 18f2d6f:	movups %xmm0,(%rax)
+ 18f2d72:	movb   $0x79,0x30(%rax)
+ 18f2d76:	mov    $0x31,%r14d
+ 18f2d7c:	mov    $0x31,%eax
+ 18f2d81:	mov    %rax,0x8(%rsp)
+ 18f2d86:	jmp    18f3385 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1085>
+ 18f2d8b:	mov    %r12,%rsi
+ 18f2d8e:	and    $0xfffffffffffffffc,%rsi
+ 18f2d92:	lea    0x490(%r15),%rdi
+ 18f2d99:	xor    %edx,%edx
+ 18f2d9b:	xor    %ecx,%ecx
+ 18f2d9d:	nopl   (%rax)
+ 18f2da0:	add    -0x450(%rdi),%rcx
+ 18f2da7:	add    -0x2e0(%rdi),%rcx
+ 18f2dae:	add    -0x170(%rdi),%rcx
+ 18f2db5:	add    (%rdi),%rcx
+ 18f2db8:	add    $0x4,%rdx
+ 18f2dbc:	add    $0x5c0,%rdi
+ 18f2dc3:	cmp    %rdx,%rsi
+ 18f2dc6:	jne    18f2da0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xaa0>
+ 18f2dc8:	test   %rax,%rax
+ 18f2dcb:	je     18f2e00 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xb00>
+ 18f2dcd:	imul   $0x170,%rdx,%rdx
+ 18f2dd4:	add    %r15,%rdx
+ 18f2dd7:	add    $0x40,%rdx
+ 18f2ddb:	imul   $0x170,%rax,%rax
+ 18f2de2:	xor    %esi,%esi
+ 18f2de4:	data16 data16 cs nopw 0x0(%rax,%rax,1)
+ 18f2df0:	add    (%rdx,%rsi,1),%rcx
+ 18f2df4:	add    $0x170,%rsi
+ 18f2dfb:	cmp    %rsi,%rax
+ 18f2dfe:	jne    18f2df0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xaf0>
+ 18f2e00:	cmp    $0x1,%r12
+ 18f2e04:	jne    18f2e0c <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xb0c>
+ 18f2e06:	xor    %edx,%edx
+ 18f2e08:	xor    %eax,%eax
+ 18f2e0a:	jmp    18f2e85 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xb85>
+ 18f2e0c:	movabs $0x7ffffffffffffe,%rsi
+ 18f2e16:	and    %r12,%rsi
+ 18f2e19:	lea    0x1c8(%r15),%rdi
+ 18f2e20:	xor    %edx,%edx
+ 18f2e22:	xor    %eax,%eax
+ 18f2e24:	jmp    18f2e5e <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xb5e>
+ 18f2e26:	cs nopw 0x0(%rax,%rax,1)
+ 18f2e30:	xor    %r8d,%r8d
+ 18f2e33:	cmpq   $0xffffffffffffffff,-0x10(%rdi)
+ 18f2e38:	je     18f2e76 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xb76>
+ 18f2e3a:	mov    (%rdi),%r9
+ 18f2e3d:	add    -0x1b8(%rdi),%rax
+ 18f2e44:	add    %r8,%rax
+ 18f2e47:	add    -0x48(%rdi),%rax
+ 18f2e4b:	add    %r9,%rax
+ 18f2e4e:	add    $0x2,%rdx
+ 18f2e52:	add    $0x2e0,%rdi
+ 18f2e59:	cmp    %rdx,%rsi
+ 18f2e5c:	je     18f2e7b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xb7b>
+ 18f2e5e:	cmpq   $0xffffffffffffffff,-0x180(%rdi)
+ 18f2e66:	je     18f2e30 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xb30>
+ 18f2e68:	mov    -0x170(%rdi),%r8
+ 18f2e6f:	cmpq   $0xffffffffffffffff,-0x10(%rdi)
+ 18f2e74:	jne    18f2e3a <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xb3a>
+ 18f2e76:	xor    %r9d,%r9d
+ 18f2e79:	jmp    18f2e3d <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xb3d>
+ 18f2e7b:	test   $0x1,%r12b
+ 18f2e7f:	je     18f2fd7 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xcd7>
+ 18f2e85:	imul   $0x170,%rdx,%rsi
+ 18f2e8c:	mov    0x10(%r15,%rsi,1),%rdx
+ 18f2e91:	cmpq   $0xffffffffffffffff,0x48(%r15,%rsi,1)
+ 18f2e97:	je     18f2fcc <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xccc>
+ 18f2e9d:	add    %r15,%rsi
+ 18f2ea0:	mov    0x58(%rsi),%rsi
+ 18f2ea4:	jmp    18f2fce <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xcce>
+ 18f2ea9:	mov    $0x1,%eax
+ 18f2eae:	mov    %r15,0x10(%rsp)
+ 18f2eb3:	mov    %rax,0x18(%rsp)
+ 18f2eb8:	movq   $0x0,0x20(%rsp)
+ 18f2ec1:	mov    0x28(%rsp),%rcx
+ 18f2ec6:	lea    0x218(%rcx),%rax
+ 18f2ecd:	xor    %esi,%esi
+ 18f2ecf:	cmpq   $0xffffffffffffffff,0x218(%rcx)
+ 18f2ed7:	cmovne %rax,%rsi
+ 18f2edb:	lea    0x1b0(%rsp),%rdi
+ 18f2ee3:	mov    %rsi,0xa0(%rsp)
+ 18f2eeb:	mov    %r12,%rdx
+ 18f2eee:	call   187b0a0 <litchi_odp::model::declaration::write_declaration_elements>
+ 18f2ef3:	mov    0x1b0(%rsp),%rbp
+ 18f2efb:	mov    0x1b8(%rsp),%rax
+ 18f2f03:	mov    %rax,0x8(%rsp)
+ 18f2f08:	mov    0x1c0(%rsp),%r13
+ 18f2f10:	mov    0x1c8(%rsp),%r14
+ 18f2f18:	cmp    $0xffffffffffffffff,%rbp
+ 18f2f1c:	jne    18f335b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x105b>
+ 18f2f22:	mov    0x10(%rsp),%rax
+ 18f2f27:	mov    0x20(%rsp),%rsi
+ 18f2f2c:	sub    %rsi,%rax
+ 18f2f2f:	cmp    %rax,%r14
+ 18f2f32:	mov    %r15,0x4e8(%rsp)
+ 18f2f3a:	ja     18f5111 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2e11>
+ 18f2f40:	test   %r14,%r14
+ 18f2f43:	je     18f2f5e <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xc5e>
+ 18f2f45:	add    0x18(%rsp),%rsi
+ 18f2f4a:	mov    %rsi,%rdi
+ 18f2f4d:	mov    %r13,%rsi
+ 18f2f50:	mov    %r14,%rdx
+ 18f2f53:	call   *0x14020ef(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f2f59:	mov    0x20(%rsp),%rsi
+ 18f2f5e:	add    %r14,%rsi
+ 18f2f61:	mov    %rsi,0x20(%rsp)
+ 18f2f66:	mov    0x8(%rsp),%rsi
+ 18f2f6b:	test   %rsi,%rsi
+ 18f2f6e:	je     18f2f7e <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xc7e>
+ 18f2f70:	mov    $0x1,%edx
+ 18f2f75:	mov    %r13,%rdi
+ 18f2f78:	call   *0x1402112(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f2f7e:	mov    0x28(%rsp),%rax
+ 18f2f83:	mov    (%rax),%rcx
+ 18f2f86:	mov    %rcx,0x128(%rsp)
+ 18f2f8e:	cmp    $0xffffffffffffffff,%rcx
+ 18f2f92:	je     18f32f9 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xff9>
+ 18f2f98:	mov    0x28(%rsp),%rax
+ 18f2f9d:	mov    0x48(%rax),%r15
+ 18f2fa1:	test   %r15,%r15
+ 18f2fa4:	je     18f32f9 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xff9>
+ 18f2faa:	mov    0x28(%rsp),%rax
+ 18f2faf:	mov    0x40(%rax),%r13
+ 18f2fb3:	shl    $0x4,%r15
+ 18f2fb7:	add    %r13,%r15
+ 18f2fba:	mov    0x28(%rax),%rcx
+ 18f2fbe:	mov    %rcx,0x8(%rsp)
+ 18f2fc3:	mov    0x30(%rax),%rbp
+ 18f2fc7:	jmp    18f3270 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xf70>
+ 18f2fcc:	xor    %esi,%esi
+ 18f2fce:	add    %rax,%rdx
+ 18f2fd1:	add    %rsi,%rdx
+ 18f2fd4:	mov    %rdx,%rax
+ 18f2fd7:	shl    $0x6,%rcx
+ 18f2fdb:	lea    (%rcx,%rcx,2),%rdx
+ 18f2fdf:	xor    %ecx,%ecx
+ 18f2fe1:	xor    %esi,%esi
+ 18f2fe3:	jmp    18f300f <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xd0f>
+ 18f2fe5:	data16 cs nopw 0x0(%rax,%rax,1)
+ 18f2ff0:	lea    (%rdi,%r8,1),%r9
+ 18f2ff4:	mov    0xa0(%r9),%r9
+ 18f2ffb:	add    0x40(%rdi,%r8,1),%rcx
+ 18f3000:	add    %r9,%rcx
+ 18f3003:	inc    %rsi
+ 18f3006:	cmp    %r12,%rsi
+ 18f3009:	je     18f2cc9 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x9c9>
+ 18f300f:	imul   $0x170,%rsi,%rdi
+ 18f3016:	mov    0x40(%r15,%rdi,1),%r8
+ 18f301b:	test   %r8,%r8
+ 18f301e:	je     18f3003 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xd03>
+ 18f3020:	mov    0x38(%r15,%rdi,1),%rdi
+ 18f3025:	cmp    $0x1,%r8
+ 18f3029:	jne    18f3030 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xd30>
+ 18f302b:	xor    %r9d,%r9d
+ 18f302e:	jmp    18f30aa <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xdaa>
+ 18f3030:	mov    %r8,%r10
+ 18f3033:	and    $0xfffffffffffffffe,%r10
+ 18f3037:	lea    0x328(%rdi),%r11
+ 18f303e:	xor    %r9d,%r9d
+ 18f3041:	jmp    18f307d <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xd7d>
+ 18f3043:	data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+ 18f3050:	xor    %ebx,%ebx
+ 18f3052:	cmpq   $0xffffffffffffffff,-0x10(%r11)
+ 18f3057:	je     18f3095 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xd95>
+ 18f3059:	mov    (%r11),%r14
+ 18f305c:	add    -0x2e8(%r11),%rcx
+ 18f3063:	add    %rbx,%rcx
+ 18f3066:	add    -0x60(%r11),%rcx
+ 18f306a:	add    %r14,%rcx
+ 18f306d:	add    $0x2,%r9
+ 18f3071:	add    $0x510,%r11
+ 18f3078:	cmp    %r9,%r10
+ 18f307b:	je     18f30a0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xda0>
+ 18f307d:	cmpq   $0xffffffffffffffff,-0x298(%r11)
+ 18f3085:	je     18f3050 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xd50>
+ 18f3087:	mov    -0x288(%r11),%rbx
+ 18f308e:	cmpq   $0xffffffffffffffff,-0x10(%r11)
+ 18f3093:	jne    18f3059 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xd59>
+ 18f3095:	xor    %r14d,%r14d
+ 18f3098:	jmp    18f305c <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xd5c>
+ 18f309a:	nopw   0x0(%rax,%rax,1)
+ 18f30a0:	test   $0x1,%r8b
+ 18f30a4:	je     18f3003 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xd03>
+ 18f30aa:	imul   $0x288,%r9,%r8
+ 18f30b1:	cmpq   $0xffffffffffffffff,0x90(%rdi,%r8,1)
+ 18f30ba:	jne    18f2ff0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xcf0>
+ 18f30c0:	xor    %r9d,%r9d
+ 18f30c3:	jmp    18f2ffb <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xcfb>
+ 18f30c8:	call   *0x1401fb2(%rip)        # 2cf5080 <_DYNAMIC+0x288>
+ 18f30ce:	mov    $0x39,%edi
+ 18f30d3:	mov    $0x1,%esi
+ 18f30d8:	call   *0x1401faa(%rip)        # 2cf5088 <_DYNAMIC+0x290>
+ 18f30de:	test   %rax,%rax
+ 18f30e1:	je     18f52ad <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2fad>
+ 18f30e7:	movabs $0x8000000000000002,%rbp
+ 18f30f1:	movups -0x15862ca(%rip),%xmm0        # 36ce2e <anon.6b5b364fdc1515aa99d91f0cc310bb61.200.llvm.12810184995107200417+0x29>
+ 18f30f8:	movups %xmm0,0x29(%rax)
+ 18f30fc:	movups -0x15862de(%rip),%xmm0        # 36ce25 <anon.6b5b364fdc1515aa99d91f0cc310bb61.200.llvm.12810184995107200417+0x20>
+ 18f3103:	movups %xmm0,0x20(%rax)
+ 18f3107:	movups -0x15862f9(%rip),%xmm0        # 36ce15 <anon.6b5b364fdc1515aa99d91f0cc310bb61.200.llvm.12810184995107200417+0x10>
+ 18f310e:	movups %xmm0,0x10(%rax)
+ 18f3112:	movups -0x1586314(%rip),%xmm0        # 36ce05 <anon.6b5b364fdc1515aa99d91f0cc310bb61.200.llvm.12810184995107200417>
+ 18f3119:	movups %xmm0,(%rax)
+ 18f311c:	movq   $0x39,0x1b8(%rsp)
+ 18f3128:	mov    %rax,0x1c0(%rsp)
+ 18f3130:	movq   $0x39,0x1c8(%rsp)
+ 18f313c:	mov    0x1b8(%rsp),%rax
+ 18f3144:	mov    %rax,0x8(%rsp)
+ 18f3149:	mov    0x1c0(%rsp),%r13
+ 18f3151:	mov    0x1c8(%rsp),%r14
+ 18f3159:	movups 0x1d0(%rsp),%xmm0
+ 18f3161:	movaps %xmm0,0x90(%rsp)
+ 18f3169:	mov    0x100(%rsp),%rcx
+ 18f3171:	test   %rcx,%rcx
+ 18f3174:	jne    18f2c71 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x971>
+ 18f317a:	xor    %ecx,%ecx
+ 18f317c:	xor    %eax,%eax
+ 18f317e:	mov    %rcx,0x1b0(%rsp)
+ 18f3186:	mov    %rcx,0x1d0(%rsp)
+ 18f318e:	mov    %rax,0x1f0(%rsp)
+ 18f3196:	lea    0x510(%rsp),%rdi
+ 18f319e:	lea    0x1b0(%rsp),%rsi
+ 18f31a6:	call   185c5f0 <<alloc::collections::btree::map::IntoIter<alloc::string::String, alloc::collections::btree::set_val::SetValZST>>::dying_next>
+ 18f31ab:	mov    0x510(%rsp),%rax
+ 18f31b3:	test   %rax,%rax
+ 18f31b6:	je     18f33b6 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x10b6>
+ 18f31bc:	lea    0x510(%rsp),%rbx
+ 18f31c4:	lea    0x1b0(%rsp),%r15
+ 18f31cc:	mov    0x1401ebd(%rip),%r12        # 2cf5090 <_DYNAMIC+0x298>
+ 18f31d3:	data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+ 18f31e0:	mov    0x520(%rsp),%rcx
+ 18f31e8:	lea    (%rcx,%rcx,2),%rcx
+ 18f31ec:	mov    0x8(%rax,%rcx,8),%rsi
+ 18f31f1:	test   %rsi,%rsi
+ 18f31f4:	je     18f320a <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xf0a>
+ 18f31f6:	lea    (%rax,%rcx,8),%rax
+ 18f31fa:	add    $0x8,%rax
+ 18f31fe:	mov    0x8(%rax),%rdi
+ 18f3202:	mov    $0x1,%edx
+ 18f3207:	call   *%r12
+ 18f320a:	mov    %rbx,%rdi
+ 18f320d:	mov    %r15,%rsi
+ 18f3210:	call   185c5f0 <<alloc::collections::btree::map::IntoIter<alloc::string::String, alloc::collections::btree::set_val::SetValZST>>::dying_next>
+ 18f3215:	mov    0x510(%rsp),%rax
+ 18f321d:	test   %rax,%rax
+ 18f3220:	jne    18f31e0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xee0>
+ 18f3222:	jmp    18f33b6 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x10b6>
+ 18f3227:	mov    $0x1,%ecx
+ 18f322c:	mov    $0x1,%r8d
+ 18f3232:	lea    0x10(%rsp),%rdi
+ 18f3237:	mov    %rbx,%rsi
+ 18f323a:	mov    %r14,%rdx
+ 18f323d:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f3242:	mov    0x20(%rsp),%rbx
+ 18f3247:	mov    0x18(%rsp),%rdi
+ 18f324c:	add    %rbx,%rdi
+ 18f324f:	mov    %r12,%rsi
+ 18f3252:	mov    %r14,%rdx
+ 18f3255:	call   *0x1401ded(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f325b:	add    %rbx,%r14
+ 18f325e:	mov    %r14,0x20(%rsp)
+ 18f3263:	add    $0x10,%r13
+ 18f3267:	cmp    %r15,%r13
+ 18f326a:	je     18f32f9 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xff9>
+ 18f3270:	mov    0x0(%r13),%r12
+ 18f3274:	mov    0x8(%r13),%rax
+ 18f3278:	mov    %rax,%r14
+ 18f327b:	sub    %r12,%r14
+ 18f327e:	setb   %cl
+ 18f3281:	cmp    %rbp,%rax
+ 18f3284:	seta   %dl
+ 18f3287:	or     %cl,%dl
+ 18f3289:	je     18f3292 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xf92>
+ 18f328b:	mov    0x20(%rsp),%rbx
+ 18f3290:	jmp    18f32f1 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xff1>
+ 18f3292:	cmp    %rbp,%r12
+ 18f3295:	je     18f32ad <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xfad>
+ 18f3297:	test   %r12,%r12
+ 18f329a:	je     18f32a8 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xfa8>
+ 18f329c:	mov    0x8(%rsp),%rcx
+ 18f32a1:	cmpb   $0xbf,(%rcx,%r12,1)
+ 18f32a6:	jle    18f328b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xf8b>
+ 18f32a8:	cmp    %rbp,%rax
+ 18f32ab:	jne    18f32b4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xfb4>
+ 18f32ad:	add    0x8(%rsp),%r12
+ 18f32b2:	jmp    18f32d2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xfd2>
+ 18f32b4:	mov    0x8(%rsp),%rcx
+ 18f32b9:	add    %rcx,%r12
+ 18f32bc:	cmpb   $0xc0,(%rcx,%rax,1)
+ 18f32c0:	mov    $0x0,%eax
+ 18f32c5:	cmovl  %rax,%r14
+ 18f32c9:	mov    $0x1,%eax
+ 18f32ce:	cmovl  %rax,%r12
+ 18f32d2:	mov    0x10(%rsp),%rax
+ 18f32d7:	mov    0x20(%rsp),%rbx
+ 18f32dc:	sub    %rbx,%rax
+ 18f32df:	cmp    %rax,%r14
+ 18f32e2:	ja     18f3227 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xf27>
+ 18f32e8:	test   %r14,%r14
+ 18f32eb:	jne    18f3247 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xf47>
+ 18f32f1:	xor    %r14d,%r14d
+ 18f32f4:	jmp    18f325b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xf5b>
+ 18f32f9:	mov    0x28(%rsp),%rcx
+ 18f32fe:	lea    0x278(%rcx),%rax
+ 18f3305:	mov    0x278(%rcx),%r15
+ 18f330c:	xor    %r12d,%r12d
+ 18f330f:	cmp    $0xffffffffffffffff,%r15
+ 18f3313:	cmovne %rax,%r12
+ 18f3317:	lea    0x1b0(%rsp),%rdi
+ 18f331f:	mov    %r12,%rsi
+ 18f3322:	mov    0x38(%rsp),%rdx
+ 18f3327:	call   19208b0 <litchi_odp::model::page_metadata::effective_page_names>
+ 18f332c:	mov    0x1b0(%rsp),%rbp
+ 18f3334:	mov    0x1b8(%rsp),%rax
+ 18f333c:	mov    0x1c0(%rsp),%r13
+ 18f3344:	mov    0x1c8(%rsp),%r14
+ 18f334c:	cmp    $0xffffffffffffffff,%rbp
+ 18f3350:	mov    %rax,0x8(%rsp)
+ 18f3355:	je     18f3416 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1116>
+ 18f335b:	movups 0x1d0(%rsp),%xmm0
+ 18f3363:	movaps %xmm0,0x90(%rsp)
+ 18f336b:	mov    0x10(%rsp),%rsi
+ 18f3370:	test   %rsi,%rsi
+ 18f3373:	je     18f3385 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1085>
+ 18f3375:	mov    0x18(%rsp),%rdi
+ 18f337a:	mov    $0x1,%edx
+ 18f337f:	call   *0x1401d0b(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f3385:	mov    0x48(%rsp),%rsi
+ 18f338a:	test   %rsi,%rsi
+ 18f338d:	je     18f339f <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x109f>
+ 18f338f:	mov    0x50(%rsp),%rdi
+ 18f3394:	mov    $0x1,%edx
+ 18f3399:	call   *0x1401cf1(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f339f:	lea    0x138(%rsp),%rdi
+ 18f33a7:	call   185d980 <<alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::string::String> as core::ops::drop::Drop>::drop>
+ 18f33ac:	cmp    $0xffffffffffffffff,%rbp
+ 18f33b0:	je     18f44ff <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x21ff>
+ 18f33b6:	movaps 0x90(%rsp),%xmm0
+ 18f33be:	mov    0x68(%rsp),%rax
+ 18f33c3:	movups %xmm0,0x20(%rax)
+ 18f33c7:	mov    %rbp,(%rax)
+ 18f33ca:	mov    0x8(%rsp),%rcx
+ 18f33cf:	mov    %rcx,0x8(%rax)
+ 18f33d3:	mov    %r13,0x10(%rax)
+ 18f33d7:	mov    %r14,0x18(%rax)
+ 18f33db:	cmpl   $0xffffffff,0x690(%rsp)
+ 18f33e3:	je     18f33f2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x10f2>
+ 18f33e5:	lea    0x690(%rsp),%rdi
+ 18f33ed:	call   18f1120 <core::ptr::drop_glue::<litchi_odf_common::core::package::Package>>
+ 18f33f2:	lea    0x9a8(%rsp),%rdi
+ 18f33fa:	call   18f0210 <core::ptr::drop_glue::<litchi_odf_common::core::writer::PackageWriter<litchi_odf_common::core::writer::BoundedBytes>>>
+ 18f33ff:	mov    0x68(%rsp),%rax
+ 18f3404:	add    $0xcb8,%rsp
+ 18f340b:	pop    %rbx
+ 18f340c:	pop    %r12
+ 18f340e:	pop    %r13
+ 18f3410:	pop    %r14
+ 18f3412:	pop    %r15
+ 18f3414:	pop    %rbp
+ 18f3415:	ret
+ 18f3416:	mov    %rax,0x4f8(%rsp)
+ 18f341e:	mov    %r13,0x500(%rsp)
+ 18f3426:	mov    %r14,0x508(%rsp)
+ 18f342e:	mov    0x28(%rsp),%rcx
+ 18f3433:	lea    0x1a8(%rcx),%rax
+ 18f343a:	xor    %ebx,%ebx
+ 18f343c:	cmpq   $0xffffffffffffffff,0x1a8(%rcx)
+ 18f3444:	cmovne %rax,%rbx
+ 18f3448:	lea    0x1b0(%rsp),%rdi
+ 18f3450:	mov    %rbx,%rsi
+ 18f3453:	mov    %r13,0x78(%rsp)
+ 18f3458:	mov    %r13,%rdx
+ 18f345b:	mov    %r14,%rcx
+ 18f345e:	call   187d710 <litchi_odp::model::settings::validate_page_references>
+ 18f3463:	mov    0x1b0(%rsp),%rbp
+ 18f346b:	cmp    $0xffffffffffffffff,%rbp
+ 18f346f:	je     18f34ad <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x11ad>
+ 18f3471:	mov    0x1b8(%rsp),%rax
+ 18f3479:	mov    %rax,0x30(%rsp)
+ 18f347e:	mov    0x1c0(%rsp),%rbx
+ 18f3486:	mov    0x1c8(%rsp),%r14
+ 18f348e:	movups 0x1d0(%rsp),%xmm0
+ 18f3496:	movaps %xmm0,0x90(%rsp)
+ 18f349e:	mov    0x78(%rsp),%r15
+ 18f34a3:	mov    0x8(%rsp),%r12
+ 18f34a8:	jmp    18f41ec <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1eec>
+ 18f34ad:	mov    %r15,0x4e0(%rsp)
+ 18f34b5:	mov    %rbx,0x4d8(%rsp)
+ 18f34bd:	movq   $0x0,0xa8(%rsp)
+ 18f34c9:	movq   $0x8,0xb0(%rsp)
+ 18f34d5:	movq   $0x0,0xb8(%rsp)
+ 18f34e1:	mov    0x38(%rsp),%r15
+ 18f34e6:	test   %r15,%r15
+ 18f34e9:	mov    0x88(%rsp),%rbp
+ 18f34f1:	je     18f40aa <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1daa>
+ 18f34f7:	mov    0x28(%rsp),%rax
+ 18f34fc:	mov    0x280(%rax),%rdx
+ 18f3503:	mov    %rdx,0x4d0(%rsp)
+ 18f350b:	mov    0x288(%rax),%rax
+ 18f3512:	mov    %rax,0x4c8(%rsp)
+ 18f351a:	xor    %esi,%esi
+ 18f351c:	mov    %r12,0x120(%rsp)
+ 18f3524:	mov    0x28(%rsp),%rdi
+ 18f3529:	mov    %rsi,0x80(%rsp)
+ 18f3531:	mov    %rbp,%rdx
+ 18f3534:	call   18f1e80 <<litchi_odp::authoring::mutable::MutablePresentation>::retained_page>
+ 18f3539:	mov    %rax,%r14
+ 18f353c:	test   %rax,%rax
+ 18f353f:	je     18f359e <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x129e>
+ 18f3541:	mov    %rdx,%rbx
+ 18f3544:	mov    0x10(%rsp),%rax
+ 18f3549:	mov    0x20(%rsp),%rsi
+ 18f354e:	sub    %rsi,%rax
+ 18f3551:	cmp    %rax,%rdx
+ 18f3554:	ja     18f3eac <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1bac>
+ 18f355a:	test   %rbx,%rbx
+ 18f355d:	je     18f3578 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1278>
+ 18f355f:	add    0x18(%rsp),%rsi
+ 18f3564:	mov    %rsi,%rdi
+ 18f3567:	mov    %r14,%rsi
+ 18f356a:	mov    %rbx,%rdx
+ 18f356d:	call   *0x1401ad5(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f3573:	mov    0x20(%rsp),%rsi
+ 18f3578:	add    %rbx,%rsi
+ 18f357b:	mov    %rsi,0x20(%rsp)
+ 18f3580:	add    $0x170,%rbp
+ 18f3587:	mov    0x80(%rsp),%rsi
+ 18f358f:	inc    %rsi
+ 18f3592:	cmp    0x70(%rsp),%rbp
+ 18f3597:	jne    18f3524 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1224>
+ 18f3599:	jmp    18f40aa <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1daa>
+ 18f359e:	mov    0xb8(%rsp),%rbx
+ 18f35a6:	cmp    0xa8(%rsp),%rbx
+ 18f35ae:	jne    18f35be <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x12be>
+ 18f35b0:	lea    0xa8(%rsp),%rdi
+ 18f35b8:	call   *0x1401c12(%rip)        # 2cf51d0 <_DYNAMIC+0x3d8>
+ 18f35be:	mov    0xb0(%rsp),%rax
+ 18f35c6:	mov    0x80(%rsp),%rdx
+ 18f35ce:	mov    %rdx,(%rax,%rbx,8)
+ 18f35d2:	inc    %rbx
+ 18f35d5:	mov    %rbx,0xb8(%rsp)
+ 18f35dd:	lea    0x150(%rsp),%rdi
+ 18f35e5:	mov    %rbp,%rsi
+ 18f35e8:	call   1891940 <litchi_odp::authoring::builder::transition::slide_style_name>
+ 18f35ed:	cmpq   $0xffffffffffffffff,0x4e0(%rsp)
+ 18f35f6:	mov    %rbp,0x60(%rsp)
+ 18f35fb:	je     18f3634 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1334>
+ 18f35fd:	mov    $0x1,%ecx
+ 18f3602:	lea    0x1b0(%rsp),%rdi
+ 18f360a:	mov    0x4d0(%rsp),%rsi
+ 18f3612:	mov    0x4c8(%rsp),%rdx
+ 18f361a:	mov    %r15,%r8
+ 18f361d:	call   19181d0 <<litchi_odp::model::page_metadata::Collection>::validate_for_slide_count>
+ 18f3622:	mov    0x1b0(%rsp),%rbp
+ 18f362a:	cmp    $0xffffffffffffffff,%rbp
+ 18f362e:	jne    18f502b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2d2b>
+ 18f3634:	mov    0x158(%rsp),%rcx
+ 18f363c:	mov    0x160(%rsp),%r8
+ 18f3644:	lea    0x1b0(%rsp),%rdi
+ 18f364c:	mov    %r12,%rsi
+ 18f364f:	mov    0x80(%rsp),%rdx
+ 18f3657:	mov    %rcx,0x4c0(%rsp)
+ 18f365f:	call   19209b0 <litchi_odp::model::page_metadata::write_page_attributes>
+ 18f3664:	mov    0x1b0(%rsp),%rbp
+ 18f366c:	mov    0x1b8(%rsp),%rax
+ 18f3674:	mov    %rax,0x30(%rsp)
+ 18f3679:	mov    0x1c0(%rsp),%rbx
+ 18f3681:	mov    0x1c8(%rsp),%r14
+ 18f3689:	cmp    $0xffffffffffffffff,%rbp
+ 18f368d:	jne    18f5048 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2d48>
+ 18f3693:	lea    0x180(%rsp),%rdi
+ 18f369b:	mov    0xa0(%rsp),%rsi
+ 18f36a3:	mov    0x80(%rsp),%rdx
+ 18f36ab:	xor    %ecx,%ecx
+ 18f36ad:	mov    %rbx,0xf0(%rsp)
+ 18f36b5:	call   187ace0 <litchi_odp::model::declaration::write_binding_attributes>
+ 18f36ba:	mov    0x10(%rsp),%rax
+ 18f36bf:	mov    0x20(%rsp),%rsi
+ 18f36c4:	sub    %rsi,%rax
+ 18f36c7:	cmp    $0x9,%rax
+ 18f36cb:	lea    0x510(%rsp),%rbp
+ 18f36d3:	jbe    18f3ece <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1bce>
+ 18f36d9:	mov    0x18(%rsp),%rax
+ 18f36de:	movabs $0x61703a776172643c,%rcx
+ 18f36e8:	mov    %rcx,(%rax,%rsi,1)
+ 18f36ec:	movw   $0x6567,0x8(%rax,%rsi,1)
+ 18f36f3:	mov    0x10(%rsp),%rsi
+ 18f36f8:	mov    0x20(%rsp),%rbx
+ 18f36fd:	add    $0xa,%rbx
+ 18f3701:	mov    %rbx,0x20(%rsp)
+ 18f3706:	mov    %rsi,%rax
+ 18f3709:	sub    %rbx,%rax
+ 18f370c:	cmp    %rax,%r14
+ 18f370f:	ja     18f3ef2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1bf2>
+ 18f3715:	test   %r14,%r14
+ 18f3718:	je     18f373d <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x143d>
+ 18f371a:	add    0x18(%rsp),%rbx
+ 18f371f:	mov    %rbx,%rdi
+ 18f3722:	mov    0xf0(%rsp),%rsi
+ 18f372a:	mov    %r14,%rdx
+ 18f372d:	call   *0x1401915(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f3733:	mov    0x10(%rsp),%rsi
+ 18f3738:	mov    0x20(%rsp),%rbx
+ 18f373d:	add    %r14,%rbx
+ 18f3740:	mov    %rbx,0x20(%rsp)
+ 18f3745:	mov    0x188(%rsp),%rax
+ 18f374d:	mov    %rax,0xf8(%rsp)
+ 18f3755:	mov    0x190(%rsp),%r14
+ 18f375d:	mov    %rsi,%rax
+ 18f3760:	sub    %rbx,%rax
+ 18f3763:	cmp    %rax,%r14
+ 18f3766:	ja     18f3f17 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1c17>
+ 18f376c:	test   %r14,%r14
+ 18f376f:	je     18f3794 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1494>
+ 18f3771:	add    0x18(%rsp),%rbx
+ 18f3776:	mov    %rbx,%rdi
+ 18f3779:	mov    0xf8(%rsp),%rsi
+ 18f3781:	mov    %r14,%rdx
+ 18f3784:	call   *0x14018be(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f378a:	mov    0x10(%rsp),%rsi
+ 18f378f:	mov    0x20(%rsp),%rbx
+ 18f3794:	add    %r14,%rbx
+ 18f3797:	mov    %rbx,0x20(%rsp)
+ 18f379c:	cmp    %rbx,%rsi
+ 18f379f:	je     18f3f3c <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1c3c>
+ 18f37a5:	mov    0x18(%rsp),%rax
+ 18f37aa:	movb   $0x3e,(%rax,%rbx,1)
+ 18f37ae:	inc    %rbx
+ 18f37b1:	mov    %rbx,0x20(%rsp)
+ 18f37b6:	mov    0x60(%rsp),%rdi
+ 18f37bb:	cmpq   $0xffffffffffffffff,0x48(%rdi)
+ 18f37c0:	je     18f3921 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1621>
+ 18f37c6:	mov    0x50(%rdi),%rsi
+ 18f37ca:	mov    0x58(%rdi),%rdx
+ 18f37ce:	mov    $0x2,%r8d
+ 18f37d4:	mov    %rbp,%rdi
+ 18f37d7:	lea    -0x15823c2(%rip),%rcx        # 37141c <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xc32>
+ 18f37de:	call   19396f0 <litchi_odp::authoring::builder::xml::generate_text_paragraphs>
+ 18f37e3:	call   *0x1401897(%rip)        # 2cf5080 <_DYNAMIC+0x288>
+ 18f37e9:	mov    $0xff,%edi
+ 18f37ee:	mov    $0x1,%esi
+ 18f37f3:	call   *0x140188f(%rip)        # 2cf5088 <_DYNAMIC+0x290>
+ 18f37f9:	test   %rax,%rax
+ 18f37fc:	je     18f52e0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2fe0>
+ 18f3802:	movq   $0xff,0x1b0(%rsp)
+ 18f380e:	mov    %rax,0x1b8(%rsp)
+ 18f3816:	mov    $0xc2,%edx
+ 18f381b:	mov    %rax,%rdi
+ 18f381e:	lea    -0x1582407(%rip),%rsi        # 37141e <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xc34>
+ 18f3825:	call   *0x140181d(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f382b:	movq   $0xc2,0x1c0(%rsp)
+ 18f3837:	mov    %rbp,0xc0(%rsp)
+ 18f383f:	lea    0x9a0a(%rip),%rax        # 18fd250 <<alloc::string::String as core::fmt::Display>::fmt>
+ 18f3846:	mov    %rax,0xc8(%rsp)
+ 18f384e:	lea    0x1b0(%rsp),%rdi
+ 18f3856:	lea    0x13c15a3(%rip),%rsi        # 2cb4e00 <anon.290e8419bff6f17028f39d4fe9417639.9.llvm.12098572966925328090+0x120>
+ 18f385d:	lea    -0x1834aa0(%rip),%rdx        # bedc4 <anon.1ee42dbef889cdf6f37567149f7c8be7.8.llvm.8077416818640781637>
+ 18f3864:	lea    0xc0(%rsp),%rcx
+ 18f386c:	call   *0x1402156(%rip)        # 2cf59c8 <_DYNAMIC+0xbd0>
+ 18f3872:	mov    0x1b0(%rsp),%r14
+ 18f387a:	mov    0x1c0(%rsp),%rbx
+ 18f3882:	mov    %r14,%rax
+ 18f3885:	sub    %rbx,%rax
+ 18f3888:	cmp    $0x1c,%rax
+ 18f388c:	jbe    18f3f5b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1c5b>
+ 18f3892:	mov    0x1b8(%rsp),%r12
+ 18f389a:	movups -0x15823b4(%rip),%xmm0        # 3714ed <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xd03>
+ 18f38a1:	movups %xmm0,0xd(%r12,%rbx,1)
+ 18f38a7:	movups -0x15823ce(%rip),%xmm0        # 3714e0 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xcf6>
+ 18f38ae:	movups %xmm0,(%r12,%rbx,1)
+ 18f38b3:	add    $0x1d,%rbx
+ 18f38b7:	mov    0x10(%rsp),%rax
+ 18f38bc:	mov    0x20(%rsp),%rsi
+ 18f38c1:	sub    %rsi,%rax
+ 18f38c4:	cmp    %rax,%rbx
+ 18f38c7:	ja     18f3f90 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1c90>
+ 18f38cd:	add    0x18(%rsp),%rsi
+ 18f38d2:	mov    %rsi,%rdi
+ 18f38d5:	mov    %r12,%rsi
+ 18f38d8:	mov    %rbx,%rdx
+ 18f38db:	call   *0x1401767(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f38e1:	add    %rbx,0x20(%rsp)
+ 18f38e6:	test   %r14,%r14
+ 18f38e9:	je     18f38fc <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x15fc>
+ 18f38eb:	mov    $0x1,%edx
+ 18f38f0:	mov    %r12,%rdi
+ 18f38f3:	mov    %r14,%rsi
+ 18f38f6:	call   *0x1401794(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f38fc:	mov    0x510(%rsp),%rsi
+ 18f3904:	test   %rsi,%rsi
+ 18f3907:	je     18f391c <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x161c>
+ 18f3909:	mov    0x518(%rsp),%rdi
+ 18f3911:	mov    $0x1,%edx
+ 18f3916:	call   *0x1401774(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f391c:	mov    0x60(%rsp),%rdi
+ 18f3921:	mov    0x10(%rdi),%rdx
+ 18f3925:	test   %rdx,%rdx
+ 18f3928:	je     18f3b31 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1831>
+ 18f392e:	cmpq   $0xffffffffffffffff,0x48(%rdi)
+ 18f3933:	lea    -0x158243d(%rip),%rax        # 3714fd <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xd13>
+ 18f393a:	lea    -0x158243f(%rip),%rcx        # 371502 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xd18>
+ 18f3941:	cmove  %rcx,%rax
+ 18f3945:	mov    %rax,0x680(%rsp)
+ 18f394d:	movq   $0x5,0x688(%rsp)
+ 18f3959:	mov    0x8(%rdi),%rsi
+ 18f395d:	mov    $0x2,%r8d
+ 18f3963:	mov    %rbp,%rdi
+ 18f3966:	lea    -0x1582466(%rip),%rcx        # 371507 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xd1d>
+ 18f396d:	call   19396f0 <litchi_odp::authoring::builder::xml::generate_text_paragraphs>
+ 18f3972:	call   *0x1401708(%rip)        # 2cf5080 <_DYNAMIC+0x288>
+ 18f3978:	mov    $0xf6,%edi
+ 18f397d:	mov    $0x1,%esi
+ 18f3982:	call   *0x1401700(%rip)        # 2cf5088 <_DYNAMIC+0x290>
+ 18f3988:	test   %rax,%rax
+ 18f398b:	je     18f52f2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2ff2>
+ 18f3991:	movq   $0xf6,0x1b0(%rsp)
+ 18f399d:	mov    %rax,0x1b8(%rsp)
+ 18f39a5:	mov    $0xa8,%edx
+ 18f39aa:	mov    %rax,%rdi
+ 18f39ad:	lea    -0x15824ab(%rip),%rsi        # 371509 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xd1f>
+ 18f39b4:	call   *0x140168e(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f39ba:	movq   $0xa8,0x1c0(%rsp)
+ 18f39c6:	lea    0x680(%rsp),%rax
+ 18f39ce:	mov    %rax,0xc0(%rsp)
+ 18f39d6:	lea    0x46e33(%rip),%rax        # 193a810 <<&str as core::fmt::Display>::fmt>
+ 18f39dd:	mov    %rax,0xc8(%rsp)
+ 18f39e5:	lea    0x1b0(%rsp),%rdi
+ 18f39ed:	lea    0x13c140c(%rip),%rsi        # 2cb4e00 <anon.290e8419bff6f17028f39d4fe9417639.9.llvm.12098572966925328090+0x120>
+ 18f39f4:	lea    -0x1834c37(%rip),%rdx        # bedc4 <anon.1ee42dbef889cdf6f37567149f7c8be7.8.llvm.8077416818640781637>
+ 18f39fb:	lea    0xc0(%rsp),%rcx
+ 18f3a03:	call   *0x1401fbf(%rip)        # 2cf59c8 <_DYNAMIC+0xbd0>
+ 18f3a09:	mov    0x1b0(%rsp),%rax
+ 18f3a11:	mov    0x1c0(%rsp),%rsi
+ 18f3a19:	sub    %rsi,%rax
+ 18f3a1c:	cmp    $0x10,%rax
+ 18f3a20:	jbe    18f3fba <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1cba>
+ 18f3a26:	mov    0x1b8(%rsp),%rax
+ 18f3a2e:	movups -0x1582484(%rip),%xmm0        # 3715b1 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xdc7>
+ 18f3a35:	movups %xmm0,(%rax,%rsi,1)
+ 18f3a39:	movb   $0x3e,0x10(%rax,%rsi,1)
+ 18f3a3e:	addq   $0x11,0x1c0(%rsp)
+ 18f3a47:	mov    %rbp,0xc0(%rsp)
+ 18f3a4f:	lea    0x97fa(%rip),%rax        # 18fd250 <<alloc::string::String as core::fmt::Display>::fmt>
+ 18f3a56:	mov    %rax,0xc8(%rsp)
+ 18f3a5e:	lea    0x1b0(%rsp),%rdi
+ 18f3a66:	lea    0x13c1393(%rip),%rsi        # 2cb4e00 <anon.290e8419bff6f17028f39d4fe9417639.9.llvm.12098572966925328090+0x120>
+ 18f3a6d:	lea    -0x1834cb0(%rip),%rdx        # bedc4 <anon.1ee42dbef889cdf6f37567149f7c8be7.8.llvm.8077416818640781637>
+ 18f3a74:	lea    0xc0(%rsp),%rcx
+ 18f3a7c:	call   *0x1401f46(%rip)        # 2cf59c8 <_DYNAMIC+0xbd0>
+ 18f3a82:	mov    0x1b0(%rsp),%r14
+ 18f3a8a:	mov    0x1c0(%rsp),%rbx
+ 18f3a92:	mov    %r14,%rax
+ 18f3a95:	sub    %rbx,%rax
+ 18f3a98:	cmp    $0x1c,%rax
+ 18f3a9c:	jbe    18f3fe4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1ce4>
+ 18f3aa2:	mov    0x1b8(%rsp),%r12
+ 18f3aaa:	movups -0x15825c4(%rip),%xmm0        # 3714ed <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xd03>
+ 18f3ab1:	movups %xmm0,0xd(%r12,%rbx,1)
+ 18f3ab7:	movups -0x15825de(%rip),%xmm0        # 3714e0 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xcf6>
+ 18f3abe:	movups %xmm0,(%r12,%rbx,1)
+ 18f3ac3:	add    $0x1d,%rbx
+ 18f3ac7:	mov    0x10(%rsp),%rax
+ 18f3acc:	mov    0x20(%rsp),%rsi
+ 18f3ad1:	sub    %rsi,%rax
+ 18f3ad4:	cmp    %rax,%rbx
+ 18f3ad7:	ja     18f4019 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1d19>
+ 18f3add:	add    0x18(%rsp),%rsi
+ 18f3ae2:	mov    %rsi,%rdi
+ 18f3ae5:	mov    %r12,%rsi
+ 18f3ae8:	mov    %rbx,%rdx
+ 18f3aeb:	call   *0x1401557(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f3af1:	add    %rbx,0x20(%rsp)
+ 18f3af6:	test   %r14,%r14
+ 18f3af9:	je     18f3b0c <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x180c>
+ 18f3afb:	mov    $0x1,%edx
+ 18f3b00:	mov    %r12,%rdi
+ 18f3b03:	mov    %r14,%rsi
+ 18f3b06:	call   *0x1401584(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f3b0c:	mov    0x510(%rsp),%rsi
+ 18f3b14:	test   %rsi,%rsi
+ 18f3b17:	je     18f3b2c <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x182c>
+ 18f3b19:	mov    0x518(%rsp),%rdi
+ 18f3b21:	mov    $0x1,%edx
+ 18f3b26:	call   *0x1401564(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f3b2c:	mov    0x60(%rsp),%rdi
+ 18f3b31:	mov    0x40(%rdi),%rax
+ 18f3b35:	test   %rax,%rax
+ 18f3b38:	je     18f3c4d <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x194d>
+ 18f3b3e:	mov    0x60(%rsp),%rcx
+ 18f3b43:	mov    0x38(%rcx),%rbx
+ 18f3b47:	imul   $0x288,%rax,%r15
+ 18f3b4e:	xor    %r12d,%r12d
+ 18f3b51:	jmp    18f3b6a <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x186a>
+ 18f3b53:	add    $0x288,%rbx
+ 18f3b5a:	inc    %r12
+ 18f3b5d:	add    $0xfffffffffffffd78,%r15
+ 18f3b64:	je     18f3c4d <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x194d>
+ 18f3b6a:	movq   $0x0,0x510(%rsp)
+ 18f3b76:	lea    0x1b0(%rsp),%rdi
+ 18f3b7e:	mov    %rbx,%rsi
+ 18f3b81:	mov    %r12,%rdx
+ 18f3b84:	xor    %ecx,%ecx
+ 18f3b86:	mov    $0xff,%r8d
+ 18f3b8c:	mov    %rbp,%r9
+ 18f3b8f:	call   188c5f0 <<litchi_odp::authoring::builder::Builder>::generate_shape_xml_at_depth>
+ 18f3b94:	mov    0x1b0(%rsp),%rbp
+ 18f3b9c:	mov    0x1b8(%rsp),%r13
+ 18f3ba4:	mov    0x1c0(%rsp),%rax
+ 18f3bac:	mov    %rax,0x40(%rsp)
+ 18f3bb1:	mov    0x1c8(%rsp),%r14
+ 18f3bb9:	cmp    $0xffffffffffffffff,%rbp
+ 18f3bbd:	jne    18f4144 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1e44>
+ 18f3bc3:	mov    0x10(%rsp),%rax
+ 18f3bc8:	mov    0x20(%rsp),%rsi
+ 18f3bcd:	sub    %rsi,%rax
+ 18f3bd0:	cmp    %rax,%r14
+ 18f3bd3:	ja     18f3c26 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1926>
+ 18f3bd5:	test   %r14,%r14
+ 18f3bd8:	lea    0x510(%rsp),%rbp
+ 18f3be0:	je     18f3bfd <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x18fd>
+ 18f3be2:	add    0x18(%rsp),%rsi
+ 18f3be7:	mov    %rsi,%rdi
+ 18f3bea:	mov    0x40(%rsp),%rsi
+ 18f3bef:	mov    %r14,%rdx
+ 18f3bf2:	call   *0x1401450(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f3bf8:	mov    0x20(%rsp),%rsi
+ 18f3bfd:	add    %r14,%rsi
+ 18f3c00:	mov    %rsi,0x20(%rsp)
+ 18f3c05:	test   %r13,%r13
+ 18f3c08:	je     18f3b53 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1853>
+ 18f3c0e:	mov    $0x1,%edx
+ 18f3c13:	mov    0x40(%rsp),%rdi
+ 18f3c18:	mov    %r13,%rsi
+ 18f3c1b:	call   *0x140146f(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f3c21:	jmp    18f3b53 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1853>
+ 18f3c26:	mov    $0x1,%ecx
+ 18f3c2b:	mov    $0x1,%r8d
+ 18f3c31:	lea    0x10(%rsp),%rdi
+ 18f3c36:	mov    %r14,%rdx
+ 18f3c39:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f3c3e:	mov    0x20(%rsp),%rsi
+ 18f3c43:	lea    0x510(%rsp),%rbp
+ 18f3c4b:	jmp    18f3be2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x18e2>
+ 18f3c4d:	mov    0x60(%rsp),%rax
+ 18f3c52:	mov    0x28(%rax),%rax
+ 18f3c56:	test   %rax,%rax
+ 18f3c59:	mov    0x120(%rsp),%r12
+ 18f3c61:	je     18f3ca9 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x19a9>
+ 18f3c63:	mov    0x60(%rsp),%rcx
+ 18f3c68:	mov    0x20(%rcx),%rbx
+ 18f3c6c:	imul   $0x38,%rax,%r14
+ 18f3c70:	lea    0x1b0(%rsp),%rdi
+ 18f3c78:	mov    %rbx,%rsi
+ 18f3c7b:	lea    0x10(%rsp),%rdx
+ 18f3c80:	lea    0x138(%rsp),%rcx
+ 18f3c88:	call   1888310 <<litchi_odp::model::animation::Node>::write_xml>
+ 18f3c8d:	mov    0x1b0(%rsp),%rbp
+ 18f3c95:	cmp    $0xffffffffffffffff,%rbp
+ 18f3c99:	jne    18f4127 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1e27>
+ 18f3c9f:	add    $0x38,%rbx
+ 18f3ca3:	add    $0xffffffffffffffc8,%r14
+ 18f3ca7:	jne    18f3c70 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1970>
+ 18f3ca9:	mov    0x60(%rsp),%rax
+ 18f3cae:	cmpq   $0xffffffffffffffff,0x78(%rax)
+ 18f3cb3:	je     18f3cea <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x19ea>
+ 18f3cb5:	mov    0x60(%rsp),%rax
+ 18f3cba:	lea    0x78(%rax),%rsi
+ 18f3cbe:	lea    0x1b0(%rsp),%rdi
+ 18f3cc6:	lea    0x10(%rsp),%rdx
+ 18f3ccb:	lea    0x138(%rsp),%rcx
+ 18f3cd3:	call   18768e0 <<litchi_odp::model::legacy_animation::Node>::write_xml>
+ 18f3cd8:	mov    0x1b0(%rsp),%rbp
+ 18f3ce0:	cmp    $0xffffffffffffffff,%rbp
+ 18f3ce4:	jne    18f4127 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1e27>
+ 18f3cea:	lea    0xc0(%rsp),%rdi
+ 18f3cf2:	mov    0xa0(%rsp),%rsi
+ 18f3cfa:	mov    0x80(%rsp),%rdx
+ 18f3d02:	mov    $0x1,%ecx
+ 18f3d07:	call   187ace0 <litchi_odp::model::declaration::write_binding_attributes>
+ 18f3d0c:	lea    0x510(%rsp),%rbx
+ 18f3d14:	mov    0x60(%rsp),%rax
+ 18f3d19:	cmpq   $0xffffffffffffffff,0x60(%rax)
+ 18f3d1e:	je     18f3d2a <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1a2a>
+ 18f3d20:	mov    0x68(%rax),%rsi
+ 18f3d24:	mov    0x70(%rax),%rdx
+ 18f3d28:	jmp    18f3d2c <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1a2c>
+ 18f3d2a:	xor    %esi,%esi
+ 18f3d2c:	mov    %rbx,%rdi
+ 18f3d2f:	call   188a5b0 <<litchi_odp::authoring::builder::Builder>::generate_notes_xml>
+ 18f3d34:	mov    0xc8(%rsp),%rdx
+ 18f3d3c:	mov    0xd0(%rsp),%rcx
+ 18f3d44:	lea    0x1b0(%rsp),%rdi
+ 18f3d4c:	mov    %rbx,%rsi
+ 18f3d4f:	mov    %rdx,0x118(%rsp)
+ 18f3d57:	call   1879700 <litchi_odp::model::declaration::apply_notes_binding>
+ 18f3d5c:	mov    0x1b0(%rsp),%rbp
+ 18f3d64:	mov    0x1b8(%rsp),%r13
+ 18f3d6c:	mov    0x1c0(%rsp),%rax
+ 18f3d74:	mov    %rax,0x40(%rsp)
+ 18f3d79:	mov    0x1c8(%rsp),%r14
+ 18f3d81:	cmp    $0xffffffffffffffff,%rbp
+ 18f3d85:	jne    18f50c6 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2dc6>
+ 18f3d8b:	mov    0x10(%rsp),%rax
+ 18f3d90:	mov    0x20(%rsp),%rsi
+ 18f3d95:	sub    %rsi,%rax
+ 18f3d98:	cmp    %rax,%r14
+ 18f3d9b:	ja     18f4043 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1d43>
+ 18f3da1:	test   %r14,%r14
+ 18f3da4:	mov    0x38(%rsp),%r15
+ 18f3da9:	mov    0x60(%rsp),%rbp
+ 18f3dae:	je     18f3dcb <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1acb>
+ 18f3db0:	add    0x18(%rsp),%rsi
+ 18f3db5:	mov    %rsi,%rdi
+ 18f3db8:	mov    0x40(%rsp),%rsi
+ 18f3dbd:	mov    %r14,%rdx
+ 18f3dc0:	call   *0x1401282(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f3dc6:	mov    0x20(%rsp),%rsi
+ 18f3dcb:	add    %r14,%rsi
+ 18f3dce:	mov    %rsi,0x20(%rsp)
+ 18f3dd3:	test   %r13,%r13
+ 18f3dd6:	je     18f3df0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1af0>
+ 18f3dd8:	mov    $0x1,%edx
+ 18f3ddd:	mov    0x40(%rsp),%rdi
+ 18f3de2:	mov    %r13,%rsi
+ 18f3de5:	call   *0x14012a5(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f3deb:	mov    0x20(%rsp),%rsi
+ 18f3df0:	mov    0x10(%rsp),%rax
+ 18f3df5:	sub    %rsi,%rax
+ 18f3df8:	cmp    $0xb,%rax
+ 18f3dfc:	mov    0x30(%rsp),%rbx
+ 18f3e01:	jbe    18f4077 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1d77>
+ 18f3e07:	mov    0x18(%rsp),%rax
+ 18f3e0c:	movabs $0x703a776172642f3c,%rcx
+ 18f3e16:	mov    %rcx,(%rax,%rsi,1)
+ 18f3e1a:	movl   $0x3e656761,0x8(%rax,%rsi,1)
+ 18f3e22:	addq   $0xc,0x20(%rsp)
+ 18f3e28:	mov    0xc0(%rsp),%rsi
+ 18f3e30:	test   %rsi,%rsi
+ 18f3e33:	je     18f3e48 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1b48>
+ 18f3e35:	mov    $0x1,%edx
+ 18f3e3a:	mov    0x118(%rsp),%rdi
+ 18f3e42:	call   *0x1401248(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f3e48:	mov    0x180(%rsp),%rsi
+ 18f3e50:	test   %rsi,%rsi
+ 18f3e53:	je     18f3e68 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1b68>
+ 18f3e55:	mov    $0x1,%edx
+ 18f3e5a:	mov    0xf8(%rsp),%rdi
+ 18f3e62:	call   *0x1401228(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f3e68:	test   %rbx,%rbx
+ 18f3e6b:	je     18f3e83 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1b83>
+ 18f3e6d:	mov    $0x1,%edx
+ 18f3e72:	mov    0xf0(%rsp),%rdi
+ 18f3e7a:	mov    %rbx,%rsi
+ 18f3e7d:	call   *0x140120d(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f3e83:	mov    0x150(%rsp),%rsi
+ 18f3e8b:	test   %rsi,%rsi
+ 18f3e8e:	je     18f3580 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1280>
+ 18f3e94:	mov    $0x1,%edx
+ 18f3e99:	mov    0x4c0(%rsp),%rdi
+ 18f3ea1:	call   *0x14011e9(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f3ea7:	jmp    18f3580 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1280>
+ 18f3eac:	mov    $0x1,%ecx
+ 18f3eb1:	mov    $0x1,%r8d
+ 18f3eb7:	lea    0x10(%rsp),%rdi
+ 18f3ebc:	mov    %rbx,%rdx
+ 18f3ebf:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f3ec4:	mov    0x20(%rsp),%rsi
+ 18f3ec9:	jmp    18f355f <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x125f>
+ 18f3ece:	mov    $0xa,%edx
+ 18f3ed3:	mov    $0x1,%ecx
+ 18f3ed8:	mov    $0x1,%r8d
+ 18f3ede:	lea    0x10(%rsp),%rdi
+ 18f3ee3:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f3ee8:	mov    0x20(%rsp),%rsi
+ 18f3eed:	jmp    18f36d9 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x13d9>
+ 18f3ef2:	mov    $0x1,%ecx
+ 18f3ef7:	mov    $0x1,%r8d
+ 18f3efd:	lea    0x10(%rsp),%rdi
+ 18f3f02:	mov    %rbx,%rsi
+ 18f3f05:	mov    %r14,%rdx
+ 18f3f08:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f3f0d:	mov    0x20(%rsp),%rbx
+ 18f3f12:	jmp    18f371a <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x141a>
+ 18f3f17:	mov    $0x1,%ecx
+ 18f3f1c:	mov    $0x1,%r8d
+ 18f3f22:	lea    0x10(%rsp),%rdi
+ 18f3f27:	mov    %rbx,%rsi
+ 18f3f2a:	mov    %r14,%rdx
+ 18f3f2d:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f3f32:	mov    0x20(%rsp),%rbx
+ 18f3f37:	jmp    18f3771 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1471>
+ 18f3f3c:	mov    $0x1,%edx
+ 18f3f41:	mov    $0x1,%ecx
+ 18f3f46:	mov    $0x1,%r8d
+ 18f3f4c:	lea    0x10(%rsp),%rdi
+ 18f3f51:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f3f56:	jmp    18f37a5 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x14a5>
+ 18f3f5b:	mov    $0x1d,%edx
+ 18f3f60:	mov    $0x1,%ecx
+ 18f3f65:	mov    $0x1,%r8d
+ 18f3f6b:	lea    0x1b0(%rsp),%rdi
+ 18f3f73:	mov    %rbx,%rsi
+ 18f3f76:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f3f7b:	mov    0x1b0(%rsp),%r14
+ 18f3f83:	mov    0x1c0(%rsp),%rbx
+ 18f3f8b:	jmp    18f3892 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1592>
+ 18f3f90:	mov    $0x1,%ecx
+ 18f3f95:	mov    $0x1,%r8d
+ 18f3f9b:	lea    0x10(%rsp),%rdi
+ 18f3fa0:	mov    %rbx,%rdx
+ 18f3fa3:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f3fa8:	mov    0x20(%rsp),%rsi
+ 18f3fad:	lea    0x510(%rsp),%rbp
+ 18f3fb5:	jmp    18f38cd <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x15cd>
+ 18f3fba:	mov    $0x11,%edx
+ 18f3fbf:	mov    $0x1,%ecx
+ 18f3fc4:	mov    $0x1,%r8d
+ 18f3fca:	lea    0x1b0(%rsp),%rdi
+ 18f3fd2:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f3fd7:	mov    0x1c0(%rsp),%rsi
+ 18f3fdf:	jmp    18f3a26 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1726>
+ 18f3fe4:	mov    $0x1d,%edx
+ 18f3fe9:	mov    $0x1,%ecx
+ 18f3fee:	mov    $0x1,%r8d
+ 18f3ff4:	lea    0x1b0(%rsp),%rdi
+ 18f3ffc:	mov    %rbx,%rsi
+ 18f3fff:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f4004:	mov    0x1b0(%rsp),%r14
+ 18f400c:	mov    0x1c0(%rsp),%rbx
+ 18f4014:	jmp    18f3aa2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x17a2>
+ 18f4019:	mov    $0x1,%ecx
+ 18f401e:	mov    $0x1,%r8d
+ 18f4024:	lea    0x10(%rsp),%rdi
+ 18f4029:	mov    %rbx,%rdx
+ 18f402c:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f4031:	mov    0x20(%rsp),%rsi
+ 18f4036:	lea    0x510(%rsp),%rbp
+ 18f403e:	jmp    18f3add <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x17dd>
+ 18f4043:	mov    $0x1,%ecx
+ 18f4048:	mov    $0x1,%r8d
+ 18f404e:	lea    0x10(%rsp),%rdi
+ 18f4053:	mov    %r14,%rdx
+ 18f4056:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f405b:	mov    0x20(%rsp),%rsi
+ 18f4060:	mov    0x38(%rsp),%r15
+ 18f4065:	mov    0x120(%rsp),%r12
+ 18f406d:	mov    0x60(%rsp),%rbp
+ 18f4072:	jmp    18f3db0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1ab0>
+ 18f4077:	mov    $0xc,%edx
+ 18f407c:	mov    $0x1,%ecx
+ 18f4081:	mov    $0x1,%r8d
+ 18f4087:	lea    0x10(%rsp),%rdi
+ 18f408c:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f4091:	mov    0x20(%rsp),%rsi
+ 18f4096:	mov    0x38(%rsp),%r15
+ 18f409b:	mov    0x30(%rsp),%rbx
+ 18f40a0:	mov    0x60(%rsp),%rbp
+ 18f40a5:	jmp    18f3e07 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1b07>
+ 18f40aa:	cmpl   $0xffffffff,0x128(%rsp)
+ 18f40b2:	mov    0x78(%rsp),%r15
+ 18f40b7:	mov    0x8(%rsp),%r12
+ 18f40bc:	je     18f40ce <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1dce>
+ 18f40be:	lea    0x10(%rsp),%rsi
+ 18f40c3:	mov    0x28(%rsp),%rdi
+ 18f40c8:	call   *0x14079ba(%rip)        # 2cfba88 <_DYNAMIC+0x6c90>
+ 18f40ce:	lea    0x1b0(%rsp),%rdi
+ 18f40d6:	mov    0x4d8(%rsp),%rsi
+ 18f40de:	call   187f720 <litchi_odp::model::settings::write>
+ 18f40e3:	mov    0x1b0(%rsp),%rbp
+ 18f40eb:	mov    0x1b8(%rsp),%rax
+ 18f40f3:	mov    %rax,0x30(%rsp)
+ 18f40f8:	mov    0x1c0(%rsp),%rbx
+ 18f4100:	mov    0x1c8(%rsp),%r14
+ 18f4108:	cmp    $0xffffffffffffffff,%rbp
+ 18f410c:	je     18f4234 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1f34>
+ 18f4112:	movups 0x1d0(%rsp),%xmm0
+ 18f411a:	movaps %xmm0,0x90(%rsp)
+ 18f4122:	jmp    18f41c8 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1ec8>
+ 18f4127:	mov    0x1b8(%rsp),%r13
+ 18f412f:	mov    0x1c0(%rsp),%rax
+ 18f4137:	mov    %rax,0x40(%rsp)
+ 18f413c:	mov    0x1c8(%rsp),%r14
+ 18f4144:	movups 0x1d0(%rsp),%xmm0
+ 18f414c:	movaps %xmm0,0x90(%rsp)
+ 18f4154:	mov    0x180(%rsp),%rsi
+ 18f415c:	test   %rsi,%rsi
+ 18f415f:	mov    0x78(%rsp),%r15
+ 18f4164:	mov    0x8(%rsp),%r12
+ 18f4169:	mov    0xf0(%rsp),%rbx
+ 18f4171:	je     18f4186 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1e86>
+ 18f4173:	mov    $0x1,%edx
+ 18f4178:	mov    0xf8(%rsp),%rdi
+ 18f4180:	call   *0x1400f0a(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f4186:	mov    0x30(%rsp),%rsi
+ 18f418b:	test   %rsi,%rsi
+ 18f418e:	je     18f419e <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1e9e>
+ 18f4190:	mov    $0x1,%edx
+ 18f4195:	mov    %rbx,%rdi
+ 18f4198:	call   *0x1400ef2(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f419e:	mov    0x40(%rsp),%rbx
+ 18f41a3:	mov    %r13,0x30(%rsp)
+ 18f41a8:	mov    0x150(%rsp),%rsi
+ 18f41b0:	test   %rsi,%rsi
+ 18f41b3:	je     18f41c8 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1ec8>
+ 18f41b5:	mov    0x158(%rsp),%rdi
+ 18f41bd:	mov    $0x1,%edx
+ 18f41c2:	call   *0x1400ec8(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f41c8:	mov    0xa8(%rsp),%rsi
+ 18f41d0:	test   %rsi,%rsi
+ 18f41d3:	je     18f41ec <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1eec>
+ 18f41d5:	mov    0xb0(%rsp),%rdi
+ 18f41dd:	shl    $0x3,%rsi
+ 18f41e1:	mov    $0x8,%edx
+ 18f41e6:	call   *0x1400ea4(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f41ec:	lea    0x4f8(%rsp),%rdi
+ 18f41f4:	call   18a6430 <<alloc::vec::Vec<alloc::string::String> as core::ops::drop::Drop>::drop>
+ 18f41f9:	test   %r12,%r12
+ 18f41fc:	je     18f4214 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1f14>
+ 18f41fe:	shl    $0x3,%r12
+ 18f4202:	lea    (%r12,%r12,2),%rsi
+ 18f4206:	mov    $0x8,%edx
+ 18f420b:	mov    %r15,%rdi
+ 18f420e:	call   *0x1400e7c(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f4214:	mov    %rbx,%r13
+ 18f4217:	mov    0x30(%rsp),%rax
+ 18f421c:	mov    %rax,0x8(%rsp)
+ 18f4221:	mov    0x10(%rsp),%rsi
+ 18f4226:	test   %rsi,%rsi
+ 18f4229:	jne    18f3375 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1075>
+ 18f422f:	jmp    18f3385 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1085>
+ 18f4234:	mov    0x10(%rsp),%rax
+ 18f4239:	mov    0x20(%rsp),%rsi
+ 18f423e:	sub    %rsi,%rax
+ 18f4241:	cmp    %rax,%r14
+ 18f4244:	ja     18f5157 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2e57>
+ 18f424a:	test   %r14,%r14
+ 18f424d:	mov    0x88(%rsp),%r13
+ 18f4255:	mov    0x38(%rsp),%rbp
+ 18f425a:	je     18f4275 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1f75>
+ 18f425c:	add    0x18(%rsp),%rsi
+ 18f4261:	mov    %rsi,%rdi
+ 18f4264:	mov    %rbx,%rsi
+ 18f4267:	mov    %r14,%rdx
+ 18f426a:	call   *0x1400dd8(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f4270:	mov    0x20(%rsp),%rsi
+ 18f4275:	add    %r14,%rsi
+ 18f4278:	mov    %rsi,0x20(%rsp)
+ 18f427d:	mov    0x30(%rsp),%rsi
+ 18f4282:	test   %rsi,%rsi
+ 18f4285:	je     18f4295 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1f95>
+ 18f4287:	mov    $0x1,%edx
+ 18f428c:	mov    %rbx,%rdi
+ 18f428f:	call   *0x1400dfb(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f4295:	cmpl   $0xffffffff,0x128(%rsp)
+ 18f429d:	je     18f43dc <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x20dc>
+ 18f42a3:	mov    0xb0(%rsp),%rdx
+ 18f42ab:	mov    0xb8(%rsp),%rcx
+ 18f42b3:	lea    0xc0(%rsp),%rdi
+ 18f42bb:	mov    0x28(%rsp),%rsi
+ 18f42c0:	call   18f5990 <<litchi_odp::authoring::mutable::MutablePresentation>::generate_page_styles>
+ 18f42c5:	mov    $0x1,%bl
+ 18f42c7:	cmpq   $0x0,0xb8(%rsp)
+ 18f42d0:	jne    18f42de <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1fde>
+ 18f42d2:	cmpq   $0x0,0xd0(%rsp)
+ 18f42db:	setne  %bl
+ 18f42de:	mov    0x4e8(%rsp),%rsi
+ 18f42e6:	add    0x20(%rsp),%rsi
+ 18f42eb:	lea    0x1b0(%rsp),%rdi
+ 18f42f3:	mov    $0x1,%ecx
+ 18f42f8:	mov    $0x1,%r8d
+ 18f42fe:	xor    %edx,%edx
+ 18f4300:	call   1906d60 <<alloc::raw_vec::RawVecInner>::try_allocate_in>
+ 18f4305:	mov    0x1b8(%rsp),%rdi
+ 18f430d:	cmpb   $0x0,0x1b0(%rsp)
+ 18f4315:	jne    18f5190 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2e90>
+ 18f431b:	mov    0x1c0(%rsp),%rax
+ 18f4323:	mov    %rdi,0x510(%rsp)
+ 18f432b:	mov    %rax,0x518(%rsp)
+ 18f4333:	movq   $0x0,0x520(%rsp)
+ 18f433f:	lea    0x510(%rsp),%rsi
+ 18f4347:	mov    0x28(%rsp),%r14
+ 18f434c:	mov    %r14,%rdi
+ 18f434f:	call   *0x1407713(%rip)        # 2cfba68 <_DYNAMIC+0x6c70>
+ 18f4355:	mov    0x50(%rsp),%rdx
+ 18f435a:	mov    0x58(%rsp),%rcx
+ 18f435f:	movzbl %bl,%r8d
+ 18f4363:	lea    0x1b0(%rsp),%rdi
+ 18f436b:	mov    %r14,%rsi
+ 18f436e:	call   *0x1407704(%rip)        # 2cfba78 <_DYNAMIC+0x6c80>
+ 18f4374:	mov    0x1b0(%rsp),%rbp
+ 18f437c:	mov    0x1b8(%rsp),%rax
+ 18f4384:	mov    %rax,0x30(%rsp)
+ 18f4389:	mov    0x1c0(%rsp),%rbx
+ 18f4391:	mov    0x1c8(%rsp),%r14
+ 18f4399:	cmp    $0xffffffffffffffff,%rbp
+ 18f439d:	je     18f4c08 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2908>
+ 18f43a3:	movups 0x1d0(%rsp),%xmm0
+ 18f43ab:	movaps %xmm0,0x90(%rsp)
+ 18f43b3:	mov    0x510(%rsp),%rsi
+ 18f43bb:	test   %rsi,%rsi
+ 18f43be:	je     18f4e42 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2b42>
+ 18f43c4:	mov    0x518(%rsp),%rdi
+ 18f43cc:	mov    $0x1,%edx
+ 18f43d1:	call   *0x1400cb9(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f43d7:	jmp    18f4e42 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2b42>
+ 18f43dc:	lea    0x510(%rsp),%rbx
+ 18f43e4:	mov    %rbx,%rdi
+ 18f43e7:	mov    %r13,%rsi
+ 18f43ea:	mov    %rbp,%rdx
+ 18f43ed:	call   1892300 <litchi_odp::authoring::builder::transition::generate_transition_styles>
+ 18f43f2:	lea    0x48(%rsp),%rax
+ 18f43f7:	mov    %rax,0x1b0(%rsp)
+ 18f43ff:	lea    0x8e4a(%rip),%rax        # 18fd250 <<alloc::string::String as core::fmt::Display>::fmt>
+ 18f4406:	mov    %rax,0x1b8(%rsp)
+ 18f440e:	mov    %rbx,0x1c0(%rsp)
+ 18f4416:	mov    %rax,0x1c8(%rsp)
+ 18f441e:	lea    0x10(%rsp),%rcx
+ 18f4423:	mov    %rcx,0x1d0(%rsp)
+ 18f442b:	mov    %rax,0x1d8(%rsp)
+ 18f4433:	lea    -0x1815ac6(%rip),%rsi        # de974 <anon.27ebc01334d26e52e912787017a60f97.120.llvm.17599591043162483340+0x94>
+ 18f443a:	lea    0x838(%rsp),%rdi
+ 18f4442:	lea    0x1b0(%rsp),%rdx
+ 18f444a:	call   *0x1400e50(%rip)        # 2cf52a0 <_DYNAMIC+0x4a8>
+ 18f4450:	mov    0x838(%rsp),%rax
+ 18f4458:	mov    %rax,0x8(%rsp)
+ 18f445d:	mov    0x840(%rsp),%r13
+ 18f4465:	mov    0x848(%rsp),%r14
+ 18f446d:	mov    0x510(%rsp),%rsi
+ 18f4475:	test   %rsi,%rsi
+ 18f4478:	je     18f448d <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x218d>
+ 18f447a:	mov    0x518(%rsp),%rdi
+ 18f4482:	mov    $0x1,%edx
+ 18f4487:	call   *0x1400c03(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f448d:	mov    0xa8(%rsp),%rsi
+ 18f4495:	test   %rsi,%rsi
+ 18f4498:	je     18f44b1 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x21b1>
+ 18f449a:	mov    0xb0(%rsp),%rdi
+ 18f44a2:	shl    $0x3,%rsi
+ 18f44a6:	mov    $0x8,%edx
+ 18f44ab:	call   *0x1400bdf(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f44b1:	lea    0x4f8(%rsp),%rdi
+ 18f44b9:	call   18efb20 <core::ptr::drop_glue::<alloc::vec::Vec<alloc::string::String>>>
+ 18f44be:	mov    0x10(%rsp),%rsi
+ 18f44c3:	test   %rsi,%rsi
+ 18f44c6:	je     18f44d8 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x21d8>
+ 18f44c8:	mov    0x18(%rsp),%rdi
+ 18f44cd:	mov    $0x1,%edx
+ 18f44d2:	call   *0x1400bb8(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f44d8:	mov    0x48(%rsp),%rsi
+ 18f44dd:	test   %rsi,%rsi
+ 18f44e0:	je     18f44f2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x21f2>
+ 18f44e2:	mov    0x50(%rsp),%rdi
+ 18f44e7:	mov    $0x1,%edx
+ 18f44ec:	call   *0x1400b9e(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f44f2:	lea    0x138(%rsp),%rdi
+ 18f44fa:	call   185d980 <<alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::string::String> as core::ops::drop::Drop>::drop>
+ 18f44ff:	cmpl   $0xffffffff,0x690(%rsp)
+ 18f4507:	je     18f453f <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x223f>
+ 18f4509:	lea    0x7c8(%rsp),%rdi
+ 18f4511:	lea    -0x15832ab(%rip),%rsi        # 37126d <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xa83>
+ 18f4518:	mov    $0xb,%edx
+ 18f451d:	call   *0x1401d5d(%rip)        # 2cf6280 <_DYNAMIC+0x1488>
+ 18f4523:	mov    %rdx,%r10
+ 18f4526:	test   %rax,%rax
+ 18f4529:	mov    $0x8,%ecx
+ 18f452e:	cmove  %rcx,%r10
+ 18f4532:	lea    -0x17fafe9(%rip),%r11        # f9550 <anon.d27b4cd661043a01734014644aa9625f.732.llvm.4444180776569045454+0x58>
+ 18f4539:	cmovne %rax,%r11
+ 18f453d:	jmp    18f454c <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x224c>
+ 18f453f:	lea    -0x17faff6(%rip),%r11        # f9550 <anon.d27b4cd661043a01734014644aa9625f.732.llvm.4444180776569045454+0x58>
+ 18f4546:	mov    $0x8,%r10d
+ 18f454c:	cmpb   $0x0,0xcb1(%rsp)
+ 18f4554:	je     18f4629 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2329>
+ 18f455a:	sub    $0x8,%rsp
+ 18f455e:	lea    -0x15832f8(%rip),%rdx        # 37126d <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xa83>
+ 18f4565:	lea    0x1b8(%rsp),%rdi
+ 18f456d:	lea    0x9b0(%rsp),%rsi
+ 18f4575:	mov    $0xb,%ecx
+ 18f457a:	mov    %r13,%r8
+ 18f457d:	mov    %r14,%r9
+ 18f4580:	push   $0x0
+ 18f4582:	push   %r10
+ 18f4584:	push   %r11
+ 18f4586:	call   18526b0 <<litchi_odf_common::core::writer::PackageWriter<litchi_odf_common::core::writer::BoundedBytes>>::write_file>
+ 18f458b:	add    $0x20,%rsp
+ 18f458f:	cmpq   $0xffffffffffffffff,0x1b0(%rsp)
+ 18f4598:	jne    18f468e <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x238e>
+ 18f459e:	lea    0x838(%rsp),%rdi
+ 18f45a6:	call   *0x1407714(%rip)        # 2cfbcc0 <_DYNAMIC+0x6ec8>
+ 18f45ac:	mov    0x28(%rsp),%rdx
+ 18f45b1:	lea    0x1a0(%rdx),%rax
+ 18f45b8:	cmpq   $0xffffffffffffffff,0x190(%rdx)
+ 18f45c0:	mov    0x840(%rsp),%r14
+ 18f45c8:	lea    0x848(%rsp),%rcx
+ 18f45d0:	cmovne %rax,%rcx
+ 18f45d4:	mov    (%rcx),%rbx
+ 18f45d7:	mov    0x198(%rdx),%r12
+ 18f45de:	cmove  %r14,%r12
+ 18f45e2:	cmpl   $0xffffffff,0x690(%rsp)
+ 18f45ea:	je     18f46ef <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x23ef>
+ 18f45f0:	lea    0x7c8(%rsp),%rdi
+ 18f45f8:	lea    -0x158339c(%rip),%rsi        # 371263 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xa79>
+ 18f45ff:	mov    $0xa,%edx
+ 18f4604:	call   *0x1401c76(%rip)        # 2cf6280 <_DYNAMIC+0x1488>
+ 18f460a:	mov    %rdx,%r10
+ 18f460d:	test   %rax,%rax
+ 18f4610:	mov    $0x8,%ecx
+ 18f4615:	cmove  %rcx,%r10
+ 18f4619:	lea    -0x17fb0d0(%rip),%r11        # f9550 <anon.d27b4cd661043a01734014644aa9625f.732.llvm.4444180776569045454+0x58>
+ 18f4620:	cmovne %rax,%r11
+ 18f4624:	jmp    18f46fc <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x23fc>
+ 18f4629:	call   *0x1400a51(%rip)        # 2cf5080 <_DYNAMIC+0x288>
+ 18f462f:	mov    $0x11,%edi
+ 18f4634:	mov    $0x1,%esi
+ 18f4639:	call   *0x1400a49(%rip)        # 2cf5088 <_DYNAMIC+0x290>
+ 18f463f:	test   %rax,%rax
+ 18f4642:	je     18f529b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2f9b>
+ 18f4648:	movzbl -0x1589389(%rip),%ecx        # 36b2c6 <anon.7af64e641a0d45b3d211bc175237ff58.39.llvm.6284367690247432662+0x10>
+ 18f464f:	mov    %cl,0x10(%rax)
+ 18f4652:	movups -0x15893a3(%rip),%xmm0        # 36b2b6 <anon.7af64e641a0d45b3d211bc175237ff58.39.llvm.6284367690247432662>
+ 18f4659:	movups %xmm0,(%rax)
+ 18f465c:	movabs $0x8000000000000002,%rcx
+ 18f4666:	mov    %rcx,0x1b0(%rsp)
+ 18f466e:	movq   $0x11,0x1b8(%rsp)
+ 18f467a:	mov    %rax,0x1c0(%rsp)
+ 18f4682:	movq   $0x11,0x1c8(%rsp)
+ 18f468e:	mov    0x1b0(%rsp),%rax
+ 18f4696:	mov    0x1b8(%rsp),%rcx
+ 18f469e:	mov    0x1c0(%rsp),%rdx
+ 18f46a6:	mov    0x1c8(%rsp),%rsi
+ 18f46ae:	movups 0x1d0(%rsp),%xmm0
+ 18f46b6:	mov    0x68(%rsp),%rdi
+ 18f46bb:	movups %xmm0,0x20(%rdi)
+ 18f46bf:	mov    %rdx,0x10(%rdi)
+ 18f46c3:	mov    %rsi,0x18(%rdi)
+ 18f46c7:	mov    %rax,(%rdi)
+ 18f46ca:	mov    %rcx,0x8(%rdi)
+ 18f46ce:	mov    0x8(%rsp),%rsi
+ 18f46d3:	test   %rsi,%rsi
+ 18f46d6:	je     18f33db <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x10db>
+ 18f46dc:	mov    $0x1,%edx
+ 18f46e1:	mov    %r13,%rdi
+ 18f46e4:	call   *0x14009a6(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f46ea:	jmp    18f33db <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x10db>
+ 18f46ef:	lea    -0x17fb1a6(%rip),%r11        # f9550 <anon.d27b4cd661043a01734014644aa9625f.732.llvm.4444180776569045454+0x58>
+ 18f46f6:	mov    $0x8,%r10d
+ 18f46fc:	cmpb   $0x0,0xcb1(%rsp)
+ 18f4704:	je     18f47af <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x24af>
+ 18f470a:	sub    $0x8,%rsp
+ 18f470e:	lea    -0x15834b2(%rip),%rdx        # 371263 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0xa79>
+ 18f4715:	lea    0x1b8(%rsp),%rdi
+ 18f471d:	lea    0x9b0(%rsp),%rsi
+ 18f4725:	mov    $0xa,%ecx
+ 18f472a:	mov    %r12,%r8
+ 18f472d:	mov    %rbx,%r9
+ 18f4730:	push   $0x0
+ 18f4732:	push   %r10
+ 18f4734:	push   %r11
+ 18f4736:	call   18526b0 <<litchi_odf_common::core::writer::PackageWriter<litchi_odf_common::core::writer::BoundedBytes>>::write_file>
+ 18f473b:	add    $0x20,%rsp
+ 18f473f:	cmpq   $0xffffffffffffffff,0x1b0(%rsp)
+ 18f4748:	jne    18f4814 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2514>
+ 18f474e:	lea    0x1b0(%rsp),%rdi
+ 18f4756:	mov    0x28(%rsp),%rsi
+ 18f475b:	call   18f5760 <<litchi_odp::authoring::mutable::MutablePresentation>::generate_meta_xml>
+ 18f4760:	mov    0x1b0(%rsp),%rax
+ 18f4768:	mov    0x1b8(%rsp),%r12
+ 18f4770:	mov    0x1c0(%rsp),%r8
+ 18f4778:	mov    0x1c8(%rsp),%rbx
+ 18f4780:	cmp    $0xffffffffffffffff,%rax
+ 18f4784:	je     18f4878 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2578>
+ 18f478a:	movups 0x1d0(%rsp),%xmm0
+ 18f4792:	mov    0x68(%rsp),%rcx
+ 18f4797:	movups %xmm0,0x20(%rcx)
+ 18f479b:	mov    %r12,0x8(%rcx)
+ 18f479f:	mov    %r8,0x10(%rcx)
+ 18f47a3:	mov    %rbx,0x18(%rcx)
+ 18f47a7:	mov    %rax,(%rcx)
+ 18f47aa:	jmp    18f4854 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2554>
+ 18f47af:	call   *0x14008cb(%rip)        # 2cf5080 <_DYNAMIC+0x288>
+ 18f47b5:	mov    $0x11,%edi
+ 18f47ba:	mov    $0x1,%esi
+ 18f47bf:	call   *0x14008c3(%rip)        # 2cf5088 <_DYNAMIC+0x290>
+ 18f47c5:	test   %rax,%rax
+ 18f47c8:	je     18f52bf <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2fbf>
+ 18f47ce:	movzbl -0x158950f(%rip),%ecx        # 36b2c6 <anon.7af64e641a0d45b3d211bc175237ff58.39.llvm.6284367690247432662+0x10>
+ 18f47d5:	mov    %cl,0x10(%rax)
+ 18f47d8:	movups -0x1589529(%rip),%xmm0        # 36b2b6 <anon.7af64e641a0d45b3d211bc175237ff58.39.llvm.6284367690247432662>
+ 18f47df:	movups %xmm0,(%rax)
+ 18f47e2:	movabs $0x8000000000000002,%rcx
+ 18f47ec:	mov    %rcx,0x1b0(%rsp)
+ 18f47f4:	movq   $0x11,0x1b8(%rsp)
+ 18f4800:	mov    %rax,0x1c0(%rsp)
+ 18f4808:	movq   $0x11,0x1c8(%rsp)
+ 18f4814:	mov    0x1b0(%rsp),%rax
+ 18f481c:	mov    0x1b8(%rsp),%rcx
+ 18f4824:	mov    0x1c0(%rsp),%rdx
+ 18f482c:	mov    0x1c8(%rsp),%rsi
+ 18f4834:	movups 0x1d0(%rsp),%xmm0
+ 18f483c:	mov    0x68(%rsp),%rdi
+ 18f4841:	movups %xmm0,0x20(%rdi)
+ 18f4845:	mov    %rdx,0x10(%rdi)
+ 18f4849:	mov    %rsi,0x18(%rdi)
+ 18f484d:	mov    %rax,(%rdi)
+ 18f4850:	mov    %rcx,0x8(%rdi)
+ 18f4854:	mov    0x838(%rsp),%rsi
+ 18f485c:	test   %rsi,%rsi
+ 18f485f:	je     18f46ce <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x23ce>
+ 18f4865:	mov    $0x1,%edx
+ 18f486a:	mov    %r14,%rdi
+ 18f486d:	call   *0x140081d(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f4873:	jmp    18f46ce <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x23ce>
+ 18f4878:	cmpl   $0xffffffff,0x690(%rsp)
+ 18f4880:	mov    %r8,0x70(%rsp)
+ 18f4885:	je     18f48c6 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x25c6>
+ 18f4887:	mov    $0x1,%bpl
+ 18f488a:	lea    0x7c8(%rsp),%rdi
+ 18f4892:	lea    -0x17fa101(%rip),%rsi        # fa798 <anon.213ff18ccee9486252eff21876a22817.31.llvm.15253654657842729239>
+ 18f4899:	mov    $0x8,%r15d
+ 18f489f:	mov    $0x8,%edx
+ 18f48a4:	call   *0x14019d6(%rip)        # 2cf6280 <_DYNAMIC+0x1488>
+ 18f48aa:	mov    %rdx,%r10
+ 18f48ad:	test   %rax,%rax
+ 18f48b0:	cmove  %r15,%r10
+ 18f48b4:	lea    -0x17fb36b(%rip),%r11        # f9550 <anon.d27b4cd661043a01734014644aa9625f.732.llvm.4444180776569045454+0x58>
+ 18f48bb:	cmovne %rax,%r11
+ 18f48bf:	mov    0x70(%rsp),%r8
+ 18f48c4:	jmp    18f48d3 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x25d3>
+ 18f48c6:	lea    -0x17fb37d(%rip),%r11        # f9550 <anon.d27b4cd661043a01734014644aa9625f.732.llvm.4444180776569045454+0x58>
+ 18f48cd:	mov    $0x8,%r10d
+ 18f48d3:	mov    $0x1,%bpl
+ 18f48d6:	lea    -0x17fa145(%rip),%rdx        # fa798 <anon.213ff18ccee9486252eff21876a22817.31.llvm.15253654657842729239>
+ 18f48dd:	lea    0x1b0(%rsp),%rdi
+ 18f48e5:	lea    0x9a8(%rsp),%rsi
+ 18f48ed:	mov    $0x8,%ecx
+ 18f48f2:	mov    %rbx,%r9
+ 18f48f5:	push   %r10
+ 18f48f7:	push   %r11
+ 18f48f9:	call   18541a0 <<litchi_odf_common::core::writer::PackageWriter<litchi_odf_common::core::writer::BoundedBytes>>::add_file_with_media_type>
+ 18f48fe:	add    $0x10,%rsp
+ 18f4902:	cmpq   $0xffffffffffffffff,0x1b0(%rsp)
+ 18f490b:	je     18f493a <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x263a>
+ 18f490d:	movups 0x1b0(%rsp),%xmm0
+ 18f4915:	movups 0x1c0(%rsp),%xmm1
+ 18f491d:	movups 0x1d0(%rsp),%xmm2
+ 18f4925:	mov    0x68(%rsp),%rax
+ 18f492a:	movups %xmm2,0x20(%rax)
+ 18f492e:	movups %xmm1,0x10(%rax)
+ 18f4932:	movups %xmm0,(%rax)
+ 18f4935:	jmp    18f50a5 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2da5>
+ 18f493a:	mov    %r12,0x38(%rsp)
+ 18f493f:	mov    0x28(%rsp),%rax
+ 18f4944:	mov    0x378(%rax),%rcx
+ 18f494b:	mov    0x380(%rax),%rdx
+ 18f4952:	mov    %rdx,0x40(%rsp)
+ 18f4957:	test   %rcx,%rcx
+ 18f495a:	setne  0xa0(%rsp)
+ 18f4962:	mov    0x388(%rax),%r15
+ 18f4969:	mov    %r15,%rax
+ 18f496c:	mov    %rcx,0x88(%rsp)
+ 18f4974:	cmove  %rcx,%rax
+ 18f4978:	mov    %rax,0x80(%rsp)
+ 18f4980:	test   %rax,%rax
+ 18f4983:	je     18f4b56 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2856>
+ 18f4989:	xor    %ebx,%ebx
+ 18f498b:	movzbl 0xa0(%rsp),%ecx
+ 18f4993:	mov    0x40(%rsp),%r12
+ 18f4998:	mov    0x88(%rsp),%rax
+ 18f49a0:	test   $0x1,%cl
+ 18f49a3:	je     18f52d1 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2fd1>
+ 18f49a9:	test   %rbx,%rbx
+ 18f49ac:	jne    18f4a29 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2729>
+ 18f49ae:	test   %r12,%r12
+ 18f49b1:	je     18f49d8 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x26d8>
+ 18f49b3:	mov    %r12,%rcx
+ 18f49b6:	mov    %rax,%rbx
+ 18f49b9:	and    $0x7,%rcx
+ 18f49bd:	je     18f49dd <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x26dd>
+ 18f49bf:	xor    %edx,%edx
+ 18f49c1:	mov    0x328(%rbx),%rbx
+ 18f49c8:	inc    %rdx
+ 18f49cb:	cmp    %rdx,%rcx
+ 18f49ce:	jne    18f49c1 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x26c1>
+ 18f49d0:	mov    %r12,%rax
+ 18f49d3:	sub    %rdx,%rax
+ 18f49d6:	jmp    18f49e0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x26e0>
+ 18f49d8:	mov    %rax,%rbx
+ 18f49db:	jmp    18f4a24 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2724>
+ 18f49dd:	mov    %r12,%rax
+ 18f49e0:	cmp    $0x8,%r12
+ 18f49e4:	jb     18f4a24 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2724>
+ 18f49e6:	mov    0x328(%rbx),%rcx
+ 18f49ed:	mov    0x328(%rcx),%rcx
+ 18f49f4:	mov    0x328(%rcx),%rcx
+ 18f49fb:	mov    0x328(%rcx),%rcx
+ 18f4a02:	mov    0x328(%rcx),%rcx
+ 18f4a09:	mov    0x328(%rcx),%rcx
+ 18f4a10:	mov    0x328(%rcx),%rcx
+ 18f4a17:	mov    0x328(%rcx),%rbx
+ 18f4a1e:	add    $0xfffffffffffffff8,%rax
+ 18f4a22:	jne    18f49e6 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x26e6>
+ 18f4a24:	xor    %eax,%eax
+ 18f4a26:	xor    %r12d,%r12d
+ 18f4a29:	movzwl 0x322(%rbx),%ecx
+ 18f4a30:	cmp    %rcx,%r12
+ 18f4a33:	jae    18f4a3d <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x273d>
+ 18f4a35:	mov    %rbx,%rsi
+ 18f4a38:	mov    %r12,%rcx
+ 18f4a3b:	jmp    18f4a63 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2763>
+ 18f4a3d:	mov    0x210(%rbx),%rsi
+ 18f4a44:	test   %rsi,%rsi
+ 18f4a47:	je     18f528c <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2f8c>
+ 18f4a4d:	inc    %rax
+ 18f4a50:	movzwl 0x320(%rbx),%ecx
+ 18f4a57:	mov    %rsi,%rbx
+ 18f4a5a:	cmp    0x322(%rsi),%cx
+ 18f4a61:	jae    18f4a3d <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x273d>
+ 18f4a63:	test   %rax,%rax
+ 18f4a66:	je     18f4a99 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2799>
+ 18f4a68:	lea    (%rsi,%rcx,8),%rdx
+ 18f4a6c:	add    $0x330,%rdx
+ 18f4a73:	mov    %rax,%rdi
+ 18f4a76:	and    $0x7,%rdi
+ 18f4a7a:	je     18f4aa2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x27a2>
+ 18f4a7c:	xor    %r8d,%r8d
+ 18f4a7f:	mov    (%rdx),%rbx
+ 18f4a82:	lea    0x328(%rbx),%rdx
+ 18f4a89:	inc    %r8
+ 18f4a8c:	cmp    %r8,%rdi
+ 18f4a8f:	jne    18f4a7f <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x277f>
+ 18f4a91:	mov    %rax,%rdi
+ 18f4a94:	sub    %r8,%rdi
+ 18f4a97:	jmp    18f4aa5 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x27a5>
+ 18f4a99:	lea    0x1(%rcx),%r12
+ 18f4a9d:	mov    %rsi,%rbx
+ 18f4aa0:	jmp    18f4aef <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x27ef>
+ 18f4aa2:	mov    %rax,%rdi
+ 18f4aa5:	cmp    $0x8,%rax
+ 18f4aa9:	jb     18f4aec <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x27ec>
+ 18f4aab:	mov    (%rdx),%rax
+ 18f4aae:	mov    0x328(%rax),%rax
+ 18f4ab5:	mov    0x328(%rax),%rax
+ 18f4abc:	mov    0x328(%rax),%rax
+ 18f4ac3:	mov    0x328(%rax),%rax
+ 18f4aca:	mov    0x328(%rax),%rax
+ 18f4ad1:	mov    0x328(%rax),%rax
+ 18f4ad8:	mov    0x328(%rax),%rbx
+ 18f4adf:	lea    0x328(%rbx),%rdx
+ 18f4ae6:	add    $0xfffffffffffffff8,%rdi
+ 18f4aea:	jne    18f4aab <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x27ab>
+ 18f4aec:	xor    %r12d,%r12d
+ 18f4aef:	lea    (%rcx,%rcx,2),%rax
+ 18f4af3:	mov    0x220(%rsi,%rax,8),%rdx
+ 18f4afb:	mov    0x228(%rsi,%rax,8),%rcx
+ 18f4b03:	shl    $0x4,%rax
+ 18f4b07:	mov    0x8(%rsi,%rax,1),%r8
+ 18f4b0c:	mov    0x10(%rsi,%rax,1),%r9
+ 18f4b11:	movups 0x20(%rsi,%rax,1),%xmm0
+ 18f4b16:	sub    $0x10,%rsp
+ 18f4b1a:	movups %xmm0,(%rsp)
+ 18f4b1e:	lea    0x1c0(%rsp),%rdi
+ 18f4b26:	lea    0x9b8(%rsp),%rsi
+ 18f4b2e:	call   18541a0 <<litchi_odf_common::core::writer::PackageWriter<litchi_odf_common::core::writer::BoundedBytes>>::add_file_with_media_type>
+ 18f4b33:	add    $0x10,%rsp
+ 18f4b37:	cmpq   $0xffffffffffffffff,0x1b0(%rsp)
+ 18f4b40:	jne    18f5078 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2d78>
+ 18f4b46:	mov    $0x1,%cl
+ 18f4b48:	mov    $0x0,%eax
+ 18f4b4d:	dec    %r15
+ 18f4b50:	jne    18f49a0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x26a0>
+ 18f4b56:	cmpq   $0xfffffffffffffffe,0x4f0(%rsp)
+ 18f4b5f:	jne    18f4e60 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2b60>
+ 18f4b65:	lea    0x1b0(%rsp),%rbx
+ 18f4b6d:	lea    0x9a8(%rsp),%rsi
+ 18f4b75:	mov    $0x310,%edx
+ 18f4b7a:	mov    %rbx,%rdi
+ 18f4b7d:	call   *0x14004c5(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f4b83:	xor    %ebp,%ebp
+ 18f4b85:	mov    0x68(%rsp),%rdi
+ 18f4b8a:	mov    %rbx,%rsi
+ 18f4b8d:	mov    0x38(%rsp),%r12
+ 18f4b92:	call   *0x1406878(%rip)        # 2cfb410 <_DYNAMIC+0x6618>
+ 18f4b98:	test   %r12,%r12
+ 18f4b9b:	je     18f4bb2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x28b2>
+ 18f4b9d:	mov    $0x1,%edx
+ 18f4ba2:	mov    0x70(%rsp),%rdi
+ 18f4ba7:	mov    0x38(%rsp),%rsi
+ 18f4bac:	call   *0x14004de(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f4bb2:	mov    0x838(%rsp),%rsi
+ 18f4bba:	test   %rsi,%rsi
+ 18f4bbd:	je     18f4bcd <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x28cd>
+ 18f4bbf:	mov    $0x1,%edx
+ 18f4bc4:	mov    %r14,%rdi
+ 18f4bc7:	call   *0x14004c3(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f4bcd:	cmpq   $0x0,0x8(%rsp)
+ 18f4bd3:	je     18f4be8 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x28e8>
+ 18f4bd5:	mov    $0x1,%edx
+ 18f4bda:	mov    %r13,%rdi
+ 18f4bdd:	mov    0x8(%rsp),%rsi
+ 18f4be2:	call   *0x14004a8(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f4be8:	cmpl   $0xffffffff,0x690(%rsp)
+ 18f4bf0:	je     18f33ff <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x10ff>
+ 18f4bf6:	lea    0x690(%rsp),%rdi
+ 18f4bfe:	call   18f1120 <core::ptr::drop_glue::<litchi_odf_common::core::package::Package>>
+ 18f4c03:	jmp    18f33ff <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x10ff>
+ 18f4c08:	mov    0x510(%rsp),%rax
+ 18f4c10:	mov    0x520(%rsp),%rsi
+ 18f4c18:	sub    %rsi,%rax
+ 18f4c1b:	cmp    %rax,%r14
+ 18f4c1e:	ja     18f51b8 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2eb8>
+ 18f4c24:	test   %r14,%r14
+ 18f4c27:	je     18f4c48 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2948>
+ 18f4c29:	add    0x518(%rsp),%rsi
+ 18f4c31:	mov    %rsi,%rdi
+ 18f4c34:	mov    %rbx,%rsi
+ 18f4c37:	mov    %r14,%rdx
+ 18f4c3a:	call   *0x1400408(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f4c40:	mov    0x520(%rsp),%rsi
+ 18f4c48:	add    %r14,%rsi
+ 18f4c4b:	mov    %rsi,0x520(%rsp)
+ 18f4c53:	mov    0x30(%rsp),%rsi
+ 18f4c58:	test   %rsi,%rsi
+ 18f4c5b:	je     18f4c6b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x296b>
+ 18f4c5d:	mov    $0x1,%edx
+ 18f4c62:	mov    %rbx,%rdi
+ 18f4c65:	call   *0x1400425(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f4c6b:	mov    0xc8(%rsp),%rdx
+ 18f4c73:	mov    0xd0(%rsp),%rcx
+ 18f4c7b:	lea    0x510(%rsp),%rsi
+ 18f4c83:	mov    0x28(%rsp),%rbx
+ 18f4c88:	mov    %rbx,%rdi
+ 18f4c8b:	call   *0x1406def(%rip)        # 2cfba80 <_DYNAMIC+0x6c88>
+ 18f4c91:	mov    %rbx,%rdi
+ 18f4c94:	call   *0x1406dd6(%rip)        # 2cfba70 <_DYNAMIC+0x6c78>
+ 18f4c9a:	mov    %rax,%r12
+ 18f4c9d:	mov    %rdx,%rbx
+ 18f4ca0:	mov    0x510(%rsp),%r15
+ 18f4ca8:	mov    0x520(%rsp),%r14
+ 18f4cb0:	mov    %r15,%rax
+ 18f4cb3:	sub    %r14,%rax
+ 18f4cb6:	cmp    %rax,%rdx
+ 18f4cb9:	ja     18f51e0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2ee0>
+ 18f4cbf:	test   %rbx,%rbx
+ 18f4cc2:	je     18f4ceb <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x29eb>
+ 18f4cc4:	add    0x518(%rsp),%r14
+ 18f4ccc:	mov    %r14,%rdi
+ 18f4ccf:	mov    %r12,%rsi
+ 18f4cd2:	mov    %rbx,%rdx
+ 18f4cd5:	call   *0x140036d(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f4cdb:	mov    0x510(%rsp),%r15
+ 18f4ce3:	mov    0x520(%rsp),%r14
+ 18f4ceb:	add    %rbx,%r14
+ 18f4cee:	mov    %r14,0x520(%rsp)
+ 18f4cf6:	mov    0x28(%rsp),%rdi
+ 18f4cfb:	call   *0x1406d8f(%rip)        # 2cfba90 <_DYNAMIC+0x6c98>
+ 18f4d01:	mov    %rax,%r12
+ 18f4d04:	mov    %rdx,%rbx
+ 18f4d07:	mov    %r15,%rax
+ 18f4d0a:	sub    %r14,%rax
+ 18f4d0d:	cmp    %rax,%rdx
+ 18f4d10:	ja     18f520b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2f0b>
+ 18f4d16:	test   %rbx,%rbx
+ 18f4d19:	je     18f4d42 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2a42>
+ 18f4d1b:	add    0x518(%rsp),%r14
+ 18f4d23:	mov    %r14,%rdi
+ 18f4d26:	mov    %r12,%rsi
+ 18f4d29:	mov    %rbx,%rdx
+ 18f4d2c:	call   *0x1400316(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f4d32:	mov    0x510(%rsp),%r15
+ 18f4d3a:	mov    0x520(%rsp),%r14
+ 18f4d42:	add    %rbx,%r14
+ 18f4d45:	mov    %r14,0x520(%rsp)
+ 18f4d4d:	mov    0x18(%rsp),%r12
+ 18f4d52:	mov    0x20(%rsp),%rbx
+ 18f4d57:	sub    %r14,%r15
+ 18f4d5a:	cmp    %r15,%rbx
+ 18f4d5d:	ja     18f5236 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2f36>
+ 18f4d63:	test   %rbx,%rbx
+ 18f4d66:	je     18f4d87 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2a87>
+ 18f4d68:	add    0x518(%rsp),%r14
+ 18f4d70:	mov    %r14,%rdi
+ 18f4d73:	mov    %r12,%rsi
+ 18f4d76:	mov    %rbx,%rdx
+ 18f4d79:	call   *0x14002c9(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f4d7f:	mov    0x520(%rsp),%r14
+ 18f4d87:	add    %rbx,%r14
+ 18f4d8a:	mov    %r14,0x520(%rsp)
+ 18f4d92:	lea    0x1b0(%rsp),%rdi
+ 18f4d9a:	mov    0x28(%rsp),%rsi
+ 18f4d9f:	call   *0x1406cbb(%rip)        # 2cfba60 <_DYNAMIC+0x6c68>
+ 18f4da5:	mov    0x1b8(%rsp),%r12
+ 18f4dad:	mov    0x1c0(%rsp),%rbx
+ 18f4db5:	mov    0x510(%rsp),%rax
+ 18f4dbd:	mov    0x520(%rsp),%r14
+ 18f4dc5:	sub    %r14,%rax
+ 18f4dc8:	cmp    %rax,%rbx
+ 18f4dcb:	ja     18f5261 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2f61>
+ 18f4dd1:	test   %rbx,%rbx
+ 18f4dd4:	je     18f4df5 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2af5>
+ 18f4dd6:	add    0x518(%rsp),%r14
+ 18f4dde:	mov    %r14,%rdi
+ 18f4de1:	mov    %r12,%rsi
+ 18f4de4:	mov    %rbx,%rdx
+ 18f4de7:	call   *0x140025b(%rip)        # 2cf5048 <memcpy@GLIBC_2.14>
+ 18f4ded:	mov    0x520(%rsp),%r14
+ 18f4df5:	add    %rbx,%r14
+ 18f4df8:	mov    %r14,0x520(%rsp)
+ 18f4e00:	mov    0x1b0(%rsp),%rsi
+ 18f4e08:	test   %rsi,%rsi
+ 18f4e0b:	je     18f4e23 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2b23>
+ 18f4e0d:	mov    $0x1,%edx
+ 18f4e12:	mov    %r12,%rdi
+ 18f4e15:	call   *0x1400275(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f4e1b:	mov    0x520(%rsp),%r14
+ 18f4e23:	mov    0x510(%rsp),%rax
+ 18f4e2b:	mov    %rax,0x30(%rsp)
+ 18f4e30:	mov    0x518(%rsp),%rbx
+ 18f4e38:	mov    0x78(%rsp),%r15
+ 18f4e3d:	mov    0x8(%rsp),%r12
+ 18f4e42:	mov    0xc0(%rsp),%rsi
+ 18f4e4a:	test   %rsi,%rsi
+ 18f4e4d:	je     18f41c8 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1ec8>
+ 18f4e53:	mov    0xc8(%rsp),%rdi
+ 18f4e5b:	jmp    18f41bd <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1ebd>
+ 18f4e60:	xor    %edx,%edx
+ 18f4e62:	movzbl 0xa0(%rsp),%eax
+ 18f4e6a:	mov    %al,%dl
+ 18f4e6c:	mov    %rdx,0x1b0(%rsp)
+ 18f4e74:	movq   $0x0,0x1b8(%rsp)
+ 18f4e80:	mov    0x88(%rsp),%rax
+ 18f4e88:	mov    %rax,0x1c0(%rsp)
+ 18f4e90:	mov    0x40(%rsp),%rcx
+ 18f4e95:	mov    %rcx,0x1c8(%rsp)
+ 18f4e9d:	mov    %rdx,0x1d0(%rsp)
+ 18f4ea5:	movq   $0x0,0x1d8(%rsp)
+ 18f4eb1:	mov    %rax,0x1e0(%rsp)
+ 18f4eb9:	mov    %rcx,0x1e8(%rsp)
+ 18f4ec1:	mov    0x80(%rsp),%rax
+ 18f4ec9:	mov    %rax,0x1f0(%rsp)
+ 18f4ed1:	lea    0x510(%rsp),%rdi
+ 18f4ed9:	lea    0x1b0(%rsp),%rsi
+ 18f4ee1:	mov    0x38(%rsp),%r12
+ 18f4ee6:	call   18a0f10 <<alloc::vec::Vec<alloc::string::String> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<alloc::string::String, core::iter::adapters::cloned::Cloned<alloc::collections::btree::map::Keys<alloc::string::String, litchi_odp::model::media::EmbeddedMedia>>>>::from_iter>
+ 18f4eeb:	mov    0x28(%rsp),%rcx
+ 18f4ef0:	mov    0x390(%rcx),%rax
+ 18f4ef7:	mov    0x398(%rcx),%rcx
+ 18f4efe:	xor    %edx,%edx
+ 18f4f00:	mov    %rax,%rsi
+ 18f4f03:	test   %rax,%rax
+ 18f4f06:	setne  %dil
+ 18f4f0a:	je     18f4f18 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2c18>
+ 18f4f0c:	mov    0x28(%rsp),%rsi
+ 18f4f11:	mov    0x3a0(%rsi),%rsi
+ 18f4f18:	mov    %dil,%dl
+ 18f4f1b:	mov    %rdx,0x1b0(%rsp)
+ 18f4f23:	movq   $0x0,0x1b8(%rsp)
+ 18f4f2f:	mov    %rax,0x1c0(%rsp)
+ 18f4f37:	mov    %rcx,0x1c8(%rsp)
+ 18f4f3f:	mov    %rdx,0x1d0(%rsp)
+ 18f4f47:	movq   $0x0,0x1d8(%rsp)
+ 18f4f53:	mov    %rax,0x1e0(%rsp)
+ 18f4f5b:	mov    %rcx,0x1e8(%rsp)
+ 18f4f63:	mov    %rsi,0x1f0(%rsp)
+ 18f4f6b:	lea    0x510(%rsp),%rdi
+ 18f4f73:	lea    0x1b0(%rsp),%rsi
+ 18f4f7b:	call   189a060 <<alloc::vec::Vec<alloc::string::String>>::extend_trusted::<core::iter::adapters::cloned::Cloned<alloc::collections::btree::set::Iter<alloc::string::String>>>>
+ 18f4f80:	mov    0x518(%rsp),%rcx
+ 18f4f88:	mov    0x520(%rsp),%r8
+ 18f4f90:	sub    $0x8,%rsp
+ 18f4f94:	lea    0x1b8(%rsp),%rdi
+ 18f4f9c:	lea    0x9b0(%rsp),%rsi
+ 18f4fa4:	mov    $0x8,%r9d
+ 18f4faa:	mov    0x138(%rsp),%rdx
+ 18f4fb2:	push   $0x0
+ 18f4fb4:	call   1856fd0 <<litchi_odf_common::core::writer::PackageWriter<litchi_odf_common::core::writer::BoundedBytes>>::copy_auxiliary_files_from_except>
+ 18f4fb9:	add    $0x10,%rsp
+ 18f4fbd:	cmpq   $0xffffffffffffffff,0x1b0(%rsp)
+ 18f4fc6:	jne    18f4ff4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2cf4>
+ 18f4fc8:	lea    0x1b0(%rsp),%rdi
+ 18f4fd0:	lea    0x9a8(%rsp),%rsi
+ 18f4fd8:	mov    0x130(%rsp),%rdx
+ 18f4fe0:	call   18542c0 <<litchi_odf_common::core::writer::PackageWriter<litchi_odf_common::core::writer::BoundedBytes>>::preserve_source_manifest>
+ 18f4fe5:	cmpq   $0xffffffffffffffff,0x1b0(%rsp)
+ 18f4fee:	je     18f5133 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2e33>
+ 18f4ff4:	movups 0x1b0(%rsp),%xmm0
+ 18f4ffc:	movups 0x1c0(%rsp),%xmm1
+ 18f5004:	movups 0x1d0(%rsp),%xmm2
+ 18f500c:	mov    0x68(%rsp),%rax
+ 18f5011:	movups %xmm2,0x20(%rax)
+ 18f5015:	movups %xmm1,0x10(%rax)
+ 18f5019:	movups %xmm0,(%rax)
+ 18f501c:	lea    0x510(%rsp),%rdi
+ 18f5024:	call   18efb20 <core::ptr::drop_glue::<alloc::vec::Vec<alloc::string::String>>>
+ 18f5029:	jmp    18f50a0 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2da0>
+ 18f502b:	mov    0x1b8(%rsp),%rax
+ 18f5033:	mov    %rax,0x30(%rsp)
+ 18f5038:	mov    0x1c0(%rsp),%rbx
+ 18f5040:	mov    0x1c8(%rsp),%r14
+ 18f5048:	movups 0x1d0(%rsp),%xmm0
+ 18f5050:	movaps %xmm0,0x90(%rsp)
+ 18f5058:	mov    0x78(%rsp),%r15
+ 18f505d:	mov    0x8(%rsp),%r12
+ 18f5062:	mov    0x150(%rsp),%rsi
+ 18f506a:	test   %rsi,%rsi
+ 18f506d:	jne    18f41b5 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1eb5>
+ 18f5073:	jmp    18f41c8 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1ec8>
+ 18f5078:	movups 0x1b0(%rsp),%xmm0
+ 18f5080:	movups 0x1c0(%rsp),%xmm1
+ 18f5088:	movups 0x1d0(%rsp),%xmm2
+ 18f5090:	mov    0x68(%rsp),%rax
+ 18f5095:	movups %xmm2,0x20(%rax)
+ 18f5099:	movups %xmm1,0x10(%rax)
+ 18f509d:	movups %xmm0,(%rax)
+ 18f50a0:	mov    0x38(%rsp),%r12
+ 18f50a5:	mov    0x70(%rsp),%rdi
+ 18f50aa:	test   %r12,%r12
+ 18f50ad:	je     18f4854 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2554>
+ 18f50b3:	mov    $0x1,%edx
+ 18f50b8:	mov    %r12,%rsi
+ 18f50bb:	call   *0x13fffcf(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f50c1:	jmp    18f4854 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2554>
+ 18f50c6:	movups 0x1d0(%rsp),%xmm0
+ 18f50ce:	movaps %xmm0,0x90(%rsp)
+ 18f50d6:	mov    0xc0(%rsp),%rsi
+ 18f50de:	test   %rsi,%rsi
+ 18f50e1:	je     18f4154 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1e54>
+ 18f50e7:	mov    $0x1,%edx
+ 18f50ec:	mov    0x118(%rsp),%rdi
+ 18f50f4:	call   *0x13fff96(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f50fa:	jmp    18f4154 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1e54>
+ 18f50ff:	lea    0x13be73a(%rip),%rdi        # 2cb3840 <anon.7af64e641a0d45b3d211bc175237ff58.25.llvm.6284367690247432662>
+ 18f5106:	call   *0x13fff44(%rip)        # 2cf5050 <_DYNAMIC+0x258>
+ 18f510c:	jmp    18f5302 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3002>
+ 18f5111:	lea    0x10(%rsp),%rdi
+ 18f5116:	mov    $0x1,%ecx
+ 18f511b:	mov    $0x1,%r8d
+ 18f5121:	mov    %r14,%rdx
+ 18f5124:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f5129:	mov    0x20(%rsp),%rsi
+ 18f512e:	jmp    18f2f45 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0xc45>
+ 18f5133:	lea    0x510(%rsp),%rdi
+ 18f513b:	call   18efb20 <core::ptr::drop_glue::<alloc::vec::Vec<alloc::string::String>>>
+ 18f5140:	jmp    18f4b65 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2865>
+ 18f5145:	lea    0x13be82c(%rip),%rdi        # 2cb3978 <anon.7af64e641a0d45b3d211bc175237ff58.124.llvm.6284367690247432662>
+ 18f514c:	call   *0x13ffefe(%rip)        # 2cf5050 <_DYNAMIC+0x258>
+ 18f5152:	jmp    18f5302 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3002>
+ 18f5157:	lea    0x10(%rsp),%rdi
+ 18f515c:	mov    $0x1,%ecx
+ 18f5161:	mov    $0x1,%r8d
+ 18f5167:	mov    %r14,%rdx
+ 18f516a:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f516f:	mov    0x20(%rsp),%rsi
+ 18f5174:	mov    0x78(%rsp),%r15
+ 18f5179:	mov    0x8(%rsp),%r12
+ 18f517e:	mov    0x88(%rsp),%r13
+ 18f5186:	mov    0x38(%rsp),%rbp
+ 18f518b:	jmp    18f425c <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x1f5c>
+ 18f5190:	mov    0x1c0(%rsp),%rsi
+ 18f5198:	call   *0x13fff0a(%rip)        # 2cf50a8 <_DYNAMIC+0x2b0>
+ 18f519e:	jmp    18f5302 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3002>
+ 18f51a3:	mov    $0x1,%edi
+ 18f51a8:	mov    $0x2b,%esi
+ 18f51ad:	call   *0x13ffef5(%rip)        # 2cf50a8 <_DYNAMIC+0x2b0>
+ 18f51b3:	jmp    18f5302 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3002>
+ 18f51b8:	lea    0x510(%rsp),%rdi
+ 18f51c0:	mov    $0x1,%ecx
+ 18f51c5:	mov    $0x1,%r8d
+ 18f51cb:	mov    %r14,%rdx
+ 18f51ce:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f51d3:	mov    0x520(%rsp),%rsi
+ 18f51db:	jmp    18f4c29 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2929>
+ 18f51e0:	lea    0x510(%rsp),%rdi
+ 18f51e8:	mov    $0x1,%ecx
+ 18f51ed:	mov    $0x1,%r8d
+ 18f51f3:	mov    %r14,%rsi
+ 18f51f6:	mov    %rbx,%rdx
+ 18f51f9:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f51fe:	mov    0x520(%rsp),%r14
+ 18f5206:	jmp    18f4cc4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x29c4>
+ 18f520b:	lea    0x510(%rsp),%rdi
+ 18f5213:	mov    $0x1,%ecx
+ 18f5218:	mov    $0x1,%r8d
+ 18f521e:	mov    %r14,%rsi
+ 18f5221:	mov    %rbx,%rdx
+ 18f5224:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f5229:	mov    0x520(%rsp),%r14
+ 18f5231:	jmp    18f4d1b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2a1b>
+ 18f5236:	lea    0x510(%rsp),%rdi
+ 18f523e:	mov    $0x1,%ecx
+ 18f5243:	mov    $0x1,%r8d
+ 18f5249:	mov    %r14,%rsi
+ 18f524c:	mov    %rbx,%rdx
+ 18f524f:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f5254:	mov    0x520(%rsp),%r14
+ 18f525c:	jmp    18f4d68 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2a68>
+ 18f5261:	lea    0x510(%rsp),%rdi
+ 18f5269:	mov    $0x1,%ecx
+ 18f526e:	mov    $0x1,%r8d
+ 18f5274:	mov    %r14,%rsi
+ 18f5277:	mov    %rbx,%rdx
+ 18f527a:	call   1904560 <<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>>
+ 18f527f:	mov    0x520(%rsp),%r14
+ 18f5287:	jmp    18f4dd6 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x2ad6>
+ 18f528c:	lea    0x13be5ad(%rip),%rdi        # 2cb3840 <anon.7af64e641a0d45b3d211bc175237ff58.25.llvm.6284367690247432662>
+ 18f5293:	call   *0x13ffdb7(%rip)        # 2cf5050 <_DYNAMIC+0x258>
+ 18f5299:	jmp    18f5302 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3002>
+ 18f529b:	mov    $0x1,%edi
+ 18f52a0:	mov    $0x11,%esi
+ 18f52a5:	call   *0x13ffdfd(%rip)        # 2cf50a8 <_DYNAMIC+0x2b0>
+ 18f52ab:	jmp    18f5302 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3002>
+ 18f52ad:	mov    $0x1,%edi
+ 18f52b2:	mov    $0x39,%esi
+ 18f52b7:	call   *0x13ffdeb(%rip)        # 2cf50a8 <_DYNAMIC+0x2b0>
+ 18f52bd:	jmp    18f5302 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3002>
+ 18f52bf:	mov    $0x1,%edi
+ 18f52c4:	mov    $0x11,%esi
+ 18f52c9:	call   *0x13ffdd9(%rip)        # 2cf50a8 <_DYNAMIC+0x2b0>
+ 18f52cf:	jmp    18f5302 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3002>
+ 18f52d1:	lea    0x13be6a0(%rip),%rdi        # 2cb3978 <anon.7af64e641a0d45b3d211bc175237ff58.124.llvm.6284367690247432662>
+ 18f52d8:	call   *0x13ffd72(%rip)        # 2cf5050 <_DYNAMIC+0x258>
+ 18f52de:	jmp    18f5302 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3002>
+ 18f52e0:	mov    $0x1,%edi
+ 18f52e5:	mov    $0xff,%esi
+ 18f52ea:	call   *0x13ffdb8(%rip)        # 2cf50a8 <_DYNAMIC+0x2b0>
+ 18f52f0:	jmp    18f5302 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3002>
+ 18f52f2:	mov    $0x1,%edi
+ 18f52f7:	mov    $0xf6,%esi
+ 18f52fc:	call   *0x13ffda6(%rip)        # 2cf50a8 <_DYNAMIC+0x2b0>
+ 18f5302:	ud2
+ 18f5304:	mov    %rax,%r15
+ 18f5307:	mov    0x1b0(%rsp),%rsi
+ 18f530f:	test   %rsi,%rsi
+ 18f5312:	je     18f5471 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3171>
+ 18f5318:	mov    $0x1,%edx
+ 18f531d:	mov    %r12,%rdi
+ 18f5320:	call   *0x13ffd6a(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f5326:	jmp    18f5471 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3171>
+ 18f532b:	mov    %rax,%r15
+ 18f532e:	cmpq   $0x0,0x30(%rsp)
+ 18f5334:	je     18f5471 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3171>
+ 18f533a:	mov    $0x1,%edx
+ 18f533f:	mov    %rbx,%rdi
+ 18f5342:	mov    0x30(%rsp),%rsi
+ 18f5347:	call   *0x13ffd43(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f534d:	jmp    18f5471 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3171>
+ 18f5352:	mov    %rax,%r15
+ 18f5355:	cmpq   $0x0,0x30(%rsp)
+ 18f535b:	je     18f5671 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3371>
+ 18f5361:	mov    $0x1,%edx
+ 18f5366:	mov    %rbx,%rdi
+ 18f5369:	mov    0x30(%rsp),%rsi
+ 18f536e:	jmp    18f566b <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x336b>
+ 18f5373:	mov    %rax,%r15
+ 18f5376:	test   %r14,%r14
+ 18f5379:	je     18f5529 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3229>
+ 18f537f:	jmp    18f538d <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x308d>
+ 18f5381:	mov    %rax,%r15
+ 18f5384:	test   %r14,%r14
+ 18f5387:	je     18f5529 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3229>
+ 18f538d:	mov    $0x1,%edx
+ 18f5392:	mov    %r12,%rdi
+ 18f5395:	mov    %r14,%rsi
+ 18f5398:	jmp    18f5523 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3223>
+ 18f539d:	mov    %rax,%r15
+ 18f53a0:	test   %r13,%r13
+ 18f53a3:	je     18f54de <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x31de>
+ 18f53a9:	mov    $0x1,%edx
+ 18f53ae:	mov    0x40(%rsp),%rdi
+ 18f53b3:	mov    %r13,%rsi
+ 18f53b6:	call   *0x13ffcd4(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f53bc:	jmp    18f54de <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x31de>
+ 18f53c1:	mov    %rax,%r15
+ 18f53c4:	cmpq   $0x0,0x8(%rsp)
+ 18f53ca:	je     18f56a2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33a2>
+ 18f53d0:	mov    $0x1,%edx
+ 18f53d5:	mov    %r13,%rdi
+ 18f53d8:	mov    0x8(%rsp),%rsi
+ 18f53dd:	call   *0x13ffcad(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f53e3:	jmp    18f56a2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33a2>
+ 18f53e8:	mov    %rax,%r15
+ 18f53eb:	test   %r13,%r13
+ 18f53ee:	je     18f55c4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x32c4>
+ 18f53f4:	mov    $0x1,%edx
+ 18f53f9:	mov    0x40(%rsp),%rdi
+ 18f53fe:	mov    %r13,%rsi
+ 18f5401:	call   *0x13ffc89(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f5407:	jmp    18f55c4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x32c4>
+ 18f540c:	jmp    18f5647 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3347>
+ 18f5411:	mov    %rax,%r15
+ 18f5414:	lea    0x510(%rsp),%rdi
+ 18f541c:	call   18efb20 <core::ptr::drop_glue::<alloc::vec::Vec<alloc::string::String>>>
+ 18f5421:	jmp    18f54b2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x31b2>
+ 18f5426:	mov    %rax,%r15
+ 18f5429:	mov    0x510(%rsp),%rsi
+ 18f5431:	test   %rsi,%rsi
+ 18f5434:	je     18f5671 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3371>
+ 18f543a:	mov    0x518(%rsp),%rdi
+ 18f5442:	jmp    18f5666 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3366>
+ 18f5447:	mov    %rax,%r15
+ 18f544a:	mov    0x1b0(%rsp),%rsi
+ 18f5452:	test   %rsi,%rsi
+ 18f5455:	je     18f56ef <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33ef>
+ 18f545b:	mov    $0x1,%edx
+ 18f5460:	mov    %rbx,%rdi
+ 18f5463:	call   *0x13ffc27(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f5469:	jmp    18f56ef <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33ef>
+ 18f546e:	mov    %rax,%r15
+ 18f5471:	mov    0x510(%rsp),%rsi
+ 18f5479:	test   %rsi,%rsi
+ 18f547c:	je     18f5651 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3351>
+ 18f5482:	mov    0x518(%rsp),%rdi
+ 18f548a:	mov    $0x1,%edx
+ 18f548f:	call   *0x13ffbfb(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f5495:	jmp    18f5651 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3351>
+ 18f549a:	mov    %r12,0x38(%rsp)
+ 18f549f:	mov    %rax,%r15
+ 18f54a2:	jmp    18f54b5 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x31b5>
+ 18f54a4:	jmp    18f54a6 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x31a6>
+ 18f54a6:	mov    %rax,%r15
+ 18f54a9:	jmp    18f5529 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3229>
+ 18f54ab:	jmp    18f5506 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3206>
+ 18f54ad:	jmp    18f54af <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x31af>
+ 18f54af:	mov    %rax,%r15
+ 18f54b2:	mov    $0x1,%bpl
+ 18f54b5:	cmpq   $0x0,0x38(%rsp)
+ 18f54bb:	je     18f55a2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x32a2>
+ 18f54c1:	mov    $0x1,%edx
+ 18f54c6:	mov    0x70(%rsp),%rdi
+ 18f54cb:	mov    0x38(%rsp),%rsi
+ 18f54d0:	call   *0x13ffbba(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f54d6:	jmp    18f55a2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x32a2>
+ 18f54db:	mov    %rax,%r15
+ 18f54de:	mov    0xc0(%rsp),%rsi
+ 18f54e6:	test   %rsi,%rsi
+ 18f54e9:	je     18f55c4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x32c4>
+ 18f54ef:	mov    0xc8(%rsp),%rdi
+ 18f54f7:	jmp    18f5542 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3242>
+ 18f54f9:	jmp    18f5594 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3294>
+ 18f54fe:	mov    %rax,%r15
+ 18f5501:	jmp    18f55e4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x32e4>
+ 18f5506:	mov    %rax,%r15
+ 18f5509:	mov    0x1b0(%rsp),%rsi
+ 18f5511:	test   %rsi,%rsi
+ 18f5514:	je     18f5529 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3229>
+ 18f5516:	mov    0x1b8(%rsp),%rdi
+ 18f551e:	mov    $0x1,%edx
+ 18f5523:	call   *0x13ffb67(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f5529:	mov    0x510(%rsp),%rsi
+ 18f5531:	test   %rsi,%rsi
+ 18f5534:	je     18f55c4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x32c4>
+ 18f553a:	mov    0x518(%rsp),%rdi
+ 18f5542:	mov    $0x1,%edx
+ 18f5547:	call   *0x13ffb43(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f554d:	jmp    18f55c4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x32c4>
+ 18f554f:	mov    %rax,%r15
+ 18f5552:	jmp    18f5604 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3304>
+ 18f5557:	jmp    18f55c1 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x32c1>
+ 18f5559:	jmp    18f56cd <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33cd>
+ 18f555e:	mov    %rax,%r15
+ 18f5561:	test   %r12,%r12
+ 18f5564:	je     18f56a2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33a2>
+ 18f556a:	mov    0x8(%rsp),%rax
+ 18f556f:	shl    $0x3,%rax
+ 18f5573:	lea    (%rax,%rax,2),%rsi
+ 18f5577:	mov    $0x8,%edx
+ 18f557c:	mov    0x78(%rsp),%rdi
+ 18f5581:	call   *0x13ffb09(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f5587:	jmp    18f56a2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33a2>
+ 18f558c:	mov    %rax,%r15
+ 18f558f:	jmp    18f5695 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3395>
+ 18f5594:	mov    %rax,%r15
+ 18f5597:	jmp    18f5671 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3371>
+ 18f559c:	mov    %rax,%r15
+ 18f559f:	mov    $0x1,%bpl
+ 18f55a2:	mov    0x838(%rsp),%rsi
+ 18f55aa:	test   %rsi,%rsi
+ 18f55ad:	je     18f5623 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3323>
+ 18f55af:	mov    $0x1,%edx
+ 18f55b4:	mov    %r14,%rdi
+ 18f55b7:	call   *0x13ffad3(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f55bd:	jmp    18f5623 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3323>
+ 18f55bf:	jmp    18f55c1 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x32c1>
+ 18f55c1:	mov    %rax,%r15
+ 18f55c4:	mov    0x180(%rsp),%rsi
+ 18f55cc:	test   %rsi,%rsi
+ 18f55cf:	je     18f55e4 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x32e4>
+ 18f55d1:	mov    0x188(%rsp),%rdi
+ 18f55d9:	mov    $0x1,%edx
+ 18f55de:	call   *0x13ffaac(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f55e4:	cmpq   $0x0,0x30(%rsp)
+ 18f55ea:	je     18f5604 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3304>
+ 18f55ec:	mov    $0x1,%edx
+ 18f55f1:	mov    0xf0(%rsp),%rdi
+ 18f55f9:	mov    0x30(%rsp),%rsi
+ 18f55fe:	call   *0x13ffa8c(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f5604:	mov    0x150(%rsp),%rsi
+ 18f560c:	test   %rsi,%rsi
+ 18f560f:	je     18f5671 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3371>
+ 18f5611:	mov    0x158(%rsp),%rdi
+ 18f5619:	jmp    18f5666 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3366>
+ 18f561b:	ud2
+ 18f561d:	mov    %rax,%r15
+ 18f5620:	mov    $0x1,%bpl
+ 18f5623:	cmpq   $0x0,0x8(%rsp)
+ 18f5629:	je     18f5719 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3419>
+ 18f562f:	mov    $0x1,%edx
+ 18f5634:	mov    %r13,%rdi
+ 18f5637:	mov    0x8(%rsp),%rsi
+ 18f563c:	call   *0x13ffa4e(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f5642:	jmp    18f5719 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3419>
+ 18f5647:	mov    %rax,%r15
+ 18f564a:	jmp    18f56a2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33a2>
+ 18f564c:	jmp    18f56cd <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33cd>
+ 18f564e:	mov    %rax,%r15
+ 18f5651:	mov    0xc0(%rsp),%rsi
+ 18f5659:	test   %rsi,%rsi
+ 18f565c:	je     18f5671 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3371>
+ 18f565e:	mov    0xc8(%rsp),%rdi
+ 18f5666:	mov    $0x1,%edx
+ 18f566b:	call   *0x13ffa1f(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f5671:	mov    0xa8(%rsp),%rsi
+ 18f5679:	test   %rsi,%rsi
+ 18f567c:	je     18f5695 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3395>
+ 18f567e:	mov    0xb0(%rsp),%rdi
+ 18f5686:	shl    $0x3,%rsi
+ 18f568a:	mov    $0x8,%edx
+ 18f568f:	call   *0x13ff9fb(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f5695:	lea    0x4f8(%rsp),%rdi
+ 18f569d:	call   18efb20 <core::ptr::drop_glue::<alloc::vec::Vec<alloc::string::String>>>
+ 18f56a2:	mov    0x10(%rsp),%rsi
+ 18f56a7:	test   %rsi,%rsi
+ 18f56aa:	je     18f56ef <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33ef>
+ 18f56ac:	mov    0x18(%rsp),%rdi
+ 18f56b1:	mov    $0x1,%edx
+ 18f56b6:	call   *0x13ff9d4(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f56bc:	jmp    18f56ef <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33ef>
+ 18f56be:	jmp    18f56cd <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33cd>
+ 18f56c0:	jmp    18f56ec <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33ec>
+ 18f56c2:	mov    %rax,%r15
+ 18f56c5:	jmp    18f5735 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3435>
+ 18f56c7:	jmp    18f56ec <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33ec>
+ 18f56c9:	jmp    18f56e2 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33e2>
+ 18f56cb:	jmp    18f56cd <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x33cd>
+ 18f56cd:	mov    %rax,%r15
+ 18f56d0:	mov    $0x1,%bpl
+ 18f56d3:	lea    0x100(%rsp),%rdi
+ 18f56db:	call   185db50 <<alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::collections::btree::set_val::SetValZST> as core::ops::drop::Drop>::drop>
+ 18f56e0:	jmp    18f5719 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3419>
+ 18f56e2:	mov    %rax,%r15
+ 18f56e5:	mov    $0x1,%bpl
+ 18f56e8:	jmp    18f5719 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3419>
+ 18f56ea:	ud2
+ 18f56ec:	mov    %rax,%r15
+ 18f56ef:	mov    0x48(%rsp),%rsi
+ 18f56f4:	test   %rsi,%rsi
+ 18f56f7:	je     18f5709 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3409>
+ 18f56f9:	mov    0x50(%rsp),%rdi
+ 18f56fe:	mov    $0x1,%edx
+ 18f5703:	call   *0x13ff987(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18f5709:	mov    $0x1,%bpl
+ 18f570c:	lea    0x138(%rsp),%rdi
+ 18f5714:	call   185d980 <<alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::string::String> as core::ops::drop::Drop>::drop>
+ 18f5719:	cmpl   $0xffffffff,0x690(%rsp)
+ 18f5721:	je     18f5730 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3430>
+ 18f5723:	lea    0x690(%rsp),%rdi
+ 18f572b:	call   18f1120 <core::ptr::drop_glue::<litchi_odf_common::core::package::Package>>
+ 18f5730:	test   %bpl,%bpl
+ 18f5733:	je     18f5742 <<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded+0x3442>
+ 18f5735:	lea    0x9a8(%rsp),%rdi
+ 18f573d:	call   18f0210 <core::ptr::drop_glue::<litchi_odf_common::core::writer::PackageWriter<litchi_odf_common::core::writer::BoundedBytes>>>
+ 18f5742:	mov    %r15,%rdi
+ 18f5745:	call   2c92b20 <_Unwind_Resume@plt>
+ 18f574a:	call   *0x13ff970(%rip)        # 2cf50c0 <_DYNAMIC+0x2c8>
+ 18f5750:	call   *0x13ff96a(%rip)        # 2cf50c0 <_DYNAMIC+0x2c8>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

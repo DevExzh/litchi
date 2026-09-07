@@ -1,0 +1,583 @@
+
+/tmp/litchi-goal-0463/baseline/litchi-perf-baseline:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000018eded0 <litchi_odp::authoring::edit::validate_compact_xml_parts_against>:
+ 18eded0:	push   %rbp
+ 18eded1:	push   %r15
+ 18eded3:	push   %r14
+ 18eded5:	push   %r13
+ 18eded7:	push   %r12
+ 18eded9:	push   %rbx
+ 18ededa:	sub    $0x218,%rsp
+ 18edee1:	mov    %ecx,%ebx
+ 18edee3:	mov    %rdx,%r14
+ 18edee6:	mov    %rsi,%r15
+ 18edee9:	mov    %rdi,%r12
+ 18edeec:	lea    0x58(%rsp),%rdi
+ 18edef1:	call   *0x140d4f9(%rip)        # 2cfb3f0 <_DYNAMIC+0x65f8>
+ 18edef7:	mov    0x58(%rsp),%rcx
+ 18edefc:	mov    0x60(%rsp),%rdx
+ 18edf01:	mov    0x68(%rsp),%r13
+ 18edf06:	mov    0x70(%rsp),%rax
+ 18edf0b:	cmp    $0xffffffffffffffff,%rcx
+ 18edf0f:	je     18edf36 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x66>
+ 18edf11:	movdqu 0x78(%rsp),%xmm0
+ 18edf17:	movdqu %xmm0,0x20(%r12)
+ 18edf1e:	mov    %rcx,(%r12)
+ 18edf22:	mov    %rdx,0x8(%r12)
+ 18edf27:	mov    %r13,0x10(%r12)
+ 18edf2c:	mov    %rax,0x18(%r12)
+ 18edf31:	jmp    18ee5e9 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x719>
+ 18edf36:	mov    %r14,0x48(%rsp)
+ 18edf3b:	lea    (%rax,%rax,2),%rcx
+ 18edf3f:	lea    0x0(,%rcx,8),%rcx
+ 18edf47:	add    %r13,%rcx
+ 18edf4a:	mov    %r13,0xe8(%rsp)
+ 18edf52:	mov    %r13,0xf0(%rsp)
+ 18edf5a:	mov    %rdx,0x138(%rsp)
+ 18edf62:	mov    %rdx,0xf8(%rsp)
+ 18edf6a:	mov    %rcx,0x30(%rsp)
+ 18edf6f:	mov    %rcx,0x100(%rsp)
+ 18edf77:	mov    %r13,%r14
+ 18edf7a:	test   %rax,%rax
+ 18edf7d:	je     18ee566 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x696>
+ 18edf83:	mov    %ebx,0x54(%rsp)
+ 18edf87:	mov    0x140b1ca(%rip),%rbx        # 2cf9158 <_DYNAMIC+0x4360>
+ 18edf8e:	mov    %r13,0x128(%rsp)
+ 18edf96:	mov    %r13,%r14
+ 18edf99:	movq   $0x0,0x40(%rsp)
+ 18edfa2:	movq   $0x0,0x120(%rsp)
+ 18edfae:	mov    %r15,0x130(%rsp)
+ 18edfb6:	jmp    18edfcb <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xfb>
+ 18edfb8:	nopl   0x0(%rax,%rax,1)
+ 18edfc0:	cmp    0x30(%rsp),%r14
+ 18edfc5:	je     18ee551 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x681>
+ 18edfcb:	mov    (%r14),%r13
+ 18edfce:	movups 0x8(%r14),%xmm0
+ 18edfd3:	add    $0x18,%r14
+ 18edfd7:	movaps %xmm0,0x180(%rsp)
+ 18edfdf:	cmp    $0xffffffffffffffff,%r13
+ 18edfe3:	je     18ee556 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x686>
+ 18edfe9:	mov    %r13,0x108(%rsp)
+ 18edff1:	movdqa 0x180(%rsp),%xmm0
+ 18edffa:	lea    0x110(%rsp),%rax
+ 18ee002:	movdqu %xmm0,(%rax)
+ 18ee006:	mov    0x110(%rsp),%rbp
+ 18ee00e:	mov    0x118(%rsp),%r15
+ 18ee016:	mov    %r15,%rdx
+ 18ee019:	jmp    18ee029 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x159>
+ 18ee01b:	nopl   0x0(%rax,%rax,1)
+ 18ee020:	cmp    %r15,%rdx
+ 18ee023:	ja     18ee350 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x480>
+ 18ee029:	mov    $0x2e,%edi
+ 18ee02e:	mov    %rbp,%rsi
+ 18ee031:	call   *%rbx
+ 18ee033:	cmp    $0x1,%rax
+ 18ee037:	jne    18ee350 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x480>
+ 18ee03d:	cmp    %r15,%rdx
+ 18ee040:	jae    18ee020 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x150>
+ 18ee042:	cmpb   $0x2e,0x0(%rbp,%rdx,1)
+ 18ee047:	jne    18ee020 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x150>
+ 18ee049:	lea    0x1(%rdx),%rax
+ 18ee04d:	mov    %r15,%rcx
+ 18ee050:	sub    %rax,%rcx
+ 18ee053:	cmp    $0x3,%rcx
+ 18ee057:	jne    18ee350 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x480>
+ 18ee05d:	movzbl 0x0(%rbp,%rax,1),%edx
+ 18ee062:	lea    -0x41(%rdx),%ecx
+ 18ee065:	cmp    $0x1a,%cl
+ 18ee068:	setb   %cl
+ 18ee06b:	shl    $0x5,%cl
+ 18ee06e:	or     %dl,%cl
+ 18ee070:	cmp    $0x72,%cl
+ 18ee073:	je     18ee0a0 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x1d0>
+ 18ee075:	movzbl %cl,%ecx
+ 18ee078:	cmp    $0x78,%ecx
+ 18ee07b:	jne    18ee350 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x480>
+ 18ee081:	movzbl 0x1(%rbp,%rax,1),%ecx
+ 18ee086:	lea    -0x41(%rcx),%edx
+ 18ee089:	cmp    $0x1a,%dl
+ 18ee08c:	setb   %dl
+ 18ee08f:	shl    $0x5,%dl
+ 18ee092:	or     %cl,%dl
+ 18ee094:	mov    $0x6c,%cl
+ 18ee096:	cmp    $0x6d,%dl
+ 18ee099:	je     18ee0be <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x1ee>
+ 18ee09b:	jmp    18ee350 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x480>
+ 18ee0a0:	movzbl 0x1(%rbp,%rax,1),%ecx
+ 18ee0a5:	lea    -0x41(%rcx),%edx
+ 18ee0a8:	cmp    $0x1a,%dl
+ 18ee0ab:	setb   %dl
+ 18ee0ae:	shl    $0x5,%dl
+ 18ee0b1:	or     %cl,%dl
+ 18ee0b3:	mov    $0x66,%cl
+ 18ee0b5:	cmp    $0x64,%dl
+ 18ee0b8:	jne    18ee350 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x480>
+ 18ee0be:	movzbl 0x2(%rbp,%rax,1),%eax
+ 18ee0c3:	lea    -0x41(%rax),%edx
+ 18ee0c6:	cmp    $0x1a,%dl
+ 18ee0c9:	setb   %dl
+ 18ee0cc:	shl    $0x5,%dl
+ 18ee0cf:	or     %al,%dl
+ 18ee0d1:	cmp    %cl,%dl
+ 18ee0d3:	jne    18ee350 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x480>
+ 18ee0d9:	cmpb   $0x0,0x54(%rsp)
+ 18ee0de:	jne    18ee1b3 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x2e3>
+ 18ee0e4:	lea    -0x8(%r15),%rax
+ 18ee0e8:	cmp    $0xd,%rax
+ 18ee0ec:	ja     18ee1b3 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x2e3>
+ 18ee0f2:	lea    -0x157d98d(%rip),%rcx        # 37076c <anon.8292c125770b4b9b75d99da2bc5523de.212.llvm.2082196788816526700+0x254>
+ 18ee0f9:	movslq (%rcx,%rax,4),%rax
+ 18ee0fd:	add    %rcx,%rax
+ 18ee100:	jmp    *%rax
+ 18ee102:	movabs $0x6c6d782e6174656d,%rax
+ 18ee10c:	cmp    %rax,0x0(%rbp)
+ 18ee110:	jne    18ee1b3 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x2e3>
+ 18ee116:	jmp    18ee350 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x480>
+ 18ee11b:	mov    0x0(%rbp),%rax
+ 18ee11f:	movabs $0x2e746e65746e6f63,%rcx
+ 18ee129:	xor    %rcx,%rax
+ 18ee12c:	movabs $0x6c6d782e6174656d,%rcx
+ 18ee136:	add    $0x12fa0007,%rcx
+ 18ee13d:	xor    0x3(%rbp),%rcx
+ 18ee141:	jmp    18ee17c <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x2ac>
+ 18ee143:	mov    0x0(%rbp),%rax
+ 18ee147:	movabs $0x782e73656c797473,%rcx
+ 18ee151:	xor    %rcx,%rax
+ 18ee154:	movzwl 0x8(%rbp),%ecx
+ 18ee158:	xor    $0x6c6d,%rcx
+ 18ee15f:	jmp    18ee17c <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x2ac>
+ 18ee161:	mov    0x0(%rbp),%rax
+ 18ee165:	movabs $0x73676e6974746573,%rcx
+ 18ee16f:	xor    %rcx,%rax
+ 18ee172:	mov    0x8(%rbp),%ecx
+ 18ee175:	xor    $0x6c6d782e,%rcx
+ 18ee17c:	or     %rax,%rcx
+ 18ee17f:	jne    18ee1b3 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x2e3>
+ 18ee181:	jmp    18ee350 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x480>
+ 18ee186:	movdqu 0x0(%rbp),%xmm0
+ 18ee18b:	pcmpeqb -0x17fdc63(%rip),%xmm0        # f0530 <anon.27ebc01334d26e52e912787017a60f97.183.llvm.17599591043162483340+0x3a0>
+ 18ee193:	movdqu 0x5(%rbp),%xmm1
+ 18ee198:	pcmpeqb -0x17f9740(%rip),%xmm1        # f4a60 <anon.00d8f1b0e338825a23746b97ebb8b1dd.135.llvm.8934466594660332504+0x100>
+ 18ee1a0:	pand   %xmm0,%xmm1
+ 18ee1a4:	pmovmskb %xmm1,%eax
+ 18ee1a8:	cmp    $0xffff,%eax
+ 18ee1ad:	je     18ee350 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x480>
+ 18ee1b3:	lea    0x58(%rsp),%rdi
+ 18ee1b8:	mov    0x130(%rsp),%rsi
+ 18ee1c0:	mov    %rbp,%rdx
+ 18ee1c3:	mov    %r15,%rcx
+ 18ee1c6:	call   *0x140a1fc(%rip)        # 2cf83c8 <_DYNAMIC+0x35d0>
+ 18ee1cc:	mov    0x58(%rsp),%rax
+ 18ee1d1:	cmp    $0xffffffffffffffff,%rax
+ 18ee1d5:	jne    18ee5fb <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x72b>
+ 18ee1db:	mov    0x60(%rsp),%rax
+ 18ee1e0:	mov    %rax,0x18(%rsp)
+ 18ee1e5:	mov    0x68(%rsp),%rax
+ 18ee1ea:	mov    %rax,0x10(%rsp)
+ 18ee1ef:	mov    0x70(%rsp),%rax
+ 18ee1f4:	mov    %rax,0x20(%rsp)
+ 18ee1f9:	lea    0x58(%rsp),%rdi
+ 18ee1fe:	mov    0x48(%rsp),%rsi
+ 18ee203:	mov    %rbp,%rdx
+ 18ee206:	mov    %r15,%rcx
+ 18ee209:	call   *0x140d1f9(%rip)        # 2cfb408 <_DYNAMIC+0x6610>
+ 18ee20f:	mov    0x58(%rsp),%rax
+ 18ee214:	cmp    $0xffffffffffffffff,%rax
+ 18ee218:	jne    18ee62d <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x75d>
+ 18ee21e:	cmpb   $0x1,0x60(%rsp)
+ 18ee223:	jne    18ee251 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x381>
+ 18ee225:	lea    0x58(%rsp),%rdi
+ 18ee22a:	mov    0x48(%rsp),%rsi
+ 18ee22f:	mov    %rbp,%rdx
+ 18ee232:	mov    %r15,%rcx
+ 18ee235:	call   *0x140a18d(%rip)        # 2cf83c8 <_DYNAMIC+0x35d0>
+ 18ee23b:	cmpq   $0xffffffffffffffff,0x58(%rsp)
+ 18ee241:	je     18ee36f <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x49f>
+ 18ee247:	lea    0x58(%rsp),%rdi
+ 18ee24c:	call   18e11a0 <core::ptr::drop_glue::<litchi_core::error::types::Error>>
+ 18ee251:	lea    0xb0(%rsp),%rdi
+ 18ee259:	mov    0x10(%rsp),%rsi
+ 18ee25e:	mov    0x20(%rsp),%rdx
+ 18ee263:	call   *0x140768f(%rip)        # 2cf58f8 <_DYNAMIC+0xb00>
+ 18ee269:	cmpb   $0x0,0xb0(%rsp)
+ 18ee271:	jne    18ee3e2 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x512>
+ 18ee277:	mov    0xb8(%rsp),%r8
+ 18ee27f:	mov    0xc0(%rsp),%r9
+ 18ee287:	lea    0x58(%rsp),%rdi
+ 18ee28c:	mov    0x48(%rsp),%rsi
+ 18ee291:	mov    %rbp,%rdx
+ 18ee294:	mov    %r15,%rcx
+ 18ee297:	call   *0x140db13(%rip)        # 2cfbdb0 <_DYNAMIC+0x6fb8>
+ 18ee29d:	mov    0x58(%rsp),%rax
+ 18ee2a2:	cmp    $0xffffffffffffffff,%rax
+ 18ee2a6:	je     18ee3f1 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x521>
+ 18ee2ac:	mov    %rax,0x38(%rsp)
+ 18ee2b1:	mov    %r12,0x28(%rsp)
+ 18ee2b6:	mov    0x60(%rsp),%rax
+ 18ee2bb:	mov    %rax,0x20(%rsp)
+ 18ee2c0:	mov    0x68(%rsp),%r15
+ 18ee2c5:	test   %r15,%r15
+ 18ee2c8:	je     18ee304 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x434>
+ 18ee2ca:	mov    0x20(%rsp),%rax
+ 18ee2cf:	lea    0x8(%rax),%r12
+ 18ee2d3:	jmp    18ee2e9 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x419>
+ 18ee2d5:	data16 cs nopw 0x0(%rax,%rax,1)
+ 18ee2e0:	add    $0x28,%r12
+ 18ee2e4:	dec    %r15
+ 18ee2e7:	je     18ee304 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x434>
+ 18ee2e9:	mov    -0x8(%r12),%rsi
+ 18ee2ee:	test   %rsi,%rsi
+ 18ee2f1:	je     18ee2e0 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x410>
+ 18ee2f3:	mov    (%r12),%rdi
+ 18ee2f7:	mov    $0x1,%edx
+ 18ee2fc:	call   *0x1406d8e(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee302:	jmp    18ee2e0 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x410>
+ 18ee304:	mov    0x38(%rsp),%rax
+ 18ee309:	test   %rax,%rax
+ 18ee30c:	je     18ee326 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x456>
+ 18ee30e:	shl    $0x3,%rax
+ 18ee312:	lea    (%rax,%rax,4),%rsi
+ 18ee316:	mov    $0x8,%edx
+ 18ee31b:	mov    0x20(%rsp),%rdi
+ 18ee320:	call   *0x1406d6a(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee326:	lea    0x70(%rsp),%rdi
+ 18ee32b:	call   18e1d90 <core::ptr::drop_glue::<litchi_odf_common::core::xml_splice::XmlSourcePart>>
+ 18ee330:	mov    0x28(%rsp),%r12
+ 18ee335:	mov    0x18(%rsp),%rsi
+ 18ee33a:	test   %rsi,%rsi
+ 18ee33d:	je     18ee350 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x480>
+ 18ee33f:	mov    $0x1,%edx
+ 18ee344:	mov    0x10(%rsp),%rdi
+ 18ee349:	call   *0x1406d41(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee34f:	nop
+ 18ee350:	test   %r13,%r13
+ 18ee353:	je     18edfc0 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xf0>
+ 18ee359:	mov    $0x1,%edx
+ 18ee35e:	mov    %rbp,%rdi
+ 18ee361:	mov    %r13,%rsi
+ 18ee364:	call   *0x1406d26(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee36a:	jmp    18edfc0 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xf0>
+ 18ee36f:	mov    0x60(%rsp),%rsi
+ 18ee374:	mov    0x68(%rsp),%rdi
+ 18ee379:	mov    0x20(%rsp),%rdx
+ 18ee37e:	cmp    %rdx,0x70(%rsp)
+ 18ee383:	jne    18ee3c9 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x4f9>
+ 18ee385:	mov    %rdi,0x38(%rsp)
+ 18ee38a:	mov    %rsi,0x28(%rsp)
+ 18ee38f:	mov    0x10(%rsp),%rsi
+ 18ee394:	call   *0x1406f16(%rip)        # 2cf52b0 <bcmp@GLIBC_2.2.5>
+ 18ee39a:	mov    0x28(%rsp),%rsi
+ 18ee39f:	test   %rsi,%rsi
+ 18ee3a2:	je     18ee3bc <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x4ec>
+ 18ee3a4:	mov    $0x1,%edx
+ 18ee3a9:	mov    0x38(%rsp),%rdi
+ 18ee3ae:	mov    %eax,0x28(%rsp)
+ 18ee3b2:	call   *0x1406cd8(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee3b8:	mov    0x28(%rsp),%eax
+ 18ee3bc:	test   %eax,%eax
+ 18ee3be:	jne    18ee251 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x381>
+ 18ee3c4:	jmp    18ee335 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x465>
+ 18ee3c9:	test   %rsi,%rsi
+ 18ee3cc:	je     18ee251 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x381>
+ 18ee3d2:	mov    $0x1,%edx
+ 18ee3d7:	call   *0x1406cb3(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee3dd:	jmp    18ee251 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x381>
+ 18ee3e2:	mov    %r14,0xf0(%rsp)
+ 18ee3ea:	mov    0x40(%rsp),%r15
+ 18ee3ef:	jmp    18ee408 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x538>
+ 18ee3f1:	mov    %r14,0xf0(%rsp)
+ 18ee3f9:	lea    0x58(%rsp),%rdi
+ 18ee3fe:	call   18e00f0 <core::ptr::drop_glue::<core::result::Result<litchi_odf_common::core::xml_splice::XmlSplicePublication, litchi_core::error::types::Error>>>
+ 18ee403:	mov    0x40(%rsp),%r15
+ 18ee408:	cmp    $0xffff,%r15
+ 18ee40f:	ja     18ee6b4 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x7e4>
+ 18ee415:	mov    0x120(%rsp),%rcx
+ 18ee41d:	add    0x20(%rsp),%rcx
+ 18ee422:	mov    %rcx,0x120(%rsp)
+ 18ee42a:	cmp    $0x8000000,%rcx
+ 18ee431:	ja     18ee6b4 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x7e4>
+ 18ee437:	movq   $0x8000000,(%rsp)
+ 18ee43f:	mov    $0x8000000,%esi
+ 18ee444:	mov    $0x200,%edx
+ 18ee449:	mov    $0xf4240,%ecx
+ 18ee44e:	mov    $0x3d090,%r8d
+ 18ee454:	mov    $0x1000000,%r9d
+ 18ee45a:	lea    0x58(%rsp),%rdi
+ 18ee45f:	call   *0x140d333(%rip)        # 2cfb798 <_DYNAMIC+0x69a0>
+ 18ee465:	cmpl   $0x1,0x58(%rsp)
+ 18ee46a:	je     18ee723 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x853>
+ 18ee470:	lea    0x60(%rsp),%rax
+ 18ee475:	movdqu (%rax),%xmm0
+ 18ee479:	movdqu 0x10(%rax),%xmm1
+ 18ee47e:	movups 0x20(%rax),%xmm2
+ 18ee482:	movdqa %xmm0,0x1e0(%rsp)
+ 18ee48b:	movdqa %xmm1,0x1f0(%rsp)
+ 18ee494:	movaps %xmm2,0x200(%rsp)
+ 18ee49c:	mov    0x20(%rsp),%r8
+ 18ee4a1:	cmp    $0x3,%r8
+ 18ee4a5:	jb     18ee4d4 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x604>
+ 18ee4a7:	mov    0x10(%rsp),%rdi
+ 18ee4ac:	lea    0x3(%rdi),%rsi
+ 18ee4b0:	lea    -0x3(%r8),%rdx
+ 18ee4b4:	movzwl (%rdi),%eax
+ 18ee4b7:	xor    $0xbbef,%eax
+ 18ee4bc:	movzbl 0x2(%rdi),%ecx
+ 18ee4c0:	xor    $0xbf,%ecx
+ 18ee4c6:	or     %ax,%cx
+ 18ee4c9:	mov    $0x0,%eax
+ 18ee4ce:	cmovne %rax,%rsi
+ 18ee4d2:	jmp    18ee4db <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x60b>
+ 18ee4d4:	xor    %esi,%esi
+ 18ee4d6:	mov    0x10(%rsp),%rdi
+ 18ee4db:	test   %rsi,%rsi
+ 18ee4de:	cmove  %rdi,%rsi
+ 18ee4e2:	cmove  %r8,%rdx
+ 18ee4e6:	lea    0x58(%rsp),%rdi
+ 18ee4eb:	lea    0x1e0(%rsp),%rcx
+ 18ee4f3:	call   *0x140d76f(%rip)        # 2cfbc68 <_DYNAMIC+0x6e70>
+ 18ee4f9:	cmpl   $0x1,0x58(%rsp)
+ 18ee4fe:	je     18ee7db <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x90b>
+ 18ee504:	mov    0x18(%rsp),%rsi
+ 18ee509:	test   %rsi,%rsi
+ 18ee50c:	je     18ee51e <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x64e>
+ 18ee50e:	mov    $0x1,%edx
+ 18ee513:	mov    0x10(%rsp),%rdi
+ 18ee518:	call   *0x1406b72(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee51e:	test   %r13,%r13
+ 18ee521:	je     18ee534 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x664>
+ 18ee523:	mov    $0x1,%edx
+ 18ee528:	mov    %rbp,%rdi
+ 18ee52b:	mov    %r13,%rsi
+ 18ee52e:	call   *0x1406b5c(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee534:	inc    %r15
+ 18ee537:	mov    %r15,0x40(%rsp)
+ 18ee53c:	cmp    0x30(%rsp),%r14
+ 18ee541:	jne    18edfcb <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xfb>
+ 18ee547:	mov    0x128(%rsp),%r13
+ 18ee54f:	jmp    18ee5be <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x6ee>
+ 18ee551:	mov    0x30(%rsp),%r14
+ 18ee556:	mov    %r14,0xf0(%rsp)
+ 18ee55e:	mov    0x128(%rsp),%r13
+ 18ee566:	mov    0x30(%rsp),%rsi
+ 18ee56b:	mov    %rsi,%rax
+ 18ee56e:	sub    %r14,%rax
+ 18ee571:	movabs $0xaaaaaaaaaaaaaaab,%rcx
+ 18ee57b:	mul    %rcx
+ 18ee57e:	cmp    %r14,%rsi
+ 18ee581:	je     18ee5be <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x6ee>
+ 18ee583:	mov    %rdx,%r15
+ 18ee586:	shr    $0x4,%r15
+ 18ee58a:	add    $0x8,%r14
+ 18ee58e:	mov    0x1406afb(%rip),%rbx        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee595:	jmp    18ee5a9 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x6d9>
+ 18ee597:	nopw   0x0(%rax,%rax,1)
+ 18ee5a0:	add    $0x18,%r14
+ 18ee5a4:	dec    %r15
+ 18ee5a7:	je     18ee5be <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x6ee>
+ 18ee5a9:	mov    -0x8(%r14),%rsi
+ 18ee5ad:	test   %rsi,%rsi
+ 18ee5b0:	je     18ee5a0 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x6d0>
+ 18ee5b2:	mov    (%r14),%rdi
+ 18ee5b5:	mov    $0x1,%edx
+ 18ee5ba:	call   *%rbx
+ 18ee5bc:	jmp    18ee5a0 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x6d0>
+ 18ee5be:	mov    0x138(%rsp),%rax
+ 18ee5c6:	test   %rax,%rax
+ 18ee5c9:	je     18ee5e1 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x711>
+ 18ee5cb:	shl    $0x3,%rax
+ 18ee5cf:	lea    (%rax,%rax,2),%rsi
+ 18ee5d3:	mov    $0x8,%edx
+ 18ee5d8:	mov    %r13,%rdi
+ 18ee5db:	call   *0x1406aaf(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee5e1:	movq   $0xffffffffffffffff,(%r12)
+ 18ee5e9:	add    $0x218,%rsp
+ 18ee5f0:	pop    %rbx
+ 18ee5f1:	pop    %r12
+ 18ee5f3:	pop    %r13
+ 18ee5f5:	pop    %r14
+ 18ee5f7:	pop    %r15
+ 18ee5f9:	pop    %rbp
+ 18ee5fa:	ret
+ 18ee5fb:	mov    %r14,0xf0(%rsp)
+ 18ee603:	movdqu 0x60(%rsp),%xmm0
+ 18ee609:	mov    0x70(%rsp),%rcx
+ 18ee60e:	movdqu 0x78(%rsp),%xmm1
+ 18ee614:	movdqu %xmm1,0x20(%r12)
+ 18ee61b:	movdqu %xmm0,0x8(%r12)
+ 18ee622:	mov    %rcx,0x18(%r12)
+ 18ee627:	mov    %rax,(%r12)
+ 18ee62b:	jmp    18ee682 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x7b2>
+ 18ee62d:	mov    %r14,0xf0(%rsp)
+ 18ee635:	movzbl 0x60(%rsp),%ecx
+ 18ee63a:	mov    0x80(%rsp),%rdx
+ 18ee642:	mov    %rdx,0x28(%r12)
+ 18ee647:	movups 0x71(%rsp),%xmm0
+ 18ee64c:	movups %xmm0,0x19(%r12)
+ 18ee652:	movdqu 0x61(%rsp),%xmm0
+ 18ee658:	movdqu %xmm0,0x9(%r12)
+ 18ee65f:	mov    %rax,(%r12)
+ 18ee663:	mov    %cl,0x8(%r12)
+ 18ee668:	mov    0x18(%rsp),%rsi
+ 18ee66d:	mov    0x10(%rsp),%rdi
+ 18ee672:	test   %rsi,%rsi
+ 18ee675:	je     18ee682 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x7b2>
+ 18ee677:	mov    $0x1,%edx
+ 18ee67c:	call   *0x1406a0e(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee682:	mov    0x108(%rsp),%rsi
+ 18ee68a:	test   %rsi,%rsi
+ 18ee68d:	je     18ee6a2 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x7d2>
+ 18ee68f:	mov    0x110(%rsp),%rdi
+ 18ee697:	mov    $0x1,%edx
+ 18ee69c:	call   *0x14069ee(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee6a2:	lea    0xe8(%rsp),%rdi
+ 18ee6aa:	call   185f590 <<alloc::vec::into_iter::IntoIter<alloc::string::String> as core::ops::drop::Drop>::drop>
+ 18ee6af:	jmp    18ee5e9 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x719>
+ 18ee6b4:	call   *0x14069c6(%rip)        # 2cf5080 <_DYNAMIC+0x288>
+ 18ee6ba:	mov    $0x31,%edi
+ 18ee6bf:	mov    $0x1,%esi
+ 18ee6c4:	call   *0x14069be(%rip)        # 2cf5088 <_DYNAMIC+0x290>
+ 18ee6ca:	test   %rax,%rax
+ 18ee6cd:	je     18ee936 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xa66>
+ 18ee6d3:	movups -0x157d5b9(%rip),%xmm0        # 371121 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0x937>
+ 18ee6da:	movups %xmm0,0x20(%rax)
+ 18ee6de:	movups -0x157d5d4(%rip),%xmm0        # 371111 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0x927>
+ 18ee6e5:	movups %xmm0,0x10(%rax)
+ 18ee6e9:	movdqu -0x157d5f0(%rip),%xmm0        # 371101 <anon.290e8419bff6f17028f39d4fe9417639.7.llvm.12098572966925328090+0x917>
+ 18ee6f1:	movdqu %xmm0,(%rax)
+ 18ee6f5:	movb   $0x74,0x30(%rax)
+ 18ee6f9:	movabs $0x8000000000000002,%rcx
+ 18ee703:	mov    %rcx,(%r12)
+ 18ee707:	movq   $0x31,0x8(%r12)
+ 18ee710:	mov    %rax,0x10(%r12)
+ 18ee715:	movq   $0x31,0x18(%r12)
+ 18ee71e:	jmp    18ee668 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x798>
+ 18ee723:	lea    0x60(%rsp),%rcx
+ 18ee728:	mov    0x10(%rcx),%rax
+ 18ee72c:	mov    %rax,0x1a0(%rsp)
+ 18ee734:	movdqu (%rcx),%xmm0
+ 18ee738:	movdqa %xmm0,0x190(%rsp)
+ 18ee741:	lea    0x190(%rsp),%rax
+ 18ee749:	mov    %rax,0x170(%rsp)
+ 18ee751:	mov    0x140d048(%rip),%rax        # 2cfb7a0 <_DYNAMIC+0x69a8>
+ 18ee758:	mov    %rax,0x178(%rsp)
+ 18ee760:	lea    0xb8(%rsp),%rdi
+ 18ee768:	lea    -0x1818d7c(%rip),%rsi        # d59f3 <anon.5232e65cd37034b75dc479c815dd8bff.643.llvm.15532643159982785724+0x13f>
+ 18ee76f:	lea    0x170(%rsp),%rdx
+ 18ee777:	call   *0x1406b23(%rip)        # 2cf52a0 <_DYNAMIC+0x4a8>
+ 18ee77d:	movabs $0x8000000000000002,%rax
+ 18ee787:	mov    %rax,0xb0(%rsp)
+ 18ee78f:	movdqu 0xb0(%rsp),%xmm0
+ 18ee798:	movdqu 0xc0(%rsp),%xmm1
+ 18ee7a1:	movups 0xd0(%rsp),%xmm2
+ 18ee7a9:	movdqa %xmm1,0x1c0(%rsp)
+ 18ee7b2:	movaps %xmm2,0x1d0(%rsp)
+ 18ee7ba:	movdqa %xmm0,0x1b0(%rsp)
+ 18ee7c3:	movups %xmm2,0x20(%r12)
+ 18ee7c9:	movdqu %xmm1,0x10(%r12)
+ 18ee7d0:	movdqu %xmm0,(%r12)
+ 18ee7d6:	jmp    18ee668 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x798>
+ 18ee7db:	mov    %r12,%r13
+ 18ee7de:	mov    0x80(%rsp),%rax
+ 18ee7e6:	mov    %rax,0xd0(%rsp)
+ 18ee7ee:	movdqu 0x60(%rsp),%xmm0
+ 18ee7f4:	movdqu 0x70(%rsp),%xmm1
+ 18ee7fa:	movdqa %xmm1,0xc0(%rsp)
+ 18ee803:	movdqa %xmm0,0xb0(%rsp)
+ 18ee80c:	cmpb   $0x3,0xb0(%rsp)
+ 18ee814:	jne    18ee884 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x9b4>
+ 18ee816:	lea    0x108(%rsp),%rax
+ 18ee81e:	mov    %rax,0x140(%rsp)
+ 18ee826:	lea    0x823(%rip),%rax        # 18ef050 <<alloc::string::String as core::fmt::Display>::fmt>
+ 18ee82d:	mov    %rax,0x148(%rsp)
+ 18ee835:	lea    0xb0(%rsp),%rax
+ 18ee83d:	mov    %rax,0x150(%rsp)
+ 18ee845:	mov    0x140a8c4(%rip),%rax        # 2cf9110 <_DYNAMIC+0x4318>
+ 18ee84c:	mov    %rax,0x158(%rsp)
+ 18ee854:	lea    -0x1838801(%rip),%rsi        # b605a <anon.053d6f3a721e7f0417afef4c030c1beb.0.llvm.1550365246909941851+0xcad>
+ 18ee85b:	lea    0x1b0(%rsp),%r14
+ 18ee863:	lea    0x140(%rsp),%rdx
+ 18ee86b:	mov    %r14,%rdi
+ 18ee86e:	call   *0x1406a2c(%rip)        # 2cf52a0 <_DYNAMIC+0x4a8>
+ 18ee874:	movabs $0x8000000000000002,%rbx
+ 18ee87e:	or     $0x8,%rbx
+ 18ee882:	jmp    18ee8ec <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xa1c>
+ 18ee884:	lea    0x108(%rsp),%rax
+ 18ee88c:	mov    %rax,0x140(%rsp)
+ 18ee894:	lea    0x7b5(%rip),%rax        # 18ef050 <<alloc::string::String as core::fmt::Display>::fmt>
+ 18ee89b:	mov    %rax,0x148(%rsp)
+ 18ee8a3:	lea    0xb0(%rsp),%rax
+ 18ee8ab:	mov    %rax,0x150(%rsp)
+ 18ee8b3:	mov    0x140a856(%rip),%rax        # 2cf9110 <_DYNAMIC+0x4318>
+ 18ee8ba:	mov    %rax,0x158(%rsp)
+ 18ee8c2:	lea    -0x183f392(%rip),%rsi        # af537 <anon.6b5b364fdc1515aa99d91f0cc310bb61.15.llvm.12810184995107200417+0x72>
+ 18ee8c9:	lea    0x1b0(%rsp),%r14
+ 18ee8d1:	lea    0x140(%rsp),%rdx
+ 18ee8d9:	mov    %r14,%rdi
+ 18ee8dc:	call   *0x14069be(%rip)        # 2cf52a0 <_DYNAMIC+0x4a8>
+ 18ee8e2:	movabs $0x8000000000000002,%rbx
+ 18ee8ec:	mov    (%r14),%r15
+ 18ee8ef:	mov    0x8(%r14),%r12
+ 18ee8f3:	mov    0x10(%r14),%r14
+ 18ee8f7:	cmpb   $0x2,0xb0(%rsp)
+ 18ee8ff:	jne    18ee921 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xa51>
+ 18ee901:	mov    0xc0(%rsp),%rsi
+ 18ee909:	test   %rsi,%rsi
+ 18ee90c:	je     18ee921 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xa51>
+ 18ee90e:	mov    0xc8(%rsp),%rdi
+ 18ee916:	mov    $0x1,%edx
+ 18ee91b:	call   *0x140676f(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee921:	mov    %rbx,0x0(%r13)
+ 18ee925:	mov    %r15,0x8(%r13)
+ 18ee929:	mov    %r12,0x10(%r13)
+ 18ee92d:	mov    %r14,0x18(%r13)
+ 18ee931:	jmp    18ee668 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0x798>
+ 18ee936:	mov    $0x1,%edi
+ 18ee93b:	mov    $0x31,%esi
+ 18ee940:	call   *0x1406762(%rip)        # 2cf50a8 <_DYNAMIC+0x2b0>
+ 18ee946:	ud2
+ 18ee948:	mov    %rax,%rbx
+ 18ee94b:	cmpb   $0x2,0xb0(%rsp)
+ 18ee953:	jne    18ee98b <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xabb>
+ 18ee955:	mov    0xc0(%rsp),%rsi
+ 18ee95d:	test   %rsi,%rsi
+ 18ee960:	je     18ee98b <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xabb>
+ 18ee962:	mov    0xc8(%rsp),%rdi
+ 18ee96a:	mov    $0x1,%edx
+ 18ee96f:	call   *0x140671b(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee975:	jmp    18ee98b <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xabb>
+ 18ee977:	jmp    18ee979 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xaa9>
+ 18ee979:	mov    %rax,%rbx
+ 18ee97c:	jmp    18ee98b <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xabb>
+ 18ee97e:	jmp    18ee9aa <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xada>
+ 18ee980:	mov    %rax,%rbx
+ 18ee983:	mov    %r14,0xf0(%rsp)
+ 18ee98b:	cmpq   $0x0,0x18(%rsp)
+ 18ee991:	je     18ee9b5 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xae5>
+ 18ee993:	mov    $0x1,%edx
+ 18ee998:	mov    0x10(%rsp),%rdi
+ 18ee99d:	mov    0x18(%rsp),%rsi
+ 18ee9a2:	call   *0x14066e8(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee9a8:	jmp    18ee9b5 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xae5>
+ 18ee9aa:	mov    %rax,%rbx
+ 18ee9ad:	mov    %r14,0xf0(%rsp)
+ 18ee9b5:	mov    0x108(%rsp),%rsi
+ 18ee9bd:	test   %rsi,%rsi
+ 18ee9c0:	je     18ee9d5 <litchi_odp::authoring::edit::validate_compact_xml_parts_against+0xb05>
+ 18ee9c2:	mov    0x110(%rsp),%rdi
+ 18ee9ca:	mov    $0x1,%edx
+ 18ee9cf:	call   *0x14066bb(%rip)        # 2cf5090 <_DYNAMIC+0x298>
+ 18ee9d5:	lea    0xe8(%rsp),%rdi
+ 18ee9dd:	call   185f590 <<alloc::vec::into_iter::IntoIter<alloc::string::String> as core::ops::drop::Drop>::drop>
+ 18ee9e2:	mov    %rbx,%rdi
+ 18ee9e5:	call   2c92b20 <_Unwind_Resume@plt>
+ 18ee9ea:	call   *0x14066d0(%rip)        # 2cf50c0 <_DYNAMIC+0x2c8>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

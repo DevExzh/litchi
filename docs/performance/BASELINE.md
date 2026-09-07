@@ -1,5 +1,44 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0463: retain ODP publication audit proof reuse
+
+0463 measures a private writer-origin proof in the ordinary ODP commit path.
+The private ODP serializer records strict authored XML audit facts around the
+existing common `PackageWriter` audit path; `PackageWriter` itself is unchanged.
+The proof binds exact source and candidate archive ownership and checked
+aggregate byte/part bounds. Commit skips only the repeated final compactness
+scan for an eligible proof; identity mismatch, missing origin, overflow, later
+package replacement or failed bounds fall back to the existing validator.
+Candidate reopen/readback, source precheck, media/domain checks, no-op and patch
+behavior remain required.
+
+| Shape | Normal p50 R1 / R2 | 95% p50 CI upper bounds R1 / R2 |
+|---|---:|---:|
+| Tiny, 64 slides | -10.0491% / -8.9678% | -9.6897% / -8.2944% |
+| Medium, 4,096 slides | -6.9642% / -7.3050% | -6.6891% / -7.1286% |
+| Large, 8,192 slides | -7.3657% / -6.8199% | -7.1987% / -6.5400% |
+
+The predeclared 3% medium/large gate passes all four normal rows, with every
+normal and allocator interval below zero. No adverse >5% elapsed or process-RSS
+flag is present. Allocated bytes fall by 2,087,682 / 11,072,106 / 20,202,090
+for tiny/medium/large in both repeats; every lane reduces allocation calls by
+1,039, reallocations by 93 and deallocations by 946. Peak above entry changes
+are 0 / -49,674 / -15,438 bytes and retained-live deltas are zero.
+
+The supplementary phase clocks exclude setup, warmups and checks, while
+whole-process counters include them. Only commit is changed by the proof;
+phase movement outside commit is diagnostic. Whole-process deltas include
+instructions -5.6821%, cycles -6.4241%, branch misses -5.2313% and branches
+-5.3523%. The final source review reports 381 ODP tests and warning-denied
+Clippy passing. The harness and final gates are complete: 387 harness tests
+pass with one ignored, for 768 passed ODP/harness tests in total. Warning-denied
+rustdoc, scoped formatting, boundaries, precleanup and source replay, fresh-copy
+portable replay, resealed +1ns tamper rejection, and owned cleanup of four
+executables totaling 233,058,712 bytes pass. No coverage is added; 0460 remains
+accepted, the registry stays 439 selectors / 36 defaults, the full non-iWork
+goal remains open, and iWork is untouched. See the [comparison](results/change-0463/summary.json), [phase summary](results/change-0463/phase-summary.json),
+[source review](results/change-0463/source-review.md), and [proof design](results/change-0463/proof-design.md).
+
 ## Change 0462: reject ODP shape-attribute index on the practical gate
 
 0462 measures a private fixed seventeen-key first-occurrence index for shape
