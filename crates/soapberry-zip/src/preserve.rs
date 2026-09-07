@@ -1811,6 +1811,29 @@ enum PreparedLocal {
         bytes: Arc<Vec<u8>>,
         range: Range<usize>,
     },
+    /// Sized local framing retained separately from a shared payload. This is
+    /// used only for verified precompressed payloads and already-shared Store
+    /// payloads, whose bytes can be written directly to the destination
+    /// without staging another complete one-entry archive.
+    FramedPayload {
+        framing: Vec<u8>,
+        payload: PreparedPayload,
+        range: Range<usize>,
+    },
+}
+
+enum PreparedPayload {
+    Shared(Arc<Vec<u8>>),
+    Precompressed(VerifiedPrecompressedEntry),
+}
+
+impl PreparedPayload {
+    fn bytes(&self) -> &[u8] {
+        match self {
+            Self::Shared(bytes) => bytes,
+            Self::Precompressed(entry) => entry.compressed_payload(),
+        }
+    }
 }
 
 impl PreparedLocal {
@@ -1832,6 +1855,24 @@ impl PreparedLocal {
                         .ok_or_else(|| unsupported("invalid prepared local range"))?,
                     "prepared local range",
                 )
+            },
+            Self::FramedPayload {
+                framing,
+                payload,
+                range,
+            } => {
+                if payload.bytes().get(range.clone()).is_none() {
+                    return Err(unsupported("invalid prepared payload range"));
+                }
+                usize_to_u64(framing.len(), "generated local framing")?
+                    .checked_add(usize_to_u64(
+                        range
+                            .end
+                            .checked_sub(range.start)
+                            .ok_or_else(|| unsupported("invalid prepared payload range"))?,
+                        "prepared payload range",
+                    )?)
+                    .ok_or_else(|| unsupported("generated local length overflow"))
             },
         }
     }
@@ -1868,6 +1909,24 @@ fn validate_prepared_local(entry: &PreparedEntry, source_end: u64) -> Result<(),
                 return Err(unsupported("invalid prepared local range"));
             }
             Ok(())
+        },
+        (
+            PreparedLocal::FramedPayload { payload, range, .. },
+            Some(GeneratedPayload {
+                range: payload_range,
+                ..
+            }),
+        ) => {
+            if payload.bytes().get(range.clone()).is_none()
+                || payload_range != range
+                || payload_range.start > payload_range.end
+            {
+                return Err(unsupported("invalid prepared payload range"));
+            }
+            Ok(())
+        },
+        (PreparedLocal::FramedPayload { .. }, None) => {
+            Err(unsupported("generated payload metadata missing"))
         },
         (PreparedLocal::Copy(_), Some(_)) => Err(unsupported("generated payload on copied member")),
         (PreparedLocal::Generated(_), Some(_)) => {
@@ -1923,10 +1982,65 @@ fn generated_deflate_needs_zip64(payload_len: usize, name_len: usize) -> Result<
 }
 
 fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
+    // Sized members already have their final CRC and sizes. Prepare only the
+    // local/central framing at offset zero and retain the verified/shared
+    // payload itself for the forward publication pass. This is the bounded
+    // passthrough path; generated Deflate below remains fully buffered.
+    let direct = match &entry.data {
+        RegeneratedPayload::Precompressed(data) => {
+            let kind = match data.compression_method() {
+                CompressionMethod::Store => AccountingWriteKind::Stored,
+                CompressionMethod::Deflate => AccountingWriteKind::Precompressed,
+                _ => return Err(unsupported("generated compression method")),
+            };
+            let payload = PreparedPayload::Precompressed(data.clone());
+            let compressed_size = usize_to_u64(payload.bytes().len(), "generated payload length")?;
+            let prepared = crate::writer::prepare_sized_member(
+                &entry.name,
+                data.compression_method(),
+                data.crc32(),
+                compressed_size,
+                data.uncompressed_size(),
+                0,
+            )?;
+            Some((payload, prepared, kind))
+        },
+        RegeneratedPayload::Shared(data) if entry.compression == CompressionMethod::Store => {
+            let prepared = crate::writer::prepare_stored_member(&entry.name, data, 0)?;
+            Some((
+                PreparedPayload::Shared(Arc::clone(data)),
+                prepared,
+                AccountingWriteKind::Stored,
+            ))
+        },
+        RegeneratedPayload::Owned(_) | RegeneratedPayload::Shared(_) => None,
+    };
+    if let Some((payload, mut prepared, kind)) = direct {
+        let payload_len = payload.bytes().len();
+        let framing = prepared.local_bytes()?;
+        let central = prepared.central_bytes()?;
+        let payload_range = 0..payload_len;
+        return Ok(PreparedEntry {
+            local: PreparedLocal::FramedPayload {
+                framing,
+                payload,
+                range: payload_range.clone(),
+            },
+            central: PreparedCentral::Generated(central),
+            generated_payload: Some(GeneratedPayload {
+                range: payload_range,
+                kind,
+            }),
+            omitted: false,
+        });
+    }
+
     let payload_len = match &entry.data {
         RegeneratedPayload::Owned(data) => data.len(),
         RegeneratedPayload::Shared(data) => data.len(),
-        RegeneratedPayload::Precompressed(data) => data.compressed_payload().len(),
+        RegeneratedPayload::Precompressed(_) => {
+            unreachable!("verified precompressed payload uses direct framing")
+        },
     };
     let name_bytes = entry
         .name
@@ -1934,19 +2048,14 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         .checked_mul(2)
         .ok_or_else(|| unsupported("generated member allocation size"))?;
     let capacity = match &entry.data {
-        // A verified payload is copied verbatim by the sized writer. It has no
-        // Deflate expansion bound, so retaining the ordinary C + C/8 reserve
-        // would overcharge the managed publication memory budget for large
-        // transfers.
-        RegeneratedPayload::Precompressed(_) => payload_len
-            .checked_add(name_bytes)
-            .and_then(|size| size.checked_add(4 * 1024))
-            .ok_or_else(|| unsupported("generated member allocation size"))?,
         RegeneratedPayload::Owned(_) | RegeneratedPayload::Shared(_) => payload_len
             .checked_add(payload_len / 8)
             .and_then(|size| size.checked_add(name_bytes))
             .and_then(|size| size.checked_add(4 * 1024))
             .ok_or_else(|| unsupported("generated member allocation size"))?,
+        RegeneratedPayload::Precompressed(_) => {
+            unreachable!("verified precompressed payload uses direct framing")
+        },
     };
     let mut generated = Vec::new();
     generated
@@ -1954,15 +2063,6 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         .map_err(|source| allocation("generated member", source))?;
     let mut writer = ZipArchiveWriter::new(generated);
     match &entry.data {
-        RegeneratedPayload::Precompressed(data) => {
-            writer.write_precompressed_file(
-                &entry.name,
-                data.compression_method(),
-                data.crc32(),
-                data.uncompressed_size(),
-                data.compressed_payload(),
-            )?;
-        },
         RegeneratedPayload::Owned(_) | RegeneratedPayload::Shared(_) => match entry.compression {
             CompressionMethod::Store => {
                 writer.write_stored_file(&entry.name, entry.data.as_slice())?
@@ -1987,6 +2087,9 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
                 file.finish(descriptor)?;
             },
             _ => return Err(unsupported("generated compression method")),
+        },
+        RegeneratedPayload::Precompressed(_) => {
+            unreachable!("verified precompressed payload uses direct framing")
         },
     }
     let bytes = writer.finish()?;
@@ -2056,13 +2159,9 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         generated_payload: Some(GeneratedPayload {
             range: payload_start..payload_end,
             kind: match (&entry.data, entry.compression) {
-                (RegeneratedPayload::Precompressed(_), CompressionMethod::Store)
-                | (RegeneratedPayload::Owned(_), CompressionMethod::Store)
+                (RegeneratedPayload::Owned(_), CompressionMethod::Store)
                 | (RegeneratedPayload::Shared(_), CompressionMethod::Store) => {
                     AccountingWriteKind::Stored
-                },
-                (RegeneratedPayload::Precompressed(_), CompressionMethod::Deflate) => {
-                    AccountingWriteKind::Precompressed
                 },
                 (RegeneratedPayload::Owned(_), CompressionMethod::Deflate)
                 | (RegeneratedPayload::Shared(_), CompressionMethod::Deflate) => {
@@ -2156,7 +2255,26 @@ where
             sink.write_all(local_bytes)?;
             Ok(())
         },
-        (PreparedLocal::Copy(_), Some(_)) | (PreparedLocal::Generated(_), Some(_)) => {
+        (
+            PreparedLocal::FramedPayload {
+                framing,
+                payload,
+                range,
+            },
+            Some(generated),
+        ) => {
+            sink.write_all(framing)?;
+            write_all_counted(
+                sink,
+                &payload.bytes()[range.clone()],
+                accounting,
+                generated.kind,
+            )?;
+            Ok(())
+        },
+        (PreparedLocal::FramedPayload { .. }, None)
+        | (PreparedLocal::Copy(_), Some(_))
+        | (PreparedLocal::Generated(_), Some(_)) => {
             unreachable!("invalid prepared local state was rejected during preflight")
         },
     }
@@ -2526,6 +2644,27 @@ mod tests {
         deflated_file(&mut writer, "second.bin", b"deflated data");
         writer.new_dir("folder/").create().unwrap();
         writer.finish().unwrap()
+    }
+
+    fn verified_precompressed_token(
+        method: CompressionMethod,
+        payload: &[u8],
+    ) -> crate::office::VerifiedPrecompressedEntry {
+        let mut writer = crate::office::StreamingArchiveWriter::new();
+        match method {
+            CompressionMethod::Store => writer.write_stored("source.bin", payload).unwrap(),
+            CompressionMethod::Deflate => writer.write_deflated("source.bin", payload).unwrap(),
+            _ => panic!("test helper only creates Store or Deflate members"),
+        }
+        let source_bytes = writer.finish_to_bytes().unwrap();
+        let source_len = source_bytes.len() as u64;
+        let source =
+            crate::office::IndexedArchive::from_reader(Cursor::new(source_bytes), source_len)
+                .unwrap();
+        let source_id = source.entry_id("source.bin").unwrap();
+        source
+            .read_entry_precompressed_with_progress(source_id, payload, |_| Ok::<(), io::Error>(()))
+            .unwrap()
     }
 
     fn large_stored_archive() -> Vec<u8> {
@@ -3613,21 +3752,67 @@ mod tests {
         assert_eq!(Arc::strong_count(&data), 2);
 
         let prepared = generated_entry(&entry).unwrap();
-        let PreparedLocal::Shared {
-            bytes: local_bytes, ..
+        drop(entry);
+        let PreparedLocal::FramedPayload {
+            payload: PreparedPayload::Shared(local_bytes),
+            range,
+            ..
         } = &prepared.local
         else {
-            panic!("generated entry must retain the shared archive buffer");
+            panic!("shared Store must retain the original payload directly");
         };
-        let PreparedCentral::Shared {
-            bytes: central_bytes,
-            ..
-        } = &prepared.central
-        else {
-            panic!("generated entry must retain the shared archive buffer");
-        };
-        assert!(Arc::ptr_eq(local_bytes, central_bytes));
+        assert!(Arc::ptr_eq(local_bytes, &data));
+        assert_eq!(&local_bytes[range.clone()], data.as_slice());
+        assert!(matches!(&prepared.central, PreparedCentral::Generated(_)));
         assert_eq!(Arc::strong_count(&data), 2);
+    }
+
+    #[test]
+    fn direct_shared_store_rejects_oversized_name_before_publication() {
+        let source = ordinary_archive();
+        let (archive, mut buffer) = indexed(&source);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let mut plan = PreservationPlan::copy_all(&index);
+        let oversized_name = "n".repeat(usize::from(u16::MAX) + 1);
+        plan.try_append(RegeneratedEntry::new_shared(
+            oversized_name,
+            Arc::new(b"payload".to_vec()),
+        ))
+        .unwrap();
+
+        let mut sink = b"untouched".to_vec();
+        let error = index
+            .write_to(&plan, &mut sink)
+            .expect_err("oversized direct Store names must fail before output");
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+        assert_eq!(sink, b"untouched");
+    }
+
+    #[test]
+    fn verified_precompressed_payloads_retain_source_storage_after_handles_drop() {
+        let payload = b"verified payload with repeated repeated bytes";
+        for method in [CompressionMethod::Store, CompressionMethod::Deflate] {
+            let token = verified_precompressed_token(method, payload);
+            let compressed_ptr = token.compressed_payload().as_ptr();
+            let compressed_len = token.compressed_payload().len();
+            let entry = RegeneratedEntry::new_precompressed_shared("verified.bin", token);
+            let prepared = generated_entry(&entry).unwrap();
+            drop(entry);
+
+            let PreparedLocal::FramedPayload {
+                payload: PreparedPayload::Precompressed(retained),
+                range,
+                ..
+            } = &prepared.local
+            else {
+                panic!("verified payload must retain direct framing and storage");
+            };
+            assert_eq!(retained.compression_method(), method);
+            assert_eq!(retained.compressed_payload().len(), compressed_len);
+            assert_eq!(retained.compressed_payload().as_ptr(), compressed_ptr);
+            assert_eq!(range.end - range.start, compressed_len);
+            assert!(matches!(&prepared.central, PreparedCentral::Generated(_)));
+        }
     }
 
     #[test]
@@ -4848,5 +5033,204 @@ mod tests {
             compressed_size
         );
         assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
+    }
+
+    #[test]
+    fn precompressed_regeneration_matches_writer_framing_and_partial_boundaries() {
+        let payload = b"precompressed preservation payload repeated repeated bytes";
+        let name = "copied-direct.bin";
+
+        for method in [CompressionMethod::Store, CompressionMethod::Deflate] {
+            let token = verified_precompressed_token(method, payload);
+            let compressed = token.compressed_payload().to_vec();
+            let crc32 = token.crc32();
+            let uncompressed_size = token.uncompressed_size();
+
+            let source = ordinary_archive();
+            let (archive, mut buffer) = indexed(&source);
+            let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+            let mut plan = PreservationPlan::copy_all(&index);
+            plan.try_append(RegeneratedEntry::new_precompressed_shared(name, token))
+                .unwrap();
+
+            let mut accounting = ZipOperationAccounting::default();
+            let output = index
+                .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
+                .unwrap();
+            let output_reader = crate::office::ArchiveReader::new(&output).unwrap();
+            assert_eq!(output_reader.read(name).unwrap(), payload);
+            assert_eq!(
+                accounting.stored_payload_bytes_emitted(),
+                if method == CompressionMethod::Store {
+                    compressed.len() as u64
+                } else {
+                    0
+                }
+            );
+            assert_eq!(
+                accounting.precompressed_payload_bytes_emitted(),
+                if method == CompressionMethod::Deflate {
+                    compressed.len() as u64
+                } else {
+                    0
+                }
+            );
+            assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
+
+            let mut writer = ZipArchiveWriter::new(Vec::new());
+            writer
+                .write_precompressed_file(name, method, crc32, uncompressed_size, &compressed)
+                .unwrap();
+            let expected = writer.finish().unwrap();
+            let output_archive = ZipArchive::from_slice(&output).unwrap();
+            let output_record = output_archive
+                .entries()
+                .map(|entry| entry.unwrap())
+                .find(|entry| entry.file_path().as_ref() == name.as_bytes())
+                .unwrap();
+            let output_entry = output_archive.get_entry(output_record.wayfinder()).unwrap();
+            let output_local_start = usize::try_from(output_record.local_header_offset()).unwrap();
+            let output_local_end = usize::try_from(output_archive.directory_offset()).unwrap();
+
+            let expected_archive = ZipArchive::from_slice(&expected).unwrap();
+            let expected_record = expected_archive
+                .entries()
+                .map(|entry| entry.unwrap())
+                .next()
+                .unwrap();
+            let expected_local_end = usize::try_from(expected_archive.directory_offset()).unwrap();
+            assert_eq!(
+                &output[output_local_start..output_local_end],
+                &expected[..expected_local_end],
+                "direct framing and payload must match ZipArchiveWriter"
+            );
+
+            let output_central_start =
+                usize::try_from(output_record.central_directory_offset()).unwrap();
+            let output_central_len = ZipFileHeaderFixed::SIZE
+                + usize::try_from(output_record.metadata_size_hint()).unwrap();
+            let expected_central_start =
+                usize::try_from(expected_record.central_directory_offset()).unwrap();
+            let expected_central_len = ZipFileHeaderFixed::SIZE
+                + usize::try_from(expected_record.metadata_size_hint()).unwrap();
+            assert_eq!(
+                central_record_without_offset(
+                    output[output_central_start..output_central_start + output_central_len]
+                        .to_vec()
+                ),
+                central_record_without_offset(
+                    expected[expected_central_start..expected_central_start + expected_central_len]
+                        .to_vec()
+                ),
+                "direct central framing must match ZipArchiveWriter"
+            );
+
+            let (payload_start, payload_end) = output_entry.compressed_data_range();
+            let payload_start = usize::try_from(payload_start).unwrap();
+            let payload_end = usize::try_from(payload_end).unwrap();
+            let central_start = usize::try_from(output_archive.directory_offset()).unwrap();
+            let mut failure_points = vec![
+                payload_start,
+                payload_start + 3,
+                central_start,
+                central_start + 3,
+            ];
+            failure_points.sort_unstable();
+            failure_points.dedup();
+
+            for fail_after in failure_points {
+                if fail_after >= output.len() {
+                    continue;
+                }
+                let mut sink = PartialFailingSink::new(fail_after, usize::MAX);
+                let mut partial_accounting = ZipOperationAccounting::default();
+                let error = index
+                    .write_to_with_accounting(&plan, &mut sink, &mut partial_accounting)
+                    .unwrap_err();
+                assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+                assert_eq!(sink.bytes, output[..fail_after]);
+
+                let accepted_payload = fail_after
+                    .saturating_sub(payload_start)
+                    .min(payload_end - payload_start) as u64;
+                assert_eq!(
+                    partial_accounting.stored_payload_bytes_emitted(),
+                    if method == CompressionMethod::Store {
+                        accepted_payload
+                    } else {
+                        0
+                    }
+                );
+                assert_eq!(
+                    partial_accounting.precompressed_payload_bytes_emitted(),
+                    if method == CompressionMethod::Deflate {
+                        accepted_payload
+                    } else {
+                        0
+                    }
+                );
+                assert_eq!(
+                    partial_accounting.generated_deflate_payload_bytes_emitted(),
+                    0
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn direct_precompressed_central_offset_promotes_to_zip64_before_publication() {
+        let source = two_stored_archive();
+        let (archive, mut buffer) = indexed(&source);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let synthetic = PreservationIndex {
+            source: index.source,
+            entries: index.entries.clone(),
+            local_order: index.local_order.clone(),
+            archive_comment: index.archive_comment.clone(),
+            zip64_tail: index.zip64_tail.clone(),
+            archive_end_offset: u64::MAX,
+        };
+
+        let token = verified_precompressed_token(CompressionMethod::Store, b"direct ZIP64 payload");
+        let generated = generated_entry(&RegeneratedEntry::new_precompressed_shared(
+            "direct.bin",
+            token,
+        ))
+        .unwrap();
+        assert!(matches!(
+            &generated.local,
+            PreparedLocal::FramedPayload {
+                payload: PreparedPayload::Precompressed(_),
+                ..
+            }
+        ));
+
+        let mut prepared = vec![
+            PreparedEntry {
+                local: PreparedLocal::Copy(0..u64::from(u32::MAX)),
+                central: PreparedCentral::Copy(0),
+                generated_payload: None,
+                omitted: false,
+            },
+            generated,
+        ];
+        let layout = synthetic.validate_output_layout(&mut prepared).unwrap();
+        let central = prepared[1]
+            .central
+            .checked_bytes(&synthetic.entries)
+            .unwrap();
+        let fixed = ZipFileHeaderFixed::parse(central).unwrap();
+        assert_eq!(fixed.local_header_offset, u32::MAX);
+        assert!(fixed.version_needed >= 45);
+        let extra_start = ZipFileHeaderFixed::SIZE + usize::from(fixed.file_name_len);
+        let extra_end = extra_start + usize::from(fixed.extra_field_len);
+        let fields: Vec<_> = ExtraFields::new(&central[extra_start..extra_end]).collect();
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].0, ExtraFieldId::ZIP64);
+        assert_eq!(fields[0].1, u64::from(u32::MAX).to_le_bytes().as_slice());
+        match layout.tail {
+            PreparedTail::Zip64(_) => {},
+            PreparedTail::Zip32(_) => panic!("ZIP64 tail required after direct offset promotion"),
+        }
     }
 }

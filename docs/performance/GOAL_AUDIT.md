@@ -1,6 +1,35 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current audit: 0455 evidence (2026-09-07)
+## Current audit: 0456 evidence (2026-09-07)
+
+The full non-iWork goal remains open. [0456](changes/0456-zip-shared-payload-framing.md)
+retains verified/shared ZIP payload storage during publication, removing a
+payload-sized preparation allocation and copy. Media publication allocates
+4,243,083 bytes (-79.85%) and peaks 593,892 bytes above entry (-96.59%); output,
+read/write work and managed budgets remain unchanged. Plain publication metadata
+costs 3,360 more allocated bytes. The complete document lifecycle is not bounded
+by this change, and managed admissions still include the old writer allowance.
+
+The 720 formal observations retain all 15 timing flags. Ordinary bytes/media API
+medians regress 15.411%/16.347% with higher page faults. Separate 240-sample fixed
+allocator-policy diagnostics improve API medians 2.626–10.266%. Acceptance is for
+the memory reduction with allocator-sensitive latency disclosed, not a general
+speedup. Release checks pass 2,654 tests (7 ignored), strict lint, documentation,
+formatting, workspace/boundaries and 1,000 ASAN fuzz iterations. Native self-pair
+output remains exact; six distinct source/destination probes refuse shared-graph
+incompatibility. An evidence SHA transcription failure and corrected retry are
+retained alongside the initial compile correction.
+
+Coverage remains 438 selectors, 36 defaults, 15 categories, 33 representative
+mappings, 10 measured mappings and 23 correctness-only mappings. No coverage row
+is promoted. Broader CRUD, native application roundtrips, distinct-package pairs,
+physical cold I/O, bounded existing-document append/repackaging and representative
+worker scaling remain incomplete. [Next-work notes](results/change-0456/next-work.md)
+identify the streaming XML/ODP append dependency. See the
+[0456 bundle](results/change-0456/README.md) for replay and owned cleanup.
+User-owned `docs/GOAL.md` remains unchanged.
+
+## Prior audit: 0455 evidence (2026-09-07)
 
 The full non-iWork goal remains open. [0455](changes/0455-zip-preservation-transfer-chunks.md)
 retains a 64 KiB ZIP preservation buffer: 256 fewer media publication reads and

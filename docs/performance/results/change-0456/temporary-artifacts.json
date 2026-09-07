@@ -1,0 +1,1872 @@
+{
+  "task": "/tmp/litchi-goal-0456",
+  "files": 373,
+  "bytes": 522511229,
+  "artifacts": [
+    {
+      "path": "formal-baseline-allocator",
+      "bytes": 57609912,
+      "sha256": "1db8e73507318ed1e7f88b6d6b4ea98506eed37780ee0ecea0da44054141be21"
+    },
+    {
+      "path": "formal-baseline-normal",
+      "bytes": 57783904,
+      "sha256": "127e2c36432afae921def35eaf6525afe1c0b46ac865cc7a92d4165878fa065c"
+    },
+    {
+      "path": "formal-candidate-allocator",
+      "bytes": 57366008,
+      "sha256": "0674ceee7f1586b2706b4391b5f28102ef9aad62063533fc331abe26b0d0aace"
+    },
+    {
+      "path": "formal-candidate-external",
+      "bytes": 7652464,
+      "sha256": "738ee961ca8dc3451c6dc17e639b046889e1c919971d1a5d38f5fff94db9bcb0"
+    },
+    {
+      "path": "formal-candidate-normal",
+      "bytes": 57527896,
+      "sha256": "6b9edd1fd654f91b8a6dcb1080051e2a342e96e542ef9c27dd3e30f99ad34828"
+    },
+    {
+      "path": "fuzz/Cargo.lock",
+      "bytes": 4463,
+      "sha256": "c931b68a4c449414a9b17bbfdb106dd8c429653eaed5459a5f25dcb5dc4d7651"
+    },
+    {
+      "path": "fuzz/Cargo.toml",
+      "bytes": 485,
+      "sha256": "a6b3701d83415bd0b574f60391c15ed710271f2df7d913fdcec8ee3d5521d1e6"
+    },
+    {
+      "path": "fuzz/corpus/00a9eb92d36f439c953de17d33e605fd205b1276",
+      "bytes": 281,
+      "sha256": "ec52f99b281860b6bc8ab3621d5573170a6ee86ca42fe82f9bbc03035446f24c"
+    },
+    {
+      "path": "fuzz/corpus/0395c229c3ba63c85245e0c483e1553fc9500fc2",
+      "bytes": 264,
+      "sha256": "bb8bb46b7bd87261b0c92201bedf69081a63f2e79428cb896b9fd6cb4fa9299a"
+    },
+    {
+      "path": "fuzz/corpus/04785c038e7802b5bef3c25a791e4a0198700edd",
+      "bytes": 277,
+      "sha256": "7ba24fda74a641856c71c89f264976c8ade1f3417367890c863b5122b16b9c47"
+    },
+    {
+      "path": "fuzz/corpus/04ae3a6098f1836ffabf61a680a2964325a73e84",
+      "bytes": 281,
+      "sha256": "0f98abda4195f527f69a45a4551938687045283aa02f17ecae4596dbb623f50c"
+    },
+    {
+      "path": "fuzz/corpus/07065d6f98d6def5b55b14e73f2f76476946656f",
+      "bytes": 247,
+      "sha256": "ddbbeae598560471d14d2024582f056e0eaa627301ba3fc37feab270f9649046"
+    },
+    {
+      "path": "fuzz/corpus/0754acce869652a8033d4e066c2983d90d49a51b",
+      "bytes": 281,
+      "sha256": "6cb3048aff7bffcaff4c07a2b5441699631059f6804af8a99d882137fa8175a1"
+    },
+    {
+      "path": "fuzz/corpus/09dfc6a1eadc8d52c157ac98efc422e5f5689a89",
+      "bytes": 264,
+      "sha256": "67f226e1a649c0b974fce20c888aa748f64953ab38e36af0fd99d686fb1481fa"
+    },
+    {
+      "path": "fuzz/corpus/0b8b5561559d183f337ab2becf53dce8e5b50b57",
+      "bytes": 271,
+      "sha256": "167590917822d0d787a98998c7861451de53e7893f7bf211721a7c7c62379c23"
+    },
+    {
+      "path": "fuzz/corpus/135d6a79c2040b19512f12eb9d081d05d42d35f3",
+      "bytes": 335,
+      "sha256": "344f5b335a1c438a2be772725cee5d0365112ac3f442e4fdfc7bb57ca6abd94e"
+    },
+    {
+      "path": "fuzz/corpus/14b7630863c0d155a69e5ad0eeec537c492d7979",
+      "bytes": 285,
+      "sha256": "0c36083b0ffa77118ab824e73c5fe9976680db257532e1992aacff7c3e307990"
+    },
+    {
+      "path": "fuzz/corpus/1cb605bd85f0c7b47793f1ba9ef33d4ff4e951ed",
+      "bytes": 396,
+      "sha256": "3b66448a108a399b7d859624f6184f80087a784482c15a7476f6d431cbeae53f"
+    },
+    {
+      "path": "fuzz/corpus/289d2164d093ae859abdaae42281f53e38ab6edd",
+      "bytes": 285,
+      "sha256": "1e7d6b6680f40bf9f6fbf3dc40f1465260855719a74442533ebf26c5d399609a"
+    },
+    {
+      "path": "fuzz/corpus/2b665b7ea2f448652c3d68d74017bb3dbea6d7ef",
+      "bytes": 264,
+      "sha256": "9eef89162b0bf303c59a45432753cd11acc60f911af68de7866f7560964357d3"
+    },
+    {
+      "path": "fuzz/corpus/2d425648e27b58cef4eded6efea47c79d680ec80",
+      "bytes": 131395,
+      "sha256": "40a44b35cba4243c3f1ea0852799bb579f136c2507023c03065ba5fbeee5097b"
+    },
+    {
+      "path": "fuzz/corpus/3185590d2b1d2c991e6abb69c9895740dbd08788",
+      "bytes": 264,
+      "sha256": "85c67cb4b341e181cd75227e968e3552957ee9c5b9bccb63e6c79d1c4fe40bda"
+    },
+    {
+      "path": "fuzz/corpus/31c800dde68cb359c2224a6efc1488f7e96c219d",
+      "bytes": 131353,
+      "sha256": "84dc21d71a21faaea71fdb86f68134a1dcf530f0ade4159eccccedfaa83dc55e"
+    },
+    {
+      "path": "fuzz/corpus/320f2629d9e69ab8a2d031b31d09c5932470cbfd",
+      "bytes": 281,
+      "sha256": "86451fff12cca7c74cd184ee8b3f5a4acd0ae7e39419843a19b4033cf64f2326"
+    },
+    {
+      "path": "fuzz/corpus/376ff10c07674a2a2376f3361973bb4f4728e6dc",
+      "bytes": 649,
+      "sha256": "e633e1bc204c295fe521e980b5975d761c25ead05a55f74efb24cb3c8353485f"
+    },
+    {
+      "path": "fuzz/corpus/3927d7b406dd0055a62bd9aba79f3ab4cb13d36b",
+      "bytes": 302,
+      "sha256": "8de2a33fc086bc37d672fc27e8f4fbd38e9e922e5c879a6844f388b3eb9c7172"
+    },
+    {
+      "path": "fuzz/corpus/3de845580db5f6ee92e5e90c9a64c0c5440d66a8",
+      "bytes": 131353,
+      "sha256": "4d26f090fb1e1f59a01aad7517f1a93dccb712f8c2d6fef063d5a936bce99943"
+    },
+    {
+      "path": "fuzz/corpus/41f02a7fa49eb966d8f1ac9416444fbd80c3a356",
+      "bytes": 210,
+      "sha256": "b4473d34de7a38cc5c9fb23ee7910e01eaaba54b17ddac115ff58511a58d9b47"
+    },
+    {
+      "path": "fuzz/corpus/499b3dbe39548ee35343fb2a9e94b50d78a566b3",
+      "bytes": 285,
+      "sha256": "d6e99f803d1a30fde425e2702c2db87ca758edfc9c281504a98e4c0323fea0ea"
+    },
+    {
+      "path": "fuzz/corpus/4b2e01859f91739bb92e6b675625334eb328e6da",
+      "bytes": 272,
+      "sha256": "2bec8253c8fab03899d8e7893de61202ec4efb4d27cf03d45b8b96ffe99979d2"
+    },
+    {
+      "path": "fuzz/corpus/4b87b7ea4d2d6b02935a6784187b7ebfd5c65cb1",
+      "bytes": 273,
+      "sha256": "9d6084bcc60f6257d43ea1a9bbadddebcd3a2c35c408b6de87b1882e7a60d2e0"
+    },
+    {
+      "path": "fuzz/corpus/4bf282cb8370692eddaff23f817dce4861ad1b57",
+      "bytes": 264,
+      "sha256": "2b21e8853bb421569c63cc62e6ce94ffe75dc31c9003ca6f53c37b5727343948"
+    },
+    {
+      "path": "fuzz/corpus/4ccb49e901106ed1cb1488337bb7bd37d77d8613",
+      "bytes": 263,
+      "sha256": "2d43edef10d448f9fc961da52dbf1c7db06dcd646d2a5971c5884699bbc463dd"
+    },
+    {
+      "path": "fuzz/corpus/509fd1bbedaa9c9d40fdce885da07056e8f719ed",
+      "bytes": 268,
+      "sha256": "329e18ed8eae248ef9e3347d2d17abbb05c0373f1535d7e711171bc99082927c"
+    },
+    {
+      "path": "fuzz/corpus/52a185143c078c07fce0e9892ae8d2e1835bafcd",
+      "bytes": 268,
+      "sha256": "acf04190ad60019b6229c55834307d8c875e4118e95d0220a543ef3efa263aac"
+    },
+    {
+      "path": "fuzz/corpus/5ac45c9538bcd1fcd753c97f62846c7b3cc1b447",
+      "bytes": 264,
+      "sha256": "757eb72d018dda81a818e5158f28465b9a1243b622ccc46bd6c5ca635393eb27"
+    },
+    {
+      "path": "fuzz/corpus/5b1a39637b70e9eb1dcd86d996c564baf1e6f202",
+      "bytes": 194,
+      "sha256": "ddbbc75c977b05c019382b40a08bdb67ae1c82f98e56d021d924f8ad974f2afd"
+    },
+    {
+      "path": "fuzz/corpus/63d290ab40d0122f125bc9ce1693781e98d813b6",
+      "bytes": 265,
+      "sha256": "9aebf53a8f7877cdc66b49df1cc68f925165083cb789bec1e2e72eddb26d5da2"
+    },
+    {
+      "path": "fuzz/corpus/6518c223ea1a7697cbf217e564e495ed1860749d",
+      "bytes": 439,
+      "sha256": "783bffabe7c75998bef5955bc8e90632fc3f57b864ca5db3179f0886b2953aa2"
+    },
+    {
+      "path": "fuzz/corpus/65e402d8e01365f034af136b499018956876f3c9",
+      "bytes": 34851,
+      "sha256": "1f888a4e0a0231689da3e3b96cc4159d4cb418afaa84ed08f2ffbb0393835b77"
+    },
+    {
+      "path": "fuzz/corpus/6a383ab5a15540c76528fe1e05671483d34f0e72",
+      "bytes": 326,
+      "sha256": "dc6115806abac6dc83f9f5f4996f509b4941067de3aa63a988376854524733ba"
+    },
+    {
+      "path": "fuzz/corpus/6c48ff8c12ee82cc9a081e0cf739afda9983664d",
+      "bytes": 281,
+      "sha256": "d22af548381d90f5d94da5ea80cd82c43a4e079130c5219f31e08d3e1f680440"
+    },
+    {
+      "path": "fuzz/corpus/6e91b209cf0c6dc261429360be4bdc787046d60b",
+      "bytes": 131395,
+      "sha256": "6c4ab20a319ab62852cdf65be1d83149311ca4710f66749de4f73ddba4d31c20"
+    },
+    {
+      "path": "fuzz/corpus/6ea39ef52fa6ccf3ce1212e4985c1950e2b95904",
+      "bytes": 316,
+      "sha256": "24be3a0ae4cff158df7cce3ed3c57436dd42b7685a4ac5542ea51ad1de43610f"
+    },
+    {
+      "path": "fuzz/corpus/7051def5f6f204ad5a226876edb2ccab1173c79e",
+      "bytes": 559,
+      "sha256": "875b0a0c8c05a4ad45713a3911fde70f138de4314c52a699581370063929f0c1"
+    },
+    {
+      "path": "fuzz/corpus/772235e39ad1c5123ec952edcebaa89a2b32f5f6",
+      "bytes": 281,
+      "sha256": "5125ab4be134e2da3c79d8bdd6f4275432d831093815026a02527f5b82c58fc7"
+    },
+    {
+      "path": "fuzz/corpus/781a2a625ac3132fe85b101e007f9cfabe56e714",
+      "bytes": 264,
+      "sha256": "7afde557e91601ba65eab727e26d76f6dc64b9dca5c34a63abf43f6b45079fe8"
+    },
+    {
+      "path": "fuzz/corpus/78d8c6ae407ac65374ae10c1205ffae17e1c468d",
+      "bytes": 131395,
+      "sha256": "7bf5d87ca2803590d35dccba108d9c2fb5e691e2d1565078c6b04845413d8ebc"
+    },
+    {
+      "path": "fuzz/corpus/7b9aab5f9c10702fe89c96d7c227c5bfbb0d0819",
+      "bytes": 396,
+      "sha256": "cc9fdf996b4004f2989edca6a1d6b2bfe93e2c60dc16b2f000472b8ae7b3630c"
+    },
+    {
+      "path": "fuzz/corpus/83b0a618a648423102473e1b29a742789574861f",
+      "bytes": 268,
+      "sha256": "00866ed234dd57bbc62444c0f155c8b8329e2223de40fb280c7096f14cabaeb5"
+    },
+    {
+      "path": "fuzz/corpus/84f5c037229a49caab70b456817b9e996e92e7da",
+      "bytes": 268,
+      "sha256": "fde2ffdd7a9e3fa67984b8f8965bdb128c8afc1048c16bd7e3256e19fba42e04"
+    },
+    {
+      "path": "fuzz/corpus/850d3414cc93aa8d76379ec86369c86ab3ed766b",
+      "bytes": 270,
+      "sha256": "46d27b7f50276e406407ed592d8d97d7b465e0ef3b1e4f485d14e504d517569e"
+    },
+    {
+      "path": "fuzz/corpus/88f7c6c9259ea500d071ac9550e6bb342a297d0d",
+      "bytes": 281,
+      "sha256": "8d08f061dfbee7ea2a0d751c1dd2298419e6c480bbcadfe594195a82f6e8451c"
+    },
+    {
+      "path": "fuzz/corpus/88feb310d140636ab707a27de7e61d0249c9ae87",
+      "bytes": 407,
+      "sha256": "305868f2dc90b046a0239d6eb12577a988f00e75e8328a62c16aecaffd747234"
+    },
+    {
+      "path": "fuzz/corpus/894abdec85580d79f2ef4f08d4bc01e9fb2859c3",
+      "bytes": 402,
+      "sha256": "1c275c1aba8016789a020dc7d4720775d3350c3ef4e4a71ac4c6aca3664a8e15"
+    },
+    {
+      "path": "fuzz/corpus/8b2a459d1d62c448d29a3082b49624687d240530",
+      "bytes": 264,
+      "sha256": "5437c2d669b533464316fbec3bc11aef25c692a8144fd9f84dbee37b2be43f2c"
+    },
+    {
+      "path": "fuzz/corpus/8dd638a03e517d04f1a612dfeef0426eba160c3b",
+      "bytes": 131395,
+      "sha256": "8155ba860321cd72e47babaca0296cbfec0c41b7e400a8f6c6840b8453a145af"
+    },
+    {
+      "path": "fuzz/corpus/8eb59de3eaa668fb649580016876c32c9a812012",
+      "bytes": 131395,
+      "sha256": "6426fbc4744af6a6a8ca4e07b3ca4ab3cb5cfd5ecf1effc673e1f20799c163e6"
+    },
+    {
+      "path": "fuzz/corpus/8f9c4b0f3e7a4e380bd2bee8d7ce5586ec59372c",
+      "bytes": 349,
+      "sha256": "ee4f97ecb655ac7e5902d2be68d8528674f778c223db9f373eb797cfe540eef7"
+    },
+    {
+      "path": "fuzz/corpus/903456cba6048174cc5c6f44bb7188b9713283a0",
+      "bytes": 69319,
+      "sha256": "566902a79145d7eaae21e8574f69940fba0d9589fa6e4cf0a9a765ac5d135db1"
+    },
+    {
+      "path": "fuzz/corpus/90aa3090f7b941098b603421e41eea7b18857861",
+      "bytes": 286,
+      "sha256": "97bc3b5be9dd7225a00b2ff6fecacb61137046ad11bf3c5e7c455d0a10ffa644"
+    },
+    {
+      "path": "fuzz/corpus/97f469d5f7bf4eb6d9824f451ccddc2de50d780c",
+      "bytes": 281,
+      "sha256": "b392ed73525dcfcc1f28fd373d6d6b1cc74d34c23dba63a8fba525e656fc2b2d"
+    },
+    {
+      "path": "fuzz/corpus/a88982a69deb1c3eaaf89df86754249f3c722526",
+      "bytes": 272,
+      "sha256": "10f2f3c41045b65a6af30f223093967623b75c7bb045bc68c753d249a8a79efd"
+    },
+    {
+      "path": "fuzz/corpus/aa90b5bc9ffc5ac4cd7b146c4d88341aac2fc5a2",
+      "bytes": 331,
+      "sha256": "56e196a8f9e6ddf68ff8c4446684be711a3a7b5f9d11b5d4e64828e397ba5407"
+    },
+    {
+      "path": "fuzz/corpus/ab4fb9f7a71c5c1ac6dce24e4d2bb5929fc8bacf",
+      "bytes": 264,
+      "sha256": "e5405f1a343b30cfce1878eeabbbc322cce741f07d6cf2f60929002ac268bc55"
+    },
+    {
+      "path": "fuzz/corpus/ac3941673d1a0cdd4894f8f4adddcb07bedb4c4b",
+      "bytes": 131395,
+      "sha256": "63f0dee118ccbefe80ef56ba56ffdb7bec5da54f4795eccc70aa53c83ff8e193"
+    },
+    {
+      "path": "fuzz/corpus/af688451e7fcf50a311745752815426790401bdf",
+      "bytes": 272,
+      "sha256": "29970614d68ff955b352fb9072b449b1aefa7efb25e269940b2660d7e80cf60a"
+    },
+    {
+      "path": "fuzz/corpus/b3a3169c21893871813e66fd5ae40e963e8e2168",
+      "bytes": 131395,
+      "sha256": "61133c6a4b0dfdac51d1d02e7fab918e14106c17ad2aba2c219018be02ab2681"
+    },
+    {
+      "path": "fuzz/corpus/b42b5ad3e1de7dc954cc2b93052290788281e14c",
+      "bytes": 131384,
+      "sha256": "4a89643f7772be1338738b8cacb0bcf4f89f064b6e90e2610f5e79d3868d0153"
+    },
+    {
+      "path": "fuzz/corpus/b8a444d77d5c60d36f4056a256320dd73b3f84c9",
+      "bytes": 384,
+      "sha256": "2c12fcfde0fe754fe19313610f0f8b5f24e9dc9f113004a4268f4c3df6f4a58d"
+    },
+    {
+      "path": "fuzz/corpus/b982c49271d8f4dd43782a13fdf5f63de67b078a",
+      "bytes": 319,
+      "sha256": "7f8c6cc9dd4e75b7b693ea28da61edf060af6d3256c4b582070dfdebd156226f"
+    },
+    {
+      "path": "fuzz/corpus/bf7e60f6af34822c423a3f2d40c6773f9dad37cd",
+      "bytes": 268,
+      "sha256": "fa21fcb68148b4bd9a59b623eb2f8418c9817ce4a5180498d9be03f330ec2818"
+    },
+    {
+      "path": "fuzz/corpus/c11352bcbc9909bb17f33aa6aab51db578636139",
+      "bytes": 131395,
+      "sha256": "e63321d6759ceb336cea497b4a1c1c6fd6d7aab0b82f5bcafa9d8b79dee9dd49"
+    },
+    {
+      "path": "fuzz/corpus/c19379d0b1cc0db617f58133f15f1423f3e3ffe0",
+      "bytes": 281,
+      "sha256": "89f9e889dfeedb6848ee1f74ea9120adee7bab46230a93a3418505079521147a"
+    },
+    {
+      "path": "fuzz/corpus/c2031430ce6b23c155643a5ce138397325d57c29",
+      "bytes": 131395,
+      "sha256": "d3765e4382a3540032254ec4505fb8f8dc1af43ce07128a0df24d1e8fc1dd9f6"
+    },
+    {
+      "path": "fuzz/corpus/c3d8d924bb90756c18b13faf798a724c371ef3f7",
+      "bytes": 285,
+      "sha256": "b871b2fe78c59fa851563c7849c96805fd65155dc96dccfc51d1ad235c1cedbb"
+    },
+    {
+      "path": "fuzz/corpus/c3f806ff6694d605de7e70af53625df95101530a",
+      "bytes": 131395,
+      "sha256": "55d7eb215e1e682b500eef2f7552601f840b4dc3f5680ba7a63c563e2b94a0a7"
+    },
+    {
+      "path": "fuzz/corpus/cb9d2d35c500766425ca596c7a2065bdab3ef992",
+      "bytes": 131395,
+      "sha256": "e84a44ae075ba9c175d1302b3244b59d018261e8fe59c5132e9902a657d7cd55"
+    },
+    {
+      "path": "fuzz/corpus/d0ee6ec5900b4d12f2c9eba03e2b090c0f7544b4",
+      "bytes": 328,
+      "sha256": "681ce2c2ef033418773edd8fe4f7776077f6bda8b5136056bfa4f2ba298d0d50"
+    },
+    {
+      "path": "fuzz/corpus/d0fe84deb42c5926241bcf282d9435caaf54f076",
+      "bytes": 302,
+      "sha256": "6b8b452c41f8b41bfc7e7f3488925e4eb973fada2d558bad99d2c95faddedc27"
+    },
+    {
+      "path": "fuzz/corpus/d137aea07047f4a3a37724f0f598641332188a0e",
+      "bytes": 339,
+      "sha256": "0aa7598b742af5cd7acf9698ec338e1ffe8ec5c9b2afb4e7d3ef29acb447e193"
+    },
+    {
+      "path": "fuzz/corpus/d38647f663642b0799364609152847865928812f",
+      "bytes": 264,
+      "sha256": "4140200e12d6041fef5798282120af7e33d3d387a9ecaae3bc7056c02002fa6e"
+    },
+    {
+      "path": "fuzz/corpus/d3d57efb43d8f22a4200f48c70b762d06453ffca",
+      "bytes": 264,
+      "sha256": "fa7c7c464d4a19e91b8999ff2c954c92dbc06847adb7b18b28385359536c5131"
+    },
+    {
+      "path": "fuzz/corpus/d411d8060a826d95c9ba715c1408b1ab6a8b33b4",
+      "bytes": 264,
+      "sha256": "4ad4c2d272b735930d41afaa7ce1c676fd64af88d5ef1f6aee2e7f65ca083cda"
+    },
+    {
+      "path": "fuzz/corpus/df212edcf3b22cec5e2a603569e67e1608422bc0",
+      "bytes": 268,
+      "sha256": "56dd60daeec53b733a4bd2da1235da6846ff433c227aa667b78c39ca32a03bc8"
+    },
+    {
+      "path": "fuzz/corpus/dfcb07d46dc9fddcf8388871374021963bcc1dc3",
+      "bytes": 264,
+      "sha256": "b10452364a22ad5a309776098c3a6c9faa06f9780b05815d326d6c83b986c166"
+    },
+    {
+      "path": "fuzz/corpus/e326d2753355c2067196e97065eb1e2e6c9c9b31",
+      "bytes": 285,
+      "sha256": "fdff27ea470ecf9e3409ea92b5db802b3e097bbe8787a6c395b6b9cc94620434"
+    },
+    {
+      "path": "fuzz/corpus/e4e8ff49067a4c1d0e2684fb3e0c94e2694957ae",
+      "bytes": 264,
+      "sha256": "80f3b52c80771def94174c0596e04b6b62125a6795f6eeaee6dba360432370f8"
+    },
+    {
+      "path": "fuzz/corpus/e89339db6b6dd2b604cd78af86ac7607eac369dd",
+      "bytes": 285,
+      "sha256": "e085ad65e93017548c474eff6e56673c4f383c11ee314ca8d7b7a073a8140223"
+    },
+    {
+      "path": "fuzz/corpus/e9ebd37a63b0495e34d7c36054753b55906e28eb",
+      "bytes": 127,
+      "sha256": "253f85e2ee1fd6e985c4019bef35787fb4975e693c5a575baaa30e7622adcf3a"
+    },
+    {
+      "path": "fuzz/corpus/ea30b42e6b7204fc16fe1f5e2f7ff2547addc6ca",
+      "bytes": 646,
+      "sha256": "d15f09ff023f8108fdda3ce576be28c3474f885868f8ebef793baa39c8ba96a6"
+    },
+    {
+      "path": "fuzz/corpus/ecca15638a15d2f25f58e334558ae89034a3a096",
+      "bytes": 264,
+      "sha256": "2ea4a3087eae76d24e097392fd66193968bdf2eb9ef7bb923aaa5a022e1d6c59"
+    },
+    {
+      "path": "fuzz/corpus/efdeb3d551314145a42567008c2a60352efae9d3",
+      "bytes": 645,
+      "sha256": "6ee1ba442772eba3edc55cbfc4993ba1d36fb19225c78c3f09bacf272b39f83e"
+    },
+    {
+      "path": "fuzz/corpus/fa9c566e707da01cd710ea61be4b327e4d6b58e1",
+      "bytes": 276,
+      "sha256": "5f3b26981acbd9423357e00a42f458845e2295ef5a64846b26061f3a67079c75"
+    },
+    {
+      "path": "fuzz/corpus/payload-0-0.zip",
+      "bytes": 264,
+      "sha256": "fe7fa6f770ba52c1a64d6fb81e5f13ce7dc89b65c5c4218e5c8d6152124d56df"
+    },
+    {
+      "path": "fuzz/corpus/payload-0-8.zip",
+      "bytes": 268,
+      "sha256": "02ffff071f3ecd7ea6ff01cbc4ca7ea19859cc34724849dc93e18fe4d5e79b44"
+    },
+    {
+      "path": "fuzz/corpus/payload-131089-0.zip",
+      "bytes": 131353,
+      "sha256": "be7ae4fee5d6f568078dea03ed53574800d2b7162e88017b163efcab3c366744"
+    },
+    {
+      "path": "fuzz/corpus/payload-131089-8.zip",
+      "bytes": 131395,
+      "sha256": "8d99a11d377a55aa0e943a0aa143c1f2e6bcd5ebc486b539c3a9f0db5b90a955"
+    },
+    {
+      "path": "fuzz/corpus/payload-17-0.zip",
+      "bytes": 281,
+      "sha256": "130874c9a51eafe45cc4b21392be1fdbcfd43999dcc4e4a2165c53f04caf48a6"
+    },
+    {
+      "path": "fuzz/corpus/payload-17-8.zip",
+      "bytes": 285,
+      "sha256": "969c7ef36a8c76ca7a60974e2e8197735fee425db9c34bacd8ae5739c5bab757"
+    },
+    {
+      "path": "fuzz/fuzz_targets/parse_zip.rs",
+      "bytes": 18440,
+      "sha256": "ebab506a987421a09c9604e8f64b0d59a2bdbcdb1c17d226fce7daac4bae221e"
+    },
+    {
+      "path": "fuzz/target/.rustc_info.json",
+      "bytes": 3139,
+      "sha256": "676d03928f8440148e786b364c136edd5cbd3e83e687a2143f164929c29d9c09"
+    },
+    {
+      "path": "fuzz/target/CACHEDIR.TAG",
+      "bytes": 177,
+      "sha256": "6d9d1d216e0f83abc5e5662ca62c92b4f23009466b54fa27321a69acdb778bb2"
+    },
+    {
+      "path": "fuzz/target/release/.cargo-artifact-lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/release/.cargo-build-lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/release/.cargo-lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/cc-afbaa9de4cb91d76/dep-lib-cc",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/cc-afbaa9de4cb91d76/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/cc-afbaa9de4cb91d76/lib-cc",
+      "bytes": 16,
+      "sha256": "87ea4c512904f13edfc1f870c686a1687dc80490a286c5f1984ce2a9f598d12e"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/cc-afbaa9de4cb91d76/lib-cc.json",
+      "bytes": 621,
+      "sha256": "10dc6eeaa7b2c52d37e29e576a872c9c809910f08daa0b71b4adb890cd5da423"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crc32fast-0a1de0d152296677/build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "c43b1f0a791d804613f08e4ba50299b7210f43c1f4b1b937a07ef990edf6c312"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crc32fast-0a1de0d152296677/build-script-build-script-build.json",
+      "bytes": 423,
+      "sha256": "a068d5d49623b50337aabc8957f660f36a259c562b4b5fd5e729fe56322c44f0"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crc32fast-0a1de0d152296677/dep-build-script-build-script-build",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crc32fast-0a1de0d152296677/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crossbeam-deque-bcc5ce77e138bf9a/build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "7f278b7a2b9fb09e5b088e52307062bab765b31411fd2cfda86e293f0e5f1c1e"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crossbeam-deque-bcc5ce77e138bf9a/build-script-build-script-build.json",
+      "bytes": 416,
+      "sha256": "7974b444fa6bb40436434a2bae958600670da29b5ab1c6ab9ae52ee2025339cc"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crossbeam-deque-bcc5ce77e138bf9a/dep-build-script-build-script-build",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crossbeam-deque-bcc5ce77e138bf9a/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crossbeam-epoch-f24e7533cf05f97c/build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "b31e0c2e72f7641a4ae311d0b086c3c8854af466041f7292d987145a557da800"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crossbeam-epoch-f24e7533cf05f97c/build-script-build-script-build.json",
+      "bytes": 464,
+      "sha256": "8cc160f77a9c9610933d5b6aa915604ad5cc95c520e0f4ec2cb7b009a2e5d623"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crossbeam-epoch-f24e7533cf05f97c/dep-build-script-build-script-build",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crossbeam-epoch-f24e7533cf05f97c/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crossbeam-utils-14ebcce4c8efee08/build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "aa0fcc3b13ab58f8ce916751854e934f1b1d71450cdcdb47b6cdb2515e99e896"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crossbeam-utils-14ebcce4c8efee08/build-script-build-script-build.json",
+      "bytes": 439,
+      "sha256": "2428a6aa2007ef4dcd25bab6b06ea99fa1012a8404ae4e8ca6d0ab6e32d6d694"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crossbeam-utils-14ebcce4c8efee08/dep-build-script-build-script-build",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/crossbeam-utils-14ebcce4c8efee08/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/find-msvc-tools-f030cef60749e165/dep-lib-find_msvc_tools",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/find-msvc-tools-f030cef60749e165/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/find-msvc-tools-f030cef60749e165/lib-find_msvc_tools",
+      "bytes": 16,
+      "sha256": "f28e8ac13b4b8ef6d5fa5a54d26b2c1b7b47328cab1672a16a9279bcb425324b"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/find-msvc-tools-f030cef60749e165/lib-find_msvc_tools.json",
+      "bytes": 365,
+      "sha256": "fc29b5d872e6ed2545378e3985f87eed08cbb704fddfbfe33d5b39ae3d955d13"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/jobserver-36be696da8cb94d8/dep-lib-jobserver",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/jobserver-36be696da8cb94d8/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/jobserver-36be696da8cb94d8/lib-jobserver",
+      "bytes": 16,
+      "sha256": "157cbc13a79fb78ecce3f73900e88b09c90f1c393a97fda5220227c43b94a284"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/jobserver-36be696da8cb94d8/lib-jobserver.json",
+      "bytes": 409,
+      "sha256": "e17ce3c666feabefa186db6ca99f66e3edfcfc7969674a8401c7a00cc276f28f"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libc-057607ed57d16375/dep-lib-libc",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libc-057607ed57d16375/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libc-057607ed57d16375/lib-libc",
+      "bytes": 16,
+      "sha256": "f6050aecbae30b93edf54e6353346293e81e50ed53dd86b5274e77d6e0873488"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libc-057607ed57d16375/lib-libc.json",
+      "bytes": 569,
+      "sha256": "e8036cb00cede84ed721a1228ea466cc7ddae6ebb7adc216e865ced8cd2ca874"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libc-439298a5e8bb8097/build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "dfaf7f3dd9d8fff42b8c4125f1387ccc1634ae2a336e5c9173b48599bcc9155e"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libc-439298a5e8bb8097/build-script-build-script-build.json",
+      "bytes": 521,
+      "sha256": "11b375d11357eb3ea80ffa8d6fbc27a5cd1b4be1fd2d7ebeaec4bdcef0a1cb63"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libc-439298a5e8bb8097/dep-build-script-build-script-build",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libc-439298a5e8bb8097/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libc-4a72b05ba2115f8b/run-build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "48f29a65e4af135cb4440ec94a96cfa64c9dc3fafccf197d73c39dde468c671d"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libc-4a72b05ba2115f8b/run-build-script-build-script-build.json",
+      "bytes": 467,
+      "sha256": "b22a3bb2d72386fd0a5e11a07854a117f1b6d5f035773faedd9089709d209aaa"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libfuzzer-sys-7b1cd51a8c7d64ff/build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "f4169af06512fe18f97b18300be5862a986ebe1028a09a3be8fd325a3059b348"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libfuzzer-sys-7b1cd51a8c7d64ff/build-script-build-script-build.json",
+      "bytes": 513,
+      "sha256": "93f13cbaec60df58a48a15d705b8df3a6916cc3e6fa4545fed054423d7da2629"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libfuzzer-sys-7b1cd51a8c7d64ff/dep-build-script-build-script-build",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/libfuzzer-sys-7b1cd51a8c7d64ff/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/rayon-core-4c7d499ccbb51c15/build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "ba443bf6cbff2ffe79d057b01c4d16b13d12d2fa2c512de65e5557762215b71a"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/rayon-core-4c7d499ccbb51c15/build-script-build-script-build.json",
+      "bytes": 389,
+      "sha256": "a77b173ec87087ab32e4ffc93df807c8dccfd2e006e9b1bb9667598ffa8fad02"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/rayon-core-4c7d499ccbb51c15/dep-build-script-build-script-build",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/rayon-core-4c7d499ccbb51c15/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/shlex-a0e6b6f3f311c935/dep-lib-shlex",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/shlex-a0e6b6f3f311c935/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/shlex-a0e6b6f3f311c935/lib-shlex",
+      "bytes": 16,
+      "sha256": "7a3103d7c167e8036c6a5e8502d470103bb6853063d863240ba7c8401f22a482"
+    },
+    {
+      "path": "fuzz/target/release/.fingerprint/shlex-a0e6b6f3f311c935/lib-shlex.json",
+      "bytes": 385,
+      "sha256": "79bc68b52de67f97251b8d423c88e8586a3695206152df8db9fb43aaf0508267"
+    },
+    {
+      "path": "fuzz/target/release/build/crc32fast-0a1de0d152296677/build-script-build",
+      "bytes": 4694136,
+      "sha256": "6586334f0b27a1380d10f614dec02f870359272b4dd3461e89930e2cea4feeb2"
+    },
+    {
+      "path": "fuzz/target/release/build/crc32fast-0a1de0d152296677/build_script_build-0a1de0d152296677",
+      "bytes": 4694136,
+      "sha256": "6586334f0b27a1380d10f614dec02f870359272b4dd3461e89930e2cea4feeb2"
+    },
+    {
+      "path": "fuzz/target/release/build/crc32fast-0a1de0d152296677/build_script_build-0a1de0d152296677.d",
+      "bytes": 499,
+      "sha256": "db08ae8e295fe28a4335b3d98822a87175cbce18ffc03531951bab1ce12ee4ad"
+    },
+    {
+      "path": "fuzz/target/release/build/crossbeam-deque-bcc5ce77e138bf9a/build-script-build",
+      "bytes": 4582336,
+      "sha256": "0f1f598ceead9db258ddb055b82a8ac6def05bc320fa32fc74c8665e684140a9"
+    },
+    {
+      "path": "fuzz/target/release/build/crossbeam-deque-bcc5ce77e138bf9a/build_script_build-bcc5ce77e138bf9a",
+      "bytes": 4582336,
+      "sha256": "0f1f598ceead9db258ddb055b82a8ac6def05bc320fa32fc74c8665e684140a9"
+    },
+    {
+      "path": "fuzz/target/release/build/crossbeam-deque-bcc5ce77e138bf9a/build_script_build-bcc5ce77e138bf9a.d",
+      "bytes": 529,
+      "sha256": "9d57e854ba51a8716685057782075122a880f5e5b6918fab4bc52c033f354ca9"
+    },
+    {
+      "path": "fuzz/target/release/build/crossbeam-epoch-f24e7533cf05f97c/build-script-build",
+      "bytes": 4582336,
+      "sha256": "82be295a009eca179908f70ead49421b4b355d28a4de5ae30e43a830d9eba58a"
+    },
+    {
+      "path": "fuzz/target/release/build/crossbeam-epoch-f24e7533cf05f97c/build_script_build-f24e7533cf05f97c",
+      "bytes": 4582336,
+      "sha256": "82be295a009eca179908f70ead49421b4b355d28a4de5ae30e43a830d9eba58a"
+    },
+    {
+      "path": "fuzz/target/release/build/crossbeam-epoch-f24e7533cf05f97c/build_script_build-f24e7533cf05f97c.d",
+      "bytes": 532,
+      "sha256": "3c963a61e6ec1cc97d22f06587a5fc06e5f4e2766594db69bad6caf9e902648d"
+    },
+    {
+      "path": "fuzz/target/release/build/crossbeam-utils-14ebcce4c8efee08/build-script-build",
+      "bytes": 4648208,
+      "sha256": "4b0ccbfc21c3073a4f517cc0306aa485e47d60a0507a177a22eec7c145c7fa13"
+    },
+    {
+      "path": "fuzz/target/release/build/crossbeam-utils-14ebcce4c8efee08/build_script_build-14ebcce4c8efee08",
+      "bytes": 4648208,
+      "sha256": "4b0ccbfc21c3073a4f517cc0306aa485e47d60a0507a177a22eec7c145c7fa13"
+    },
+    {
+      "path": "fuzz/target/release/build/crossbeam-utils-14ebcce4c8efee08/build_script_build-14ebcce4c8efee08.d",
+      "bytes": 1191,
+      "sha256": "947966900e15a82317df92cc1ae33e5ce8d007e1f458e76d7aa4a504fea0a673"
+    },
+    {
+      "path": "fuzz/target/release/build/libc-439298a5e8bb8097/build-script-build",
+      "bytes": 4852800,
+      "sha256": "ef70940679028e4578856f521d3db1669d7ddbd75d57b36224cd3efdf09e034f"
+    },
+    {
+      "path": "fuzz/target/release/build/libc-439298a5e8bb8097/build_script_build-439298a5e8bb8097",
+      "bytes": 4852800,
+      "sha256": "ef70940679028e4578856f521d3db1669d7ddbd75d57b36224cd3efdf09e034f"
+    },
+    {
+      "path": "fuzz/target/release/build/libc-439298a5e8bb8097/build_script_build-439298a5e8bb8097.d",
+      "bytes": 480,
+      "sha256": "80e266d3daa534ddec0610a66e1b8dcdfdbcc63e9010f7204401ea99063bec01"
+    },
+    {
+      "path": "fuzz/target/release/build/libc-4a72b05ba2115f8b/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/release/build/libc-4a72b05ba2115f8b/output",
+      "bytes": 1222,
+      "sha256": "a8c8f65c7e5ff321c04794c844638e113fcb0823bef06c2baf483eaf13c1a73e"
+    },
+    {
+      "path": "fuzz/target/release/build/libc-4a72b05ba2115f8b/root-output",
+      "bytes": 73,
+      "sha256": "7d5615afa8522e25b1071bd628e160849379137fde813249dbe441beb71587a9"
+    },
+    {
+      "path": "fuzz/target/release/build/libc-4a72b05ba2115f8b/stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/release/build/libfuzzer-sys-7b1cd51a8c7d64ff/build-script-build",
+      "bytes": 8184968,
+      "sha256": "640b105106e7332cdcd42bce220f2423db1f35903bd100fffc5c79bf8f31f91a"
+    },
+    {
+      "path": "fuzz/target/release/build/libfuzzer-sys-7b1cd51a8c7d64ff/build_script_build-7b1cd51a8c7d64ff",
+      "bytes": 8184968,
+      "sha256": "640b105106e7332cdcd42bce220f2423db1f35903bd100fffc5c79bf8f31f91a"
+    },
+    {
+      "path": "fuzz/target/release/build/libfuzzer-sys-7b1cd51a8c7d64ff/build_script_build-7b1cd51a8c7d64ff.d",
+      "bytes": 522,
+      "sha256": "9b3ac7ff7ff385a4668aab5a41fb263adbe7bf241c2f2880c29cc0f14d311b20"
+    },
+    {
+      "path": "fuzz/target/release/build/rayon-core-4c7d499ccbb51c15/build-script-build",
+      "bytes": 4509816,
+      "sha256": "b5cdabc85a5f1c3732ea132fed2d31514218b82702d55231d9a62b7b122e94e9"
+    },
+    {
+      "path": "fuzz/target/release/build/rayon-core-4c7d499ccbb51c15/build_script_build-4c7d499ccbb51c15",
+      "bytes": 4509816,
+      "sha256": "b5cdabc85a5f1c3732ea132fed2d31514218b82702d55231d9a62b7b122e94e9"
+    },
+    {
+      "path": "fuzz/target/release/build/rayon-core-4c7d499ccbb51c15/build_script_build-4c7d499ccbb51c15.d",
+      "bytes": 507,
+      "sha256": "4b91721571dea38c490c5bbdb35ed607693950deeb03c441a8ac5bd7969def8d"
+    },
+    {
+      "path": "fuzz/target/release/deps/cc-afbaa9de4cb91d76.d",
+      "bytes": 6675,
+      "sha256": "b0e13f73d47df5f30e32541c0063f15bbeb30986e3eaca0269b9313437322a6a"
+    },
+    {
+      "path": "fuzz/target/release/deps/find_msvc_tools-f030cef60749e165.d",
+      "bytes": 1488,
+      "sha256": "9c7c2301128394d7396b22e530b5847214bbe116b0989493d0278a2947bdd049"
+    },
+    {
+      "path": "fuzz/target/release/deps/jobserver-36be696da8cb94d8.d",
+      "bytes": 1378,
+      "sha256": "1384b5ee4c1f6fae67fff14d04af6e7b47fa7844e34d0deca5423af8b5c4237a"
+    },
+    {
+      "path": "fuzz/target/release/deps/libc-057607ed57d16375.d",
+      "bytes": 22141,
+      "sha256": "06e877dc5f8c0145f71f5a61eb7b62e2575ebb55d47f3e86ff2af35de7206073"
+    },
+    {
+      "path": "fuzz/target/release/deps/libcc-afbaa9de4cb91d76.rlib",
+      "bytes": 6334118,
+      "sha256": "a353c898292e358bc9f044328d39502388fa9616962a14517cbc3d3d8d52b85e"
+    },
+    {
+      "path": "fuzz/target/release/deps/libcc-afbaa9de4cb91d76.rmeta",
+      "bytes": 547321,
+      "sha256": "e80ca4618b1d68f5dd96ff7a6529c431263d50b4f7599200c671fc5a211cb6a4"
+    },
+    {
+      "path": "fuzz/target/release/deps/libfind_msvc_tools-f030cef60749e165.rlib",
+      "bytes": 511700,
+      "sha256": "3f97f5b050237ab0f3507ef0f1527fef1efdbae1fc4ee1f5b8e0948e47f267a3"
+    },
+    {
+      "path": "fuzz/target/release/deps/libfind_msvc_tools-f030cef60749e165.rmeta",
+      "bytes": 51072,
+      "sha256": "8cee0545ef394c948ba7ce47ae68f27db8cab50e8696d4b76f8b9ccbdc2a7b4d"
+    },
+    {
+      "path": "fuzz/target/release/deps/libjobserver-36be696da8cb94d8.rlib",
+      "bytes": 860108,
+      "sha256": "0e21012d0766913eae690d53c46f0b1f6b163b3117611e8bc422c867bfdb112f"
+    },
+    {
+      "path": "fuzz/target/release/deps/libjobserver-36be696da8cb94d8.rmeta",
+      "bytes": 94745,
+      "sha256": "43f06a7b35dc714111e9c7b3badc2c6b98ea90b394c15e1c15170c61c5fe87de"
+    },
+    {
+      "path": "fuzz/target/release/deps/liblibc-057607ed57d16375.rlib",
+      "bytes": 4138340,
+      "sha256": "4e6587b422b9542e60a57b8209215705528389bf1112854818d174baf0dd24ee"
+    },
+    {
+      "path": "fuzz/target/release/deps/liblibc-057607ed57d16375.rmeta",
+      "bytes": 4109899,
+      "sha256": "4bcc214336257a0b8cb4df88c606b953498821d4c105e29c42362b63bdcbb34d"
+    },
+    {
+      "path": "fuzz/target/release/deps/libshlex-a0e6b6f3f311c935.rlib",
+      "bytes": 190252,
+      "sha256": "0bdee3399f56e43848b717e2fea67cdb2647e49fe9ae6b741ada106e34ee9c03"
+    },
+    {
+      "path": "fuzz/target/release/deps/libshlex-a0e6b6f3f311c935.rmeta",
+      "bytes": 48772,
+      "sha256": "29012353c074b2ed9d58a64ec81c2d7fdab17b73195f6e560faf623b1d2f0da8"
+    },
+    {
+      "path": "fuzz/target/release/deps/shlex-a0e6b6f3f311c935.d",
+      "bytes": 949,
+      "sha256": "cc6cb5193946a4085fb8246308430b00ff18100d784eb613c183f540a13091f9"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/CACHEDIR.TAG",
+      "bytes": 177,
+      "sha256": "6d9d1d216e0f83abc5e5662ca62c92b4f23009466b54fa27321a69acdb778bb2"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.cargo-artifact-lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.cargo-build-lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.cargo-lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/arbitrary-9ce35286202d29f9/dep-lib-arbitrary",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/arbitrary-9ce35286202d29f9/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/arbitrary-9ce35286202d29f9/lib-arbitrary",
+      "bytes": 16,
+      "sha256": "2b3c45913ec5e36ee8c43540fe2bda72df01e7aa6bac2808c52a51a1b02487a6"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/arbitrary-9ce35286202d29f9/lib-arbitrary.json",
+      "bytes": 702,
+      "sha256": "14c74d92fba766fa9f249f43e30180ec8c3445caa8682c65c4a733fab3ce1f6f"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/cfg-if-d5dad1fa038038d1/dep-lib-cfg_if",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/cfg-if-d5dad1fa038038d1/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/cfg-if-d5dad1fa038038d1/lib-cfg_if",
+      "bytes": 16,
+      "sha256": "826e60485e56b8ee05c56c663986355206a8ec019dd00418603afcdcdc4abcaa"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/cfg-if-d5dad1fa038038d1/lib-cfg_if.json",
+      "bytes": 693,
+      "sha256": "62e6e34a3095fffb2d9fcde28ba26a8aecc4f999150f72f4cfb315e1bcd16746"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crc32fast-583be9e0f87fd34b/run-build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "7e8d98b827be4e5e7a4db2fea878e84ef0329279823dabca4f8e10fc1179fc7a"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crc32fast-583be9e0f87fd34b/run-build-script-build-script-build.json",
+      "bytes": 527,
+      "sha256": "f034e67b5733afea248e33565431fc1d08589a5f3f19170f5d63fd537f68263c"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crc32fast-c96b7480f77ca399/dep-lib-crc32fast",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crc32fast-c96b7480f77ca399/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crc32fast-c96b7480f77ca399/lib-crc32fast",
+      "bytes": 16,
+      "sha256": "367a0621a7d5aeb85f7ea1fc2ae74af54376b56c8c4c4d65ffe74db755bce21c"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crc32fast-c96b7480f77ca399/lib-crc32fast.json",
+      "bytes": 848,
+      "sha256": "7afeb132e5464b49111a4767304900e77e7488762562914090fa50c135e9bfc3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-deque-6eab4b4aaf32f8b5/run-build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "ef12bb45f2191c4d7f154498bc5e2ab6595d943208a14be60a22cd37bc91b91a"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-deque-6eab4b4aaf32f8b5/run-build-script-build-script-build.json",
+      "bytes": 633,
+      "sha256": "16177728730f8d6a7455e00798315d028dd2f51b62b9efd3fcc1cfaf9a9a0daf"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-deque-d5eb6fde963cf519/dep-lib-crossbeam_deque",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-deque-d5eb6fde963cf519/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-deque-d5eb6fde963cf519/lib-crossbeam_deque",
+      "bytes": 16,
+      "sha256": "12e6ad6566d4373284f3a7c6e2c9d311919f1e2cd2eed9de30eeec217fb6871e"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-deque-d5eb6fde963cf519/lib-crossbeam_deque.json",
+      "bytes": 924,
+      "sha256": "495b247330edac0cd18a3af5c46f3ceb08ceefe45753b7d33a0c60c1df88bf70"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-epoch-bf1bda084962b513/run-build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "3db91c8fbeecbc0fdfd6488dfea54989c656b4b7715145d0c3bda250037bf06a"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-epoch-bf1bda084962b513/run-build-script-build-script-build.json",
+      "bytes": 633,
+      "sha256": "c2b89ab1811cd4abd1315da6acf1179cbda1dfad10e6c15eb656f5a0d1907bcd"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-epoch-f8ccf8b95483a679/dep-lib-crossbeam_epoch",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-epoch-f8ccf8b95483a679/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-epoch-f8ccf8b95483a679/lib-crossbeam_epoch",
+      "bytes": 16,
+      "sha256": "54ef574559c459138e26d93c4d2d6669b8a175b8f2cc05f2b3a4c47ef6e3e840"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-epoch-f8ccf8b95483a679/lib-crossbeam_epoch.json",
+      "bytes": 905,
+      "sha256": "9c62eb424b4d0909441bad791ccddbead40aa4c9f3477ce310791e9697eac7d6"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-utils-0efcfa819d8a8228/dep-lib-crossbeam_utils",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-utils-0efcfa819d8a8228/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-utils-0efcfa819d8a8228/lib-crossbeam_utils",
+      "bytes": 16,
+      "sha256": "a611dd41e2c41cd2fe968c886513e71f6e369119774f044d8763b6b137e8f32e"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-utils-0efcfa819d8a8228/lib-crossbeam_utils.json",
+      "bytes": 813,
+      "sha256": "b395a3051ab7f813be9f4e55f989781104e5d8d625f96e5c5ccf3ae219cc6c74"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-utils-29ba9d313a644afc/run-build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "001aed6bc5e048185aa0736ed20142aae494c3286e7d92d4108c95546ce34cb7"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/crossbeam-utils-29ba9d313a644afc/run-build-script-build-script-build.json",
+      "bytes": 637,
+      "sha256": "8950c849e204422a1c51116c45e15390b5209436b91370ce70dbe140a4cbfe9b"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/either-2b08f73413e70746/dep-lib-either",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/either-2b08f73413e70746/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/either-2b08f73413e70746/lib-either",
+      "bytes": 16,
+      "sha256": "f847aedb991db289849f38340ad074cc2878cecc528a63da2079ea4388cf5add"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/either-2b08f73413e70746/lib-either.json",
+      "bytes": 708,
+      "sha256": "48ad949b87d158a92fdc91e29d8f4e4cf9279a0519e8f862737accbe7c2123cb"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/flate2-ebfee09be1985cfe/dep-lib-flate2",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/flate2-ebfee09be1985cfe/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/flate2-ebfee09be1985cfe/lib-flate2",
+      "bytes": 16,
+      "sha256": "f794ba3389febf337440722607d73a41b800571de123d95f58ddfae1fc4fe25d"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/flate2-ebfee09be1985cfe/lib-flate2.json",
+      "bytes": 1038,
+      "sha256": "9e715a10772f27ae8770af11b2f917e9a55cd31252220e2b9e8940f106f3a0ea"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/libfuzzer-sys-0d73bbe39909b0a1/dep-lib-libfuzzer_sys",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/libfuzzer-sys-0d73bbe39909b0a1/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/libfuzzer-sys-0d73bbe39909b0a1/lib-libfuzzer_sys",
+      "bytes": 16,
+      "sha256": "bcdaf9204db258fe4d078e3fa1ce85bd488eff5626a345ff97152a8cd339e016"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/libfuzzer-sys-0d73bbe39909b0a1/lib-libfuzzer_sys.json",
+      "bytes": 890,
+      "sha256": "b3990cca013960907621c65b4b0d3109b8838d8538471f8cb31da994f0df1e27"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/libfuzzer-sys-50f058bf153f01fb/run-build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "16cd85a027ced6c5320b2729e96a336b0abe96e1b986382813d00c24fe90539f"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/libfuzzer-sys-50f058bf153f01fb/run-build-script-build-script-build.json",
+      "bytes": 18068,
+      "sha256": "2543ca29f9837f6e5953fcb3bb49128f502898797036e4d42659aa8b09b8f4f0"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-87f19cf75544896f/dep-lib-rayon",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-87f19cf75544896f/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-87f19cf75544896f/lib-rayon",
+      "bytes": 16,
+      "sha256": "2cf9fde70682f25c8db452d7deb5d6a92a5baf0d6a1effa78d4eed3557c803f1"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-87f19cf75544896f/lib-rayon.json",
+      "bytes": 798,
+      "sha256": "4f077ff552b704559138ca9c901ca88846ea717e740b4c8133c078ba274e2383"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-core-2f93655bdbd98f4b/run-build-script-build-script-build",
+      "bytes": 16,
+      "sha256": "86b790e836858e1f41badb725824d54e241e8a3456008a5a17aea0193a8e7b8b"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-core-2f93655bdbd98f4b/run-build-script-build-script-build.json",
+      "bytes": 628,
+      "sha256": "c98929e6e5f5bf936f4faeba2c99191a8420557bb436ad15de85ccfefcef1a64"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-core-86c7d03ab88ea34c/dep-lib-rayon_core",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-core-86c7d03ab88ea34c/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-core-86c7d03ab88ea34c/lib-rayon_core",
+      "bytes": 16,
+      "sha256": "eafe008e69a33da5ccc9862c1ca10a52d4be2e758de1c4c9bb1f2dbcebfe5652"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/rayon-core-86c7d03ab88ea34c/lib-rayon_core.json",
+      "bytes": 893,
+      "sha256": "c5db903e419dfdead012e01f81703d24ff32900e19b246aacd20ddfe66aff837"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-02860b939c428b1d/dep-lib-soapberry_zip",
+      "bytes": 323,
+      "sha256": "a2d649653b281bfe0b5863b956171a3d0abbcbc2583e5f672ac8dc7d0d1ce5a1"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-02860b939c428b1d/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-02860b939c428b1d/lib-soapberry_zip",
+      "bytes": 16,
+      "sha256": "e5dc2cd8b45d1f78d2b9a2801c41e4f1bce6ff56f42cfb2cbbac1151a7f3ce1f"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-02860b939c428b1d/lib-soapberry_zip.json",
+      "bytes": 847,
+      "sha256": "5f649f1585db53e0bbe1bf147a76f45f27ef2eda50b78326098c5bd698a2d32d"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-fuzz-9bf9981e9b4e3df7/bin-parse_zip",
+      "bytes": 16,
+      "sha256": "cb4ec5eac9375607faa9ce13e8d33ad5a0ab700dcbcd984d2e8ca4cb067ec93b"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-fuzz-9bf9981e9b4e3df7/bin-parse_zip.json",
+      "bytes": 808,
+      "sha256": "1b18a9ef494382a7a90531d9ac3c2c169266214945b6ff19aebd67c264931d96"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-fuzz-9bf9981e9b4e3df7/dep-bin-parse_zip",
+      "bytes": 45,
+      "sha256": "1343350be27645edb4a48139e147f94740e87d25c7cb1a276e677c5222208314"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/soapberry-zip-fuzz-9bf9981e9b4e3df7/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/zlib-rs-9f54bf36daf196c6/dep-lib-zlib_rs",
+      "bytes": 14,
+      "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/zlib-rs-9f54bf36daf196c6/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/zlib-rs-9f54bf36daf196c6/lib-zlib_rs",
+      "bytes": 16,
+      "sha256": "fa5303d08b1bb0e654c83df282126625a64477a0fb713f0c526c302feb595bba"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/.fingerprint/zlib-rs-9f54bf36daf196c6/lib-zlib_rs.json",
+      "bytes": 924,
+      "sha256": "c2753bddf63c35592370330a09544b3030814410b0dda5633dd092300183ea13"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crc32fast-583be9e0f87fd34b/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crc32fast-583be9e0f87fd34b/output",
+      "bytes": 178,
+      "sha256": "bb516d28b8feef7a2a8a75f6be81a78c3c41644271069b8d42f54b4183f1dfc7"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crc32fast-583be9e0f87fd34b/root-output",
+      "bytes": 103,
+      "sha256": "ae494cffa69302455fa18b5f817d47bf9b9a39b760d9a7af2ec037cbd1a2e7a9"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crc32fast-583be9e0f87fd34b/stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-deque-6eab4b4aaf32f8b5/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-deque-6eab4b4aaf32f8b5/output",
+      "bytes": 85,
+      "sha256": "8ba2fe9791014b8b7befc812fb9a284415cf2a2c09a1791591abbba5382f46fc"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-deque-6eab4b4aaf32f8b5/root-output",
+      "bytes": 109,
+      "sha256": "392c54ed98a91556ed461d87901b874b202bbc3d31eb9e4fc9a33cbd211e92f7"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-deque-6eab4b4aaf32f8b5/stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-epoch-bf1bda084962b513/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-epoch-bf1bda084962b513/output",
+      "bytes": 85,
+      "sha256": "8ba2fe9791014b8b7befc812fb9a284415cf2a2c09a1791591abbba5382f46fc"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-epoch-bf1bda084962b513/root-output",
+      "bytes": 109,
+      "sha256": "493f59135515dd080e4ad58d6ddc0fe5ce13efaa671aebe041cd04e730e43b17"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-epoch-bf1bda084962b513/stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-utils-29ba9d313a644afc/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-utils-29ba9d313a644afc/output",
+      "bytes": 109,
+      "sha256": "cb6814e09e64fb079e8defed607f9407cb5ef09b64fd8a31d4c581164f39bac5"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-utils-29ba9d313a644afc/root-output",
+      "bytes": 109,
+      "sha256": "a143f414e8921f5df3d8e8a2f84bee238c20f75f659b7ca4c760767d15dbb965"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/crossbeam-utils-29ba9d313a644afc/stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerCrossOver.o",
+      "bytes": 185376,
+      "sha256": "fe11363167bda6c747cb9859d74be983056f41ca3e61acbdd0bc6e65959225a0"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerDataFlowTrace.o",
+      "bytes": 2518128,
+      "sha256": "c5654d6faecc8cb4a18f3ccf5f4a1963eb99f53b08e4d35441e8928e087f8b52"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerDriver.o",
+      "bytes": 6008008,
+      "sha256": "e746b5715e2e3bc9da56ecf53313da60cc10b63261642d0ad15b31f4461246da"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerExtFunctionsDlsym.o",
+      "bytes": 1544,
+      "sha256": "c788e62322cb3e0e48696f49807cdf2730b008d2ffb25e352c8ec0982077e26f"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerExtFunctionsWeak.o",
+      "bytes": 47224,
+      "sha256": "7aec9275f7ba3dbd207d95e98f3ab3e549fef6fbe7d765a0abeb050f9b9294dc"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerExtFunctionsWindows.o",
+      "bytes": 1544,
+      "sha256": "2a1ad9b99e5b10c261db7037a54222a2781fc0b73250da570adb04e843c3835a"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerExtraCounters.o",
+      "bytes": 9240,
+      "sha256": "aaf7a50db27e16aa2162e3c390d0be2e626976e44ea794ca7c67c7c2a763b64a"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerExtraCountersDarwin.o",
+      "bytes": 5584,
+      "sha256": "d8444d2cbf2fba7a52fd3b05c732bde0b82a51f63f18cd773fb4ed06f791d076"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerExtraCountersWindows.o",
+      "bytes": 5584,
+      "sha256": "cf589087b8162d31744be5f4996b5dbdc571ce81840397b38f40f1f0920c3dcd"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerFork.o",
+      "bytes": 5556968,
+      "sha256": "6c502f38bb9a23e8bbfe164c7b9c6159541f0ed8e657fee5a9270ac4f03f89e6"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerIO.o",
+      "bytes": 920248,
+      "sha256": "1f59431c10bb2290ffead4eb241bb89266c5fdaa88fa61b3a6d0f63ddb6ca3b9"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerIOPosix.o",
+      "bytes": 375400,
+      "sha256": "0adc069b1765db88b5d77da85c0ccce0982b573459613b378f2823e53939f6ee"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerIOWindows.o",
+      "bytes": 1528,
+      "sha256": "48fbac54cb8b07ed471fca82330da5971c98ef002c426baac4b5cfec2c28c1af"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerInterceptors.o",
+      "bytes": 87376,
+      "sha256": "e7965a15d684d3a538009bdc94ea6743086857e1337fbf25ff80922b021a4746"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerLoop.o",
+      "bytes": 4514152,
+      "sha256": "ebfeb5a495112a592df5803e863571e2fde5be768536d3e7f64e83a6e30641dd"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerMain.o",
+      "bytes": 29496,
+      "sha256": "d55381eb8dabbdb64f7a0f7f8c2dfd444176d342617b4d2b918cecf124bf0ca4"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerMerge.o",
+      "bytes": 5251616,
+      "sha256": "613dc5c988da756c7596ac14a59690b67c576e4ed60176bccce1407a85a988dc"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerMutate.o",
+      "bytes": 1396040,
+      "sha256": "2b1ca80ebf2064ee97f1222d9a8aa43f6a237d1dde586e72c0f55b86b4a04c7b"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerSHA1.o",
+      "bytes": 225496,
+      "sha256": "249e11355a0f3cd5d23d0da8b083318df6c7031278624e03bb56effeccdb0af0"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerTracePC.o",
+      "bytes": 940808,
+      "sha256": "b91b86ed511678b3a7041b383873f5cdec9b5315c4fd7cc8d6e4d06be1c86790"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerUtil.o",
+      "bytes": 508376,
+      "sha256": "c8da79750e3a2d7b29b4dc88e6b4e4b1155689ba09aa134cca5a3e43f8ac7fdb"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerUtilDarwin.o",
+      "bytes": 1528,
+      "sha256": "d011c86db23ae89a2c9d7b18d15e10da623368a0698d53bce5b216a14ab2a526"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerUtilFuchsia.o",
+      "bytes": 1528,
+      "sha256": "eba0425ad476a49acce1019ae38397ca4a40ebed82ce56224be3116c80f18913"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerUtilLinux.o",
+      "bytes": 645520,
+      "sha256": "52fbb027e89dbce6fa056d0d69895ca1d51548316f8f5704e4b8684db36d31ea"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerUtilPosix.o",
+      "bytes": 758056,
+      "sha256": "7564c1bfcfb750129d9ccc19980caea7c66f77896c8438b4a527e48b68a90915"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/e5f0d71fb86e9d6b-FuzzerUtilWindows.o",
+      "bytes": 1528,
+      "sha256": "827446758cc56b3a5abadd0a3a63c0d5a70060beb6e901084e336238a0108d71"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/flag_check",
+      "bytes": 1304,
+      "sha256": "c521a840ec1f176c3b19d7477148e89f6e893f20735fdb436487058990c6eba2"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/flag_check.cpp",
+      "bytes": 28,
+      "sha256": "65d2fad425e300ae19bd229a513aa7564086a7f0feb9405f806c70b2366ad59a"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/out/libfuzzer.a",
+      "bytes": 30028030,
+      "sha256": "236c12f237a94cb376f933a743bc7c53a36a7b68c56476db650cf0dc8f068d73"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/output",
+      "bytes": 21505,
+      "sha256": "111f48fee5fdde1767f75ceb6ba6ca06c593935f608f73628027c6aa12132ace"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/root-output",
+      "bytes": 107,
+      "sha256": "3cb5adec09ab0a9cd9cbaf41fdb2e8a5a128e19513903b0c5551eef023fc0cae"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/libfuzzer-sys-50f058bf153f01fb/stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/rayon-core-2f93655bdbd98f4b/invoked.timestamp",
+      "bytes": 48,
+      "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/rayon-core-2f93655bdbd98f4b/output",
+      "bytes": 32,
+      "sha256": "dd454a92dee8a02b053b2cf6f15c04b2ff982baaa108229e76ba230456bca222"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/rayon-core-2f93655bdbd98f4b/root-output",
+      "bytes": 104,
+      "sha256": "b24538d4aa4e6779b60aa4210679bb68d902d79a9dcf0a4ebf50b1e6be82443a"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/build/rayon-core-2f93655bdbd98f4b/stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/arbitrary-9ce35286202d29f9.d",
+      "bytes": 21703,
+      "sha256": "4d06444fa72693d092b220aeef49797e23e616985050697620ab78b41a47440e"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/cfg_if-d5dad1fa038038d1.d",
+      "bytes": 670,
+      "sha256": "44cb49410add637ce03d54afea4ea2985c5793918b6169cbbe7b9d00ffb3c94f"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/crc32fast-c96b7480f77ca399.d",
+      "bytes": 2700,
+      "sha256": "36fbfe1f4183120f7141abaad6cec3053a9c63dc148dbcda6b8e171d079f70d5"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/crossbeam_deque-d5eb6fde963cf519.d",
+      "bytes": 1134,
+      "sha256": "b3a5b626bb2a8032e0478583ab8311e9ee23994e9671cf77d55d5a45d8f09b64"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/crossbeam_epoch-f8ccf8b95483a679.d",
+      "bytes": 5328,
+      "sha256": "b71a8aa49942a2f3c081b1275c4e78f057c10312660d20a698a1c4dee0a4eb70"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/crossbeam_utils-0efcfa819d8a8228.d",
+      "bytes": 5945,
+      "sha256": "3600e6277ac1be122de5b1e21492af9b40a9780ed1ecf3e531e6e8ac912225f7"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/either-2b08f73413e70746.d",
+      "bytes": 1448,
+      "sha256": "8f9cef6bd82d9e00147208fdf0379b3bdbc750c223f91d1792f35c203d3df2c9"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/flate2-ebfee09be1985cfe.d",
+      "bytes": 7969,
+      "sha256": "9cf7f4a9445697d89488ed6fcc1f7c5f0211b72f6482e188f9d0ccc5f2b65d71"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libarbitrary-9ce35286202d29f9.rlib",
+      "bytes": 2236218,
+      "sha256": "e582ac184e3d3a2b9d1840bffb1b148ade38342f1020221b45117d91221854b8"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libarbitrary-9ce35286202d29f9.rmeta",
+      "bytes": 1892069,
+      "sha256": "87c32b37b4ec46539e8da4d0efd852f8e31de25b23420cb534dd001e103bdeb8"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcfg_if-d5dad1fa038038d1.rlib",
+      "bytes": 12934,
+      "sha256": "a8296a9917578a257f24b6f96e51a183fcf51fea7ec61805d6e54a997cf4532d"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcfg_if-d5dad1fa038038d1.rmeta",
+      "bytes": 5499,
+      "sha256": "c2af3bc1438526e39304daf3a5f066be6c69d171b238491352871d03643cb1bb"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrc32fast-c96b7480f77ca399.rlib",
+      "bytes": 255402,
+      "sha256": "d8d1fe668070fe8ff246243a6ff3fe63e8e2297d45ec0cc118b9c1e2686baac8"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrc32fast-c96b7480f77ca399.rmeta",
+      "bytes": 55736,
+      "sha256": "0d722288d7f66229e081afe5d6ecd5a84cc15823f9a62db127864cd8096f5aee"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrossbeam_deque-d5eb6fde963cf519.rlib",
+      "bytes": 241992,
+      "sha256": "903c9f31c77e356fca3cfddf596a4178970f8808360c9d3f9951cd983f094683"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrossbeam_deque-d5eb6fde963cf519.rmeta",
+      "bytes": 234479,
+      "sha256": "5696f8700a28a2ad34865eb25257e04cc9f901ea80ac323c64f69e462cc142eb"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrossbeam_epoch-f8ccf8b95483a679.rlib",
+      "bytes": 576372,
+      "sha256": "8adc3ae7d0d2efe4d0ea480813e8460068b2b5047fc45ba19d24983da7fe99f9"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrossbeam_epoch-f8ccf8b95483a679.rmeta",
+      "bytes": 370843,
+      "sha256": "9494c8e4b763b9f7e0a22bbc273432a357221ccc48e596d72e2933d7301f767f"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrossbeam_utils-0efcfa819d8a8228.rlib",
+      "bytes": 994550,
+      "sha256": "d5fc6f37c095fcf0d427c031bac1345ddcb695aaaf49a17f3d719f108bcb3dce"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libcrossbeam_utils-0efcfa819d8a8228.rmeta",
+      "bytes": 748127,
+      "sha256": "8a6e9195977ef623f63e97a0bc7420c352d6da03b7ec791af61b3d7a26a8836a"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libeither-2b08f73413e70746.rlib",
+      "bytes": 259890,
+      "sha256": "c4ed9bc36238edbddbcd3ec430d09335f27067e2e40ae09f65ee54a582945308"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libeither-2b08f73413e70746.rmeta",
+      "bytes": 252447,
+      "sha256": "2e3e2cfe98005f28e3a7c3e635e6453f5bfe36791482178c979034a0404d1620"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libflate2-ebfee09be1985cfe.rlib",
+      "bytes": 989822,
+      "sha256": "30f2d5b56e461ffc8c7f14638e91bc0b4bcdf9ce2fd6d87d91dab606abd19667"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libflate2-ebfee09be1985cfe.rmeta",
+      "bytes": 701335,
+      "sha256": "be42c2585560602ec95e149eb2a905d81dc044de6275b3e82eb0761c7142641a"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libfuzzer_sys-0d73bbe39909b0a1.d",
+      "bytes": 723,
+      "sha256": "6675811b53e34ec321acc59d703b2fa4667b19f577c3c8fb1ba5b0b3f84c0b27"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/liblibfuzzer_sys-0d73bbe39909b0a1.rlib",
+      "bytes": 30147020,
+      "sha256": "d9a458d752d933c0fd550a0e3d90503cb8a4b8792e3cc32bfe6b11eb853420ce"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/liblibfuzzer_sys-0d73bbe39909b0a1.rmeta",
+      "bytes": 43261,
+      "sha256": "53b30f2b934e110c6f88f77e4ea1af2f0060c7cbae1728364663313810c9ed24"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/librayon-87f19cf75544896f.rlib",
+      "bytes": 4719642,
+      "sha256": "add6b9a1339339d228be2f6802622278e8ea450010c13a27e283356f57697f3c"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/librayon-87f19cf75544896f.rmeta",
+      "bytes": 4488172,
+      "sha256": "3bded8fda85c6cdd4d384d97df6d5363625b215bbf971c5a76ba869788b42811"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/librayon_core-86c7d03ab88ea34c.rlib",
+      "bytes": 1749982,
+      "sha256": "9f7c1a60289cd6e6f4e3c03a53ec50ec57430565f3a7ae0df137916e0531fc46"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/librayon_core-86c7d03ab88ea34c.rmeta",
+      "bytes": 557893,
+      "sha256": "a52de35aa9c0e3289ec11af338cb67c4c6484981f060a3d75fa56896de945921"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libsoapberry_zip-02860b939c428b1d.rlib",
+      "bytes": 9552054,
+      "sha256": "6a42c86f23668d30ebf5b3496a1a8a191f2e3805e7ae3fa4a2940616d040ef72"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libsoapberry_zip-02860b939c428b1d.rmeta",
+      "bytes": 3322990,
+      "sha256": "3fa6e47ecccbf1086121f7f89a631bcce1bbc134e56e5b1fd19e6c0b425f4f1f"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libzlib_rs-9f54bf36daf196c6.rlib",
+      "bytes": 2832856,
+      "sha256": "4dbc6960a66e96491dfa920666607a1cba41779276437b4a49bf3389bf86b6b7"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/libzlib_rs-9f54bf36daf196c6.rmeta",
+      "bytes": 835688,
+      "sha256": "945a5df60a56c8947beafd730e73e564186f2654dda3ef9ffaac2e19adb42658"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/parse_zip-9bf9981e9b4e3df7",
+      "bytes": 22373648,
+      "sha256": "46ffb55db77cab4e5e9295d51b641db55b6d00e1400d32bcd14c5aad4317f61a"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/parse_zip-9bf9981e9b4e3df7.d",
+      "bytes": 283,
+      "sha256": "5dd7403b0bf63f82d6b0a778a58239b77341846db4d5f0f8b53ad496e33cba1b"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/rayon-87f19cf75544896f.d",
+      "bytes": 39524,
+      "sha256": "38e27affa2814391314b799d7113d0bae5a5109b64161790036a80e83efb192a"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/rayon_core-86c7d03ab88ea34c.d",
+      "bytes": 9972,
+      "sha256": "a26d92b50f4c06402e1deea1c02249d2fca2175c5052233608f37ffa42e30a26"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/soapberry_zip-02860b939c428b1d.d",
+      "bytes": 4146,
+      "sha256": "8f5e665ba4f3c2be06aa4bf6e700e9eb4bdae5023b82319a3023457a41b7a68f"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/deps/zlib_rs-9f54bf36daf196c6.d",
+      "bytes": 15798,
+      "sha256": "50d035708843cbfbcc3dd89f2824e3f93e4a6ee242f72fe644843b88c4298af4"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/parse_zip",
+      "bytes": 22373648,
+      "sha256": "46ffb55db77cab4e5e9295d51b641db55b6d00e1400d32bcd14c5aad4317f61a"
+    },
+    {
+      "path": "fuzz/target/x86_64-unknown-linux-gnu/release/parse_zip.d",
+      "bytes": 1080,
+      "sha256": "542d75e7a4c0e8d60b9aa015b0c35f4b27a855c0eb4fc1dfe3fbacb6cf3492f0"
+    },
+    {
+      "path": "native/bytes.json",
+      "bytes": 7824,
+      "sha256": "564c05546fcac981d440ec882ddf917fb5d8d5c69aaf5f94db89b0d6028c44a6"
+    },
+    {
+      "path": "native/bytes.pptx",
+      "bytes": 42948,
+      "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+    },
+    {
+      "path": "native-r1/bytes.json",
+      "bytes": 7827,
+      "sha256": "3e48c6f60f3c4f70bbd928a3fb30d3e8981f0afabe8ab07862f81bec9e755419"
+    },
+    {
+      "path": "native-r1/bytes.pptx",
+      "bytes": 42948,
+      "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+    },
+    {
+      "path": "native-r1/range.json",
+      "bytes": 7866,
+      "sha256": "15ba7cbed6bdf64a6d78f8abc86710a1c3124f0b63d8edcb3cd18a51b89a19d4"
+    },
+    {
+      "path": "native-r1/range.pptx",
+      "bytes": 42948,
+      "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+    },
+    {
+      "path": "probe",
+      "bytes": 3566600,
+      "sha256": "b89b3a051eb52daa4e88543d80706c859eef00c8b319d7d57948702f0bad900f"
+    },
+    {
+      "path": "stacks-local/baseline.data",
+      "bytes": 8267880,
+      "sha256": "321cbf4c64022396997b238bf48b6b85d07689d16751667cd09416e77cc5c802"
+    },
+    {
+      "path": "stacks-local/candidate.data",
+      "bytes": 8259808,
+      "sha256": "1eaf2a3cd835de7bcfcafe2d8781e6976e9f03edbabb93d8df242df2022ae0a9"
+    }
+  ]
+}

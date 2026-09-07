@@ -1,10 +1,14 @@
 #![no_main]
 
 use std::hint::black_box;
+use std::io::{self, Write};
 
 use libfuzzer_sys::fuzz_target;
 use soapberry_zip::office::{ArchiveLimits, ArchiveReader, IndexedArchive};
-use soapberry_zip::{RECOMMENDED_BUFFER_SIZE, ReaderAt, ZipArchive};
+use soapberry_zip::{
+    CompressionMethod, ErrorKind, PreservationPlan, RECOMMENDED_BUFFER_SIZE, ReaderAt,
+    RegeneratedEntry, ZipArchive, ZipOperationAccounting,
+};
 
 const MAX_INPUT_BYTES: usize = 1 << 20;
 const MAX_FILES: usize = 256;
@@ -12,6 +16,75 @@ const MAX_MEMBER_NAME_BYTES: u64 = 4 << 10;
 const MAX_METADATA_BYTES: u64 = 64 << 10;
 const MAX_ENTRY_BYTES: u64 = 1 << 20;
 const MAX_PRECOMPRESSED_PROGRESS_EVENTS: usize = 8;
+const MAX_REPUBLISHED_OUTPUT_BYTES: usize = 3 * MAX_INPUT_BYTES;
+const MAX_REPUBLISHED_WRITE_CHUNK: usize = 4096;
+const REPUBLISHED_MEMBER_NAME: &str = "__fuzz_precompressed_member__";
+
+/// A forward-only sink with both a finite output ceiling and optional failure
+/// point.  The fuzz target must not let a valid source turn into an
+/// archive-sized unbounded output allocation merely because it appends one
+/// verified member.
+#[derive(Debug)]
+struct BoundedSink {
+    bytes: Vec<u8>,
+    max_bytes: usize,
+    max_write: usize,
+    fail_after: Option<usize>,
+}
+
+impl BoundedSink {
+    fn new(max_bytes: usize, max_write: usize, fail_after: Option<usize>) -> Self {
+        assert!(max_bytes > 0);
+        assert!(max_write > 0);
+        Self {
+            bytes: Vec::new(),
+            max_bytes,
+            max_write,
+            fail_after,
+        }
+    }
+}
+
+impl Write for BoundedSink {
+    fn write(&mut self, input: &[u8]) -> io::Result<usize> {
+        if input.is_empty() {
+            return Ok(0);
+        }
+        if self.bytes.len() >= self.max_bytes {
+            return Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                "fuzz output limit reached",
+            ));
+        }
+        if self
+            .fail_after
+            .is_some_and(|fail_after| self.bytes.len() >= fail_after)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "fuzz partial sink failure",
+            ));
+        }
+
+        let mut accepted = input.len().min(self.max_write);
+        accepted = accepted.min(self.max_bytes - self.bytes.len());
+        if let Some(fail_after) = self.fail_after {
+            accepted = accepted.min(fail_after.saturating_sub(self.bytes.len()));
+        }
+        if accepted == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "fuzz partial sink failure",
+            ));
+        }
+        self.bytes.extend_from_slice(&input[..accepted]);
+        Ok(accepted)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 fn fuzz_limits() -> ArchiveLimits {
     ArchiveLimits {
@@ -106,7 +179,11 @@ fn exercise_preservation_index<R: ReaderAt>(archive: &IndexedArchive<R>, limits:
     }
 }
 
-fn exercise_precompressed<R: ReaderAt>(archive: &IndexedArchive<R>, borrowed: &ArchiveReader<'_>) {
+fn exercise_precompressed<R: ReaderAt>(
+    archive: &IndexedArchive<R>,
+    borrowed: &ArchiveReader<'_>,
+    limits: ArchiveLimits,
+) {
     for name in archive.file_names() {
         let Some(entry_id) = archive.entry_id(name) else {
             continue;
@@ -146,11 +223,156 @@ fn exercise_precompressed<R: ReaderAt>(archive: &IndexedArchive<R>, borrowed: &A
             assert_eq!(token.uncompressed_size(), decoded_size);
             assert_eq!(token.crc32(), soapberry_zip::crc32(&decoded));
             let _ = black_box(token.compression_method());
+            exercise_precompressed_republication(archive, limits, &decoded, token);
         }
 
         // One bounded member is enough to cover both successful small-member
         // tokens and callback cancellation for larger admitted members.
         break;
+    }
+}
+
+fn republished_payload_range(output: &[u8]) -> Option<(usize, usize)> {
+    let archive = ZipArchive::from_slice(output).ok()?;
+    let record = archive.entries().find_map(|entry| {
+        let entry = entry.ok()?;
+        (entry.file_path().as_ref() == REPUBLISHED_MEMBER_NAME.as_bytes()).then_some(entry)
+    })?;
+    let entry = archive.get_entry(record.wayfinder()).ok()?;
+    let (start, end) = entry.compressed_data_range();
+    Some((usize::try_from(start).ok()?, usize::try_from(end).ok()?))
+}
+
+fn exercise_precompressed_republication<R: ReaderAt>(
+    archive: &IndexedArchive<R>,
+    limits: ArchiveLimits,
+    decoded: &[u8],
+    token: soapberry_zip::office::VerifiedPrecompressedEntry,
+) {
+    // Avoid ambiguous readback if a fuzz input already contains the fixed
+    // generated name.  This keeps the target's one appended entry addressable
+    // without retaining or scanning an unbounded name set.
+    if archive.contains(REPUBLISHED_MEMBER_NAME) {
+        return;
+    }
+
+    let mut scratch = [0u8; RECOMMENDED_BUFFER_SIZE];
+    let Ok(index) = archive.preservation_index_with_limits(&mut scratch, limits) else {
+        return;
+    };
+    let mut plan = PreservationPlan::copy_all(&index);
+    if plan
+        .try_append(RegeneratedEntry::new_precompressed_shared(
+            REPUBLISHED_MEMBER_NAME,
+            token.clone(),
+        ))
+        .is_err()
+    {
+        return;
+    }
+
+    let mut baseline_sink = BoundedSink::new(MAX_REPUBLISHED_OUTPUT_BYTES, usize::MAX, None);
+    let mut baseline_accounting = ZipOperationAccounting::default();
+    if index
+        .write_to_with_accounting(&plan, &mut baseline_sink, &mut baseline_accounting)
+        .is_err()
+    {
+        // A bounded refusal is an expected fuzz outcome for an input whose
+        // source plus one retained member exceeds the publication ceiling.
+        return;
+    }
+    let output = baseline_sink.bytes;
+    let (payload_start, payload_end) = republished_payload_range(&output)
+        .expect("successful publication must contain the generated member");
+    assert!(payload_start <= payload_end && payload_end <= output.len());
+
+    let mut output_limits = limits;
+    output_limits.max_files = limits.max_files.saturating_add(1);
+    output_limits.max_metadata_bytes = limits.max_metadata_bytes.saturating_add(128 * 1024);
+    output_limits.max_total_size = MAX_REPUBLISHED_OUTPUT_BYTES as u64;
+    let output_reader = ArchiveReader::new_with_limits(&output, output_limits)
+        .expect("successful bounded publication must reopen within expanded limits");
+    let readback = output_reader
+        .read(REPUBLISHED_MEMBER_NAME)
+        .expect("verified precompressed republish must decode");
+    assert_eq!(readback, decoded);
+
+    let payload_bytes = (payload_end - payload_start) as u64;
+    match token.compression_method() {
+        CompressionMethod::Store => {
+            assert_eq!(
+                baseline_accounting.stored_payload_bytes_emitted(),
+                payload_bytes
+            );
+            assert_eq!(baseline_accounting.precompressed_payload_bytes_emitted(), 0);
+        },
+        CompressionMethod::Deflate => {
+            assert_eq!(
+                baseline_accounting.precompressed_payload_bytes_emitted(),
+                payload_bytes
+            );
+            assert_eq!(baseline_accounting.stored_payload_bytes_emitted(), 0);
+        },
+        _ => return,
+    }
+    assert_eq!(
+        baseline_accounting.generated_deflate_payload_bytes_emitted(),
+        0
+    );
+
+    // Exercise Write::write short returns across every publication phase while
+    // requiring the exact same bytes and accounting as an unconstrained sink.
+    let mut short_sink = BoundedSink::new(
+        MAX_REPUBLISHED_OUTPUT_BYTES,
+        MAX_REPUBLISHED_WRITE_CHUNK,
+        None,
+    );
+    let mut short_accounting = ZipOperationAccounting::default();
+    index
+        .write_to_with_accounting(&plan, &mut short_sink, &mut short_accounting)
+        .expect("bounded short-write sink must complete");
+    assert_eq!(short_sink.bytes, output);
+    assert_eq!(short_accounting, baseline_accounting);
+
+    // Fail after a small accepted payload prefix.  This exercises the direct
+    // verified-payload publication path and proves accounting charges only
+    // bytes the sink accepted before returning its typed I/O error.
+    let accepted_prefix = (payload_end - payload_start).min(3);
+    let fail_after = payload_start.saturating_add(accepted_prefix);
+    if fail_after < output.len() {
+        let mut partial_sink = BoundedSink::new(
+            MAX_REPUBLISHED_OUTPUT_BYTES,
+            MAX_REPUBLISHED_WRITE_CHUNK,
+            Some(fail_after),
+        );
+        let mut partial_accounting = ZipOperationAccounting::default();
+        let error = index
+            .write_to_with_accounting(&plan, &mut partial_sink, &mut partial_accounting)
+            .expect_err("partial sink must fail after its accepted prefix");
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert_eq!(partial_sink.bytes, output[..fail_after]);
+        let accepted_payload = accepted_prefix as u64;
+        match token.compression_method() {
+            CompressionMethod::Store => {
+                assert_eq!(
+                    partial_accounting.stored_payload_bytes_emitted(),
+                    accepted_payload
+                );
+                assert_eq!(partial_accounting.precompressed_payload_bytes_emitted(), 0);
+            },
+            CompressionMethod::Deflate => {
+                assert_eq!(
+                    partial_accounting.precompressed_payload_bytes_emitted(),
+                    accepted_payload
+                );
+                assert_eq!(partial_accounting.stored_payload_bytes_emitted(), 0);
+            },
+            _ => return,
+        }
+        assert_eq!(
+            partial_accounting.generated_deflate_payload_bytes_emitted(),
+            0
+        );
     }
 }
 
@@ -214,7 +436,7 @@ fn exercise_bounded_paths(data: &[u8]) {
     // contiguous borrowed source and the positional ReaderAt source.
     if let (Ok(reader), Ok(archive)) = (&borrowed, &reader_at) {
         exercise_fused_precompressed(archive, reader);
-        exercise_precompressed(archive, reader);
+        exercise_precompressed(archive, reader, limits);
         for name in reader.file_names() {
             assert!(archive.contains(name));
             if let (Ok(borrowed_metadata), Ok(reader_at_metadata)) =

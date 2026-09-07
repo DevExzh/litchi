@@ -1,0 +1,245 @@
+{
+  "status": "pass",
+  "scope": "separate whole-process counters including corpus generation, untimed output oracles and serialization; not API-attributed counters or ordinary timing samples",
+  "events": "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+  "order": [
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline"
+  ],
+  "rows": [
+    {
+      "build": "baseline",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/profiles/0/perf.csv",
+        "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/profiles/0/report.json"
+      ],
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "sha256": "127e2c36432afae921def35eaf6525afe1c0b46ac865cc7a92d4165878fa065c",
+        "bytes": 57783904
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "artifacts": [
+        {
+          "path": "profiles/0/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "profiles/0/perf.csv",
+          "sha256": "67628f4089b5972f5a18cebecacd97947464cd4551c056d3c0d68a0500a0ecfb",
+          "bytes": 294
+        },
+        {
+          "path": "profiles/0/report.json",
+          "sha256": "849e31f55c068a3acbf3b0a401e26d7629027b3166899b116594b4ba583960aa",
+          "bytes": 1836497
+        },
+        {
+          "path": "profiles/0/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "build": "candidate",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/profiles/1/perf.csv",
+        "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/profiles/1/report.json"
+      ],
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "sha256": "6b9edd1fd654f91b8a6dcb1080051e2a342e96e542ef9c27dd3e30f99ad34828",
+        "bytes": 57527896
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "artifacts": [
+        {
+          "path": "profiles/1/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "profiles/1/perf.csv",
+          "sha256": "5b69ed6b0759db400e473977d282086bfe039462841869d136713761869d1cb3",
+          "bytes": 294
+        },
+        {
+          "path": "profiles/1/report.json",
+          "sha256": "40f78d1f649bc694e6e9f8906ba71f88a9b20ac8609b19b4b3cd382265be28f3",
+          "bytes": 1836498
+        },
+        {
+          "path": "profiles/1/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "build": "candidate",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/profiles/2/perf.csv",
+        "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/profiles/2/report.json"
+      ],
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "sha256": "6b9edd1fd654f91b8a6dcb1080051e2a342e96e542ef9c27dd3e30f99ad34828",
+        "bytes": 57527896
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "artifacts": [
+        {
+          "path": "profiles/2/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "profiles/2/perf.csv",
+          "sha256": "545919a96328292a684af123dda171510f27bd7a1cd3bff70226dc21a7597581",
+          "bytes": 294
+        },
+        {
+          "path": "profiles/2/report.json",
+          "sha256": "5a1a4e065f00e261cdad438ac90090434dedd8576b928050c478c624f1609b45",
+          "bytes": 1836498
+        },
+        {
+          "path": "profiles/2/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "build": "baseline",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/profiles/3/perf.csv",
+        "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/profiles/3/report.json"
+      ],
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "sha256": "127e2c36432afae921def35eaf6525afe1c0b46ac865cc7a92d4165878fa065c",
+        "bytes": 57783904
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "artifacts": [
+        {
+          "path": "profiles/3/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "profiles/3/perf.csv",
+          "sha256": "e143345f6016dfb54d16dc0b63d64f30a3b24b8b8233929667dcfd1dcf03bd42",
+          "bytes": 294
+        },
+        {
+          "path": "profiles/3/report.json",
+          "sha256": "b8c5531913f58e00a54d00fb83a77d9a813abef9be18b39dc073dab911c8b52b",
+          "bytes": 1836497
+        },
+        {
+          "path": "profiles/3/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    }
+  ]
+}

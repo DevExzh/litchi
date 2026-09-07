@@ -193,6 +193,95 @@ struct SizedLocalHeader {
     extra: [u8; ZIP64_LOCAL_SIZE_EXTRA_MAX_LEN],
 }
 
+/// Sized member metadata shared by the ordinary writer and preservation's
+/// direct-payload path.
+///
+/// The local header and central record carry the same grammar used by
+/// [`ZipArchiveWriter::write_precompressed_file`].  The local-header offset is
+/// supplied by the caller; preservation prepares it at zero and applies its
+/// checked output-offset patch during layout preflight.
+pub(crate) struct PreparedSizedMember<'a> {
+    path: ZipFilePath<NormalizedPath<'a>>,
+    local_header: SizedLocalHeader,
+    file_header: FileHeader,
+}
+
+impl PreparedSizedMember<'_> {
+    fn name_bytes(&self) -> &[u8] {
+        self.path.as_ref().as_bytes()
+    }
+
+    fn local_len(&self) -> Result<usize, Error> {
+        ZipLocalFileHeaderFixed::SIZE
+            .checked_add(self.name_bytes().len())
+            .and_then(|size| size.checked_add(usize::from(self.local_header.fixed.extra_field_len)))
+            .ok_or_else(|| {
+                ErrorKind::InvalidInput {
+                    msg: "sized local header length overflow".to_string(),
+                }
+                .into()
+            })
+    }
+
+    /// Materialize only the local framing; the compressed payload is supplied
+    /// separately by the preservation writer.
+    pub(crate) fn local_bytes(&self) -> Result<Vec<u8>, Error> {
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.local_len()?)
+            .map_err(|source| ErrorKind::Allocation {
+                resource: "generated local framing",
+                source,
+            })?;
+        self.write_local(&mut bytes)?;
+        Ok(bytes)
+    }
+
+    /// Materialize one central-directory record with the prepared local-header
+    /// offset.  Preservation prepares the offset as zero and patches it only
+    /// after all member spans have been measured.
+    pub(crate) fn central_bytes(&mut self) -> Result<Vec<u8>, Error> {
+        self.finalize_central()?;
+        let capacity = ZipFileHeaderFixed::SIZE
+            .checked_add(self.name_bytes().len())
+            .and_then(|size| {
+                size.checked_add(usize::from(self.file_header.extra_fields.central_size))
+            })
+            .ok_or_else(|| ErrorKind::InvalidInput {
+                msg: "sized central record length overflow".to_string(),
+            })?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(capacity)
+            .map_err(|source| ErrorKind::Allocation {
+                resource: "generated central framing",
+                source,
+            })?;
+        self.file_header.central_fixed().write(&mut bytes)?;
+        bytes.extend_from_slice(self.name_bytes());
+        self.file_header
+            .extra_fields
+            .write_extra_fields(&mut bytes, Header::CENTRAL)?;
+        Ok(bytes)
+    }
+
+    fn finalize_central(&mut self) -> Result<(), Error> {
+        self.file_header.finalize_extra_fields()
+    }
+
+    fn write_local<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        self.local_header.fixed.write(&mut *writer)?;
+        writer.write_all(self.name_bytes())?;
+        let extra_len = usize::from(self.local_header.fixed.extra_field_len);
+        writer.write_all(&self.local_header.extra[..extra_len])?;
+        Ok(())
+    }
+
+    fn into_file_header(self) -> FileHeader {
+        self.file_header
+    }
+}
+
 fn sized_local_header(
     flags: u16,
     compression_method: CompressionMethod,
@@ -248,6 +337,105 @@ fn sized_local_header(
         },
         extra,
     })
+}
+
+fn sized_member_path(name: &str) -> Result<ZipFilePath<NormalizedPath<'_>>, Error> {
+    let path = ZipFilePath::from_str(name.trim_end_matches('/'));
+    if path.len() > u16::MAX as usize {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "file name too long".to_string(),
+        }));
+    }
+    Ok(path)
+}
+
+fn prepare_sized_member_with_path(
+    path: ZipFilePath<NormalizedPath<'_>>,
+    compression_method: CompressionMethod,
+    crc32: u32,
+    compressed_size: u64,
+    uncompressed_size: u64,
+    local_header_offset: u64,
+) -> Result<PreparedSizedMember<'_>, Error> {
+    if !matches!(
+        compression_method,
+        CompressionMethod::Store | CompressionMethod::Deflate
+    ) {
+        return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+            compression_method.as_id().as_u16(),
+        )));
+    }
+
+    let mut flags = 0u16;
+    if path.needs_utf8_encoding() {
+        flags |= FLAG_UTF8_ENCODING;
+    }
+    let name_len = path.len() as u16;
+    let local_header = sized_local_header(
+        flags,
+        compression_method,
+        crc32,
+        compressed_size,
+        uncompressed_size,
+        name_len,
+    )?;
+    let file_header = FileHeader {
+        name_len,
+        compression_method,
+        local_header_offset,
+        compressed_size,
+        uncompressed_size,
+        crc: crc32,
+        flags,
+        zip64: false,
+        modification_time: None,
+        unix_permissions: None,
+        extra_fields: ExtraFieldsContainer::new(),
+    };
+    Ok(PreparedSizedMember {
+        path,
+        local_header,
+        file_header,
+    })
+}
+
+pub(crate) fn prepare_sized_member(
+    name: &str,
+    compression_method: CompressionMethod,
+    crc32: u32,
+    compressed_size: u64,
+    uncompressed_size: u64,
+    local_header_offset: u64,
+) -> Result<PreparedSizedMember<'_>, Error> {
+    let path = sized_member_path(name)?;
+    prepare_sized_member_with_path(
+        path,
+        compression_method,
+        crc32,
+        compressed_size,
+        uncompressed_size,
+        local_header_offset,
+    )
+}
+
+/// Prepare a stored member while preserving the writer's cheap name-refusal
+/// ordering before scanning the payload for its CRC-32.
+pub(crate) fn prepare_stored_member<'name>(
+    name: &'name str,
+    data: &[u8],
+    local_header_offset: u64,
+) -> Result<PreparedSizedMember<'name>, Error> {
+    let path = sized_member_path(name)?;
+    let size = usize_to_u64(data.len(), "stored payload length")?;
+    let crc32 = crc::crc32(data);
+    prepare_sized_member_with_path(
+        path,
+        CompressionMethod::Store,
+        crc32,
+        size,
+        size,
+        local_header_offset,
+    )
 }
 
 impl ZipArchiveWriter<()> {
@@ -654,6 +842,21 @@ impl<W> ZipArchiveWriter<W>
 where
     W: Write,
 {
+    fn reserve_member_metadata(&mut self, name_bytes: &[u8]) -> Result<(), Error> {
+        self.file_names
+            .try_reserve(name_bytes.len())
+            .map_err(|error| ErrorKind::InvalidInput {
+                msg: format!("could not reserve ZIP member-name storage: {error}"),
+            })?;
+        self.files
+            .try_reserve(1)
+            .map_err(|error| ErrorKind::InvalidInput {
+                msg: format!("could not reserve ZIP file-header storage: {error}"),
+            })?;
+        self.file_names.extend_from_slice(name_bytes);
+        Ok(())
+    }
+
     pub fn write_stored_file(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
         let mut accounting = ZipOperationAccounting::default();
         self.write_stored_file_with_accounting(name, data, &mut accounting)
@@ -667,78 +870,33 @@ where
         data: &[u8],
         accounting: &mut ZipOperationAccounting,
     ) -> Result<(), Error> {
-        let file_path = ZipFilePath::from_str(name.trim_end_matches('/'));
-
-        if file_path.len() > u16::MAX as usize {
-            return Err(Error::from(ErrorKind::InvalidInput {
-                msg: "file name too long".to_string(),
-            }));
-        }
-
-        let local_header_offset = self.writer.count();
-        let mut flags = 0u16;
-        if file_path.needs_utf8_encoding() {
-            flags |= FLAG_UTF8_ENCODING;
-        }
-
-        let name_bytes = file_path.as_ref().as_bytes();
-        let name_len = name_bytes.len() as u16;
-        self.file_names
-            .try_reserve(name_bytes.len())
-            .map_err(|error| ErrorKind::InvalidInput {
-                msg: format!("could not reserve ZIP member-name storage: {error}"),
-            })?;
-        self.files
-            .try_reserve(1)
-            .map_err(|error| ErrorKind::InvalidInput {
-                msg: format!("could not reserve ZIP file-header storage: {error}"),
-            })?;
-        self.file_names.extend_from_slice(name_bytes);
-
+        let path = sized_member_path(name)?;
         let crc32 = crc::crc32(data);
         let size_u64 = usize_to_u64(data.len(), "stored payload length")?;
-        let local_header = sized_local_header(
-            flags,
+        let mut prepared = prepare_sized_member_with_path(
+            path,
             CompressionMethod::Store,
             crc32,
             size_u64,
             size_u64,
-            name_len,
+            self.writer.count(),
         )?;
-
-        let uses_zip64 = local_header.fixed.version_needed == ZIP64_VERSION_NEEDED;
-        let mut file_header = FileHeader {
-            name_len,
-            compression_method: CompressionMethod::Store,
-            local_header_offset,
-            compressed_size: size_u64,
-            uncompressed_size: size_u64,
-            crc: crc32,
-            flags,
-            zip64: false,
-            modification_time: None,
-            unix_permissions: None,
-            extra_fields: ExtraFieldsContainer::new(),
-        };
+        let uses_zip64 = prepared.local_header.fixed.version_needed == ZIP64_VERSION_NEEDED;
         if uses_zip64 {
-            file_header.finalize_extra_fields()?;
+            prepared.finalize_central()?;
         }
-
-        local_header.fixed.write(&mut self.writer)?;
-        self.writer.write_all(file_path.as_ref().as_bytes())?;
-        let extra_len = usize::from(local_header.fixed.extra_field_len);
-        self.writer.write_all(&local_header.extra[..extra_len])?;
+        self.reserve_member_metadata(prepared.name_bytes())?;
+        prepared.write_local(&mut self.writer)?;
         write_all_counted(
             &mut self.writer,
             data,
             accounting,
             AccountingWriteKind::Stored,
         )?;
-
         if !uses_zip64 {
-            file_header.finalize_extra_fields()?;
+            prepared.finalize_central()?;
         }
-        self.files.push(file_header);
+        self.files.push(prepared.into_file_header());
 
         Ok(())
     }
@@ -835,73 +993,26 @@ where
                 compression_method.as_id().as_u16(),
             )));
         }
-        let file_path = ZipFilePath::from_str(name.trim_end_matches('/'));
-
-        if file_path.len() > u16::MAX as usize {
-            return Err(Error::from(ErrorKind::InvalidInput {
-                msg: "file name too long".to_string(),
-            }));
-        }
-
         let compressed_size = usize_to_u64(compressed.len(), "precompressed payload length")?;
-
-        let local_header_offset = self.writer.count();
-        let mut flags = 0u16;
-        if file_path.needs_utf8_encoding() {
-            flags |= FLAG_UTF8_ENCODING;
-        }
-
-        let name_bytes = file_path.as_ref().as_bytes();
-        let name_len = name_bytes.len() as u16;
-        self.file_names
-            .try_reserve(name_bytes.len())
-            .map_err(|error| ErrorKind::InvalidInput {
-                msg: format!("could not reserve ZIP member-name storage: {error}"),
-            })?;
-        self.files
-            .try_reserve(1)
-            .map_err(|error| ErrorKind::InvalidInput {
-                msg: format!("could not reserve ZIP file-header storage: {error}"),
-            })?;
-        self.file_names.extend_from_slice(name_bytes);
-
-        let local_header = sized_local_header(
-            flags,
+        let mut prepared = prepare_sized_member(
+            name,
             compression_method,
             crc32,
             compressed_size,
             uncompressed_size,
-            name_len,
+            self.writer.count(),
         )?;
-
-        let uses_zip64 = local_header.fixed.version_needed == ZIP64_VERSION_NEEDED;
-        let mut file_header = FileHeader {
-            name_len,
-            compression_method,
-            local_header_offset,
-            compressed_size,
-            uncompressed_size,
-            crc: crc32,
-            flags,
-            zip64: false,
-            modification_time: None,
-            unix_permissions: None,
-            extra_fields: ExtraFieldsContainer::new(),
-        };
+        let uses_zip64 = prepared.local_header.fixed.version_needed == ZIP64_VERSION_NEEDED;
         if uses_zip64 {
-            file_header.finalize_extra_fields()?;
+            prepared.finalize_central()?;
         }
-
-        local_header.fixed.write(&mut self.writer)?;
-        self.writer.write_all(file_path.as_ref().as_bytes())?;
-        let extra_len = usize::from(local_header.fixed.extra_field_len);
-        self.writer.write_all(&local_header.extra[..extra_len])?;
+        self.reserve_member_metadata(prepared.name_bytes())?;
+        prepared.write_local(&mut self.writer)?;
         write_all_counted(&mut self.writer, compressed, accounting, accounting_kind)?;
-
         if !uses_zip64 {
-            file_header.finalize_extra_fields()?;
+            prepared.finalize_central()?;
         }
-        self.files.push(file_header);
+        self.files.push(prepared.into_file_header());
 
         Ok(())
     }
@@ -1335,50 +1446,7 @@ where
 
         // Write central directory entries
         for file in &self.files {
-            // Version made by and version needed to extract
-            let version_needed = if file.needs_zip64() {
-                ZIP64_VERSION_NEEDED
-            } else {
-                20
-            };
-
-            // Set version_made_by to indicate Unix when Unix permissions are present
-            let version_made_by_hi = file.unix_permissions.map(|_| CREATOR_UNIX).unwrap_or(0);
-            let version_made_by = (version_made_by_hi << 8) | version_needed;
-
-            let (dos_time, dos_date) = file
-                .modification_time
-                .as_ref()
-                .map(|dt| DosDateTime::from(dt).into_parts())
-                .unwrap_or((0, 0));
-
-            let header = ZipFileHeaderFixed {
-                signature: CENTRAL_HEADER_SIGNATURE,
-                version_made_by,
-                version_needed,
-                flags: file.flags,
-                compression_method: file.compression_method.as_id(),
-                last_mod_time: dos_time,
-                last_mod_date: dos_date,
-                crc32: file.crc,
-                compressed_size: if file.zip64 {
-                    u32::MAX
-                } else {
-                    file.compressed_size.min(ZIP64_THRESHOLD_FILE_SIZE) as u32
-                },
-                uncompressed_size: if file.zip64 {
-                    u32::MAX
-                } else {
-                    file.uncompressed_size.min(ZIP64_THRESHOLD_FILE_SIZE) as u32
-                },
-                file_name_len: file.name_len,
-                extra_field_len: file.extra_fields.central_size,
-                file_comment_len: 0,
-                disk_number_start: 0,
-                internal_file_attrs: 0,
-                external_file_attrs: file.unix_permissions.map(|x| x << 16).unwrap_or(0),
-                local_header_offset: file.local_header_offset.min(ZIP64_THRESHOLD_OFFSET) as u32,
-            };
+            let header = file.central_fixed();
 
             header.write(&mut self.writer)?;
 
@@ -2034,6 +2102,53 @@ struct FileHeader {
 }
 
 impl FileHeader {
+    fn central_fixed(&self) -> ZipFileHeaderFixed {
+        // Version made by and version needed to extract.
+        let version_needed = if self.needs_zip64() {
+            ZIP64_VERSION_NEEDED
+        } else {
+            20
+        };
+
+        // Set version_made_by to indicate Unix when Unix permissions are present.
+        let version_made_by_hi = self.unix_permissions.map(|_| CREATOR_UNIX).unwrap_or(0);
+        let version_made_by = (version_made_by_hi << 8) | version_needed;
+
+        let (dos_time, dos_date) = self
+            .modification_time
+            .as_ref()
+            .map(|dt| DosDateTime::from(dt).into_parts())
+            .unwrap_or((0, 0));
+
+        ZipFileHeaderFixed {
+            signature: CENTRAL_HEADER_SIGNATURE,
+            version_made_by,
+            version_needed,
+            flags: self.flags,
+            compression_method: self.compression_method.as_id(),
+            last_mod_time: dos_time,
+            last_mod_date: dos_date,
+            crc32: self.crc,
+            compressed_size: if self.zip64 {
+                u32::MAX
+            } else {
+                self.compressed_size.min(ZIP64_THRESHOLD_FILE_SIZE) as u32
+            },
+            uncompressed_size: if self.zip64 {
+                u32::MAX
+            } else {
+                self.uncompressed_size.min(ZIP64_THRESHOLD_FILE_SIZE) as u32
+            },
+            file_name_len: self.name_len,
+            extra_field_len: self.extra_fields.central_size,
+            file_comment_len: 0,
+            disk_number_start: 0,
+            internal_file_attrs: 0,
+            external_file_attrs: self.unix_permissions.map(|x| x << 16).unwrap_or(0),
+            local_header_offset: self.local_header_offset.min(ZIP64_THRESHOLD_OFFSET) as u32,
+        }
+    }
+
     fn needs_zip64(&self) -> bool {
         self.zip64
             || self.compressed_size >= ZIP64_THRESHOLD_FILE_SIZE

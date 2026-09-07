@@ -1,5 +1,24 @@
 # Performance hotspot inventory
 
+## Change 0456: eliminate the verified-payload preparation copy
+
+[0456](changes/0456-zip-shared-payload-framing.md) retains shared payload storage
+and allocates only framing/central metadata. Media publication drops 16,814,784
+allocated bytes and 16,812,496 regional peak bytes above entry. The remaining
+publication allocation is 4,243,083 bytes with 593,892 peak bytes above entry;
+managed admissions remain conservative. Read/write counts and payload bytes
+are unchanged. Ordinary owned Store and generated Deflate remain buffered.
+
+The ordinary bytes/media API regression of 15.411%/16.347% is retained. Separate
+fixed-policy diagnostics reverse the comparison, demonstrating allocator-sensitive
+latency without proving historical mapping decisions. No universal latency or
+API-level CPU gain is claimed. The next bounded-append gap needs a streaming
+common XML transform and a format-owned ODP tail append; the current source
+presentation and replacement publisher retain whole XML. Six actual distinct
+native PPTX pair probes all refuse incompatible shared graphs. Neither native
+applications nor broader pair/append coverage is completed by this batch.
+See [remaining work](results/change-0456/next-work.md).
+
 ## Change 0455: fewer unchanged destination requests
 
 [0455](changes/0455-zip-preservation-transfer-chunks.md) doubles the fixed ZIP

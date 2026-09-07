@@ -1,0 +1,16 @@
+crate boundaries valid for 64 workspace packages and 240 internal dependency declarations (14 explicit debt items)
+ordered migration debt:
+  [001] litchi-iwa -> litchi-core
+  [002] litchi-iwa -> litchi-iwa-archive
+  [004] litchi-iwa -> litchi-iwa-common
+  [005] litchi-iwa -> litchi-iwa-core
+  [006] litchi-iwa -> litchi-iwa-detect
+  [008] litchi-iwa -> litchi-iwa-index
+  [009] litchi-iwa -> litchi-iwa-package
+  [010] litchi-iwa -> litchi-iwa-protos
+  [012] litchi-iwa -> litchi-iwa-text
+  [013] litchi-iwa -> litchi-iwa-text-wire
+  [014] litchi-iwa -> litchi-keynote
+  [015] litchi-iwa -> litchi-numbers
+  [016] litchi-iwa -> litchi-numbers-wire
+  [017] litchi-iwa -> litchi-pages

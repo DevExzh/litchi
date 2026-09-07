@@ -1,0 +1,20 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+error[E0382]: borrow of moved value: `writer`
+   --> crates/soapberry-zip/src/writer.rs:274:9
+    |
+272 |     fn write_local<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+    |                                     ------ move occurs because `writer` has type `&mut W`, which does not implement the `Copy` trait
+273 |         self.local_header.fixed.write(writer)?;
+    |                                       ------ value moved here
+274 |         writer.write_all(self.name_bytes())?;
+    |         ^^^^^^ value borrowed here after move
+    |
+help: consider creating a fresh reborrow of `writer` here
+    |
+273 |         self.local_header.fixed.write(&mut *writer)?;
+    |                                       ++++++
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `soapberry-zip` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `soapberry-zip` (lib test) due to 1 previous error

@@ -1,5 +1,22 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0456: retain shared payloads during ZIP publication
+
+[0456](changes/0456-zip-shared-payload-framing.md) removes the complete-member
+preparation copy for verified Store/Deflate and shared Store payloads. In the
+720-sample matched matrix, media publication allocation falls 21,057,867→4,243,083
+bytes (-79.85%) and regional heap peak above entry falls 17,406,388→593,892
+(-96.59%). Output hashes, read/write work and managed budgets remain identical.
+Plain publication allocates 3,360 more bytes; the 64 KiB stack buffer is unchanged.
+
+Ordinary bytes/media API medians regress 15.411%/16.347% with higher minor faults.
+All 15 timing flags are retained. Separate whole-process perf processes have
+matched low faults, while 240 fixed allocator-policy diagnostic samples improve
+API medians 2.626–10.266%. The result is a memory saving with allocator-sensitive
+latency, not an unconditional speedup. See the
+[bundle](results/change-0456/README.md) and
+[diagnostic table](results/change-0456/formal/diagnostic-summary.md).
+
 ## Change 0455: bounded ZIP transfer chunks
 
 [0455](changes/0455-zip-preservation-transfer-chunks.md) uses a 64 KiB unchanged

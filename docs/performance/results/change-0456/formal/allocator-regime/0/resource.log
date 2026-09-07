@@ -1,0 +1,23 @@
+	Command being timed: "perf stat -x, -e cycles,instructions,branches,branch-misses,cache-misses,page-faults -o /home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/0/perf.csv /tmp/litchi-goal-0456/formal-baseline-normal provider-lifecycle --corpus media-rich --provider bytes --samples 30 --warmup 3 --source-revision 9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3 --output /home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/0/report.json"
+	User time (seconds): 5.27
+	System time (seconds): 1.43
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:06.72
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 802868
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 1782405
+	Voluntary context switches: 6
+	Involuntary context switches: 66
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 3600
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

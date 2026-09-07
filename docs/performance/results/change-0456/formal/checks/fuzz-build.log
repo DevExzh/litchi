@@ -1,0 +1,20 @@
+   Compiling crossbeam-utils v0.8.23
+   Compiling libc v0.2.189
+   Compiling crossbeam-epoch v0.9.21
+   Compiling crossbeam-deque v0.8.8
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.12
+   Compiling rayon-core v1.13.0
+   Compiling crc32fast v1.5.1
+   Compiling either v1.18.0
+   Compiling zlib-rs v0.6.7
+   Compiling cfg-if v1.0.4
+   Compiling arbitrary v1.4.2
+   Compiling jobserver v0.1.35
+   Compiling cc v1.4.5
+   Compiling rayon v1.12.0
+   Compiling libfuzzer-sys v0.4.13
+   Compiling flate2 v1.1.10
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling soapberry-zip-fuzz v0.0.0 (/tmp/litchi-goal-0456/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 13.22s

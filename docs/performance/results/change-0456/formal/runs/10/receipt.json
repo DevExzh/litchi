@@ -1,0 +1,90 @@
+{
+  "status": "pass",
+  "lane": 10,
+  "lane_definition": {
+    "build": "candidate",
+    "provider": "bytes",
+    "corpus": "media-rich",
+    "repeat": "R2",
+    "instrumentation": "normal"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/runs/10/resource.log",
+    "/tmp/litchi-goal-0456/formal-candidate-normal",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "bytes",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/runs/10/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-09-07T09:40:25.840310+00:00",
+  "binary": {
+    "path": "/tmp/litchi-goal-0456/formal-candidate-normal",
+    "sha256": "6b9edd1fd654f91b8a6dcb1080051e2a342e96e542ef9c27dd3e30f99ad34828",
+    "bytes": 57527896
+  },
+  "build_manifest": {
+    "path": "candidate-build.json",
+    "sha256": "6a64ded4471846ae2b281a7322c163c85f037859d15fb99cdf1504d310d0523f",
+    "bytes": 943
+  },
+  "source_before": {
+    "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+    "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+    "files": 6672
+  },
+  "protocol_sha256": "b02402d16992a5e14e172c053ae927ef00d5c07dacde880521d20f9706012459",
+  "capture_sha256": "b5c2abf39f515f19b0ebee88c70408dd2857f5e4b717f2d69c35cd350db22ea1",
+  "exit_code": 0,
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/verify-report.py",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/runs/10/report.json"
+  ],
+  "oracle_exit_code": 0,
+  "finished_utc": "2026-09-07T09:40:31.807994+00:00",
+  "source_after": {
+    "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+    "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+    "files": 6672
+  },
+  "source_unchanged": true,
+  "artifacts": {
+    "report.json": {
+      "path": "runs/10/report.json",
+      "sha256": "b41c0bd863c5ea6aa7a7df75f67a6be9a1a8249b0a44cc2073566b5cd70687e3",
+      "bytes": 1836498
+    },
+    "resource.log": {
+      "path": "runs/10/resource.log",
+      "sha256": "fedcd4ac58ff72531443e9f33abafa16d4beb20bfad5128d39bbe863590fad7e",
+      "bytes": 1003
+    },
+    "workload.log": {
+      "path": "runs/10/workload.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "oracle.log": {
+      "path": "runs/10/oracle.log",
+      "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+      "bytes": 311
+    }
+  }
+}

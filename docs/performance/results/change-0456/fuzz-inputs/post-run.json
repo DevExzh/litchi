@@ -1,0 +1,15 @@
+{
+  "scope": "Post-run capture of generated lockfile and executed ASAN binary; initial target and Cargo manifest are retained separately.",
+  "artifacts": [
+    {
+      "path": "/tmp/litchi-goal-0456/fuzz/Cargo.lock",
+      "sha256": "c931b68a4c449414a9b17bbfdb106dd8c429653eaed5459a5f25dcb5dc4d7651",
+      "bytes": 4463
+    },
+    {
+      "path": "/tmp/litchi-goal-0456/fuzz/target/x86_64-unknown-linux-gnu/release/parse_zip",
+      "sha256": "46ffb55db77cab4e5e9295d51b641db55b6d00e1400d32bcd14c5aad4317f61a",
+      "bytes": 22373648
+    }
+  ]
+}

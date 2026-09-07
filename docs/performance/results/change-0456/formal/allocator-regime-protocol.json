@@ -1,0 +1,48 @@
+{
+  "purpose": "Investigate the ordinary bytes/media candidate slowdown with fixed glibc mmap thresholds, ABBA each. All original results retained; diagnostics do not replace primary timing lanes. Test memory-policy dependence without asserting historical allocator decisions.",
+  "reference": "https://sourceware.org/glibc/manual/latest/html_node/Malloc-Tunable-Parameters.html",
+  "driver_sha256": "0230c4e4217caa68b9794cc3b93ca4aa268fd4210cbc5f52bb978fade9203a17",
+  "inherited_allocator_environment": {},
+  "samples": 30,
+  "warmups": 3,
+  "cpu": 2,
+  "workers": 1,
+  "events": "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+  "lanes": [
+    {
+      "build": "baseline",
+      "mmap_threshold": 131072
+    },
+    {
+      "build": "candidate",
+      "mmap_threshold": 131072
+    },
+    {
+      "build": "candidate",
+      "mmap_threshold": 131072
+    },
+    {
+      "build": "baseline",
+      "mmap_threshold": 131072
+    },
+    {
+      "build": "baseline",
+      "mmap_threshold": 33554432
+    },
+    {
+      "build": "candidate",
+      "mmap_threshold": 33554432
+    },
+    {
+      "build": "candidate",
+      "mmap_threshold": 33554432
+    },
+    {
+      "build": "baseline",
+      "mmap_threshold": 33554432
+    }
+  ],
+  "change": 456,
+  "status": "frozen",
+  "frozen_utc": "2026-09-07T09:44:57.680636+00:00"
+}

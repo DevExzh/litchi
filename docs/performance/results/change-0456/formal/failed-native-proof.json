@@ -1,0 +1,23 @@
+{
+  "status": "failed",
+  "reason": "Golden relationship metadata SHA accidentally altered during batch-number text replacement; whole output SHA and all other expected hashes unchanged.",
+  "rows": [
+    {
+      "output": {
+        "path": "/tmp/litchi-goal-0456/native/bytes.pptx",
+        "bytes": 42948,
+        "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+      },
+      "report": {
+        "path": "/tmp/litchi-goal-0456/native/bytes.json",
+        "bytes": 7824,
+        "sha256": "564c05546fcac981d440ec882ddf917fb5d8d5c69aaf5f94db89b0d6028c44a6"
+      },
+      "retained_report": {
+        "path": "docs/performance/results/change-0456/formal/native-initial-bytes.json",
+        "bytes": 7824,
+        "sha256": "564c05546fcac981d440ec882ddf917fb5d8d5c69aaf5f94db89b0d6028c44a6"
+      }
+    }
+  ]
+}

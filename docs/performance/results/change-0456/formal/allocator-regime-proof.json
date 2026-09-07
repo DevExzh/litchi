@@ -1,0 +1,672 @@
+{
+  "status": "pass",
+  "protocol_sha256": "41b6d0a6916c0827cdf526f0e5fa3ee98ff0cb3c774ca0911569ad57179ada5e",
+  "driver_sha256": "0230c4e4217caa68b9794cc3b93ca4aa268fd4210cbc5f52bb978fade9203a17",
+  "glibc": "glibc 2.43",
+  "rows": [
+    {
+      "lane": 0,
+      "build": "baseline",
+      "mmap_threshold": 131072,
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/0/resource.log",
+        "perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/0/perf.csv",
+        "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/0/report.json"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "environment": {
+        "MALLOC_MMAP_THRESHOLD_": "131072"
+      },
+      "source_before": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "source_after": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "sha256": "127e2c36432afae921def35eaf6525afe1c0b46ac865cc7a92d4165878fa065c",
+        "bytes": 57783904
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "artifacts": [
+        {
+          "path": "allocator-regime/0/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "allocator-regime/0/perf.csv",
+          "sha256": "fde937aba8ef8c00da928cd2b1c52eab9a7065415171f6b3d6ecee2621136e68",
+          "bytes": 295
+        },
+        {
+          "path": "allocator-regime/0/report.json",
+          "sha256": "4b13eaa8c47e8e08bfe31889d121c1a534656025d4ca369b29feaa4f20de3b62",
+          "bytes": 1836437
+        },
+        {
+          "path": "allocator-regime/0/resource.log",
+          "sha256": "b1215e37b368a7783ecc6c97557e3ff19cfce7fa37dd55c1003738b296be8f76",
+          "bytes": 1198
+        },
+        {
+          "path": "allocator-regime/0/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "lane": 1,
+      "build": "candidate",
+      "mmap_threshold": 131072,
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/1/resource.log",
+        "perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/1/perf.csv",
+        "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/1/report.json"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "environment": {
+        "MALLOC_MMAP_THRESHOLD_": "131072"
+      },
+      "source_before": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "source_after": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "sha256": "6b9edd1fd654f91b8a6dcb1080051e2a342e96e542ef9c27dd3e30f99ad34828",
+        "bytes": 57527896
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "artifacts": [
+        {
+          "path": "allocator-regime/1/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "allocator-regime/1/perf.csv",
+          "sha256": "6cc669a19196d010edf2929873558121c89b4ab6327cfafad1bb461240f0beaa",
+          "bytes": 295
+        },
+        {
+          "path": "allocator-regime/1/report.json",
+          "sha256": "16d51be124cc467d407927f33826bb0e3e278600bc16ee4906f08d16fd3685a2",
+          "bytes": 1836438
+        },
+        {
+          "path": "allocator-regime/1/resource.log",
+          "sha256": "2dcd8128a8bc3b1e60f8d76e42d4c8fd7e80eb5d2a60d6e2f22db7d8642143ec",
+          "bytes": 1199
+        },
+        {
+          "path": "allocator-regime/1/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "lane": 2,
+      "build": "candidate",
+      "mmap_threshold": 131072,
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/2/resource.log",
+        "perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/2/perf.csv",
+        "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/2/report.json"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "environment": {
+        "MALLOC_MMAP_THRESHOLD_": "131072"
+      },
+      "source_before": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "source_after": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "sha256": "6b9edd1fd654f91b8a6dcb1080051e2a342e96e542ef9c27dd3e30f99ad34828",
+        "bytes": 57527896
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "artifacts": [
+        {
+          "path": "allocator-regime/2/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "allocator-regime/2/perf.csv",
+          "sha256": "c7d2b63bd2931daf06074b55d93b2534a839553032ddcfeaadb39e3e699ceed8",
+          "bytes": 295
+        },
+        {
+          "path": "allocator-regime/2/report.json",
+          "sha256": "7c2927366b3b37df9afc5cac075c68525bb5b5f467b3b85d084d19e1265c5502",
+          "bytes": 1836438
+        },
+        {
+          "path": "allocator-regime/2/resource.log",
+          "sha256": "ca5bb43549a144daeeddcdde67002bb6a2b4fddbbeabd34c7349c4c8043e453b",
+          "bytes": 1199
+        },
+        {
+          "path": "allocator-regime/2/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "lane": 3,
+      "build": "baseline",
+      "mmap_threshold": 131072,
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/3/resource.log",
+        "perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/3/perf.csv",
+        "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/3/report.json"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "environment": {
+        "MALLOC_MMAP_THRESHOLD_": "131072"
+      },
+      "source_before": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "source_after": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "sha256": "127e2c36432afae921def35eaf6525afe1c0b46ac865cc7a92d4165878fa065c",
+        "bytes": 57783904
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "artifacts": [
+        {
+          "path": "allocator-regime/3/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "allocator-regime/3/perf.csv",
+          "sha256": "0cd8a27e3ba59d0665e5f7e7c581b5f209950cc68fdcd5bee74f839b2837ea92",
+          "bytes": 295
+        },
+        {
+          "path": "allocator-regime/3/report.json",
+          "sha256": "10add2ab69398106993eb8430ffe56ef86f6fcf581c885ff36ad199a0808d5f6",
+          "bytes": 1836437
+        },
+        {
+          "path": "allocator-regime/3/resource.log",
+          "sha256": "06e9fae06b36b4b0a64316ed34368bd664a0722972d553fff5327bfe62dbe610",
+          "bytes": 1198
+        },
+        {
+          "path": "allocator-regime/3/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "lane": 4,
+      "build": "baseline",
+      "mmap_threshold": 33554432,
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/4/resource.log",
+        "perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/4/perf.csv",
+        "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/4/report.json"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "environment": {
+        "MALLOC_MMAP_THRESHOLD_": "33554432"
+      },
+      "source_before": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "source_after": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "sha256": "127e2c36432afae921def35eaf6525afe1c0b46ac865cc7a92d4165878fa065c",
+        "bytes": 57783904
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "artifacts": [
+        {
+          "path": "allocator-regime/4/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "allocator-regime/4/perf.csv",
+          "sha256": "1a49859c0d72bc256e5c73ac6a3df4f59c3367833b69d89ee265459ea64e3aee",
+          "bytes": 294
+        },
+        {
+          "path": "allocator-regime/4/report.json",
+          "sha256": "1fca7321185a8420425b6fa06ad45d217dd658034bed651080d3ce35c31b8882",
+          "bytes": 1836497
+        },
+        {
+          "path": "allocator-regime/4/resource.log",
+          "sha256": "9a658ab74ffff82ab6df694dd09449313afaa32ee402bd95121e18e9b1856d23",
+          "bytes": 1197
+        },
+        {
+          "path": "allocator-regime/4/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "lane": 5,
+      "build": "candidate",
+      "mmap_threshold": 33554432,
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/5/resource.log",
+        "perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/5/perf.csv",
+        "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/5/report.json"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "environment": {
+        "MALLOC_MMAP_THRESHOLD_": "33554432"
+      },
+      "source_before": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "source_after": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "sha256": "6b9edd1fd654f91b8a6dcb1080051e2a342e96e542ef9c27dd3e30f99ad34828",
+        "bytes": 57527896
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "artifacts": [
+        {
+          "path": "allocator-regime/5/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "allocator-regime/5/perf.csv",
+          "sha256": "b823ba8a17bfb746c34b23076e3aa808651320865df809cd66b1f91f02aef160",
+          "bytes": 294
+        },
+        {
+          "path": "allocator-regime/5/report.json",
+          "sha256": "e30ef4777c2f3da7df94fe034409edfd7486e576a4fd97b3e22767cf90da163b",
+          "bytes": 1836498
+        },
+        {
+          "path": "allocator-regime/5/resource.log",
+          "sha256": "8e3dbf91a082399fbed3e20213323990c57f99a4308002f778993846e164350f",
+          "bytes": 1198
+        },
+        {
+          "path": "allocator-regime/5/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "lane": 6,
+      "build": "candidate",
+      "mmap_threshold": 33554432,
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/6/resource.log",
+        "perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/6/perf.csv",
+        "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/6/report.json"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "environment": {
+        "MALLOC_MMAP_THRESHOLD_": "33554432"
+      },
+      "source_before": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "source_after": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "sha256": "6b9edd1fd654f91b8a6dcb1080051e2a342e96e542ef9c27dd3e30f99ad34828",
+        "bytes": 57527896
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "artifacts": [
+        {
+          "path": "allocator-regime/6/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "allocator-regime/6/perf.csv",
+          "sha256": "c326dd4955bfc5307bb2ba1a25edd3b27d1a0bbb77acf8f7eeee1acb7f58eb0d",
+          "bytes": 294
+        },
+        {
+          "path": "allocator-regime/6/report.json",
+          "sha256": "a4617f5440d0091d8a9106f23157529868accf7d564bd64a65ce69d6faabab34",
+          "bytes": 1836498
+        },
+        {
+          "path": "allocator-regime/6/resource.log",
+          "sha256": "e817a4b7554916aaa4d26aa7d3f2069fadaefc80d0d7064a5ae33b8638f38225",
+          "bytes": 1198
+        },
+        {
+          "path": "allocator-regime/6/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "lane": 7,
+      "build": "baseline",
+      "mmap_threshold": 33554432,
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/7/resource.log",
+        "perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/7/perf.csv",
+        "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/allocator-regime/7/report.json"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "environment": {
+        "MALLOC_MMAP_THRESHOLD_": "33554432"
+      },
+      "source_before": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "source_after": {
+        "path": "sources/ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313.json",
+        "sha256": "ae415b23f4aaffd4ab2f0ad4ab4104692dfa9a24566f9e5c6addda6612d60313",
+        "files": 6672
+      },
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "sha256": "127e2c36432afae921def35eaf6525afe1c0b46ac865cc7a92d4165878fa065c",
+        "bytes": 57783904
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "artifacts": [
+        {
+          "path": "allocator-regime/7/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "allocator-regime/7/perf.csv",
+          "sha256": "28cc31c6a5b56a880fccbbfc0b1ef687f8989d793dfe55d620c2071b88f8293a",
+          "bytes": 294
+        },
+        {
+          "path": "allocator-regime/7/report.json",
+          "sha256": "c5b7689641fbd03d612b2d7a1f6f21a83b05c59bc63df09e7a14049dba1eb02f",
+          "bytes": 1836497
+        },
+        {
+          "path": "allocator-regime/7/resource.log",
+          "sha256": "4e8f89a8c5f0b37cd17152b396e0088f1d9293f77a5406107a38d64ab0de8d7e",
+          "bytes": 1197
+        },
+        {
+          "path": "allocator-regime/7/workload.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    }
+  ]
+}
