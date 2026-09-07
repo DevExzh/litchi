@@ -1,0 +1,209 @@
+{
+  "change": 454,
+  "schema": "pptx_change0454_performance_protocol_v1",
+  "status": "frozen",
+  "frozen_utc": "2026-09-07T04:24:38+00:00",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "allow_pilot": true,
+  "provider_lanes": [
+    {
+      "suite": "provider",
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "baseline",
+      "build_manifest": "baseline-lifecycle-binary.json",
+      "repeat": "R1"
+    },
+    {
+      "suite": "provider",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "build_manifest": "baseline-lifecycle-binary.json",
+      "repeat": "R1"
+    },
+    {
+      "suite": "provider",
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "candidate",
+      "build_manifest": "candidate-build.json",
+      "repeat": "R1"
+    },
+    {
+      "suite": "provider",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "candidate",
+      "build_manifest": "candidate-build.json",
+      "repeat": "R1"
+    },
+    {
+      "suite": "provider",
+      "provider": "range",
+      "corpus": "plain",
+      "build": "baseline",
+      "build_manifest": "baseline-lifecycle-binary.json",
+      "repeat": "R1"
+    },
+    {
+      "suite": "provider",
+      "provider": "range",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "build_manifest": "baseline-lifecycle-binary.json",
+      "repeat": "R1"
+    },
+    {
+      "suite": "provider",
+      "provider": "range",
+      "corpus": "plain",
+      "build": "candidate",
+      "build_manifest": "candidate-build.json",
+      "repeat": "R1"
+    },
+    {
+      "suite": "provider",
+      "provider": "range",
+      "corpus": "media-rich",
+      "build": "candidate",
+      "build_manifest": "candidate-build.json",
+      "repeat": "R1"
+    },
+    {
+      "suite": "provider",
+      "provider": "range",
+      "corpus": "media-rich",
+      "build": "candidate",
+      "build_manifest": "candidate-build.json",
+      "repeat": "R2"
+    },
+    {
+      "suite": "provider",
+      "provider": "range",
+      "corpus": "plain",
+      "build": "candidate",
+      "build_manifest": "candidate-build.json",
+      "repeat": "R2"
+    },
+    {
+      "suite": "provider",
+      "provider": "range",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "build_manifest": "baseline-lifecycle-binary.json",
+      "repeat": "R2"
+    },
+    {
+      "suite": "provider",
+      "provider": "range",
+      "corpus": "plain",
+      "build": "baseline",
+      "build_manifest": "baseline-lifecycle-binary.json",
+      "repeat": "R2"
+    },
+    {
+      "suite": "provider",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "candidate",
+      "build_manifest": "candidate-build.json",
+      "repeat": "R2"
+    },
+    {
+      "suite": "provider",
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "candidate",
+      "build_manifest": "candidate-build.json",
+      "repeat": "R2"
+    },
+    {
+      "suite": "provider",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "build_manifest": "baseline-lifecycle-binary.json",
+      "repeat": "R2"
+    },
+    {
+      "suite": "provider",
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "baseline",
+      "build_manifest": "baseline-lifecycle-binary.json",
+      "repeat": "R2"
+    }
+  ],
+  "external_lanes": [
+    {
+      "suite": "external",
+      "fixture": "libreoffice-smoketest",
+      "provider": "bytes",
+      "build": "candidate",
+      "build_manifest": "candidate-build.json",
+      "repeat": "descriptive"
+    },
+    {
+      "suite": "external",
+      "fixture": "libreoffice-smoketest",
+      "provider": "range",
+      "build": "candidate",
+      "build_manifest": "candidate-build.json",
+      "repeat": "descriptive"
+    }
+  ],
+  "reports": 18,
+  "provider_reports": 16,
+  "external_reports": 2,
+  "provider_samples": 480,
+  "external_samples": 60,
+  "range": {
+    "max_range_bytes": 65536,
+    "delay_us": 200,
+    "transfer_bytes_per_second": 26214400,
+    "transfer_delay_policy": "separate-sleeps",
+    "scope": "logical caller ReadAt simulation; no physical network, storage, or cold-cache claim"
+  },
+  "corpora": {
+    "plain": {
+      "source_archive_sha256": "8ab4513642f48d99fa46e83b2c2764e8b20d417d3933ce3d5efe0825b21f918e",
+      "source_archive_bytes": 31498,
+      "destination_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+      "destination_archive_bytes": 30539,
+      "expected_output_sha256": "ab5109b0584aacb070b9b33a5769f469464ede991c12fd4da7e9e7bce53f159b",
+      "expected_output_bytes": 31514
+    },
+    "media-rich": {
+      "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+      "source_archive_bytes": 16815621,
+      "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "destination_archive_bytes": 16814664,
+      "expected_output_sha256": "809c61728c9e059e7b30758fbd668d2f6bb161cb3bd5f5fbdf0c9465bc611cea",
+      "expected_output_bytes": 33599715
+    }
+  },
+  "external_fixture": {
+    "manifest": "external-fixture.json",
+    "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44",
+    "bytes": 29956,
+    "comparison": "descriptive candidate-only; preserved baseline has a typed unnamed-slide refusal and cannot supply a baseline timing pair"
+  },
+  "bound_files": {
+    "capture.py": "6b7c16480704deb348528a7d9b0c84d8887aa68b8ecee5510a2fba6629ca1640",
+    "derive.py": "8f1c035a9f15de914e27c8adad26cfe3b30a2932897c8f4279a08e60bb55bcf9",
+    "machine.py": "bd5c8342cc3205b2e331a32554e532d920148ce7cc803f9c2bb2ec8d9138ee0a",
+    "protocol.md": "1e22785662948395e6c47476ed6a7e62e84e3600508f4b52475b9cdb9467823f",
+    "verify-report.py": "436e0f9a926e2713ff030c9b9ed9c32b4312d0a6734096729b631074c0872316",
+    "external-verifier.py": "d16a62597a2973a177cf7b6bc05e31c04f952b972c55a63278460ef13e3d77ca"
+  },
+  "allocation": {
+    "status": "not_measured",
+    "scope": "The preserved lifecycle and external binaries use the Rust system allocator without operation-scoped counters.",
+    "limitation": "Process RSS is reported from /usr/bin/time -v, but allocation calls, allocated bytes, deallocation bytes, peak live bytes, and allocator-region peaks are unavailable and must not be inferred from RSS."
+  },
+  "claims": "Provider lanes are matched warm synthetic lifecycle controls with descriptive baseline/candidate ABBA statistics. External fixture lanes are candidate-only descriptive bytes/range evidence; no speedup is claimed against the preserved refusal. No native application, cold-cache, physical-I/O, allocator, or scaling claim is authorized."
+}
