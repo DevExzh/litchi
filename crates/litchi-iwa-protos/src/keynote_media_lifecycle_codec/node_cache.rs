@@ -252,6 +252,74 @@ pub fn rewrite_slide_node_build_cache_with_report(
     prepare_slide_node_build_cache_rewrite(source, edit, options)?.commit()
 }
 
+/// Rewrite the four build-cache scalars after authoring a fresh build.
+///
+/// This follows the native Keynote writer's event-count behavior: a zero
+/// count removes `buildEventCount`, stores `u32::MAX` in its cache version,
+/// and writes `hasExplicitBuilds = false`; a nonzero count stores the count,
+/// version `2`, and `hasExplicitBuilds = true`.  The source remains the
+/// preservation authority, so unrelated fields and unknown spans are copied
+/// byte-for-byte.  The existing cache invalidation edit intentionally keeps
+/// its separate remove-operation semantics.
+#[doc(hidden)]
+pub fn rewrite_slide_node_build_cache_for_event_count(
+    source: &[u8],
+    event_count: u32,
+    options: DecodeOptions,
+) -> Result<Vec<u8>, DecodeError> {
+    rewrite_slide_node_build_cache_for_event_count_with_report(source, event_count, options)
+        .map(|(output, _)| output)
+}
+
+/// Rewrite build-cache scalars and return exact bounded resource evidence.
+#[doc(hidden)]
+pub fn rewrite_slide_node_build_cache_for_event_count_with_report(
+    source: &[u8],
+    event_count: u32,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, RewriteReport), DecodeError> {
+    validate_input(source, options)?;
+    let mut budget = Budget::new(source, options);
+    let snapshot = parse_cache(source, options, &mut budget)?;
+    cross_check_projection(source, options, snapshot, &mut budget)?;
+    let values = expected_event_count_values(event_count, snapshot);
+    let output_bytes = measure_cache_values(source, values, options, &mut budget)?;
+    ensure_output(output_bytes, options)?;
+    let estimated_work_bytes = output_bytes
+        .checked_mul(4)
+        .and_then(|value| value.checked_add(budget.work_bytes))
+        .ok_or_else(DecodeError::invalid)?;
+    if estimated_work_bytes > options.max_work_bytes() {
+        return Err(DecodeError::limited(DecodeLimit::Work {
+            observed: estimated_work_bytes,
+            maximum: options.max_work_bytes(),
+        }));
+    }
+    let mut output = reserve_output(output_bytes)?;
+    emit_cache_values(source, values, options, &mut budget, &mut output)?;
+    if output.len() != output_bytes {
+        return Err(DecodeError::projection());
+    }
+
+    let readback_options =
+        options.with_max_message_bytes(options.max_message_bytes().max(output.len()));
+    let (readback, readback_report) =
+        decode_slide_node_build_cache_with_report(&output, readback_options)?;
+    if CacheValues::from_snapshot(readback) != values {
+        return Err(DecodeError::projection());
+    }
+    let changed = output.as_slice() != source;
+    let mut report = rewrite_report(source, &budget, &readback_report, output_bytes, changed);
+    report.work_bytes = report.work_bytes.saturating_add(estimated_work_bytes);
+    if report.work_bytes > options.max_work_bytes() {
+        return Err(DecodeError::limited(DecodeLimit::Work {
+            observed: report.work_bytes,
+            maximum: options.max_work_bytes(),
+        }));
+    }
+    Ok((output, report))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct CacheValues {
     build_event_count: Option<u32>,
@@ -293,6 +361,20 @@ fn expected_values(_edit: SlideNodeBuildCacheEdit) -> CacheValues {
         has_explicit_builds: None,
         has_explicit_builds_cache_version: Some(u32::MAX),
         has_explicit_builds_is_up_to_date: None,
+    }
+}
+
+fn expected_event_count_values(
+    event_count: u32,
+    snapshot: SlideNodeBuildCacheSnapshot<'_>,
+) -> CacheValues {
+    CacheValues {
+        build_event_count: (event_count != 0).then_some(event_count),
+        build_event_count_cache_version: Some(if event_count == 0 { u32::MAX } else { 2 }),
+        build_event_count_is_up_to_date: snapshot.build_event_count_is_up_to_date,
+        has_explicit_builds: Some(event_count != 0),
+        has_explicit_builds_cache_version: Some(2),
+        has_explicit_builds_is_up_to_date: snapshot.has_explicit_builds_is_up_to_date,
     }
 }
 
@@ -508,7 +590,15 @@ fn measure_cache(
     options: DecodeOptions,
     budget: &mut Budget,
 ) -> Result<usize, DecodeError> {
-    let values = expected_values(edit);
+    measure_cache_values(source, expected_values(edit), options, budget)
+}
+
+fn measure_cache_values(
+    source: &[u8],
+    values: CacheValues,
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<usize, DecodeError> {
     let mut parser = Parser::new(source, 1, options, budget)?;
     let mut presence = Presence::default();
     let mut output = 0usize;
@@ -545,7 +635,16 @@ fn emit_cache(
     budget: &mut Budget,
     output: &mut Vec<u8>,
 ) -> Result<(), DecodeError> {
-    let values = expected_values(edit);
+    emit_cache_values(source, expected_values(edit), options, budget, output)
+}
+
+fn emit_cache_values(
+    source: &[u8],
+    values: CacheValues,
+    options: DecodeOptions,
+    budget: &mut Budget,
+    output: &mut Vec<u8>,
+) -> Result<(), DecodeError> {
     let mut parser = Parser::new(source, 1, options, budget)?;
     let mut presence = Presence::default();
     while let Some(field) = parser.next()? {

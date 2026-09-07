@@ -18,6 +18,9 @@ pub struct Options {
     duration_seconds: f32,
 }
 
+/// Exact-source transaction vocabulary for creating slide audio.
+pub mod creation;
+
 /// Package transaction types for an existing audio control's position.
 pub mod transaction {
     pub use crate::{

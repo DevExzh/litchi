@@ -1,0 +1,58 @@
+// Private Buffa projection used only to construct the canonical Keynote
+// playback records attached to a newly-created slide audio control.
+//
+// The native KN archives contain considerably more build state.  This schema
+// contains only the fields emitted by the focused Start Audio writer.  It is
+// intentionally write-only in the owner: existing payloads remain source
+// authoritative and are never decoded through this projection to manufacture
+// a replacement.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+}
+
+message UUID {
+  required uint64 lower = 1;
+  required uint64 upper = 2;
+}
+
+message AnimationAttributesArchive {
+  optional string animation_type = 1;
+  optional string effect = 2;
+  optional double duration = 3;
+  optional double delay = 5;
+  optional uint32 random_number_seed = 11;
+  optional bool writing_direction_is_rtl = 16;
+}
+
+message BuildAttributesArchive {
+  optional .LitchiIwaProjection.AnimationAttributesArchive animation_attributes = 18;
+  optional uint32 event_trigger = 4;
+  optional double chart_rotation_3_d = 17;
+}
+
+message BuildArchive {
+  optional .LitchiIwaProjection.Reference drawable = 1;
+  required string delivery = 2;
+  optional double duration = 3;
+  required .LitchiIwaProjection.BuildAttributesArchive attributes = 4;
+  optional int32 chunk_id_seed = 5;
+}
+
+message BuildChunkIdentifierArchive {
+  optional .LitchiIwaProjection.UUID build_id = 1;
+  optional int32 build_chunk_id = 2;
+}
+
+message BuildChunkArchive {
+  optional .LitchiIwaProjection.Reference build = 1;
+  optional double delay = 3;
+  optional double duration = 4;
+  optional bool automatic = 5;
+  optional bool referent = 6;
+  optional .LitchiIwaProjection.BuildChunkIdentifierArchive build_chunk_identifier = 7;
+  optional .LitchiIwaProjection.UUID build_id = 8;
+}

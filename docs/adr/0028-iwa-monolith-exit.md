@@ -9961,3 +9961,56 @@ with warnings denied. Workspace all-feature library/integration testing passes
 21,705 cases across 929 targets, with 12 existing ignored cases; workspace
 all-feature doctests also pass. This is source-level validation and does not
 supply the missing native container/group or media-properties acceptance.
+
+
+## 2026-09-07 focused Keynote slide-audio creation
+
+`litchi-keynote::Package::{add_slide_audio,apply_slide_audio_creation}` now owns
+fresh slide audio on exact source packages. Callers supply a semantic slide
+selector, a safe preferred filename, borrowed audio bytes, and the existing
+archive-free audio options. The commit retains exact source/target artifacts,
+semantic diagnostics, inverse, replay, and preview restoration. Native object
+and component identifiers remain private.
+
+The transaction creates one movie archive, two caption stand-ins, and one
+start-audio build/chunk pair. Object allocation respects both the physical
+maximum and the PackageMetadata watermark. Four UUID-map additions are distinct
+from the build UUID embedded in the chunk; the chunk has no UUID-map addition.
+Metadata component identities are resolved through unique current locators,
+including when those identities differ from the slide's object identity.
+Identical audio reuses its validated DataInfo and materialized bytes, adds the
+new owner, and reuses an existing strong stylesheet edge. The selected slide
+and its node receive the new package save token, and node event counts use
+build chunks while preserving deprecated cache flags. Atomic core reference transitions preserve unknown and
+noncanonical ArchiveInfo bytes while adding the new slide references.
+
+Private Buffa projections in `litchi-iwa-protos` encode media and audio-start
+builds. Static output sizing and allocation preflight run before constructing
+nested MessageFieldView boxes; the accounting includes those boxes, the output
+vector, both size passes, and writing. Native generated messages remain test
+oracles. The migration host's movie/audio payload constructor consumes the
+same neutral media writer and preserves optional geometry fields. The show
+reference projection now reports consumed fields, work, nesting and allocations
+so focused creation can carry residual budgets across discovery.
+
+Before publication, the reopened candidate is checked for the five-object
+closure, selected style, slide references, build/chunk identity and payloads,
+UUID maps, media owners, and node cache. The existing replacement owner supplies
+selected media-data verification under residual budgets, avoiding an unrelated
+matching Data member as evidence. Replay checks the selected audio's length and
+digest. Created audio composes with position, properties and removal editors.
+The position owner admits a registered same-component build's header edge only
+when its strict payload and header identify the selected audio; forged targets
+remain rejected, and sparse producer headers keep their prior admission.
+
+The creation, graph, header-preservation, existing audio-position,
+media-properties and movie-geometry integration suites pass 70 cases. These
+include exact inverse/replay, shared data, component-ID mismatch, high metadata
+watermark, unknown/noncanonical headers, sparse build headers and forged inbound
+build edges. Neutral media and build writer tests pass nine and five cases.
+
+Computer Use was attempted for Keynote, but ScreenCaptureKit returned `-3802`
+(`Stream failed to start`). No fresh creation artifact was saved, actually
+closed and reopened in Keynote. Native acceptance remains open, raw host
+creation APIs remain retained, and the eleven migration dependencies remain
+recorded. This increment does not complete the monolith exit.

@@ -13,6 +13,7 @@ mod limits;
 mod rendering_invalidation;
 mod save;
 pub(crate) mod show_settings;
+mod slide_audio_creation;
 mod slide_audio_position;
 mod slide_background;
 mod slide_build_order;
