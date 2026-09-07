@@ -1,0 +1,30 @@
+{
+  "schema": "litchi-0465-portable-catalog-test-v1",
+  "status": "pass",
+  "verifier_sha256": "cdb7327a5477f935259b598ff7085b6340a481e1e2d92879778cdeee112b68b5",
+  "later_catalog_ignored_only_in_portable_mode": true,
+  "temporary_directory_absent": true,
+  "results": {
+    "portable": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/tmp/litchi-0465-catalog-replay-z250rq_u/repo/docs/performance/results/change-0465/verify.py"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"allocator_reports\": 2,\n  \"allocator_results\": 3,\n  \"binding_modes\": [\n    \"allocator\",\n    \"normal\"\n  ],\n  \"change\": 465,\n  \"full_normal_reports\": 2,\n  \"full_normal_results\": 201,\n  \"portable\": true,\n  \"precleanup\": false,\n  \"preflight_results\": 201,\n  \"schema\": \"litchi-0465-verification-v1\",\n  \"sealed_files\": 96,\n  \"selected_checks\": {\n    \"boundaries\": \"boundaries\",\n    \"doc\": \"doc\",\n    \"fmt\": \"fmt-r1\",\n    \"harness-clippy\": \"harness-clippy\",\n    \"harness-tests\": \"harness-tests\",\n    \"promote\": \"promote\",\n    \"python-tests\": \"python-tests-r1\"\n  },\n  \"status\": \"pass\",\n  \"summary_schema\": \"litchi-0465-summary-v1\"\n}\n",
+      "stderr": ""
+    },
+    "precleanup": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/tmp/litchi-0465-catalog-replay-z250rq_u/repo/docs/performance/results/change-0465/verify.py",
+        "--precleanup"
+      ],
+      "exit_code": 1,
+      "stdout": "{\n  \"change\": 465,\n  \"error\": \"checked/perf-regression-default-manifest-v1.json: does not equal repository checked artifact\",\n  \"portable\": false,\n  \"precleanup\": true,\n  \"schema\": \"litchi-0465-verification-v1\",\n  \"status\": \"fail\"\n}\n",
+      "stderr": ""
+    }
+  }
+}

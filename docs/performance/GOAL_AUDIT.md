@@ -1,5 +1,27 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0465 checked default coverage (2026-09-07)
+
+0465 completes the measured capture for the existing materialized
+`odp_existing_append_lifecycle` case. Preflight preserves all prior 198 row
+identities and the checked catalog now binds 37 default cases, 201 rows and 31
+corpora. The mixed append-incremental category has exactly one measured ODP
+row and two correctness-only fresh-streaming rows, enforced by the validator;
+the taxonomy is 15 categories, 33 mappings, 11 measured and 22
+correctness-only.
+
+The formal lanes retain 6,030 normal samples and 90 ODP-only allocator samples.
+ODP normal p50 is 1.691887/1.687518 ms (tiny), 67.786424/67.745553 ms
+(medium) and 136.334131/136.843521 ms (large) in R1/R2. All four lanes,
+353 harness tests (one ignored), warning-denied Clippy, rustdoc, scoped format,
+167 latest Python tests, both full-report CRUD validators and boundaries pass.
+Initial stale Python hash/count-pin failures remain retained. The sealed
+precleanup verifier, five resealed negative probes, finalize precleanup,
+fresh-copy flagless portable verification and owned cleanup pass; the portable
+seal is unchanged and temporary directories are absent. This evidence makes no
+regression, speedup, independent native-producer, bounded-memory streaming or
+scaling claim; the broader non-iWork goal remains open.
+
 ## Current audit: 0464 evidence (2026-09-07)
 
 0464 adds descriptive harness evidence for a generic PPTX source/destination

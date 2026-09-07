@@ -1,0 +1,27 @@
+{
+  "change": 465,
+  "probes": {
+    "changed_checked_input": {
+      "rejection": "checked default identity counts differ",
+      "status": "pass"
+    },
+    "missing_odp_row": {
+      "rejection": "expected 201 rows",
+      "status": "pass"
+    },
+    "normal_allocator_presence": {
+      "rejection": "normal report exposes allocator fields",
+      "status": "pass"
+    },
+    "odp_gate_false": {
+      "rejection": "required gate is not true",
+      "status": "pass"
+    },
+    "summary_p50_plus_one": {
+      "rejection": "summary.json: deterministic recomputation differs",
+      "status": "pass"
+    }
+  },
+  "schema": "litchi-0465-negative-probes-v1",
+  "status": "pass"
+}

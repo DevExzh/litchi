@@ -108,6 +108,28 @@ FAMILY_MAP: dict[str, dict[str, Any]] = {
             "XlsxShape",
         ],
     },
+    "litchi-odp-existing-append-lifecycle-v1": {
+        "family": "odp",
+        "kind": "synthetic",
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/odp_existing_append.rs",
+        "producer": "Litchi deterministic generator",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": True,
+        "algorithm_id": "litchi-perf.odp-existing-append-v1",
+        "seed_spec": "none",
+        "source_functions": [
+            "build_odp_existing_append_corpus",
+            "source_archive_from_base",
+            "opaque_payload",
+            "append_once",
+            "appended_title",
+            "appended_body",
+            "odp_buffered_create::build_odp_buffered_corpus",
+            "SemanticShape",
+        ],
+    },
 }
 
 _COMPRESSIBLE_PAYLOAD_FORMULA = (
@@ -276,6 +298,24 @@ def generator_parameters(
         )
         return parameters
 
+    if family_id == "odp":
+        parameters.update(
+            {
+                "base_generator": "litchi-odp-buffered-slides-v1",
+                "slide_count_by_shape": {"tiny": 64, "medium": 4096, "large": 8192},
+                "append_count": 1,
+                "opaque_member_path": (
+                    "Opaque/litchi-perf-odp-existing-append-opaque.bin"
+                ),
+                "opaque_payload_bytes": 65_536,
+                "opaque_payload_formula": (
+                    "byte[index] = index_byte*37 + page_byte + 0x5b + "
+                    "variant (mod 256); variant=0"
+                ),
+            }
+        )
+        return parameters
+
     return parameters
 
 
@@ -413,7 +453,12 @@ def migrate_corpus(legacy: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def generate(v1: dict[str, Any], revision: str | None) -> dict[str, Any]:
+def generate(
+    v1: dict[str, Any],
+    revision: str | None,
+    *,
+    worktree_dirty: bool | None = None,
+) -> dict[str, Any]:
     corpora = {
         content_id(corpus): migrate_corpus(corpus)
         for corpus in v1["corpora"].values()
@@ -438,6 +483,13 @@ def generate(v1: dict[str, Any], revision: str | None) -> dict[str, Any]:
             set(corpus["coverage"]["timed_cases"])
         )
     bindings.sort(key=lambda binding: (binding["case"], binding["corpus_id"]))
+    build_worktree_dirty = (
+        None
+        if revision is None
+        else False
+        if worktree_dirty is None
+        else worktree_dirty
+    )
     catalog = {
         "manifest_version": MANIFEST_VERSION,
         "manifest_kind": MANIFEST_KIND,
@@ -449,7 +501,7 @@ def generate(v1: dict[str, Any], revision: str | None) -> dict[str, Any]:
             "tool": "litchi-perf-baseline",
             "tool_version": "0.1.0",
             "git_revision": revision,
-            "git_worktree_dirty": False if revision else None,
+            "git_worktree_dirty": build_worktree_dirty,
             "source_files": [],
         },
         "corpora": [corpora[key] for key in sorted(corpora)],
@@ -492,9 +544,18 @@ def main() -> int:
     parser.add_argument("--v1", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--revision")
+    parser.add_argument(
+        "--worktree-dirty",
+        action="store_true",
+        help="record a dirty worktree when --revision is supplied",
+    )
     args = parser.parse_args()
     v1 = json.loads(args.v1.read_text(encoding="utf-8"))
-    catalog = generate(v1, args.revision)
+    catalog = generate(
+        v1,
+        args.revision,
+        worktree_dirty=True if args.worktree_dirty else None,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(catalog, indent=2, ensure_ascii=False) + "\n",

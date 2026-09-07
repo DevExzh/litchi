@@ -1,0 +1,517 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "1e66ce2152261dd752c203cdb032ba337ce14ec2564c36b6f6f44c86ff698048",
+  "content_set_sha256": "c1e152c3aed2edb9a11913ff9751a2187e2875f5771638bdee466b62fdea42c2",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "161cf53b20d8bb65fe79d4567b9ea7768430de7b",
+    "git_worktree_dirty": true,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "odp-odf-zip:sha256:62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "name": "odp-existing-append-lifecycle-medium",
+      "legacy_v1": {
+        "name": "odp-existing-append-lifecycle-medium",
+        "generator": "litchi-odp-existing-append-lifecycle-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+        "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+        "entry_count": 4096,
+        "archive_member_count": 6,
+        "entry_bytes": 96,
+        "uncompressed_payload_bytes": 471038,
+        "archive_bytes": 54646,
+        "archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+        "target_entry": "content.xml",
+        "target_payload_bytes": 3043815,
+        "target_payload_sha256": "53b6c3426ab2cbd140fa2a92a6d3b6d981fa15c769e6c5236a8ee2dc2b7644e7",
+        "xlsx": null
+      },
+      "format": "ODP/ODF/ZIP",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odp-existing-append-lifecycle-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odp-existing-append-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "append_count": 1,
+          "archive_member_count": 6,
+          "base_generator": "litchi-odp-buffered-slides-v1",
+          "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+          "entry_bytes": 96,
+          "entry_count": 4096,
+          "family": "odp",
+          "legacy_payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+          "legacy_shape": "medium",
+          "opaque_member_path": "Opaque/litchi-perf-odp-existing-append-opaque.bin",
+          "opaque_payload_bytes": 65536,
+          "opaque_payload_formula": "byte[index] = index_byte*37 + page_byte + 0x5b + variant (mod 256); variant=0",
+          "package_format": "ODP/ODF/ZIP",
+          "slide_count_by_shape": {
+            "large": 8192,
+            "medium": 4096,
+            "tiny": 64
+          },
+          "source_functions": [
+            "build_odp_existing_append_corpus",
+            "source_archive_from_base",
+            "opaque_payload",
+            "append_once",
+            "appended_title",
+            "appended_body",
+            "odp_buffered_create::build_odp_buffered_corpus",
+            "SemanticShape"
+          ]
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/odp_existing_append.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 54646,
+        "archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+        "logical_payload_bytes": 471038,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 96,
+        "entry_count": 4096
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 54646,
+          "members": 6,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "content.xml",
+          "logical_bytes": 3043815,
+          "sha256": "53b6c3426ab2cbd140fa2a92a6d3b6d981fa15c769e6c5236a8ee2dc2b7644e7"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odp_existing_append_lifecycle"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "odp-odf-zip:sha256:92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "name": "odp-existing-append-lifecycle-tiny",
+      "legacy_v1": {
+        "name": "odp-existing-append-lifecycle-tiny",
+        "generator": "litchi-odp-existing-append-lifecycle-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+        "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+        "entry_count": 64,
+        "archive_member_count": 6,
+        "entry_bytes": 96,
+        "uncompressed_payload_bytes": 7358,
+        "archive_bytes": 4684,
+        "archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+        "target_entry": "content.xml",
+        "target_payload_bytes": 49009,
+        "target_payload_sha256": "6085294e5d6a363515b71c9131fa1c49af5bf5b34374e26a7436fd509fde3037",
+        "xlsx": null
+      },
+      "format": "ODP/ODF/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odp-existing-append-lifecycle-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odp-existing-append-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "append_count": 1,
+          "archive_member_count": 6,
+          "base_generator": "litchi-odp-buffered-slides-v1",
+          "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+          "entry_bytes": 96,
+          "entry_count": 64,
+          "family": "odp",
+          "legacy_payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+          "legacy_shape": "tiny",
+          "opaque_member_path": "Opaque/litchi-perf-odp-existing-append-opaque.bin",
+          "opaque_payload_bytes": 65536,
+          "opaque_payload_formula": "byte[index] = index_byte*37 + page_byte + 0x5b + variant (mod 256); variant=0",
+          "package_format": "ODP/ODF/ZIP",
+          "slide_count_by_shape": {
+            "large": 8192,
+            "medium": 4096,
+            "tiny": 64
+          },
+          "source_functions": [
+            "build_odp_existing_append_corpus",
+            "source_archive_from_base",
+            "opaque_payload",
+            "append_once",
+            "appended_title",
+            "appended_body",
+            "odp_buffered_create::build_odp_buffered_corpus",
+            "SemanticShape"
+          ]
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/odp_existing_append.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 4684,
+        "archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+        "logical_payload_bytes": 7358,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 96,
+        "entry_count": 64
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 4684,
+          "members": 6,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "content.xml",
+          "logical_bytes": 49009,
+          "sha256": "6085294e5d6a363515b71c9131fa1c49af5bf5b34374e26a7436fd509fde3037"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odp_existing_append_lifecycle"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "odp-odf-zip:sha256:bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "name": "odp-existing-append-lifecycle-large",
+      "legacy_v1": {
+        "name": "odp-existing-append-lifecycle-large",
+        "generator": "litchi-odp-existing-append-lifecycle-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+        "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+        "entry_count": 8192,
+        "archive_member_count": 6,
+        "entry_bytes": 96,
+        "uncompressed_payload_bytes": 942078,
+        "archive_bytes": 105112,
+        "archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+        "target_entry": "content.xml",
+        "target_payload_bytes": 6087143,
+        "target_payload_sha256": "57e3c83e7153ee5e35be58a1a0c3ae725c813b00752a45366e29d00840d41538",
+        "xlsx": null
+      },
+      "format": "ODP/ODF/ZIP",
+      "size_class": "large",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odp-existing-append-lifecycle-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odp-existing-append-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "append_count": 1,
+          "archive_member_count": 6,
+          "base_generator": "litchi-odp-buffered-slides-v1",
+          "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+          "entry_bytes": 96,
+          "entry_count": 8192,
+          "family": "odp",
+          "legacy_payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+          "legacy_shape": "large",
+          "opaque_member_path": "Opaque/litchi-perf-odp-existing-append-opaque.bin",
+          "opaque_payload_bytes": 65536,
+          "opaque_payload_formula": "byte[index] = index_byte*37 + page_byte + 0x5b + variant (mod 256); variant=0",
+          "package_format": "ODP/ODF/ZIP",
+          "slide_count_by_shape": {
+            "large": 8192,
+            "medium": 4096,
+            "tiny": 64
+          },
+          "source_functions": [
+            "build_odp_existing_append_corpus",
+            "source_archive_from_base",
+            "opaque_payload",
+            "append_once",
+            "appended_title",
+            "appended_body",
+            "odp_buffered_create::build_odp_buffered_corpus",
+            "SemanticShape"
+          ]
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/odp_existing_append.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 105112,
+        "archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+        "logical_payload_bytes": 942078,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 96,
+        "entry_count": 8192
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 105112,
+          "members": 6,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "content.xml",
+          "logical_bytes": 6087143,
+          "sha256": "57e3c83e7153ee5e35be58a1a0c3ae725c813b00752a45366e29d00840d41538"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odp_existing_append_lifecycle"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "odp_existing_append_lifecycle",
+      "corpus_id": "odp-odf-zip:sha256:62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "legacy_name": "odp-existing-append-lifecycle-medium",
+      "legacy_archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "role": "timed"
+    },
+    {
+      "case": "odp_existing_append_lifecycle",
+      "corpus_id": "odp-odf-zip:sha256:92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "legacy_name": "odp-existing-append-lifecycle-tiny",
+      "legacy_archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "role": "timed"
+    },
+    {
+      "case": "odp_existing_append_lifecycle",
+      "corpus_id": "odp-odf-zip:sha256:bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "legacy_name": "odp-existing-append-lifecycle-large",
+      "legacy_archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "role": "timed"
+    }
+  ]
+}

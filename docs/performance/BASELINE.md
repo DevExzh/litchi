@@ -1,5 +1,45 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0465: checked-default ODP append baseline
+
+0465 adds the existing `odp_existing_append_lifecycle` case to the checked
+default matrix. Production code, generated fixture bytes, timing boundaries
+and preservation oracles are unchanged. Preflight passes with all prior 198
+row identities unchanged; the Rust and Python derivations agree on the checked
+37-case, 201-row, 31-corpus identity and catalog SHA-256
+`d2c35126ee4e862ada539944ddb6cc2c654b82fe1e1465f505034fd1a9f7a84f`.
+
+The four formal lanes retain 6,030 normal samples (two 201-row runs) and 90
+allocator samples (two three-row ODP runs). The ODP rows account for 180
+samples. Normal p50 values for the ODP rows are:
+
+| Shape | Normal p50 R1 / R2 | Allocated bytes per iteration | Allocation calls | Reallocation calls |
+|---|---:|---:|---:|---:|
+| Tiny, 64 slides | 1.691887 / 1.687518 ms | 8,521,059 | 11,020 | 1,854 |
+| Medium, 4,096 slides | 67.786424 / 67.745553 ms | 99,149,357 | 490,881 | 90,611 |
+| Large, 8,192 slides | 136.334131 / 136.843521 ms | 191,235,475 | 978,314 | 180,732 |
+
+The allocator values are identical in R1 and R2. Region-peak values are
+absolute process-live observations that include the baseline; they are not net
+working-memory values and are not summed across phases. GNU time reports
+161,524/152,224 KiB for the two full normal runs and 82,680/82,568 KiB for the
+two ODP-only allocator runs; these scopes include different case sets and are
+not cross-instrument RSS comparisons.
+
+All four lane receipts pass. The harness has 353 passing library tests with
+one ignored; warning-denied all-feature/all-target Clippy, rustdoc, scoped
+formatting, 167 latest Python tests, both full-report CRUD validators and live
+boundary checks pass. The initial two stale hash/count-pin Python failures are
+retained as historical receipts. The sealed precleanup verifier, five resealed
+negative probes and finalize precleanup pass. Fresh-copy flagless portable
+verification passes with an unchanged seal and absent temporary directory.
+Cleanup removed two owned binaries totaling 116,542,728 bytes;
+`/tmp/litchi-goal-0465` and its temporary audits are absent. This descriptive
+baseline makes no regression, speedup, native-producer, bounded-memory
+streaming or scaling claim. See the [0465 bundle](results/change-0465/README.md), [source review](results/change-0465/source-review.md),
+[protocol](results/change-0465/protocol.json), [checked catalog](results/change-0465/checked/perf-corpus-manifest-v2.json),
+and [normal captures](results/change-0465/captures/R1-normal/report.json).
+
 ## Change 0464: descriptive PPTX derived-pair lifecycle evidence
 
 0464 is a harness-only PPTX source/destination pair baseline; it changes no

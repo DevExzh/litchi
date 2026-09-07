@@ -1,0 +1,11 @@
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/corpus_manifest.rs:634:
+             parameters.insert("opaque_payload_bytes".to_owned(), json!(65_536));
+             parameters.insert(
+                 "opaque_payload_formula".to_owned(),
+[31m-                json!("byte[index] = index_byte*37 + page_byte + 0x5b + variant (mod 256); variant=0"),
+[m[32m+                json!(
+[m[32m+                    "byte[index] = index_byte*37 + page_byte + 0x5b + variant (mod 256); variant=0"
+[m[32m+                ),
+[m             );
+         },
+         _ => {},

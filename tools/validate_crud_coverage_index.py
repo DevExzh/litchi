@@ -1293,7 +1293,14 @@ def _validate_index(
                 f"{scenario_context} status",
                 set(STATUSES),
             )
-            if status != category_status:
+            # A representative category may include both timed and untimed
+            # scenarios. Only measured rows enter the full-run timing gate.
+            allowed_statuses = (
+                {"measured", "correctness-only"}
+                if category_status == "measured"
+                else {category_status}
+            )
+            if status not in allowed_statuses:
                 raise ValidationError(f"{scenario_context} status differs from category status")
             if status in {"measured", "correctness-only"}:
                 scenario = _exact(
@@ -1354,6 +1361,10 @@ def _validate_index(
                 reason = _string(scenario["reason"], f"{scenario_context} reason")
                 if FORBIDDEN_IWORK.search(reason):
                     raise ValidationError(f"{scenario_context} reason must not broaden into iWork")
+        if category_status == "measured" and not any(
+            scenario["status"] == "measured" for scenario in scenarios
+        ):
+            raise ValidationError(f"{context} measured category has no measured scenario")
     identity = _validate_identity_artifact(
         _read_json(repo_root / IDENTITY_ARTIFACT),
         "identity artifact",

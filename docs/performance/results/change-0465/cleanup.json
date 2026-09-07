@@ -1,0 +1,37 @@
+{
+  "schema": "litchi-0465-cleanup-v1",
+  "change": 465,
+  "status": "pass",
+  "task": "/tmp/litchi-goal-0465",
+  "temporary_directory_absent": true,
+  "temporary_audits_absent": true,
+  "files_removed": 2,
+  "bytes_removed": 116542728,
+  "inventory": {
+    "path": "temporary-artifacts.json",
+    "bytes": 998,
+    "sha256": "7b6fca287821f7d22c25e9e2d50a178eeff068760ee2d5e8fbc0c7fea67c2612"
+  },
+  "receipts": {
+    "precleanup": {
+      "path": "precleanup.json",
+      "bytes": 2217,
+      "sha256": "e39d431feceff26d5bf4c8aa4278e9005f0ecbe72b45f591bb6977a297bac4cb"
+    },
+    "portable": {
+      "path": "portable-verification.json",
+      "bytes": 2843,
+      "sha256": "85e89edd997e9a723312f6318134d127730b85dc2ee9413cb616381dfa83e4a2"
+    }
+  },
+  "seal": {
+    "path": "SHA256SUMS",
+    "bytes": 9637,
+    "sha256": "ab630f3bcfd3dafe54225e5ed16516984839dff3d93f5c98868465c3768fc1f2",
+    "members": 99
+  },
+  "audit_archives": [],
+  "verifier_path": "verify.py",
+  "verifier_sha256": "cdb7327a5477f935259b598ff7085b6340a481e1e2d92879778cdeee112b68b5",
+  "driver_sha256": "a85d2d8cd7113029de67fbba3134eaa616f5ad32eb49bb48aeeb0dd9de73b97b"
+}

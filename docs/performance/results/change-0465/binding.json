@@ -1,0 +1,30 @@
+{
+  "schema": "litchi-0465-binaries-v1",
+  "revision": "161cf53b20d8bb65fe79d4567b9ea7768430de7b",
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0465/normal",
+      "sha256": "a19400ca3fbcae0f56c108f1806874750b4a28612a3ea6f1f6fb9f10a4fa01e5",
+      "bytes": 58346112,
+      "build_receipt": "checks/normal-build.json",
+      "build_receipt_sha256": "8301b3c1dae8c4206c0e054ae200ce43cdcd27d370e495e6483c5a80a83b7620",
+      "source": {
+        "path": "sources/0021cdee1035d1dc28ae1506fb991396d26b28e6c48ce4f1452c6be4bd5a263d.json",
+        "sha256": "0021cdee1035d1dc28ae1506fb991396d26b28e6c48ce4f1452c6be4bd5a263d",
+        "files": 7032
+      }
+    },
+    "allocator": {
+      "path": "/tmp/litchi-goal-0465/allocator",
+      "sha256": "c41e304975de31cde90b8670c70f04e5e9be3aeb73c53ea3b962ba6c8b7b00ae",
+      "bytes": 58196616,
+      "build_receipt": "checks/allocator-build.json",
+      "build_receipt_sha256": "6863348dd07986cfb801fbcc48ee4fb8d81525b3ee727809f288271cf021c1d6",
+      "source": {
+        "path": "sources/0021cdee1035d1dc28ae1506fb991396d26b28e6c48ce4f1452c6be4bd5a263d.json",
+        "sha256": "0021cdee1035d1dc28ae1506fb991396d26b28e6c48ce4f1452c6be4bd5a263d",
+        "files": 7032
+      }
+    }
+  }
+}

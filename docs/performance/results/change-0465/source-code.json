@@ -1,0 +1,17 @@
+{
+  "schema": "litchi-0465-source-code-v1",
+  "files": [
+    {
+      "source": "tools/perf-baseline/src/lib.rs",
+      "path": "source-code/tools/perf-baseline/src/lib.rs.txt",
+      "bytes": 2826232,
+      "sha256": "1dce9fe26e3e7bda5a5b81f8225323fd5d420a2b4b1363a7e2a267a1d1c0a223"
+    },
+    {
+      "source": "tools/perf-baseline/src/corpus_manifest.rs",
+      "path": "source-code/tools/perf-baseline/src/corpus_manifest.rs.txt",
+      "bytes": 50339,
+      "sha256": "ff5202ef2f6fe0ef0e49fdcfaf7b1ebce9bec68bec99b738a568df55678e717f"
+    }
+  ]
+}

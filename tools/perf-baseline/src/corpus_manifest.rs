@@ -74,6 +74,16 @@ const XLSX_SOURCE_FUNCTIONS: &[&str] = &[
     "xlsx_address",
     "XlsxShape",
 ];
+const ODP_EXISTING_APPEND_SOURCE_FUNCTIONS: &[&str] = &[
+    "build_odp_existing_append_corpus",
+    "source_archive_from_base",
+    "opaque_payload",
+    "append_once",
+    "appended_title",
+    "appended_body",
+    "odp_buffered_create::build_odp_buffered_corpus",
+    "SemanticShape",
+];
 
 // Keep this source-audited map in lockstep with the Python migration and the
 // table in CORPUS_MANIFEST_V2.md.  It describes generator algorithms, not an
@@ -141,6 +151,22 @@ const FAMILY_MAP: &[(&str, FamilyMetadata)] = &[
             algorithm_id: "litchi-perf.xlsx-integer-grid-v1",
             seed_spec: "none",
             source_functions: XLSX_SOURCE_FUNCTIONS,
+        },
+    ),
+    (
+        "litchi-odp-existing-append-lifecycle-v1",
+        FamilyMetadata {
+            family: "odp",
+            kind: "synthetic",
+            source_kind: "generated",
+            source_path: "tools/perf-baseline/src/odp_existing_append.rs",
+            producer: "Litchi deterministic generator",
+            license_spdx: "Apache-2.0",
+            license_evidence: "repository-license",
+            redistributable: true,
+            algorithm_id: "litchi-perf.odp-existing-append-v1",
+            seed_spec: "none",
+            source_functions: ODP_EXISTING_APPEND_SOURCE_FUNCTIONS,
         },
     ),
 ];
@@ -589,6 +615,28 @@ fn generator_parameters(
             parameters.insert(
                 "one_percent_update_formula".to_owned(),
                 json!("ceil(cell_count / 100)"),
+            );
+        },
+        "odp" => {
+            parameters.insert(
+                "base_generator".to_owned(),
+                json!("litchi-odp-buffered-slides-v1"),
+            );
+            parameters.insert(
+                "slide_count_by_shape".to_owned(),
+                json!({"tiny": 64, "medium": 4096, "large": 8192}),
+            );
+            parameters.insert("append_count".to_owned(), json!(1));
+            parameters.insert(
+                "opaque_member_path".to_owned(),
+                json!("Opaque/litchi-perf-odp-existing-append-opaque.bin"),
+            );
+            parameters.insert("opaque_payload_bytes".to_owned(), json!(65_536));
+            parameters.insert(
+                "opaque_payload_formula".to_owned(),
+                json!(
+                    "byte[index] = index_byte*37 + page_byte + 0x5b + variant (mod 256); variant=0"
+                ),
             );
         },
         _ => {},
@@ -1194,34 +1242,45 @@ mod tests {
 
     #[test]
     fn known_family_map_enriches_without_source_hashes() {
-        assert_eq!(FAMILY_MAP.len(), 4);
+        assert_eq!(FAMILY_MAP.len(), 5);
         let expected = [
             (
                 "litchi-cfb-synthetic-v1",
                 "litchi-perf.cfb-payload-v1",
                 "indexed-formula-v1",
                 "cfb",
+                "tools/perf-baseline/src/lib.rs",
             ),
             (
                 "litchi-opc-synthetic-v2",
                 "litchi-perf.opc-payload-v1",
                 "indexed-formula-v1",
                 "opc",
+                "tools/perf-baseline/src/lib.rs",
             ),
             (
                 "litchi-legacy-writer-v1",
                 "litchi-perf.legacy-writer-v1",
                 "none",
                 "legacy-writer",
+                "tools/perf-baseline/src/lib.rs",
             ),
             (
                 "litchi-xlsx-synthetic-v1",
                 "litchi-perf.xlsx-integer-grid-v1",
                 "none",
                 "xlsx",
+                "tools/perf-baseline/src/lib.rs",
+            ),
+            (
+                "litchi-odp-existing-append-lifecycle-v1",
+                "litchi-perf.odp-existing-append-v1",
+                "none",
+                "odp",
+                "tools/perf-baseline/src/odp_existing_append.rs",
             ),
         ];
-        for (generator, algorithm_id, seed_spec, family) in expected {
+        for (generator, algorithm_id, seed_spec, family, source_path) in expected {
             let mut corpus = legacy();
             corpus.generator = generator.to_owned();
             if family == "legacy-writer" {
@@ -1243,6 +1302,13 @@ mod tests {
                         styles: Some("xl/styles.xml".to_owned()),
                     },
                 });
+            } else if family == "odp" {
+                corpus.package_format = "ODP/ODF/ZIP".to_owned();
+                corpus.payload_kind =
+                    "deterministic-buffered-plain-titled-slides-with-opaque-member".to_owned();
+                corpus.entry_count = 64;
+                corpus.archive_member_count = 6;
+                corpus.target_entry = "content.xml".to_owned();
             }
             let migrated = CorpusManifestV2::from_legacy(corpus).unwrap();
             assert_eq!(migrated.generator.kind, "synthetic");
@@ -1254,7 +1320,7 @@ mod tests {
             assert_eq!(migrated.generator.parameters["family"], json!(family));
             assert_eq!(
                 migrated.provenance.source_path.as_deref(),
-                Some("tools/perf-baseline/src/lib.rs")
+                Some(source_path)
             );
             assert_eq!(migrated.provenance.source_kind, "generated");
             assert_eq!(migrated.provenance.source_sha256, None);

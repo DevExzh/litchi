@@ -6,13 +6,13 @@
     "algorithm": "sorted-json-utf8-compact-v1",
     "hash": "sha256"
   },
-  "catalog_sha256": "679d39548de0150b9fdfcdd2628ca3adc1bbd3c041a21d7a95ab70095c2d0ba9",
-  "content_set_sha256": "f0fad22aa4deed6ccf2f8ecc202222ee2c901aec3fe908e69edee0dbd46b1d71",
+  "catalog_sha256": "d2c35126ee4e862ada539944ddb6cc2c654b82fe1e1465f505034fd1a9f7a84f",
+  "content_set_sha256": "0ac5a8c267b6da1424ae0f322ac309e6a52606a67cfccaed12cd6821e93becd5",
   "build": {
     "tool": "litchi-perf-baseline",
     "tool_version": "0.1.0",
-    "git_revision": "e42aedef6ef7a9baae177f2e031196125c4a0706",
-    "git_worktree_dirty": false,
+    "git_revision": "161cf53b20d8bb65fe79d4567b9ea7768430de7b",
+    "git_worktree_dirty": true,
     "source_files": []
   },
   "corpora": [
@@ -51,14 +51,15 @@
         "algorithm_id": "litchi-perf.cfb-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "tiny",
-          "legacy_payload_kind": "incompressible",
-          "family": "cfb",
-          "package_format": "CFB/OLE2",
-          "compression": "none",
-          "entry_count": 3,
-          "entry_bytes": 512,
           "archive_member_count": 3,
+          "compression": "none",
+          "entry_bytes": 512,
+          "entry_count": 3,
+          "family": "cfb",
+          "legacy_payload_kind": "incompressible",
+          "legacy_shape": "tiny",
+          "package_format": "CFB/OLE2",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
           "source_functions": [
             "build_cfb_corpus",
             "cfb_entry_name",
@@ -67,8 +68,7 @@
             "PayloadKind"
           ],
           "target_index": 2,
-          "target_name_pattern": "benchmark_stream_{index:05}.bin",
-          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24"
+          "target_name_pattern": "benchmark_stream_{index:05}.bin"
         }
       },
       "provenance": {
@@ -90,8 +90,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 3,
-        "entry_bytes": 512
+        "entry_bytes": 512,
+        "entry_count": 3
       },
       "relationships": {
         "status": "unknown",
@@ -207,14 +207,15 @@
         "algorithm_id": "litchi-perf.cfb-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "wide-root",
-          "legacy_payload_kind": "incompressible",
-          "family": "cfb",
-          "package_format": "CFB/OLE2",
-          "compression": "none",
-          "entry_count": 2048,
-          "entry_bytes": 64,
           "archive_member_count": 2048,
+          "compression": "none",
+          "entry_bytes": 64,
+          "entry_count": 2048,
+          "family": "cfb",
+          "legacy_payload_kind": "incompressible",
+          "legacy_shape": "wide-root",
+          "package_format": "CFB/OLE2",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
           "source_functions": [
             "build_cfb_corpus",
             "cfb_entry_name",
@@ -223,8 +224,7 @@
             "PayloadKind"
           ],
           "target_index": 2047,
-          "target_name_pattern": "benchmark_stream_{index:05}.bin",
-          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24"
+          "target_name_pattern": "benchmark_stream_{index:05}.bin"
         }
       },
       "provenance": {
@@ -246,8 +246,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 2048,
-        "entry_bytes": 64
+        "entry_bytes": 64,
+        "entry_count": 2048
       },
       "relationships": {
         "status": "unknown",
@@ -364,14 +364,15 @@
         "algorithm_id": "litchi-perf.cfb-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "few-large",
-          "legacy_payload_kind": "incompressible",
-          "family": "cfb",
-          "package_format": "CFB/OLE2",
-          "compression": "none",
-          "entry_count": 4,
-          "entry_bytes": 4194304,
           "archive_member_count": 4,
+          "compression": "none",
+          "entry_bytes": 4194304,
+          "entry_count": 4,
+          "family": "cfb",
+          "legacy_payload_kind": "incompressible",
+          "legacy_shape": "few-large",
+          "package_format": "CFB/OLE2",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
           "source_functions": [
             "build_cfb_corpus",
             "cfb_entry_name",
@@ -380,8 +381,7 @@
             "PayloadKind"
           ],
           "target_index": 3,
-          "target_name_pattern": "benchmark_stream_{index:05}.bin",
-          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24"
+          "target_name_pattern": "benchmark_stream_{index:05}.bin"
         }
       },
       "provenance": {
@@ -403,8 +403,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 4,
-        "entry_bytes": 4194304
+        "entry_bytes": 4194304,
+        "entry_count": 4
       },
       "relationships": {
         "status": "unknown",
@@ -521,14 +521,16 @@
         "algorithm_id": "litchi-perf.cfb-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "few-large",
-          "legacy_payload_kind": "compressible",
-          "family": "cfb",
-          "package_format": "CFB/OLE2",
-          "compression": "none",
-          "entry_count": 4,
-          "entry_bytes": 4194304,
           "archive_member_count": 4,
+          "compression": "none",
+          "entry_bytes": 4194304,
+          "entry_count": 4,
+          "family": "cfb",
+          "legacy_payload_kind": "compressible",
+          "legacy_shape": "few-large",
+          "package_format": "CFB/OLE2",
+          "payload_block_bytes": 45,
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
           "source_functions": [
             "build_cfb_corpus",
             "cfb_entry_name",
@@ -537,9 +539,7 @@
             "PayloadKind"
           ],
           "target_index": 3,
-          "target_name_pattern": "benchmark_stream_{index:05}.bin",
-          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
-          "payload_block_bytes": 45
+          "target_name_pattern": "benchmark_stream_{index:05}.bin"
         }
       },
       "provenance": {
@@ -561,8 +561,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 4,
-        "entry_bytes": 4194304
+        "entry_bytes": 4194304,
+        "entry_count": 4
       },
       "relationships": {
         "status": "unknown",
@@ -679,14 +679,16 @@
         "algorithm_id": "litchi-perf.cfb-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "many-small",
-          "legacy_payload_kind": "compressible",
-          "family": "cfb",
-          "package_format": "CFB/OLE2",
-          "compression": "none",
-          "entry_count": 256,
-          "entry_bytes": 1024,
           "archive_member_count": 256,
+          "compression": "none",
+          "entry_bytes": 1024,
+          "entry_count": 256,
+          "family": "cfb",
+          "legacy_payload_kind": "compressible",
+          "legacy_shape": "many-small",
+          "package_format": "CFB/OLE2",
+          "payload_block_bytes": 45,
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
           "source_functions": [
             "build_cfb_corpus",
             "cfb_entry_name",
@@ -695,9 +697,7 @@
             "PayloadKind"
           ],
           "target_index": 255,
-          "target_name_pattern": "benchmark_stream_{index:05}.bin",
-          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
-          "payload_block_bytes": 45
+          "target_name_pattern": "benchmark_stream_{index:05}.bin"
         }
       },
       "provenance": {
@@ -719,8 +719,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 256,
-        "entry_bytes": 1024
+        "entry_bytes": 1024,
+        "entry_count": 256
       },
       "relationships": {
         "status": "unknown",
@@ -836,14 +836,16 @@
         "algorithm_id": "litchi-perf.cfb-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "tiny",
-          "legacy_payload_kind": "compressible",
-          "family": "cfb",
-          "package_format": "CFB/OLE2",
-          "compression": "none",
-          "entry_count": 3,
-          "entry_bytes": 512,
           "archive_member_count": 3,
+          "compression": "none",
+          "entry_bytes": 512,
+          "entry_count": 3,
+          "family": "cfb",
+          "legacy_payload_kind": "compressible",
+          "legacy_shape": "tiny",
+          "package_format": "CFB/OLE2",
+          "payload_block_bytes": 45,
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
           "source_functions": [
             "build_cfb_corpus",
             "cfb_entry_name",
@@ -852,9 +854,7 @@
             "PayloadKind"
           ],
           "target_index": 2,
-          "target_name_pattern": "benchmark_stream_{index:05}.bin",
-          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
-          "payload_block_bytes": 45
+          "target_name_pattern": "benchmark_stream_{index:05}.bin"
         }
       },
       "provenance": {
@@ -876,8 +876,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 3,
-        "entry_bytes": 512
+        "entry_bytes": 512,
+        "entry_count": 3
       },
       "relationships": {
         "status": "unknown",
@@ -993,14 +993,16 @@
         "algorithm_id": "litchi-perf.cfb-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "wide-root",
-          "legacy_payload_kind": "compressible",
-          "family": "cfb",
-          "package_format": "CFB/OLE2",
-          "compression": "none",
-          "entry_count": 2048,
-          "entry_bytes": 64,
           "archive_member_count": 2048,
+          "compression": "none",
+          "entry_bytes": 64,
+          "entry_count": 2048,
+          "family": "cfb",
+          "legacy_payload_kind": "compressible",
+          "legacy_shape": "wide-root",
+          "package_format": "CFB/OLE2",
+          "payload_block_bytes": 45,
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
           "source_functions": [
             "build_cfb_corpus",
             "cfb_entry_name",
@@ -1009,9 +1011,7 @@
             "PayloadKind"
           ],
           "target_index": 2047,
-          "target_name_pattern": "benchmark_stream_{index:05}.bin",
-          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
-          "payload_block_bytes": 45
+          "target_name_pattern": "benchmark_stream_{index:05}.bin"
         }
       },
       "provenance": {
@@ -1033,8 +1033,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 2048,
-        "entry_bytes": 64
+        "entry_bytes": 64,
+        "entry_count": 2048
       },
       "relationships": {
         "status": "unknown",
@@ -1151,14 +1151,15 @@
         "algorithm_id": "litchi-perf.cfb-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "many-small",
-          "legacy_payload_kind": "incompressible",
-          "family": "cfb",
-          "package_format": "CFB/OLE2",
-          "compression": "none",
-          "entry_count": 256,
-          "entry_bytes": 1024,
           "archive_member_count": 256,
+          "compression": "none",
+          "entry_bytes": 1024,
+          "entry_count": 256,
+          "family": "cfb",
+          "legacy_payload_kind": "incompressible",
+          "legacy_shape": "many-small",
+          "package_format": "CFB/OLE2",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
           "source_functions": [
             "build_cfb_corpus",
             "cfb_entry_name",
@@ -1167,8 +1168,7 @@
             "PayloadKind"
           ],
           "target_index": 255,
-          "target_name_pattern": "benchmark_stream_{index:05}.bin",
-          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24"
+          "target_name_pattern": "benchmark_stream_{index:05}.bin"
         }
       },
       "provenance": {
@@ -1190,8 +1190,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 256,
-        "entry_bytes": 1024
+        "entry_bytes": 1024,
+        "entry_count": 256
       },
       "relationships": {
         "status": "unknown",
@@ -1306,14 +1306,17 @@
         "algorithm_id": "litchi-perf.legacy-writer-v1",
         "seed_spec": "none",
         "parameters": {
-          "legacy_shape": "large",
-          "legacy_payload_kind": "not-applicable",
-          "family": "legacy-writer",
-          "package_format": "DOC/CFB",
-          "compression": "none",
-          "entry_count": 512,
-          "entry_bytes": 0,
           "archive_member_count": 5,
+          "compression": "none",
+          "entry_bytes": 0,
+          "entry_count": 512,
+          "family": "legacy-writer",
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "large",
+          "package_format": "DOC/CFB",
+          "paragraph_count": 512,
+          "payload_heavy_bytes": 20000,
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
           "source_functions": [
             "build_writer_corpus",
             "write_fresh_doc",
@@ -1323,13 +1326,10 @@
             "writer_text",
             "writer_payload_text"
           ],
+          "target_stream": "WordDocument",
           "writer_format": "doc",
           "writer_shape": "large",
-          "target_stream": "WordDocument",
-          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
-          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
-          "payload_heavy_bytes": 20000,
-          "paragraph_count": 512
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload"
         }
       },
       "provenance": {
@@ -1351,8 +1351,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 512,
-        "entry_bytes": 0
+        "entry_bytes": 0,
+        "entry_count": 512
       },
       "relationships": {
         "status": "unknown",
@@ -1460,14 +1460,17 @@
         "algorithm_id": "litchi-perf.legacy-writer-v1",
         "seed_spec": "none",
         "parameters": {
-          "legacy_shape": "payload-heavy",
-          "legacy_payload_kind": "not-applicable",
-          "family": "legacy-writer",
-          "package_format": "DOC/CFB",
-          "compression": "none",
-          "entry_count": 128,
-          "entry_bytes": 0,
           "archive_member_count": 5,
+          "compression": "none",
+          "entry_bytes": 0,
+          "entry_count": 128,
+          "family": "legacy-writer",
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "payload-heavy",
+          "package_format": "DOC/CFB",
+          "paragraph_count": 128,
+          "payload_heavy_bytes": 20000,
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
           "source_functions": [
             "build_writer_corpus",
             "write_fresh_doc",
@@ -1477,13 +1480,10 @@
             "writer_text",
             "writer_payload_text"
           ],
+          "target_stream": "WordDocument",
           "writer_format": "doc",
           "writer_shape": "payload-heavy",
-          "target_stream": "WordDocument",
-          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
-          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
-          "payload_heavy_bytes": 20000,
-          "paragraph_count": 128
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload"
         }
       },
       "provenance": {
@@ -1505,8 +1505,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 128,
-        "entry_bytes": 0
+        "entry_bytes": 0,
+        "entry_count": 128
       },
       "relationships": {
         "status": "unknown",
@@ -1614,14 +1614,17 @@
         "algorithm_id": "litchi-perf.legacy-writer-v1",
         "seed_spec": "none",
         "parameters": {
-          "legacy_shape": "tiny",
-          "legacy_payload_kind": "not-applicable",
-          "family": "legacy-writer",
-          "package_format": "DOC/CFB",
-          "compression": "none",
-          "entry_count": 3,
-          "entry_bytes": 0,
           "archive_member_count": 5,
+          "compression": "none",
+          "entry_bytes": 0,
+          "entry_count": 3,
+          "family": "legacy-writer",
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "tiny",
+          "package_format": "DOC/CFB",
+          "paragraph_count": 3,
+          "payload_heavy_bytes": 20000,
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
           "source_functions": [
             "build_writer_corpus",
             "write_fresh_doc",
@@ -1631,13 +1634,10 @@
             "writer_text",
             "writer_payload_text"
           ],
+          "target_stream": "WordDocument",
           "writer_format": "doc",
           "writer_shape": "tiny",
-          "target_stream": "WordDocument",
-          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
-          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
-          "payload_heavy_bytes": 20000,
-          "paragraph_count": 3
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload"
         }
       },
       "provenance": {
@@ -1659,8 +1659,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 3,
-        "entry_bytes": 0
+        "entry_bytes": 0,
+        "entry_count": 3
       },
       "relationships": {
         "status": "unknown",
@@ -1735,6 +1735,480 @@
       }
     },
     {
+      "id": "odp-odf-zip:sha256:62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "name": "odp-existing-append-lifecycle-medium",
+      "legacy_v1": {
+        "name": "odp-existing-append-lifecycle-medium",
+        "generator": "litchi-odp-existing-append-lifecycle-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+        "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+        "entry_count": 4096,
+        "archive_member_count": 6,
+        "entry_bytes": 96,
+        "uncompressed_payload_bytes": 471038,
+        "archive_bytes": 54646,
+        "archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+        "target_entry": "content.xml",
+        "target_payload_bytes": 3043815,
+        "target_payload_sha256": "53b6c3426ab2cbd140fa2a92a6d3b6d981fa15c769e6c5236a8ee2dc2b7644e7",
+        "xlsx": null
+      },
+      "format": "ODP/ODF/ZIP",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odp-existing-append-lifecycle-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odp-existing-append-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "append_count": 1,
+          "archive_member_count": 6,
+          "base_generator": "litchi-odp-buffered-slides-v1",
+          "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+          "entry_bytes": 96,
+          "entry_count": 4096,
+          "family": "odp",
+          "legacy_payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+          "legacy_shape": "medium",
+          "opaque_member_path": "Opaque/litchi-perf-odp-existing-append-opaque.bin",
+          "opaque_payload_bytes": 65536,
+          "opaque_payload_formula": "byte[index] = index_byte*37 + page_byte + 0x5b + variant (mod 256); variant=0",
+          "package_format": "ODP/ODF/ZIP",
+          "slide_count_by_shape": {
+            "large": 8192,
+            "medium": 4096,
+            "tiny": 64
+          },
+          "source_functions": [
+            "build_odp_existing_append_corpus",
+            "source_archive_from_base",
+            "opaque_payload",
+            "append_once",
+            "appended_title",
+            "appended_body",
+            "odp_buffered_create::build_odp_buffered_corpus",
+            "SemanticShape"
+          ]
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/odp_existing_append.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 54646,
+        "archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+        "logical_payload_bytes": 471038,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 96,
+        "entry_count": 4096
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 54646,
+          "members": 6,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "content.xml",
+          "logical_bytes": 3043815,
+          "sha256": "53b6c3426ab2cbd140fa2a92a6d3b6d981fa15c769e6c5236a8ee2dc2b7644e7"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odp_existing_append_lifecycle"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "odp-odf-zip:sha256:92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "name": "odp-existing-append-lifecycle-tiny",
+      "legacy_v1": {
+        "name": "odp-existing-append-lifecycle-tiny",
+        "generator": "litchi-odp-existing-append-lifecycle-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+        "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+        "entry_count": 64,
+        "archive_member_count": 6,
+        "entry_bytes": 96,
+        "uncompressed_payload_bytes": 7358,
+        "archive_bytes": 4684,
+        "archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+        "target_entry": "content.xml",
+        "target_payload_bytes": 49009,
+        "target_payload_sha256": "6085294e5d6a363515b71c9131fa1c49af5bf5b34374e26a7436fd509fde3037",
+        "xlsx": null
+      },
+      "format": "ODP/ODF/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odp-existing-append-lifecycle-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odp-existing-append-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "append_count": 1,
+          "archive_member_count": 6,
+          "base_generator": "litchi-odp-buffered-slides-v1",
+          "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+          "entry_bytes": 96,
+          "entry_count": 64,
+          "family": "odp",
+          "legacy_payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+          "legacy_shape": "tiny",
+          "opaque_member_path": "Opaque/litchi-perf-odp-existing-append-opaque.bin",
+          "opaque_payload_bytes": 65536,
+          "opaque_payload_formula": "byte[index] = index_byte*37 + page_byte + 0x5b + variant (mod 256); variant=0",
+          "package_format": "ODP/ODF/ZIP",
+          "slide_count_by_shape": {
+            "large": 8192,
+            "medium": 4096,
+            "tiny": 64
+          },
+          "source_functions": [
+            "build_odp_existing_append_corpus",
+            "source_archive_from_base",
+            "opaque_payload",
+            "append_once",
+            "appended_title",
+            "appended_body",
+            "odp_buffered_create::build_odp_buffered_corpus",
+            "SemanticShape"
+          ]
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/odp_existing_append.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 4684,
+        "archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+        "logical_payload_bytes": 7358,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 96,
+        "entry_count": 64
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 4684,
+          "members": 6,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "content.xml",
+          "logical_bytes": 49009,
+          "sha256": "6085294e5d6a363515b71c9131fa1c49af5bf5b34374e26a7436fd509fde3037"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odp_existing_append_lifecycle"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "odp-odf-zip:sha256:bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "name": "odp-existing-append-lifecycle-large",
+      "legacy_v1": {
+        "name": "odp-existing-append-lifecycle-large",
+        "generator": "litchi-odp-existing-append-lifecycle-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+        "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+        "entry_count": 8192,
+        "archive_member_count": 6,
+        "entry_bytes": 96,
+        "uncompressed_payload_bytes": 942078,
+        "archive_bytes": 105112,
+        "archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+        "target_entry": "content.xml",
+        "target_payload_bytes": 6087143,
+        "target_payload_sha256": "57e3c83e7153ee5e35be58a1a0c3ae725c813b00752a45366e29d00840d41538",
+        "xlsx": null
+      },
+      "format": "ODP/ODF/ZIP",
+      "size_class": "large",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odp-existing-append-lifecycle-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odp-existing-append-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "append_count": 1,
+          "archive_member_count": 6,
+          "base_generator": "litchi-odp-buffered-slides-v1",
+          "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+          "entry_bytes": 96,
+          "entry_count": 8192,
+          "family": "odp",
+          "legacy_payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+          "legacy_shape": "large",
+          "opaque_member_path": "Opaque/litchi-perf-odp-existing-append-opaque.bin",
+          "opaque_payload_bytes": 65536,
+          "opaque_payload_formula": "byte[index] = index_byte*37 + page_byte + 0x5b + variant (mod 256); variant=0",
+          "package_format": "ODP/ODF/ZIP",
+          "slide_count_by_shape": {
+            "large": 8192,
+            "medium": 4096,
+            "tiny": 64
+          },
+          "source_functions": [
+            "build_odp_existing_append_corpus",
+            "source_archive_from_base",
+            "opaque_payload",
+            "append_once",
+            "appended_title",
+            "appended_body",
+            "odp_buffered_create::build_odp_buffered_corpus",
+            "SemanticShape"
+          ]
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/odp_existing_append.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 105112,
+        "archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+        "logical_payload_bytes": 942078,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 96,
+        "entry_count": 8192
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 105112,
+          "members": 6,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "content.xml",
+          "logical_bytes": 6087143,
+          "sha256": "57e3c83e7153ee5e35be58a1a0c3ae725c813b00752a45366e29d00840d41538"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odp_existing_append_lifecycle"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
       "id": "opc-zip:sha256:08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
       "name": "tiny-incompressible",
       "legacy_v1": {
@@ -1769,14 +2243,22 @@
         "algorithm_id": "litchi-perf.opc-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "tiny",
-          "legacy_payload_kind": "incompressible",
-          "family": "opc",
-          "package_format": "OPC/ZIP",
-          "compression": "deflate",
-          "entry_count": 3,
-          "entry_bytes": 512,
           "archive_member_count": 5,
+          "compression": "deflate",
+          "entry_bytes": 512,
+          "entry_count": 3,
+          "family": "opc",
+          "legacy_payload_kind": "incompressible",
+          "legacy_shape": "tiny",
+          "package_format": "OPC/ZIP",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream",
+            "target": "benchmark/parts/00001.bin",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+          },
           "source_functions": [
             "build_opc_corpus",
             "entry_name",
@@ -1785,15 +2267,7 @@
             "PayloadKind"
           ],
           "target_index": 1,
-          "target_name_pattern": "benchmark/parts/{index:05}.bin",
-          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
-          "relationship": {
-            "id": "rIdBenchmarkMain",
-            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-            "target": "benchmark/parts/00001.bin",
-            "mode": "Internal",
-            "part_content_type": "application/octet-stream"
-          }
+          "target_name_pattern": "benchmark/parts/{index:05}.bin"
         }
       },
       "provenance": {
@@ -1815,8 +2289,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 3,
-        "entry_bytes": 512
+        "entry_bytes": 512,
+        "entry_count": 3
       },
       "relationships": {
         "status": "unknown",
@@ -1935,14 +2409,22 @@
         "algorithm_id": "litchi-perf.opc-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "many-small",
-          "legacy_payload_kind": "incompressible",
-          "family": "opc",
-          "package_format": "OPC/ZIP",
-          "compression": "deflate",
-          "entry_count": 256,
-          "entry_bytes": 1024,
           "archive_member_count": 258,
+          "compression": "deflate",
+          "entry_bytes": 1024,
+          "entry_count": 256,
+          "family": "opc",
+          "legacy_payload_kind": "incompressible",
+          "legacy_shape": "many-small",
+          "package_format": "OPC/ZIP",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream",
+            "target": "benchmark/parts/00128.bin",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+          },
           "source_functions": [
             "build_opc_corpus",
             "entry_name",
@@ -1951,15 +2433,7 @@
             "PayloadKind"
           ],
           "target_index": 128,
-          "target_name_pattern": "benchmark/parts/{index:05}.bin",
-          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
-          "relationship": {
-            "id": "rIdBenchmarkMain",
-            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-            "target": "benchmark/parts/00128.bin",
-            "mode": "Internal",
-            "part_content_type": "application/octet-stream"
-          }
+          "target_name_pattern": "benchmark/parts/{index:05}.bin"
         }
       },
       "provenance": {
@@ -1981,8 +2455,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 256,
-        "entry_bytes": 1024
+        "entry_bytes": 1024,
+        "entry_count": 256
       },
       "relationships": {
         "status": "unknown",
@@ -2100,14 +2574,23 @@
         "algorithm_id": "litchi-perf.opc-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "tiny",
-          "legacy_payload_kind": "compressible",
-          "family": "opc",
-          "package_format": "OPC/ZIP",
-          "compression": "deflate",
-          "entry_count": 3,
-          "entry_bytes": 512,
           "archive_member_count": 5,
+          "compression": "deflate",
+          "entry_bytes": 512,
+          "entry_count": 3,
+          "family": "opc",
+          "legacy_payload_kind": "compressible",
+          "legacy_shape": "tiny",
+          "package_format": "OPC/ZIP",
+          "payload_block_bytes": 45,
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream",
+            "target": "benchmark/parts/00001.bin",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+          },
           "source_functions": [
             "build_opc_corpus",
             "entry_name",
@@ -2116,16 +2599,7 @@
             "PayloadKind"
           ],
           "target_index": 1,
-          "target_name_pattern": "benchmark/parts/{index:05}.bin",
-          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
-          "payload_block_bytes": 45,
-          "relationship": {
-            "id": "rIdBenchmarkMain",
-            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-            "target": "benchmark/parts/00001.bin",
-            "mode": "Internal",
-            "part_content_type": "application/octet-stream"
-          }
+          "target_name_pattern": "benchmark/parts/{index:05}.bin"
         }
       },
       "provenance": {
@@ -2147,8 +2621,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 3,
-        "entry_bytes": 512
+        "entry_bytes": 512,
+        "entry_count": 3
       },
       "relationships": {
         "status": "unknown",
@@ -2267,14 +2741,23 @@
         "algorithm_id": "litchi-perf.opc-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "many-small",
-          "legacy_payload_kind": "compressible",
-          "family": "opc",
-          "package_format": "OPC/ZIP",
-          "compression": "deflate",
-          "entry_count": 256,
-          "entry_bytes": 1024,
           "archive_member_count": 258,
+          "compression": "deflate",
+          "entry_bytes": 1024,
+          "entry_count": 256,
+          "family": "opc",
+          "legacy_payload_kind": "compressible",
+          "legacy_shape": "many-small",
+          "package_format": "OPC/ZIP",
+          "payload_block_bytes": 45,
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream",
+            "target": "benchmark/parts/00128.bin",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+          },
           "source_functions": [
             "build_opc_corpus",
             "entry_name",
@@ -2283,16 +2766,7 @@
             "PayloadKind"
           ],
           "target_index": 128,
-          "target_name_pattern": "benchmark/parts/{index:05}.bin",
-          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
-          "payload_block_bytes": 45,
-          "relationship": {
-            "id": "rIdBenchmarkMain",
-            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-            "target": "benchmark/parts/00128.bin",
-            "mode": "Internal",
-            "part_content_type": "application/octet-stream"
-          }
+          "target_name_pattern": "benchmark/parts/{index:05}.bin"
         }
       },
       "provenance": {
@@ -2314,8 +2788,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 256,
-        "entry_bytes": 1024
+        "entry_bytes": 1024,
+        "entry_count": 256
       },
       "relationships": {
         "status": "unknown",
@@ -2434,14 +2908,22 @@
         "algorithm_id": "litchi-perf.opc-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "few-large",
-          "legacy_payload_kind": "incompressible",
-          "family": "opc",
-          "package_format": "OPC/ZIP",
-          "compression": "deflate",
-          "entry_count": 4,
-          "entry_bytes": 4194304,
           "archive_member_count": 6,
+          "compression": "deflate",
+          "entry_bytes": 4194304,
+          "entry_count": 4,
+          "family": "opc",
+          "legacy_payload_kind": "incompressible",
+          "legacy_shape": "few-large",
+          "package_format": "OPC/ZIP",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream",
+            "target": "benchmark/parts/00002.bin",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+          },
           "source_functions": [
             "build_opc_corpus",
             "entry_name",
@@ -2450,15 +2932,7 @@
             "PayloadKind"
           ],
           "target_index": 2,
-          "target_name_pattern": "benchmark/parts/{index:05}.bin",
-          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
-          "relationship": {
-            "id": "rIdBenchmarkMain",
-            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-            "target": "benchmark/parts/00002.bin",
-            "mode": "Internal",
-            "part_content_type": "application/octet-stream"
-          }
+          "target_name_pattern": "benchmark/parts/{index:05}.bin"
         }
       },
       "provenance": {
@@ -2480,8 +2954,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 4,
-        "entry_bytes": 4194304
+        "entry_bytes": 4194304,
+        "entry_count": 4
       },
       "relationships": {
         "status": "unknown",
@@ -2599,14 +3073,22 @@
         "algorithm_id": "litchi-perf.opc-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "wide-root",
-          "legacy_payload_kind": "incompressible",
-          "family": "opc",
-          "package_format": "OPC/ZIP",
-          "compression": "deflate",
-          "entry_count": 2048,
-          "entry_bytes": 64,
           "archive_member_count": 2050,
+          "compression": "deflate",
+          "entry_bytes": 64,
+          "entry_count": 2048,
+          "family": "opc",
+          "legacy_payload_kind": "incompressible",
+          "legacy_shape": "wide-root",
+          "package_format": "OPC/ZIP",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream",
+            "target": "benchmark/parts/01024.bin",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+          },
           "source_functions": [
             "build_opc_corpus",
             "entry_name",
@@ -2615,15 +3097,7 @@
             "PayloadKind"
           ],
           "target_index": 1024,
-          "target_name_pattern": "benchmark/parts/{index:05}.bin",
-          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
-          "relationship": {
-            "id": "rIdBenchmarkMain",
-            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-            "target": "benchmark/parts/01024.bin",
-            "mode": "Internal",
-            "part_content_type": "application/octet-stream"
-          }
+          "target_name_pattern": "benchmark/parts/{index:05}.bin"
         }
       },
       "provenance": {
@@ -2645,8 +3119,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 2048,
-        "entry_bytes": 64
+        "entry_bytes": 64,
+        "entry_count": 2048
       },
       "relationships": {
         "status": "unknown",
@@ -2765,14 +3239,23 @@
         "algorithm_id": "litchi-perf.opc-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "few-large",
-          "legacy_payload_kind": "compressible",
-          "family": "opc",
-          "package_format": "OPC/ZIP",
-          "compression": "deflate",
-          "entry_count": 4,
-          "entry_bytes": 4194304,
           "archive_member_count": 6,
+          "compression": "deflate",
+          "entry_bytes": 4194304,
+          "entry_count": 4,
+          "family": "opc",
+          "legacy_payload_kind": "compressible",
+          "legacy_shape": "few-large",
+          "package_format": "OPC/ZIP",
+          "payload_block_bytes": 45,
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream",
+            "target": "benchmark/parts/00002.bin",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+          },
           "source_functions": [
             "build_opc_corpus",
             "entry_name",
@@ -2781,16 +3264,7 @@
             "PayloadKind"
           ],
           "target_index": 2,
-          "target_name_pattern": "benchmark/parts/{index:05}.bin",
-          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
-          "payload_block_bytes": 45,
-          "relationship": {
-            "id": "rIdBenchmarkMain",
-            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-            "target": "benchmark/parts/00002.bin",
-            "mode": "Internal",
-            "part_content_type": "application/octet-stream"
-          }
+          "target_name_pattern": "benchmark/parts/{index:05}.bin"
         }
       },
       "provenance": {
@@ -2812,8 +3286,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 4,
-        "entry_bytes": 4194304
+        "entry_bytes": 4194304,
+        "entry_count": 4
       },
       "relationships": {
         "status": "unknown",
@@ -2931,14 +3405,23 @@
         "algorithm_id": "litchi-perf.opc-payload-v1",
         "seed_spec": "indexed-formula-v1",
         "parameters": {
-          "legacy_shape": "wide-root",
-          "legacy_payload_kind": "compressible",
-          "family": "opc",
-          "package_format": "OPC/ZIP",
-          "compression": "deflate",
-          "entry_count": 2048,
-          "entry_bytes": 64,
           "archive_member_count": 2050,
+          "compression": "deflate",
+          "entry_bytes": 64,
+          "entry_count": 2048,
+          "family": "opc",
+          "legacy_payload_kind": "compressible",
+          "legacy_shape": "wide-root",
+          "package_format": "OPC/ZIP",
+          "payload_block_bytes": 45,
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream",
+            "target": "benchmark/parts/01024.bin",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+          },
           "source_functions": [
             "build_opc_corpus",
             "entry_name",
@@ -2947,16 +3430,7 @@
             "PayloadKind"
           ],
           "target_index": 1024,
-          "target_name_pattern": "benchmark/parts/{index:05}.bin",
-          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
-          "payload_block_bytes": 45,
-          "relationship": {
-            "id": "rIdBenchmarkMain",
-            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-            "target": "benchmark/parts/01024.bin",
-            "mode": "Internal",
-            "part_content_type": "application/octet-stream"
-          }
+          "target_name_pattern": "benchmark/parts/{index:05}.bin"
         }
       },
       "provenance": {
@@ -2978,8 +3452,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 2048,
-        "entry_bytes": 64
+        "entry_bytes": 64,
+        "entry_count": 2048
       },
       "relationships": {
         "status": "unknown",
@@ -3096,14 +3570,20 @@
         "algorithm_id": "litchi-perf.legacy-writer-v1",
         "seed_spec": "none",
         "parameters": {
-          "legacy_shape": "large",
-          "legacy_payload_kind": "not-applicable",
-          "family": "legacy-writer",
-          "package_format": "PPT/CFB",
-          "compression": "none",
-          "entry_count": 144,
-          "entry_bytes": 0,
           "archive_member_count": 4,
+          "compression": "none",
+          "dimensions": {
+            "slides": 12,
+            "text_boxes_per_slide": 12
+          },
+          "entry_bytes": 0,
+          "entry_count": 144,
+          "family": "legacy-writer",
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "large",
+          "package_format": "PPT/CFB",
+          "payload_heavy_bytes": 40000,
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
           "source_functions": [
             "build_writer_corpus",
             "write_fresh_doc",
@@ -3113,17 +3593,11 @@
             "writer_text",
             "writer_payload_text"
           ],
+          "target_stream": "PowerPoint Document",
+          "textbox_position_formula": "x=36+(box_number % 3)*180; y=36+(box_number / 3)*90; width=144; height=54",
           "writer_format": "ppt",
           "writer_shape": "large",
-          "target_stream": "PowerPoint Document",
-          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
-          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
-          "payload_heavy_bytes": 40000,
-          "dimensions": {
-            "slides": 12,
-            "text_boxes_per_slide": 12
-          },
-          "textbox_position_formula": "x=36+(box_number % 3)*180; y=36+(box_number / 3)*90; width=144; height=54"
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload"
         }
       },
       "provenance": {
@@ -3145,8 +3619,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 144,
-        "entry_bytes": 0
+        "entry_bytes": 0,
+        "entry_count": 144
       },
       "relationships": {
         "status": "unknown",
@@ -3254,14 +3728,20 @@
         "algorithm_id": "litchi-perf.legacy-writer-v1",
         "seed_spec": "none",
         "parameters": {
-          "legacy_shape": "payload-heavy",
-          "legacy_payload_kind": "not-applicable",
-          "family": "legacy-writer",
-          "package_format": "PPT/CFB",
-          "compression": "none",
-          "entry_count": 128,
-          "entry_bytes": 0,
           "archive_member_count": 4,
+          "compression": "none",
+          "dimensions": {
+            "slides": 16,
+            "text_boxes_per_slide": 8
+          },
+          "entry_bytes": 0,
+          "entry_count": 128,
+          "family": "legacy-writer",
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "payload-heavy",
+          "package_format": "PPT/CFB",
+          "payload_heavy_bytes": 40000,
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
           "source_functions": [
             "build_writer_corpus",
             "write_fresh_doc",
@@ -3271,17 +3751,11 @@
             "writer_text",
             "writer_payload_text"
           ],
+          "target_stream": "PowerPoint Document",
+          "textbox_position_formula": "x=36+(box_number % 3)*180; y=36+(box_number / 3)*90; width=144; height=54",
           "writer_format": "ppt",
           "writer_shape": "payload-heavy",
-          "target_stream": "PowerPoint Document",
-          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
-          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
-          "payload_heavy_bytes": 40000,
-          "dimensions": {
-            "slides": 16,
-            "text_boxes_per_slide": 8
-          },
-          "textbox_position_formula": "x=36+(box_number % 3)*180; y=36+(box_number / 3)*90; width=144; height=54"
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload"
         }
       },
       "provenance": {
@@ -3303,8 +3777,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 128,
-        "entry_bytes": 0
+        "entry_bytes": 0,
+        "entry_count": 128
       },
       "relationships": {
         "status": "unknown",
@@ -3412,14 +3886,20 @@
         "algorithm_id": "litchi-perf.legacy-writer-v1",
         "seed_spec": "none",
         "parameters": {
-          "legacy_shape": "tiny",
-          "legacy_payload_kind": "not-applicable",
-          "family": "legacy-writer",
-          "package_format": "PPT/CFB",
-          "compression": "none",
-          "entry_count": 2,
-          "entry_bytes": 0,
           "archive_member_count": 4,
+          "compression": "none",
+          "dimensions": {
+            "slides": 1,
+            "text_boxes_per_slide": 2
+          },
+          "entry_bytes": 0,
+          "entry_count": 2,
+          "family": "legacy-writer",
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "tiny",
+          "package_format": "PPT/CFB",
+          "payload_heavy_bytes": 40000,
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
           "source_functions": [
             "build_writer_corpus",
             "write_fresh_doc",
@@ -3429,17 +3909,11 @@
             "writer_text",
             "writer_payload_text"
           ],
+          "target_stream": "PowerPoint Document",
+          "textbox_position_formula": "x=36+(box_number % 3)*180; y=36+(box_number / 3)*90; width=144; height=54",
           "writer_format": "ppt",
           "writer_shape": "tiny",
-          "target_stream": "PowerPoint Document",
-          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
-          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
-          "payload_heavy_bytes": 40000,
-          "dimensions": {
-            "slides": 1,
-            "text_boxes_per_slide": 2
-          },
-          "textbox_position_formula": "x=36+(box_number % 3)*180; y=36+(box_number / 3)*90; width=144; height=54"
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload"
         }
       },
       "provenance": {
@@ -3461,8 +3935,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 2,
-        "entry_bytes": 0
+        "entry_bytes": 0,
+        "entry_count": 2
       },
       "relationships": {
         "status": "unknown",
@@ -3570,14 +4044,22 @@
         "algorithm_id": "litchi-perf.legacy-writer-v1",
         "seed_spec": "none",
         "parameters": {
-          "legacy_shape": "large",
-          "legacy_payload_kind": "not-applicable",
-          "family": "legacy-writer",
-          "package_format": "XLS/CFB",
-          "compression": "none",
-          "entry_count": 8192,
-          "entry_bytes": 0,
           "archive_member_count": 1,
+          "compression": "none",
+          "dimensions": {
+            "columns": 16,
+            "rows": 128,
+            "sheets": 4
+          },
+          "entry_bytes": 0,
+          "entry_count": 8192,
+          "family": "legacy-writer",
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "large",
+          "numeric_value_formula": "(sheet * rows * columns + row * columns + column) as f64",
+          "package_format": "XLS/CFB",
+          "payload_heavy_bytes": 32700,
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
           "source_functions": [
             "build_writer_corpus",
             "write_fresh_doc",
@@ -3587,18 +4069,10 @@
             "writer_text",
             "writer_payload_text"
           ],
+          "target_stream": "Workbook",
           "writer_format": "xls",
           "writer_shape": "large",
-          "target_stream": "Workbook",
-          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
-          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
-          "payload_heavy_bytes": 32700,
-          "dimensions": {
-            "sheets": 4,
-            "rows": 128,
-            "columns": 16
-          },
-          "numeric_value_formula": "(sheet * rows * columns + row * columns + column) as f64"
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload"
         }
       },
       "provenance": {
@@ -3620,8 +4094,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 8192,
-        "entry_bytes": 0
+        "entry_bytes": 0,
+        "entry_count": 8192
       },
       "relationships": {
         "status": "unknown",
@@ -3729,14 +4203,22 @@
         "algorithm_id": "litchi-perf.legacy-writer-v1",
         "seed_spec": "none",
         "parameters": {
-          "legacy_shape": "tiny",
-          "legacy_payload_kind": "not-applicable",
-          "family": "legacy-writer",
-          "package_format": "XLS/CFB",
-          "compression": "none",
-          "entry_count": 16,
-          "entry_bytes": 0,
           "archive_member_count": 1,
+          "compression": "none",
+          "dimensions": {
+            "columns": 4,
+            "rows": 4,
+            "sheets": 1
+          },
+          "entry_bytes": 0,
+          "entry_count": 16,
+          "family": "legacy-writer",
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "tiny",
+          "numeric_value_formula": "(sheet * rows * columns + row * columns + column) as f64",
+          "package_format": "XLS/CFB",
+          "payload_heavy_bytes": 32700,
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
           "source_functions": [
             "build_writer_corpus",
             "write_fresh_doc",
@@ -3746,18 +4228,10 @@
             "writer_text",
             "writer_payload_text"
           ],
+          "target_stream": "Workbook",
           "writer_format": "xls",
           "writer_shape": "tiny",
-          "target_stream": "Workbook",
-          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
-          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
-          "payload_heavy_bytes": 32700,
-          "dimensions": {
-            "sheets": 1,
-            "rows": 4,
-            "columns": 4
-          },
-          "numeric_value_formula": "(sheet * rows * columns + row * columns + column) as f64"
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload"
         }
       },
       "provenance": {
@@ -3779,8 +4253,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 16,
-        "entry_bytes": 0
+        "entry_bytes": 0,
+        "entry_count": 16
       },
       "relationships": {
         "status": "unknown",
@@ -3888,14 +4362,21 @@
         "algorithm_id": "litchi-perf.legacy-writer-v1",
         "seed_spec": "none",
         "parameters": {
-          "legacy_shape": "payload-heavy",
-          "legacy_payload_kind": "not-applicable",
-          "family": "legacy-writer",
-          "package_format": "XLS/CFB",
-          "compression": "none",
-          "entry_count": 128,
-          "entry_bytes": 0,
           "archive_member_count": 1,
+          "compression": "none",
+          "dimensions": {
+            "sheets": 128,
+            "string_bytes": 32700
+          },
+          "entry_bytes": 0,
+          "entry_count": 128,
+          "family": "legacy-writer",
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "payload-heavy",
+          "numeric_value_formula": "(sheet * rows * columns + row * columns + column) as f64",
+          "package_format": "XLS/CFB",
+          "payload_heavy_bytes": 32700,
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
           "source_functions": [
             "build_writer_corpus",
             "write_fresh_doc",
@@ -3905,17 +4386,10 @@
             "writer_text",
             "writer_payload_text"
           ],
+          "target_stream": "Workbook",
           "writer_format": "xls",
           "writer_shape": "payload-heavy",
-          "target_stream": "Workbook",
-          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
-          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
-          "payload_heavy_bytes": 32700,
-          "dimensions": {
-            "sheets": 128,
-            "string_bytes": 32700
-          },
-          "numeric_value_formula": "(sheet * rows * columns + row * columns + column) as f64"
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload"
         }
       },
       "provenance": {
@@ -3937,8 +4411,8 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 128,
-        "entry_bytes": 0
+        "entry_bytes": 0,
+        "entry_count": 128
       },
       "relationships": {
         "status": "unknown",
@@ -4060,14 +4534,21 @@
         "algorithm_id": "litchi-perf.xlsx-integer-grid-v1",
         "seed_spec": "none",
         "parameters": {
-          "legacy_shape": "dense-wide",
-          "legacy_payload_kind": "deterministic-integer-grid",
-          "family": "xlsx",
-          "package_format": "XLSX/OPC/ZIP",
-          "compression": "deflate",
-          "entry_count": 131072,
-          "entry_bytes": 4,
+          "address_formula": "column_to_letters(column + 1) + (row + 1)",
           "archive_member_count": 7,
+          "columns_per_sheet": 256,
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 131072,
+          "family": "xlsx",
+          "legacy_payload_kind": "deterministic-integer-grid",
+          "legacy_shape": "dense-wide",
+          "one_percent_update_count": 1311,
+          "one_percent_update_formula": "ceil(cell_count / 100)",
+          "package_format": "XLSX/OPC/ZIP",
+          "rows_per_sheet": 256,
+          "sheet_count": 2,
+          "sheet_name_formula": "index == 0 ? Sheet1 : Bench{index:02}",
           "source_functions": [
             "build_xlsx_corpus",
             "build_xlsx_workbook",
@@ -4077,14 +4558,7 @@
             "xlsx_address",
             "XlsxShape"
           ],
-          "sheet_count": 2,
-          "rows_per_sheet": 256,
-          "columns_per_sheet": 256,
-          "one_percent_update_count": 1311,
-          "value_formula": "(sheet * 1_000_000 + row * 1_000 + column) as i32",
-          "sheet_name_formula": "index == 0 ? Sheet1 : Bench{index:02}",
-          "address_formula": "column_to_letters(column + 1) + (row + 1)",
-          "one_percent_update_formula": "ceil(cell_count / 100)"
+          "value_formula": "(sheet * 1_000_000 + row * 1_000 + column) as i32"
         }
       },
       "provenance": {
@@ -4106,11 +4580,11 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 131072,
+        "columns_per_sheet": 256,
         "entry_bytes": 4,
-        "sheet_count": 2,
+        "entry_count": 131072,
         "rows_per_sheet": 256,
-        "columns_per_sheet": 256
+        "sheet_count": 2
       },
       "relationships": {
         "status": "unknown",
@@ -4247,14 +4721,21 @@
         "algorithm_id": "litchi-perf.xlsx-integer-grid-v1",
         "seed_spec": "none",
         "parameters": {
-          "legacy_shape": "tiny",
-          "legacy_payload_kind": "deterministic-integer-grid",
-          "family": "xlsx",
-          "package_format": "XLSX/OPC/ZIP",
-          "compression": "deflate",
-          "entry_count": 192,
-          "entry_bytes": 4,
+          "address_formula": "column_to_letters(column + 1) + (row + 1)",
           "archive_member_count": 8,
+          "columns_per_sheet": 8,
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 192,
+          "family": "xlsx",
+          "legacy_payload_kind": "deterministic-integer-grid",
+          "legacy_shape": "tiny",
+          "one_percent_update_count": 2,
+          "one_percent_update_formula": "ceil(cell_count / 100)",
+          "package_format": "XLSX/OPC/ZIP",
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "sheet_name_formula": "index == 0 ? Sheet1 : Bench{index:02}",
           "source_functions": [
             "build_xlsx_corpus",
             "build_xlsx_workbook",
@@ -4264,14 +4745,7 @@
             "xlsx_address",
             "XlsxShape"
           ],
-          "sheet_count": 3,
-          "rows_per_sheet": 8,
-          "columns_per_sheet": 8,
-          "one_percent_update_count": 2,
-          "value_formula": "(sheet * 1_000_000 + row * 1_000 + column) as i32",
-          "sheet_name_formula": "index == 0 ? Sheet1 : Bench{index:02}",
-          "address_formula": "column_to_letters(column + 1) + (row + 1)",
-          "one_percent_update_formula": "ceil(cell_count / 100)"
+          "value_formula": "(sheet * 1_000_000 + row * 1_000 + column) as i32"
         }
       },
       "provenance": {
@@ -4293,11 +4767,11 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 192,
+        "columns_per_sheet": 8,
         "entry_bytes": 4,
-        "sheet_count": 3,
+        "entry_count": 192,
         "rows_per_sheet": 8,
-        "columns_per_sheet": 8
+        "sheet_count": 3
       },
       "relationships": {
         "status": "unknown",
@@ -4435,14 +4909,21 @@
         "algorithm_id": "litchi-perf.xlsx-integer-grid-v1",
         "seed_spec": "none",
         "parameters": {
-          "legacy_shape": "medium",
-          "legacy_payload_kind": "deterministic-integer-grid",
-          "family": "xlsx",
-          "package_format": "XLSX/OPC/ZIP",
-          "compression": "deflate",
-          "entry_count": 4096,
-          "entry_bytes": 4,
+          "address_formula": "column_to_letters(column + 1) + (row + 1)",
           "archive_member_count": 9,
+          "columns_per_sheet": 32,
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 4096,
+          "family": "xlsx",
+          "legacy_payload_kind": "deterministic-integer-grid",
+          "legacy_shape": "medium",
+          "one_percent_update_count": 41,
+          "one_percent_update_formula": "ceil(cell_count / 100)",
+          "package_format": "XLSX/OPC/ZIP",
+          "rows_per_sheet": 32,
+          "sheet_count": 4,
+          "sheet_name_formula": "index == 0 ? Sheet1 : Bench{index:02}",
           "source_functions": [
             "build_xlsx_corpus",
             "build_xlsx_workbook",
@@ -4452,14 +4933,7 @@
             "xlsx_address",
             "XlsxShape"
           ],
-          "sheet_count": 4,
-          "rows_per_sheet": 32,
-          "columns_per_sheet": 32,
-          "one_percent_update_count": 41,
-          "value_formula": "(sheet * 1_000_000 + row * 1_000 + column) as i32",
-          "sheet_name_formula": "index == 0 ? Sheet1 : Bench{index:02}",
-          "address_formula": "column_to_letters(column + 1) + (row + 1)",
-          "one_percent_update_formula": "ceil(cell_count / 100)"
+          "value_formula": "(sheet * 1_000_000 + row * 1_000 + column) as i32"
         }
       },
       "provenance": {
@@ -4481,11 +4955,11 @@
         "metadata_bytes": null
       },
       "shape_parameters": {
-        "entry_count": 4096,
+        "columns_per_sheet": 32,
         "entry_bytes": 4,
-        "sheet_count": 4,
+        "entry_count": 4096,
         "rows_per_sheet": 32,
-        "columns_per_sheet": 32
+        "sheet_count": 4
       },
       "relationships": {
         "status": "unknown",
@@ -5042,6 +5516,27 @@
       "corpus_id": "doc-cfb:sha256:ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
       "legacy_name": "doc-tiny",
       "legacy_archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+      "role": "timed"
+    },
+    {
+      "case": "odp_existing_append_lifecycle",
+      "corpus_id": "odp-odf-zip:sha256:62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "legacy_name": "odp-existing-append-lifecycle-medium",
+      "legacy_archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+      "role": "timed"
+    },
+    {
+      "case": "odp_existing_append_lifecycle",
+      "corpus_id": "odp-odf-zip:sha256:92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "legacy_name": "odp-existing-append-lifecycle-tiny",
+      "legacy_archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+      "role": "timed"
+    },
+    {
+      "case": "odp_existing_append_lifecycle",
+      "corpus_id": "odp-odf-zip:sha256:bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+      "legacy_name": "odp-existing-append-lifecycle-large",
+      "legacy_archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
       "role": "timed"
     },
     {

@@ -1520,7 +1520,7 @@ enum Case {
 }
 
 impl Case {
-    const DEFAULT: [Self; 36] = [
+    const DEFAULT: [Self; 37] = [
         Self::ZipIndex,
         Self::ZipReadOne,
         Self::OpcOpen,
@@ -1557,6 +1557,7 @@ impl Case {
         Self::XlsxSourceListSheets,
         Self::XlsxSourceFirstCell,
         Self::XlsxSourceNarrowColumnRangeScan,
+        Self::OdpExistingAppendLifecycle,
     ];
 
     const fn name(self) -> &'static str {
@@ -57919,7 +57920,7 @@ mod tests {
         );
         assert_eq!(Case::OpcRelationshipOpen.name(), "opc_relationship_open");
         assert!(!Case::DEFAULT.contains(&Case::OpcRelationshipOpen));
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         assert!(super::usage_text().contains("opc_relationship_open"));
         assert_eq!(parse_case("opc_relationship_open:tiny"), None);
@@ -57996,7 +57997,7 @@ mod tests {
         assert!(case.is_opc_serial_eager_open());
         assert!(!case.uses_synthetic_opc());
         assert!(!Case::DEFAULT.contains(&case));
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
         assert!(usage_text().contains(case.name()));
         assert_eq!(parse_case("opc_serial_eager_open:tiny"), None);
 
@@ -58398,7 +58399,7 @@ mod tests {
         assert!(!case.is_opc_casefold_source_backed());
         assert!(!Case::DEFAULT.contains(&case));
         assert!(usage_text().contains(case.name()));
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         for part_count in [256, 2_047, 2_048, 16_384] {
             let corpus = build_opc_casefold_corpus(part_count).unwrap();
@@ -58742,7 +58743,7 @@ mod tests {
             })
             .count();
         assert_eq!(selectable_count, 439);
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
     }
 
     #[test]
@@ -58764,7 +58765,7 @@ mod tests {
             assert_eq!(result.corpus.generator, OOXML_TRACKER_CORPUS_GENERATOR);
             assert!(result.output_sha256.is_some());
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
     }
 
     #[test]
@@ -58831,7 +58832,7 @@ mod tests {
             assert!(case.uses_semantic_xlsb());
             assert!(!Case::DEFAULT.contains(&case));
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let mut corpora = Vec::with_capacity(XlsbShape::ALL.len());
         for shape in XlsbShape::ALL {
@@ -58879,7 +58880,7 @@ mod tests {
         assert!(text.uses_semantic_docx());
         assert!(!Case::DEFAULT.contains(&scanner));
         assert!(!Case::DEFAULT.contains(&text));
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
     }
 
     #[test]
@@ -58895,7 +58896,7 @@ mod tests {
         assert!(direct.uses_semantic_doc());
         assert!(!Case::DEFAULT.contains(&materializing));
         assert!(!Case::DEFAULT.contains(&direct));
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
     }
 
     #[test]
@@ -59620,7 +59621,7 @@ mod tests {
 
     #[test]
     fn default_matrix_case_and_result_counts_are_stable() {
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
         assert_eq!(
             Case::DEFAULT
                 .iter()
@@ -59638,7 +59639,11 @@ mod tests {
         let substrate_results = 18 * CorpusShape::ALL.len() * PayloadKind::ALL.len();
         let writer_results = 3 * WriterShape::ALL.len();
         let xlsx_results = 15 * XlsxShape::ALL.len();
-        assert_eq!(substrate_results + writer_results + xlsx_results, 198);
+        let odp_results = SemanticShape::ALL.len();
+        assert_eq!(
+            substrate_results + writer_results + xlsx_results + odp_results,
+            201
+        );
         assert!(!Case::DEFAULT.contains(&Case::OpcSourceOverlayOnePartSave));
         assert!(!Case::DEFAULT.contains(&Case::DocxSourceBackedOneEditSave));
         assert!(!Case::DEFAULT.contains(&Case::PptxSourceBackedOneEditSave));
@@ -59704,7 +59709,7 @@ mod tests {
             assert!(!Case::DEFAULT.contains(&case));
         }
         assert_eq!(names.len(), 12);
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
     }
 
     #[test]
@@ -59722,7 +59727,7 @@ mod tests {
             assert!(!Case::DEFAULT.contains(&case));
         }
         assert_eq!(names.len(), 4);
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
     }
 
     #[test]
@@ -59732,7 +59737,7 @@ mod tests {
         assert_eq!(case.name(), name);
         assert!(case.is_filesystem());
         assert!(!Case::DEFAULT.contains(&case));
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
     }
 
     #[test]
@@ -60046,7 +60051,7 @@ mod tests {
             assert!(!Case::DEFAULT.contains(&case));
             assert!(case.is_xls_source_backed_case());
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let corpus = build_xls_comments_edit_corpus().unwrap();
         assert!(corpus.archive.len() >= super::XLS_SOURCE_MIN_ARCHIVE_BYTES);
@@ -61267,7 +61272,7 @@ mod tests {
         );
         assert_eq!(first.manifest.entry_count, 32);
         assert_eq!(first.manifest.entry_bytes, 1024);
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let mut restricted_shapes = CorpusShape::ALL.to_vec();
         restricted_shapes.pop();
@@ -62819,7 +62824,7 @@ mod tests {
             assert!(RtfSemanticVariant::Lzfu.supports_case(case));
             assert!(!RtfSemanticVariant::Watermark.supports_case(case));
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
     }
 
     #[test]
@@ -63921,7 +63926,7 @@ mod tests {
             assert!(!Case::DEFAULT.contains(&case));
             assert!(case.is_odt_repeated_text());
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let first = build_odt_repeated_text_corpus().unwrap();
         let second = build_odt_repeated_text_corpus().unwrap();
@@ -64037,7 +64042,7 @@ mod tests {
             assert!(!Case::DEFAULT.contains(&case));
             assert!(case.is_odt_source_backed_catalog());
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let first = build_odt_repeated_text_corpus().unwrap();
         let second = build_odt_repeated_text_corpus().unwrap();
@@ -64204,7 +64209,7 @@ mod tests {
             assert!(!Case::DEFAULT.contains(&case));
             assert!(case.is_odp_source_backed_catalog());
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let first = build_odp_media_corpus().unwrap();
         let second = build_odp_media_corpus().unwrap();
@@ -64336,7 +64341,7 @@ mod tests {
             assert!(case.is_filesystem());
             assert!(case.is_odt_root_file());
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let corpus = build_odt_repeated_text_corpus().unwrap();
         let results = cases
@@ -64672,7 +64677,7 @@ mod tests {
             parse_case("odp_media_source_backed_one_slide"),
             Some(Case::OdpMediaSourceBackedOneSlide)
         );
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
         assert!(!Case::DEFAULT.contains(&Case::OdpMediaEagerOpen));
         assert!(!Case::DEFAULT.contains(&Case::OdpMediaSourceBackedOpen));
         assert!(!Case::DEFAULT.contains(&Case::OdpMediaEagerOneSlide));
@@ -64809,7 +64814,7 @@ mod tests {
             assert_eq!(parse_case(name), Some(case));
             assert!(!Case::DEFAULT.contains(&case));
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let corpus = build_odp_media_corpus().unwrap();
         let eager_open = run_case(Case::OdpFileEagerOpen, &corpus, 0, 2)
@@ -64905,7 +64910,7 @@ mod tests {
             assert!(!case.is_odp_root_file());
             assert!(case.is_odp_repeated_text());
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let corpus = build_odp_media_corpus().unwrap();
         let uncached = run_case(Case::OdpSourceBackedRepeatedTextUncached, &corpus, 0, 2)
@@ -65035,7 +65040,7 @@ mod tests {
             assert_eq!(parse_case(name), Some(case));
             assert!(!Case::DEFAULT.contains(&case));
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let corpus = build_ods_media_corpus().unwrap();
         let eager_open = run_case(Case::OdsFileEagerOpen, &corpus, 0, 2)
@@ -65164,7 +65169,7 @@ mod tests {
             assert!(!case.uses_xlsx());
             assert!(!Case::DEFAULT.contains(&case));
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
     }
 
     #[test]
@@ -65181,7 +65186,7 @@ mod tests {
             assert!(case.is_filesystem());
             assert!(!Case::DEFAULT.contains(&case));
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
     }
 
     #[test]
@@ -65197,7 +65202,7 @@ mod tests {
             assert!(!case.uses_xlsx());
             assert!(!Case::DEFAULT.contains(&case));
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
         let eager = Workbook::from_bytes(corpus.archive.clone()).unwrap();
@@ -65226,7 +65231,7 @@ mod tests {
             assert_eq!(parse_case(name), Some(case));
             assert!(!Case::DEFAULT.contains(&case));
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let corpus = build_ods_media_corpus().unwrap();
         let eager = run_case(Case::OdsFileEagerCellSweep, &corpus, 0, 2)
@@ -65319,7 +65324,7 @@ mod tests {
             assert!(!Case::DEFAULT.contains(&case));
             assert!(case.is_ods_root_file());
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
 
         let corpus = build_ods_media_corpus().unwrap();
         let eager = run_case(Case::OdsFileEagerCellBatchSweep, &corpus, 0, 2)
@@ -65644,7 +65649,7 @@ mod tests {
 
     #[test]
     fn xlsx_row_visibility_matched_controls_cover_single_and_bounded_batch() {
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
         assert_eq!(XlsxRowVisibilityShape::ALL.len(), 2);
         assert_eq!(XlsxRowVisibilityShape::Medium.row_count(), 512);
         assert_eq!(XlsxRowVisibilityShape::Large.row_count(), 2_048);
@@ -66856,7 +66861,7 @@ mod tests {
             assert!(case.uses_odf_content_cow());
             assert!(!Case::DEFAULT.contains(&case));
         }
-        assert_eq!(Case::DEFAULT.len(), 36);
+        assert_eq!(Case::DEFAULT.len(), 37);
     }
 
     #[test]

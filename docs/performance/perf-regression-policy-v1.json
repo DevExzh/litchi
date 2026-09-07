@@ -1,9 +1,9 @@
 {
   "schema_version": 2,
-  "policy_id": "litchi-hosted-default-matrix-v2",
+  "policy_id": "litchi-hosted-default-matrix-v3",
   "minimum_samples": 15,
-  "expected_result_count": 198,
-  "expected_result_keys_sha256": "3b57c3b5aef77f5149d520fd885194d1fd8734460b28bff9d317d1cd840c246f",
+  "expected_result_count": 201,
+  "expected_result_keys_sha256": "f0fd76293959e72211e06e51b0a2b41f371423fda34c55144077193d262b1670",
   "required_cases": [
     "zip_index",
     "zip_read_one",
@@ -40,7 +40,8 @@
     "xlsx_source_open",
     "xlsx_source_list_sheets",
     "xlsx_source_first_cell",
-    "xlsx_source_narrow_column_range_scan"
+    "xlsx_source_narrow_column_range_scan",
+    "odp_existing_append_lifecycle"
   ],
   "require_clean_worktree": true,
   "require_distinct_revisions": true,

@@ -1,0 +1,875 @@
+{
+  "allocator_reports": {
+    "report_count": 2,
+    "result_count": 3,
+    "samples_per_case": 15,
+    "warmup_iterations_per_case": 3
+  },
+  "change": 465,
+  "full_normal": {
+    "case_count": 37,
+    "repeats": {
+      "R1": {
+        "large": {
+          "append_count": 1,
+          "instrumentation": "normal",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 136056919.82424352,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 136457212.44242314
+            },
+            "count": 15,
+            "max": 136716242,
+            "mean": 136257066.13333333,
+            "min": 135576117,
+            "p50": 136334131,
+            "p95": 136716242,
+            "p99": 136716242,
+            "standard_deviation": 361381.5020558244
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 136056919.82424352,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 136457212.44242314
+            },
+            "count": 15,
+            "max": 136716242,
+            "mean": 136257066.13333333,
+            "min": 135576117,
+            "p50": 136334131,
+            "p95": 136716242,
+            "p99": 136716242,
+            "standard_deviation": 361381.5020558244
+          },
+          "output_archive_bytes": 105124,
+          "output_archive_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+          "output_digests": [
+            "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1"
+          ],
+          "output_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+          "output_slide_count": 8193,
+          "repeat": "R1",
+          "shape": "large",
+          "source_archive_bytes": 105112,
+          "source_archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+          "source_slide_count": 8192
+        },
+        "medium": {
+          "append_count": 1,
+          "instrumentation": "normal",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 67736294.57834636,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 67923132.88832031
+            },
+            "count": 15,
+            "max": 68057305,
+            "mean": 67829713.73333333,
+            "min": 67590643,
+            "p50": 67786424,
+            "p95": 68057305,
+            "p99": 68057305,
+            "standard_deviation": 168676.3783129723
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 67736294.57834636,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 67923132.88832031
+            },
+            "count": 15,
+            "max": 68057305,
+            "mean": 67829713.73333333,
+            "min": 67590643,
+            "p50": 67786424,
+            "p95": 68057305,
+            "p99": 68057305,
+            "standard_deviation": 168676.3783129723
+          },
+          "output_archive_bytes": 54658,
+          "output_archive_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+          "output_digests": [
+            "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b"
+          ],
+          "output_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+          "output_slide_count": 4097,
+          "repeat": "R1",
+          "shape": "medium",
+          "source_archive_bytes": 54646,
+          "source_archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+          "source_slide_count": 4096
+        },
+        "tiny": {
+          "append_count": 1,
+          "instrumentation": "normal",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 1685168.02697166,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1694036.2396950065
+            },
+            "count": 15,
+            "max": 1700867,
+            "mean": 1689602.1333333333,
+            "min": 1679277,
+            "p50": 1691887,
+            "p95": 1700867,
+            "p99": 1700867,
+            "standard_deviation": 8006.163214019797
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 1685168.02697166,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1694036.2396950065
+            },
+            "count": 15,
+            "max": 1700867,
+            "mean": 1689602.1333333333,
+            "min": 1679277,
+            "p50": 1691887,
+            "p95": 1700867,
+            "p99": 1700867,
+            "standard_deviation": 8006.163214019797
+          },
+          "output_archive_bytes": 4697,
+          "output_archive_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+          "output_digests": [
+            "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5"
+          ],
+          "output_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+          "output_slide_count": 65,
+          "repeat": "R1",
+          "shape": "tiny",
+          "source_archive_bytes": 4684,
+          "source_archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+          "source_slide_count": 64
+        }
+      },
+      "R2": {
+        "large": {
+          "append_count": 1,
+          "instrumentation": "normal",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 136571332.5503536,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 136977224.24964643
+            },
+            "count": 15,
+            "max": 137338864,
+            "mean": 136774278.4,
+            "min": 136141228,
+            "p50": 136843521,
+            "p95": 137338864,
+            "p99": 137338864,
+            "standard_deviation": 366436.3150873949
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 136571332.5503536,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 136977224.24964643
+            },
+            "count": 15,
+            "max": 137338864,
+            "mean": 136774278.4,
+            "min": 136141228,
+            "p50": 136843521,
+            "p95": 137338864,
+            "p99": 137338864,
+            "standard_deviation": 366436.3150873949
+          },
+          "output_archive_bytes": 105124,
+          "output_archive_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+          "output_digests": [
+            "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1"
+          ],
+          "output_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+          "output_slide_count": 8193,
+          "repeat": "R2",
+          "shape": "large",
+          "source_archive_bytes": 105112,
+          "source_archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+          "source_slide_count": 8192
+        },
+        "medium": {
+          "append_count": 1,
+          "instrumentation": "normal",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 67683434.22092076,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 67909963.64574592
+            },
+            "count": 15,
+            "max": 68205935,
+            "mean": 67796698.93333334,
+            "min": 67578502,
+            "p50": 67745553,
+            "p95": 68205935,
+            "p99": 68205935,
+            "standard_deviation": 204509.2516955325
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 67683434.22092076,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 67909963.64574592
+            },
+            "count": 15,
+            "max": 68205935,
+            "mean": 67796698.93333334,
+            "min": 67578502,
+            "p50": 67745553,
+            "p95": 68205935,
+            "p99": 68205935,
+            "standard_deviation": 204509.2516955325
+          },
+          "output_archive_bytes": 54658,
+          "output_archive_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+          "output_digests": [
+            "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b"
+          ],
+          "output_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+          "output_slide_count": 4097,
+          "repeat": "R2",
+          "shape": "medium",
+          "source_archive_bytes": 54646,
+          "source_archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+          "source_slide_count": 4096
+        },
+        "tiny": {
+          "append_count": 1,
+          "instrumentation": "normal",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 1682844.5204051817,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1690257.2129281517
+            },
+            "count": 15,
+            "max": 1699027,
+            "mean": 1686550.8666666667,
+            "min": 1673628,
+            "p50": 1687518,
+            "p95": 1699027,
+            "p99": 1699027,
+            "standard_deviation": 6692.129298839119
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 1682844.5204051817,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1690257.2129281517
+            },
+            "count": 15,
+            "max": 1699027,
+            "mean": 1686550.8666666667,
+            "min": 1673628,
+            "p50": 1687518,
+            "p95": 1699027,
+            "p99": 1699027,
+            "standard_deviation": 6692.129298839119
+          },
+          "output_archive_bytes": 4697,
+          "output_archive_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+          "output_digests": [
+            "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5"
+          ],
+          "output_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+          "output_slide_count": 65,
+          "repeat": "R2",
+          "shape": "tiny",
+          "source_archive_bytes": 4684,
+          "source_archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+          "source_slide_count": 64
+        }
+      }
+    },
+    "report_count": 2,
+    "result_count": 201,
+    "samples_per_case": 15,
+    "warmup_iterations_per_case": 3
+  },
+  "odp_append": {
+    "allocator_is_separate_from_latency": true,
+    "allocator_observations": {
+      "R1": {
+        "large": {
+          "append_count": 1,
+          "instrumentation": "allocator",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 148189084.31013855,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 149266668.62319478
+            },
+            "count": 15,
+            "max": 150390305,
+            "mean": 148727876.46666667,
+            "min": 147293081,
+            "p50": 148799748,
+            "p95": 150390305,
+            "p99": 150390305,
+            "standard_deviation": 972835.9204198434
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 148189084.31013855,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 149266668.62319478
+            },
+            "count": 15,
+            "max": 150390305,
+            "mean": 148727876.46666667,
+            "min": 147293081,
+            "p50": 148799748,
+            "p95": 150390305,
+            "p99": 150390305,
+            "standard_deviation": 972835.9204198434
+          },
+          "output_archive_bytes": 105124,
+          "output_archive_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+          "output_digests": [
+            "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1"
+          ],
+          "output_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+          "output_slide_count": 8193,
+          "repeat": "R1",
+          "shape": "large",
+          "source_archive_bytes": 105112,
+          "source_archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+          "source_slide_count": 8192
+        },
+        "medium": {
+          "append_count": 1,
+          "instrumentation": "allocator",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 73295905.4761122,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 73545051.19055445
+            },
+            "count": 15,
+            "max": 73908202,
+            "mean": 73420478.33333333,
+            "min": 73197269,
+            "p50": 73347829,
+            "p95": 73908202,
+            "p99": 73908202,
+            "standard_deviation": 224927.08690299324
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 73295905.4761122,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 73545051.19055445
+            },
+            "count": 15,
+            "max": 73908202,
+            "mean": 73420478.33333333,
+            "min": 73197269,
+            "p50": 73347829,
+            "p95": 73908202,
+            "p99": 73908202,
+            "standard_deviation": 224927.08690299324
+          },
+          "output_archive_bytes": 54658,
+          "output_archive_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+          "output_digests": [
+            "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b"
+          ],
+          "output_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+          "output_slide_count": 4097,
+          "repeat": "R1",
+          "shape": "medium",
+          "source_archive_bytes": 54646,
+          "source_archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+          "source_slide_count": 4096
+        },
+        "tiny": {
+          "append_count": 1,
+          "instrumentation": "allocator",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 1810146.918410516,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1828645.4815894838
+            },
+            "count": 15,
+            "max": 1860279,
+            "mean": 1819396.2,
+            "min": 1800478,
+            "p50": 1817918,
+            "p95": 1860279,
+            "p99": 1860279,
+            "standard_deviation": 16700.379282262682
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 1810146.918410516,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1828645.4815894838
+            },
+            "count": 15,
+            "max": 1860279,
+            "mean": 1819396.2,
+            "min": 1800478,
+            "p50": 1817918,
+            "p95": 1860279,
+            "p99": 1860279,
+            "standard_deviation": 16700.379282262682
+          },
+          "output_archive_bytes": 4697,
+          "output_archive_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+          "output_digests": [
+            "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5"
+          ],
+          "output_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+          "output_slide_count": 65,
+          "repeat": "R1",
+          "shape": "tiny",
+          "source_archive_bytes": 4684,
+          "source_archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+          "source_slide_count": 64
+        }
+      },
+      "R2": {
+        "large": {
+          "append_count": 1,
+          "instrumentation": "allocator",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 148515744.70954028,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 149219488.62379304
+            },
+            "count": 15,
+            "max": 149917957,
+            "mean": 148867616.66666666,
+            "min": 147961919,
+            "p50": 148767543,
+            "p95": 149917957,
+            "p99": 149917957,
+            "standard_deviation": 635335.305337006
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 148515744.70954028,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 149219488.62379304
+            },
+            "count": 15,
+            "max": 149917957,
+            "mean": 148867616.66666666,
+            "min": 147961919,
+            "p50": 148767543,
+            "p95": 149917957,
+            "p99": 149917957,
+            "standard_deviation": 635335.305337006
+          },
+          "output_archive_bytes": 105124,
+          "output_archive_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+          "output_digests": [
+            "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1"
+          ],
+          "output_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+          "output_slide_count": 8193,
+          "repeat": "R2",
+          "shape": "large",
+          "source_archive_bytes": 105112,
+          "source_archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+          "source_slide_count": 8192
+        },
+        "medium": {
+          "append_count": 1,
+          "instrumentation": "allocator",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 73471614.80292203,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 73839626.39707796
+            },
+            "count": 15,
+            "max": 74460471,
+            "mean": 73655620.6,
+            "min": 73235216,
+            "p50": 73569568,
+            "p95": 74460471,
+            "p99": 74460471,
+            "standard_deviation": 332238.4091788391
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 73471614.80292203,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 73839626.39707796
+            },
+            "count": 15,
+            "max": 74460471,
+            "mean": 73655620.6,
+            "min": 73235216,
+            "p50": 73569568,
+            "p95": 74460471,
+            "p99": 74460471,
+            "standard_deviation": 332238.4091788391
+          },
+          "output_archive_bytes": 54658,
+          "output_archive_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+          "output_digests": [
+            "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b"
+          ],
+          "output_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+          "output_slide_count": 4097,
+          "repeat": "R2",
+          "shape": "medium",
+          "source_archive_bytes": 54646,
+          "source_archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+          "source_slide_count": 4096
+        },
+        "tiny": {
+          "append_count": 1,
+          "instrumentation": "allocator",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 1802853.8669110655,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1810380.9330889343
+            },
+            "count": 15,
+            "max": 1817879,
+            "mean": 1806617.4,
+            "min": 1790188,
+            "p50": 1806528,
+            "p95": 1817879,
+            "p99": 1817879,
+            "standard_deviation": 6795.385070556551
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 1802853.8669110655,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1810380.9330889343
+            },
+            "count": 15,
+            "max": 1817879,
+            "mean": 1806617.4,
+            "min": 1790188,
+            "p50": 1806528,
+            "p95": 1817879,
+            "p99": 1817879,
+            "standard_deviation": 6795.385070556551
+          },
+          "output_archive_bytes": 4697,
+          "output_archive_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+          "output_digests": [
+            "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5"
+          ],
+          "output_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+          "output_slide_count": 65,
+          "repeat": "R2",
+          "shape": "tiny",
+          "source_archive_bytes": 4684,
+          "source_archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+          "source_slide_count": 64
+        }
+      }
+    },
+    "no_speedup_claim": true,
+    "normal_latency": {
+      "R1": {
+        "large": {
+          "append_count": 1,
+          "instrumentation": "normal",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 136056919.82424352,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 136457212.44242314
+            },
+            "count": 15,
+            "max": 136716242,
+            "mean": 136257066.13333333,
+            "min": 135576117,
+            "p50": 136334131,
+            "p95": 136716242,
+            "p99": 136716242,
+            "standard_deviation": 361381.5020558244
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 136056919.82424352,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 136457212.44242314
+            },
+            "count": 15,
+            "max": 136716242,
+            "mean": 136257066.13333333,
+            "min": 135576117,
+            "p50": 136334131,
+            "p95": 136716242,
+            "p99": 136716242,
+            "standard_deviation": 361381.5020558244
+          },
+          "output_archive_bytes": 105124,
+          "output_archive_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+          "output_digests": [
+            "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1"
+          ],
+          "output_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+          "output_slide_count": 8193,
+          "repeat": "R1",
+          "shape": "large",
+          "source_archive_bytes": 105112,
+          "source_archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+          "source_slide_count": 8192
+        },
+        "medium": {
+          "append_count": 1,
+          "instrumentation": "normal",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 67736294.57834636,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 67923132.88832031
+            },
+            "count": 15,
+            "max": 68057305,
+            "mean": 67829713.73333333,
+            "min": 67590643,
+            "p50": 67786424,
+            "p95": 68057305,
+            "p99": 68057305,
+            "standard_deviation": 168676.3783129723
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 67736294.57834636,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 67923132.88832031
+            },
+            "count": 15,
+            "max": 68057305,
+            "mean": 67829713.73333333,
+            "min": 67590643,
+            "p50": 67786424,
+            "p95": 68057305,
+            "p99": 68057305,
+            "standard_deviation": 168676.3783129723
+          },
+          "output_archive_bytes": 54658,
+          "output_archive_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+          "output_digests": [
+            "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b"
+          ],
+          "output_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+          "output_slide_count": 4097,
+          "repeat": "R1",
+          "shape": "medium",
+          "source_archive_bytes": 54646,
+          "source_archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+          "source_slide_count": 4096
+        },
+        "tiny": {
+          "append_count": 1,
+          "instrumentation": "normal",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 1685168.02697166,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1694036.2396950065
+            },
+            "count": 15,
+            "max": 1700867,
+            "mean": 1689602.1333333333,
+            "min": 1679277,
+            "p50": 1691887,
+            "p95": 1700867,
+            "p99": 1700867,
+            "standard_deviation": 8006.163214019797
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 1685168.02697166,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1694036.2396950065
+            },
+            "count": 15,
+            "max": 1700867,
+            "mean": 1689602.1333333333,
+            "min": 1679277,
+            "p50": 1691887,
+            "p95": 1700867,
+            "p99": 1700867,
+            "standard_deviation": 8006.163214019797
+          },
+          "output_archive_bytes": 4697,
+          "output_archive_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+          "output_digests": [
+            "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5"
+          ],
+          "output_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+          "output_slide_count": 65,
+          "repeat": "R1",
+          "shape": "tiny",
+          "source_archive_bytes": 4684,
+          "source_archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+          "source_slide_count": 64
+        }
+      },
+      "R2": {
+        "large": {
+          "append_count": 1,
+          "instrumentation": "normal",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 136571332.5503536,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 136977224.24964643
+            },
+            "count": 15,
+            "max": 137338864,
+            "mean": 136774278.4,
+            "min": 136141228,
+            "p50": 136843521,
+            "p95": 137338864,
+            "p99": 137338864,
+            "standard_deviation": 366436.3150873949
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 136571332.5503536,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 136977224.24964643
+            },
+            "count": 15,
+            "max": 137338864,
+            "mean": 136774278.4,
+            "min": 136141228,
+            "p50": 136843521,
+            "p95": 137338864,
+            "p99": 137338864,
+            "standard_deviation": 366436.3150873949
+          },
+          "output_archive_bytes": 105124,
+          "output_archive_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+          "output_digests": [
+            "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1"
+          ],
+          "output_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+          "output_slide_count": 8193,
+          "repeat": "R2",
+          "shape": "large",
+          "source_archive_bytes": 105112,
+          "source_archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+          "source_slide_count": 8192
+        },
+        "medium": {
+          "append_count": 1,
+          "instrumentation": "normal",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 67683434.22092076,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 67909963.64574592
+            },
+            "count": 15,
+            "max": 68205935,
+            "mean": 67796698.93333334,
+            "min": 67578502,
+            "p50": 67745553,
+            "p95": 68205935,
+            "p99": 68205935,
+            "standard_deviation": 204509.2516955325
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 67683434.22092076,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 67909963.64574592
+            },
+            "count": 15,
+            "max": 68205935,
+            "mean": 67796698.93333334,
+            "min": 67578502,
+            "p50": 67745553,
+            "p95": 68205935,
+            "p99": 68205935,
+            "standard_deviation": 204509.2516955325
+          },
+          "output_archive_bytes": 54658,
+          "output_archive_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+          "output_digests": [
+            "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b"
+          ],
+          "output_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+          "output_slide_count": 4097,
+          "repeat": "R2",
+          "shape": "medium",
+          "source_archive_bytes": 54646,
+          "source_archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+          "source_slide_count": 4096
+        },
+        "tiny": {
+          "append_count": 1,
+          "instrumentation": "normal",
+          "latency_ns": {
+            "confidence_interval_95": {
+              "lower": 1682844.5204051817,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1690257.2129281517
+            },
+            "count": 15,
+            "max": 1699027,
+            "mean": 1686550.8666666667,
+            "min": 1673628,
+            "p50": 1687518,
+            "p95": 1699027,
+            "p99": 1699027,
+            "standard_deviation": 6692.129298839119
+          },
+          "lifecycle_ns": {
+            "confidence_interval_95": {
+              "lower": 1682844.5204051817,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1690257.2129281517
+            },
+            "count": 15,
+            "max": 1699027,
+            "mean": 1686550.8666666667,
+            "min": 1673628,
+            "p50": 1687518,
+            "p95": 1699027,
+            "p99": 1699027,
+            "standard_deviation": 6692.129298839119
+          },
+          "output_archive_bytes": 4697,
+          "output_archive_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+          "output_digests": [
+            "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5"
+          ],
+          "output_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+          "output_slide_count": 65,
+          "repeat": "R2",
+          "shape": "tiny",
+          "source_archive_bytes": 4684,
+          "source_archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+          "source_slide_count": 64
+        }
+      }
+    }
+  },
+  "preflight": {
+    "case_count": 37,
+    "report_count": 1,
+    "result_count": 201,
+    "samples_per_case": 1,
+    "warmup_iterations_per_case": 0
+  },
+  "schema": "litchi-0465-summary-v1",
+  "scope": "descriptive default matrix plus ODP append lifecycle; allocator rows are separate evidence"
+}

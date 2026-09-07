@@ -1,5 +1,43 @@
 # Performance program phase report
 
+## Change 0465: checked-default ODP append capture
+
+0465 adds `odp_existing_append_lifecycle` to the checked default run without
+changing production code, timing boundaries or preservation oracles. Preflight
+passes with the previous 198 identities unchanged; the exact Rust/Python
+checked identity is 37 cases, 201 rows and 31 corpora, with catalog SHA-256
+`d2c35126ee4e862ada539944ddb6cc2c654b82fe1e1465f505034fd1a9f7a84f`.
+
+The formal protocol retains two normal full-matrix runs and two ODP-only
+allocator runs, each with three warmups and 15 samples per row. It retains
+6,030 normal samples, 90 allocator samples and 180 ODP samples. Normal ODP
+p50 values are:
+
+| Shape | R1 / R2 p50 |
+|---|---:|
+| Tiny, 64 slides | 1.691887 / 1.687518 ms |
+| Medium, 4,096 slides | 67.786424 / 67.745553 ms |
+| Large, 8,192 slides | 136.334131 / 136.843521 ms |
+
+Per-iteration allocator values match between repeats: allocated bytes are
+8,521,059 / 99,149,357 / 191,235,475 for tiny/medium/large, with allocation
+calls 11,020 / 490,881 / 978,314 and reallocations 1,854 / 90,611 / 180,732.
+Region peaks are absolute process-live values including baseline, not net
+working-memory measurements. Full normal GNU-time RSS is 161,524/152,224 KiB
+and ODP-only allocator RSS is 82,680/82,568 KiB; these scopes are not compared
+across instruments.
+
+The four lane receipts and both official full-report CRUD validators pass.
+353 harness library tests pass with one ignored; all-feature/all-target Clippy,
+rustdoc, scoped formatting, 167 latest Python tests and boundary checks pass.
+Two initial stale hash/count-pin Python failures remain retained as historical
+receipts. The sealed precleanup verifier, five resealed negative probes and
+finalize precleanup pass. Fresh-copy flagless portable verification passes with
+an unchanged seal and absent temporary directory. Cleanup removed two owned
+binaries totaling 116,542,728 bytes and left the task directory absent. No
+regression, speedup, independent native-producer, bounded-memory streaming or
+scaling claim is made.
+
 ## Change 0464: descriptive PPTX derived-pair lifecycle evidence
 
 0464 records a harness-only generic PPTX source/destination pair. It has no

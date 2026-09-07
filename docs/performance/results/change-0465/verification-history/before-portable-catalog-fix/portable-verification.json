@@ -1,0 +1,68 @@
+{
+  "schema": "litchi-0465-portable-verification-v1",
+  "change": 465,
+  "status": "pass",
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/tmp/litchi-0465-portable-q1smzd9e/change-0465/verify.py"
+  ],
+  "cwd": "/tmp/litchi-0465-portable-q1smzd9e/change-0465",
+  "verifier_path": "verify.py",
+  "verifier_sha256": "f89248b9a42144e9c3ca6af0bc1d61d9165b03fe11f89be60e07d49d7fc9e16a",
+  "copied_verifier_sha256": "f89248b9a42144e9c3ca6af0bc1d61d9165b03fe11f89be60e07d49d7fc9e16a",
+  "driver_sha256": "a85d2d8cd7113029de67fbba3134eaa616f5ad32eb49bb48aeeb0dd9de73b97b",
+  "root_seal": {
+    "path": "SHA256SUMS",
+    "bytes": 8424,
+    "sha256": "e04cd40d72aa380aa3a52e8b8dff0a5e5b31f2f82cfc7f5f3d9428c6435fc1c9",
+    "members": 89
+  },
+  "copy_seal": {
+    "path": "SHA256SUMS",
+    "bytes": 8424,
+    "sha256": "e04cd40d72aa380aa3a52e8b8dff0a5e5b31f2f82cfc7f5f3d9428c6435fc1c9",
+    "members": 89
+  },
+  "copy_seal_after": {
+    "path": "SHA256SUMS",
+    "bytes": 8424,
+    "sha256": "e04cd40d72aa380aa3a52e8b8dff0a5e5b31f2f82cfc7f5f3d9428c6435fc1c9",
+    "members": 89
+  },
+  "copy_seal_unchanged": true,
+  "started_utc": "2026-09-07T20:13:26.798234+00:00",
+  "finished_utc": "2026-09-07T20:13:28.399660+00:00",
+  "exit_code": 0,
+  "stdout": "{\n  \"allocator_reports\": 2,\n  \"allocator_results\": 3,\n  \"binding_modes\": [\n    \"allocator\",\n    \"normal\"\n  ],\n  \"change\": 465,\n  \"full_normal_reports\": 2,\n  \"full_normal_results\": 201,\n  \"portable\": true,\n  \"precleanup\": false,\n  \"preflight_results\": 201,\n  \"schema\": \"litchi-0465-verification-v1\",\n  \"sealed_files\": 89,\n  \"selected_checks\": {\n    \"boundaries\": \"boundaries\",\n    \"doc\": \"doc\",\n    \"fmt\": \"fmt-r1\",\n    \"harness-clippy\": \"harness-clippy\",\n    \"harness-tests\": \"harness-tests\",\n    \"promote\": \"promote\",\n    \"python-tests\": \"python-tests-r1\"\n  },\n  \"status\": \"pass\",\n  \"summary_schema\": \"litchi-0465-summary-v1\"\n}\n",
+  "stderr": "",
+  "verifier_output": {
+    "allocator_reports": 2,
+    "allocator_results": 3,
+    "binding_modes": [
+      "allocator",
+      "normal"
+    ],
+    "change": 465,
+    "full_normal_reports": 2,
+    "full_normal_results": 201,
+    "portable": true,
+    "precleanup": false,
+    "preflight_results": 201,
+    "schema": "litchi-0465-verification-v1",
+    "sealed_files": 89,
+    "selected_checks": {
+      "boundaries": "boundaries",
+      "doc": "doc",
+      "fmt": "fmt-r1",
+      "harness-clippy": "harness-clippy",
+      "harness-tests": "harness-tests",
+      "promote": "promote",
+      "python-tests": "python-tests-r1"
+    },
+    "status": "pass",
+    "summary_schema": "litchi-0465-summary-v1"
+  },
+  "temporary_directory_absent": true,
+  "mode": "complete sealed change-0465 bundle copied to a fresh temporary directory; verifier default is portable"
+}

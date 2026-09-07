@@ -1,0 +1,38 @@
+{
+  "schema": "litchi-0465-temporary-artifacts-v1",
+  "change": 465,
+  "task": "/tmp/litchi-goal-0465",
+  "files": 2,
+  "bytes": 116542728,
+  "artifacts": [
+    {
+      "path": "allocator",
+      "bytes": 58196616,
+      "sha256": "c41e304975de31cde90b8670c70f04e5e9be3aeb73c53ea3b962ba6c8b7b00ae"
+    },
+    {
+      "path": "normal",
+      "bytes": 58346112,
+      "sha256": "a19400ca3fbcae0f56c108f1806874750b4a28612a3ea6f1f6fb9f10a4fa01e5"
+    }
+  ],
+  "receipts": {
+    "precleanup": {
+      "path": "precleanup.json",
+      "bytes": 2217,
+      "sha256": "9b13e2cd6e10203c592e94141b688c0df2031faa68f79596166a5de6ce5334aa"
+    },
+    "portable": {
+      "path": "portable-verification.json",
+      "bytes": 2843,
+      "sha256": "d8a8534e773a63780a7cdf39a2851fa81997eceea71d15e425f44c2477920c4e"
+    }
+  },
+  "seal": {
+    "path": "SHA256SUMS",
+    "bytes": 8517,
+    "sha256": "003e0b25b1e41318442f1b5715963331d6125a95480b53f9de501c31e21318e3",
+    "members": 90
+  },
+  "audit_archives": []
+}

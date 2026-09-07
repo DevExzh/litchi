@@ -1,5 +1,18 @@
 # OPC, CFB, OLE2 Office, OOXML, RTF, and ODF performance baseline
 
+0465 adds the existing materialized `odp_existing_append_lifecycle` case to the
+checked default matrix. Preflight preserves all prior 198 identities; the
+checked identity is 37 default cases, 201 rows and 31 deterministic corpora,
+with catalog SHA-256
+`d2c35126ee4e862ada539944ddb6cc2c654b82fe1e1465f505034fd1a9f7a84f`. Two
+normal full-matrix runs retain 6,030 samples and two ODP-only allocator runs
+retain 90 samples. Timing boundaries and correctness oracles are unchanged.
+The sealed precleanup verifier, five resealed negative probes, fresh-copy
+portable verification and owned cleanup pass; two owned binaries totaling
+116,542,728 bytes were removed and the task directory is absent. This
+descriptive baseline makes no regression, speedup, independent native-producer,
+bounded-memory streaming or scaling claim.
+
 The standalone `odp-append-attribution` command added in
 [0458](../../docs/performance/results/change-0458/README.md) measures the owned
 append lifecycle with either one clock or public API phase clocks. It is
@@ -22,7 +35,9 @@ It uses the same 64/4,096/8,192-slide source corpus as the owned append control,
 but returns a specialized publication report rather than an ordinary Commit or
 Patch. Its 360 samples and the recaptured 360-sample control support a scoped
 working-memory comparison, not ordinary Commit/Patch speedup or equivalence.
-The current registry has 439 selectors and 36 defaults.
+The registry has 439 selectors. The checked default now has 37 cases and 201
+rows across 31 corpora; final 0465 sealing, portable verification and owned
+cleanup pass.
 
 The opt-in `odp_existing_append_lifecycle` selector measures owned ODP opening,
 one public slide append, commit, and sequential output of the committed bytes.

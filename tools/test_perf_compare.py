@@ -1003,8 +1003,8 @@ class PerfCompareTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest["manifest_kind"], "case-corpus-key-identity")
-        self.assertEqual(manifest["result_count"], 198)
-        self.assertEqual(manifest["case_count"], 36)
+        self.assertEqual(manifest["result_count"], 201)
+        self.assertEqual(manifest["case_count"], 37)
         self.assertEqual(manifest["source_report_samples_per_case"], 1)
         self.assertEqual(manifest["source_report_warmup_iterations_per_case"], 0)
         self.assertEqual(checked_policy["schema_version"], 2)
@@ -1054,7 +1054,7 @@ class PerfCompareTests(unittest.TestCase):
         )
         self.assertEqual(
             sorted(len(names) for names in case_corpora.values()),
-            [3] * 18 + [8] * 18,
+            [3] * 19 + [8] * 18,
         )
         for forbidden in ("elapsed_ns", "metrics", "sink", "output_sha256"):
             self.assertNotIn(forbidden, manifest)

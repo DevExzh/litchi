@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## Change 0465: checked-default ODP append coverage
+
+0465 measures the existing materialized ODP append lifecycle as the 37th
+checked default case. The four lanes pass over 6,030 normal and 90 allocator
+samples; ODP normal p50 is 1.691887/1.687518 ms for tiny, 67.786424/67.745553
+ms for medium and 136.334131/136.843521 ms for large in R1/R2. The allocator
+observations are descriptive per-iteration counts, and region peaks include
+absolute process-live baseline bytes. No hotspot attribution or optimization
+comparison follows. The sealed precleanup verifier, five resealed negative
+probes, fresh-copy portable verification and owned cleanup pass, with no
+regression, speedup, native-producer, bounded-memory streaming or scaling
+claim.
+
 ## Change 0464: descriptive PPTX pair lifecycle baseline
 
 0464 measures a harness-only generic PPTX pair lifecycle. The pair is a
