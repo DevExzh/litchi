@@ -1,0 +1,29 @@
+{
+  "schema": "litchi-0461-temporary-artifacts-v1",
+  "change": 461,
+  "task": "/tmp/litchi-goal-0461",
+  "files": 4,
+  "bytes": 233048120,
+  "artifacts": [
+    {
+      "path": "baseline/litchi-perf-baseline",
+      "bytes": 58341544,
+      "sha256": "5426137c597a212882df4a139ae940c9f1ed119b23df8db7307ed36f32414974"
+    },
+    {
+      "path": "baseline/litchi-perf-baseline-alloc",
+      "bytes": 58182648,
+      "sha256": "c7ec5c0b913e33d3a132be96c8596827733a2fff57dd8f8048f19229a29a85ac"
+    },
+    {
+      "path": "candidate/litchi-perf-baseline",
+      "bytes": 58341424,
+      "sha256": "957a2cd8ea4142f05d02533ebb8c37de2a7ab8a50b2bce78bd358ec16e857dab"
+    },
+    {
+      "path": "candidate/litchi-perf-baseline-alloc",
+      "bytes": 58182504,
+      "sha256": "29192f93cf94087ae425a652993f7bdf71fa46ae9f69f42027fd8a8935aeefa3"
+    }
+  ]
+}

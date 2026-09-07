@@ -1,0 +1,36 @@
+{
+  "change": 461,
+  "variant": "baseline",
+  "binding_sha256": "994e47e4ab6fb6987be61328ccad24277ffe063d850f59d3e8ee56b1240d967f",
+  "binary_sha256": "5426137c597a212882df4a139ae940c9f1ed119b23df8db7307ed36f32414974",
+  "commands": [
+    [
+      "objdump",
+      "-d",
+      "--demangle",
+      "--no-show-raw-insn",
+      "--disassemble=<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get",
+      "/tmp/litchi-goal-0461/baseline/litchi-perf-baseline"
+    ],
+    [
+      "objdump",
+      "-d",
+      "--demangle",
+      "--no-show-raw-insn",
+      "--disassemble=<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup",
+      "/tmp/litchi-goal-0461/baseline/litchi-perf-baseline"
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "baseline-get.asm.txt",
+      "bytes": 12437,
+      "sha256": "89b0b70b958a2313a7e948613485b7ff751bbad1ce04b7d44466f2b9c3b9d5ce"
+    },
+    {
+      "path": "baseline-lookup.asm.txt",
+      "bytes": 5229,
+      "sha256": "01e2abfae0b99636c68991f7b29da1a7b657d111442570fed2f386de2f2d8fa1"
+    }
+  ]
+}

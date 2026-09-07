@@ -1,0 +1,126 @@
+--- a/crates/litchi-odp/src/codec/parser/codec/xml/validation.rs
++++ b/crates/litchi-odp/src/codec/parser/codec/xml/validation.rs
+@@ -355,8 +355,8 @@
+         local_name: &[u8],
+     ) -> Result<Option<String>> {
+         for cached in &self.parsed {
+-            if let Some(value) = Self::lookup(reader, cached, namespace_uri, local_name)? {
+-                return Ok(Some(value));
++            if Self::matches(cached, namespace_uri, local_name) {
++                return Self::decode_value(reader, cached).map(Some);
+             }
+         }
+         if let Some(message) = &self.malformed {
+@@ -372,7 +372,8 @@
+                 },
+             };
+             let cached = Self::resolve_at_scan(reader, attribute);
+-            if let Some(value) = Self::lookup(reader, &cached, namespace_uri, local_name)? {
++            if Self::matches(&cached, namespace_uri, local_name) {
++                let value = Self::decode_value(reader, &cached)?;
+                 self.parsed.push(cached);
+                 return Ok(Some(value));
+             }
+@@ -428,25 +429,29 @@
+         }
+     }
+ 
+-    /// Matches one cached attribute and decodes its value on a hit, exactly
+-    /// like [`Parser::get_attr`]: the snapshotted resolution stands in for a
+-    /// fresh resolver call, and only the matching attribute is decoded.
+-    fn lookup(
+-        reader: &NsReader<&[u8]>,
++    /// Matches one cached attribute in the same order as the historical
++    /// one-shot lookup: namespace URI first, then local name. Keeping this
++    /// predicate separate lets the miss path avoid constructing and returning
++    /// the lazy decode result for every non-matching attribute.
++    fn matches(
+         cached: &ResolvedAttribute<'event, 'resolver>,
+         namespace_uri: &[u8],
+         local_name: &[u8],
+-    ) -> Result<Option<String>> {
+-        if cached.namespace.matches(namespace_uri) && cached.local_name.as_ref() == local_name {
+-            return cached
+-                .attribute
+-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+-                .map(|value| Some(value.into_owned()))
+-                .map_err(|error| {
+-                    Error::InvalidFormat(format!("invalid XML attribute value: {error}"))
+-                });
+-        }
+-        Ok(None)
++    ) -> bool {
++        cached.namespace.matches(namespace_uri) && cached.local_name.as_ref() == local_name
++    }
++
++    /// Decodes a matching attribute lazily, exactly like [`Parser::get_attr`].
++    /// Non-matching attributes never enter this path.
++    fn decode_value(
++        reader: &NsReader<&[u8]>,
++        cached: &ResolvedAttribute<'event, 'resolver>,
++    ) -> Result<String> {
++        cached
++            .attribute
++            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
++            .map(|value| value.into_owned())
++            .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute value: {error}")))
+     }
+ 
+     /// Harvests the non-modeled drawing attributes in document order,
+@@ -725,6 +730,56 @@
+         assert_eq!(
+             attributes.get(&reader, DRAW_NAMESPACE, b"ws").unwrap(),
+             Some("x y".to_string())
++        );
++    }
++
++    #[test]
++    fn lazy_attribute_decode_matches_fresh_lookup_for_cached_and_scanned_hits() {
++        let presentation_uri =
++            std::str::from_utf8(PRESENTATION_NAMESPACE).expect("presentation namespace is UTF-8");
++        let xml = format!(
++            "<e xmlns:d=\"{}\" xmlns:p=\"{presentation_uri}\" \
++             p:bad=\"&bogus;\" d:good=\"ok\" d:bad=\"&bogus;\"/>",
++            draw_uri()
++        );
++        let mut reader = NsReader::from_str(&xml);
++        let mut buf = Vec::new();
++        let element = first_element(&mut reader, &mut buf);
++        let mut attributes = ElementAttrs::new(&element);
++
++        // The invalid foreign-namespace value is scanned but must not be
++        // decoded while looking up the valid drawing attribute.
++        assert_eq!(
++            attributes.get(&reader, DRAW_NAMESPACE, b"good").unwrap(),
++            Some("ok".to_string())
++        );
++
++        // The first invalid value is now cached; the second is reached by the
++        // shared iterator. Both errors must match independent one-shot scans.
++        let cached_error =
++            invalid_format_message(attributes.get(&reader, PRESENTATION_NAMESPACE, b"bad"));
++        let scanned_error = invalid_format_message(attributes.get(&reader, DRAW_NAMESPACE, b"bad"));
++        let fresh_cached_error = invalid_format_message(direct_lookup(
++            &reader,
++            &element,
++            PRESENTATION_NAMESPACE,
++            b"bad",
++        ));
++        let fresh_scanned_error =
++            invalid_format_message(direct_lookup(&reader, &element, DRAW_NAMESPACE, b"bad"));
++        assert_eq!(cached_error, fresh_cached_error);
++        assert_eq!(scanned_error, fresh_scanned_error);
++        assert!(cached_error.starts_with("invalid XML attribute value:"));
++        // A cached decode failure remains replayable, while a failure reached
++        // by the shared iterator retains the historical advance-without-cache
++        // behavior. This is part of the lazy lookup state machine.
++        assert_eq!(
++            invalid_format_message(attributes.get(&reader, PRESENTATION_NAMESPACE, b"bad",)),
++            cached_error
++        );
++        assert_eq!(
++            attributes.get(&reader, DRAW_NAMESPACE, b"bad").unwrap(),
++            None
+         );
+     }
+ 

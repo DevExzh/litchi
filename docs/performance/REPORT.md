@@ -1,5 +1,45 @@
 # Performance program phase report
 
+## Change 0461: reject ODP attribute-match split on the practical gate
+
+0461 tests a private ODP attribute-cache split with the same frozen A1/B1/B2/A2
+boundary: 24 reports, 720 samples, two repeats, normal and allocator lanes,
+three warmups and 30 samples per lane on CPU 2 with one worker. Negative values
+are candidate minus baseline p50 deltas.
+
+| Shape | Normal p50 R1 / R2 | Bootstrap p50 CI R1 / R2 |
+|---|---:|---:|
+| Tiny, 64 slides | -2.0578% / -2.2940% | [-2.2591%, -1.7182%] / [-2.6463%, -1.7941%] |
+| Medium, 4,096 slides | -2.0604% / -3.8754% | [-2.3632%, -1.8185%] / [-4.0991%, -3.6516%] |
+| Large, 8,192 slides | -2.1547% / -3.1281% | [-2.5908%, -2.0598%] / [-3.4058%, -2.9037%] |
+
+The predeclared keep gate requires at least 3% normal p50 improvement for
+medium and large in both repeats. R1 medium and large fail that threshold, so
+the candidate is rejected even though every normal p50 bootstrap upper bound is below
+zero. Allocation metrics are exactly unchanged and there are no adverse >5%
+elapsed or process-RSS flags. The evidence records partial improvements without
+retaining a speedup claim.
+
+Supplementary phase clocks show transaction p50 deltas of -3.0962% / -0.4057%,
+snapshot opening -3.9421% / -4.2911%, commit -4.1677% / -3.0561%, add -0.1727%
+/ +1.2645%, and publication -0.4772% / -0.4562% in R1/R2. These clocks are
+separate mechanism evidence. Whole-process counters report instructions
+-3.2567%, cycles -3.2314%, branch misses -3.3587% and cache misses +0.2581%;
+setup, warmups and checks are included, so these are not operation-only or
+causal counts.
+
+Assembly confirms the intended mechanism: the candidate removes the out-of-line
+`ElementAttrs::lookup` body, inlines namespace/local-name matching in `get`, and
+reduces the stack frame from `0x148` to `0x128`. The source review finds no
+semantic blocker. Candidate validation reports 372 ODP tests, warning-denied
+all-target Clippy and scoped formatting passing. The candidate also passes 387 harness tests (one ignored). Source restoration
+to `05f432d48`, final Clippy/docs/formatting/boundaries, portable verification,
+tamper rejection and owned temporary cleanup pass.
+0460's fused staging optimization remains accepted; no coverage is added, the
+registry remains 439 selectors / 36 defaults, the full non-iWork goal remains
+open, and iWork is excluded. See the [comparison summary](results/change-0461/summary.json), [phase summary](results/change-0461/phase-summary.json),
+[source review](results/change-0461/source-review.md), and [assembly receipt](results/change-0461/candidate-assembly.json).
+
 ## Change 0460: retain fused ODP staging and source scanning
 
 0460 keeps the private staging optimization after the authoritative

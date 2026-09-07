@@ -1,5 +1,33 @@
 # Performance hotspot inventory
 
+## Change 0461: attribute-match split helps slightly but misses the gate
+
+0461 moves ODP attribute matching into a pure cached-key path and decodes values
+only after a namespace/local-name hit. The 24-report, 720-sample matrix records
+normal p50 deltas of -2.0578% / -2.2940% for tiny, -2.0604% / -3.8754% for
+medium, and -2.1547% / -3.1281% for large in R1/R2. R1 medium and large miss
+the predeclared 3% practical gate, so the candidate is rejected despite
+negative bootstrap upper bounds. There are no adverse >5% elapsed or RSS flags.
+
+Allocator metrics are exactly unchanged across all six lanes. This preserves
+the practical-gate refusal and supplies no retained speedup claim. Supplementary
+phase clocks show transaction -3.0962% / -0.4057%, snapshot opening -3.9421% /
+-4.2911%, commit -4.1677% / -3.0561%, add -0.1727% / +1.2645%, and publication
+-0.4772% / -0.4562% in R1/R2. These are diagnostic public-phase observations,
+not causal API attribution. Whole-process counters report instructions -3.2567%,
+cycles -3.2314%, branch misses -3.3587% and cache misses +0.2581%; setup,
+warmups and checks are included.
+
+The authenticated assembly explains the partial result: `ElementAttrs::lookup`
+has no candidate out-of-line body, matching checks are inlined into `get`, and
+the `get` stack frame contracts from `0x148` to `0x128`. The source review
+preserves lazy decoding, iterator/error order, namespace shadowing and drawing
+attribute harvest semantics. Candidate validation reports 372 ODP tests,
+all-target warning-denied Clippy and scoped formatting passing. The candidate also passes 387 harness tests (one ignored). Source restoration
+to `05f432d48`, final Clippy/docs/formatting/boundaries, portable verification,
+tamper rejection and owned temporary cleanup pass; 0460 stays accepted, coverage remains 439/36, the full goal remains open, and iWork is
+outside scope.
+
 ## Change 0460: fused staging reduces transaction work
 
 0460 retains the private ODP fused staging/source scan after a 24-report,
