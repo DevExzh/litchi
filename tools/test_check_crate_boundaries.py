@@ -176,6 +176,128 @@ def add_iwa_numbers_model_storage_scaffold(
     )
 
 
+def add_iwa_numbers_table_info_projection_scaffold(
+    root: Path,
+    *,
+    projection_generated_decode: bool = False,
+    role_projection_call: bool = True,
+    table_template_projection_call: bool = True,
+    table_template_generated_decode: bool = False,
+) -> None:
+    """Create the migrated Numbers TableInfo discovery source topology.
+
+    The fixture keeps complete generated decoding in ``decode_table_info`` to
+    prove the ratchet follows only the read-only ownership/template paths.
+    Those two paths use the private typed projection and its bounded Buffa
+    codec; the storage cache fixture remains covered by the older audit.
+    """
+
+    add_iwa_numbers_model_storage_scaffold(root)
+
+    editor = root / boundaries.IWA_NUMBERS_EDITOR_MODULE_SOURCE
+    editor.parent.mkdir(parents=True, exist_ok=True)
+    editor.write_text(
+        "mod table_info_projection;\n",
+        encoding="utf-8",
+    )
+
+    projection = root / boundaries.IWA_NUMBERS_TABLE_INFO_PROJECTION_SOURCE
+    projection.parent.mkdir(parents=True, exist_ok=True)
+    generated = (
+        "fn legacy_probe(source: &[u8]) {\n"
+        "    let _ = tst::TableInfoArchive::decode(source);\n"
+        "}\n"
+        if projection_generated_decode
+        else ""
+    )
+    projection.write_text(
+        "use std::num::NonZeroU64;\n"
+        "use litchi_iwa_common::{WireLimits, LimitKind};\n"
+        "use litchi_iwa_protos::table_info_codec;\n"
+        "fn model_reference(source: &[u8]) -> Result<NonZeroU64> {\n"
+        "    table_info_codec::decode_table_model_reference(\n"
+        "        source, table_info_codec::DecodeOptions::new(\n"
+        "            source.len(), WireLimits::MAX_FIELDS, WireLimits::MAX_REWRITE_WORK, 64\n"
+        "        )\n"
+        "    )\n"
+        "}\n"
+        "fn model_reference_for_type(message_type: u32, source: &[u8]) -> Result<NonZeroU64> {\n"
+        "    let _ = message_type;\n"
+        "    model_reference(source)\n"
+        "}\n"
+        f"{generated}",
+        encoding="utf-8",
+    )
+
+    model = root / boundaries.IWA_NUMBERS_MODEL_SOURCE
+    model.write_text(
+        "fn table_info_message_index(object: &ArchiveObject) {\n"
+        "    let _ = TABLE_INFO_MESSAGE_TYPES;\n"
+        "    let _ = table_info_model_identifier(message);\n"
+        "    let _ = object;\n"
+        "}\n"
+        "fn decode_table_info(object: &ArchiveObject) {\n"
+        "    let _ = table_info_message_index(object);\n"
+        "    let _ = object.messages[index].data;\n"
+        "    let _ = tst::TableInfoArchive::decode(object.messages[index].data);\n"
+        "}\n"
+        "fn find_table_owner(package: &IWorkPackage) {\n"
+        "    package.with_parsed_archive(name, |archive| {\n"
+        "        let _ = table_info_message_index(archive);\n"
+        "    });\n"
+        "}\n"
+        "fn attached_table_info_model_identifier(object: &ArchiveObject, message: &RawMessage) {\n"
+        "    let _ = TABLE_INFO_MESSAGE_TYPES;\n"
+        "    let table_info_id = "
+        + (
+            "super::table_info_projection::model_reference_for_type(message.type_, message.data)"
+            if role_projection_call
+            else "table_info_model_identifier(message)"
+        )
+        + ";\n"
+        "    if message.type_ != TABLE_INFO_MESSAGE_TYPES[0] { return; }\n"
+        "    let is_table_model = matches!(\n"
+        "        probe_candidate(message.type_, message.data.as_slice()),\n"
+        "        CandidateProbe::Valid,\n"
+        "    );\n"
+        "    if matches!(table_info_id, Some(_)) && is_table_model {\n"
+        "        return Err(ambiguous_role());\n"
+        "    }\n"
+        "    let _ = object;\n"
+        "}\n"
+        "fn attached_table_descriptor(package: &IWorkPackage) {\n"
+        "    attached_table_info_model_identifier(object, message);\n"
+        "    let _ = package;\n"
+        "}\n"
+        "fn attached_table_descriptors(package: &IWorkPackage) {\n"
+        "    attached_table_info_model_identifier(object, message);\n"
+        "    let _ = package;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    table_create = root / boundaries.IWA_NUMBERS_TABLE_CREATE_SOURCE
+    table_create.parent.mkdir(parents=True, exist_ok=True)
+    template_decode = (
+        "    let _ = tst::TableInfoArchive::decode(message.data);\n"
+        if table_template_generated_decode
+        else ""
+    )
+    template_call = (
+        "    model::attached_table_info_model_identifier(info_object, message);\n"
+        if table_template_projection_call
+        else "    let _ = message;\n"
+    )
+    table_create.write_text(
+        "fn attached_table_templates(package: &IWorkPackage) {\n"
+        f"{template_call}"
+        f"{template_decode}"
+        "    let _ = package;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def add_iwa_shared_media_playback_scaffold(
     root: Path,
     *,
@@ -43335,6 +43457,106 @@ fn rewrite_movie_title_operation(
             "+ audit_iwa_numbers_model_storage_source_topology()",
             main_source,
         )
+
+    def test_iwa_numbers_table_info_projection_boundary_accepts_migrated_paths(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_table_info_projection_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_model_storage_source_topology(root), []
+            )
+
+    def test_iwa_numbers_table_info_projection_rejects_generated_decode_in_helper(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_table_info_projection_scaffold(
+                root,
+                projection_generated_decode=True,
+            )
+
+            violations = boundaries.audit_iwa_numbers_model_storage_source_topology(root)
+
+            self.assertTrue(
+                any(
+                    "table-info projection retains generated decode" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_iwa_numbers_table_info_projection_rejects_missing_helper_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_table_info_projection_scaffold(root)
+            (root / boundaries.IWA_NUMBERS_TABLE_INFO_PROJECTION_SOURCE).unlink()
+
+            violations = boundaries.audit_iwa_numbers_model_storage_source_topology(root)
+
+            self.assertTrue(
+                any("projection call has no private source" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_numbers_table_info_projection_rejects_role_bypass(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_table_info_projection_scaffold(
+                root,
+                role_projection_call=False,
+            )
+
+            violations = boundaries.audit_iwa_numbers_model_storage_source_topology(root)
+
+            self.assertTrue(
+                any(
+                    "attached-table role resolver must delegate" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_iwa_numbers_table_info_projection_rejects_template_generated_decode(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_table_info_projection_scaffold(
+                root,
+                table_template_generated_decode=True,
+            )
+
+            violations = boundaries.audit_iwa_numbers_model_storage_source_topology(root)
+
+            self.assertTrue(
+                any(
+                    "table-template discovery retains a generated decode" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_iwa_numbers_table_info_projection_rejects_template_bypass(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_table_info_projection_scaffold(
+                root,
+                table_template_projection_call=False,
+            )
+
+            violations = boundaries.audit_iwa_numbers_model_storage_source_topology(root)
+
+            self.assertTrue(
+                any(
+                    "table-template discovery must delegate" in item
+                    for item in violations
+                ),
+                violations,
+            )
 
     def test_iwa_shared_media_playback_boundary_accepts_focused_owners(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

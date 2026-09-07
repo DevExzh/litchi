@@ -262,29 +262,27 @@ pub fn open_xlsb_workbook_dyn_with_limits<P: AsRef<std::path::Path>>(
                 ..
             } => {
                 let workbook = super::adapters::XlsbWorkbook::from_source_backed(workbook)?;
-                return Ok(Box::new(workbook));
+                Ok(Box::new(workbook))
             },
             crate::detection_smart::detected::WorkbookSourcePathDetection::Bytes(bytes) => {
-                return open_xlsb_workbook_from_owned_bytes_dyn_with_limits(bytes, limits);
+                open_xlsb_workbook_from_owned_bytes_dyn_with_limits(bytes, limits)
             },
             #[cfg(feature = "xlsx")]
             crate::detection_smart::detected::WorkbookSourcePathDetection::Xlsx { .. } => {
-                return Err(Box::new(litchi_core::Error::NotOfficeFile));
+                Err(Box::new(litchi_core::Error::NotOfficeFile))
             },
             #[cfg(feature = "ods")]
             crate::detection_smart::detected::WorkbookSourcePathDetection::Ods(_) => {
-                return Err(Box::new(litchi_core::Error::NotOfficeFile));
+                Err(Box::new(litchi_core::Error::NotOfficeFile))
             },
             #[cfg(feature = "xls")]
             crate::detection_smart::detected::WorkbookSourcePathDetection::Xls { .. } => {
-                return Err(Box::new(litchi_core::Error::NotOfficeFile));
+                Err(Box::new(litchi_core::Error::NotOfficeFile))
             },
             crate::detection_smart::detected::WorkbookSourcePathDetection::OtherOoxml(_)
             | crate::detection_smart::detected::WorkbookSourcePathDetection::DisabledOtherOoxml(
                 _,
-            ) => {
-                return Err(Box::new(litchi_core::Error::NotOfficeFile));
-            },
+            ) => Err(Box::new(litchi_core::Error::NotOfficeFile)),
         }
     }
 

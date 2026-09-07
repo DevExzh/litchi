@@ -3436,7 +3436,7 @@ fn cell_tile_location<'a>(
 /// validates only as the legacy model remains a non-owner.  Invalid or
 /// untyped candidates retain the descriptor path's historical best-effort
 /// behavior and are ignored.
-fn attached_table_info_model_identifier(
+pub(super) fn attached_table_info_model_identifier(
     object: &ArchiveObject,
     message: &RawMessage,
 ) -> Result<Option<u64>> {
@@ -3445,7 +3445,11 @@ fn attached_table_info_model_identifier(
     }
 
     let object_id = object.archive_info.identifier.unwrap_or_default();
-    let Ok(table_info_id) = super::storage::table_info_model_identifier(message, object_id) else {
+    let Ok(table_info_id) = super::table_info_projection::model_reference_for_type(
+        message.type_,
+        message.data.as_slice(),
+    )
+    .map(std::num::NonZeroU64::get) else {
         return Ok(None);
     };
     if message.type_ != TABLE_INFO_MESSAGE_TYPES[0] {
@@ -5647,6 +5651,37 @@ mod tests {
         assert_eq!(
             attached_table_info_model_identifier(&object, &object.messages[0]).unwrap(),
             None
+        );
+    }
+
+    #[test]
+    fn attached_table_info_accepts_sparse_legacy_type_6003() {
+        let object = ArchiveObject::new(
+            7,
+            vec![RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPES[1],
+                data: vec![0x12, 0x02, 0x08, 0x29],
+            }],
+        )
+        .unwrap();
+
+        assert_eq!(
+            attached_table_info_model_identifier(&object, &object.messages[0]).unwrap(),
+            Some(41)
+        );
+
+        let canonical = ArchiveObject::new(
+            7,
+            vec![RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPES[0],
+                data: vec![0x12, 0x02, 0x08, 0x29],
+            }],
+        )
+        .unwrap();
+        assert_eq!(
+            attached_table_info_model_identifier(&canonical, &canonical.messages[0]).unwrap(),
+            None,
+            "canonical type 6000 must retain the required super envelope"
         );
     }
 

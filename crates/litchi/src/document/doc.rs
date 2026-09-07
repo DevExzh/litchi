@@ -761,7 +761,7 @@ impl Document {
                         Self::map_source_docx_error(error)
                     },
                 })?;
-            return match detected {
+            match detected {
                 #[cfg(feature = "odt")]
                 crate::detection_smart::detected::DocumentSourcePathDetection::Odt(candidate) => {
                     Ok(Self {
@@ -795,7 +795,7 @@ impl Document {
                         },
                     }
                 },
-            };
+            }
         }
 
         #[cfg(not(any(unix, windows)))]

@@ -635,33 +635,12 @@ fn parse_semantic_component(
     let (snappy_limits, archive_limits) =
         semantic_component_budgets(limits, decompressed_iwa_bytes, semantic_iwa_objects)?;
     let decompressed = SnappyStream::decompress_with_limits(compressed_data, snappy_limits)
-        .map_err(|error| map_semantic_iwa_total_limit(error, decompressed_iwa_bytes, limits))?;
+        .map_err(|error| limits.map_iwa_decode_error(error, decompressed_iwa_bytes))?;
     let decompressed_bytes = u64::try_from(decompressed.as_bytes().len()).map_err(|_error| {
         crate::Error::InvalidBundle("decompressed IWA stream length does not fit u64".to_owned())
     })?;
     let archive = Archive::parse_with_limits(decompressed.as_bytes(), archive_limits)?;
     Ok(Some((Component::new(name, archive), decompressed_bytes)))
-}
-
-fn map_semantic_iwa_total_limit(
-    error: litchi_iwa_core::Error,
-    current: u64,
-    limits: Limits,
-) -> crate::Error {
-    let litchi_iwa_core::Error::Limit {
-        kind:
-            litchi_iwa_core::LimitKind::SnappyChunkBytes | litchi_iwa_core::LimitKind::SnappyStreamBytes,
-        observed,
-        ..
-    } = error
-    else {
-        return crate::Error::Iwa(error);
-    };
-    crate::Error::Limit {
-        kind: crate::LimitKind::IwaTotalBytes,
-        observed: current.saturating_add(u64::try_from(observed).unwrap_or(u64::MAX)),
-        maximum: limits.max_total_bytes(),
-    }
 }
 
 const fn semantic_iwa_object_limit(observed: usize) -> crate::Error {

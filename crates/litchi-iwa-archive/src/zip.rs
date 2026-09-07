@@ -7,6 +7,8 @@ use crate::catalog::DirectoryIndexReport;
 use crate::catalog::{Component, parse_component};
 use crate::{Error, Limits, Result};
 
+pub(crate) const ZIP_CENTRAL_FIXED_METADATA_BYTES: u64 = 46;
+
 #[cfg(test)]
 std::thread_local! {
     static TEST_PARSE_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
@@ -223,32 +225,68 @@ impl<'data> ZipArchive<'data> {
 
     pub(crate) fn directory_index_report(&self) -> Result<DirectoryIndexReport> {
         let mut entries = 0usize;
-        let mut metadata_bytes = 0u64;
+        let mut raw_metadata_bytes = 0u64;
+        let mut central_metadata_bytes = 0u64;
         let mut expanded_bytes = 0u64;
         for entry in &self.physical_entries {
             let local = &entry.local_header;
             let central = &entry.central_header;
-            let metadata = local
+            let local_metadata =
+                local
+                    .name
+                    .len()
+                    .checked_add(local.extra.len())
+                    .ok_or_else(|| {
+                        Error::InvalidBundle(
+                            "directory index local metadata length overflowed usize".to_owned(),
+                        )
+                    })?;
+            let central_metadata = central
                 .name
                 .len()
-                .checked_add(local.extra.len())
-                .and_then(|value| value.checked_add(central.name.len()))
-                .and_then(|value| value.checked_add(central.extra.len()))
+                .checked_add(central.extra.len())
                 .and_then(|value| value.checked_add(central.comment.len()))
                 .ok_or_else(|| {
                     Error::InvalidBundle(
-                        "directory index metadata length overflowed usize".to_owned(),
+                        "directory index central metadata length overflowed usize".to_owned(),
                     )
                 })?;
-            metadata_bytes = metadata_bytes
-                .checked_add(u64::try_from(metadata).map_err(|_error| {
-                    Error::InvalidBundle(
-                        "directory index metadata length does not fit u64".to_owned(),
-                    )
-                })?)
+            let raw_metadata = local_metadata
+                .checked_add(central_metadata)
                 .ok_or_else(|| {
                     Error::InvalidBundle(
-                        "directory index metadata length overflowed u64".to_owned(),
+                        "directory index raw metadata length overflowed usize".to_owned(),
+                    )
+                })?;
+            let raw_metadata = u64::try_from(raw_metadata).map_err(|_error| {
+                Error::InvalidBundle(
+                    "directory index raw metadata length does not fit u64".to_owned(),
+                )
+            })?;
+            let central_metadata = u64::try_from(central_metadata)
+                .map_err(|_error| {
+                    Error::InvalidBundle(
+                        "directory index central metadata length does not fit u64".to_owned(),
+                    )
+                })?
+                .checked_add(ZIP_CENTRAL_FIXED_METADATA_BYTES)
+                .ok_or_else(|| {
+                    Error::InvalidBundle(
+                        "directory index central metadata length overflowed u64".to_owned(),
+                    )
+                })?;
+            raw_metadata_bytes = raw_metadata_bytes
+                .checked_add(raw_metadata)
+                .ok_or_else(|| {
+                    Error::InvalidBundle(
+                        "directory index raw metadata total overflowed u64".to_owned(),
+                    )
+                })?;
+            central_metadata_bytes = central_metadata_bytes
+                .checked_add(central_metadata)
+                .ok_or_else(|| {
+                    Error::InvalidBundle(
+                        "directory index central metadata total overflowed u64".to_owned(),
                     )
                 })?;
             if !entry.is_directory() {
@@ -264,6 +302,9 @@ impl<'data> ZipArchive<'data> {
                     })?;
             }
         }
+        // Admission enforces both raw variable headers and the backend's
+        // central-directory charge against the same ceiling.
+        let metadata_bytes = raw_metadata_bytes.max(central_metadata_bytes);
         Ok(DirectoryIndexReport {
             input_bytes: u64::try_from(self.data.len()).map_err(|_error| {
                 Error::InvalidBundle("directory index input length does not fit u64".to_owned())
@@ -864,6 +905,19 @@ mod tests {
                 maximum: 7,
             })
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn directory_index_report_covers_local_and_central_metadata_limits() -> Result<()> {
+        let local_extra = vec![b'x'; 64];
+        let bytes = physical_zip(b"a", &local_extra, b"a", b"", b"", b"x");
+        let archive = ZipArchive::new_with_limits(&bytes, Limits::default())?;
+        let report = archive.directory_index_report()?;
+        let local_extra_bytes = u64::try_from(local_extra.len()).map_err(|_error| {
+            Error::InvalidBundle("test local extra length does not fit u64".to_owned())
+        })?;
+        assert_eq!(report.metadata_bytes, local_extra_bytes + 2);
         Ok(())
     }
 

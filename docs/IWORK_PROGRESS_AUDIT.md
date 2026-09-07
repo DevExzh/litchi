@@ -860,3 +860,124 @@ save/actual-close/exact-reopen receipt was produced. All four raw host APIs
 and their private helper remain retained. `MEDIA_PROPERTIES_NATIVE_VERIFIED`
 is absent, so this increment records source ownership and does not retire
 those routes or complete the monolith exit.
+
+
+## 2026-09-07 Numbers template discovery and Keynote readback hardening
+
+Numbers creation-template discovery now delegates table-info ownership to the
+existing typed role resolver and table-model selection to its bounded
+projection. It no longer probes arbitrary payloads with a complete generated
+`TableInfoArchive`, collects all decoded models, or clones the selected model.
+Canonical type-6001 models take precedence over legacy type-6000 aliases;
+malformed canonical payloads and ambiguous valid model ownership fail closed.
+These are explicit admission tightenings, not parity claims for the former
+permissive malformed-input behavior. The selected table model still uses its
+owned generated representation where creation needs its full state.
+
+The previously unintegrated private table-info projection now serves attached
+ownership discovery through the existing Buffa codec. Its nonzero model edge
+is source-bound and subject to byte, field, work, and nesting ceilings.
+Only legacy type 6003 may receive a temporary empty Drawable envelope when
+that required field is absent; canonical type 6000 remains strict. The source
+payload is never rewritten by discovery. A source boundary ratchet protects
+the migrated lookup paths without banning generated mutation code elsewhere.
+
+Keynote media-property verification now exercises both audio and file-movie
+candidates by default and provides separate optional native-saved path inputs.
+Readback checks the selected target, every unselected property, media counts,
+geometry, playback, asset/poster bytes, and comment/reply graph signatures.
+Generated transaction checks remain distinct from native save evidence.
+
+Computer Use was retried against `/Applications/Keynote.app`; capture still
+failed with ScreenCaptureKit `-3802` (`Stream failed to start`). No new native
+fixture or save/close/reopen receipt was produced. The four raw host media
+property APIs remain retained, and no native-verification marker is enabled.
+The monolith exit and its eleven migration dependencies remain open.
+
+Scoped verification passes 18 Keynote media-property integration tests,
+including the end-to-end merge/base-message refusal regression. The boundary
+suite passes 962 tests, and the full scanner passes for 64 packages and 238
+internal dependency declarations with 11 explicit migration debt items.
+Compiler-backed root and all three semantic leaf API checks report no native
+IDs or physical archive/wire/protobuf leakage. Native verification remains
+unavailable; these results do not close the monolith deletion gate.
+
+Numbers focused verification passes five projection cases, five ownership
+cases, four package-level template-discovery cases, and the existing empty
+table creation test. The template regressions include an untyped-only owner,
+legacy envelope omission, canonical preference, malformed canonical refusal,
+and duplicate canonical refusal.
+
+The initial normal-hook attempt found pre-existing formatting differences in
+Keynote document ingress and a DOCX glossary test, plus an ODF archive-reader
+large-enum lint. Formatting was corrected mechanically. A local documented
+lint allowance retains the ODF borrowed reader inline, avoiding a new heap
+allocation on each borrowed open. No ODF runtime behavior changed. The already
+failed hook attempt was interrupted as its incremental cache consumed disk
+space; subsequent hooks run with `CARGO_INCREMENTAL=0` and the same full check
+commands after `cargo clean`.
+
+The subsequent lint pass also exposed three existing PPTX style diagnostics:
+a negated optional predicate, cloning a `Copy` source version, and needless
+explicit lifetimes. They were corrected without changing their behavior.
+The intermediate full clean removed 221,047 files and 58.5 GiB of artifacts,
+restoring approximately 60 GiB free before the non-incremental hook run.
+
+The workspace inventory exposed an existing iWork error-attribution defect:
+semantic component readers relabeled every Snappy size refusal as aggregate
+decoded bytes, including refusals from the original component ceiling. Both
+readers now use one private mapper that attributes aggregate exhaustion only
+when its remaining budget is strictly tighter. Component and native chunk
+ceilings, including ties, retain the original evidence. Actual compressed
+single- and multi-chunk tests cover both resources, retained-byte offsets, and
+ties. The unchanged facade exact/one-over resource tests now pass. The directory
+input regression also counts all three retained canonical metadata sidecars
+alongside `Index.zip`; its seven path cases and two source-error cases pass.
+
+Other required-hook repairs preserve the existing admission contracts: DOCX
+arbitration distinguishes an absent catalog from a malformed present one and
+enforces the caller's input ceiling for an OOXML-suffixed ODT; the RTF test
+constructs a genuinely versionless negative fixture from the now-versioned
+vendored input. The PPTX authoring templates include the empty direct slide-ID
+list required by source-backed ingress. Their focused existing tests pass.
+
+The XLSX lazy-read fixture now corrupts only the unselected member payload;
+its former central-only CRC corruption violated local/central header agreement
+and correctly failed before any payload read. The XLSB format-precedence fixture
+now includes the required root office-document relationship. The focused XLSX
+and XLSB checks pass under all-features and their isolated feature profiles.
+PPTX's stale unsupported-child expectation now checks the earlier snapshot
+refusal, and its missing-size fixture supplies a valid empty slide list to
+isolate that owner. All 537 PPTX library tests and the five malformed-presentation
+and eight table-style tests pass.
+
+The remaining root lint corrections remove redundant returns, an identity
+match, and an identity error conversion. Private one-shot document/presentation
+source handoff enums retain their inline ownership with narrowly documented
+large-enum allowances, avoiding new allocations on filesystem opens. Root
+all-feature library Clippy passes with warnings denied. The XML asset registry
+passes four tests with one existing ignored test after recompiling its embedded
+template snapshot. The final full `cargo lint` workspace run also passes.
+
+The XLS formula fixture exposed valid BIFF8 `RgbExtra` following `Rgce`
+(`PtgMemArea`/`PtgExtraMem`), which the existing exact-token-end check rejected.
+Formula metadata now retains that bounded opaque suffix behind an optional
+shared owner. Writing preserves it only for the exact source token sequence;
+changed tokens cannot carry the stale suffix. The total BIFF record ceiling
+still applies before writing. All 146 focused XLS formula library tests and
+the previously failing root XLS formula test pass.
+
+The directory index report now uses the larger of raw variable-header metadata
+and the ZIP backend's central-directory metadata charge. Both admission checks
+remain enforced, and exact sidecar reservation now agrees with either binding
+ceiling. The 169 archive library tests pass, including a local-extra regression.
+Formula suffix preservation remains inert: complete Ptg/suffix semantic
+correspondence validation is outside this repair. Tokenless cached-string
+records still reject ancillary bytes under both parsing profiles.
+
+The XLSB corpus expectation now distinguishes its six raw drawing anchors from
+the five admitted worksheet transfers: the LibreOffice fixture's remaining
+anchor belongs to a chart sheet, excluded by the worksheet-only API under
+ADR 0307. Per-fixture inventory counts preserve all six anchors, and all five
+worksheet transfers still save and reopen. All nine workbook-structure tests
+pass. No XLSB production behavior changed.
