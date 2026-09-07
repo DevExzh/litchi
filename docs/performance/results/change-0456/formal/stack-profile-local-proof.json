@@ -1,0 +1,152 @@
+{
+  "status": "pass",
+  "scope": "one baseline and candidate whole-process instruction-sampling diagnostic including user and kernel events; local symbols only, DEBUGINFOD_URLS empty; includes corpus/oracles, not API-only samples or timing comparison",
+  "rows": [
+    {
+      "build": "baseline",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "record",
+        "--no-buildid-cache",
+        "-e",
+        "instructions",
+        "-c",
+        "50000000",
+        "--call-graph",
+        "dwarf,8192",
+        "-o",
+        "/tmp/litchi-goal-0456/stacks-local/baseline.data",
+        "--",
+        "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/stack-profiles-local/baseline/report.json"
+      ],
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-baseline-normal",
+        "sha256": "127e2c36432afae921def35eaf6525afe1c0b46ac865cc7a92d4165878fa065c",
+        "bytes": 57783904
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "raw_profile": {
+        "path": "/tmp/litchi-goal-0456/stacks-local/baseline.data",
+        "sha256": "321cbf4c64022396997b238bf48b6b85d07689d16751667cd09416e77cc5c802",
+        "bytes": 8267880
+      },
+      "artifacts": [
+        {
+          "path": "stack-profiles-local/baseline/inclusive.txt",
+          "sha256": "f1ad9b000719190d23c6c3c84cbd3c516e013854ce7fd5dc95f009daf2155715",
+          "bytes": 16571
+        },
+        {
+          "path": "stack-profiles-local/baseline/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "stack-profiles-local/baseline/record.log",
+          "sha256": "7735ebd70afaf00cc237822e544dad82e6fd73e76db1420fcc285a549c416656",
+          "bytes": 769
+        },
+        {
+          "path": "stack-profiles-local/baseline/report.json",
+          "sha256": "31866e4dd6487f40b56b5562aa72f654a45add0f4e3bca27db0a16698475a5b8",
+          "bytes": 1836497
+        },
+        {
+          "path": "stack-profiles-local/baseline/self.txt",
+          "sha256": "3a905f976f1d1c8d7f7674127c1b9923d48893205413b7f1b494e82e06d4cba4",
+          "bytes": 3271
+        }
+      ]
+    },
+    {
+      "build": "candidate",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "record",
+        "--no-buildid-cache",
+        "-e",
+        "instructions",
+        "-c",
+        "50000000",
+        "--call-graph",
+        "dwarf,8192",
+        "-o",
+        "/tmp/litchi-goal-0456/stacks-local/candidate.data",
+        "--",
+        "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "provider-lifecycle",
+        "--corpus",
+        "media-rich",
+        "--provider",
+        "bytes",
+        "--samples",
+        "30",
+        "--warmup",
+        "3",
+        "--source-revision",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/stack-profiles-local/candidate/report.json"
+      ],
+      "binary": {
+        "path": "/tmp/litchi-goal-0456/formal-candidate-normal",
+        "sha256": "6b9edd1fd654f91b8a6dcb1080051e2a342e96e542ef9c27dd3e30f99ad34828",
+        "bytes": 57527896
+      },
+      "exit_code": 0,
+      "oracle_exit_code": 0,
+      "raw_profile": {
+        "path": "/tmp/litchi-goal-0456/stacks-local/candidate.data",
+        "sha256": "1eaf2a3cd835de7bcfcafe2d8781e6976e9f03edbabb93d8df242df2022ae0a9",
+        "bytes": 8259808
+      },
+      "artifacts": [
+        {
+          "path": "stack-profiles-local/candidate/inclusive.txt",
+          "sha256": "d9361cca4dc6cdb2e99a251ba32a851ed4f3680acfee5f5f190f5f814804d7ae",
+          "bytes": 22286
+        },
+        {
+          "path": "stack-profiles-local/candidate/oracle.log",
+          "sha256": "df39fee757e6fe345acb0b885c70247635e1bcddb9b4e970833664f27a06c8b0",
+          "bytes": 311
+        },
+        {
+          "path": "stack-profiles-local/candidate/record.log",
+          "sha256": "ce880d911b372d3e2478c1ce1796871d266d69016cf09732b88eb5f75934a451",
+          "bytes": 770
+        },
+        {
+          "path": "stack-profiles-local/candidate/report.json",
+          "sha256": "2ea3389c799ed4765b3e6dd4b4ec153ea15beb3d3d33ce12f9c0e768bdc15d05",
+          "bytes": 1836498
+        },
+        {
+          "path": "stack-profiles-local/candidate/self.txt",
+          "sha256": "ec6ed8b7f0c4ac034b3f17e192a05e4c5d7ebbbffc170e963e92bbe5fafe8924",
+          "bytes": 3203
+        }
+      ]
+    }
+  ]
+}

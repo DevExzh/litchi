@@ -1,0 +1,73 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 972  of event 'instructions'
+# Event count (approx.): 48600000000
+#
+# Overhead  Command          Shared Object           Symbol                                                                                                                                                                                                                                                                          
+# ........  ...............  ......................  ................................................................................................................................................................................................................................................................................
+#
+    40.84%  formal-baseline  formal-baseline-normal  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |          
+             --1.95%--zlib_rs::deflate::algorithm::medium::deflate_medium
+                       |          
+                       |--0.62%--0x5845ffffffff
+                       |          
+                        --0.51%--0x5ffffffffffffff
+
+    24.28%  formal-baseline  formal-baseline-normal  [.] sha2::sha256::x86_sha::compress
+    13.68%  formal-baseline  formal-baseline-normal  [.] zlib_rs::deflate::longest_match::longest_match
+     3.29%  formal-baseline  formal-baseline-normal  [.] litchi_perf_baseline::payload_bytes
+            |          
+             --0.62%--litchi_perf_baseline::payload_bytes
+
+     2.78%  formal-baseline  formal-baseline-normal  [.] <zlib_rs::deflate::Heap>::pqdownheap
+     1.54%  formal-baseline  formal-baseline-normal  [.] crc32fast::specialized::pclmulqdq::calculate
+     1.54%  formal-baseline  libc.so.6               [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+
+     1.34%  formal-baseline  libc.so.6               [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+
+     0.72%  formal-baseline  [unknown]               [k] 0xffffffff8c800ef0
+            |
+            ---0xffffffff8c800ef0
+
+     0.62%  formal-baseline  formal-baseline-normal  [.] zlib_rs::deflate::flush_block_only
+     0.62%  formal-baseline  [unknown]               [k] 0xffffffff8df2e39b
+            |
+            ---0xffffffff8df2e39b
+               0xffffffff8d037cad
+               0xffffffff8d039cc2
+               0xffffffff8d03b34c
+               0xffffffff8d07cf38
+               0xffffffff8d0807bb
+               0xffffffff8cffe429
+               0xffffffff8cffe882
+               0xffffffff8cfffc80
+               0xffffffff8d000153
+               0xffffffff8d0004de
+               0xffffffff8cc1a38e
+               0xffffffff8df1c2e3
+               0xffffffff8c800bb7
+
+     0.51%  formal-baseline  formal-baseline-normal  [.] zlib_rs::deflate::gen_codes
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
+Warning:
+Kernel address maps (/proc/{kallsyms,modules}) were restricted.
+
+Check /proc/sys/kernel/kptr_restrict before running 'perf record'.
+
+As no suitable kallsyms nor vmlinux was found, kernel samples
+can't be resolved.
+
+Samples in kernel modules can't be resolved as well.
+

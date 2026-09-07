@@ -1,5 +1,24 @@
 # Performance program phase report
 
+## Change 0456: smaller shared-payload publication working set
+
+The [0456 batch](changes/0456-zip-shared-payload-framing.md) removes a duplicate
+ZIP payload preparation buffer. Media publication allocation falls 79.85% and
+regional heap peak above entry falls 96.59%, with identical output, provider work,
+sink writes and managed budgets. Plain metadata allocation rises 3,360 bytes.
+The 720 formal observations retain all 15 timing flags, including repeated
+ordinary bytes/media API regressions of 15.411%/16.347%. Separate 240-sample
+allocator-policy diagnostics improve API medians 2.626–10.266%, supporting a
+policy-sensitive tradeoff rather than an unconditional latency claim.
+
+Release checks pass 2,654 tests (7 ignored), strict lint, rustdoc, formatting,
+minimal workspace/boundaries and 1,000 ASAN fuzz iterations. The native self-pair
+matches its prior output through both providers; an initial copied expected-SHA
+error and its corrected retry are retained. Six distinct native pair probes
+refuse incompatible graphs. This batch promotes no scenario coverage and leaves
+the full non-iWork goal open. The [bundle](results/change-0456/README.md) retains
+source/build custody, raw results, diagnostics and portable verification.
+
 ## Change 0455: fewer bounded preservation transfers
 
 The [0455 batch](changes/0455-zip-preservation-transfer-chunks.md) retains a

@@ -1,5 +1,24 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0456: direct shared payload framing
+
+[0456](changes/0456-zip-shared-payload-framing.md) keeps verified Store/Deflate
+payload storage and shared Store storage inside the ZIP owner. Only local
+framing and central metadata are allocated; full output layout preflight and
+ZIP64 promotion remain before publication. The ordinary and preservation
+writers share checked framing grammar. Partial sink acceptance is accounted
+exactly. Owned Store and ordinary generated Deflate retain their buffered paths.
+
+The API, dependencies, safe-code policy, executor model, source/version checks,
+resource limits, cancellation and typed refusal boundaries are unchanged.
+Managed OPC writer reservations remain conservative, including the old payload
+allowance; physical allocation savings do not lower admission budgets. The
+64 KiB copy buffer and stack cost from 0455 are unchanged. Tests cover retained
+payload ownership, exact bytes, preflight refusals and partial-output boundaries.
+Release evidence passes 2,654 tests (7 ignored) and 1,000 ASAN fuzz iterations.
+The accepted ADR tree is unchanged. No native-pair, bounded-document-lifecycle,
+or full non-iWork completion claim follows from this optimization.
+
 ## Change 0455: private ZIP transfer bound
 
 [0455](changes/0455-zip-preservation-transfer-chunks.md) changes only the private

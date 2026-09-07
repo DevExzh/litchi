@@ -1,0 +1,789 @@
+{
+  "scope": "Per-operation heap counters; regional peak above entry subtracts live_bytes_before from region_peak_live_bytes for each sample. The existing 64 KiB stack buffer is unchanged and outside allocator accounting. Absolute process live/peak values can have different pre-operation baselines.",
+  "rows": [
+    {
+      "lane": 16,
+      "build": "baseline",
+      "provider": "bytes",
+      "corpus": "plain",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "phases": {
+        "open_source": {
+          "allocation_calls": {
+            "min": 2016,
+            "median": 2016.0,
+            "max": 2016
+          },
+          "allocated_bytes": {
+            "min": 1974238,
+            "median": 1974238.0,
+            "max": 1974238
+          },
+          "live_growth_bytes": {
+            "min": 57264,
+            "median": 57264.0,
+            "max": 57264
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 152048,
+            "median": 152048.0,
+            "max": 152048
+          }
+        },
+        "open_destination": {
+          "allocation_calls": {
+            "min": 1896,
+            "median": 1896.0,
+            "max": 1896
+          },
+          "allocated_bytes": {
+            "min": 1880338,
+            "median": 1880338.0,
+            "max": 1880338
+          },
+          "live_growth_bytes": {
+            "min": 52607,
+            "median": 52607.0,
+            "max": 52607
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 150908,
+            "median": 150908.0,
+            "max": 150908
+          }
+        },
+        "plan": {
+          "allocation_calls": {
+            "min": 2857,
+            "median": 2857.0,
+            "max": 2857
+          },
+          "allocated_bytes": {
+            "min": 984496,
+            "median": 984496.0,
+            "max": 984496
+          },
+          "live_growth_bytes": {
+            "min": 56283,
+            "median": 56283.0,
+            "max": 56283
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 142420,
+            "median": 142420.0,
+            "max": 142420
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "min": 4251,
+            "median": 4251.0,
+            "max": 4251
+          },
+          "allocated_bytes": {
+            "min": 4084587,
+            "median": 4084587.0,
+            "max": 4084587
+          },
+          "live_growth_bytes": {
+            "min": -80187,
+            "median": -80187.0,
+            "max": -80187
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 556745,
+            "median": 556745.0,
+            "max": 556745
+          }
+        }
+      }
+    },
+    {
+      "lane": 17,
+      "build": "baseline",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "phases": {
+        "open_source": {
+          "allocation_calls": {
+            "min": 2378,
+            "median": 2378.0,
+            "max": 2378
+          },
+          "allocated_bytes": {
+            "min": 2076831,
+            "median": 2076831.0,
+            "max": 2076831
+          },
+          "live_growth_bytes": {
+            "min": 68372,
+            "median": 68372.0,
+            "max": 68372
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 192710,
+            "median": 192710.0,
+            "max": 192710
+          }
+        },
+        "open_destination": {
+          "allocation_calls": {
+            "min": 2258,
+            "median": 2258.0,
+            "max": 2258
+          },
+          "allocated_bytes": {
+            "min": 1982931,
+            "median": 1982931.0,
+            "max": 1982931
+          },
+          "live_growth_bytes": {
+            "min": 63715,
+            "median": 63715.0,
+            "max": 63715
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 191570,
+            "median": 191570.0,
+            "max": 191570
+          }
+        },
+        "plan": {
+          "allocation_calls": {
+            "min": 3470,
+            "median": 3470.0,
+            "max": 3470
+          },
+          "allocated_bytes": {
+            "min": 34988230,
+            "median": 34988230.0,
+            "max": 34988230
+          },
+          "live_growth_bytes": {
+            "min": 33648494,
+            "median": 33648494.0,
+            "max": 33648494
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 33697259,
+            "median": 33697259.0,
+            "max": 33697259
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "min": 5397,
+            "median": 5397.0,
+            "max": 5397
+          },
+          "allocated_bytes": {
+            "min": 21057867,
+            "median": 21057867.0,
+            "max": 21057867
+          },
+          "live_growth_bytes": {
+            "min": -95641,
+            "median": -95641.0,
+            "max": -95641
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 17406388,
+            "median": 17406388.0,
+            "max": 17406388
+          }
+        }
+      }
+    },
+    {
+      "lane": 18,
+      "build": "candidate",
+      "provider": "bytes",
+      "corpus": "plain",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "phases": {
+        "open_source": {
+          "allocation_calls": {
+            "min": 2016,
+            "median": 2016.0,
+            "max": 2016
+          },
+          "allocated_bytes": {
+            "min": 1974238,
+            "median": 1974238.0,
+            "max": 1974238
+          },
+          "live_growth_bytes": {
+            "min": 57264,
+            "median": 57264.0,
+            "max": 57264
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 152048,
+            "median": 152048.0,
+            "max": 152048
+          }
+        },
+        "open_destination": {
+          "allocation_calls": {
+            "min": 1896,
+            "median": 1896.0,
+            "max": 1896
+          },
+          "allocated_bytes": {
+            "min": 1880338,
+            "median": 1880338.0,
+            "max": 1880338
+          },
+          "live_growth_bytes": {
+            "min": 52607,
+            "median": 52607.0,
+            "max": 52607
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 150908,
+            "median": 150908.0,
+            "max": 150908
+          }
+        },
+        "plan": {
+          "allocation_calls": {
+            "min": 2857,
+            "median": 2857.0,
+            "max": 2857
+          },
+          "allocated_bytes": {
+            "min": 984496,
+            "median": 984496.0,
+            "max": 984496
+          },
+          "live_growth_bytes": {
+            "min": 56283,
+            "median": 56283.0,
+            "max": 56283
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 142420,
+            "median": 142420.0,
+            "max": 142420
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "min": 4251,
+            "median": 4251.0,
+            "max": 4251
+          },
+          "allocated_bytes": {
+            "min": 4087947,
+            "median": 4087947.0,
+            "max": 4087947
+          },
+          "live_growth_bytes": {
+            "min": -80187,
+            "median": -80187.0,
+            "max": -80187
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 558465,
+            "median": 558465.0,
+            "max": 558465
+          }
+        }
+      }
+    },
+    {
+      "lane": 19,
+      "build": "candidate",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R1",
+      "instrumentation": "allocator",
+      "phases": {
+        "open_source": {
+          "allocation_calls": {
+            "min": 2378,
+            "median": 2378.0,
+            "max": 2378
+          },
+          "allocated_bytes": {
+            "min": 2076831,
+            "median": 2076831.0,
+            "max": 2076831
+          },
+          "live_growth_bytes": {
+            "min": 68372,
+            "median": 68372.0,
+            "max": 68372
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 192710,
+            "median": 192710.0,
+            "max": 192710
+          }
+        },
+        "open_destination": {
+          "allocation_calls": {
+            "min": 2258,
+            "median": 2258.0,
+            "max": 2258
+          },
+          "allocated_bytes": {
+            "min": 1982931,
+            "median": 1982931.0,
+            "max": 1982931
+          },
+          "live_growth_bytes": {
+            "min": 63715,
+            "median": 63715.0,
+            "max": 63715
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 191570,
+            "median": 191570.0,
+            "max": 191570
+          }
+        },
+        "plan": {
+          "allocation_calls": {
+            "min": 3470,
+            "median": 3470.0,
+            "max": 3470
+          },
+          "allocated_bytes": {
+            "min": 34988230,
+            "median": 34988230.0,
+            "max": 34988230
+          },
+          "live_growth_bytes": {
+            "min": 33648494,
+            "median": 33648494.0,
+            "max": 33648494
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 33697259,
+            "median": 33697259.0,
+            "max": 33697259
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "min": 5381,
+            "median": 5381.0,
+            "max": 5381
+          },
+          "allocated_bytes": {
+            "min": 4243083,
+            "median": 4243083.0,
+            "max": 4243083
+          },
+          "live_growth_bytes": {
+            "min": -95641,
+            "median": -95641.0,
+            "max": -95641
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 593892,
+            "median": 593892.0,
+            "max": 593892
+          }
+        }
+      }
+    },
+    {
+      "lane": 20,
+      "build": "candidate",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "phases": {
+        "open_source": {
+          "allocation_calls": {
+            "min": 2378,
+            "median": 2378.0,
+            "max": 2378
+          },
+          "allocated_bytes": {
+            "min": 2076831,
+            "median": 2076831.0,
+            "max": 2076831
+          },
+          "live_growth_bytes": {
+            "min": 68372,
+            "median": 68372.0,
+            "max": 68372
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 192710,
+            "median": 192710.0,
+            "max": 192710
+          }
+        },
+        "open_destination": {
+          "allocation_calls": {
+            "min": 2258,
+            "median": 2258.0,
+            "max": 2258
+          },
+          "allocated_bytes": {
+            "min": 1982931,
+            "median": 1982931.0,
+            "max": 1982931
+          },
+          "live_growth_bytes": {
+            "min": 63715,
+            "median": 63715.0,
+            "max": 63715
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 191570,
+            "median": 191570.0,
+            "max": 191570
+          }
+        },
+        "plan": {
+          "allocation_calls": {
+            "min": 3470,
+            "median": 3470.0,
+            "max": 3470
+          },
+          "allocated_bytes": {
+            "min": 34988230,
+            "median": 34988230.0,
+            "max": 34988230
+          },
+          "live_growth_bytes": {
+            "min": 33648494,
+            "median": 33648494.0,
+            "max": 33648494
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 33697259,
+            "median": 33697259.0,
+            "max": 33697259
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "min": 5381,
+            "median": 5381.0,
+            "max": 5381
+          },
+          "allocated_bytes": {
+            "min": 4243083,
+            "median": 4243083.0,
+            "max": 4243083
+          },
+          "live_growth_bytes": {
+            "min": -95641,
+            "median": -95641.0,
+            "max": -95641
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 593892,
+            "median": 593892.0,
+            "max": 593892
+          }
+        }
+      }
+    },
+    {
+      "lane": 21,
+      "build": "candidate",
+      "provider": "bytes",
+      "corpus": "plain",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "phases": {
+        "open_source": {
+          "allocation_calls": {
+            "min": 2016,
+            "median": 2016.0,
+            "max": 2016
+          },
+          "allocated_bytes": {
+            "min": 1974238,
+            "median": 1974238.0,
+            "max": 1974238
+          },
+          "live_growth_bytes": {
+            "min": 57264,
+            "median": 57264.0,
+            "max": 57264
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 152048,
+            "median": 152048.0,
+            "max": 152048
+          }
+        },
+        "open_destination": {
+          "allocation_calls": {
+            "min": 1896,
+            "median": 1896.0,
+            "max": 1896
+          },
+          "allocated_bytes": {
+            "min": 1880338,
+            "median": 1880338.0,
+            "max": 1880338
+          },
+          "live_growth_bytes": {
+            "min": 52607,
+            "median": 52607.0,
+            "max": 52607
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 150908,
+            "median": 150908.0,
+            "max": 150908
+          }
+        },
+        "plan": {
+          "allocation_calls": {
+            "min": 2857,
+            "median": 2857.0,
+            "max": 2857
+          },
+          "allocated_bytes": {
+            "min": 984496,
+            "median": 984496.0,
+            "max": 984496
+          },
+          "live_growth_bytes": {
+            "min": 56283,
+            "median": 56283.0,
+            "max": 56283
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 142420,
+            "median": 142420.0,
+            "max": 142420
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "min": 4251,
+            "median": 4251.0,
+            "max": 4251
+          },
+          "allocated_bytes": {
+            "min": 4087947,
+            "median": 4087947.0,
+            "max": 4087947
+          },
+          "live_growth_bytes": {
+            "min": -80187,
+            "median": -80187.0,
+            "max": -80187
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 558465,
+            "median": 558465.0,
+            "max": 558465
+          }
+        }
+      }
+    },
+    {
+      "lane": 22,
+      "build": "baseline",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "phases": {
+        "open_source": {
+          "allocation_calls": {
+            "min": 2378,
+            "median": 2378.0,
+            "max": 2378
+          },
+          "allocated_bytes": {
+            "min": 2076831,
+            "median": 2076831.0,
+            "max": 2076831
+          },
+          "live_growth_bytes": {
+            "min": 68372,
+            "median": 68372.0,
+            "max": 68372
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 192710,
+            "median": 192710.0,
+            "max": 192710
+          }
+        },
+        "open_destination": {
+          "allocation_calls": {
+            "min": 2258,
+            "median": 2258.0,
+            "max": 2258
+          },
+          "allocated_bytes": {
+            "min": 1982931,
+            "median": 1982931.0,
+            "max": 1982931
+          },
+          "live_growth_bytes": {
+            "min": 63715,
+            "median": 63715.0,
+            "max": 63715
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 191570,
+            "median": 191570.0,
+            "max": 191570
+          }
+        },
+        "plan": {
+          "allocation_calls": {
+            "min": 3470,
+            "median": 3470.0,
+            "max": 3470
+          },
+          "allocated_bytes": {
+            "min": 34988230,
+            "median": 34988230.0,
+            "max": 34988230
+          },
+          "live_growth_bytes": {
+            "min": 33648494,
+            "median": 33648494.0,
+            "max": 33648494
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 33697259,
+            "median": 33697259.0,
+            "max": 33697259
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "min": 5397,
+            "median": 5397.0,
+            "max": 5397
+          },
+          "allocated_bytes": {
+            "min": 21057867,
+            "median": 21057867.0,
+            "max": 21057867
+          },
+          "live_growth_bytes": {
+            "min": -95641,
+            "median": -95641.0,
+            "max": -95641
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 17406388,
+            "median": 17406388.0,
+            "max": 17406388
+          }
+        }
+      }
+    },
+    {
+      "lane": 23,
+      "build": "baseline",
+      "provider": "bytes",
+      "corpus": "plain",
+      "repeat": "R2",
+      "instrumentation": "allocator",
+      "phases": {
+        "open_source": {
+          "allocation_calls": {
+            "min": 2016,
+            "median": 2016.0,
+            "max": 2016
+          },
+          "allocated_bytes": {
+            "min": 1974238,
+            "median": 1974238.0,
+            "max": 1974238
+          },
+          "live_growth_bytes": {
+            "min": 57264,
+            "median": 57264.0,
+            "max": 57264
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 152048,
+            "median": 152048.0,
+            "max": 152048
+          }
+        },
+        "open_destination": {
+          "allocation_calls": {
+            "min": 1896,
+            "median": 1896.0,
+            "max": 1896
+          },
+          "allocated_bytes": {
+            "min": 1880338,
+            "median": 1880338.0,
+            "max": 1880338
+          },
+          "live_growth_bytes": {
+            "min": 52607,
+            "median": 52607.0,
+            "max": 52607
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 150908,
+            "median": 150908.0,
+            "max": 150908
+          }
+        },
+        "plan": {
+          "allocation_calls": {
+            "min": 2857,
+            "median": 2857.0,
+            "max": 2857
+          },
+          "allocated_bytes": {
+            "min": 984496,
+            "median": 984496.0,
+            "max": 984496
+          },
+          "live_growth_bytes": {
+            "min": 56283,
+            "median": 56283.0,
+            "max": 56283
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 142420,
+            "median": 142420.0,
+            "max": 142420
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "min": 4251,
+            "median": 4251.0,
+            "max": 4251
+          },
+          "allocated_bytes": {
+            "min": 4084587,
+            "median": 4084587.0,
+            "max": 4084587
+          },
+          "live_growth_bytes": {
+            "min": -80187,
+            "median": -80187.0,
+            "max": -80187
+          },
+          "regional_peak_above_entry_bytes": {
+            "min": 556745,
+            "median": 556745.0,
+            "max": 556745
+          }
+        }
+      }
+    }
+  ]
+}

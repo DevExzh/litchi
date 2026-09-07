@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0456/formal/native.py", line 18, in <module>
+    for name,digest in [('ppt/slides/slide2.xml',expected['copied_slide_sha256']),('ppt/media/image1-copy1.png',expected['copied_image_sha256']),*expected['metadata_sha256'].items()]:assert hashlib.sha256(z.read(name)).hexdigest()==digest
+                                                                                                                                                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

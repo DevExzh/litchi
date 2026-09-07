@@ -1,0 +1,63 @@
+{
+  "status": "pass",
+  "scope": "same pinned LibreOffice QA archive reopened independently as source and destination; exact 0454 output hash, ZIP CRC, member order, copied bytes and XML parsing; no native-application roundtrip",
+  "fixture_sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44",
+  "expected_sha256": "4073db260b900324ea80d1af678e3a9d92607ce658ddc3e21c011de0f25b504f",
+  "binary": {
+    "path": "/tmp/litchi-goal-0456/formal-candidate-external",
+    "sha256": "738ee961ca8dc3451c6dc17e639b046889e1c919971d1a5d38f5fff94db9bcb0",
+    "bytes": 7652464
+  },
+  "rows": [
+    {
+      "provider": "bytes",
+      "argv": [
+        "/tmp/litchi-goal-0456/formal-candidate-external",
+        "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/smoketest.pptx",
+        "/tmp/litchi-goal-0456/native-r1/bytes.json",
+        "1",
+        "0",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "bytes"
+      ],
+      "exit_code": 0,
+      "stdout": "external copy capture passed: 1 samples\n",
+      "stderr": "",
+      "report": {
+        "path": "native-r1/bytes.json",
+        "bytes": 7827,
+        "sha256": "3e48c6f60f3c4f70bbd928a3fb30d3e8981f0afabe8ab07862f81bec9e755419"
+      },
+      "output": {
+        "path": "/tmp/litchi-goal-0456/native-r1/bytes.pptx",
+        "bytes": 42948,
+        "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+      }
+    },
+    {
+      "provider": "range",
+      "argv": [
+        "/tmp/litchi-goal-0456/formal-candidate-external",
+        "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/smoketest.pptx",
+        "/tmp/litchi-goal-0456/native-r1/range.json",
+        "1",
+        "0",
+        "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+        "range"
+      ],
+      "exit_code": 0,
+      "stdout": "external copy capture passed: 1 samples\n",
+      "stderr": "",
+      "report": {
+        "path": "native-r1/range.json",
+        "bytes": 7866,
+        "sha256": "15ba7cbed6bdf64a6d78f8abc86710a1c3124f0b63d8edcb3cd18a51b89a19d4"
+      },
+      "output": {
+        "path": "/tmp/litchi-goal-0456/native-r1/range.pptx",
+        "bytes": 42948,
+        "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+      }
+    }
+  ]
+}

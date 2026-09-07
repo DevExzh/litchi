@@ -1,0 +1,31 @@
+{
+  "change": 456,
+  "status": "frozen",
+  "frozen_utc": "2026-09-07T09:41:00.379314+00:00",
+  "commands": {
+    "native": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0456/formal/native.py"
+    ],
+    "profiles": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0456/formal/profile.py"
+    ],
+    "stack-profiles-local": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0456/formal/profile-stacks-local.py"
+    ]
+  },
+  "bound_files": {
+    "native.py": "eca25937a5c434400759ef9d03459c7c8bdcc36823ce3b82eb7d8ce244a22681",
+    "native-expected.json": "4a40809d7c1b518b075580700ef62eab378691fec478ac165b3a9c61c2fa4fd8",
+    "profile.py": "4e5bd02558b150fd997096a503796bd3fa4258f6b8b1c637362ddb557073ec6a",
+    "profile-stacks-local.py": "a96ea599085c932ad31e64f950516bf1e21b4910eae173d8e48aa16035b2969f",
+    "profile-summary.py": "392282ac8e8101da16c29a84d81a78d4d0c37f0fc5bd633cfb5296b98675e75f",
+    "check.py": "64f1056117378c28f83d6a8693651e0c63145c9fbff833e4c2347d3dc3dab710",
+    "verify-report.py": "b0505644bb6be304ac217889455539a6926bbdd7731974c2b1d0aaf85c77a629"
+  }
+}

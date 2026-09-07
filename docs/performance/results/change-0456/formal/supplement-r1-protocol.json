@@ -1,0 +1,32 @@
+{
+  "change": 456,
+  "status": "frozen",
+  "frozen_utc": "2026-09-07T09:43:33.181714+00:00",
+  "reason": "Original native expected metadata SHA was accidentally changed by broad 0455-to-0456 text substitution. Whole-output hash matched. Restore exact prior expected bytes; retain original failed receipt, script and expected file.",
+  "commands": {
+    "native-r1": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0456/formal/native-r1.py"
+    ],
+    "profiles": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0456/formal/profile.py"
+    ],
+    "stack-profiles-local": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0456/formal/profile-stacks-local.py"
+    ]
+  },
+  "bound_files": {
+    "native-r1.py": "0b23d9c4dee49439762e9c4199d8958872740e400825216cec1c170066e0e74e",
+    "native-expected-r1.json": "4073db260b900324ea80d1af678e3a9d92607ce658ddc3e21c011de0f25b504f",
+    "profile.py": "4e5bd02558b150fd997096a503796bd3fa4258f6b8b1c637362ddb557073ec6a",
+    "profile-stacks-local.py": "a96ea599085c932ad31e64f950516bf1e21b4910eae173d8e48aa16035b2969f",
+    "profile-summary.py": "392282ac8e8101da16c29a84d81a78d4d0c37f0fc5bd633cfb5296b98675e75f",
+    "check.py": "64f1056117378c28f83d6a8693651e0c63145c9fbff833e4c2347d3dc3dab710",
+    "verify-report.py": "b0505644bb6be304ac217889455539a6926bbdd7731974c2b1d0aaf85c77a629"
+  }
+}

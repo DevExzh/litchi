@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/tmp/litchi-goal-0456-portable-fk3l_fey/docs/performance/results/change-0456/formal/verify.py"
+  ],
+  "cwd": "/tmp/litchi-goal-0456-portable-fk3l_fey",
+  "exit_code": 0,
+  "started_utc": "2026-09-07T09:50:40.549459+00:00",
+  "finished_utc": "2026-09-07T09:50:42.885196+00:00",
+  "verifier_sha256": "5fcfab70f0e3802e29bf8180938aa4ad923ee2c2a5575f111cf00ba97027f300",
+  "driver_sha256": "a712e5d32e55b173898128a8e118ac3f53fc74fc6b1ceade2bee3f25f4ae7002",
+  "mode": "separate bundle copy without owned binaries, fuzz build, native outputs or raw perf data",
+  "stdout": "{\"allocator_policy_diagnostic_samples\": 240, \"change\": 456, \"fuzz_gates\": 3, \"lanes\": 24, \"passed_tests\": 2654, \"required_release_gates\": 11, \"review_flags\": 15, \"samples\": 720, \"status\": \"pass\"}\n",
+  "stderr": "",
+  "temporary_directory_absent": true
+}

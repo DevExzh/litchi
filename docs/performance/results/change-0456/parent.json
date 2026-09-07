@@ -1,0 +1,6 @@
+{
+  "revision": "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+  "accepted_adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "previous_turn": "progress: production commit 9ac71ccd3 and sealed measurement evidence",
+  "scope": "Inspect actual distinct native PPTX copy and bounded append gaps; measured next slice chosen from evidence."
+}

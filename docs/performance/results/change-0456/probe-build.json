@@ -1,0 +1,13 @@
+{
+  "revision": "9ac71ccd343498dbed4a3f0397ed02a50e2ed7d3",
+  "source_manifest": {
+    "path": "sources/c65afdff205766047a72c447f4fb076009993073a5cce6f7befabb04f7d5612b.json",
+    "sha256": "c65afdff205766047a72c447f4fb076009993073a5cce6f7befabb04f7d5612b",
+    "files": 6672
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0456/probe",
+    "sha256": "b89b3a051eb52daa4e88543d80706c859eef00c8b319d7d57948702f0bad900f",
+    "bytes": 3566600
+  }
+}
