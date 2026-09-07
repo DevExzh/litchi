@@ -1,0 +1,15 @@
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error: variable does not need to be mutable
+   --> src/pptx_pair_lifecycle.rs:498:9
+    |
+498 |     let mut file = File::open(path)?;
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `-D unused-mut` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(unused_mut)]`
+
+error: could not compile `litchi-perf-baseline` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-perf-baseline` (lib test) due to 1 previous error

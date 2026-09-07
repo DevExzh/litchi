@@ -1,0 +1,42 @@
+{
+  "change": 464,
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0464/oracle-tests.py",
+    "--destination",
+    "docs/performance/results/change-0464/inputs/destination.pptx",
+    "--output",
+    "docs/performance/results/change-0464/smoke/normal-bytes.pptx"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "1c1e29473f9402190f5bc4bf68d96029ff106470",
+  "driver_sha256": "467787e0a8d2c2f6186ebbba736a1f679f7ac9c5a8476f73421a5996014dd123",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-07T18:44:32.286243+00:00",
+  "source_before": {
+    "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+    "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe",
+    "files": 7032
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T18:44:32.520342+00:00",
+  "source_after": {
+    "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+    "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe",
+    "files": 7032
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/oracle-tests.log",
+    "bytes": 624,
+    "sha256": "366c3279a94d84f3104e4b0ead693982ac9733b8e1d05654fe97585ebfcc0f2b"
+  }
+}

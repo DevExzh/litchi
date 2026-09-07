@@ -1,0 +1,42 @@
+{
+  "change": 464,
+  "argv": [
+    "env",
+    "LIBREOFFICE_BIN=/usr/bin/libreoffice",
+    "python3",
+    "-B",
+    "tools/native_odf_resave.py",
+    "/tmp/litchi-goal-0464/native-pilot/publication.pptx",
+    "/tmp/litchi-goal-0464/native-pilot/resaved"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "1c1e29473f9402190f5bc4bf68d96029ff106470",
+  "driver_sha256": "467787e0a8d2c2f6186ebbba736a1f679f7ac9c5a8476f73421a5996014dd123",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-07T18:11:04.565401+00:00",
+  "source_before": {
+    "path": "sources/d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c.json",
+    "sha256": "d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c",
+    "files": 7030
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T18:11:06.219158+00:00",
+  "source_after": {
+    "path": "sources/d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c.json",
+    "sha256": "d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c",
+    "files": 7030
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/native-pilot-resave.log",
+    "bytes": 60,
+    "sha256": "03ab0f6956d4efb1f38ddc1c10344dbf3ab3498138c885c7d6c803ecb5d72942"
+  }
+}

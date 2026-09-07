@@ -1,0 +1,419 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/usr/bin/perf",
+    "stat",
+    "--no-big-num",
+    "-x,",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/counters/counters.csv",
+    "-e",
+    "cycles:u,instructions:u,branches:u,branch-misses:u,cache-references:u,cache-misses:u,page-faults:u",
+    "--",
+    "/tmp/litchi-goal-0464/normal",
+    "pptx-pair-lifecycle",
+    "--manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0464/pair.json",
+    "--provider",
+    "bytes",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--repeat",
+    "diagnostic",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/counters/report.json",
+    "--output-pptx",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/counters/output.pptx",
+    "--source-revision",
+    "1c1e29473f9402190f5bc4bf68d96029ff106470"
+  ],
+  "artifacts": [
+    {
+      "bytes": 326,
+      "path": "docs/performance/results/change-0464/profiling-r1/counters/counters.csv",
+      "sha256": "b104c43b3a8f07ec41f0e99d309a4cf2cac89c23c51870bd999631a975f2205f"
+    },
+    {
+      "bytes": 55891,
+      "path": "docs/performance/results/change-0464/profiling-r1/counters/output.pptx",
+      "sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb"
+    },
+    {
+      "bytes": 1816467,
+      "path": "docs/performance/results/change-0464/profiling-r1/counters/report.json",
+      "sha256": "e2544df5ea9eda29ab5094c6eb7ff5bd0738d707c7766b4a6cba55818055d251"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0464/profiling-r1/counters/workload.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0464/profiling-r1/counters/workload.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "callgraph_probe": {
+    "attempts": [
+      {
+        "argv": [
+          "/usr/bin/taskset",
+          "-c",
+          "2",
+          "/usr/bin/perf",
+          "record",
+          "--no-buildid-cache",
+          "-F",
+          "99",
+          "-e",
+          "cycles:u",
+          "--call-graph",
+          "dwarf,8192",
+          "-o",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/samples/callgraph-dwarf.data",
+          "--",
+          "/usr/bin/python3",
+          "-c",
+          "total = 0\nfor value in range(2_000_000):\n    total += value * value\nprint(total)\n"
+        ],
+        "command": {
+          "argv": [
+            "/usr/bin/taskset",
+            "-c",
+            "2",
+            "/usr/bin/perf",
+            "record",
+            "--no-buildid-cache",
+            "-F",
+            "99",
+            "-e",
+            "cycles:u",
+            "--call-graph",
+            "dwarf,8192",
+            "-o",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/samples/callgraph-dwarf.data",
+            "--",
+            "/usr/bin/python3",
+            "-c",
+            "total = 0\nfor value in range(2_000_000):\n    total += value * value\nprint(total)\n"
+          ],
+          "cwd": "/home/zhuhe/code/litchi",
+          "exit_code": 0,
+          "stderr": "docs/performance/results/change-0464/profiling-r1/samples/callgraph-dwarf.stderr",
+          "stdout": "docs/performance/results/change-0464/profiling-r1/samples/callgraph-dwarf.stdout"
+        },
+        "data": {
+          "bytes": 184816,
+          "path": "docs/performance/results/change-0464/profiling-r1/samples/callgraph-dwarf.data",
+          "sha256": "5a468afa313c5b1be8e45d0ba10f612109d6681d17bdc6be6290260d246c9a39"
+        },
+        "mode": "dwarf,8192",
+        "status": "available"
+      }
+    ],
+    "cpu": 2,
+    "cpu_affinity": 2,
+    "requested": "actual dwarf,8192 then fp recording",
+    "schema": "litchi-0464-callgraph-probe-v1",
+    "scope": "bounded capability probes only; excluded from whole-process workload totals",
+    "selected": "dwarf,8192",
+    "status": "available",
+    "workload_argv": [
+      "/usr/bin/python3",
+      "-c",
+      "total = 0\nfor value in range(2_000_000):\n    total += value * value\nprint(total)\n"
+    ]
+  },
+  "change": 464,
+  "command": {
+    "argv": [
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/usr/bin/perf",
+      "stat",
+      "--no-big-num",
+      "-x,",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/counters/counters.csv",
+      "-e",
+      "cycles:u,instructions:u,branches:u,branch-misses:u,cache-references:u,cache-misses:u,page-faults:u",
+      "--",
+      "/tmp/litchi-goal-0464/normal",
+      "pptx-pair-lifecycle",
+      "--manifest",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/pair.json",
+      "--provider",
+      "bytes",
+      "--samples",
+      "30",
+      "--warmup",
+      "3",
+      "--repeat",
+      "diagnostic",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/counters/report.json",
+      "--output-pptx",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/counters/output.pptx",
+      "--source-revision",
+      "1c1e29473f9402190f5bc4bf68d96029ff106470"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "exit_code": 0,
+    "stderr": "docs/performance/results/change-0464/profiling-r1/counters/workload.stderr",
+    "stdout": "docs/performance/results/change-0464/profiling-r1/counters/workload.stdout"
+  },
+  "counters": {
+    "events": {
+      "branch-misses": {
+        "counter_scope": "whole-process child lifetime including input loading, setup, three warmups, 30 retained samples (33 checked iterations), semantic/raw oracle checks, output writes, teardown, and report serialization; not operation-only attribution",
+        "event": "branch-misses:u",
+        "normalization_denominator": 33,
+        "normalized_to_checked_iterations": 106501.24242424243,
+        "raw_value": "3514541",
+        "running_percent": "83.00",
+        "runtime": "133137819",
+        "scope": "whole-process",
+        "status": "available",
+        "total": 3514541,
+        "unit": ""
+      },
+      "branches": {
+        "counter_scope": "whole-process child lifetime including input loading, setup, three warmups, 30 retained samples (33 checked iterations), semantic/raw oracle checks, output writes, teardown, and report serialization; not operation-only attribution",
+        "event": "branches:u",
+        "normalization_denominator": 33,
+        "normalized_to_checked_iterations": 9920387.757575758,
+        "raw_value": "327372796",
+        "running_percent": "83.00",
+        "runtime": "132234950",
+        "scope": "whole-process",
+        "status": "available",
+        "total": 327372796,
+        "unit": ""
+      },
+      "cache-misses": {
+        "counter_scope": "whole-process child lifetime including input loading, setup, three warmups, 30 retained samples (33 checked iterations), semantic/raw oracle checks, output writes, teardown, and report serialization; not operation-only attribution",
+        "event": "cache-misses:u",
+        "normalization_denominator": 33,
+        "normalized_to_checked_iterations": 69566.36363636363,
+        "raw_value": "2295690",
+        "running_percent": "83.00",
+        "runtime": "132864159",
+        "scope": "whole-process",
+        "status": "available",
+        "total": 2295690,
+        "unit": ""
+      },
+      "cache-references": {
+        "counter_scope": "whole-process child lifetime including input loading, setup, three warmups, 30 retained samples (33 checked iterations), semantic/raw oracle checks, output writes, teardown, and report serialization; not operation-only attribution",
+        "event": "cache-references:u",
+        "normalization_denominator": 33,
+        "normalized_to_checked_iterations": 0.0,
+        "raw_value": "0",
+        "running_percent": "83.00",
+        "runtime": "133118518",
+        "scope": "whole-process",
+        "status": "available",
+        "total": 0,
+        "unit": ""
+      },
+      "cycles": {
+        "counter_scope": "whole-process child lifetime including input loading, setup, three warmups, 30 retained samples (33 checked iterations), semantic/raw oracle checks, output writes, teardown, and report serialization; not operation-only attribution",
+        "event": "cycles:u",
+        "normalization_denominator": 33,
+        "normalized_to_checked_iterations": 19129515.515151516,
+        "raw_value": "631274012",
+        "running_percent": "83.00",
+        "runtime": "132125600",
+        "scope": "whole-process",
+        "status": "available",
+        "total": 631274012,
+        "unit": ""
+      },
+      "instructions": {
+        "counter_scope": "whole-process child lifetime including input loading, setup, three warmups, 30 retained samples (33 checked iterations), semantic/raw oracle checks, output writes, teardown, and report serialization; not operation-only attribution",
+        "event": "instructions:u",
+        "normalization_denominator": 33,
+        "normalized_to_checked_iterations": 53279248.42424242,
+        "raw_value": "1758215198",
+        "running_percent": "83.00",
+        "runtime": "132153949",
+        "scope": "whole-process",
+        "status": "available",
+        "total": 1758215198,
+        "unit": ""
+      },
+      "page-faults": {
+        "counter_scope": "whole-process child lifetime including input loading, setup, three warmups, 30 retained samples (33 checked iterations), semantic/raw oracle checks, output writes, teardown, and report serialization; not operation-only attribution",
+        "event": "page-faults:u",
+        "normalization_denominator": 33,
+        "normalized_to_checked_iterations": 51.78787878787879,
+        "raw_value": "1709",
+        "running_percent": "100.00",
+        "runtime": "159126999",
+        "scope": "whole-process",
+        "status": "available",
+        "total": 1709,
+        "unit": ""
+      }
+    },
+    "rows": [
+      {
+        "event": "cycles:u",
+        "raw_value": "631274012",
+        "running_percent": "83.00",
+        "runtime": "132125600",
+        "total": 631274012,
+        "unit": ""
+      },
+      {
+        "event": "instructions:u",
+        "raw_value": "1758215198",
+        "running_percent": "83.00",
+        "runtime": "132153949",
+        "total": 1758215198,
+        "unit": ""
+      },
+      {
+        "event": "branches:u",
+        "raw_value": "327372796",
+        "running_percent": "83.00",
+        "runtime": "132234950",
+        "total": 327372796,
+        "unit": ""
+      },
+      {
+        "event": "branch-misses:u",
+        "raw_value": "3514541",
+        "running_percent": "83.00",
+        "runtime": "133137819",
+        "total": 3514541,
+        "unit": ""
+      },
+      {
+        "event": "cache-references:u",
+        "raw_value": "0",
+        "running_percent": "83.00",
+        "runtime": "133118518",
+        "total": 0,
+        "unit": ""
+      },
+      {
+        "event": "cache-misses:u",
+        "raw_value": "2295690",
+        "running_percent": "83.00",
+        "runtime": "132864159",
+        "total": 2295690,
+        "unit": ""
+      },
+      {
+        "event": "page-faults:u",
+        "raw_value": "1709",
+        "running_percent": "100.00",
+        "runtime": "159126999",
+        "total": 1709,
+        "unit": ""
+      }
+    ],
+    "status": "pass"
+  },
+  "cpu": 2,
+  "cpu_affinity": 2,
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T19:11:26.730452+00:00",
+  "instrumentation": "perf_stat",
+  "kind": "counters",
+  "operation_only_attribution": false,
+  "output": {
+    "bytes": 55891,
+    "path": "docs/performance/results/change-0464/profiling-r1/counters/output.pptx",
+    "sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb"
+  },
+  "profiler": {
+    "argv": [
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/usr/bin/perf",
+      "stat",
+      "--no-big-num",
+      "-x,",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/counters/counters.csv",
+      "-e",
+      "cycles:u,instructions:u,branches:u,branch-misses:u,cache-references:u,cache-misses:u,page-faults:u",
+      "--",
+      "/tmp/litchi-goal-0464/normal",
+      "pptx-pair-lifecycle",
+      "--manifest",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/pair.json",
+      "--provider",
+      "bytes",
+      "--samples",
+      "30",
+      "--warmup",
+      "3",
+      "--repeat",
+      "diagnostic",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/counters/report.json",
+      "--output-pptx",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/counters/output.pptx",
+      "--source-revision",
+      "1c1e29473f9402190f5bc4bf68d96029ff106470"
+    ],
+    "event_encoding": "user-mode (:u)",
+    "events": [
+      "cycles",
+      "instructions",
+      "branches",
+      "branch-misses",
+      "cache-references",
+      "cache-misses",
+      "page-faults"
+    ],
+    "output": "docs/performance/results/change-0464/profiling-r1/counters/counters.csv",
+    "status": "requested"
+  },
+  "report": {
+    "bytes": 1816467,
+    "path": "docs/performance/results/change-0464/profiling-r1/counters/report.json",
+    "sha256": "e2544df5ea9eda29ab5094c6eb7ff5bd0738d707c7766b4a6cba55818055d251"
+  },
+  "report_valid": true,
+  "root_only": false,
+  "root_required": false,
+  "schema": "litchi-0464-profile-run-v1",
+  "scope": "whole-process child lifetime including input loading, setup, three warmups, 30 retained samples (33 checked iterations), semantic/raw oracle checks, output writes, teardown, and report serialization; not operation-only attribution",
+  "serialized": true,
+  "started_utc": "2026-09-07T19:11:26.549476+00:00",
+  "status": "pass",
+  "unavailable": [],
+  "whole_process": true,
+  "workload_argv": [
+    "/tmp/litchi-goal-0464/normal",
+    "pptx-pair-lifecycle",
+    "--manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0464/pair.json",
+    "--provider",
+    "bytes",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--repeat",
+    "diagnostic",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/counters/report.json",
+    "--output-pptx",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0464/profiling-r1/counters/output.pptx",
+    "--source-revision",
+    "1c1e29473f9402190f5bc4bf68d96029ff106470"
+  ],
+  "workload_cwd": "/home/zhuhe/code/litchi"
+}

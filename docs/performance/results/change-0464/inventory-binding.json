@@ -1,0 +1,21 @@
+{
+  "schema": "litchi-0464-supplemental-inventory-v1",
+  "revision": "1c1e29473f9402190f5bc4bf68d96029ff106470",
+  "binary": {
+    "path": "/tmp/litchi-goal-0464/inventory-supplemental",
+    "sha256": "4dad1920ffdf333db1b133b9b0d2338c3ae381ad21dd6178e3e169a54c9866b3",
+    "bytes": 2701064,
+    "build_receipt": "checks/inventory-build.json",
+    "build_receipt_sha256": "24260a3c958171ef83889425cc940bb48b886c22bfa69b67a8d25c8b53eff4de",
+    "source": {
+      "path": "sources/28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf.json",
+      "sha256": "28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf",
+      "files": 7032
+    }
+  },
+  "measured_source": {
+    "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+    "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe",
+    "files": 7032
+  }
+}

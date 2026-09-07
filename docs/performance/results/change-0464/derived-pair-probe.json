@@ -1,0 +1,26 @@
+{
+  "scope": "Derived distinct archive admission probe; original QA source and its Litchi-created two-slide destination; not independent original documents or measured timing. Execution bound to retained probe build epoch; mutable worktree does not identify this binary.",
+  "binding_path": "docs/performance/results/change-0464/probe-binding.json",
+  "binding_sha256": "06a9807fa32a39aa8a3cd2a7af630e0b7e2d2e118571796c3d73a6dbe5b6bd04",
+  "inputs": {
+    "3rdparty/libreoffice-core/sd/qa/unit/data/smoketest.pptx": {
+      "bytes": 29956,
+      "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44"
+    },
+    "/tmp/litchi-goal-0464/native-pilot/publication.pptx": {
+      "bytes": 42948,
+      "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+    }
+  },
+  "argv": [
+    "/tmp/litchi-goal-0464/probe",
+    "3rdparty/libreoffice-core/sd/qa/unit/data/smoketest.pptx",
+    "0",
+    "/tmp/litchi-goal-0464/native-pilot/publication.pptx",
+    "0"
+  ],
+  "exit_code": 0,
+  "stdout": "PUBLISHED bytes=55891 slides=3 name=\"\"\n",
+  "stderr": "",
+  "inputs_unchanged": true
+}

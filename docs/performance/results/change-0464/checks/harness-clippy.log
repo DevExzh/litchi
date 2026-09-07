@@ -1,0 +1,16 @@
+    Checking litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error: variable does not need to be mutable
+   --> src/bin/pptx_semantic_inventory.rs:216:9
+    |
+216 |     let mut file = File::open(path)?;
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `-D unused-mut` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(unused_mut)]`
+
+error: could not compile `litchi-perf-baseline` (bin "pptx_semantic_inventory" test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

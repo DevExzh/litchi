@@ -1,0 +1,113 @@
+{
+  "schema": "litchi-0464-temporary-artifacts-v1",
+  "change": 464,
+  "task": "/tmp/litchi-goal-0464",
+  "files": 12,
+  "bytes": 252885687,
+  "artifacts": [
+    {
+      "path": "allocator",
+      "bytes": 58197584,
+      "sha256": "7e2d17e73739c5296c8af959b7c1c2db5fba6f8b22fece053e31549d3fbf2ede"
+    },
+    {
+      "path": "allocator-initial",
+      "bytes": 58379848,
+      "sha256": "a20833d5178a4503dd996fecab419facdb9fccf8da33caf0a6e1fa2a4df062b0"
+    },
+    {
+      "path": "external-pilot",
+      "bytes": 7687400,
+      "sha256": "c52c31f7e6a1bf1e0b9e818a74fff43ee26565f6a391c239627eeae0444cea7e"
+    },
+    {
+      "path": "inventory",
+      "bytes": 2695128,
+      "sha256": "288d050a80fc0718d744be28d0eed8f3e112497e8ee41765727a9c0646da4864"
+    },
+    {
+      "path": "inventory-initial",
+      "bytes": 2694536,
+      "sha256": "bb3cf25474210e2e1479716c4e063fb0b9769c0d32aa3741e6cbaa0890b05290"
+    },
+    {
+      "path": "inventory-supplemental",
+      "bytes": 2701064,
+      "sha256": "4dad1920ffdf333db1b133b9b0d2338c3ae381ad21dd6178e3e169a54c9866b3"
+    },
+    {
+      "path": "native-pilot/publication.json",
+      "bytes": 7770,
+      "sha256": "ea13acd6ed19b1a7d562e3984da0099f8b22c39e4002ef5562a374f642222a5f"
+    },
+    {
+      "path": "native-pilot/publication.pptx",
+      "bytes": 42948,
+      "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+    },
+    {
+      "path": "native-pilot/resaved/publication.pptx",
+      "bytes": 38417,
+      "sha256": "aff31f4eaf89cc45b20766a928897184a0440c7b9cc63581b4ea66ead3c4821c"
+    },
+    {
+      "path": "normal",
+      "bytes": 58347576,
+      "sha256": "4478fbf1b12dd022ec9f1f04c88af51628b68c4cf3830adda08d65c3f0679b3f"
+    },
+    {
+      "path": "normal-initial",
+      "bytes": 58514832,
+      "sha256": "f36bafebbdf1e8702120f8fb246905acfa02449dc41269cf95be10e944ec6052"
+    },
+    {
+      "path": "probe",
+      "bytes": 3578584,
+      "sha256": "4e2602773bbda5dfd24c7f6b59851671f02d9dfbe484801db8a08c3035c00962"
+    }
+  ],
+  "receipts": {
+    "precleanup": {
+      "path": "precleanup.json",
+      "bytes": 3753,
+      "sha256": "bcb0a966d6f52bddabd0b6730075796ff1bf7ede2103ee964de53700e950c93b"
+    },
+    "portable": {
+      "path": "portable-verification.json",
+      "bytes": 4383,
+      "sha256": "bfd9554e5ab1c5bd9ff6d869b938a01873d42c598b129af24e8ba9a73ffef3ca"
+    }
+  },
+  "seal": {
+    "path": "SHA256SUMS",
+    "bytes": 25924,
+    "sha256": "e9a4ac6cf59d318b8f1119459ae68b37922ab400c55a7a0880dbc71e9da79057",
+    "members": 264
+  },
+  "audit_archives": [
+    {
+      "archive": {
+        "path": "native-pair-audit/graph-audit.py",
+        "bytes": 8582,
+        "sha256": "4b516c5cc35e8c042785775f3c28c4bd8ca3df125055052789bd9f9abe756c64"
+      },
+      "temporary_path": "/tmp/litchi-0464-graph-audit.py",
+      "temporary": {
+        "bytes": 8582,
+        "sha256": "4b516c5cc35e8c042785775f3c28c4bd8ca3df125055052789bd9f9abe756c64"
+      }
+    },
+    {
+      "archive": {
+        "path": "native-pair-audit/graph-audit.json",
+        "bytes": 252568,
+        "sha256": "4c02493c3d96b54af1d2fc7a75842b6e6bffd55d7254d7d82b6fbc3c4139c6df"
+      },
+      "temporary_path": "/tmp/litchi-0464-graph-audit.json",
+      "temporary": {
+        "bytes": 252568,
+        "sha256": "4c02493c3d96b54af1d2fc7a75842b6e6bffd55d7254d7d82b6fbc3c4139c6df"
+      }
+    }
+  ]
+}

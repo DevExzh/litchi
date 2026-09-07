@@ -1,0 +1,37 @@
+{
+  "schema": "pptx_pair_manifest_v1",
+  "pair_id": "lo-smoketest-to-litchi-derived-two-slide",
+  "provenance": {
+    "kind": "same-source-derived",
+    "independent_producer_claim": false,
+    "source": "Unmodified LibreOffice QA smoketest.pptx; original producer/save chain unknown",
+    "destination": "Litchi publication of self-copy from that source; checks/native-pilot-publication.json",
+    "source_git_blob": "e0cfe49009c9d735b5dd6ea774dda2e7a6710ae8",
+    "upstream_introduced_commit": "83ea2162b80b4d03e4cca90d354b5d56ea3f5898",
+    "prior_provenance": "docs/performance/results/change-0454/fixture-provenance.md"
+  },
+  "source": {
+    "path": "inputs/source.pptx",
+    "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44",
+    "bytes": 29956
+  },
+  "destination": {
+    "path": "inputs/destination.pptx",
+    "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84",
+    "bytes": 42948
+  },
+  "operation": {
+    "source_slide": 0,
+    "destination_slide": 0,
+    "insertion_position": 1
+  },
+  "limits": {
+    "input_bytes": 1048576,
+    "output_bytes": 1048576,
+    "memory_bytes": 536870912,
+    "max_write_bytes": 65536,
+    "max_range_bytes": 256,
+    "delay_us": 0
+  },
+  "source_revision": "1c1e29473f9402190f5bc4bf68d96029ff106470"
+}

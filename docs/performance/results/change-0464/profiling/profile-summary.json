@@ -1,0 +1,293 @@
+{
+  "bound": {
+    "binary": {
+      "bytes": 58347576,
+      "path": "/tmp/litchi-goal-0464/normal",
+      "sha256": "4478fbf1b12dd022ec9f1f04c88af51628b68c4cf3830adda08d65c3f0679b3f"
+    },
+    "binary_binding": {
+      "build_receipt": "checks/normal-build-r1.json",
+      "build_receipt_sha256": "2be3a53aff1d81269ec5deff55ae419cf8921fc788bfeae31a982c6dbb9b2307",
+      "bytes": 58347576,
+      "path": "/tmp/litchi-goal-0464/normal",
+      "sha256": "4478fbf1b12dd022ec9f1f04c88af51628b68c4cf3830adda08d65c3f0679b3f",
+      "source": {
+        "files": 7032,
+        "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+        "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+      }
+    },
+    "build_receipt": {
+      "bytes": 1393,
+      "path": "docs/performance/results/change-0464/checks/normal-build-r1.json",
+      "sha256": "2be3a53aff1d81269ec5deff55ae419cf8921fc788bfeae31a982c6dbb9b2307"
+    },
+    "formal_binding": {
+      "bytes": 1817,
+      "path": "docs/performance/results/change-0464/binding.json",
+      "sha256": "1e20467356450d763ef9d7260aa33c014a4767f200cfa85419bceb31ae37e192"
+    },
+    "inventory_binary": {
+      "bytes": 2701064,
+      "path": "/tmp/litchi-goal-0464/inventory-supplemental",
+      "sha256": "4dad1920ffdf333db1b133b9b0d2338c3ae381ad21dd6178e3e169a54c9866b3"
+    },
+    "inventory_binding": {
+      "bytes": 887,
+      "path": "docs/performance/results/change-0464/inventory-binding.json",
+      "sha256": "83a12e8d8ed1827755085c756bfbb6dfd994d7a71bb3412c6c6e6a6619f00a13"
+    },
+    "measured_binding": {
+      "bytes": 1082,
+      "path": "docs/performance/results/change-0464/normal-final-binding.json",
+      "sha256": "907ef03cbaea753fdafde18c70379f89c2f822d5506af71cd9e0f66f0fe4ad42"
+    },
+    "measured_source_binding": {
+      "files": 7032,
+      "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+      "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+    },
+    "measured_source_manifest": {
+      "bytes": 855992,
+      "path": "docs/performance/results/change-0464/sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+      "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+    },
+    "pair_id": "lo-smoketest-to-litchi-derived-two-slide",
+    "pair_manifest": {
+      "bytes": 1298,
+      "path": "docs/performance/results/change-0464/pair.json",
+      "sha256": "6d44140a188ecd636567b57f25248b509392f6f23a0a2551d0943ee4bdda6f1a"
+    },
+    "protocol": {
+      "bytes": 9945,
+      "path": "docs/performance/results/change-0464/protocol.json",
+      "sha256": "55921cbea4b5bef96ec9b5a42771a41b6ec11e4ca97428f76568067421842b89"
+    },
+    "source_compatibility": {
+      "bytes": 1197,
+      "path": "docs/performance/results/change-0464/source-compatibility.json",
+      "sha256": "e6796c53234b41106161ec862cc25c0a35c23f01bb59758472960748c86da14b"
+    },
+    "source_compatibility_attestation": {
+      "allowlisted_changed_files": [
+        "tools/perf-baseline/src/bin/pptx_semantic_inventory.rs"
+      ],
+      "artifact": {
+        "bytes": 18938,
+        "path": "source-code-supplemental/pptx_semantic_inventory.rs.txt",
+        "sha256": "747ba127d5c500079a9d4a627b5c379677fb39283b1e216912dc6d4efa1e532a",
+        "source_path": "tools/perf-baseline/src/bin/pptx_semantic_inventory.rs"
+      },
+      "current_source": {
+        "files": 7032,
+        "path": "sources/28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf.json",
+        "sha256": "28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf"
+      },
+      "custody_argv": [
+        "git",
+        "ls-files",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+        "-z"
+      ],
+      "measured_source": {
+        "files": 7032,
+        "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+        "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+      },
+      "unchanged_files": 7031
+    },
+    "source_revision": "1c1e29473f9402190f5bc4bf68d96029ff106470"
+  },
+  "bound_artifact_hashes": {
+    "current_source_manifest": "28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf",
+    "destination_input": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84",
+    "formal_binding": "1e20467356450d763ef9d7260aa33c014a4767f200cfa85419bceb31ae37e192",
+    "inventory_binary": "4dad1920ffdf333db1b133b9b0d2338c3ae381ad21dd6178e3e169a54c9866b3",
+    "inventory_binding": "83a12e8d8ed1827755085c756bfbb6dfd994d7a71bb3412c6c6e6a6619f00a13",
+    "inventory_build_receipt": "24260a3c958171ef83889425cc940bb48b886c22bfa69b67a8d25c8b53eff4de",
+    "measured_binding": "907ef03cbaea753fdafde18c70379f89c2f822d5506af71cd9e0f66f0fe4ad42",
+    "measured_source_manifest": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe",
+    "normal_binary": "4478fbf1b12dd022ec9f1f04c88af51628b68c4cf3830adda08d65c3f0679b3f",
+    "normal_build_receipt": "2be3a53aff1d81269ec5deff55ae419cf8921fc788bfeae31a982c6dbb9b2307",
+    "pair_manifest": "6d44140a188ecd636567b57f25248b509392f6f23a0a2551d0943ee4bdda6f1a",
+    "protocol": "55921cbea4b5bef96ec9b5a42771a41b6ec11e4ca97428f76568067421842b89",
+    "source_compatibility": "e6796c53234b41106161ec862cc25c0a35c23f01bb59758472960748c86da14b",
+    "source_input": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44"
+  },
+  "bound_artifacts": {
+    "current_source_manifest": {
+      "bytes": 855992,
+      "path": "docs/performance/results/change-0464/sources/28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf.json",
+      "sha256": "28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf"
+    },
+    "destination_input": {
+      "bytes": 42948,
+      "path": "docs/performance/results/change-0464/inputs/destination.pptx",
+      "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+    },
+    "formal_binding": {
+      "bytes": 1817,
+      "path": "docs/performance/results/change-0464/binding.json",
+      "sha256": "1e20467356450d763ef9d7260aa33c014a4767f200cfa85419bceb31ae37e192"
+    },
+    "inventory_binary": {
+      "bytes": 2701064,
+      "path": "/tmp/litchi-goal-0464/inventory-supplemental",
+      "sha256": "4dad1920ffdf333db1b133b9b0d2338c3ae381ad21dd6178e3e169a54c9866b3"
+    },
+    "inventory_binding": {
+      "bytes": 887,
+      "path": "docs/performance/results/change-0464/inventory-binding.json",
+      "sha256": "83a12e8d8ed1827755085c756bfbb6dfd994d7a71bb3412c6c6e6a6619f00a13"
+    },
+    "inventory_build_receipt": {
+      "bytes": 1352,
+      "path": "docs/performance/results/change-0464/checks/inventory-build.json",
+      "sha256": "24260a3c958171ef83889425cc940bb48b886c22bfa69b67a8d25c8b53eff4de"
+    },
+    "measured_binding": {
+      "bytes": 1082,
+      "path": "docs/performance/results/change-0464/normal-final-binding.json",
+      "sha256": "907ef03cbaea753fdafde18c70379f89c2f822d5506af71cd9e0f66f0fe4ad42"
+    },
+    "measured_source_manifest": {
+      "bytes": 855992,
+      "path": "docs/performance/results/change-0464/sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+      "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe"
+    },
+    "normal_binary": {
+      "bytes": 58347576,
+      "path": "/tmp/litchi-goal-0464/normal",
+      "sha256": "4478fbf1b12dd022ec9f1f04c88af51628b68c4cf3830adda08d65c3f0679b3f"
+    },
+    "normal_build_receipt": {
+      "bytes": 1393,
+      "path": "docs/performance/results/change-0464/checks/normal-build-r1.json",
+      "sha256": "2be3a53aff1d81269ec5deff55ae419cf8921fc788bfeae31a982c6dbb9b2307"
+    },
+    "pair_manifest": {
+      "bytes": 1298,
+      "path": "docs/performance/results/change-0464/pair.json",
+      "sha256": "6d44140a188ecd636567b57f25248b509392f6f23a0a2551d0943ee4bdda6f1a"
+    },
+    "protocol": {
+      "bytes": 9945,
+      "path": "docs/performance/results/change-0464/protocol.json",
+      "sha256": "55921cbea4b5bef96ec9b5a42771a41b6ec11e4ca97428f76568067421842b89"
+    },
+    "source_compatibility": {
+      "bytes": 1197,
+      "path": "docs/performance/results/change-0464/source-compatibility.json",
+      "sha256": "e6796c53234b41106161ec862cc25c0a35c23f01bb59758472960748c86da14b"
+    },
+    "source_input": {
+      "bytes": 29956,
+      "path": "docs/performance/results/change-0464/inputs/source.pptx",
+      "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44"
+    }
+  },
+  "change": 464,
+  "checked_iterations": 33,
+  "counter_scope": "whole-process",
+  "counter_totals": {},
+  "cpu": 2,
+  "environment": {
+    "fixed": {
+      "DEBUGINFOD_URLS": "",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "RUSTUP_TOOLCHAIN": "1.98.1"
+    },
+    "removed_ambient": {}
+  },
+  "environment_guard": {
+    "cpu": 2,
+    "cpu_available": true,
+    "effective_uid": 1001,
+    "logical_cpus": 32,
+    "process_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "root_available": false,
+    "root_required": true,
+    "serialized": true
+  },
+  "events": [
+    "cycles",
+    "instructions",
+    "branches",
+    "branch-misses",
+    "cache-references",
+    "cache-misses",
+    "page-faults"
+  ],
+  "finished_utc": "2026-09-07T19:06:23.737552+00:00",
+  "normalization": {
+    "denominator": 33,
+    "label": "normalized_to_checked_iterations",
+    "method": "whole-process counter total divided by 33 checked iterations; descriptive only",
+    "scope": "whole-process"
+  },
+  "operation_only_attribution": false,
+  "provider": "bytes",
+  "raw_artifact_hashes": {},
+  "raw_artifacts": [],
+  "raw_artifacts_scope": "raw report, PPTX, perf CSV/data, command logs, post-processing text, probe output, and run receipts; profile-summary.json excluded to avoid self-reference",
+  "repeat": "diagnostic",
+  "runner": {
+    "path": "docs/performance/results/change-0464/profile.py",
+    "sha256": "178b5d385b6423bbe8c9f81704b05f943b0e9f90c3bc17821b4f1ca8b07cc52c"
+  },
+  "runs": [],
+  "samples": 30,
+  "schema": "litchi-0464-profile-summary-v1",
+  "scope": "whole-process child lifetime including input loading, setup, three warmups, 30 retained samples (33 checked iterations), semantic/raw oracle checks, output writes, teardown, and report serialization; not operation-only attribution",
+  "serialized": true,
+  "started_utc": "2026-09-07T19:06:23.452803+00:00",
+  "status": "unavailable",
+  "tools": {
+    "perf": "/usr/bin/perf",
+    "taskset": "/usr/bin/taskset"
+  },
+  "top_symbols": [],
+  "top_symbols_scope": "whole-process sampled cycles:u; no operation-only attribution",
+  "unavailable": [
+    {
+      "kind": "execution",
+      "reason": "helper is root-only"
+    }
+  ],
+  "warmup": 3
+}

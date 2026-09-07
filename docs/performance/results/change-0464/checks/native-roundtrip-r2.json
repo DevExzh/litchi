@@ -1,0 +1,44 @@
+{
+  "change": 464,
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0464/native-roundtrip.py",
+    "--input",
+    "docs/performance/results/change-0464/captures/R1/normal-bytes/output.pptx",
+    "--inventory",
+    "/tmp/litchi-goal-0464/inventory-supplemental",
+    "--bundle",
+    "docs/performance/results/change-0464/native-roundtrip-r2"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "1c1e29473f9402190f5bc4bf68d96029ff106470",
+  "driver_sha256": "467787e0a8d2c2f6186ebbba736a1f679f7ac9c5a8476f73421a5996014dd123",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-07T19:04:33.872333+00:00",
+  "source_before": {
+    "path": "sources/28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf.json",
+    "sha256": "28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf",
+    "files": 7032
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T19:04:34.698530+00:00",
+  "source_after": {
+    "path": "sources/28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf.json",
+    "sha256": "28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf",
+    "files": 7032
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/native-roundtrip-r2.log",
+    "bytes": 67,
+    "sha256": "2191fa2a622fd0d73b2489fd94632e2951ca75e7af2255fe25e04cb35ad296d1"
+  }
+}

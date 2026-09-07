@@ -1,0 +1,866 @@
+#!/usr/bin/env python3
+"""Run one bounded LibreOffice PPTX round trip and record readback evidence.
+
+The input is a formal capture package, preferably the three-slide
+``R1-normal-bytes.pptx`` capture.  LibreOffice is run headlessly with a fresh
+temporary profile.  The resulting package is copied into the sibling
+``native-roundtrip`` bundle using a create-new destination, then the pinned
+Litchi semantic-inventory binary reopens both packages independently.
+
+This helper records a LibreOffice-only application observation.  It does not
+claim Microsoft Office acceptance, rendering equivalence, or preservation of
+archive bytes, slide names, or image encoding.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parent
+REPO = next((parent for parent in ROOT.parents if (parent / ".git").exists()), ROOT)
+DEFAULT_INVENTORY = Path("/tmp/litchi-goal-0464/inventory")
+LIBREOFFICE = Path("/usr/bin/libreoffice")
+SOFFICE_BIN = Path("/usr/lib/libreoffice/program/soffice.bin")
+SCHEMA = "litchi-0464-native-roundtrip-v1"
+INVENTORY_SCHEMA = "litchi.pptx.semantic-inventory.v1"
+MAX_INPUT_BYTES = 128 * 1024 * 1024
+MAX_INVENTORY_BYTES = 32 * 1024 * 1024
+SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
+
+LIMITATIONS = [
+    "LibreOffice headless conversion only; no Microsoft Office acceptance claim.",
+    "No rendering, pixel, or visual-layout comparison is performed.",
+    "Archive bytes, slide names, and image encoding invariance are not required.",
+    "Unavailable or partial source-backed image inventories remain unknown comparisons.",
+]
+
+
+class RoundtripError(RuntimeError):
+    """The native round-trip evidence could not be captured or validated."""
+
+
+def now() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def sha_bytes(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def sha_path(path: Path) -> str:
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def display_path(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return str(resolved.relative_to(ROOT.resolve()))
+    except ValueError:
+        return str(resolved)
+
+
+def artifact(path: Path) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise RoundtripError(f"missing or symlinked artifact: {path}")
+    return {
+        "path": display_path(path),
+        "bytes": path.stat().st_size,
+        "sha256": sha_path(path),
+    }
+
+
+def write_bytes_create_new(path: Path, raw: bytes) -> None:
+    try:
+        with path.open("xb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except FileExistsError as error:
+        raise RoundtripError(f"refusing to replace existing artifact: {path}") from error
+
+
+def write_json_create_new(path: Path, value: Any) -> None:
+    write_bytes_create_new(
+        path, (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    )
+
+
+def copy_create_new(source: Path, destination: Path) -> None:
+    if not source.is_file() or source.is_symlink():
+        raise RoundtripError(f"LibreOffice did not produce a regular output: {source}")
+    try:
+        with source.open("rb") as source_stream, destination.open("xb") as destination_stream:
+            shutil.copyfileobj(source_stream, destination_stream, length=1024 * 1024)
+            destination_stream.flush()
+            os.fsync(destination_stream.fileno())
+    except FileExistsError as error:
+        raise RoundtripError(f"refusing to replace existing output: {destination}") from error
+
+
+def ensure_regular_file(path: Path, label: str, *, executable: bool = False) -> Path:
+    if not path.is_file() or path.is_symlink():
+        raise RoundtripError(f"{label} is missing or symlinked: {path}")
+    if executable and not os.access(path, os.X_OK):
+        raise RoundtripError(f"{label} is not executable: {path}")
+    return path.resolve()
+
+
+def executable_binding(path: Path, label: str) -> dict[str, Any]:
+    """Validate an executable path and record its requested and resolved target."""
+
+    if not path.exists():
+        raise RoundtripError(f"{label} is missing: {path}")
+    try:
+        resolved = path.resolve(strict=True)
+    except OSError as error:
+        raise RoundtripError(f"{label} cannot resolve {path}: {error}") from error
+    if not resolved.is_file() or resolved.is_symlink():
+        raise RoundtripError(f"{label} target is not a regular file: {resolved}")
+    if not os.access(resolved, os.X_OK):
+        raise RoundtripError(f"{label} target is not executable: {resolved}")
+    return {
+        "requested_path": str(path),
+        "resolved_path": str(resolved),
+        "resolved_target": artifact(resolved),
+    }
+
+
+def resolve_input(requested: Path | None) -> Path:
+    if requested is not None:
+        path = requested.resolve(strict=True)
+        return ensure_regular_file(path, "input package")
+
+    matches = sorted(
+        path.resolve()
+        for path in ROOT.rglob("R1-normal-bytes.pptx")
+        if path.is_file() and not path.is_symlink() and "native-roundtrip" not in path.parts
+    )
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise RoundtripError(
+            "could not locate formal R1-normal-bytes.pptx capture; pass --input explicitly"
+        )
+    raise RoundtripError(
+        "formal R1-normal-bytes.pptx capture is ambiguous; pass --input explicitly: "
+        + ", ".join(str(path) for path in matches)
+    )
+
+
+def prepare_bundle(bundle: Path, expected_names: list[str]) -> None:
+    if bundle.exists():
+        if not bundle.is_dir() or bundle.is_symlink():
+            raise RoundtripError(f"native-roundtrip bundle is not a directory: {bundle}")
+    else:
+        bundle.mkdir(parents=True)
+    for name in expected_names:
+        path = bundle / name
+        if path.exists() or path.is_symlink():
+            raise RoundtripError(f"native-roundtrip artifact already exists: {path}")
+
+
+def run_logged(
+    argv: list[str], stdout_path: Path, stderr_path: Path, *, cwd: Path = REPO
+) -> int:
+    try:
+        with stdout_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
+            completed = subprocess.run(
+                argv,
+                cwd=cwd,
+                stdout=stdout,
+                stderr=stderr,
+                check=False,
+            )
+    except FileExistsError as error:
+        raise RoundtripError(f"refusing to replace command log: {error.filename}") from error
+    return completed.returncode
+
+
+def command_record(
+    argv: list[str], stdout_path: Path, stderr_path: Path, exit_code: int
+) -> dict[str, Any]:
+    return {
+        "argv": argv,
+        "cwd": str(REPO),
+        "exit_code": exit_code,
+        "stdout": artifact(stdout_path),
+        "stderr": artifact(stderr_path),
+    }
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise RoundtripError(f"missing or symlinked inventory: {path}")
+    size = path.stat().st_size
+    if size > MAX_INVENTORY_BYTES:
+        raise RoundtripError(
+            f"inventory exceeds {MAX_INVENTORY_BYTES} bytes: {path} ({size})"
+        )
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise RoundtripError(f"cannot decode inventory {path}: {error}") from error
+    if not isinstance(value, dict):
+        raise RoundtripError(f"inventory root is not an object: {path}")
+    return value
+
+
+def mapping(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise RoundtripError(f"{label} is not an object")
+    return value
+
+
+def sequence(value: Any, label: str) -> list[Any]:
+    if not isinstance(value, list):
+        raise RoundtripError(f"{label} is not an array")
+    return value
+
+
+def integer(value: Any, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise RoundtripError(f"{label} is not a non-negative integer")
+    return value
+
+
+def text(value: Any, label: str) -> str:
+    if not isinstance(value, str):
+        raise RoundtripError(f"{label} is not a string")
+    return value
+
+
+def digest(value: Any, label: str) -> str:
+    value = text(value, label)
+    if SHA256_RE.fullmatch(value) is None:
+        raise RoundtripError(f"{label} is not a lowercase SHA-256 digest")
+    return value
+
+
+def slide_size(value: Any, label: str) -> tuple[int, int]:
+    value = mapping(value, label)
+    width = value.get("width_emu")
+    height = value.get("height_emu")
+    if isinstance(width, bool) or not isinstance(width, int):
+        raise RoundtripError(f"{label}.width_emu is not an integer")
+    if isinstance(height, bool) or not isinstance(height, int):
+        raise RoundtripError(f"{label}.height_emu is not an integer")
+    return width, height
+
+
+def payload_identity(value: Any, label: str) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    value = mapping(value, label)
+    return {
+        "size": integer(value.get("size"), f"{label}.size"),
+        "sha256": digest(value.get("sha256"), f"{label}.sha256"),
+    }
+
+
+def image_inventory_error(value: Any, label: str) -> dict[str, Any]:
+    value = mapping(value, label)
+    kind = text(value.get("kind"), f"{label}.kind")
+    message = text(value.get("message"), f"{label}.message")
+    operation = value.get("operation")
+    reason = value.get("reason")
+    if operation is not None:
+        operation = text(operation, f"{label}.operation")
+    if reason is not None:
+        reason = text(reason, f"{label}.reason")
+    if kind == "unsafe_edit" and (operation is None or reason is None):
+        raise RoundtripError(f"{label} unsafe_edit error lacks operation or reason")
+    return {
+        "kind": kind,
+        "operation": operation,
+        "reason": reason,
+        "message": message,
+    }
+
+
+def image_inventory_projection(value: Any, label: str) -> dict[str, Any]:
+    value = mapping(value, label)
+    availability = text(value.get("availability"), f"{label}.availability")
+    if availability not in ("complete", "partial", "unavailable"):
+        raise RoundtripError(f"{label} has unsupported availability {availability!r}")
+    raw_count = value.get("count")
+    count = None if raw_count is None else integer(raw_count, f"{label}.count")
+    raw_images = value.get("images")
+    images = None if raw_images is None else sequence(raw_images, f"{label}.images")
+    raw_error = value.get("error")
+    error = None if raw_error is None else image_inventory_error(raw_error, f"{label}.error")
+
+    if availability == "complete":
+        if count is None or images is None or error is not None:
+            raise RoundtripError(
+                f"{label} complete inventory must have count/images and no error"
+            )
+        if len(images) != count:
+            raise RoundtripError(
+                f"{label} complete image count {len(images)} differs from {count}"
+            )
+    elif availability == "partial":
+        if count is None or images is None or error is None:
+            raise RoundtripError(
+                f"{label} partial inventory must have count/images/error"
+            )
+        if len(images) > count:
+            raise RoundtripError(
+                f"{label} partial image list {len(images)} exceeds known count {count}"
+            )
+    elif count is not None or images is not None or error is None:
+        raise RoundtripError(
+            f"{label} unavailable inventory must have null count/images and an error"
+        )
+
+    image_payloads: list[dict[str, Any] | None] | None = None
+    image_target_kinds: list[str] | None = None
+    if images is not None:
+        image_payloads = []
+        image_target_kinds = []
+        for image_index, image_value in enumerate(images):
+            image = mapping(image_value, f"{label}.images[{image_index}]")
+            if integer(
+                image.get("position"), f"{label}.images[{image_index}].position"
+            ) != image_index:
+                raise RoundtripError(f"{label} image positions are not ordered")
+            target = mapping(
+                image.get("target"), f"{label}.images[{image_index}].target"
+            )
+            kind = text(
+                target.get("kind"), f"{label}.images[{image_index}].target.kind"
+            )
+            if kind not in ("internal", "external"):
+                raise RoundtripError(f"{label} image target kind is unsupported: {kind!r}")
+            payload = payload_identity(
+                image.get("payload"), f"{label}.images[{image_index}].payload"
+            )
+            if kind == "external" and payload is not None:
+                raise RoundtripError(
+                    f"{label} external image {image_index} unexpectedly has payload"
+                )
+            if kind == "internal" and payload is None:
+                raise RoundtripError(
+                    f"{label} internal image {image_index} has no payload"
+                )
+            image_target_kinds.append(kind)
+            image_payloads.append(payload)
+    return {
+        "availability": availability,
+        "count": count,
+        "images": images,
+        "image_target_kinds": image_target_kinds,
+        "payload_identities": image_payloads,
+        "error": error,
+    }
+
+
+def inventory_projection(report: dict[str, Any], label: str) -> dict[str, Any]:
+    if report.get("schema") != INVENTORY_SCHEMA:
+        raise RoundtripError(
+            f"{label} has unexpected inventory schema: {report.get('schema')!r}"
+        )
+    source = mapping(report.get("source"), f"{label}.source")
+    source_size = integer(source.get("size"), f"{label}.source.size")
+    source_sha256 = digest(source.get("sha256"), f"{label}.source.sha256")
+    source_backed = mapping(report.get("source_backed"), f"{label}.source_backed")
+    eager = mapping(report.get("eager"), f"{label}.eager")
+    source_count = integer(
+        source_backed.get("slide_count"), f"{label}.source_backed.slide_count"
+    )
+    eager_count = integer(eager.get("slide_count"), f"{label}.eager.slide_count")
+    source_size_emu = slide_size(
+        source_backed.get("slide_size"), f"{label}.source_backed.slide_size"
+    )
+    eager_size_emu = slide_size(eager.get("slide_size"), f"{label}.eager.slide_size")
+    slides = sequence(source_backed.get("slides"), f"{label}.source_backed.slides")
+    if len(slides) != source_count:
+        raise RoundtripError(
+            f"{label} source slide array length {len(slides)} differs from {source_count}"
+        )
+
+    slide_texts: list[str] = []
+    slide_names: list[str] = []
+    image_availability: list[str] = []
+    image_counts: list[int | None] = []
+    payloads: list[list[dict[str, Any] | None] | None] = []
+    image_kinds: list[list[str] | None] = []
+    image_errors: list[dict[str, Any] | None] = []
+    for index, value in enumerate(slides):
+        slide = mapping(value, f"{label}.source_backed.slides[{index}]")
+        if integer(slide.get("position"), f"{label}.slides[{index}].position") != index:
+            raise RoundtripError(f"{label} slide positions are not ordered")
+        slide_texts.append(text(slide.get("text"), f"{label}.slides[{index}].text"))
+        slide_names.append(text(slide.get("name"), f"{label}.slides[{index}].name"))
+        image_inventory = image_inventory_projection(
+            slide.get("image_inventory"),
+            f"{label}.source_backed.slides[{index}].image_inventory",
+        )
+        image_availability.append(image_inventory["availability"])
+        image_counts.append(image_inventory["count"])
+        image_kinds.append(image_inventory["image_target_kinds"])
+        payloads.append(image_inventory["payload_identities"])
+        image_errors.append(image_inventory["error"])
+
+    ordered_text = text(eager.get("ordered_text"), f"{label}.eager.ordered_text")
+    ordered_text_count = integer(
+        eager.get("ordered_text_count"), f"{label}.eager.ordered_text_count"
+    )
+    expected_ordered_text = "\n".join(value for value in slide_texts if value)
+    expected_ordered_text_count = sum(bool(value) for value in slide_texts)
+    return {
+        "source_size": source_size,
+        "source_sha256": source_sha256,
+        "source_backed_slide_count": source_count,
+        "eager_slide_count": eager_count,
+        "source_backed_slide_size": source_size_emu,
+        "eager_slide_size": eager_size_emu,
+        "slide_texts": slide_texts,
+        "slide_names": slide_names,
+        "image_availability": image_availability,
+        "image_counts": image_counts,
+        "image_target_kinds": image_kinds,
+        "payload_identities": payloads,
+        "image_errors": image_errors,
+        "image_inventory_complete": all(
+            availability == "complete" for availability in image_availability
+        ),
+        "ordered_text": ordered_text,
+        "ordered_text_count": ordered_text_count,
+        "source_eager_count_equal": source_count == eager_count,
+        "source_eager_size_equal": source_size_emu == eager_size_emu,
+        "ordered_text_matches_slides": ordered_text == expected_ordered_text,
+        "ordered_text_count_matches_slides": ordered_text_count
+        == expected_ordered_text_count,
+    }
+
+
+def image_comparison(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    unavailable: list[dict[str, Any]] = []
+    unknown: list[dict[str, Any]] = []
+    for side, projection in (("pre", before), ("post", after)):
+        for position, availability in enumerate(projection["image_availability"]):
+            if availability != "complete":
+                unavailable.append(
+                    {
+                        "side": side,
+                        "slide_position": position,
+                        "availability": availability,
+                        "known_count": projection["image_counts"][position],
+                        "error": projection["image_errors"][position],
+                    }
+                )
+    for position in range(
+        max(len(before["image_availability"]), len(after["image_availability"]))
+    ):
+        before_availability = (
+            before["image_availability"][position]
+            if position < len(before["image_availability"])
+            else None
+        )
+        after_availability = (
+            after["image_availability"][position]
+            if position < len(after["image_availability"])
+            else None
+        )
+        if before_availability != "complete" or after_availability != "complete":
+            unknown.append(
+                {
+                    "slide_position": position,
+                    "pre_availability": before_availability,
+                    "post_availability": after_availability,
+                }
+            )
+
+    comparable = before["image_inventory_complete"] and after["image_inventory_complete"]
+    return {
+        "status": (
+            "complete"
+            if comparable
+            else (
+                "partial_image_inventory"
+                if any(item["availability"] == "partial" for item in unavailable)
+                else "unavailable_image_inventory"
+            )
+        ),
+        "comparable": comparable,
+        "image_counts_equivalent_observed": (
+            before["image_counts"] == after["image_counts"] if comparable else None
+        ),
+        "payload_identity_equal_observed": (
+            before["payload_identities"] == after["payload_identities"]
+            if comparable
+            else None
+        ),
+        "unavailable_image_comparisons": unavailable,
+        "unknown_image_comparisons": unknown,
+    }
+
+
+def validate_semantics(
+    before: dict[str, Any],
+    after: dict[str, Any],
+    input_artifact: dict[str, Any],
+    output_artifact: dict[str, Any],
+) -> dict[str, Any]:
+    before_projection = inventory_projection(before, "pre-roundtrip inventory")
+    after_projection = inventory_projection(after, "post-roundtrip inventory")
+    image_observation = image_comparison(before_projection, after_projection)
+
+    identity_checks = {
+        "pre_inventory_matches_input": before_projection["source_size"]
+        == input_artifact["bytes"]
+        and before_projection["source_sha256"] == input_artifact["sha256"],
+        "post_inventory_matches_output": after_projection["source_size"]
+        == output_artifact["bytes"]
+        and after_projection["source_sha256"] == output_artifact["sha256"],
+    }
+    semantic_checks = {
+        "pre_source_eager_slide_count": before_projection["source_eager_count_equal"],
+        "post_source_eager_slide_count": after_projection["source_eager_count_equal"],
+        "pre_source_eager_slide_size": before_projection["source_eager_size_equal"],
+        "post_source_eager_slide_size": after_projection["source_eager_size_equal"],
+        "pre_ordered_text_matches_source_slides": before_projection[
+            "ordered_text_matches_slides"
+        ],
+        "post_ordered_text_matches_source_slides": after_projection[
+            "ordered_text_matches_slides"
+        ],
+        "pre_ordered_text_count_matches_source_slides": before_projection[
+            "ordered_text_count_matches_slides"
+        ],
+        "post_ordered_text_count_matches_source_slides": after_projection[
+            "ordered_text_count_matches_slides"
+        ],
+        "slide_count_equivalent": before_projection["source_backed_slide_count"]
+        == after_projection["source_backed_slide_count"]
+        == before_projection["eager_slide_count"]
+        == after_projection["eager_slide_count"],
+        "slide_size_equivalent": before_projection["source_backed_slide_size"]
+        == after_projection["source_backed_slide_size"]
+        == before_projection["eager_slide_size"]
+        == after_projection["eager_slide_size"],
+        "ordered_slide_text_equivalent": before_projection["slide_texts"]
+        == after_projection["slide_texts"],
+        "eager_ordered_text_equivalent": before_projection["ordered_text"]
+        == after_projection["ordered_text"],
+        "eager_ordered_text_count_equivalent": before_projection[
+            "ordered_text_count"
+        ]
+        == after_projection["ordered_text_count"],
+    }
+
+    names_equal = before_projection["slide_names"] == after_projection["slide_names"]
+    observations = {
+        "pre": {
+            "source_sha256": before_projection["source_sha256"],
+            "source_size": before_projection["source_size"],
+            "slide_count": before_projection["source_backed_slide_count"],
+            "slide_size": before_projection["source_backed_slide_size"],
+            "image_availability": before_projection["image_availability"],
+            "image_counts": before_projection["image_counts"],
+            "image_target_kinds": before_projection["image_target_kinds"],
+            "payload_identities": before_projection["payload_identities"],
+            "image_errors": before_projection["image_errors"],
+        },
+        "post": {
+            "source_sha256": after_projection["source_sha256"],
+            "source_size": after_projection["source_size"],
+            "slide_count": after_projection["source_backed_slide_count"],
+            "slide_size": after_projection["source_backed_slide_size"],
+            "image_availability": after_projection["image_availability"],
+            "image_counts": after_projection["image_counts"],
+            "image_target_kinds": after_projection["image_target_kinds"],
+            "payload_identities": after_projection["payload_identities"],
+            "image_errors": after_projection["image_errors"],
+        },
+        **image_observation,
+        "slide_name_equal_observed": names_equal,
+        "image_encoding_invariance_required": False,
+        "slide_name_invariance_required": False,
+        "image_equivalence_claimed": False,
+        "rendering_claimed": False,
+    }
+    checks = {**identity_checks, **semantic_checks}
+    return {
+        "passed": all(checks.values()),
+        "required_checks": checks,
+        "observations": observations,
+        "native_acceptance": {
+            "scope": "application_save_plus_slide_count_size_and_ordered_text",
+            "required_semantics": [
+                "source_backed_slide_count",
+                "eager_slide_count",
+                "source_backed_slide_size",
+                "eager_slide_size",
+                "ordered_slide_text",
+                "eager_ordered_text",
+                "eager_ordered_text_count",
+            ],
+            "image_equivalence_claimed": False,
+            "rendering_claimed": False,
+        },
+    }
+
+
+def create_new_entries(paths: list[tuple[str, Path]]) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for label, path in paths:
+        if path.is_file() and not path.is_symlink():
+            entries.append(
+                {
+                    "label": label,
+                    "path": display_path(path),
+                    "created_new": True,
+                    "bytes": path.stat().st_size,
+                    "sha256": sha_path(path),
+                }
+            )
+    return entries
+
+
+def run(arguments: argparse.Namespace) -> tuple[int, dict[str, Any]]:
+    input_path = resolve_input(arguments.input)
+    if input_path.stat().st_size > MAX_INPUT_BYTES:
+        raise RoundtripError(
+            f"input exceeds {MAX_INPUT_BYTES} bytes: {input_path} ({input_path.stat().st_size})"
+        )
+    bundle = arguments.bundle.resolve()
+    expected_names = [
+        "libreoffice-version.stdout",
+        "libreoffice-version.stderr",
+        "libreoffice.stdout",
+        "libreoffice.stderr",
+        "inventory-pre.stdout",
+        "inventory-pre.stderr",
+        "inventory-post.stdout",
+        "inventory-post.stderr",
+        "pre-inventory.json",
+        "post-inventory.json",
+        "resaved.pptx",
+        "create-new-receipts.json",
+        "receipt.json",
+    ]
+    prepare_bundle(bundle, expected_names)
+    inventory_path = ensure_regular_file(
+        arguments.inventory, "semantic inventory binary", executable=True
+    )
+    libreoffice_binding = executable_binding(LIBREOFFICE, "LibreOffice wrapper")
+    soffice_binding = executable_binding(SOFFICE_BIN, "soffice.bin")
+    libreoffice = Path(libreoffice_binding["requested_path"])
+    input_record = artifact(input_path)
+
+    pre_inventory = bundle / "pre-inventory.json"
+    post_inventory = bundle / "post-inventory.json"
+    output_path = bundle / "resaved.pptx"
+    create_receipts_path = bundle / "create-new-receipts.json"
+    record: dict[str, Any] = {
+        "change": 464,
+        "schema": SCHEMA,
+        "scope": "native_application_roundtrip",
+        "status": "running",
+        "started_utc": now(),
+        "input": input_record,
+        "bundle": display_path(bundle),
+        "inventory_binary": artifact(inventory_path),
+        "libreoffice": {
+            "wrapper": libreoffice_binding,
+            "soffice_bin": soffice_binding,
+        },
+        "limitations": LIMITATIONS,
+    }
+    command_artifacts: list[tuple[str, Path]] = []
+    validation: dict[str, Any] | None = None
+    error_text: str | None = None
+    receipt_error: str | None = None
+    try:
+        version_stdout = bundle / "libreoffice-version.stdout"
+        version_stderr = bundle / "libreoffice-version.stderr"
+        version_argv = [str(libreoffice), "--version"]
+        version_exit = run_logged(version_argv, version_stdout, version_stderr)
+        record["libreoffice"]["version"] = command_record(
+            version_argv, version_stdout, version_stderr, version_exit
+        )
+        command_artifacts.extend(
+            [
+                ("libreoffice_version_stdout", version_stdout),
+                ("libreoffice_version_stderr", version_stderr),
+            ]
+        )
+        if version_exit != 0:
+            raise RoundtripError(f"LibreOffice --version exited {version_exit}")
+
+        with (
+            tempfile.TemporaryDirectory(prefix="litchi-0464-native-profile-") as profile_name,
+            tempfile.TemporaryDirectory(prefix="litchi-0464-native-output-") as output_name,
+        ):
+            profile = Path(profile_name)
+            conversion_directory = Path(output_name)
+            app_argv = [
+                str(libreoffice),
+                "--headless",
+                "--nologo",
+                "--nodefault",
+                "--nolockcheck",
+                "--nofirststartwizard",
+                f"-env:UserInstallation={profile.as_uri()}",
+                "--convert-to",
+                "pptx:Impress MS PowerPoint 2007 XML",
+                "--outdir",
+                str(conversion_directory),
+                str(input_path),
+            ]
+            app_stdout = bundle / "libreoffice.stdout"
+            app_stderr = bundle / "libreoffice.stderr"
+            app_exit = run_logged(app_argv, app_stdout, app_stderr)
+            record["libreoffice"]["application"] = command_record(
+                app_argv, app_stdout, app_stderr, app_exit
+            )
+            command_artifacts.extend(
+                [("libreoffice_stdout", app_stdout), ("libreoffice_stderr", app_stderr)]
+            )
+            if app_exit != 0:
+                raise RoundtripError(f"LibreOffice conversion exited {app_exit}")
+            converted = conversion_directory / input_path.name
+            if not converted.is_file() or converted.is_symlink() or converted.stat().st_size == 0:
+                raise RoundtripError(
+                    f"LibreOffice reported success without producing {converted}"
+                )
+            copy_create_new(converted, output_path)
+            record["output"] = artifact(output_path)
+            command_artifacts.append(("resaved_output", output_path))
+            record["temporary"] = {
+                "profile": str(profile),
+                "conversion_directory": str(conversion_directory),
+                "cleaned_after_command": True,
+            }
+
+        pre_stdout = bundle / "inventory-pre.stdout"
+        pre_stderr = bundle / "inventory-pre.stderr"
+        pre_argv = [str(inventory_path), str(input_path), str(pre_inventory)]
+        pre_exit = run_logged(pre_argv, pre_stdout, pre_stderr)
+        record["pre_inventory_command"] = command_record(
+            pre_argv, pre_stdout, pre_stderr, pre_exit
+        )
+        command_artifacts.extend(
+            [("inventory_pre_stdout", pre_stdout), ("inventory_pre_stderr", pre_stderr)]
+        )
+        if pre_exit != 0:
+            raise RoundtripError(f"pre-roundtrip inventory exited {pre_exit}")
+        record["pre_inventory"] = artifact(pre_inventory)
+
+        post_stdout = bundle / "inventory-post.stdout"
+        post_stderr = bundle / "inventory-post.stderr"
+        post_argv = [str(inventory_path), str(output_path), str(post_inventory)]
+        post_exit = run_logged(post_argv, post_stdout, post_stderr)
+        record["post_inventory_command"] = command_record(
+            post_argv, post_stdout, post_stderr, post_exit
+        )
+        command_artifacts.extend(
+            [("inventory_post_stdout", post_stdout), ("inventory_post_stderr", post_stderr)]
+        )
+        if post_exit != 0:
+            raise RoundtripError(f"post-roundtrip inventory exited {post_exit}")
+        record["post_inventory"] = artifact(post_inventory)
+
+        before = load_json(pre_inventory)
+        after = load_json(post_inventory)
+        validation = validate_semantics(
+            before, after, input_record, record["output"]
+        )
+        record["semantic_validation"] = validation
+        if not validation["passed"]:
+            raise RoundtripError("required native semantic readback checks failed")
+        record["native_acceptance"] = {
+            **validation["native_acceptance"],
+            "application_exit_code": app_exit,
+        }
+        record["status"] = "pass"
+    except (OSError, RoundtripError, ValueError, json.JSONDecodeError) as error:
+        error_text = f"{type(error).__name__}: {error}"
+        record["status"] = "failed"
+        record["error"] = error_text
+    finally:
+        entries = create_new_entries(command_artifacts + [("pre_inventory", pre_inventory), ("post_inventory", post_inventory)])
+        try:
+            write_json_create_new(
+                create_receipts_path,
+                {
+                    "schema": "litchi-0464-create-new-receipts-v1",
+                    "entries": entries,
+                    "output": "All listed artifacts were opened with create-new semantics by this helper or the inventory binary.",
+                },
+            )
+            record["create_new_receipts"] = artifact(create_receipts_path)
+        except (OSError, RoundtripError) as error:
+            record["status"] = "failed"
+            error_text = error_text or f"{type(error).__name__}: {error}"
+            record["error"] = error_text
+        record["finished_utc"] = now()
+        if validation is not None:
+            record["semantic_validation"] = validation
+        try:
+            write_json_create_new(bundle / "receipt.json", record)
+        except (OSError, RoundtripError) as error:
+            # There is no safe replacement path for a receipt.  Surface the
+            # failure to the caller even though the primary receipt could not
+            # be created.
+            receipt_error = f"{type(error).__name__}: {error}"
+    if receipt_error is not None:
+        print(f"native roundtrip receipt failure: {receipt_error}", file=sys.stderr)
+        return 1, record
+    return (0 if record["status"] == "pass" else 1), record
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--input",
+        type=Path,
+        help="formal capture PPTX; defaults to the unique R1-normal-bytes.pptx under this bundle",
+    )
+    parser.add_argument(
+        "--inventory",
+        type=Path,
+        default=DEFAULT_INVENTORY,
+        help=f"native Litchi semantic inventory binary (default: {DEFAULT_INVENTORY})",
+    )
+    parser.add_argument(
+        "--bundle",
+        type=Path,
+        default=ROOT / "native-roundtrip",
+        help="fresh evidence bundle directory",
+    )
+    args = parser.parse_args(argv)
+    try:
+        status, record = run(args)
+    except (OSError, RoundtripError, ValueError) as error:
+        print(f"native roundtrip failed before receipt creation: {error}", file=sys.stderr)
+        return 1
+    print(
+        json.dumps(
+            {
+                "status": record.get("status", "failed"),
+                "bundle": record.get("bundle"),
+                "error": record.get("error"),
+            },
+            sort_keys=True,
+        )
+    )
+    return status
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

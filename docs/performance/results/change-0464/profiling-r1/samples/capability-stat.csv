@@ -1,0 +1,9 @@
+# started on Mon Sep  7 19:11:26 2026
+
+0,,cycles:u,35727006,99.00,,
+130538,,instructions:u,36025826,100.00,,
+26806,,branches:u,36025826,100.00,,
+2511,,branch-misses:u,36025826,100.00,,
+0,,cache-references:u,36025826,100.00,,
+377835,,cache-misses:u,298820,0.00,,
+54,,page-faults:u,36025826,100.00,,

@@ -1,0 +1,80 @@
+{
+  "added_members": [
+    "ppt/media/image1-copy2.png",
+    "ppt/slides/_rels/slide3.xml.rels",
+    "ppt/slides/slide3.xml"
+  ],
+  "copied_part_map": {
+    "ppt/media/image1.png": "ppt/media/image1-copy2.png",
+    "ppt/slides/slide1.xml": "ppt/slides/slide3.xml"
+  },
+  "copied_slide": "ppt/slides/slide3.xml",
+  "destination_slide_order": [
+    "ppt/slides/slide1.xml",
+    "ppt/slides/slide2.xml"
+  ],
+  "identities": {
+    "destination": {
+      "bytes": 42948,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/inputs/destination.pptx",
+      "resolved_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/inputs/destination.pptx",
+      "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84"
+    },
+    "output": {
+      "bytes": 55891,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/captures/R1/normal-bytes/output.pptx",
+      "resolved_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/captures/R1/normal-bytes/output.pptx",
+      "sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb"
+    },
+    "source": {
+      "bytes": 29956,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/inputs/source.pptx",
+      "resolved_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0464/inputs/source.pptx",
+      "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44"
+    }
+  },
+  "independent_producer_claim": false,
+  "input_identity_fact": "distinct_bytes",
+  "insertion_index": 1,
+  "limits": {
+    "dependency_surface": "current bounded planner relationship families; unsupported internal families fail closed",
+    "independent_producer": false,
+    "native_application_acceptance": false
+  },
+  "metadata": {
+    "content_types_insertion_bytes": 204,
+    "exact_prefix_suffix_checked": true,
+    "new_content_type_overrides": [
+      "ppt/media/image1-copy2.png",
+      "ppt/slides/slide3.xml"
+    ],
+    "presentation_insertion_bytes": 178,
+    "presentation_relationship_insertion_bytes": 133
+  },
+  "output_slide_order": [
+    "ppt/slides/slide1.xml",
+    "ppt/slides/slide3.xml",
+    "ppt/slides/slide2.xml"
+  ],
+  "payload_identity_checked": true,
+  "relationship_target_legality_checked": true,
+  "removed_members": [],
+  "reused_destination_layout": "ppt/slideLayouts/slideLayout2.xml",
+  "schema": "litchi-0464-pptx-pair-oracle-v1",
+  "source_closure": {
+    "external_relationships": 0,
+    "owned_parts": [
+      "ppt/media/image1.png",
+      "ppt/slides/slide1.xml"
+    ],
+    "reused_source_layout": "ppt/slideLayouts/slideLayout2.xml",
+    "sidecars": [
+      "ppt/slides/_rels/slide1.xml.rels"
+    ]
+  },
+  "source_index": 0,
+  "source_slide": "ppt/slides/slide1.xml",
+  "status": "pass",
+  "untouched_destination_raw_records_checked": 34
+}
+argv=["/usr/bin/python3", "-B", "/home/zhuhe/code/litchi/docs/performance/results/change-0464/pair-oracle.py", "--source", "/home/zhuhe/code/litchi/docs/performance/results/change-0464/inputs/source.pptx", "--destination", "/home/zhuhe/code/litchi/docs/performance/results/change-0464/inputs/destination.pptx", "--output", "/home/zhuhe/code/litchi/docs/performance/results/change-0464/captures/R1/normal-bytes/output.pptx", "--source-index", "0", "--insertion-index", "1", "--source-sha256", "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44", "--source-bytes", "29956", "--destination-sha256", "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84", "--destination-bytes", "42948", "--output-sha256", "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb", "--output-bytes", "55891"]

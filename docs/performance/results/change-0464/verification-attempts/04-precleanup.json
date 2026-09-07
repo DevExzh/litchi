@@ -1,0 +1,79 @@
+{
+  "schema": "litchi-0464-precleanup-v1",
+  "change": 464,
+  "status": "pass",
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0464/verify.py",
+    "--precleanup"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "verifier_path": "verify.py",
+  "verifier_sha256": "7507e6dd94337e6d10928519a070ca091a2529f8587a4448982387e1bec4df72",
+  "driver_sha256": "bd1e8b5484bf8d107585a4dd7b039ce5c6a9247e7d3afa52b8c88f2bee890405",
+  "seal": {
+    "path": "SHA256SUMS",
+    "bytes": 25294,
+    "sha256": "2d6b52c080c59f157e4e29f4c75637859ae0c34b12e2dcfa7bdc23e02fc7adb4",
+    "members": 258
+  },
+  "started_utc": "2026-09-07T19:29:42.426867+00:00",
+  "exit_code": 0,
+  "stdout": "{\"lanes\": 8, \"native_roundtrip\": {\"create_new_receipts\": {\"bytes\": 2807, \"path\": \"native-roundtrip-r2/create-new-receipts.json\", \"sha256\": \"2bc379ed5e695584d036ff5f63c746d0058d5b58f32e9aa1acf05cd9eca8e609\"}, \"input\": {\"bytes\": 55891, \"path\": \"captures/R1/normal-bytes/output.pptx\", \"sha256\": \"550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb\"}, \"output\": {\"bytes\": 39830, \"path\": \"native-roundtrip-r2/resaved.pptx\", \"sha256\": \"d2ca3109448f5a0797f00561beff4eafa84616f7dbf897ff2456667fbf555915\"}, \"post_inventory\": {\"bytes\": 1682, \"path\": \"native-roundtrip-r2/post-inventory.json\", \"sha256\": \"c553b3b917f9e50ce6aa0aafa49851ad3987e6b95d992f398620aa37061604f9\"}, \"pre_inventory\": {\"bytes\": 1952, \"path\": \"native-roundtrip-r2/pre-inventory.json\", \"sha256\": \"adbbb2a4238f570bf4e04969a192057d09cea5dd925fcba20fbabf36193e9ed2\"}, \"status\": \"pass\"}, \"portable\": false, \"precleanup\": true, \"profiling\": {\"final\": {\"final\": true, \"path\": \"profiling-r1\", \"runs\": 2, \"status\": \"pass\"}, \"historical\": {\"final\": false, \"path\": \"profiling\", \"runs\": 0, \"status\": \"unavailable\"}, \"optional\": true, \"status\": \"pass\"}, \"schema\": \"litchi-0464-verification-v1\", \"sealed_files\": 258, \"status\": \"pass\", \"summary\": \"litchi-0464-summary-v1\"}\n",
+  "stderr": "",
+  "verifier_output": {
+    "lanes": 8,
+    "native_roundtrip": {
+      "create_new_receipts": {
+        "bytes": 2807,
+        "path": "native-roundtrip-r2/create-new-receipts.json",
+        "sha256": "2bc379ed5e695584d036ff5f63c746d0058d5b58f32e9aa1acf05cd9eca8e609"
+      },
+      "input": {
+        "bytes": 55891,
+        "path": "captures/R1/normal-bytes/output.pptx",
+        "sha256": "550e8d8e8082f43f705f0c0a8bac0f2dc4fde09fb4c0d1989747abb3ca6ffbfb"
+      },
+      "output": {
+        "bytes": 39830,
+        "path": "native-roundtrip-r2/resaved.pptx",
+        "sha256": "d2ca3109448f5a0797f00561beff4eafa84616f7dbf897ff2456667fbf555915"
+      },
+      "post_inventory": {
+        "bytes": 1682,
+        "path": "native-roundtrip-r2/post-inventory.json",
+        "sha256": "c553b3b917f9e50ce6aa0aafa49851ad3987e6b95d992f398620aa37061604f9"
+      },
+      "pre_inventory": {
+        "bytes": 1952,
+        "path": "native-roundtrip-r2/pre-inventory.json",
+        "sha256": "adbbb2a4238f570bf4e04969a192057d09cea5dd925fcba20fbabf36193e9ed2"
+      },
+      "status": "pass"
+    },
+    "portable": false,
+    "precleanup": true,
+    "profiling": {
+      "final": {
+        "final": true,
+        "path": "profiling-r1",
+        "runs": 2,
+        "status": "pass"
+      },
+      "historical": {
+        "final": false,
+        "path": "profiling",
+        "runs": 0,
+        "status": "unavailable"
+      },
+      "optional": true,
+      "status": "pass"
+    },
+    "schema": "litchi-0464-verification-v1",
+    "sealed_files": 258,
+    "status": "pass",
+    "summary": "litchi-0464-summary-v1"
+  },
+  "finished_utc": "2026-09-07T19:29:53.975671+00:00"
+}

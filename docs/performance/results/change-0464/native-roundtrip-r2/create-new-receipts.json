@@ -1,0 +1,83 @@
+{
+  "entries": [
+    {
+      "bytes": 35,
+      "created_new": true,
+      "label": "libreoffice_version_stdout",
+      "path": "native-roundtrip-r2/libreoffice-version.stdout",
+      "sha256": "589a65ed942c0a356442e86b3886c0125528d1ee54fd56c4d0a022c96863ec13"
+    },
+    {
+      "bytes": 0,
+      "created_new": true,
+      "label": "libreoffice_version_stderr",
+      "path": "native-roundtrip-r2/libreoffice-version.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 229,
+      "created_new": true,
+      "label": "libreoffice_stdout",
+      "path": "native-roundtrip-r2/libreoffice.stdout",
+      "sha256": "3a203ea5a736ef8613ca525db33e321962f3cd2582b61525c91e91752bd4577e"
+    },
+    {
+      "bytes": 0,
+      "created_new": true,
+      "label": "libreoffice_stderr",
+      "path": "native-roundtrip-r2/libreoffice.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 39830,
+      "created_new": true,
+      "label": "resaved_output",
+      "path": "native-roundtrip-r2/resaved.pptx",
+      "sha256": "d2ca3109448f5a0797f00561beff4eafa84616f7dbf897ff2456667fbf555915"
+    },
+    {
+      "bytes": 0,
+      "created_new": true,
+      "label": "inventory_pre_stdout",
+      "path": "native-roundtrip-r2/inventory-pre.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "created_new": true,
+      "label": "inventory_pre_stderr",
+      "path": "native-roundtrip-r2/inventory-pre.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "created_new": true,
+      "label": "inventory_post_stdout",
+      "path": "native-roundtrip-r2/inventory-post.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "created_new": true,
+      "label": "inventory_post_stderr",
+      "path": "native-roundtrip-r2/inventory-post.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1952,
+      "created_new": true,
+      "label": "pre_inventory",
+      "path": "native-roundtrip-r2/pre-inventory.json",
+      "sha256": "adbbb2a4238f570bf4e04969a192057d09cea5dd925fcba20fbabf36193e9ed2"
+    },
+    {
+      "bytes": 1682,
+      "created_new": true,
+      "label": "post_inventory",
+      "path": "native-roundtrip-r2/post-inventory.json",
+      "sha256": "c553b3b917f9e50ce6aa0aafa49851ad3987e6b95d992f398620aa37061604f9"
+    }
+  ],
+  "output": "All listed artifacts were opened with create-new semantics by this helper or the inventory binary.",
+  "schema": "litchi-0464-create-new-receipts-v1"
+}

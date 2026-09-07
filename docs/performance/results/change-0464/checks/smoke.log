@@ -1,0 +1,1 @@
+smoke failed: too-small-output-budget error did not contain one of ('sequential sink byte budget exceeded',); diagnostics were '\nError: Opc(Execution(ResourceLimit(ResourceLimit { resource: OutputBytes, observed: 224, limit: 1, scope: "pptx-pair-lifecycle-destination" })))\n'

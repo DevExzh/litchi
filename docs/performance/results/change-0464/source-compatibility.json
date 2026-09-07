@@ -1,0 +1,27 @@
+{
+  "schema": "litchi-0464-source-compatibility-v1",
+  "measured_source": {
+    "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+    "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe",
+    "files": 7032
+  },
+  "supplemental_source": {
+    "path": "sources/28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf.json",
+    "sha256": "28f1843728fe0a84e91c2bd5498127f3a872b46651c738ef9abb74b264320bdf",
+    "files": 7032
+  },
+  "allowed_differences": [
+    "tools/perf-baseline/src/bin/pptx_semantic_inventory.rs"
+  ],
+  "actual_differences": [
+    "tools/perf-baseline/src/bin/pptx_semantic_inventory.rs"
+  ],
+  "unchanged_files": 7031,
+  "artifact": {
+    "source_path": "tools/perf-baseline/src/bin/pptx_semantic_inventory.rs",
+    "path": "source-code-supplemental/pptx_semantic_inventory.rs.txt",
+    "bytes": 18938,
+    "sha256": "747ba127d5c500079a9d4a627b5c379677fb39283b1e216912dc6d4efa1e532a"
+  },
+  "scope": "Only the independent semantic diagnostic binary changed after measurement; every source file used by the measured pair harness is byte-identical. The measured binary/binding/captures remain immutable."
+}

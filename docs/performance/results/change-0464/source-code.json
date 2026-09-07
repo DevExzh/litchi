@@ -1,0 +1,40 @@
+{
+  "schema": "litchi-0464-source-code-v1",
+  "source": {
+    "path": "sources/a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe.json",
+    "sha256": "a35f4507a74e7678f29f91dd6857d07a87579ba872785a1eaf19e296540debbe",
+    "files": 7032
+  },
+  "files": [
+    {
+      "source_path": "tools/perf-baseline/src/lib.rs",
+      "artifact_path": "source-code/tools/perf-baseline/src/lib.rs.txt",
+      "bytes": 2826090,
+      "sha256": "320d3acb1204507e3ad723322bc1af66c08443a260ba3ae8a436b20cd36f91ab"
+    },
+    {
+      "source_path": "tools/perf-baseline/src/main.rs",
+      "artifact_path": "source-code/tools/perf-baseline/src/main.rs.txt",
+      "bytes": 1156,
+      "sha256": "5658a7afeb934fc7b85673f1ac53b6a0d19f6a186354144f308085e4d8e0c201"
+    },
+    {
+      "source_path": "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+      "artifact_path": "source-code/tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs.txt",
+      "bytes": 11762,
+      "sha256": "c10f0c79d672a7d544c4190357809437a3c3a996af02f0e5700b33ea7df2a16f"
+    },
+    {
+      "source_path": "tools/perf-baseline/src/bin/pptx_semantic_inventory.rs",
+      "artifact_path": "source-code/tools/perf-baseline/src/bin/pptx_semantic_inventory.rs.txt",
+      "bytes": 16174,
+      "sha256": "94edaab83256b0b83ef0bea8db08922b87cac6fd06f5b672466305e1e4d3af80"
+    },
+    {
+      "source_path": "tools/perf-baseline/src/pptx_pair_lifecycle.rs",
+      "artifact_path": "source-code/tools/perf-baseline/src/pptx_pair_lifecycle.rs.txt",
+      "bytes": 62105,
+      "sha256": "17e96bcd64c7971bf25a0cdc152ce193077eaa95511d7bbb37dccb404855d222"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "scope": "Preliminary independent ZIP/XML inspection after actual LibreOffice save; pending Litchi semantic readback; not performance evidence or an independent-document pair.",
+  "files": {
+    "original": {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/smoketest.pptx",
+      "bytes": 29956,
+      "sha256": "88a4755fa90815802c8f439c9e0488772e5e7d8db63cfd0326e4d3f35fdeaa44",
+      "presentation_slide_count": 1,
+      "slide_text_runs": {
+        "ppt/slides/slide1.xml": [
+          "Hello",
+          "Radekski :-)"
+        ]
+      }
+    },
+    "published": {
+      "path": "/tmp/litchi-goal-0464/native-pilot/publication.pptx",
+      "bytes": 42948,
+      "sha256": "c199b7241faeaa9e5cb1e52b2b33f52b100a6c6fdd7aee21d7553fd319586d84",
+      "presentation_slide_count": 2,
+      "slide_text_runs": {
+        "ppt/slides/slide1.xml": [
+          "Hello",
+          "Radekski :-)"
+        ],
+        "ppt/slides/slide2.xml": [
+          "Hello",
+          "Radekski :-)"
+        ]
+      }
+    },
+    "resaved": {
+      "path": "/tmp/litchi-goal-0464/native-pilot/resaved/publication.pptx",
+      "bytes": 38417,
+      "sha256": "aff31f4eaf89cc45b20766a928897184a0440c7b9cc63581b4ea66ead3c4821c",
+      "presentation_slide_count": 2,
+      "slide_text_runs": {
+        "ppt/slides/slide1.xml": [
+          "Hello",
+          "Radekski :-)"
+        ],
+        "ppt/slides/slide2.xml": [
+          "Hello",
+          "Radekski :-)"
+        ]
+      }
+    }
+  },
+  "runtime_version": "LibreOffice 26.2.5.2 620(Build:2)",
+  "runtime": {
+    "/usr/bin/libreoffice": "3d585422d7cdddf9bcc954e7064da24c7e44d43508a5abaeb11de9d918d24f13",
+    "/usr/lib/libreoffice/program/soffice.bin": "51ac4b1ad2e310024b9d55f49f615bc134bb7304a87808c40f5d5c847a45b05d"
+  },
+  "resave_driver": {
+    "path": "tools/native_odf_resave.py",
+    "sha256": "7067204fc947cd8d990e63286a7fed2483c1e835932a7af15cd82637dceba688"
+  }
+}

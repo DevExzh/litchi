@@ -1,0 +1,42 @@
+{
+  "change": 464,
+  "argv": [
+    "/tmp/litchi-goal-0464/external-pilot",
+    "3rdparty/libreoffice-core/sd/qa/unit/data/smoketest.pptx",
+    "/tmp/litchi-goal-0464/native-pilot/publication.json",
+    "1",
+    "0",
+    "1c1e29473",
+    "bytes"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "1c1e29473f9402190f5bc4bf68d96029ff106470",
+  "driver_sha256": "467787e0a8d2c2f6186ebbba736a1f679f7ac9c5a8476f73421a5996014dd123",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-07T18:10:26.296117+00:00",
+  "source_before": {
+    "path": "sources/d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c.json",
+    "sha256": "d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c",
+    "files": 7030
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T18:10:26.474672+00:00",
+  "source_after": {
+    "path": "sources/d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c.json",
+    "sha256": "d18406665f4fd9ad76cb0a2530bfe8e7459bf4ada874ea353b435a84ae4f921c",
+    "files": 7030
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/native-pilot-publication.log",
+    "bytes": 40,
+    "sha256": "2e55932ce7499243f196bb3437c8c36bd8cf3644d708b26cbe7c2aeb5bac6e4e"
+  }
+}

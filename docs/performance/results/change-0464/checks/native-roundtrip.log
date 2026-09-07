@@ -1,0 +1,3 @@
+/home/zhuhe/code/litchi/docs/performance/results/change-0464/native-roundtrip.py:632: SyntaxWarning: 'return' in a 'finally' block
+  return 1, record
+native roundtrip failed before receipt creation: LibreOffice wrapper is missing or symlinked: /usr/bin/libreoffice

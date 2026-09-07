@@ -1,0 +1,5 @@
+{"status": "running", "repeat": "R2", "lane": "allocator-range"}
+{"status": "running", "repeat": "R2", "lane": "allocator-bytes"}
+{"status": "running", "repeat": "R2", "lane": "normal-range"}
+{"status": "running", "repeat": "R2", "lane": "normal-bytes"}
+{"status": "pass", "repeat": "R2", "completed_lanes": ["allocator-range", "allocator-bytes", "normal-range", "normal-bytes"]}
