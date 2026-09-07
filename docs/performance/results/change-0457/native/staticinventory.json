@@ -1,0 +1,406 @@
+{
+  "schema": "litchi-0457-native-odp-static-inventory-v1",
+  "inventory_scope": "Read-only bounded inventory of local LibreOffice ODP fixtures. These facts do not claim that a native application opened or saved any fixture.",
+  "inventory_repository_revision": "48f11c7745f8f798a00e11a14f1f34dc1c9c7954",
+  "thirdparty_provenance": {
+    "checkout_root": "3rdparty/libreoffice-core",
+    "vendor": "LibreOffice core",
+    "configure_ac_version": "26.8.0.2",
+    "nested_vendor_git_commit": null,
+    "nested_vendor_git_commit_status": "No nested .git metadata is present; each fixture is pinned by repository revision, path, archive SHA-256, byte count, and embedded meta:generator where available.",
+    "local_odp_path_count": 330,
+    "poi_odp_path_count": 0,
+    "selection_command": "find 3rdparty/libreoffice-core -type f -name '*.odp'",
+    "poi_check_command": "find 3rdparty/poi -type f -name '*.odp'"
+  },
+  "limits_checked": {
+    "max_package_bytes": 134217728,
+    "max_xml_parts_or_slides": 65536,
+    "all_selected_archives_under_package_limit": true,
+    "all_selected_member_counts_under_limit": true,
+    "all_selected_presentations_nonempty": true
+  },
+  "canonical_six_member_set": [
+    "mimetype",
+    "META-INF/manifest.xml",
+    "content.xml",
+    "styles.xml",
+    "meta.xml",
+    "settings.xml"
+  ],
+  "namespace_shape_checked": {
+    "required_prefixes": {
+      "office": "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
+      "draw": "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0",
+      "presentation": "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0",
+      "style": "urn:oasis:names:tc:opendocument:xmlns:style:1.0",
+      "text": "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
+      "svg": "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+    },
+    "required_prefixes_are_canonical": true,
+    "alternate_prefixes_for_required_namespaces": false
+  },
+  "static_only_classification": "All records below are static package/XML observations. A current source-append scanner shape is a lead only; no native application, Rust semantic reopen, or successful append is asserted.",
+  "fixtures": [
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf169979.odp",
+      "archive_bytes": 12568,
+      "archive_sha256": "160908f993c6ba901233695b12d34c4b009142971b36dcd57c0549bf8ee5656b",
+      "provenance": {
+        "source": "ignored local LibreOffice QA fixture",
+        "embedded_meta_generator": "OpenXML/ODF Translator Command Line Tool 3.0 2.0.0",
+        "embedded_libreoffice_project_commit": null
+      },
+      "zip_facts": {
+        "member_count": 8,
+        "file_count": 8,
+        "directory_count": 0,
+        "member_names": ["mimetype", "META-INF/manifest.xml", "content.xml", "styles.xml", "settings.xml", "meta.xml", "Configurations2/accelerator/current.xml", "OleobjectM2230000"],
+        "first_member": "mimetype",
+        "first_member_stored": true,
+        "encrypted_member": false,
+        "manifest_encryption_data": false,
+        "signature_named_member": false,
+        "exact_canonical_six_members": false
+      },
+      "content_facts": {
+        "content_xml_bytes": 16526,
+        "utf8_bom": true,
+        "office_version": "1.1",
+        "direct_page_names": ["page1", "page2", "page3"],
+        "direct_page_count": 3,
+        "leading_direct_children": ["presentation:header-decl", "presentation:date-time-decl", "presentation:footer-decl", "presentation:header-decl", "presentation:date-time-decl", "presentation:footer-decl"],
+        "trailing_direct_children": ["presentation:settings"],
+        "direct_page_run_contiguous": true,
+        "direct_pages_are_prefix": false,
+        "formatted_xml": false,
+        "required_namespace_prefixes_canonical": true
+      },
+      "static_only_classification": "static_candidate_shape_but_current_source_append_scanner_refuses_leading_direct_children"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp",
+      "archive_bytes": 11416,
+      "archive_sha256": "06e7fb8bb06d3b2625c3c82bf1a9b2a6bc84ff2a25704596e5e31ee28a8c248b",
+      "provenance": {
+        "source": "ignored local LibreOffice QA fixture",
+        "embedded_meta_generator": "LibreOfficeDev/26.2.0.0.alpha0$Windows_X86_64 LibreOffice_project/52da2155aecf73d76d39b82991a2693fce63f44a",
+        "embedded_libreoffice_project_commit": "52da2155aecf73d76d39b82991a2693fce63f44a"
+      },
+      "zip_facts": {
+        "member_count": 8,
+        "file_count": 7,
+        "directory_count": 1,
+        "member_names": ["mimetype", "Configurations2/", "styles.xml", "Thumbnails/thumbnail.png", "content.xml", "meta.xml", "settings.xml", "META-INF/manifest.xml"],
+        "first_member": "mimetype",
+        "first_member_stored": true,
+        "encrypted_member": false,
+        "manifest_encryption_data": false,
+        "signature_named_member": false,
+        "exact_canonical_six_members": false
+      },
+      "content_facts": {
+        "content_xml_bytes": 9937,
+        "utf8_bom": false,
+        "office_version": "1.4",
+        "direct_page_names": ["page1"],
+        "direct_page_count": 1,
+        "leading_direct_children": [],
+        "trailing_direct_children": ["presentation:settings"],
+        "direct_page_run_contiguous": true,
+        "direct_pages_are_prefix": true,
+        "formatted_xml": false,
+        "required_namespace_prefixes_canonical": true
+      },
+      "static_only_classification": "static_candidate_shape_current_scanner_eligible; application_not_verified"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs-compat.odp",
+      "archive_bytes": 11466,
+      "archive_sha256": "c3807045610afa87e5e217284f236a0cbb7aaca2ca2eea6b0f0acc0c6a7746cf",
+      "provenance": {
+        "source": "ignored local LibreOffice QA fixture",
+        "embedded_meta_generator": "LibreOfficeDev/26.2.0.0.alpha0$Windows_X86_64 LibreOffice_project/52da2155aecf73d76d39b82991a2693fce63f44a",
+        "embedded_libreoffice_project_commit": "52da2155aecf73d76d39b82991a2693fce63f44a"
+      },
+      "zip_facts": {
+        "member_count": 8,
+        "file_count": 7,
+        "directory_count": 1,
+        "member_names": ["mimetype", "Configurations2/", "styles.xml", "Thumbnails/thumbnail.png", "content.xml", "meta.xml", "settings.xml", "META-INF/manifest.xml"],
+        "first_member": "mimetype",
+        "first_member_stored": true,
+        "encrypted_member": false,
+        "manifest_encryption_data": false,
+        "signature_named_member": false,
+        "exact_canonical_six_members": false
+      },
+      "content_facts": {
+        "content_xml_bytes": 9937,
+        "utf8_bom": false,
+        "office_version": "1.4",
+        "direct_page_names": ["page1"],
+        "direct_page_count": 1,
+        "leading_direct_children": [],
+        "trailing_direct_children": ["presentation:settings"],
+        "direct_page_run_contiguous": true,
+        "direct_pages_are_prefix": true,
+        "formatted_xml": false,
+        "required_namespace_prefixes_canonical": true
+      },
+      "static_only_classification": "static_candidate_shape_current_scanner_eligible; application_not_verified"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/masterpage_style_parent.odp",
+      "archive_bytes": 17790,
+      "archive_sha256": "ef36a19185beb776c54d367758ebe8b7d815b5c7bd39ed869473e45255d50e60",
+      "provenance": {
+        "source": "ignored local LibreOffice QA fixture",
+        "embedded_meta_generator": "LibreOffice/4.2.6.2$Linux_X86_64 LibreOffice_project/420$Build-2",
+        "embedded_libreoffice_project_commit": null
+      },
+      "zip_facts": {
+        "member_count": 17,
+        "file_count": 9,
+        "directory_count": 8,
+        "member_names": ["mimetype", "Thumbnails/thumbnail.png", "meta.xml", "settings.xml", "content.xml", "Pictures/1000068800009698000054AB537EA062.svg", "styles.xml", "Configurations2/images/Bitmaps/", "Configurations2/toolpanel/", "Configurations2/progressbar/", "Configurations2/accelerator/current.xml", "Configurations2/floater/", "Configurations2/statusbar/", "Configurations2/toolbar/", "Configurations2/popupmenu/", "Configurations2/menubar/", "META-INF/manifest.xml"],
+        "first_member": "mimetype",
+        "first_member_stored": true,
+        "encrypted_member": false,
+        "manifest_encryption_data": false,
+        "signature_named_member": false,
+        "exact_canonical_six_members": false
+      },
+      "content_facts": {
+        "content_xml_bytes": 7689,
+        "utf8_bom": false,
+        "office_version": "1.2",
+        "direct_page_names": ["page1", "page2"],
+        "direct_page_count": 2,
+        "leading_direct_children": [],
+        "trailing_direct_children": ["presentation:settings"],
+        "direct_page_run_contiguous": true,
+        "direct_pages_are_prefix": true,
+        "formatted_xml": false,
+        "required_namespace_prefixes_canonical": true
+      },
+      "static_only_classification": "static_candidate_shape_current_scanner_eligible; application_not_verified"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf123658_SearchAfterSlideChange.odp",
+      "archive_bytes": 11749,
+      "archive_sha256": "f1a4ac949addd581d704adf38098b0a0a757aad1fcf4ff884463a67d1e6baca4",
+      "provenance": {
+        "source": "ignored local LibreOffice QA fixture",
+        "embedded_meta_generator": "LibreOffice/6.1.5.2$Windows_X86_64 LibreOffice_project/90f8dcf33c87b3705e78202e3df5142b201bd805",
+        "embedded_libreoffice_project_commit": "90f8dcf33c87b3705e78202e3df5142b201bd805"
+      },
+      "zip_facts": {
+        "member_count": 16,
+        "file_count": 7,
+        "directory_count": 9,
+        "member_names": ["mimetype", "Configurations2/popupmenu/", "Configurations2/progressbar/", "Configurations2/menubar/", "Configurations2/statusbar/", "Configurations2/toolbar/", "Configurations2/accelerator/", "Configurations2/floater/", "Configurations2/images/Bitmaps/", "Configurations2/toolpanel/", "styles.xml", "Thumbnails/thumbnail.png", "content.xml", "settings.xml", "meta.xml", "META-INF/manifest.xml"],
+        "first_member": "mimetype",
+        "first_member_stored": true,
+        "encrypted_member": false,
+        "manifest_encryption_data": false,
+        "signature_named_member": false,
+        "exact_canonical_six_members": false
+      },
+      "content_facts": {
+        "content_xml_bytes": 13757,
+        "utf8_bom": false,
+        "office_version": "1.2",
+        "direct_page_names": ["page1", "page2", "page3"],
+        "direct_page_count": 3,
+        "leading_direct_children": [],
+        "trailing_direct_children": ["presentation:settings"],
+        "direct_page_run_contiguous": true,
+        "direct_pages_are_prefix": true,
+        "formatted_xml": false,
+        "required_namespace_prefixes_canonical": true
+      },
+      "static_only_classification": "static_candidate_shape_current_scanner_eligible; application_not_verified"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/2slides.odp",
+      "archive_bytes": 10984,
+      "archive_sha256": "9c81dff29ada5e2c3a6631d6f24167d9a41a9eb7d3b76caeed4bfc4af5b3aee9",
+      "provenance": {
+        "source": "ignored local LibreOffice QA fixture",
+        "embedded_meta_generator": "LibreOffice/5.1.3.2$Linux_X86_64 LibreOffice_project/10m0$Build-2",
+        "embedded_libreoffice_project_commit": null
+      },
+      "zip_facts": {
+        "member_count": 16,
+        "file_count": 8,
+        "directory_count": 8,
+        "member_names": ["mimetype", "Thumbnails/thumbnail.png", "meta.xml", "settings.xml", "content.xml", "styles.xml", "Configurations2/floater/", "Configurations2/menubar/", "Configurations2/toolbar/", "Configurations2/progressbar/", "Configurations2/toolpanel/", "Configurations2/images/Bitmaps/", "Configurations2/popupmenu/", "Configurations2/accelerator/current.xml", "Configurations2/statusbar/", "META-INF/manifest.xml"],
+        "first_member": "mimetype",
+        "first_member_stored": true,
+        "encrypted_member": false,
+        "manifest_encryption_data": false,
+        "signature_named_member": false,
+        "exact_canonical_six_members": false
+      },
+      "content_facts": {
+        "content_xml_bytes": 10328,
+        "utf8_bom": false,
+        "office_version": "1.2",
+        "direct_page_names": ["page1", "page2"],
+        "direct_page_count": 2,
+        "leading_direct_children": [],
+        "trailing_direct_children": ["presentation:settings"],
+        "direct_page_run_contiguous": true,
+        "direct_pages_are_prefix": true,
+        "formatted_xml": false,
+        "required_namespace_prefixes_canonical": true
+      },
+      "static_only_classification": "static_candidate_shape_current_scanner_eligible; application_not_verified"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf102223.odp",
+      "archive_bytes": 17335,
+      "archive_sha256": "0dcb0606e5d7352faee806ebb02fa6414773574bf6082bcde07725be2a744ee2",
+      "provenance": {
+        "source": "ignored local LibreOffice QA fixture",
+        "embedded_meta_generator": "LibreOfficeDev/5.3.0.0.alpha0$Linux_X86_64 LibreOffice_project/32e45a6f2a6b35ad72796387633b6b88ad117232",
+        "embedded_libreoffice_project_commit": "32e45a6f2a6b35ad72796387633b6b88ad117232"
+      },
+      "zip_facts": {
+        "member_count": 17,
+        "file_count": 8,
+        "directory_count": 9,
+        "member_names": ["mimetype", "Thumbnails/thumbnail.png", "meta.xml", "settings.xml", "Configurations2/toolpanel/", "Configurations2/menubar/", "Configurations2/floater/", "Configurations2/accelerator/", "Configurations2/statusbar/", "Configurations2/popupmenu/", "Configurations2/images/Bitmaps/", "Configurations2/progressbar/", "Configurations2/toolbar/", "styles.xml", "content.xml", "Pictures/TablePreview1.svm", "META-INF/manifest.xml"],
+        "first_member": "mimetype",
+        "first_member_stored": true,
+        "encrypted_member": false,
+        "manifest_encryption_data": false,
+        "signature_named_member": false,
+        "exact_canonical_six_members": false
+      },
+      "content_facts": {
+        "content_xml_bytes": 14098,
+        "utf8_bom": false,
+        "office_version": "1.2",
+        "direct_page_names": ["page1"],
+        "direct_page_count": 1,
+        "leading_direct_children": [],
+        "trailing_direct_children": ["presentation:settings"],
+        "direct_page_run_contiguous": true,
+        "direct_pages_are_prefix": true,
+        "formatted_xml": false,
+        "required_namespace_prefixes_canonical": true
+      },
+      "static_only_classification": "static_candidate_shape_current_scanner_eligible; application_not_verified"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf105502.odp",
+      "archive_bytes": 11629,
+      "archive_sha256": "ae92fb371ff0c4778f7ac9739fb63d467306f5994c5a9f2a2a9c741134e33d40",
+      "provenance": {
+        "source": "ignored local LibreOffice QA fixture",
+        "embedded_meta_generator": "LibreOfficeDev/6.0.0.0.alpha1$Linux_X86_64 LibreOffice_project/5fcf36f5100c8d003f94fa3ec1d926d2fe8634c2",
+        "embedded_libreoffice_project_commit": "5fcf36f5100c8d003f94fa3ec1d926d2fe8634c2"
+      },
+      "zip_facts": {
+        "member_count": 17,
+        "file_count": 8,
+        "directory_count": 9,
+        "member_names": ["mimetype", "Thumbnails/thumbnail.png", "meta.xml", "settings.xml", "Pictures/TablePreview1.svm", "content.xml", "styles.xml", "Configurations2/floater/", "Configurations2/menubar/", "Configurations2/toolbar/", "Configurations2/progressbar/", "Configurations2/images/Bitmaps/", "Configurations2/popupmenu/", "Configurations2/accelerator/", "Configurations2/statusbar/", "Configurations2/toolpanel/", "META-INF/manifest.xml"],
+        "first_member": "mimetype",
+        "first_member_stored": true,
+        "encrypted_member": false,
+        "manifest_encryption_data": false,
+        "signature_named_member": false,
+        "exact_canonical_six_members": false
+      },
+      "content_facts": {
+        "content_xml_bytes": 12846,
+        "utf8_bom": false,
+        "office_version": "1.2",
+        "direct_page_names": ["page1"],
+        "direct_page_count": 1,
+        "leading_direct_children": [],
+        "trailing_direct_children": ["presentation:settings"],
+        "direct_page_run_contiguous": true,
+        "direct_pages_are_prefix": true,
+        "formatted_xml": false,
+        "required_namespace_prefixes_canonical": true
+      },
+      "static_only_classification": "static_candidate_shape_current_scanner_eligible; application_not_verified"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/slide_with_text.odp",
+      "archive_bytes": 19483,
+      "archive_sha256": "4042d79e4d59750c2590b01b817fb826ab593407496cb0c3fdcc889acb06e96f",
+      "provenance": {
+        "source": "ignored local LibreOffice QA fixture",
+        "embedded_meta_generator": "CollaboraOfficeDev/25.04.5.1$Linux_X86_64 LibreOffice_project/5ad06f7d7ae58c2e30da7cee7c3cdca6811ff3ac",
+        "embedded_libreoffice_project_commit": "5ad06f7d7ae58c2e30da7cee7c3cdca6811ff3ac"
+      },
+      "zip_facts": {
+        "member_count": 16,
+        "file_count": 7,
+        "directory_count": 9,
+        "member_names": ["mimetype", "Configurations2/accelerator/", "Configurations2/images/Bitmaps/", "Configurations2/toolpanel/", "Configurations2/floater/", "Configurations2/statusbar/", "Configurations2/toolbar/", "Configurations2/progressbar/", "Configurations2/popupmenu/", "Configurations2/menubar/", "styles.xml", "content.xml", "settings.xml", "meta.xml", "Thumbnails/thumbnail.png", "META-INF/manifest.xml"],
+        "first_member": "mimetype",
+        "first_member_stored": true,
+        "encrypted_member": false,
+        "manifest_encryption_data": false,
+        "signature_named_member": false,
+        "exact_canonical_six_members": false
+      },
+      "content_facts": {
+        "content_xml_bytes": 9664,
+        "utf8_bom": false,
+        "office_version": "1.4",
+        "direct_page_names": ["page1"],
+        "direct_page_count": 1,
+        "leading_direct_children": [],
+        "trailing_direct_children": ["presentation:settings"],
+        "direct_page_run_contiguous": true,
+        "direct_pages_are_prefix": true,
+        "formatted_xml": false,
+        "required_namespace_prefixes_canonical": true
+      },
+      "static_only_classification": "static_candidate_shape_current_scanner_eligible; application_not_verified"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/libreofficekit/qa/data/impress_slidenames.odp",
+      "archive_bytes": 15799,
+      "archive_sha256": "a60f9138d9653709fa303b7cf7bf4c79c1fd378800cf37615a5a2a7e97f1a403",
+      "provenance": {
+        "source": "ignored local LibreOffice QA fixture",
+        "embedded_meta_generator": "LibreOfficeDev/4.4.0.0.alpha0$Linux_X86_64 LibreOffice_project/f998ed0b26e6e0b2097160e0eff45edbd7b6ac9f",
+        "embedded_libreoffice_project_commit": "f998ed0b26e6e0b2097160e0eff45edbd7b6ac9f"
+      },
+      "zip_facts": {
+        "member_count": 16,
+        "file_count": 8,
+        "directory_count": 8,
+        "member_names": ["mimetype", "Thumbnails/thumbnail.png", "meta.xml", "settings.xml", "content.xml", "styles.xml", "Configurations2/popupmenu/", "Configurations2/statusbar/", "Configurations2/menubar/", "Configurations2/toolbar/", "Configurations2/floater/", "Configurations2/accelerator/current.xml", "Configurations2/toolpanel/", "Configurations2/progressbar/", "Configurations2/images/Bitmaps/", "META-INF/manifest.xml"],
+        "first_member": "mimetype",
+        "first_member_stored": true,
+        "encrypted_member": false,
+        "manifest_encryption_data": false,
+        "signature_named_member": false,
+        "exact_canonical_six_members": false
+      },
+      "content_facts": {
+        "content_xml_bytes": 8019,
+        "utf8_bom": false,
+        "office_version": "1.2",
+        "direct_page_names": ["TestText1", "TestText2", "page3"],
+        "direct_page_count": 3,
+        "leading_direct_children": [],
+        "trailing_direct_children": ["presentation:settings"],
+        "direct_page_run_contiguous": true,
+        "direct_pages_are_prefix": true,
+        "formatted_xml": false,
+        "required_namespace_prefixes_canonical": true
+      },
+      "static_only_classification": "static_candidate_shape_current_scanner_eligible; application_not_verified"
+    }
+  ]
+}

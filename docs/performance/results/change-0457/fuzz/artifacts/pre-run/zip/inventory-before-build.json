@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "change": 457,
+  "stage_root": "/tmp/litchi-goal-0457",
+  "target_dir": "/home/zhuhe/code/litchi/target/fuzz-asan",
+  "parent_check": {
+    "path": "check.py",
+    "bytes": 3960,
+    "sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6"
+  },
+  "files": [
+    {
+      "path": "SHA256SUMS",
+      "bytes": 1897,
+      "sha256": "88a22abc113c266c72f857010c0ff21c36f252009ad0298b279ef3ebcb0fb141"
+    },
+    {
+      "path": "seed-manifest.json",
+      "bytes": 2922,
+      "sha256": "35473bb361b41c72ca2999d2dcf7ba83be6f9a995d16a3de45c3fb3fff337930"
+    },
+    {
+      "path": "source-manifest.json",
+      "bytes": 1048,
+      "sha256": "efae37034f019b64fa6051fec05b891b28f5bfce3049103342eec2e678308993"
+    },
+    {
+      "path": "xml/corpus/bad-truncated.xml",
+      "bytes": 50,
+      "sha256": "7b6a9bcfb2916132618445aa8463aa05ee227833f56016d798838b7067677dd4"
+    },
+    {
+      "path": "xml/corpus/bom.xml",
+      "bytes": 49,
+      "sha256": "cb8a94ffd602bd7ba45d8b8b0b415d6052a3453a57455a5f8952fe5b7073cd76"
+    },
+    {
+      "path": "xml/corpus/depth-64.xml",
+      "bytes": 449,
+      "sha256": "bd7785c1654936f098593ee3650a45be2ca9c9a3c2491d271ff0838407b24377"
+    },
+    {
+      "path": "xml/corpus/good.xml",
+      "bytes": 115,
+      "sha256": "fd8af4be15b00baea1d311fc2ccf8d1572257fd55681c3cfd88dd4dd94a630a7"
+    },
+    {
+      "path": "xml/corpus/namespaces.xml",
+      "bytes": 141,
+      "sha256": "11723bd986789810c929d8f1e1f6e726450f744f82e4e9359e359b08b89a4efb"
+    },
+    {
+      "path": "xml/corpus/token-boundaries.xml",
+      "bytes": 144,
+      "sha256": "bc245d24619e88864fa5f9a9cef6ba0f4b2c9cf6080a6d22d23785c4b5178629"
+    },
+    {
+      "path": "xml/source/Cargo.toml",
+      "bytes": 447,
+      "sha256": "9bdd11a2594f9d046359b4df8ce6430e793b1616890aaafafb1d72937f625aae"
+    },
+    {
+      "path": "xml/source/scan_xml.rs",
+      "bytes": 995,
+      "sha256": "1faf58709a267ebb8972d81342cdb0421c26e684a0ba44da793b2fac7847aba1"
+    },
+    {
+      "path": "zip/Cargo.lock",
+      "bytes": 6303,
+      "sha256": "e4208efab27a549e64b87da7cfbca6635262b37616e261da15b6cedf11baf78b"
+    },
+    {
+      "path": "zip/corpus/native-small.odp",
+      "bytes": 10369,
+      "sha256": "1a53debb329bb86e2b65252b2c40ad5b2d8692d2b1ed0c3d737d7a16f381a44e"
+    },
+    {
+      "path": "zip/corpus/payload-0-0.zip",
+      "bytes": 264,
+      "sha256": "fe7fa6f770ba52c1a64d6fb81e5f13ce7dc89b65c5c4218e5c8d6152124d56df"
+    },
+    {
+      "path": "zip/corpus/payload-0-8.zip",
+      "bytes": 268,
+      "sha256": "02ffff071f3ecd7ea6ff01cbc4ca7ea19859cc34724849dc93e18fe4d5e79b44"
+    },
+    {
+      "path": "zip/corpus/payload-131089-0.zip",
+      "bytes": 131353,
+      "sha256": "be7ae4fee5d6f568078dea03ed53574800d2b7162e88017b163efcab3c366744"
+    },
+    {
+      "path": "zip/corpus/payload-131089-8.zip",
+      "bytes": 131395,
+      "sha256": "8d99a11d377a55aa0e943a0aa143c1f2e6bcd5ebc486b539c3a9f0db5b90a955"
+    },
+    {
+      "path": "zip/corpus/payload-17-0.zip",
+      "bytes": 281,
+      "sha256": "130874c9a51eafe45cc4b21392be1fdbcfd43999dcc4e4a2165c53f04caf48a6"
+    },
+    {
+      "path": "zip/corpus/payload-17-8.zip",
+      "bytes": 285,
+      "sha256": "969c7ef36a8c76ca7a60974e2e8197735fee425db9c34bacd8ae5739c5bab757"
+    },
+    {
+      "path": "zip/source/Cargo.toml",
+      "bytes": 485,
+      "sha256": "a6b3701d83415bd0b574f60391c15ed710271f2df7d913fdcec8ee3d5521d1e6"
+    },
+    {
+      "path": "zip/source/parse_zip.rs",
+      "bytes": 21864,
+      "sha256": "3c0a99513cfca93486493140caec770c19557792b5b26bd565ff110c834511ae"
+    }
+  ],
+  "lock_target": "zip"
+}

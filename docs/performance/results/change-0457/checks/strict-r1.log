@@ -1,0 +1,112 @@
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+error: the `Err`-variant returned from this function is very large
+   --> crates/litchi-odf-common/src/core/source_publication/insertion.rs:436:10
+    |
+111 | /     Transport {
+112 | |         /// Exact bytes accepted by the caller sink before failure.
+113 | |         progress: SourceContentPublicationProgress,
+114 | |         /// The public cancellation, limit, source, execution, or sink cause.
+...   |
+117 | |         replay: ReplayPublicationError<SourceContentInsertionCallbackError>,
+118 | |     },
+    | |_____- the largest variant contains at least 160 bytes
+...
+436 |       ) -> std::result::Result<SourceContentPublicationReport, SourceContentInsertionError>
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try reducing the size of `core::source_publication::insertion::SourceContentInsertionError`, for example by boxing large elements or replacing it with `Box<core::source_publication::insertion::SourceContentInsertionError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+    = note: `-D clippy::result-large-err` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::result_large_err)]`
+
+error: the `Err`-variant returned from this function is very large
+   --> crates/litchi-odf-common/src/core/source_publication/insertion.rs:462:10
+    |
+111 | /     Transport {
+112 | |         /// Exact bytes accepted by the caller sink before failure.
+113 | |         progress: SourceContentPublicationProgress,
+114 | |         /// The public cancellation, limit, source, execution, or sink cause.
+...   |
+117 | |         replay: ReplayPublicationError<SourceContentInsertionCallbackError>,
+118 | |     },
+    | |_____- the largest variant contains at least 160 bytes
+...
+462 |       ) -> std::result::Result<SourceContentPublicationReport, SourceContentInsertionError> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try reducing the size of `core::source_publication::insertion::SourceContentInsertionError`, for example by boxing large elements or replacing it with `Box<core::source_publication::insertion::SourceContentInsertionError>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/litchi-odf-common/src/core/stream_xml.rs:626:36
+    |
+626 |                 let bytes: &[u8] = &text;
+    |                                    ^^^^^ help: change this to: `text`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+    = note: `-D clippy::needless-borrow` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::needless_borrow)]`
+
+error: this call to `as_ref` does nothing
+    --> crates/litchi-odf-common/src/core/stream_xml.rs:1007:20
+     |
+1007 |             local: local.as_ref(),
+     |                    ^^^^^^^^^^^^^^ help: try: `local`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_asref
+     = note: `-D clippy::useless-asref` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::useless_asref)]`
+
+error: this can be `std::io::Error::other(_)`
+    --> crates/litchi-odf-common/src/core/stream_xml.rs:1447:5
+     |
+1447 |     io::Error::new(io::ErrorKind::Other, WindowError::Total { observed, limit })
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+     = note: `-D clippy::io-other-error` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::io_other_error)]`
+help: use `std::io::Error::other`
+     |
+1447 -     io::Error::new(io::ErrorKind::Other, WindowError::Total { observed, limit })
+1447 +     io::Error::other(WindowError::Total { observed, limit })
+     |
+
+error: this can be `std::io::Error::other(_)`
+    --> crates/litchi-odf-common/src/core/stream_xml.rs:1451:5
+     |
+1451 |     io::Error::new(io::ErrorKind::Other, WindowError::Token { observed, limit })
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#io_other_error
+help: use `std::io::Error::other`
+     |
+1451 -     io::Error::new(io::ErrorKind::Other, WindowError::Token { observed, limit })
+1451 +     io::Error::other(WindowError::Token { observed, limit })
+     |
+
+error: large size difference between variants
+   --> crates/litchi-odf-common/src/package/model.rs:230:1
+    |
+230 | / pub(super) enum ArchiveReaderKind<'data> {
+231 | |     Borrowed(ArchiveReader<'data>),
+    | |     ------------------------------ the largest variant contains at least 312 bytes
+232 | |     Prepared(PreparedArchive),
+    | |     ------------------------- the second-largest variant contains at least 8 bytes
+233 | | }
+    | |_^ the entire enum is at least 312 bytes
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#large_enum_variant
+    = note: `-D clippy::large-enum-variant` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::large_enum_variant)]`
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+    |
+231 -     Borrowed(ArchiveReader<'data>),
+231 +     Borrowed(Box<ArchiveReader<'data>>),
+    |
+
+error: could not compile `litchi-odf-common` (lib) due to 7 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-odf-common` (lib) due to 7 previous errors
+error: could not compile `litchi-odf-common` (lib test) due to 7 previous errors

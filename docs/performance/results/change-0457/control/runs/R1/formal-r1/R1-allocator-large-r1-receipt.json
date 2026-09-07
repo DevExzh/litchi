@@ -1,0 +1,108 @@
+{
+  "allocator_environment": {},
+  "allocator_environment_after": {},
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/control/runs/R1/formal-r1/R1-allocator-large-r1-resource.log",
+    "/tmp/litchi-goal-0457/control/litchi-perf-baseline-alloc",
+    "--case",
+    "odp_existing_append_lifecycle",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/control/runs/R1/formal-r1/R1-allocator-large-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/control/runs/R1/formal-r1/R1-allocator-large-r1-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4945,
+      "path": "runs/R1/formal-r1/R1-allocator-large-r1-catalog.json",
+      "sha256": "e7a121e024a51eb0fa9a420d9ea80c65d6ff14b124712510031bc9b4da68a3ad"
+    },
+    "oracle_log": {
+      "bytes": 323,
+      "path": "runs/R1/formal-r1/R1-allocator-large-r1-oracle.log",
+      "sha256": "e757a495cffe5bb9987bda5e3ee02d7c781c164c66723d02b8d59c05b05f9b09"
+    },
+    "report": {
+      "bytes": 54978,
+      "path": "runs/R1/formal-r1/R1-allocator-large-r1.json",
+      "sha256": "a32e8ea14e0dfc5ec1a03abe89d889bf7b004584a70264254546604a547baa65"
+    },
+    "resource_log": {
+      "bytes": 1134,
+      "path": "runs/R1/formal-r1/R1-allocator-large-r1-resource.log",
+      "sha256": "a1ebac0f7974cfbc797ca0c8d8d06176e4b6d9fbce6cbbe3e54d18d6d9a036ee"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/R1/formal-r1/R1-allocator-large-r1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal-r1",
+  "binary": {
+    "bytes": 57366216,
+    "copy_path": "/tmp/litchi-goal-0457/control/litchi-perf-baseline-alloc",
+    "sha256": "536d98aa3201561f54034b339bd0800179f141e20c93a3b545f855f352bcdf6e",
+    "source_path": "tools/perf-baseline/target/release/litchi-perf-baseline-alloc"
+  },
+  "change": 457,
+  "custody_driver": "/home/zhuhe/code/litchi/docs/performance/results/change-0457/check.py",
+  "custody_driver_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "1240fb87b02da86c9e34a1399efdcb5268c34654479898b0a6bb30665c492a6f",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T10:24:20.632985+00:00",
+  "lane": {
+    "mode": "allocator",
+    "phase": "R1",
+    "repeat": "R1",
+    "shape": "large"
+  },
+  "name": "R1-allocator-large-r1",
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/control/oracle/verify-report-r1.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/control/runs/R1/formal-r1/R1-allocator-large-r1.json",
+    "--mode",
+    "allocator",
+    "--shape",
+    "large"
+  ],
+  "oracle_exit_code": 0,
+  "oracle_stdout_sha256": "e757a495cffe5bb9987bda5e3ee02d7c781c164c66723d02b8d59c05b05f9b09",
+  "phase": "R1",
+  "protocol_sha256": "9ad033b9a9fd3787f9d6c9b2bbe1fa3cc7476072430551329708ba50d86f2c5e",
+  "revision": "48f11c7745f8f798a00e11a14f1f34dc1c9c7954",
+  "role": "control",
+  "schema": "litchi-0457-control-capture-receipt-v1",
+  "selector": "odp_existing_append_lifecycle",
+  "source_after": {
+    "files": 7007,
+    "path": "sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json",
+    "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89"
+  },
+  "source_before": {
+    "files": 7007,
+    "path": "sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json",
+    "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-07T10:24:13.993512+00:00",
+  "status": "pass"
+}

@@ -28,7 +28,7 @@
   },
   "selector_registry": {
     "source": "tools/perf-baseline/src/lib.rs",
-    "minimum_selectable_cases": 408
+    "minimum_selectable_cases": 439
   },
   "checked_catalog": {
     "path": "docs/performance/results/perf-corpus-manifest-v2.json",

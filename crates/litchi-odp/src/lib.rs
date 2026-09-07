@@ -26,6 +26,10 @@ pub use facade::{
 };
 pub use facade::{edit, embedded, image, layout, master, page, slide};
 pub use package::ReadLimits;
+pub use package::{
+    SourceBackedTailAppendEdit, SourceBackedTailAppendPublicationPlan, TailAppendError,
+    TailAppendLimits, TailAppendSourceProof,
+};
 
 // Keep implementation modules ergonomic internally without flattening their
 // semantic vocabulary into the public crate root.

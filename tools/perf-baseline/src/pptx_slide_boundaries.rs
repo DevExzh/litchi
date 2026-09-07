@@ -10,9 +10,9 @@ use super::{
     Case, CaseResult, CorpusManifest, CountingSink, PrefixFailSink, SourceSummary,
     deterministic_sink_summary, elapsed_ns, iteration_count, sha256_hex, statistics,
 };
+use litchi_opc::OpcPackage;
 use litchi_pptx::opened::{Limits, Patch};
 use litchi_pptx::{Error, Package, SlideRemovalPatch, SlideRemovalRefusal};
-use litchi_opc::OpcPackage;
 use serde::Serialize;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use std::error::Error as StdError;
@@ -95,10 +95,13 @@ impl Operation {
             Self::Move => "move",
         }
     }
-
 }
 
-fn reserve_exact<T>(values: &mut Vec<T>, amount: usize, label: &str) -> Result<(), Box<dyn StdError>> {
+fn reserve_exact<T>(
+    values: &mut Vec<T>,
+    amount: usize,
+    label: &str,
+) -> Result<(), Box<dyn StdError>> {
     values
         .try_reserve_exact(amount)
         .map_err(|error| format!("{label} allocation failed: {error}").into())
@@ -110,13 +113,7 @@ fn build_plain_archive(slide_count: usize, prefix: &str) -> Result<Vec<u8>, Box<
     for index in 0..slide_count {
         let slide = presentation.add_slide()?;
         slide.set_title(&format!("{prefix}-title-{index}"));
-        slide.add_text_box(
-            &format!("{prefix}-body-{index}"),
-            36,
-            36,
-            540,
-            72,
-        );
+        slide.add_text_box(&format!("{prefix}-body-{index}"), 36, 36, 540, 72);
     }
     Ok(package.to_bytes()?)
 }
@@ -125,8 +122,17 @@ fn package_slide_names(bytes: &[u8]) -> Result<Vec<String>, Box<dyn StdError>> {
     let package = Package::from_vec(bytes.to_vec())?;
     let snapshot = package.opened_presentation()?;
     let mut names = Vec::new();
-    reserve_exact(&mut names, snapshot.slides().len(), "PPTX boundary slide names")?;
-    names.extend(snapshot.slides().iter().map(|slide| slide.name().to_owned()));
+    reserve_exact(
+        &mut names,
+        snapshot.slides().len(),
+        "PPTX boundary slide names",
+    )?;
+    names.extend(
+        snapshot
+            .slides()
+            .iter()
+            .map(|slide| slide.name().to_owned()),
+    );
     Ok(names)
 }
 
@@ -138,11 +144,7 @@ fn remove_bytes(bytes: &[u8], position: usize) -> Result<Vec<u8>, Box<dyn StdErr
     Ok(package.to_bytes()?)
 }
 
-fn move_bytes(
-    bytes: &[u8],
-    from: usize,
-    to: usize,
-) -> Result<Vec<u8>, Box<dyn StdError>> {
+fn move_bytes(bytes: &[u8], from: usize, to: usize) -> Result<Vec<u8>, Box<dyn StdError>> {
     let mut package = Package::from_vec(bytes.to_vec())?;
     let snapshot = package.opened_presentation()?;
     let mut transaction = snapshot.edit();
@@ -154,7 +156,11 @@ fn move_bytes(
     Ok(package.to_bytes()?)
 }
 
-fn rewrite_member<F>(bytes: &[u8], member_name: &str, rewrite: F) -> Result<Vec<u8>, Box<dyn StdError>>
+fn rewrite_member<F>(
+    bytes: &[u8],
+    member_name: &str,
+    rewrite: F,
+) -> Result<Vec<u8>, Box<dyn StdError>>
 where
     F: FnOnce(&[u8]) -> Result<Vec<u8>, Box<dyn StdError>>,
 {
@@ -201,7 +207,11 @@ fn add_signature_marker(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
     rewrite_member(bytes, "_rels/.rels", |member| {
         let xml = std::str::from_utf8(member)?;
         let relationship = "<Relationship Id=\"rIdBoundarySignature\" Type=\"http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin\" Target=\"_xmlsignatures/origin.sigs\"/>";
-        let updated = xml.replacen("</Relationships>", &format!("{relationship}</Relationships>"), 1);
+        let updated = xml.replacen(
+            "</Relationships>",
+            &format!("{relationship}</Relationships>"),
+            1,
+        );
         Ok(updated.into_bytes())
     })
 }
@@ -210,7 +220,11 @@ fn add_external_dependency(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
     rewrite_member(bytes, "ppt/slides/_rels/slide2.xml.rels", |member| {
         let xml = std::str::from_utf8(member)?;
         let relationship = "<Relationship Id=\"rIdBoundaryExternal\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"https://litchi-perf.invalid/boundary\" TargetMode=\"External\"/>";
-        let updated = xml.replacen("</Relationships>", &format!("{relationship}</Relationships>"), 1);
+        let updated = xml.replacen(
+            "</Relationships>",
+            &format!("{relationship}</Relationships>"),
+            1,
+        );
         Ok(updated.into_bytes())
     })
 }
@@ -261,7 +275,9 @@ pub(super) fn build_corpus() -> Result<Corpus, Box<dyn StdError>> {
     {
         return Err(format!(
             "PPTX boundary corpus identity changed: bytes={}, sha256={}, members={}",
-            archive.len(), manifest.archive_sha256, manifest.archive_member_count
+            archive.len(),
+            manifest.archive_sha256,
+            manifest.archive_member_count
         )
         .into());
     }
@@ -312,10 +328,10 @@ fn changed_member_allowed(name: &str, operation: Operation, selected_slide: Opti
     match (operation, selected_slide) {
         (Operation::Remove, Some(slide)) => {
             name == slide
-                || name == slide.replace("ppt/slides/", "ppt/slides/_rels/").replace(
-                    ".xml",
-                    ".xml.rels",
-                )
+                || name
+                    == slide
+                        .replace("ppt/slides/", "ppt/slides/_rels/")
+                        .replace(".xml", ".xml.rels")
         },
         (Operation::Move, _) => false,
         _ => false,
@@ -531,8 +547,8 @@ fn verify_dependency_refusal(corpus: &Corpus) -> Result<bool, Box<dyn StdError>>
         .iter()
         .map(|slide| slide.name().to_owned())
         .collect::<Vec<_>>();
-    let staging_unchanged = !transaction.is_changed()
-        && transaction.source().revision() == source_revision;
+    let staging_unchanged =
+        !transaction.is_changed() && transaction.source().revision() == source_revision;
     let rolled_back = transaction.rollback();
     let rollback_names = rolled_back
         .slides()
@@ -553,9 +569,7 @@ fn verify_refusal_gates(
 ) -> Result<(bool, bool, bool, bool, bool, bool), Box<dyn StdError>> {
     let one_slide = Package::from_vec(build_plain_archive(1, "sole")?)?;
     let one_slide_verified = matches!(
-        one_slide
-            .opened_presentation()?
-            .plan_slide_removal(0),
+        one_slide.opened_presentation()?.plan_slide_removal(0),
         Err(Error::SlideRemovalPlan {
             kind: SlideRemovalRefusal::FinalSlide,
             ..
@@ -564,9 +578,7 @@ fn verify_refusal_gates(
 
     let unknown = Package::from_vec(add_unknown_member(&corpus.archive)?)?;
     let unknown_verified = matches!(
-        unknown
-            .opened_presentation()?
-            .plan_slide_removal(0),
+        unknown.opened_presentation()?.plan_slide_removal(0),
         Err(Error::SlideRemovalPlan {
             kind: SlideRemovalRefusal::UnknownPhysicalMember,
             ..
@@ -586,17 +598,15 @@ fn verify_refusal_gates(
 
     let signed = Package::from_vec(add_signature_marker(&corpus.archive)?)?;
     let signed_verified = matches!(
-        signed
-            .opened_presentation()?
-            .plan_slide_removal(0),
+        signed.opened_presentation()?.plan_slide_removal(0),
         Err(Error::SlideRemovalPlan {
             kind: SlideRemovalRefusal::SignedPackage,
             ..
         })
     );
 
-    let limits = Limits::new(64, 1, 1_024, 1, 1)
-        .ok_or("PPTX boundary test limits must be nonzero")?;
+    let limits =
+        Limits::new(64, 1, 1_024, 1, 1).ok_or("PPTX boundary test limits must be nonzero")?;
     let remove_limited = Package::from_vec(corpus.archive.clone())?
         .opened_presentation_with_limits(limits)?
         .plan_slide_removal(REPRESENTATIVE_REMOVE_POSITION)
@@ -630,7 +640,11 @@ fn verify_boundary_semantics(corpus: &Corpus) -> Result<(bool, bool), Box<dyn St
             .filter(|(index, _)| *index != position)
             .map(|(_, name)| name.clone())
             .collect::<Vec<_>>();
-        remove_verified &= snapshot.slides().iter().map(|slide| slide.name()).eq(expected.iter().map(String::as_str));
+        remove_verified &= snapshot
+            .slides()
+            .iter()
+            .map(|slide| slide.name())
+            .eq(expected.iter().map(String::as_str));
         let selected = corpus
             .slide_names
             .get(position)
@@ -648,16 +662,21 @@ fn verify_boundary_semantics(corpus: &Corpus) -> Result<(bool, bool), Box<dyn St
     let mut move_verified = true;
     for (index, output) in corpus.move_outputs.iter().enumerate() {
         move_verified &= verify_semantic_output(output, Operation::Move, index, corpus)?;
-        move_verified &= verify_untouched_raw_members(&corpus.archive, output, Operation::Move, None)?;
+        move_verified &=
+            verify_untouched_raw_members(&corpus.archive, output, Operation::Move, None)?;
     }
     let noop = move_bytes(&corpus.archive, 0, 0)?;
     let noop_verified = noop == corpus.archive;
-    Ok((remove_verified && corpus.remove_outputs.len() == REMOVE_POSITIONS.len(), move_verified && noop_verified))
+    Ok((
+        remove_verified && corpus.remove_outputs.len() == REMOVE_POSITIONS.len(),
+        move_verified && noop_verified,
+    ))
 }
 
 fn verify_untimed_gates(corpus: &Corpus) -> Result<(), Box<dyn StdError>> {
     let (boundary_remove, boundary_move) = verify_boundary_semantics(corpus)?;
-    let (remove_forward, remove_inverse, remove_stale, remove_foreign) = verify_remove_durable(corpus)?;
+    let (remove_forward, remove_inverse, remove_stale, remove_foreign) =
+        verify_remove_durable(corpus)?;
     let (move_forward, move_inverse, move_stale, move_foreign) = verify_move_durable(corpus)?;
     let (one_slide, unknown, dependency, mce, signed, limits) = verify_refusal_gates(corpus)?;
     if !(boundary_remove
@@ -732,11 +751,15 @@ pub(super) fn run(
         .transpose()?;
 
     let (boundary_semantics_verified, no_op_verified) = verify_boundary_semantics(corpus)?;
-    let (durable_forward_verified, durable_inverse_verified, stale_refusal_verified, foreign_refusal_verified) =
-        match operation {
-            Operation::Remove => verify_remove_durable(corpus)?,
-            Operation::Move => verify_move_durable(corpus)?,
-        };
+    let (
+        durable_forward_verified,
+        durable_inverse_verified,
+        stale_refusal_verified,
+        foreign_refusal_verified,
+    ) = match operation {
+        Operation::Remove => verify_remove_durable(corpus)?,
+        Operation::Move => verify_move_durable(corpus)?,
+    };
     let (
         one_slide_refusal_verified,
         unknown_member_refusal_verified,
@@ -744,8 +767,7 @@ pub(super) fn run(
         markup_compatibility_refusal_verified,
         signed_refusal_verified,
         limits_verified,
-    ) =
-        verify_refusal_gates(corpus)?;
+    ) = verify_refusal_gates(corpus)?;
     if !(boundary_semantics_verified
         && durable_forward_verified
         && durable_inverse_verified
@@ -771,7 +793,11 @@ pub(super) fn run(
     reserve_exact(&mut elapsed, samples, "PPTX boundary elapsed samples")?;
     reserve_exact(&mut plan_ns, samples, "PPTX boundary plan samples")?;
     reserve_exact(&mut commit_ns, samples, "PPTX boundary commit samples")?;
-    reserve_exact(&mut publication_ns, samples, "PPTX boundary publication samples")?;
+    reserve_exact(
+        &mut publication_ns,
+        samples,
+        "PPTX boundary publication samples",
+    )?;
     reserve_exact(&mut reopen_ns, samples, "PPTX boundary reopen samples")?;
     reserve_exact(&mut sink_summaries, samples, "PPTX boundary sink samples")?;
     reserve_exact(&mut output_digests, samples, "PPTX boundary output digests")?;
@@ -881,7 +907,10 @@ pub(super) fn run(
     }
 
     let sink = deterministic_sink_summary(&sink_summaries, case.name())?;
-    if output_digests.iter().any(|digest| digest != &expected_output_sha256) {
+    if output_digests
+        .iter()
+        .any(|digest| digest != &expected_output_sha256)
+    {
         return Err("PPTX boundary output digest is not deterministic".into());
     }
     if sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256 {
@@ -966,21 +995,33 @@ mod tests {
             serde_json::to_vec(&again.manifest).expect("PPTX boundary manifest encoding")
         );
         assert_eq!(corpus.manifest.archive_bytes, EXPECTED_SOURCE_ARCHIVE_BYTES);
-        assert_eq!(corpus.manifest.archive_sha256, EXPECTED_SOURCE_ARCHIVE_SHA256);
+        assert_eq!(
+            corpus.manifest.archive_sha256,
+            EXPECTED_SOURCE_ARCHIVE_SHA256
+        );
         assert_eq!(
             corpus.manifest.archive_member_count,
             EXPECTED_SOURCE_ARCHIVE_MEMBER_COUNT
         );
         assert!(!Case::DEFAULT.contains(&Case::PptxSlideRemoveBoundarySave));
         assert!(!Case::DEFAULT.contains(&Case::PptxSlideMoveBoundarySave));
-        assert_eq!(super::super::parse_case("pptx_slide_remove_boundary_save"), Some(Case::PptxSlideRemoveBoundarySave));
-        assert_eq!(super::super::parse_case("pptx_slide_move_boundary_save"), Some(Case::PptxSlideMoveBoundarySave));
+        assert_eq!(
+            super::super::parse_case("pptx_slide_remove_boundary_save"),
+            Some(Case::PptxSlideRemoveBoundarySave)
+        );
+        assert_eq!(
+            super::super::parse_case("pptx_slide_move_boundary_save"),
+            Some(Case::PptxSlideMoveBoundarySave)
+        );
     }
 
     #[test]
     fn selectors_emit_phases_and_all_boundary_gates() {
         let corpus = build_corpus().expect("PPTX boundary corpus");
-        for case in [Case::PptxSlideRemoveBoundarySave, Case::PptxSlideMoveBoundarySave] {
+        for case in [
+            Case::PptxSlideRemoveBoundarySave,
+            Case::PptxSlideMoveBoundarySave,
+        ] {
             let result = run(case, &corpus, 0, 1).expect("PPTX boundary run");
             let summary = result
                 .source

@@ -1,5 +1,61 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0457: bounded source-backed ODP publication obligations
+
+0457 keeps the accepted non-iWork ownership and publication boundaries intact.
+The ordinary `odp_existing_append_lifecycle` control is a formal
+current-revision baseline; the paired `odp_source_tail_append_lifecycle`
+candidate is a specialized publication plan with a different result contract.
+The final comparison retains 360-sample control and candidate captures across
+12 rows; these are descriptive
+numeric endpoint evidence, not an ordinary Commit/Patch, reversible-patch or
+retained-result-equivalence claim.
+
+The common ODF/ZIP path verifies source members through bounded callbacks,
+limits XML growth before parser expansion, binds the tail insertion to source
+identity, validates candidate XML before output, and replays the changed ZIP
+member through a sequential sink. Replay checks decoded and compressed sizes,
+CRC and strong digests; fixed Deflate input windows keep output independent of
+caller write boundaries. Typed errors retain accepted output counts and the
+primary source or transport cause, and compression performs no implicit writes
+on drop. Untouched ZIP records remain source-backed.
+
+Source/version checks, unknown-content preservation, finite hierarchical
+budgets, cancellation, signature/encryption refusals, exact partial-output
+accounting and atomic publication remain required. The specialized plan does
+not integrate with or reuse the ordinary owned `edit::Snapshot`,
+`edit::Transaction`, `edit::Commit` and reversible `edit::Patch` surface; that
+integration gap remains explicit in the goal and benchmark reports. The
+ordinary editor is implemented separately. The accepted ADR tree is unchanged;
+no dependency, executor, ambient-I/O, unsafe policy or iWork ownership change
+is asserted here.
+
+The release receipts pass the ZIP, ODF-common, ODP, harness, OPC, non-iWork
+formatting, workspace and boundary checks. The shared suites pass 1,348 tests
+with three ignored (ODF-common 499, ZIP 481, and ODP 368). ZIP and XML
+sanitizer fuzz lanes retain 1,000 runs each. The final identity-bound set has
+ten native records and three synthetic source/output pairs, all passing exact
+independent replay. Candidate derivation and comparison receipts pass. The
+[final source read review](results/change-0457/final-code-review.md) records
+the retained-fragment lease fix as resolved
+and found no additional verified blocker. Initial pre-fix large-normal
+profiles retain 1,000 sampled `cycles:u` observations: candidate SHA-256
+compression is 11.00%, XML `validate_name` 9.08%, `memcmp` 6.01% and
+`validate_start_element` 5.42%; control `memcmp` is 9.67%, Quick-XML attribute
+iteration 6.00%, `memmove` 5.76% and namespace-prefix resolution 5.24%.
+These are whole-process sampled stacks, not API-attributed CPU or causal
+evidence, and no hard counter totals were collected. These whole-process samples
+remain initial pre-fix diagnostics, not final candidate attribution; no
+sampling profile was captured for the final candidate epoch. Candidate profile
+checking
+passes for this initial capture; the unchanged control report/raw profile pass the existing amended
+oracle after the original frame-pointer expectation failed. Sealed precleanup,
+portable-copy replay and three altered-copy rejection checks pass; owned staging
+cleanup is recorded in the [bundle](results/change-0457/README.md). See the
+[final candidate summary](results/change-0457/candidate-final/summary.json),
+[ADR refresh](results/change-0457/adr-refresh.json), and
+[final comparison](results/change-0457/comparison-final.json).
+
 ## Change 0456: direct shared payload framing
 
 [0456](changes/0456-zip-shared-payload-framing.md) keeps verified Store/Deflate

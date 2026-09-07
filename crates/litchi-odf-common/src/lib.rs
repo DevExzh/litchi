@@ -27,13 +27,15 @@ pub mod style;
 pub mod validation;
 
 pub use core::{
-    ArchiveLimits, OwnedPackage, PreparedPackage, SourceBackedPackage, SourcePackageLimits,
+    ArchiveLimits, OwnedPackage, PreparedPackage, SourceBackedPackage, SourceMemberReaderError,
+    SourcePackageLimits,
 };
 pub use core::{
     GeneratedXmlEnvelope, GeneratedXmlLimitExceeded, GeneratedXmlLimitResource, GeneratedXmlLimits,
-    GeneratedXmlReport,
+    GeneratedXmlReport, XmlStreamLimits,
 };
 pub use core::{
+    SourceContentInsertionCallbackError, SourceContentInsertionError, SourceContentInsertionPlan,
     SourceContentPublicationError, SourceContentPublicationOptions,
     SourceContentPublicationProgress, SourceContentPublicationReport, write_content_xml_to_stream,
     write_content_xml_to_stream_with_options,

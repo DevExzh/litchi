@@ -1,0 +1,24 @@
+{
+  "schema": "litchi-0457-odp-source-tail-candidate-oracle-v1",
+  "selector": "odp_source_tail_append_lifecycle",
+  "role": "candidate",
+  "shapes": {
+    "tiny": 64,
+    "medium": 4096,
+    "large": 8192
+  },
+  "samples": 30,
+  "warmups": 3,
+  "checks": {
+    "corpus": "exact generator, shape, ZIP member names, source archive/content hashes and byte counts from candidate/corpus-bindings.json",
+    "semantic": "independent title/body regeneration, source/output semantic and order digests, text projection and exact one-slide append",
+    "zip": "source/output member media types, compression, CRC, decoded/compressed hashes, untouched-member raw identity, manifest gates, opaque payload identity",
+    "output_fixture": "candidate source/output archive bytes, content identity, and member identities are pre-bound by native/verify-output.py; control output is semantic/order/text/count reference only",
+    "proof": "source slide count, content.xml byte proof, positive insertion offset before source end, deterministic page name, fixture proof scalar validation, and aligned per-sample runtime-proof/report source ID and revision equality",
+    "source": "read_calls and returned bytes measured; requested byte lengths, largest ranges, request pattern, compressed/decompressed/recompressed boundaries explicitly unavailable",
+    "sink": "accepted bytes, logical write calls, largest accepted write, and write-size buckets bind to the returned publication output",
+    "allocator": "allocator mode requires operation-scoped measured vectors and live-byte balance; normal mode must not publish measured allocator vectors",
+    "scope": "specialized source-backed publication-plan lifecycle; no ordinary Commit/Patch or general CRUD speedup claim"
+  },
+  "success_stdout": "VALID"
+}

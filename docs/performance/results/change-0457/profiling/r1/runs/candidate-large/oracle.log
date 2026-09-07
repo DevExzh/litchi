@@ -1,0 +1,2 @@
+INVALID: configuration.samples_per_case differs from --samples
+argv=["/usr/bin/python3", "-B", "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate/oracle/verify-report.py", "--report", "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r1/runs/candidate-large/report.json", "--mode", "normal", "--shape", "large"]

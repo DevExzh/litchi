@@ -1,0 +1,56 @@
+{
+  "fixture": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf169979.odp",
+  "source_sha256": "160908f993c6ba901233695b12d34c4b009142971b36dcd57c0549bf8ee5656b",
+  "argv": [
+    "/tmp/litchi-goal-0457/candidate/odp_native_tail_append_probe",
+    "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf169979.odp",
+    "/tmp/litchi-goal-0457/native/00.odp",
+    "Native title & <字> café",
+    "Native body Ω 😀"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-09-07T12:43:22.277399+00:00",
+  "exit_code": 0,
+  "log": "00-probe.log",
+  "log_sha256": "f4887063214db3657bc69fedb0d9c757f1607f0ba1f8d9f388269bd265048963",
+  "title": "Native title & <字> café",
+  "body": "Native body Ω 😀",
+  "retained_source": {
+    "path": "00-source.odp.gz",
+    "bytes": 10763,
+    "sha256": "b43450193f7f6af45456842f9517b0cb1c17413126bfe1eea816e707982880cf",
+    "decoded_bytes": 12568,
+    "decoded_sha256": "160908f993c6ba901233695b12d34c4b009142971b36dcd57c0549bf8ee5656b"
+  },
+  "output": {
+    "path": "/tmp/litchi-goal-0457/native/00.odp",
+    "bytes": 12711,
+    "sha256": "adee86fc02f843e65aa71d546ccdfe139369ed14f4c540e5026a6b9299f0b64a"
+  },
+  "retained_output": {
+    "path": "00-output.odp.gz",
+    "bytes": 10905,
+    "sha256": "659ec730c8ed7b5ddacb6baa7602bde803b890ece2dd7da6f5ed791c88ad6707",
+    "decoded_bytes": 12711,
+    "decoded_sha256": "adee86fc02f843e65aa71d546ccdfe139369ed14f4c540e5026a6b9299f0b64a"
+  },
+  "oracle": {
+    "argv": [
+      "python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native/verify-output.py",
+      "--source",
+      "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf169979.odp",
+      "--output",
+      "/tmp/litchi-goal-0457/native/00.odp",
+      "--title",
+      "Native title & <字> café",
+      "--body",
+      "Native body Ω 😀"
+    ],
+    "exit_code": 0,
+    "log": "00-oracle.log",
+    "sha256": "bacc1d68450f39908a827f96aa5ad0c4745d3ab0272d41a48c76887e647b5c81"
+  },
+  "status": "validated"
+}

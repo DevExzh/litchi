@@ -1,0 +1,371 @@
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:10:
+     Case, CaseResult, CorpusManifest, CountingSink, PrefixFailSink, SourceSummary,
+     deterministic_sink_summary, elapsed_ns, iteration_count, sha256_hex, statistics,
+ };
+[32m+use litchi_opc::OpcPackage;
+[m use litchi_pptx::opened::{Limits, Patch};
+ use litchi_pptx::{Error, Package, SlideRemovalPatch, SlideRemovalRefusal};
+[31m-use litchi_opc::OpcPackage;
+[m use serde::Serialize;
+ use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
+ use std::error::Error as StdError;
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:95:
+             Self::Move => "move",
+         }
+     }
+[31m-
+[m }
+ 
+[31m-fn reserve_exact<T>(values: &mut Vec<T>, amount: usize, label: &str) -> Result<(), Box<dyn StdError>> {
+[m[32m+fn reserve_exact<T>(
+[m[32m+    values: &mut Vec<T>,
+[m[32m+    amount: usize,
+[m[32m+    label: &str,
+[m[32m+) -> Result<(), Box<dyn StdError>> {
+[m     values
+         .try_reserve_exact(amount)
+         .map_err(|error| format!("{label} allocation failed: {error}").into())
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:110:
+     for index in 0..slide_count {
+         let slide = presentation.add_slide()?;
+         slide.set_title(&format!("{prefix}-title-{index}"));
+[31m-        slide.add_text_box(
+[m[31m-            &format!("{prefix}-body-{index}"),
+[m[31m-            36,
+[m[31m-            36,
+[m[31m-            540,
+[m[31m-            72,
+[m[31m-        );
+[m[32m+        slide.add_text_box(&format!("{prefix}-body-{index}"), 36, 36, 540, 72);
+[m     }
+     Ok(package.to_bytes()?)
+ }
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:125:
+     let package = Package::from_vec(bytes.to_vec())?;
+     let snapshot = package.opened_presentation()?;
+     let mut names = Vec::new();
+[31m-    reserve_exact(&mut names, snapshot.slides().len(), "PPTX boundary slide names")?;
+[m[31m-    names.extend(snapshot.slides().iter().map(|slide| slide.name().to_owned()));
+[m[32m+    reserve_exact(
+[m[32m+        &mut names,
+[m[32m+        snapshot.slides().len(),
+[m[32m+        "PPTX boundary slide names",
+[m[32m+    )?;
+[m[32m+    names.extend(
+[m[32m+        snapshot
+[m[32m+            .slides()
+[m[32m+            .iter()
+[m[32m+            .map(|slide| slide.name().to_owned()),
+[m[32m+    );
+[m     Ok(names)
+ }
+ 
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:138:
+     Ok(package.to_bytes()?)
+ }
+ 
+[31m-fn move_bytes(
+[m[31m-    bytes: &[u8],
+[m[31m-    from: usize,
+[m[31m-    to: usize,
+[m[31m-) -> Result<Vec<u8>, Box<dyn StdError>> {
+[m[32m+fn move_bytes(bytes: &[u8], from: usize, to: usize) -> Result<Vec<u8>, Box<dyn StdError>> {
+[m     let mut package = Package::from_vec(bytes.to_vec())?;
+     let snapshot = package.opened_presentation()?;
+     let mut transaction = snapshot.edit();
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:154:
+     Ok(package.to_bytes()?)
+ }
+ 
+[31m-fn rewrite_member<F>(bytes: &[u8], member_name: &str, rewrite: F) -> Result<Vec<u8>, Box<dyn StdError>>
+[m[32m+fn rewrite_member<F>(
+[m[32m+    bytes: &[u8],
+[m[32m+    member_name: &str,
+[m[32m+    rewrite: F,
+[m[32m+) -> Result<Vec<u8>, Box<dyn StdError>>
+[m where
+     F: FnOnce(&[u8]) -> Result<Vec<u8>, Box<dyn StdError>>,
+ {
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:201:
+     rewrite_member(bytes, "_rels/.rels", |member| {
+         let xml = std::str::from_utf8(member)?;
+         let relationship = "<Relationship Id=\"rIdBoundarySignature\" Type=\"http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin\" Target=\"_xmlsignatures/origin.sigs\"/>";
+[31m-        let updated = xml.replacen("</Relationships>", &format!("{relationship}</Relationships>"), 1);
+[m[32m+        let updated = xml.replacen(
+[m[32m+            "</Relationships>",
+[m[32m+            &format!("{relationship}</Relationships>"),
+[m[32m+            1,
+[m[32m+        );
+[m         Ok(updated.into_bytes())
+     })
+ }
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:210:
+     rewrite_member(bytes, "ppt/slides/_rels/slide2.xml.rels", |member| {
+         let xml = std::str::from_utf8(member)?;
+         let relationship = "<Relationship Id=\"rIdBoundaryExternal\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"https://litchi-perf.invalid/boundary\" TargetMode=\"External\"/>";
+[31m-        let updated = xml.replacen("</Relationships>", &format!("{relationship}</Relationships>"), 1);
+[m[32m+        let updated = xml.replacen(
+[m[32m+            "</Relationships>",
+[m[32m+            &format!("{relationship}</Relationships>"),
+[m[32m+            1,
+[m[32m+        );
+[m         Ok(updated.into_bytes())
+     })
+ }
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:261:
+     {
+         return Err(format!(
+             "PPTX boundary corpus identity changed: bytes={}, sha256={}, members={}",
+[31m-            archive.len(), manifest.archive_sha256, manifest.archive_member_count
+[m[32m+            archive.len(),
+[m[32m+            manifest.archive_sha256,
+[m[32m+            manifest.archive_member_count
+[m         )
+         .into());
+     }
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:312:
+     match (operation, selected_slide) {
+         (Operation::Remove, Some(slide)) => {
+             name == slide
+[31m-                || name == slide.replace("ppt/slides/", "ppt/slides/_rels/").replace(
+[m[31m-                    ".xml",
+[m[31m-                    ".xml.rels",
+[m[31m-                )
+[m[32m+                || name
+[m[32m+                    == slide
+[m[32m+                        .replace("ppt/slides/", "ppt/slides/_rels/")
+[m[32m+                        .replace(".xml", ".xml.rels")
+[m         },
+         (Operation::Move, _) => false,
+         _ => false,
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:531:
+         .iter()
+         .map(|slide| slide.name().to_owned())
+         .collect::<Vec<_>>();
+[31m-    let staging_unchanged = !transaction.is_changed()
+[m[31m-        && transaction.source().revision() == source_revision;
+[m[32m+    let staging_unchanged =
+[m[32m+        !transaction.is_changed() && transaction.source().revision() == source_revision;
+[m     let rolled_back = transaction.rollback();
+     let rollback_names = rolled_back
+         .slides()
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:553:
+ ) -> Result<(bool, bool, bool, bool, bool, bool), Box<dyn StdError>> {
+     let one_slide = Package::from_vec(build_plain_archive(1, "sole")?)?;
+     let one_slide_verified = matches!(
+[31m-        one_slide
+[m[31m-            .opened_presentation()?
+[m[31m-            .plan_slide_removal(0),
+[m[32m+        one_slide.opened_presentation()?.plan_slide_removal(0),
+[m         Err(Error::SlideRemovalPlan {
+             kind: SlideRemovalRefusal::FinalSlide,
+             ..
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:564:
+ 
+     let unknown = Package::from_vec(add_unknown_member(&corpus.archive)?)?;
+     let unknown_verified = matches!(
+[31m-        unknown
+[m[31m-            .opened_presentation()?
+[m[31m-            .plan_slide_removal(0),
+[m[32m+        unknown.opened_presentation()?.plan_slide_removal(0),
+[m         Err(Error::SlideRemovalPlan {
+             kind: SlideRemovalRefusal::UnknownPhysicalMember,
+             ..
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:586:
+ 
+     let signed = Package::from_vec(add_signature_marker(&corpus.archive)?)?;
+     let signed_verified = matches!(
+[31m-        signed
+[m[31m-            .opened_presentation()?
+[m[31m-            .plan_slide_removal(0),
+[m[32m+        signed.opened_presentation()?.plan_slide_removal(0),
+[m         Err(Error::SlideRemovalPlan {
+             kind: SlideRemovalRefusal::SignedPackage,
+             ..
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:595:
+         })
+     );
+ 
+[31m-    let limits = Limits::new(64, 1, 1_024, 1, 1)
+[m[31m-        .ok_or("PPTX boundary test limits must be nonzero")?;
+[m[32m+    let limits =
+[m[32m+        Limits::new(64, 1, 1_024, 1, 1).ok_or("PPTX boundary test limits must be nonzero")?;
+[m     let remove_limited = Package::from_vec(corpus.archive.clone())?
+         .opened_presentation_with_limits(limits)?
+         .plan_slide_removal(REPRESENTATIVE_REMOVE_POSITION)
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:630:
+             .filter(|(index, _)| *index != position)
+             .map(|(_, name)| name.clone())
+             .collect::<Vec<_>>();
+[31m-        remove_verified &= snapshot.slides().iter().map(|slide| slide.name()).eq(expected.iter().map(String::as_str));
+[m[32m+        remove_verified &= snapshot
+[m[32m+            .slides()
+[m[32m+            .iter()
+[m[32m+            .map(|slide| slide.name())
+[m[32m+            .eq(expected.iter().map(String::as_str));
+[m         let selected = corpus
+             .slide_names
+             .get(position)
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:648:
+     let mut move_verified = true;
+     for (index, output) in corpus.move_outputs.iter().enumerate() {
+         move_verified &= verify_semantic_output(output, Operation::Move, index, corpus)?;
+[31m-        move_verified &= verify_untouched_raw_members(&corpus.archive, output, Operation::Move, None)?;
+[m[32m+        move_verified &=
+[m[32m+            verify_untouched_raw_members(&corpus.archive, output, Operation::Move, None)?;
+[m     }
+     let noop = move_bytes(&corpus.archive, 0, 0)?;
+     let noop_verified = noop == corpus.archive;
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:655:
+[31m-    Ok((remove_verified && corpus.remove_outputs.len() == REMOVE_POSITIONS.len(), move_verified && noop_verified))
+[m[32m+    Ok((
+[m[32m+        remove_verified && corpus.remove_outputs.len() == REMOVE_POSITIONS.len(),
+[m[32m+        move_verified && noop_verified,
+[m[32m+    ))
+[m }
+ 
+ fn verify_untimed_gates(corpus: &Corpus) -> Result<(), Box<dyn StdError>> {
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:659:
+     let (boundary_remove, boundary_move) = verify_boundary_semantics(corpus)?;
+[31m-    let (remove_forward, remove_inverse, remove_stale, remove_foreign) = verify_remove_durable(corpus)?;
+[m[32m+    let (remove_forward, remove_inverse, remove_stale, remove_foreign) =
+[m[32m+        verify_remove_durable(corpus)?;
+[m     let (move_forward, move_inverse, move_stale, move_foreign) = verify_move_durable(corpus)?;
+     let (one_slide, unknown, dependency, mce, signed, limits) = verify_refusal_gates(corpus)?;
+     if !(boundary_remove
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:732:
+         .transpose()?;
+ 
+     let (boundary_semantics_verified, no_op_verified) = verify_boundary_semantics(corpus)?;
+[31m-    let (durable_forward_verified, durable_inverse_verified, stale_refusal_verified, foreign_refusal_verified) =
+[m[31m-        match operation {
+[m[31m-            Operation::Remove => verify_remove_durable(corpus)?,
+[m[31m-            Operation::Move => verify_move_durable(corpus)?,
+[m[31m-        };
+[m     let (
+[32m+        durable_forward_verified,
+[m[32m+        durable_inverse_verified,
+[m[32m+        stale_refusal_verified,
+[m[32m+        foreign_refusal_verified,
+[m[32m+    ) = match operation {
+[m[32m+        Operation::Remove => verify_remove_durable(corpus)?,
+[m[32m+        Operation::Move => verify_move_durable(corpus)?,
+[m[32m+    };
+[m[32m+    let (
+[m         one_slide_refusal_verified,
+         unknown_member_refusal_verified,
+         dependency_refusal_verified,
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:744:
+         markup_compatibility_refusal_verified,
+         signed_refusal_verified,
+         limits_verified,
+[31m-    ) =
+[m[31m-        verify_refusal_gates(corpus)?;
+[m[32m+    ) = verify_refusal_gates(corpus)?;
+[m     if !(boundary_semantics_verified
+         && durable_forward_verified
+         && durable_inverse_verified
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:771:
+     reserve_exact(&mut elapsed, samples, "PPTX boundary elapsed samples")?;
+     reserve_exact(&mut plan_ns, samples, "PPTX boundary plan samples")?;
+     reserve_exact(&mut commit_ns, samples, "PPTX boundary commit samples")?;
+[31m-    reserve_exact(&mut publication_ns, samples, "PPTX boundary publication samples")?;
+[m[32m+    reserve_exact(
+[m[32m+        &mut publication_ns,
+[m[32m+        samples,
+[m[32m+        "PPTX boundary publication samples",
+[m[32m+    )?;
+[m     reserve_exact(&mut reopen_ns, samples, "PPTX boundary reopen samples")?;
+     reserve_exact(&mut sink_summaries, samples, "PPTX boundary sink samples")?;
+     reserve_exact(&mut output_digests, samples, "PPTX boundary output digests")?;
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:881:
+     }
+ 
+     let sink = deterministic_sink_summary(&sink_summaries, case.name())?;
+[31m-    if output_digests.iter().any(|digest| digest != &expected_output_sha256) {
+[m[32m+    if output_digests
+[m[32m+        .iter()
+[m[32m+        .any(|digest| digest != &expected_output_sha256)
+[m[32m+    {
+[m         return Err("PPTX boundary output digest is not deterministic".into());
+     }
+     if sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256 {
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:966:
+             serde_json::to_vec(&again.manifest).expect("PPTX boundary manifest encoding")
+         );
+         assert_eq!(corpus.manifest.archive_bytes, EXPECTED_SOURCE_ARCHIVE_BYTES);
+[31m-        assert_eq!(corpus.manifest.archive_sha256, EXPECTED_SOURCE_ARCHIVE_SHA256);
+[m         assert_eq!(
+[32m+            corpus.manifest.archive_sha256,
+[m[32m+            EXPECTED_SOURCE_ARCHIVE_SHA256
+[m[32m+        );
+[m[32m+        assert_eq!(
+[m             corpus.manifest.archive_member_count,
+             EXPECTED_SOURCE_ARCHIVE_MEMBER_COUNT
+         );
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:974:
+         assert!(!Case::DEFAULT.contains(&Case::PptxSlideRemoveBoundarySave));
+         assert!(!Case::DEFAULT.contains(&Case::PptxSlideMoveBoundarySave));
+[31m-        assert_eq!(super::super::parse_case("pptx_slide_remove_boundary_save"), Some(Case::PptxSlideRemoveBoundarySave));
+[m[31m-        assert_eq!(super::super::parse_case("pptx_slide_move_boundary_save"), Some(Case::PptxSlideMoveBoundarySave));
+[m[32m+        assert_eq!(
+[m[32m+            super::super::parse_case("pptx_slide_remove_boundary_save"),
+[m[32m+            Some(Case::PptxSlideRemoveBoundarySave)
+[m[32m+        );
+[m[32m+        assert_eq!(
+[m[32m+            super::super::parse_case("pptx_slide_move_boundary_save"),
+[m[32m+            Some(Case::PptxSlideMoveBoundarySave)
+[m[32m+        );
+[m     }
+ 
+     #[test]
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/pptx_slide_boundaries.rs:981:
+     fn selectors_emit_phases_and_all_boundary_gates() {
+         let corpus = build_corpus().expect("PPTX boundary corpus");
+[31m-        for case in [Case::PptxSlideRemoveBoundarySave, Case::PptxSlideMoveBoundarySave] {
+[m[32m+        for case in [
+[m[32m+            Case::PptxSlideRemoveBoundarySave,
+[m[32m+            Case::PptxSlideMoveBoundarySave,
+[m[32m+        ] {
+[m             let result = run(case, &corpus, 0, 1).expect("PPTX boundary run");
+             let summary = result
+                 .source
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/tests/xlsx_filesystem.rs:314:
+             repeated["claim_scope"],
+             "structural cache/read control only; elapsed/query_ns must not be compared with candidate"
+         );
+[31m-        assert_eq!(repeated["implementation"], "explicit_part_data_reacquisition_structural_control");
+[m[32m+        assert_eq!(
+[m[32m+            repeated["implementation"],
+[m[32m+            "explicit_part_data_reacquisition_structural_control"
+[m[32m+        );
+[m         assert_eq!(repeated["query_iterations"], 8);
+         assert_eq!(repeated["control_reacquire_count"], 32);
+         assert_eq!(
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/tests/xlsx_filesystem.rs:330:
+             .map(|elapsed| elapsed.as_u64().expect("query timing"))
+             .sum::<u64>();
+         assert_eq!(repeated["timed_elapsed_total_ns"], query_total);
+[31m-        let selected_member_read_calls = repeated["diagnostics_delta"]
+[m[31m-            ["selected_member_read_calls"]
+[m[31m-            .as_u64()
+[m[31m-            .expect("selected-member read calls");
+[m[32m+        let selected_member_read_calls =
+[m[32m+            repeated["diagnostics_delta"]["selected_member_read_calls"]
+[m[32m+                .as_u64()
+[m[32m+                .expect("selected-member read calls");
+[m         let source_read_calls = repeated["diagnostics_delta"]["source_read_calls"]
+             .as_u64()
+             .expect("source read calls");
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/tests/xlsx_filesystem.rs:344:
+                 assert_eq!(repeated["diagnostics_delta"]["cache_bypasses"], 0);
+             },
+             "oversized" => {
+[31m-                assert_eq!(repeated["diagnostics_delta"]["cache_oversized_bypasses"], 32);
+[m[32m+                assert_eq!(
+[m[32m+                    repeated["diagnostics_delta"]["cache_oversized_bypasses"],
+[m[32m+                    32
+[m[32m+                );
+[m                 assert_eq!(repeated["diagnostics_delta"]["cache_evictions"], 0);
+             },
+             scenario => panic!("unexpected repeated-store scenario {scenario}"),

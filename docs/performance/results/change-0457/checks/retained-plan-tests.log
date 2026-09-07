@@ -1,0 +1,22 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+    Finished `release` profile [optimized] target(s) in 23.85s
+     Running tests/source_content_insertion.rs (target/release/deps/source_content_insertion-16241de4265716bd)
+
+running 13 tests
+test cancellation_after_first_sink_write_retains_typed_cause_and_prefix ... ok
+test cancellation_is_typed_during_prepare_and_publication ... ok
+test hierarchical_budgets_and_input_accounting_are_enforced ... ok
+test invalid_offset_token_and_document_are_rejected_before_publication ... ok
+test memory_and_work_admission_precede_source_reads ... ok
+test optional_payload_verification_reads_opaque_member_before_first_output ... ok
+test replacement_and_output_limits_fail_before_output ... ok
+test retained_fragment_capacity_refuses_before_source_reads ... ok
+test retained_fragment_capacity_stays_charged_until_plan_drop ... ok
+test sink_output_budget_retains_public_execution_cause ... ok
+test source_changes_after_prepare_and_during_measure_and_emit_are_primary ... ok
+test store_and_deflate_preserve_untouched_raw_members_and_xml_prefix_suffix ... ok
+test zero_partial_and_failing_sinks_report_truthful_progress ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

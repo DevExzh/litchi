@@ -1,0 +1,62 @@
+Diff in /home/zhuhe/code/litchi/crates/soapberry-zip/src/preserve/replay.rs:492:
+                 };
+                 sink.write_all(framing)
+                     .map_err(|source| sink_error(ReplayPass::Emit, source, None, &mut sink))?;
+[31m-                let actual = emit_callback(
+[m[31m-                    &mut callback,
+[m[31m-                    compression,
+[m[31m-                    limits,
+[m[31m-                    &mut sink,
+[m[31m-                    accounting,
+[m[31m-                )?;
+[m[32m+                let actual =
+[m[32m+                    emit_callback(&mut callback, compression, limits, &mut sink, accounting)?;
+[m                 if actual != measurement {
+                     return Err(ReplayPublicationError::NonDeterministic {
+                         expected: Box::new(measurement),
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/tests/glossary_authoring.rs:1:
+[32m+use litchi_docx::Package;
+[m use litchi_docx::glossary::{
+     self, Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Name, Props, raw,
+ };
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/tests/glossary_authoring.rs:4:
+[31m-use litchi_docx::Package;
+[m use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+ use litchi_opc::{PackURI, part::BlobPart};
+ 
+Diff in /home/zhuhe/code/litchi/crates/litchi-docx/tests/glossary_authoring.rs:240:
+         );
+     }
+ 
+[31m-    assert!(
+[m[31m-        package
+[m[31m-            .edit_opc(glossary::remove)
+[m[31m-            .unwrap()
+[m[31m-    );
+[m[31m-    assert!(
+[m[31m-        !package
+[m[31m-            .edit_opc(glossary::remove)
+[m[31m-            .unwrap()
+[m[31m-    );
+[m[32m+    assert!(package.edit_opc(glossary::remove).unwrap());
+[m[32m+    assert!(!package.edit_opc(glossary::remove).unwrap());
+[m }
+ 
+ #[test]
+Diff in /home/zhuhe/code/litchi/crates/litchi-keynote/src/document.rs:592:
+             .source()
+             .detector_limits()
+             .map_err(map_detection_error)?;
+[31m-        let source =
+[m[31m-            litchi_iwa_detect::PreparedSource::__from_path_with_keynote_properties(path, source_limits)
+[m[31m-                .map_err(map_detection_error)?
+[m[31m-                .ok_or(DocumentReadError::InvalidFormat)?;
+[m[32m+        let source = litchi_iwa_detect::PreparedSource::__from_path_with_keynote_properties(
+[m[32m+            path,
+[m[32m+            source_limits,
+[m[32m+        )
+[m[32m+        .map_err(map_detection_error)?
+[m[32m+        .ok_or(DocumentReadError::InvalidFormat)?;
+[m         if source.format() != litchi_iwa_detect::Format::Keynote {
+             return Err(DocumentReadError::NotKeynote);
+         }

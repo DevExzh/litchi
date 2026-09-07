@@ -1,0 +1,21 @@
+{
+  "change": 457,
+  "binary": {
+    "path": "/tmp/litchi-goal-0457/candidate/odp_native_tail_append_probe",
+    "bytes": 2973696,
+    "sha256": "055b6c65c33d6d17c6673e43852df51a4ed00b7a8dee3347a560281b932c44a1"
+  },
+  "build_receipt": {
+    "path": "../checks/candidate-build.json",
+    "sha256": "756814f2a77bcc4ba86377a028dd8b899126cc9bb02ac2ddd3a1e2a79c33b92e"
+  },
+  "source_manifest": {
+    "path": "../sources/8eff4cebced4d8831ed987b6cfb8ecb905caa296acdd590236c5c4e3c82ae4d4.json",
+    "sha256": "8eff4cebced4d8831ed987b6cfb8ecb905caa296acdd590236c5c4e3c82ae4d4",
+    "files": 7023
+  },
+  "inventory_sha256": "38ef407dc45dd73d73912d296751008b13932362e92da27d51e279f61ed063f0",
+  "oracle_sha256": "f81bd21de6134a92ee9204e5c5c5ff7c5220a2d682f05e7b023e1ebef561cad2",
+  "runner_sha256": "5b0954c3282d1f356633e883970b9bebb372241ca380e673e9f8115167a43446",
+  "binder_sha256": "58a5adc17b6b6108da07497969f7b0d89214d22d32cd44bf9864513a8a0af437"
+}

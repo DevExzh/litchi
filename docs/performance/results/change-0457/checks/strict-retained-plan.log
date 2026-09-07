@@ -1,0 +1,20 @@
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+error: redundant redefinition of a binding `fragment`
+   --> crates/litchi-odf-common/src/core/source_publication/insertion.rs:252:9
+    |
+252 |         let fragment = fragment;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: `fragment` is initially defined here
+   --> crates/litchi-odf-common/src/core/source_publication/insertion.rs:229:9
+    |
+229 |         fragment: AuthoredXmlFragment,
+    |         ^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#redundant_locals
+    = note: `-D clippy::redundant-locals` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::redundant_locals)]`
+
+error: could not compile `litchi-odf-common` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-odf-common` (lib) due to 1 previous error
+error: could not compile `litchi-odf-common` (lib test) due to 1 previous error

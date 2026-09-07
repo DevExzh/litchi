@@ -8,8 +8,10 @@
 //! method does not materialize an owning package and has no logical fallback.
 
 use super::package::{
-    SourceBackedPackage, SourceChangedIo, SourceExecutionIo, SourceReadIo, is_signature_owner_path,
+    SourceBackedPackage, SourceChangedIo, SourceExecutionIo, SourceMemberReaderError, SourceReadIo,
+    is_signature_owner_path,
 };
+use super::private::{BindingTracker, XmlStreamEvent, XmlStreamLimits, XmlStreamReport, scan_xml};
 use crate::constants;
 use litchi_core::{
     CancellationToken, Error, ExecutionContext, ExecutionError, Resource, Result, SourceVersion,
@@ -20,8 +22,14 @@ use soapberry_zip::{
 };
 use std::collections::HashSet;
 use std::fmt;
-use std::io::{self, Write};
+use std::io::{self, BufRead, Write};
 use std::sync::Arc;
+
+mod insertion;
+
+pub use self::insertion::{
+    SourceContentInsertionCallbackError, SourceContentInsertionError, SourceContentInsertionPlan,
+};
 
 const COPY_CHUNK_SIZE: usize = 32 * 1024;
 const ZIP_LOCAL_HEADER_SIZE: usize = 30;
@@ -31,6 +39,14 @@ const ZIP_DATA_DESCRIPTOR_FLAG: u16 = 1 << 3;
 const ZIP_UTF8_FLAG: u16 = 1 << 11;
 const ZIP_STORE_METHOD: u16 = 0;
 const DEFAULT_MAX_OUTPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+// One verified source-content scan or replay callback keeps only fixed reader,
+// splice/ZIP-copy, hash, and selected zlib-rs state.  The default zlib-rs
+// Deflate profile is roughly 512 KiB (128 KiB window plus prev/head tables,
+// pending/symbol buffers, and state); this 2 MiB envelope leaves room for the
+// source inflater and fixed transport state without depending on member size.
+pub(crate) const SOURCE_CONTENT_OPERATION_BUFFER_BYTES: u64 = 2 * 1024 * 1024;
+pub(crate) const SOURCE_CONTENT_SCAN_CANCELLED_MESSAGE: &str =
+    "source-content insertion scan cancelled";
 
 /// Options for source-backed `content.xml` publication.
 ///
@@ -194,6 +210,14 @@ pub struct SourceContentPublicationReport {
 }
 
 impl SourceContentPublicationReport {
+    pub(crate) const fn from_parts(bytes: u64, no_op: bool, source_version: SourceVersion) -> Self {
+        Self {
+            bytes,
+            no_op,
+            source_version,
+        }
+    }
+
     /// Complete candidate artifact bytes accepted by the sink.
     #[must_use]
     pub const fn bytes(self) -> u64 {
@@ -394,6 +418,161 @@ impl From<Error> for SourceContentPublicationError {
     }
 }
 
+/// Failure from the hidden common source-content scan seam.
+#[doc(hidden)]
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum SourceContentScanError {
+    /// The bounded publication policy rejected the scan before output.
+    Publication(SourceContentPublicationError),
+    /// The verified source-member reader failed, retaining source priority
+    /// and any callback diagnostic supplied by the member reader.
+    SourceMember(SourceMemberReaderError<Error>),
+}
+
+impl fmt::Display for SourceContentScanError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Publication(error) => error.fmt(formatter),
+            Self::SourceMember(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for SourceContentScanError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Publication(error) => Some(error),
+            Self::SourceMember(error) => Some(error),
+        }
+    }
+}
+
+impl From<SourceContentPublicationError> for SourceContentScanError {
+    fn from(error: SourceContentPublicationError) -> Self {
+        Self::Publication(error)
+    }
+}
+
+/// Run one bounded, verified `content.xml` source scan for a format owner.
+///
+/// This hidden seam keeps family-owned semantic scans on the common source
+/// contract: the member is opened through the abortable verified reader, the
+/// XML parser envelope is admitted before traversal, source reads are charged
+/// through the publication input-accounting guard, and cancellation is checked
+/// between parser events.  The visitor sees borrowed events only for the
+/// duration of its callback and must not retain them.
+#[doc(hidden)]
+pub fn scan_source_content<F>(
+    package: &SourceBackedPackage,
+    limits: XmlStreamLimits,
+    options: &SourceContentPublicationOptions,
+    mut visitor: F,
+) -> std::result::Result<XmlStreamReport, SourceContentScanError>
+where
+    F: for<'event> FnMut(&'event XmlStreamEvent<'event>, &BindingTracker) -> Result<()>,
+{
+    check_cancellation(options, SourceContentPublicationProgress::Untouched)?;
+    package
+        .ensure_current_for_publication()
+        .map_err(|error| map_core_error(error, SourceContentPublicationProgress::Untouched))?;
+    reject_encrypted_source(package)?;
+
+    let content_length = package
+        .publication_member_size(constants::ODF_CONTENT)
+        .map_err(|error| map_core_error(error, SourceContentPublicationProgress::Untouched))?;
+    let xml_memory = limits
+        .memory_upper_bound()
+        .map_err(|error| map_core_error(error, SourceContentPublicationProgress::Untouched))?;
+    let scan_memory = xml_memory
+        .checked_add(SOURCE_CONTENT_OPERATION_BUFFER_BYTES)
+        .ok_or_else(|| unsupported("source-content scan memory accounting overflow"))?;
+    let _memory = reserve_memory(
+        options,
+        scan_memory,
+        SourceContentPublicationProgress::Untouched,
+    )?;
+    let _input = package
+        .begin_publication_input_accounting(options.execution_context())
+        .map_err(|source| SourceContentPublicationError::Allocation {
+            resource: "source-content scan input-accounting stack",
+            source,
+        })?;
+    consume_execution_resource(
+        options,
+        Resource::Work,
+        content_length,
+        SourceContentPublicationProgress::Untouched,
+    )?;
+
+    let mut scan_cancellation = None;
+    let result = package.with_verified_member_reader_abortable(constants::ODF_CONTENT, |reader| {
+        scan_content_reader(
+            reader,
+            limits,
+            options,
+            &mut scan_cancellation,
+            &mut visitor,
+        )
+    });
+    let report = match result {
+        Ok(report) => report,
+        Err(error) => {
+            let source_primary = error.core().is_some();
+            let callback_cancelled = !source_primary
+                && matches!(
+                    error.callback(),
+                    Some(Error::Other(message))
+                        if message.as_str() == SOURCE_CONTENT_SCAN_CANCELLED_MESSAGE
+                );
+            if callback_cancelled {
+                if let Some(error) = scan_cancellation.take() {
+                    return Err(SourceContentScanError::Publication(error));
+                }
+            }
+            return Err(SourceContentScanError::SourceMember(error));
+        },
+    };
+
+    package.ensure_current_for_publication().map_err(|error| {
+        SourceContentScanError::Publication(map_core_error(
+            error,
+            SourceContentPublicationProgress::Untouched,
+        ))
+    })?;
+    check_cancellation(options, SourceContentPublicationProgress::Untouched)?;
+    Ok(report)
+}
+
+pub(crate) fn scan_content_reader<F>(
+    reader: &mut dyn BufRead,
+    limits: XmlStreamLimits,
+    options: &SourceContentPublicationOptions,
+    cancellation: &mut Option<SourceContentPublicationError>,
+    visitor: &mut F,
+) -> Result<XmlStreamReport>
+where
+    F: for<'event> FnMut(&'event XmlStreamEvent<'event>, &BindingTracker) -> Result<()>,
+{
+    let mut visit = |event: &XmlStreamEvent<'_>, bindings: &BindingTracker| {
+        if let Err(error) = check_cancellation(options, SourceContentPublicationProgress::Untouched)
+        {
+            *cancellation = Some(error);
+            return Err(Error::Other(
+                SOURCE_CONTENT_SCAN_CANCELLED_MESSAGE.to_string(),
+            ));
+        }
+        visitor(event, bindings)
+    };
+    let scan_result = scan_xml(reader, limits, &mut visit);
+    if cancellation.is_some() {
+        return Err(Error::Other(
+            SOURCE_CONTENT_SCAN_CANCELLED_MESSAGE.to_string(),
+        ));
+    }
+    scan_result
+}
+
 /// Publish one source-backed ODF `content.xml` replacement to a non-seekable
 /// sink using the default bounded policy.
 pub fn write_content_xml_to_stream<W: Write>(
@@ -554,6 +733,13 @@ impl<W: Write> CheckedSink<'_, W> {
 
 impl<W: Write> Write for CheckedSink<'_, W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if !bytes.is_empty() {
+            // A successful flush only covers bytes accepted before this
+            // write.  Clear both markers before checking the write so a
+            // rejected later write cannot be reported as a complete output.
+            self.state.flush_started = false;
+            self.state.flush_completed = false;
+        }
         self.check_cancelled()?;
         self.check_source()?;
         let requested = u64::try_from(bytes.len()).map_err(|_| {
@@ -633,6 +819,7 @@ impl<W: Write> Write for CheckedSink<'_, W> {
 
     fn flush(&mut self) -> io::Result<()> {
         self.state.flush_started = true;
+        self.state.flush_completed = false;
         self.check_cancelled()?;
         self.check_source()?;
         {
@@ -915,7 +1102,7 @@ fn validate_replacement_limit(
     Ok(())
 }
 
-fn reject_encrypted_source(
+pub(crate) fn reject_encrypted_source(
     package: &SourceBackedPackage,
 ) -> std::result::Result<(), SourceContentPublicationError> {
     let manifest = package
@@ -965,6 +1152,82 @@ fn preflight_changed_publication(
                 "XML publication rejected for 'content.xml': {error}"
             )))
         })?;
+    package
+        .ensure_current_for_publication()
+        .map_err(|error| map_core_error(error, SourceContentPublicationProgress::Untouched))?;
+    Ok(())
+}
+
+/// Validate the common raw-preservation boundary for a streamed content
+/// insertion.  The insertion owner supplies the replacement member through
+/// ZIP replay; this helper therefore validates only source metadata and
+/// framing before the first output byte.
+pub(crate) fn preflight_insertion_source(
+    package: &SourceBackedPackage,
+    index: &soapberry_zip::PreservationIndex<'_, impl soapberry_zip::ReaderAt>,
+    options: &SourceContentPublicationOptions,
+) -> std::result::Result<(), SourceContentPublicationError> {
+    check_cancellation(options, SourceContentPublicationProgress::Untouched)?;
+    reject_encrypted_source(package)?;
+    if index.archive_end_offset() != package.len() {
+        return Err(unsupported(
+            "source archive has trailing bytes outside the located ZIP",
+        ));
+    }
+    let manifest = package
+        .manifest()
+        .map_err(|error| map_core_error(error, SourceContentPublicationProgress::Untouched))?;
+    let Some(content_entry) = manifest.get_entry(constants::ODF_CONTENT) else {
+        return Err(unsupported("manifest has no canonical content.xml entry"));
+    };
+    if content_entry.size.is_some() {
+        return Err(unsupported(
+            "manifest:size on content.xml is incompatible with streamed insertion",
+        ));
+    }
+    if !xml_minifier::audit::package::is_xml_part(constants::ODF_CONTENT, &content_entry.media_type)
+    {
+        return Err(unsupported("content.xml manifest media type is not XML"));
+    }
+    for path in package.publication_file_names() {
+        if is_signature_owner_path(path) {
+            return Err(unsupported(
+                "signed ODF packages require an explicit signature policy",
+            ));
+        }
+    }
+    validate_canonical_mimetype(package, index)?;
+    validate_preserved_member_framing(package, index)?;
+    let mut seen_names = HashSet::new();
+    seen_names
+        .try_reserve(index.entries().len())
+        .map_err(|source| SourceContentPublicationError::Allocation {
+            resource: "source-content insertion member names",
+            source,
+        })?;
+    let mut content_count = 0_u8;
+    for entry in index.entries() {
+        let raw_name = entry.raw_name_bytes();
+        let mut owned_name = Vec::new();
+        owned_name
+            .try_reserve_exact(raw_name.len())
+            .map_err(|source| SourceContentPublicationError::Allocation {
+                resource: "source-content insertion member name",
+                source,
+            })?;
+        owned_name.extend_from_slice(raw_name);
+        if !seen_names.insert(owned_name) {
+            return Err(unsupported("ambiguous duplicate ZIP member names"));
+        }
+        if entry.raw_name_bytes() == constants::ODF_CONTENT.as_bytes() {
+            content_count = content_count.saturating_add(1);
+        }
+    }
+    if content_count != 1 {
+        return Err(unsupported(
+            "source archive must contain exactly one canonical content.xml member",
+        ));
+    }
     package
         .ensure_current_for_publication()
         .map_err(|error| map_core_error(error, SourceContentPublicationProgress::Untouched))?;
@@ -1521,7 +1784,9 @@ fn map_execution_error(
     }
 }
 
-fn map_preflight_zip_error(error: soapberry_zip::Error) -> SourceContentPublicationError {
+pub(crate) fn map_preflight_zip_error(
+    error: soapberry_zip::Error,
+) -> SourceContentPublicationError {
     match error.into_kind() {
         ZipErrorKind::Allocation { resource, source } => {
             SourceContentPublicationError::Allocation { resource, source }
@@ -1763,6 +2028,8 @@ mod tests {
     use super::*;
     use crate::core::PackageWriter;
     use litchi_core::OwnedSource;
+    use std::io::{self, Write};
+    use std::sync::Arc;
 
     const MIME: &str = constants::ODF_TEXT;
     const SOURCE: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body/></office:document-content>"#;
@@ -1803,6 +2070,106 @@ mod tests {
             .expect("publish");
         assert!(report.is_no_op());
         assert_eq!(output, bytes);
+    }
+
+    #[test]
+    fn checked_sink_late_write_invalidates_completed_flush() {
+        struct ZeroAfterFirstWrite {
+            writes: usize,
+        }
+
+        impl Write for ZeroAfterFirstWrite {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.writes += 1;
+                if self.writes == 1 {
+                    Ok(bytes.len())
+                } else {
+                    Ok(0)
+                }
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(package_bytes())))
+                .expect("open");
+        let options = SourceContentPublicationOptions::new();
+        let expected_version = package.source_version_snapshot();
+        let mut state = OutputState::new();
+        let mut sink = CheckedSink {
+            inner: ZeroAfterFirstWrite { writes: 0 },
+            package: &package,
+            expected_version,
+            options: &options,
+            state: &mut state,
+        };
+
+        assert_eq!(sink.write(b"x").expect("first write"), 1);
+        sink.flush().expect("first flush");
+        assert_eq!(
+            sink.state.progress(),
+            SourceContentPublicationProgress::Complete { bytes: 1 }
+        );
+        assert_eq!(
+            sink.write(b"y")
+                .expect_err("second write must be zero")
+                .kind(),
+            io::ErrorKind::WriteZero
+        );
+        assert_eq!(
+            sink.state.progress(),
+            SourceContentPublicationProgress::Prefix { accepted: 1 }
+        );
+    }
+
+    #[test]
+    fn checked_sink_repeat_flush_failure_is_unflushed() {
+        struct FailSecondFlush {
+            flushes: usize,
+        }
+
+        impl Write for FailSecondFlush {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                Ok(bytes.len())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                self.flushes += 1;
+                if self.flushes == 2 {
+                    Err(io::Error::new(
+                        io::ErrorKind::BrokenPipe,
+                        "second flush failed",
+                    ))
+                } else {
+                    Ok(())
+                }
+            }
+        }
+
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(package_bytes())))
+                .expect("open");
+        let options = SourceContentPublicationOptions::new();
+        let expected_version = package.source_version_snapshot();
+        let mut state = OutputState::new();
+        let mut sink = CheckedSink {
+            inner: FailSecondFlush { flushes: 0 },
+            package: &package,
+            expected_version,
+            options: &options,
+            state: &mut state,
+        };
+
+        assert_eq!(sink.write(b"x").expect("write"), 1);
+        sink.flush().expect("first flush");
+        assert!(sink.flush().is_err(), "second flush must fail");
+        assert_eq!(
+            sink.state.progress(),
+            SourceContentPublicationProgress::CompleteUnflushed { bytes: 1 }
+        );
     }
 
     #[test]

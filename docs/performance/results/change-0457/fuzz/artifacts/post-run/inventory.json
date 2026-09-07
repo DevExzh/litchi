@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "change": 457,
+  "runs": 1000,
+  "seed": 457,
+  "timeout_seconds": 10,
+  "target_dir": "/home/zhuhe/code/litchi/target/fuzz-asan",
+  "files": [
+    {
+      "path": "zip/corpus-inventory.json",
+      "bytes": 17022,
+      "sha256": "a1eb23d4f4d7d10c7593ab6fcb70a2da23d9864125f3afaf66520186a728966e"
+    },
+    {
+      "path": "zip/fuzz-0457-zip-build.json",
+      "bytes": 1764,
+      "sha256": "ef6ca51d898bc5354af8f490f6b203fbc58401be78a329bcb49b45184f45d98c"
+    },
+    {
+      "path": "zip/fuzz-0457-zip-build.log",
+      "bytes": 1000,
+      "sha256": "632d2b7ebaefc70063f5c3308ddc0195f700205f00426d35ee1368b30f51daef"
+    },
+    {
+      "path": "zip/fuzz-0457-zip-lock.json",
+      "bytes": 1394,
+      "sha256": "401a7e4b1ceafb7e0accb9390304e24202e51218883a3a93a2b131f60cd48169"
+    },
+    {
+      "path": "zip/fuzz-0457-zip-lock.log",
+      "bytes": 123,
+      "sha256": "6d14d2d28694d361e855dab914fb87bf06027d01bf005cce1f3e8744b6a3b3b5"
+    },
+    {
+      "path": "zip/fuzz-0457-zip-smoke.json",
+      "bytes": 1464,
+      "sha256": "2999fa7b3d936d20197a7d0fa34932de98baf0c984634caa3d951a8d2d1231ab"
+    },
+    {
+      "path": "zip/fuzz-0457-zip-smoke.log",
+      "bytes": 18082,
+      "sha256": "9085c1728049d19834c84f751416fac5603f0c74e10962dbc9d9fea5143becda"
+    },
+    {
+      "path": "zip/parse_zip",
+      "bytes": 23226512,
+      "sha256": "7e93608293e7c6be739c6ea62284e6800935b7fe5e2c25fd7540fba18c94f48e"
+    },
+    {
+      "path": "xml/corpus-inventory.json",
+      "bytes": 23488,
+      "sha256": "5527a3ad04fcbd00278af678f4a22129c456987671218200173b83e8b96c8a74"
+    },
+    {
+      "path": "xml/fuzz-0457-xml-build.json",
+      "bytes": 1763,
+      "sha256": "07a31a01b0cf441f99198ca5f80b5389288658cea5d201601f91477aca158591"
+    },
+    {
+      "path": "xml/fuzz-0457-xml-build.log",
+      "bytes": 3893,
+      "sha256": "69c78e6974f73cf8d678de98e4d11d80d0df240f0f52c0f955eb7e69a5096e02"
+    },
+    {
+      "path": "xml/fuzz-0457-xml-lock.json",
+      "bytes": 1394,
+      "sha256": "61308e49f24c2d4deb2ac390bdaf7ce99318223df9798dbfbfd6925787e421cb"
+    },
+    {
+      "path": "xml/fuzz-0457-xml-lock.log",
+      "bytes": 124,
+      "sha256": "034ba42d39befbf36c22c7b0e805a3599408b22a682ef6b03a702e6307f9367b"
+    },
+    {
+      "path": "xml/fuzz-0457-xml-smoke.json",
+      "bytes": 1461,
+      "sha256": "25db02ad064106c8fea618b7d537f323a770af5a5ce21c559b01d9a1545fb4e6"
+    },
+    {
+      "path": "xml/fuzz-0457-xml-smoke.log",
+      "bytes": 25153,
+      "sha256": "166d8cb66e29430abbf264efa06af5309037df0b4c50beb794cd5fc7286c3193"
+    },
+    {
+      "path": "xml/scan_xml",
+      "bytes": 51801704,
+      "sha256": "95050b64489f7fcd651b6ff9e5d9e7de029ed4e703fb4eab0c85b4152a817b99"
+    }
+  ]
+}

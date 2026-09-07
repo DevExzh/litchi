@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "kind": "fuzz-seed-snapshot",
+  "change": 457,
+  "zip_max_len": 1048576,
+  "xml_max_len": 65536,
+  "seed_rows": [
+    {
+      "path": "seeds/zip/payload-0-0.zip",
+      "bytes": 264,
+      "sha256": "fe7fa6f770ba52c1a64d6fb81e5f13ce7dc89b65c5c4218e5c8d6152124d56df",
+      "source": "change-0456/fuzz-inputs/payload-0-0.zip"
+    },
+    {
+      "path": "seeds/zip/payload-0-8.zip",
+      "bytes": 268,
+      "sha256": "02ffff071f3ecd7ea6ff01cbc4ca7ea19859cc34724849dc93e18fe4d5e79b44",
+      "source": "change-0456/fuzz-inputs/payload-0-8.zip"
+    },
+    {
+      "path": "seeds/zip/payload-131089-0.zip",
+      "bytes": 131353,
+      "sha256": "be7ae4fee5d6f568078dea03ed53574800d2b7162e88017b163efcab3c366744",
+      "source": "change-0456/fuzz-inputs/payload-131089-0.zip"
+    },
+    {
+      "path": "seeds/zip/payload-131089-8.zip",
+      "bytes": 131395,
+      "sha256": "8d99a11d377a55aa0e943a0aa143c1f2e6bcd5ebc486b539c3a9f0db5b90a955",
+      "source": "change-0456/fuzz-inputs/payload-131089-8.zip"
+    },
+    {
+      "path": "seeds/zip/payload-17-0.zip",
+      "bytes": 281,
+      "sha256": "130874c9a51eafe45cc4b21392be1fdbcfd43999dcc4e4a2165c53f04caf48a6",
+      "source": "change-0456/fuzz-inputs/payload-17-0.zip"
+    },
+    {
+      "path": "seeds/zip/payload-17-8.zip",
+      "bytes": 285,
+      "sha256": "969c7ef36a8c76ca7a60974e2e8197735fee425db9c34bacd8ae5739c5bab757",
+      "source": "change-0456/fuzz-inputs/payload-17-8.zip"
+    },
+    {
+      "path": "seeds/xml/bad-truncated.xml",
+      "bytes": 50,
+      "sha256": "7b6a9bcfb2916132618445aa8463aa05ee227833f56016d798838b7067677dd4",
+      "source": "deterministic XML seed"
+    },
+    {
+      "path": "seeds/xml/bom.xml",
+      "bytes": 49,
+      "sha256": "cb8a94ffd602bd7ba45d8b8b0b415d6052a3453a57455a5f8952fe5b7073cd76",
+      "source": "deterministic XML seed"
+    },
+    {
+      "path": "seeds/xml/depth-64.xml",
+      "bytes": 449,
+      "sha256": "bd7785c1654936f098593ee3650a45be2ca9c9a3c2491d271ff0838407b24377",
+      "source": "deterministic XML seed"
+    },
+    {
+      "path": "seeds/xml/good.xml",
+      "bytes": 115,
+      "sha256": "fd8af4be15b00baea1d311fc2ccf8d1572257fd55681c3cfd88dd4dd94a630a7",
+      "source": "deterministic XML seed"
+    },
+    {
+      "path": "seeds/xml/namespaces.xml",
+      "bytes": 141,
+      "sha256": "11723bd986789810c929d8f1e1f6e726450f744f82e4e9359e359b08b89a4efb",
+      "source": "deterministic XML seed"
+    },
+    {
+      "path": "seeds/xml/token-boundaries.xml",
+      "bytes": 144,
+      "sha256": "bc245d24619e88864fa5f9a9cef6ba0f4b2c9cf6080a6d22d23785c4b5178629",
+      "source": "deterministic XML seed"
+    },
+    {
+      "path": "seeds/native/native-small.odp",
+      "bytes": 10369,
+      "sha256": "1a53debb329bb86e2b65252b2c40ad5b2d8692d2b1ed0c3d737d7a16f381a44e",
+      "source": "3rdparty/libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf108963.odp"
+    }
+  ]
+}

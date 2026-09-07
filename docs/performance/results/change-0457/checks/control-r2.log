@@ -1,0 +1,6 @@
+{"status": "running", "phase": "R2", "lane": "R2-allocator-large-r2"}
+{"status": "running", "phase": "R2", "lane": "R2-allocator-medium-r2"}
+{"status": "running", "phase": "R2", "lane": "R2-allocator-tiny-r2"}
+{"status": "running", "phase": "R2", "lane": "R2-normal-large-r2"}
+{"status": "running", "phase": "R2", "lane": "R2-normal-medium-r2"}
+{"status": "running", "phase": "R2", "lane": "R2-normal-tiny-r2"}

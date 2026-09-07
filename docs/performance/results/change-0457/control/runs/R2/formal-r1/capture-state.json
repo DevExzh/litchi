@@ -1,0 +1,58 @@
+{
+  "allocator_environment": {},
+  "allocator_environment_after": {},
+  "attempt": "formal-r1",
+  "change": 457,
+  "completed_lanes": 6,
+  "driver_sha256": "1240fb87b02da86c9e34a1399efdcb5268c34654479898b0a6bb30665c492a6f",
+  "expected_lanes": 6,
+  "finished_utc": "2026-09-07T10:25:53.935080+00:00",
+  "index": [
+    "runs/R2/formal-r1/R2-allocator-large-r2-receipt.json",
+    "runs/R2/formal-r1/R2-allocator-medium-r2-receipt.json",
+    "runs/R2/formal-r1/R2-allocator-tiny-r2-receipt.json",
+    "runs/R2/formal-r1/R2-normal-large-r2-receipt.json",
+    "runs/R2/formal-r1/R2-normal-medium-r2-receipt.json",
+    "runs/R2/formal-r1/R2-normal-tiny-r2-receipt.json"
+  ],
+  "outside_bundle_status_unchanged": true,
+  "phase": "R2",
+  "protocol_sha256": "9ad033b9a9fd3787f9d6c9b2bbe1fa3cc7476072430551329708ba50d86f2c5e",
+  "schema": "litchi-0457-control-capture-state-v1",
+  "source_after": {
+    "files": 7007,
+    "path": "sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json",
+    "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89"
+  },
+  "source_before": {
+    "files": 7007,
+    "path": "sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json",
+    "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89"
+  },
+  "source_unchanged": true,
+  "status": "pass",
+  "status_after": [
+    "?? docs/GOAL.md",
+    "?? docs/performance/results/change-0457/check.py",
+    "?? docs/performance/results/change-0457/checks/baseline-build.json",
+    "?? docs/performance/results/change-0457/checks/control-oracle-r1-preflight.json",
+    "?? docs/performance/results/change-0457/checks/control-r1-retry.json",
+    "?? docs/performance/results/change-0457/checks/control-r1.json",
+    "?? docs/performance/results/change-0457/checks/control-r2.json",
+    "?? docs/performance/results/change-0457/hypothesis.md",
+    "?? docs/performance/results/change-0457/parent.json",
+    "?? docs/performance/results/change-0457/sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md",
+    "?? docs/performance/results/change-0457/check.py",
+    "?? docs/performance/results/change-0457/checks/baseline-build.json",
+    "?? docs/performance/results/change-0457/checks/control-oracle-r1-preflight.json",
+    "?? docs/performance/results/change-0457/checks/control-r1-retry.json",
+    "?? docs/performance/results/change-0457/checks/control-r1.json",
+    "?? docs/performance/results/change-0457/checks/control-r2.json",
+    "?? docs/performance/results/change-0457/hypothesis.md",
+    "?? docs/performance/results/change-0457/parent.json",
+    "?? docs/performance/results/change-0457/sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json"
+  ]
+}

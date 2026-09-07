@@ -1,0 +1,192 @@
+{
+  "capture_driver_sha256": "609a705bf61c8863e6e526d51d6571b89e12d101fb535002819865479412e614",
+  "change": 457,
+  "claims": {
+    "allowed": [
+      "current-revision source-backed ODP publication-plan timing, source ReadAt counters, sink counters, process/RSS observations, and allocator observations for this selector and matrix",
+      "independent deterministic semantic, ZIP member, manifest, source immutability, stale-source refusal, proof, and output digest checks"
+    ],
+    "withheld": [
+      "ordinary Commit/Patch speedup or regression",
+      "general CRUD or retained-result equivalence",
+      "physical I/O, source requested-byte or request-histogram attribution",
+      "bounded-memory, scaling, cancellation, or causal hotspot claim"
+    ]
+  },
+  "cpu": 2,
+  "custody": {
+    "driver_path": "../check.py",
+    "driver_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+    "source_manifest_policy": "candidate build receipt and source-manifest.json bind the exact source snapshot; capture derives the check.py source identity and requires no drift before, between, or after lanes"
+  },
+  "environment": {
+    "allocator_ambient": {},
+    "allocator_observation": {
+      "keys": [
+        "GLIBC_TUNABLES"
+      ],
+      "policy": "record ambient values and pass them through unchanged; this lane requires an empty ambient observation and never tunes it",
+      "prefixes": [
+        "MALLOC_"
+      ]
+    },
+    "fixed": {
+      "DEBUGINFOD_URLS": "",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "RUSTUP_TOOLCHAIN": "1.98.1"
+    },
+    "rustflags": null
+  },
+  "matrix": {
+    "reports": 12,
+    "reports_per_phase": 6,
+    "retained_samples": 360,
+    "samples_per_report": 30
+  },
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "oracle": {
+    "argv": [
+      "{python}",
+      "-B",
+      "{verifier}",
+      "--report",
+      "{report}",
+      "--mode",
+      "{mode}",
+      "--shape",
+      "{shape}"
+    ],
+    "corpus_bindings_path": "corpus-bindings.json",
+    "corpus_bindings_sha256": "dc49f4ee6593fe769729087f7b564f75f36899f0db9e71a55bf9ea3e42b8e459",
+    "protocol_path": "oracle/protocol.json",
+    "protocol_sha256": "7f16a5d5d8f52222c59fa73cdf930a9cb07c3b0a9ebf4b34e431f062fd2b9c7a",
+    "success_stdout": "VALID",
+    "verifier_path": "oracle/verify-report.py",
+    "verifier_sha256": "ea8c712f0a2499d5b1e76a3dcf8a5a03c913302ed4e6cba3f94cb6d2bc791d14"
+  },
+  "order": [
+    {
+      "mode": "normal",
+      "phase": "R1",
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "mode": "normal",
+      "phase": "R1",
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "mode": "normal",
+      "phase": "R1",
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "mode": "allocator",
+      "phase": "R1",
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "mode": "allocator",
+      "phase": "R1",
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "mode": "allocator",
+      "phase": "R1",
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "mode": "allocator",
+      "phase": "R2",
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "mode": "allocator",
+      "phase": "R2",
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "mode": "allocator",
+      "phase": "R2",
+      "repeat": "R2",
+      "shape": "tiny"
+    },
+    {
+      "mode": "normal",
+      "phase": "R2",
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "mode": "normal",
+      "phase": "R2",
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "mode": "normal",
+      "phase": "R2",
+      "repeat": "R2",
+      "shape": "tiny"
+    }
+  ],
+  "output_binding": {
+    "binder_path": "bind-output.py",
+    "binder_sha256": "2a66e9404e700cd1e3c81e918f95402e0f6c8071a806564e8aef21808acefb97",
+    "native_oracle": {
+      "path": "../native/verify-output.py",
+      "sha256": "f81bd21de6134a92ee9204e5c5c5ff7c5220a2d682f05e7b023e1ebef561cad2"
+    },
+    "path": "output-binding.json",
+    "sha256": "b6ffcd0b6e4ceb1e04eb00c480f44932f9e4648124e7daa9aac9cdc9bbf3a7c3"
+  },
+  "purpose": "Two-repeat current-revision source-backed ODP tail-append publication evidence over the shared deterministic 64/4096/8192 corpus; specialized publication-plan evidence only, with no ordinary Commit/Patch comparison claim.",
+  "repeats": 2,
+  "roles": {
+    "candidate": {
+      "binary_binding": {
+        "path": "binary-bindings.json"
+      },
+      "build_receipt": {
+        "path": "build-receipt.json"
+      },
+      "revision": "from-build-receipt",
+      "selector": "odp_source_tail_append_lifecycle",
+      "source_field": "odp_source_tail_append",
+      "source_manifest": {
+        "path": "source-manifest.json"
+      }
+    }
+  },
+  "samples": 30,
+  "schema": "litchi-0457-odp-source-tail-candidate-v1",
+  "selector": "odp_source_tail_append_lifecycle",
+  "shapes": {
+    "large": 8192,
+    "medium": 4096,
+    "tiny": 64
+  },
+  "status": "prepared-final-candidate-epoch-before-build-binding",
+  "warmups": 3,
+  "workers": 1,
+  "workload_cli": {
+    "case_flag": "--case",
+    "catalog_flag": "--corpus-manifest",
+    "report_flag": "--json",
+    "samples_flag": "--samples",
+    "shape_flag": "--semantic-shape",
+    "warmup_flag": "--warmup",
+    "workers_flag": "--workers"
+  }
+}

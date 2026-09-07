@@ -1,0 +1,56 @@
+{
+  "fixture": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf123658_SearchAfterSlideChange.odp",
+  "source_sha256": "f1a4ac949addd581d704adf38098b0a0a757aad1fcf4ff884463a67d1e6baca4",
+  "argv": [
+    "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+    "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf123658_SearchAfterSlideChange.odp",
+    "/tmp/litchi-goal-0457/native-final/04.odp",
+    "Native title & <字> café",
+    "Native body Ω 😀"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-09-07T13:37:26.702382+00:00",
+  "exit_code": 0,
+  "log": "04-probe.log",
+  "log_sha256": "fc47ec8dade592452bac8fbfeb3916d4591e551a1f33969a07d1d00934479c69",
+  "title": "Native title & <字> café",
+  "body": "Native body Ω 😀",
+  "retained_source": {
+    "path": "04-source.odp.gz",
+    "bytes": 9824,
+    "sha256": "2bee130c47cea49139cc03ffd100fe35dd6aedec9978ce171a1ef1cc0837dbea",
+    "decoded_bytes": 11749,
+    "decoded_sha256": "f1a4ac949addd581d704adf38098b0a0a757aad1fcf4ff884463a67d1e6baca4"
+  },
+  "output": {
+    "path": "/tmp/litchi-goal-0457/native-final/04.odp",
+    "bytes": 11860,
+    "sha256": "409412099235d02e3cb90f152d74c61bd2956e2e8ffc1638a0c6b9d9253ffc5b"
+  },
+  "retained_output": {
+    "path": "04-output.odp.gz",
+    "bytes": 9945,
+    "sha256": "ecee48733bedcfd71e9c922100cd084709877bdf74cfddfd6dd283af490d897f",
+    "decoded_bytes": 11860,
+    "decoded_sha256": "409412099235d02e3cb90f152d74c61bd2956e2e8ffc1638a0c6b9d9253ffc5b"
+  },
+  "oracle": {
+    "argv": [
+      "python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+      "--source",
+      "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf123658_SearchAfterSlideChange.odp",
+      "--output",
+      "/tmp/litchi-goal-0457/native-final/04.odp",
+      "--title",
+      "Native title & <字> café",
+      "--body",
+      "Native body Ω 😀"
+    ],
+    "exit_code": 0,
+    "log": "04-oracle.log",
+    "sha256": "f276e4bece6893c85043f48be9aa2587e62af1a9122e95bb6d95914d84dd0802"
+  },
+  "status": "validated"
+}

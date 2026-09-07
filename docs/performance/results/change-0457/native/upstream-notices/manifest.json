@@ -1,0 +1,26 @@
+[
+  {
+    "source": "3rdparty/libreoffice-core/COPYING",
+    "retained": "COPYING",
+    "bytes": 35147,
+    "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+  },
+  {
+    "source": "3rdparty/libreoffice-core/COPYING.LGPL",
+    "retained": "COPYING.LGPL",
+    "bytes": 7639,
+    "sha256": "a853c2ffec17057872340eee242ae4d96cbf2b520ae27d903e1b2fef1a5f9d1c"
+  },
+  {
+    "source": "3rdparty/libreoffice-core/COPYING.MPL",
+    "retained": "COPYING.MPL",
+    "bytes": 16725,
+    "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5"
+  },
+  {
+    "source": "3rdparty/libreoffice-core/README.md",
+    "retained": "README.md",
+    "bytes": 7066,
+    "sha256": "5613c7d727910f7f9f71203d2df850d8d44e50059b69ff21f1d3b0c2a60ece58"
+  }
+]

@@ -1,0 +1,124 @@
+{
+  "content": {
+    "exact_source_prefix_verified": true,
+    "exact_source_suffix_verified": true,
+    "generated_page": {
+      "name": "page2",
+      "roles": [
+        {
+          "role": "title",
+          "text_bytes": 26
+        },
+        {
+          "role": "object",
+          "text_bytes": 19
+        }
+      ]
+    },
+    "generated_page_sha256": "3f214f9dd044b21f40fba0e238a4c909e846d48e517671181a48fce3d7311e8e",
+    "one_extra_direct_draw_page_verified": true,
+    "output_content_xml_bytes": 10641,
+    "output_content_xml_sha256": "6e10738de44ef0a2f28db644387bc2ec60d6127b4f5d3b339ba205af26e868ee",
+    "output_generated_page_end_byte": 10520,
+    "output_generated_page_start_byte": 9816,
+    "output_page_count": 2,
+    "output_page_names": [
+      "page1",
+      "page2"
+    ],
+    "source_content_xml_bytes": 9937,
+    "source_content_xml_sha256": "0fed939bd56059d708b054ad27c739334bceef2c4a9c88f7add019735bc9d46e",
+    "source_last_page_end_byte": 9816,
+    "source_leading_direct_children": [],
+    "source_page_count": 1,
+    "source_page_names": [
+      "page1"
+    ],
+    "source_pages_contiguous": true,
+    "source_prefix_sha256": "67459e4877e4a9b6f3d0887902dd3638243b5ba24790e10fb5414a4d547154b4",
+    "source_suffix_sha256": "1cefe969866c9f7b23991e5c00fe33a3dfe5240d95b780434b5a1ff6e10874fe",
+    "source_trailing_direct_children": [
+      "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0}settings"
+    ]
+  },
+  "output": {
+    "bytes": 11589,
+    "path": "/tmp/litchi-goal-0457/native/02.odp",
+    "sha256": "a724fbcf5fa0b2b7dd8fa0eab0051359eb90f25ed90483a09983837c99d0b1a8"
+  },
+  "output_archive_sha256": "a724fbcf5fa0b2b7dd8fa0eab0051359eb90f25ed90483a09983837c99d0b1a8",
+  "request": {
+    "body": "Native body Ω 😀",
+    "name": "page2",
+    "title": "Native title & <字> café"
+  },
+  "schema": "litchi-0457-native-odp-append-oracle-v1",
+  "source": {
+    "bytes": 11466,
+    "inventory_binding": {
+      "bytes": 11466,
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs-compat.odp",
+      "sha256": "c3807045610afa87e5e217284f236a0cbb7aaca2ca2eea6b0f0acc0c6a7746cf",
+      "static_only": true
+    },
+    "path": "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs-compat.odp",
+    "sha256": "c3807045610afa87e5e217284f236a0cbb7aaca2ca2eea6b0f0acc0c6a7746cf"
+  },
+  "source_archive_sha256": "c3807045610afa87e5e217284f236a0cbb7aaca2ca2eea6b0f0acc0c6a7746cf",
+  "source_hash_verified": true,
+  "static_only_classification": "independent ZIP/XML append oracle; no native application or semantic Rust reopen claim",
+  "status": "validated",
+  "zip": {
+    "archive_comment_verified": true,
+    "central_member_order_verified": true,
+    "local_member_order_verified": true,
+    "target_dynamic_central_fields": {
+      "output_compressed_size": 1919,
+      "output_crc32": 870836400,
+      "output_date": 0,
+      "output_flags": 0,
+      "output_time": 0,
+      "output_uncompressed_size": 10641,
+      "source_compressed_size": 1780,
+      "source_crc32": 4256359881,
+      "source_uncompressed_size": 9937
+    },
+    "target_local_central_self_consistent": true,
+    "target_member": "content.xml",
+    "target_output_compression_method": 8,
+    "target_output_dynamic_sizes": {
+      "compressed_size": 1919,
+      "crc32": 870836400,
+      "uncompressed_size": 10641
+    },
+    "target_source_compression_method": 8,
+    "untouched_member_count": 7,
+    "untouched_members_central_records_offset_only_verified": [
+      "mimetype",
+      "Configurations2/",
+      "styles.xml",
+      "Thumbnails/thumbnail.png",
+      "meta.xml",
+      "settings.xml",
+      "META-INF/manifest.xml"
+    ],
+    "untouched_members_compressed_payload_verified": [
+      "mimetype",
+      "Configurations2/",
+      "styles.xml",
+      "Thumbnails/thumbnail.png",
+      "meta.xml",
+      "settings.xml",
+      "META-INF/manifest.xml"
+    ],
+    "untouched_members_raw_local_spans_verified": [
+      "mimetype",
+      "Configurations2/",
+      "styles.xml",
+      "Thumbnails/thumbnail.png",
+      "meta.xml",
+      "settings.xml",
+      "META-INF/manifest.xml"
+    ]
+  }
+}

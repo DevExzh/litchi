@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "kind": "fuzz-source-snapshot",
+  "change": 457,
+  "source_rows": [
+    {
+      "path": "source/parse_zip.rs",
+      "bytes": 21864,
+      "sha256": "3c0a99513cfca93486493140caec770c19557792b5b26bd565ff110c834511ae",
+      "source": "crates/soapberry-zip/fuzz/fuzz_targets/parse_zip.rs"
+    },
+    {
+      "path": "source/scan_xml.rs",
+      "bytes": 995,
+      "sha256": "1faf58709a267ebb8972d81342cdb0421c26e684a0ba44da793b2fac7847aba1",
+      "source": "crates/litchi-odf-common/fuzz/fuzz_targets/scan_xml.rs"
+    },
+    {
+      "path": "source/soapberry-zip-Cargo.toml",
+      "bytes": 485,
+      "sha256": "a6b3701d83415bd0b574f60391c15ed710271f2df7d913fdcec8ee3d5521d1e6",
+      "source": "crates/soapberry-zip/fuzz/Cargo.toml (absolute dependency path)"
+    },
+    {
+      "path": "source/litchi-odf-common-Cargo.toml",
+      "bytes": 447,
+      "sha256": "9bdd11a2594f9d046359b4df8ce6430e793b1616890aaafafb1d72937f625aae",
+      "source": "crates/litchi-odf-common/fuzz/Cargo.toml (absolute dependency path)"
+    }
+  ]
+}

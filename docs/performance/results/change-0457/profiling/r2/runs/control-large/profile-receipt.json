@@ -1,0 +1,250 @@
+{
+  "allocation": {
+    "reason": "ordinary allocator counters were not collected and allocator variables were not tuned",
+    "status": "unavailable"
+  },
+  "allocator_environment": {},
+  "artifacts": {
+    "catalog": {
+      "bytes": 4945,
+      "path": "runs/control-large/catalog.json",
+      "sha256": "e7a121e024a51eb0fa9a420d9ea80c65d6ff14b124712510031bc9b4da68a3ad"
+    },
+    "oracle": {
+      "bytes": 381,
+      "path": "runs/control-large/oracle.log",
+      "sha256": "4c7efcf0be95feab1dd0a0fa25f3432d39929ced60c753d47fb543b15ea59be9"
+    },
+    "perf_data": {
+      "bytes": 14636480,
+      "path": "runs/control-large/perf.data",
+      "sha256": "f94d3e0c35a843598fa21c11e6949f0ea18c0e868bba125e852d8f1afe492c69"
+    },
+    "perf_help_stderr": {
+      "bytes": 469,
+      "path": "runs/control-large/perf-help.stderr",
+      "sha256": "0d0fb5d56368819238f62b804bd641c11bf1529d330f1cb18f5a72155ab4164a"
+    },
+    "perf_help_stdout": {
+      "bytes": 0,
+      "path": "runs/control-large/perf-help.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf_record_stderr": {
+      "bytes": 198,
+      "path": "runs/control-large/perf-record.stderr",
+      "sha256": "f8133ff8225c3bd1cd5383a42affe2b36687d3bfa5a0cb3388228b7247ca3632"
+    },
+    "perf_record_stdout": {
+      "bytes": 0,
+      "path": "runs/control-large/perf-record.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf_script": {
+      "bytes": 431552,
+      "path": "runs/control-large/perf-script.txt",
+      "sha256": "1e1ed47fbf8ff70515a1dc7809c6d7b704e765c7e5aba889f74147a5c7c5eb26"
+    },
+    "perf_script_stderr": {
+      "bytes": 0,
+      "path": "runs/control-large/perf-script.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "report": {
+      "bytes": 88105,
+      "path": "runs/control-large/report.json",
+      "sha256": "c1dbcddac5a300111fa089f293e44664ea66a41e9748a558f28608263b0521e3"
+    },
+    "resource": {
+      "bytes": 1290,
+      "path": "runs/control-large/resource.log",
+      "sha256": "3f22b8b0c46d923a5086ab914856567115c4193eedbaaca7467d0f772e1da7ee"
+    },
+    "stacks_folded": {
+      "bytes": 200625,
+      "path": "runs/control-large/stacks.folded",
+      "sha256": "079bfdeec3b275ba7f8a6b4d600e37f520e0cc00d79a0aa64674fc035037b167"
+    },
+    "top_symbols": {
+      "bytes": 17779,
+      "path": "runs/control-large/top-symbols.txt",
+      "sha256": "29e2bc4cfe8492573c89c8e45d7ca0e2e9789fbf097f9c989a7894b81c5a9255"
+    },
+    "top_symbols_stderr": {
+      "bytes": 0,
+      "path": "runs/control-large/top-symbols.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "bytes": 57528080,
+    "copy_path": "/tmp/litchi-goal-0457/control/litchi-perf-baseline",
+    "sha256": "746ac15348863c13f3ee3aae79d63d37ffda255e77471981540842088c9b8356",
+    "source_path": "tools/perf-baseline/target/release/litchi-perf-baseline"
+  },
+  "bound_files": {
+    "binary_binding": {
+      "path": "control/binary-bindings.json",
+      "sha256": "1423e0f091681aaf87537246d96b2e7dd73c434c229218c53b966eaa5dbe7e9e"
+    },
+    "build_receipt": {
+      "path": "control/build-receipt.json",
+      "sha256": "d984795360d6572fcd569c41a40cf5064f328dcb528d4e5923231c759c0116f0"
+    },
+    "source_manifest": {
+      "path": "control/source-manifest.json",
+      "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89"
+    },
+    "workload_protocol": {
+      "path": "control/protocol.json",
+      "sha256": "a451ae1d963d441321fad486bcfef7834f5d3487b4ed19fb150d0342ec53bd80"
+    }
+  },
+  "call_graph": {
+    "dwarf_advertised": true,
+    "probe_exit_code": 129,
+    "requested": "dwarf,8192",
+    "selected": "dwarf,8192"
+  },
+  "change": 457,
+  "check_tag": "profile-control-large-r2",
+  "commands": {
+    "call_graph_probe": [
+      "perf",
+      "record",
+      "--call-graph",
+      "help"
+    ],
+    "flat_report": [
+      "perf",
+      "report",
+      "--stdio",
+      "--no-inline",
+      "--no-children",
+      "--call-graph",
+      "none",
+      "--percent-limit",
+      "0",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/control-large/perf.data"
+    ],
+    "oracle": [
+      "/usr/bin/python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/control/oracle/verify-report.py",
+      "--report",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/control-large/report.json",
+      "--mode",
+      "normal",
+      "--shape",
+      "large",
+      "--samples",
+      "100",
+      "--warmups",
+      "3"
+    ],
+    "record": [
+      "taskset",
+      "-c",
+      "2",
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/control-large/resource.log",
+      "perf",
+      "record",
+      "--no-buildid-cache",
+      "-F",
+      "99",
+      "-e",
+      "cycles:u",
+      "--call-graph",
+      "dwarf,8192",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/control-large/perf.data",
+      "--",
+      "/tmp/litchi-goal-0457/control/litchi-perf-baseline",
+      "--case",
+      "odp_existing_append_lifecycle",
+      "--semantic-shape",
+      "large",
+      "--workers",
+      "1",
+      "--samples",
+      "100",
+      "--warmup",
+      "3",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/control-large/report.json",
+      "--corpus-manifest",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/control-large/catalog.json"
+    ],
+    "script": [
+      "perf",
+      "script",
+      "--no-inline",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/control-large/perf.data"
+    ]
+  },
+  "counters": {
+    "reason": "sampled cycles:u profile only; perf stat counters were not collected",
+    "status": "unavailable"
+  },
+  "custody_wrapper_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+  "failures": [
+    "oracle exited 2"
+  ],
+  "finished_utc": "2026-09-07T13:12:46.136203+00:00",
+  "label": "control-large-normal",
+  "oracle_exit_code": 2,
+  "postprocess": {
+    "flat_report_exit_code": 0,
+    "folded": {
+      "malformed_blocks": 0,
+      "parsed_blocks": 1469,
+      "total_period": 64672297523,
+      "unique_stacks": 901
+    },
+    "script_exit_code": 0
+  },
+  "protocol_sha256": "21f1b3e9d227e09d8bd2c6b7bb2340d90d69a543a486a3378524cff0d640f0ac",
+  "r1_provenance": {
+    "ambient_source_epoch": {
+      "files": 7027,
+      "path": "sources/faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422.json",
+      "sha256": "faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422"
+    },
+    "amendment": "r2",
+    "bound_source": {
+      "files": 7007,
+      "path": "sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json",
+      "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89"
+    },
+    "candidate_ambient_exclusions": [],
+    "control_ambient_comparison": "withheld-by-design",
+    "source_policy": "control old binary is authenticated by retained build and binary bindings; current ambient source is recorded separately"
+  },
+  "record_exit_code": 0,
+  "role": "control",
+  "rss": {
+    "scope": "perf-recorded process tree, including profiler overhead",
+    "source": "GNU /usr/bin/time -v Maximum resident set size (kbytes) in resource.log",
+    "status": "retained"
+  },
+  "runner_sha256": "4a658eb52ef9d777c191a68c081efb3af11cef2064bfe297150d6e67f7a6d5f4",
+  "schema": "litchi-0457-large-profile-receipt-v1",
+  "source_after": {
+    "files": 7027,
+    "path": "sources/faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422.json",
+    "sha256": "faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422"
+  },
+  "source_before": {
+    "files": 7027,
+    "path": "sources/faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422.json",
+    "sha256": "faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-07T13:12:28.165941+00:00",
+  "status": "failed"
+}

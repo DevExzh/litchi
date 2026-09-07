@@ -1,0 +1,9 @@
+{
+  "change": 457,
+  "parent_revision": "48f11c7745f8f798a00e11a14f1f34dc1c9c7954",
+  "accepted_adr_tree": "76e25f13bb82090aa8941efddd0f352e91481d4f",
+  "previous_goal_turn_classification": "progress",
+  "previous_evidence": "0456 measured shared ZIP framing, sealed replay/cleanup, committed then rebased onto origin/feat/office-format-completeness.",
+  "started_utc": "2026-09-07T10:01:39.661810+00:00",
+  "purpose": "Measured bounded existing-document ODP tail append; ZIP replay framing and ODF streaming transform are dependencies. Full non-iWork goal remains open."
+}

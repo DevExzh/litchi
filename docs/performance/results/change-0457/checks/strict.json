@@ -1,0 +1,50 @@
+{
+  "change": 457,
+  "argv": [
+    "cargo",
+    "clippy",
+    "--locked",
+    "--release",
+    "-p",
+    "soapberry-zip",
+    "-p",
+    "litchi-odf-common",
+    "-p",
+    "litchi-odp",
+    "--all-targets",
+    "--all-features",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "48f11c7745f8f798a00e11a14f1f34dc1c9c7954",
+  "driver_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-07T11:59:14.674161+00:00",
+  "source_before": {
+    "path": "sources/fc1691d4c5d5c06a2c0e154fabffb4707ea3d219bbf96abbe539a32ea0a6bc7e.json",
+    "sha256": "fc1691d4c5d5c06a2c0e154fabffb4707ea3d219bbf96abbe539a32ea0a6bc7e",
+    "files": 7023
+  },
+  "status": "failed",
+  "exit_code": 101,
+  "finished_utc": "2026-09-07T11:59:17.122868+00:00",
+  "source_after": {
+    "path": "sources/fc1691d4c5d5c06a2c0e154fabffb4707ea3d219bbf96abbe539a32ea0a6bc7e.json",
+    "sha256": "fc1691d4c5d5c06a2c0e154fabffb4707ea3d219bbf96abbe539a32ea0a6bc7e",
+    "files": 7023
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/strict.log",
+    "bytes": 5628,
+    "sha256": "7a26b8a91ea653a3940d7adfbce85b0b4e1e845b5e47937818c76e949fab8613"
+  }
+}

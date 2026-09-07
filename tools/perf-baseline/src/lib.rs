@@ -14,6 +14,7 @@ mod docx_story_hyperlinks;
 mod filesystem;
 mod odp_buffered_create;
 mod odp_existing_append;
+mod odp_source_tail_append;
 mod odp_streaming_create;
 mod odt_streaming_create;
 mod opc_part_add;
@@ -1479,6 +1480,7 @@ enum Case {
     OdpBufferedCreate,
     OdpStreamingCreate,
     OdpExistingAppendLifecycle,
+    OdpSourceTailAppendLifecycle,
     OdpSemanticNoopEditSave,
     OdpSemanticOneEditSave,
     OdpMediaTextBoxEditSave,
@@ -2067,6 +2069,7 @@ impl Case {
             Self::OdpBufferedCreate => "odp_buffered_create",
             Self::OdpStreamingCreate => "odp_streaming_create",
             Self::OdpExistingAppendLifecycle => "odp_existing_append_lifecycle",
+            Self::OdpSourceTailAppendLifecycle => "odp_source_tail_append_lifecycle",
             Self::OdpSemanticNoopEditSave => "odp_semantic_noop_edit_save",
             Self::OdpSemanticOneEditSave => "odp_semantic_one_edit_save",
             Self::OdpMediaTextBoxEditSave => "odp_media_textbox_edit_save",
@@ -2687,6 +2690,10 @@ impl Case {
 
     const fn uses_odp_existing_append(self) -> bool {
         matches!(self, Self::OdpExistingAppendLifecycle)
+    }
+
+    const fn uses_odp_source_tail_append(self) -> bool {
+        matches!(self, Self::OdpSourceTailAppendLifecycle)
     }
 
     const fn uses_odp_media(self) -> bool {
@@ -4383,6 +4390,8 @@ struct SourceSummary {
     odp_slides: Option<odp_buffered_create::OdpSlidesSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_append: Option<odp_existing_append::OdpExistingAppendSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    odp_source_tail_append: Option<odp_source_tail_append::OdpSourceTailAppendSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     opc_part_add: Option<opc_part_add::Summary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -8795,6 +8804,18 @@ pub fn write_opc_part_add_fixtures(directory: &std::path::Path) -> Result<(), Bo
     opc_part_add::export(directory)
 }
 
+/// Export source/candidate ODP tail-append fixtures to a new caller-selected directory.
+///
+/// This is a standalone benchmark helper, not a production library API.
+///
+/// # Errors
+/// Returns fixture validation or filesystem errors; an existing directory is refused.
+pub fn write_odp_source_tail_append_fixtures(
+    directory: &std::path::Path,
+) -> Result<(), Box<dyn Error>> {
+    odp_source_tail_append::export_odp_source_tail_append_fixtures(directory)
+}
+
 pub fn run() -> Result<(), Box<dyn Error>> {
     if filesystem::run_child_if_requested()? {
         return Ok(());
@@ -8983,6 +9004,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_odp_buffered_creation()
                     && !case.uses_odp_streaming_creation()
                     && !case.uses_odp_existing_append()
+                    && !case.uses_odp_source_tail_append()
                     && !case.uses_opc_part_add()
                     && !case.uses_ods_buffered_creation()
                     && !case.uses_ods_streaming_creation()
@@ -10621,6 +10643,31 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_odp_source_tail_append())
+    {
+        for shape in &options.semantic_shapes {
+            let corpus = odp_source_tail_append::build_odp_source_tail_append_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_odp_source_tail_append())
+            {
+                results.push(
+                    odp_source_tail_append::run_odp_source_tail_append_lifecycle(
+                        case,
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                    )?,
+                );
+            }
+        }
+    }
+
     if options.cases.iter().any(|case| case.uses_odp_media()) {
         let corpus = build_odp_media_corpus()?;
         for case in options.cases.iter().filter(|case| case.uses_odp_media()) {
@@ -11821,6 +11868,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_buffered_create" => Some(Case::OdpBufferedCreate),
         "odp_streaming_create" => Some(Case::OdpStreamingCreate),
         "odp_existing_append_lifecycle" => Some(Case::OdpExistingAppendLifecycle),
+        "odp_source_tail_append_lifecycle" => Some(Case::OdpSourceTailAppendLifecycle),
         "odp_semantic_noop_edit_save" => Some(Case::OdpSemanticNoopEditSave),
         "odp_semantic_one_edit_save" => Some(Case::OdpSemanticOneEditSave),
         "odp_media_textbox_edit_save" => Some(Case::OdpMediaTextBoxEditSave),
@@ -12255,6 +12303,7 @@ fn usage_text() -> String {
                                        odp_semantic_text_to_sink,\n\
                                        odp_semantic_create_small,odp_buffered_create,\n\
                                        odp_streaming_create, odp_existing_append_lifecycle,\n\
+                                       odp_source_tail_append_lifecycle,\n\
                                        odp_semantic_noop_edit_save,\n\
                                        odp_semantic_one_edit_save,odp_media_textbox_edit_save,\n\
                                        odp_media_textbox_scalar_replace_save,\n\
@@ -23229,6 +23278,9 @@ fn run_case_with_config(
         },
         Case::OdpExistingAppendLifecycle => {
             Err("existing ODP append cases use their dedicated corpus runner".into())
+        },
+        Case::OdpSourceTailAppendLifecycle => {
+            Err("source-backed ODP tail append uses its dedicated corpus runner".into())
         },
         Case::OdpMediaTextBoxEditSave => {
             run_odp_media_textbox_edit_save(corpus, warmup_iterations, samples)
@@ -58687,7 +58739,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 438);
+        assert_eq!(selectable_count, 439);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 

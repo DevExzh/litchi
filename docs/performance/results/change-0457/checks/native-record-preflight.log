@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native/preflight.py", line 14, in <module>
+    records, validated, probe_failures, oracle_failures = verifier['verify_records'](
+                                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        fixtures, bindings, True)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native/verify.py", line 740, in verify_records
+    require(output_path.resolve().is_relative_to(TASK.resolve()),
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            f"record {index_number} output escapes native task directory")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native/verify.py", line 51, in require
+    fail(message)
+    ~~~~^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native/verify.py", line 46, in fail
+    raise VerificationError(message)
+<run_path>.VerificationError: record 0 output escapes native task directory

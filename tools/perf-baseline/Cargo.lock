@@ -1966,6 +1966,7 @@ dependencies = [
  "crc32fast",
  "flate2",
  "rayon",
+ "sha2 0.10.9",
 ]
 
 [[package]]

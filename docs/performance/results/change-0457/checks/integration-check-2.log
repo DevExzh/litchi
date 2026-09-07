@@ -1,0 +1,137 @@
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking ecdsa v0.16.9
+    Checking primeorder v0.13.6
+    Checking phf v0.14.0
+    Checking bergshamra-c14n v0.7.0
+    Checking x509-cert v0.2.5
+    Checking p256 v0.13.2
+    Checking zopfli v0.8.3
+    Checking der v0.7.10
+    Checking zip v8.6.0
+   Compiling rstest_macros v0.26.1
+    Checking spki v0.7.3
+    Checking rand v0.8.8
+    Checking pkcs8 v0.10.2
+    Checking sec1 v0.7.3
+    Checking thiserror v2.0.18
+    Checking elliptic-curve v0.13.8
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+    Checking quickcheck v1.0.3
+error: hidden lifetime parameters in types are deprecated
+   --> crates/litchi-odf-common/src/core/source_publication.rs:557:30
+    |
+557 |     let mut visit = |event: &XmlStreamEvent, bindings: &BindingTracker| {
+    |                              ^^^^^^^^^^^^^^ expected lifetime parameter
+    |
+    = note: `-D elided-lifetimes-in-paths` implied by `-D rust-2018-idioms`
+    = help: to override `-D rust-2018-idioms` add `#[allow(elided_lifetimes_in_paths)]`
+help: indicate the anonymous lifetime
+    |
+557 |     let mut visit = |event: &XmlStreamEvent<'_>, bindings: &BindingTracker| {
+    |                                            ++++
+
+error: unnecessary qualification
+  --> crates/litchi-odf-common/src/core/stream_xml.rs:60:33
+   |
+60 | const MACHINE_WORD_BYTES: u64 = std::mem::size_of::<usize>() as u64;
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+   |
+60 - const MACHINE_WORD_BYTES: u64 = std::mem::size_of::<usize>() as u64;
+60 + const MACHINE_WORD_BYTES: u64 = size_of::<usize>() as u64;
+   |
+
+    Checking bergshamra-core v0.7.0
+    Checking bergshamra-xml v0.7.0
+    Checking num-bigint-dig v0.8.6
+error[E0599]: no method named `attributes` found for reference `&BytesDecl<'_>` in the current scope
+    --> crates/litchi-odf-common/src/core/stream_xml.rs:1164:34
+     |
+1164 |     for attribute in declaration.attributes() {
+     |                                  ^^^^^^^^^^ method not found in `&BytesDecl<'_>`
+
+    Checking pkcs1 v0.7.5
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking rstest v0.26.1
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking rsa v0.9.10
+error[E0004]: non-exhaustive patterns: `&_` not covered
+   --> crates/litchi-odf-common/src/core/source_publication/insertion.rs:953:11
+    |
+953 |     match error {
+    |           ^^^^^ pattern `&_` not covered
+    |
+note: `ReplayPublicationError<SourceContentInsertionCallbackError>` defined here
+   --> crates/soapberry-zip/src/preserve/replay.rs:188:1
+    |
+188 | pub enum ReplayPublicationError<E> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: the matched value is of type `&ReplayPublicationError<SourceContentInsertionCallbackError>`
+    = note: `ReplayPublicationError<SourceContentInsertionCallbackError>` is marked as non-exhaustive, so a wildcard `_` is necessary to match exhaustively
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+982 ~         ReplayPublicationError::NonDeterministic { .. } => None,
+983 ~         &_ => todo!(),
+    |
+
+error[E0597]: `local` does not live long enough
+    --> crates/litchi-odf-common/src/core/stream_xml.rs:1005:20
+     |
+ 991 |         let local = tracker
+     |             ----- binding `local` declared here
+...
+1005 |             local: local.as_ref(),
+     |                    ^^^^^ borrowed value does not live long enough
+1006 |         };
+1007 |         if expanded_names.len() == expanded_names.capacity() {
+     |            -------------- borrow later used here
+...
+1018 |     }
+     |     - `local` dropped here while still borrowed
+
+Some errors have detailed explanations: E0004, E0597, E0599.
+For more information about an error, try `rustc --explain E0004`.
+error: could not compile `litchi-odf-common` (lib) due to 5 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0308]: mismatched types
+   --> crates/soapberry-zip/src/preserve/replay_tests.rs:833:21
+    |
+833 |                 Err("emit failed")
+    |                 --- ^^^^^^^^^^^^^ expected `String`, found `&str`
+    |                 |
+    |                 arguments to this enum variant are incorrect
+    |
+help: the type constructed contains `&'static str` due to the type of the argument passed
+   --> crates/soapberry-zip/src/preserve/replay_tests.rs:833:17
+    |
+833 |                 Err("emit failed")
+    |                 ^^^^-------------^
+    |                     |
+    |                     this argument influences the type of `Err`
+note: tuple variant defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:566:4
+help: try using a conversion method
+    |
+833 |                 Err("emit failed".to_string())
+    |                                  ++++++++++++
+
+error[E0282]: type annotations needed
+   --> crates/litchi-odf-common/src/core/stream_xml.rs:627:26
+    |
+627 |                         .as_ref()
+    |                          ^^^^^^
+    |
+help: try using a fully qualified path to specify the expected types
+    |
+626 -                     && !text
+627 -                         .as_ref()
+626 +                     && !<[u8] as AsRef<T>>::as_ref(text)
+    |
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `soapberry-zip` (lib test) due to 1 previous error
+error: could not compile `litchi-odf-common` (lib) due to 5 previous errors
+Some errors have detailed explanations: E0004, E0282, E0597, E0599.
+error: could not compile `litchi-odf-common` (lib test) due to 6 previous errors

@@ -1,0 +1,112 @@
+{
+  "allocator_environment": {},
+  "allocator_environment_after": {},
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R1/final/R1-normal-large-r1-resource.log",
+    "/tmp/litchi-goal-0457/candidate-final/litchi-perf-baseline",
+    "--case",
+    "odp_source_tail_append_lifecycle",
+    "--semantic-shape",
+    "large",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R1/final/R1-normal-large-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R1/final/R1-normal-large-r1-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4951,
+      "path": "runs/R1/final/R1-normal-large-r1-catalog.json",
+      "sha256": "9812408ecb52dc2713ea96068c1872ac0524614f5c948350d34c8ccfa78fad84"
+    },
+    "oracle_log": {
+      "bytes": 326,
+      "path": "runs/R1/final/R1-normal-large-r1-oracle.log",
+      "sha256": "93f1c7e397022aac8fff7a5e46f9ea99caa53ebd184f77f48a06ec3a4750be03"
+    },
+    "report": {
+      "bytes": 54403,
+      "path": "runs/R1/final/R1-normal-large-r1.json",
+      "sha256": "9c0277d5f8d025551bc2238e9414fadfc6435b2bf1b0f75386996f8579efa072"
+    },
+    "resource_log": {
+      "bytes": 1141,
+      "path": "runs/R1/final/R1-normal-large-r1-resource.log",
+      "sha256": "751e257460cdb99dec2d13890cd8b996caf902e9c2fd2eb27fd121522a4b8af1"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/R1/final/R1-normal-large-r1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "final",
+  "binary": {
+    "bytes": 58037952,
+    "copy_path": "/tmp/litchi-goal-0457/candidate-final/litchi-perf-baseline",
+    "executable": true,
+    "profile": "release",
+    "sha256": "3c8b2503ab692838cd5f36ad72fc1a3afce49e9b0411f4d9db0d7095ded34a52",
+    "source_path": "tools/perf-baseline/target/release/litchi-perf-baseline"
+  },
+  "binary_binding_sha256": "34dfe25667c8ebb4233412778165e3aa931146b3ee5cef46bcbde57c6122bd6d",
+  "change": 457,
+  "custody_driver": "/home/zhuhe/code/litchi/docs/performance/results/change-0457/check.py",
+  "custody_driver_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "609a705bf61c8863e6e526d51d6571b89e12d101fb535002819865479412e614",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T13:37:53.912296+00:00",
+  "lane": {
+    "mode": "normal",
+    "phase": "R1",
+    "repeat": "R1",
+    "shape": "large"
+  },
+  "name": "R1-normal-large-r1",
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/oracle/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R1/final/R1-normal-large-r1.json",
+    "--mode",
+    "normal",
+    "--shape",
+    "large"
+  ],
+  "oracle_exit_code": 0,
+  "oracle_stdout_sha256": "93f1c7e397022aac8fff7a5e46f9ea99caa53ebd184f77f48a06ec3a4750be03",
+  "output_binding_sha256": "b6ffcd0b6e4ceb1e04eb00c480f44932f9e4648124e7daa9aac9cdc9bbf3a7c3",
+  "phase": "R1",
+  "protocol_sha256": "d8e1d48aacf76337529dd76ee1bfc021ac91d52a02f71d7327ab0e8c118169f7",
+  "revision": "48f11c7745f8f798a00e11a14f1f34dc1c9c7954",
+  "role": "candidate",
+  "schema": "litchi-0457-source-tail-candidate-capture-receipt-v1",
+  "selector": "odp_source_tail_append_lifecycle",
+  "source_after": {
+    "files": 7027,
+    "path": "sources/02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8.json",
+    "sha256": "02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8"
+  },
+  "source_before": {
+    "files": 7027,
+    "path": "sources/02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8.json",
+    "sha256": "02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-07T13:37:47.607328+00:00",
+  "status": "pass"
+}

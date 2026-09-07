@@ -1,0 +1,44 @@
+{
+  "change": 457,
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0457/control/oracle/verify-report-r1.py",
+    "--report",
+    "docs/performance/results/change-0457/control/runs/R1/formal/R1-normal-tiny-r1.json",
+    "--mode",
+    "normal",
+    "--shape",
+    "tiny"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "48f11c7745f8f798a00e11a14f1f34dc1c9c7954",
+  "driver_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-07T10:23:03.775008+00:00",
+  "source_before": {
+    "path": "sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json",
+    "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89",
+    "files": 7007
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T10:23:03.977079+00:00",
+  "source_after": {
+    "path": "sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json",
+    "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89",
+    "files": 7007
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/control-oracle-r1-preflight.log",
+    "bytes": 6,
+    "sha256": "de545cc7e7ff8eaacefae8fcb4a954555a1224f24fe7ce8ff62b9874c54f3fe2"
+  }
+}

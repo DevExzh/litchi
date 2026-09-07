@@ -1,0 +1,8 @@
+[
+  "runs/R1/final/R1-normal-tiny-r1-receipt.json",
+  "runs/R1/final/R1-normal-medium-r1-receipt.json",
+  "runs/R1/final/R1-normal-large-r1-receipt.json",
+  "runs/R1/final/R1-allocator-tiny-r1-receipt.json",
+  "runs/R1/final/R1-allocator-medium-r1-receipt.json",
+  "runs/R1/final/R1-allocator-large-r1-receipt.json"
+]

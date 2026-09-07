@@ -1,0 +1,19 @@
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+   Compiling litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+    Finished `release` profile [optimized] target(s) in 33.90s
+     Running unittests src/lib.rs (target/release/deps/litchi_odp-e8510d1515433f67)
+
+running 10 tests
+test package::source_append::tests::candidate_validation_refuses_existing_generated_name_without_source_rescan ... ok
+test package::source_append::tests::carriage_return_text_is_a_typed_refusal ... ok
+test package::source_append::tests::empty_presentation_refuses_with_typed_invalid_error ... ok
+test package::source_append::tests::generated_story_semantics_match_established_readback ... ok
+test package::source_append::tests::large_space_runs_are_split_at_parser_limit ... ok
+test package::source_append::tests::leading_presentation_declaration_does_not_block_page_tail_append ... ok
+test package::source_append::tests::publication_inserts_before_native_trailing_presentation_child ... ok
+test package::source_append::tests::self_closing_presentation_refuses_with_typed_invalid_error ... ok
+test package::source_append::tests::unicode_whitespace_is_a_typed_refusal ... ok
+test package::source_append::tests::whitespace_only_body_is_read_back_from_object_shape ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 172 filtered out; finished in 0.00s
+

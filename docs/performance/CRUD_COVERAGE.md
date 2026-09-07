@@ -1,5 +1,24 @@
 # Performance CRUD coverage
 
+## 2026-09-07: change 0457 measures bounded existing ODP tail publication
+
+[0457](results/change-0457/README.md) adds the opt-in
+`odp_source_tail_append_lifecycle` selector and recaptures the ordinary
+`odp_existing_append_lifecycle` control. Each retains 360 samples over two
+repeats, normal/allocator binaries, and three generated source sizes. The
+source-tail result uses a bounded XML window and ZIP replay; ordinary
+Snapshot/Edit/Commit/Patch remains a separate, implemented owned lifecycle.
+The comparison does not establish ordinary Commit/Patch speedup or equivalence.
+
+Registry/default counts are 439/36. Representative index counts remain 15
+categories, 33 mappings, 10 measured and 23 correctness-only. That index's
+`measured` status specifically requires its default-run checked catalog;
+the generated-per-run ODP matrix is a formal supplementary baseline. Ten
+public native fixtures and three synthetic output pairs passed independent
+ZIP/XML preservation checks, without an Office application launch. Broader
+append/repackaging, native application, cold/range I/O and scaling obligations
+remain open.
+
 ## 2026-09-07: change 0453 measures category 9 PPTX decoded sharing
 
 [0453](changes/0453-pptx-shared-decoded-payload.md) adds 480 ordinary timing samples, 240 separate allocator samples and a

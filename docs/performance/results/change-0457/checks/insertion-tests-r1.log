@@ -1,0 +1,39 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+    Finished `release` profile [optimized] target(s) in 20.23s
+     Running tests/source_content_insertion.rs (target/release/deps/source_content_insertion-16241de4265716bd)
+
+running 11 tests
+test cancellation_after_first_sink_write_retains_typed_cause_and_prefix ... ok
+test cancellation_is_typed_during_prepare_and_publication ... ok
+test hierarchical_budgets_and_input_accounting_are_enforced ... ok
+test invalid_offset_token_and_document_are_rejected_before_publication ... ok
+test memory_and_work_admission_precede_source_reads ... ok
+test optional_payload_verification_reads_opaque_member_before_first_output ... ok
+test replacement_and_output_limits_fail_before_output ... FAILED
+test sink_output_budget_retains_public_execution_cause ... ok
+test source_changes_after_prepare_and_during_measure_and_emit_are_primary ... ok
+test store_and_deflate_preserve_untouched_raw_members_and_xml_prefix_suffix ... ok
+test zero_partial_and_failing_sinks_report_truthful_progress ... FAILED
+
+failures:
+
+---- replacement_and_output_limits_fail_before_output stdout ----
+
+thread 'replacement_and_output_limits_fail_before_output' (3877886) panicked at crates/litchi-odf-common/tests/source_content_insertion.rs:616:5:
+assertion failed: matches!(error, SourceContentInsertionError::Replay { .. })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- zero_partial_and_failing_sinks_report_truthful_progress stdout ----
+
+thread 'zero_partial_and_failing_sinks_report_truthful_progress' (3877890) panicked at crates/litchi-odf-common/tests/source_content_insertion.rs:568:5:
+assertion failed: matches!(error, SourceContentInsertionError::Replay { .. })
+
+
+failures:
+    replacement_and_output_limits_fail_before_output
+    zero_partial_and_failing_sinks_report_truthful_progress
+
+test result: FAILED. 9 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-odf-common --test source_content_insertion`

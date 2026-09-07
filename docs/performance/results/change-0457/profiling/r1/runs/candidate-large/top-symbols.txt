@@ -1,0 +1,136 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cycles:u'
+# Event count (approx.): 75265600053
+#
+# Overhead  Command          Shared Object         Symbol                                                                                                                                                                                                                                                                                                                                  
+# ........  ...............  ....................  ........................................................................................................................................................................................................................................................................................................................................
+#
+    11.22%  litchi-perf-bas  litchi-perf-baseline  [.] sha2::sha256::x86_sha::compress
+     7.48%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odf_common::core::stream_xml::validate_name
+     6.30%  litchi-perf-bas  libc.so.6             [.] __memcmp_evex_movbe
+     5.30%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odf_common::core::stream_xml::validate_start_element
+     4.36%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odf_common::core::stream_xml::validate_event_bytes
+     4.12%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odf_common::core::binding_tracker::BindingTracker>::resolve_prefix
+     4.00%  litchi-perf-bas  litchi-perf-baseline  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+     3.96%  litchi-perf-bas  litchi-perf-baseline  [.] zlib_rs::deflate::longest_match::longest_match
+     3.59%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::events::attributes::IterState>::next
+     3.30%  litchi-perf-bas  litchi-perf-baseline  [.] core::str::converts::from_utf8
+     3.24%  litchi-perf-bas  litchi-perf-baseline  [.] sha2::sha256::x86::digest_blocks
+     2.53%  litchi-perf-bas  litchi-perf-baseline  [.] <core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write
+     2.12%  litchi-perf-bas  litchi-perf-baseline  [.] <std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&litchi_odf_common::core::stream_xml::ExpandedAttributeName>
+     1.94%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odf_common::core::binding_tracker::BindingTracker>::resolve_attribute
+     1.89%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::reader::Reader<litchi_odf_common::core::stream_xml::GuardedBufRead<&mut dyn std::io::BufRead>>>::read_event_impl::<&mut alloc::vec::Vec<u8>>
+     1.89%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odf_common::core::binding_tracker::BindingTracker>::push_scanned
+     1.83%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odf_common::core::stream_xml::scan_xml::<&mut dyn std::io::BufRead, &mut litchi_odf_common::core::source_publication::scan_content_reader<litchi_odp::package::source_append::scan_source::{closure#0}>::{closure#0}>
+     1.53%  litchi-perf-bas  litchi-perf-baseline  [.] <hashbrown::map::HashMap<litchi_odf_common::core::stream_xml::ExpandedAttributeName, (), std::hash::random::RandomState>>::insert
+     1.41%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odf_common::core::stream_xml::GuardedBufRead<&mut dyn std::io::BufRead> as std::io::BufRead>::fill_buf
+     1.41%  litchi-perf-bas  litchi-perf-baseline  [.] <memchr::arch::x86_64::avx2::memchr::One>::find_raw
+     1.41%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::events::attributes::IterState>::check_for_duplicates
+     1.29%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odf_common::core::stream_xml::scan_xml::<&mut dyn std::io::BufRead, &mut litchi_odf_common::core::source_publication::scan_content_reader<<litchi_odp::package::source_append::SourceBackedTailAppendEdit>::plan::{closure#3}>::{closure#0}>
+     1.29%  litchi-perf-bas  litchi-perf-baseline  [.] crc32fast::specialized::pclmulqdq::calculate
+     1.24%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::name::QName>::decompose
+     1.06%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odf_common::core::stream_xml::validate_references
+     1.06%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+     1.00%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odf_common::core::stream_xml::GuardedBufRead<&mut dyn std::io::BufRead> as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>
+     0.94%  litchi-perf-bas  litchi-perf-baseline  [.] zlib_rs::inflate::inflate_fast_help_avx2
+     0.82%  litchi-perf-bas  litchi-perf-baseline  [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+     0.82%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::reader::state::ReaderState>::emit_start
+     0.71%  litchi-perf-bas  libc.so.6             [.] __memmove_avx512_unaligned_erms
+     0.65%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odf_common::core::source_publication::insertion::SplicedReader as std::io::BufRead>::fill_buf
+     0.59%  litchi-perf-bas  litchi-perf-baseline  [.] core::slice::memchr::memchr_aligned
+     0.59%  litchi-perf-bas  [unknown]             [k] 0xffffffff8c800ef0
+     0.53%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odf_common::core::stream_xml::validate_end_element
+     0.53%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odf_common::core::stream_xml::validate_qname
+     0.47%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odf_common::core::binding_tracker::BindingTracker>::resolve_element
+     0.41%  litchi-perf-bas  libc.so.6             [.] _int_malloc
+     0.41%  litchi-perf-bas  litchi-perf-baseline  [.] <memchr::arch::x86_64::avx2::memchr::One>::find_raw_avx2
+     0.41%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odf_common::core::stream_xml::GuardedBufRead<&mut dyn std::io::BufRead> as std::io::BufRead>::consume
+     0.41%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>
+     0.35%  litchi-perf-bas  litchi-perf-baseline  [.] zlib_rs::deflate::flush_block_only
+     0.35%  litchi-perf-bas  libc.so.6             [.] malloc
+     0.35%  litchi-perf-bas  litchi-perf-baseline  [.] <memchr::arch::x86_64::avx2::memchr::Three>::find_raw
+     0.29%  litchi-perf-bas  litchi-perf-baseline  [.] zlib_rs::deflate::slide_hash::avx2::slide_hash_chain
+     0.29%  litchi-perf-bas  litchi-perf-baseline  [.] memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+     0.29%  litchi-perf-bas  litchi-perf-baseline  [.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+     0.29%  litchi-perf-bas  litchi-perf-baseline  [.] <memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2
+     0.29%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odf_common::core::source_publication::check_cancellation
+     0.29%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get
+     0.29%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event
+     0.24%  litchi-perf-bas  litchi-perf-baseline  [.] <soapberry_zip::office::VerifiedEntryBufReader<&mut flate2::deflate::read::DeflateDecoder<&mut soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_odf_common::core::package::SourceReader>>>>>::fill_buf_internal
+     0.24%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odf_common::core::source_publication::insertion::SplicedReader as std::io::BufRead>::consume
+     0.24%  litchi-perf-bas  litchi-perf-baseline  [.] <memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2
+     0.24%  litchi-perf-bas  litchi-perf-baseline  [.] <hashbrown::raw::RawTable<(litchi_odf_common::core::stream_xml::ExpandedAttributeName, ())>>::reserve_rehash::<hashbrown::map::make_hasher<litchi_odf_common::core::stream_xml::ExpandedAttributeName, (), std::hash::random::RandomState>::{closure#0}>
+     0.23%  litchi-perf-bas  litchi-perf-baseline  [.] <soapberry_zip::office::VerifiedEntryBufReader<&mut flate2::deflate::read::DeflateDecoder<&mut soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_odf_common::core::package::SourceReader>>>> as std::io::BufRead>::fill_buf
+     0.23%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::name::NamespaceResolver>::resolve_prefix
+     0.23%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles
+     0.18%  litchi-perf-bas  libc.so.6             [.] _int_free_merge_chunk
+     0.18%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odp::package::source_append::OdpScanState>::observe
+     0.18%  litchi-perf-bas  litchi-perf-baseline  [.] <soapberry_zip::office::VerifiedEntryBufReader<&mut flate2::deflate::read::DeflateDecoder<&mut soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_odf_common::core::package::SourceReader>>>> as std::io::BufRead>::consume
+     0.18%  litchi-perf-bas  litchi-perf-baseline  [.] <alloc::raw_vec::RawVecInner>::finish_grow
+     0.18%  litchi-perf-bas  litchi-perf-baseline  [.] zlib_rs::deflate::compare256::avx2::compare256
+     0.18%  litchi-perf-bas  libc.so.6             [.] unlink_chunk.isra.0
+     0.18%  litchi-perf-bas  libc.so.6             [.] cfree@GLIBC_2.2.5
+     0.18%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odp::package::source_append::CandidateValidator>::observe
+     0.18%  litchi-perf-bas  litchi-perf-baseline  [.] <&mut litchi_odf_common::core::source_publication::scan_content_reader<litchi_odp::package::source_append::scan_source::{closure#0}>::{closure#0} as core::ops::function::FnMut<(&litchi_odf_common::core::stream_xml::XmlStreamEvent, &litchi_odf_common::core::binding_tracker::BindingTracker)>>::call_mut
+     0.18%  litchi-perf-bas  litchi-perf-baseline  [.] <alloc::raw_vec::RawVec<core::ops::range::Range<usize>>>::grow_one
+     0.12%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_perf_baseline::odp_buffered_create::content_structure::verify_odp_buffered_content_structure
+     0.12%  litchi-perf-bas  litchi-perf-baseline  [.] core::ptr::drop_glue::<quick_xml::events::attributes::Attributes>
+     0.12%  litchi-perf-bas  litchi-perf-baseline  [.] <&mut litchi_odf_common::core::source_publication::scan_content_reader<<litchi_odp::package::source_append::SourceBackedTailAppendEdit>::plan::{closure#3}>::{closure#0} as core::ops::function::FnMut<(&litchi_odf_common::core::stream_xml::XmlStreamEvent, &litchi_odf_common::core::binding_tracker::BindingTracker)>>::call_mut
+     0.12%  litchi-perf-bas  litchi-perf-baseline  [.] <hashbrown::raw::RawTableInner>::fallible_with_capacity::<alloc::alloc::Global>
+     0.12%  litchi-perf-bas  litchi-perf-baseline  [.] zlib_rs::deflate::compare256::compare256_slice
+     0.12%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::name::NamespaceResolver>::resolve_event
+     0.12%  litchi-perf-bas  libc.so.6             [.] _int_free_chunk
+     0.12%  litchi-perf-bas  libc.so.6             [.] _int_realloc
+     0.11%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odp::codec::parser::codec::Parser>::shape_builder
+     0.11%  litchi-perf-bas  litchi-perf-baseline  [.] <alloc::raw_vec::RawVecInner>::finish_grow
+     0.11%  litchi-perf-bas  litchi-perf-baseline  [.] <alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+     0.06%  litchi-perf-bas  libc.so.6             [.] _int_free_maybe_trim
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odp::package::source_append::OdpScanState>::classify_start
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] xml_minifier::audit::check_attribute_layout
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <memchr::arch::x86_64::avx2::packedpair::Finder>::with_pair_impl
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] zlib_rs::inflate::inftrees::inflate_table
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] __rustc::__rust_no_alloc_shim_is_unstable_v2
+     0.06%  litchi-perf-bas  libc.so.6             [.] __libc_malloc2
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <<std::hash::random::RandomState>::new::KEYS::{K#0}::{closure#1} as core::ops::function::FnOnce<(core::option::Option<&mut core::option::Option<core::cell::Cell<(u64, u64)>>>,)>>::call_once
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] core::slice::memchr::memrchr
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::reader::state::ReaderState>::emit_end
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odp::codec::content_source::scanner::Scanner>::run
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] __rustc::__rdl_realloc
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <soapberry_zip::preserve::PreparedCentral>::checked_bytes
+     0.06%  litchi-perf-bas  libc.so.6             [.] realloc
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::model::slide::DrawingAttribute>>
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odp::model::slide::is_xml_local_name
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] quick_xml::escape::normalize_attribute_value::<quick_xml::escape::is_xml10_normalization_char, quick_xml::escape::normalize_xml10_eol_step, quick_xml::escape::resolve_predefined_entity>
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odf_common::package::edit::xml_splice_publication
+     0.06%  litchi-perf-bas  libc.so.6             [.] __memset_avx512_unaligned_erms
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odp::model::page_metadata::parse_page
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::name::NamespaceResolver>::set_level
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odp::codec::parser::codec::Parser>::finish_shape
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <memchr::arch::x86_64::avx2::memchr::Two>::find_raw
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <zlib_rs::deflate::Heap>::pqdownheap
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <soapberry_zip::office::VerifiedEntryBufReader<&mut flate2::deflate::read::DeflateDecoder<&mut soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_odf_common::core::package::SourceReader>>>>>::fill_buf_internal
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <soapberry_zip::accounting::ZipOperationAccounting>::add_deflate_bytes_accepted
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::name::QName>::as_namespace_binding
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::events::Event as core::ops::deref::Deref>::deref
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_perf_baseline::odp_buffered_create::content_structure::require_attributes
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odp::codec::parser::codec::Parser>::parse_pages_with_styles::<false>::{closure#0}
+     0.06%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>
+     0.05%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup
+     0.05%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+     0.05%  litchi-perf-bas  litchi-perf-baseline  [.] __rustc::__rust_dealloc
+     0.05%  git              [unknown]             [k] 0xffffffff8c800ef0
+     0.05%  git              git                   [.] 0x0000000000241c9b
+     0.00%  litchi-perf-bas  [unknown]             [k] 0xffffffff8cfed2d9
+     0.00%  litchi-perf-bas  ld-linux-x86-64.so.2  [.] _dl_sysdep_start
+     0.00%  litchi-perf-bas  [unknown]             [k] 0xffffffff8c800b90
+     0.00%  litchi-perf-bas  ld-linux-x86-64.so.2  [.] _start
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

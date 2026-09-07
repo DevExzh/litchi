@@ -1,0 +1,32 @@
+{
+  "change": 457,
+  "build_receipt": {
+    "path": "checks/candidate-final-build.json",
+    "sha256": "72005efbd64d85cb1ec6768cafbc38e9ff6f785345895ecb88f59a1f8f4d67bf"
+  },
+  "source_manifest": {
+    "path": "sources/02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8.json",
+    "sha256": "02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8",
+    "files": 7027
+  },
+  "files": [
+    {
+      "source": "tools/perf-baseline/target/release/litchi-perf-baseline",
+      "retained": "/tmp/litchi-goal-0457/candidate-final/litchi-perf-baseline",
+      "bytes": 58037952,
+      "sha256": "3c8b2503ab692838cd5f36ad72fc1a3afce49e9b0411f4d9db0d7095ded34a52"
+    },
+    {
+      "source": "tools/perf-baseline/target/release/litchi-perf-baseline-alloc",
+      "retained": "/tmp/litchi-goal-0457/candidate-final/litchi-perf-baseline-alloc",
+      "bytes": 57880592,
+      "sha256": "fe0a0bc8bafa976682dc03adcf16f80ee8602eefc0e4123c3c5da45a9214ab26"
+    },
+    {
+      "source": "tools/perf-baseline/target/release/examples/odp_source_tail_append_fixtures",
+      "retained": "/tmp/litchi-goal-0457/candidate-final/odp_source_tail_append_fixtures",
+      "bytes": 9448536,
+      "sha256": "ec7651aafdb8e17ed72840c9b49e8073dc8b9d7fa6049d7eb8953153786a5f24"
+    }
+  ]
+}

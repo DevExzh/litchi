@@ -1,0 +1,2 @@
+VALID
+argv=["/usr/bin/python3", "-B", "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate/oracle/verify-report.py", "--report", "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/candidate-large/report.json", "--mode", "normal", "--shape", "large", "--samples", "100", "--warmups", "3"]

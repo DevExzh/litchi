@@ -1,0 +1,34 @@
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+    Finished `release` profile [optimized] target(s) in 13.19s
+     Running tests/source_content_insertion.rs (target/release/deps/source_content_insertion-16241de4265716bd)
+
+running 11 tests
+test cancellation_after_first_sink_write_retains_typed_cause_and_prefix ... ok
+test cancellation_is_typed_during_prepare_and_publication ... ok
+test hierarchical_budgets_and_input_accounting_are_enforced ... ok
+test invalid_offset_token_and_document_are_rejected_before_publication ... ok
+test memory_and_work_admission_precede_source_reads ... ok
+test optional_payload_verification_reads_opaque_member_before_first_output ... ok
+test replacement_and_output_limits_fail_before_output ... ok
+test sink_output_budget_retains_public_execution_cause ... ok
+test source_changes_after_prepare_and_during_measure_and_emit_are_primary ... ok
+test store_and_deflate_preserve_untouched_raw_members_and_xml_prefix_suffix ... ok
+test zero_partial_and_failing_sinks_report_truthful_progress ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_member_reader.rs (target/release/deps/source_member_reader-408cbcce91a1a871)
+
+running 9 tests
+test abortable_callback_failure_does_not_drain_the_member ... ok
+test callback_error_and_bad_crc_keep_archive_error_primary ... ok
+test early_source_zero_is_observed_only_by_the_draining_reader ... ok
+test encrypted_target_refuses_before_callback ... ok
+test final_source_change_is_primary_and_retains_abortable_callback_error ... ok
+test normal_reader_drains_bad_size_but_abortable_reader_stops_before_it ... ok
+test repeated_reads_traverse_source_again_without_a_payload_cache ... ok
+test unsupported_compression_refuses_before_callback ... ok
+test verified_reader_streams_store_and_deflate_full_or_early_without_materializing ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

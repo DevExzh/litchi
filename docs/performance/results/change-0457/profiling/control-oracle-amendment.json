@@ -1,0 +1,39 @@
+{
+  "schema": "litchi-0457-profile-control-oracle-amendment-v1",
+  "change": 457,
+  "status": "validated",
+  "reason": "The profile recorder invoked the original control oracle, which expected frame-pointer flags. The frozen baseline was already corrected by control/protocol-r1.json to require rustflags null. The retained 100-sample profile report passes that already-existing amended oracle; workload, perf data, profile receipt, and formal captures are unchanged.",
+  "original_profile": {
+    "path": "profiling/r2/runs/control-large/profile-receipt.json",
+    "bytes": 8386,
+    "sha256": "c4a52923b77156447f8fcabdbea1273f931eb31a500e70d6afa26acf9fdfe390"
+  },
+  "report": {
+    "path": "profiling/r2/runs/control-large/report.json",
+    "bytes": 88105,
+    "sha256": "c1dbcddac5a300111fa089f293e44664ea66a41e9748a558f28608263b0521e3"
+  },
+  "applicable_control_protocol": {
+    "path": "control/protocol-r1.json",
+    "bytes": 5088,
+    "sha256": "9ad033b9a9fd3787f9d6c9b2bbe1fa3cc7476072430551329708ba50d86f2c5e"
+  },
+  "oracle": {
+    "path": "control/oracle/verify-report-r1.py",
+    "bytes": 53158,
+    "sha256": "cb7c76d6f2522e838bc26c72ed4e470380d846a63152f468fe9b79df1c088f41"
+  },
+  "validation_gate": {
+    "path": "checks/profile-control-oracle-r1.json",
+    "bytes": 1514,
+    "sha256": "7556f66e7a6ccc18eb1ee2b53dc15a1304ee4aaf9860324f54d87928f1d20eb3"
+  },
+  "validation_log": {
+    "path": "checks/profile-control-oracle-r1.log",
+    "bytes": 6,
+    "sha256": "de545cc7e7ff8eaacefae8fcb4a954555a1224f24fe7ce8ff62b9874c54f3fe2"
+  },
+  "samples": 100,
+  "warmups": 3,
+  "scope": "Post-capture diagnostic report validation only; original failed profile receipt retained."
+}

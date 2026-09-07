@@ -1,0 +1,2 @@
+INVALID: toolchain or frame-pointer build flags differ
+argv=["/usr/bin/python3", "-B", "/home/zhuhe/code/litchi/docs/performance/results/change-0457/control/oracle/verify-report.py", "--report", "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/control-large/report.json", "--mode", "normal", "--shape", "large", "--samples", "100", "--warmups", "3"]

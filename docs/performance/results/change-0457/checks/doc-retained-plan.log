@@ -1,0 +1,7 @@
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+ Documenting soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+ Documenting litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+ Documenting litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+    Finished `release` profile [optimized] target(s) in 19.23s
+   Generated /home/zhuhe/code/litchi/target/doc/litchi_odf_common/index.html and 2 other files
