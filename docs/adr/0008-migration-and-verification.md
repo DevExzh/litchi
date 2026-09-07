@@ -17808,3 +17808,21 @@ deleted-preview count was lost; the private `restored_previews` swap was fixed
 and a mandatory integration assertion was added before this passing rerun.
 Normal hooks and cleanup remain pending. No broader host-retirement claim
 follows from this slice.
+
+
+### Final audio-position retirement receipt (2026-09-07)
+
+Commit `4503332ba` publishes the focused audio-position owner and retires the
+raw host position methods, their private writer, and the obsolete example.
+All normal hooks passed: formatting, manifest sorting, workspace all-feature
+library lint, workspace all-feature library/integration tests, and workspace
+documentation tests. The final 13 audio-position cases include the exact double
+inverse regression and mandatory Keynote-saved fixture. The bounded ASAN run
+passed 256 inputs; boundary verification passed 949 cases and the full
+64-package, 238-dependency scan with 11 recorded migration dependencies.
+
+Cleanup removed 79 temporary files totaling 5,528,057 bytes and the generated
+fuzz lock/artifact directories. `cargo clean` removed 16,005 files and 10.7 GiB,
+leaving approximately 62 GiB free. Both native position fixtures remain tracked.
+The monolith exit remains active; richer media properties/readers and creation
+still require focused owners.
