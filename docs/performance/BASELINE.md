@@ -1,5 +1,35 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0461: reject ODP attribute-match split on the practical gate
+
+0461 measures a private ODP attribute-cache split that keeps namespace-first
+matching and delays value decoding until a namespace/local-name hit. The frozen
+A1/B1/B2/A2 matrix retains 24 reports and 720 samples; negative values are
+candidate minus baseline p50 deltas.
+
+| Shape | Normal p50 R1 / R2 | 95% p50 CI upper bounds R1 / R2 |
+|---|---:|---:|
+| Tiny, 64 slides | -2.0578% / -2.2940% | -1.7182% / -1.7941% |
+| Medium, 4,096 slides | -2.0604% / -3.8754% | -1.8185% / -3.6516% |
+| Large, 8,192 slides | -2.1547% / -3.1281% | -2.0598% / -2.9037% |
+
+The predeclared 3% medium/large gate fails in both R1 gated shapes, despite
+negative bootstrap upper bounds. All allocation metrics are exactly unchanged
+and no adverse >5% elapsed or process-RSS flags are present. This records
+partial timing improvements without retaining a speedup claim. Supplementary
+phase clocks and whole-process counters are diagnostic scopes; the key counter
+deltas are instructions -3.2567%, cycles -3.2314%, branch misses -3.3587% and
+cache misses +0.2581%, with setup, warmups and checks included.
+
+Assembly receipts show the candidate removes the out-of-line `lookup` body,
+inlines matching in `get`, and reduces its stack frame from `0x148` to `0x128`.
+The candidate passes 372 ODP tests, warning-denied all-target Clippy and scoped
+formatting; 387 harness tests pass with one ignored. The source is restored
+byte-exact to `05f432d48`. Final Clippy, documentation, formatting, boundaries,
+portable verification, tamper rejection and owned temporary cleanup pass. The experiment adds no coverage; 0460's retained
+optimization remains accepted, the registry stays 439 selectors / 36 defaults,
+the full non-iWork goal remains open, and iWork is untouched.
+
 ## Change 0460: retained fused ODP staging and source scanning
 
 0460 retains the private ODP staging optimization after the frozen A1/B1/B2/A2

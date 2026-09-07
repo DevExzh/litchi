@@ -1,0 +1,14 @@
+{
+  "schema": "litchi-0461-decision-v1",
+  "change": 461,
+  "status": "rejected",
+  "production_change_retained": false,
+  "summary_sha256": "0497055a0986f765dc685af1ff39828106728c2762d1d1ce4eac6027146f9d37",
+  "reason": "Normal p50 improves in every measured lane, but R1 medium (-2.0604%) and large (-2.1547%) fail the predeclared 3% practical threshold. R2 medium/large clear it; all normal bootstrap intervals lie below zero. Every allocation metric is unchanged. The code is restored exactly; the threshold is not relaxed after capture.",
+  "adverse_flags": [],
+  "allocation_increase_review_flags": [],
+  "restored_file": "crates/litchi-odp/src/codec/parser/codec/xml/validation.rs",
+  "restored_sha256": "0cbf4993e1516a633c63bcce8136dc7265f4fd00583684f993312562bfc26e29",
+  "memory_review": "All allocated bytes, allocation/deallocation/reallocation calls, regional peak above entry and retained-live metrics are equal. The assembly stack-frame decrease is not evidence of a practical memory benefit. RSS changes are within -2.537% to +1.852%.",
+  "next_work": "Investigate eliminating repeated cached-name matching with bounded recognized attribute keys/indexing; preserve lazy scan/error/first-match semantics. Keep 0460 staging fusion."
+}

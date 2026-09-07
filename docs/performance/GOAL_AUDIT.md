@@ -1,5 +1,35 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0461 evidence (2026-09-07)
+
+0461 records a partial normal-lifecycle improvement from splitting ODP
+attribute matching from value decoding, but rejects the candidate after the
+predeclared 3% practical gate. The frozen A1/B1/B2/A2 evidence contains 24
+reports and 720 samples. Normal p50 candidate-minus-baseline deltas are
+-2.0578% / -2.2940% for tiny, -2.0604% / -3.8754% for medium, and
+-2.1547% / -3.1281% for large in R1/R2. R1 medium and large fail the gated
+threshold; all normal p50 bootstrap upper bounds remain below zero. Allocation bytes,
+allocation calls, reallocations, deallocations, regional peak and retained-live
+metrics are exactly unchanged, and no adverse >5% elapsed or process-RSS flag
+is present. No retained speedup claim follows.
+
+The assembly receipt confirms that the out-of-line `ElementAttrs::lookup` body
+is removed, namespace/local-name checks are inlined into `get`, and the `get`
+stack frame moves from `0x148` to `0x128`. Supplementary phase clocks measure
+public API calls separately from the primary matrix. Whole-process counters
+include setup, warmups and checks and are not operation-only totals. Neither
+diagnostic establishes causal attribution.
+The candidate records 372 ODP tests, warning-denied all-target Clippy and
+scoped formatting as passing, plus 387 harness tests with one ignored. Source
+restoration to `05f432d48`, final Clippy/docs/formatting/boundaries, portable
+verification, tamper rejection and owned temporary cleanup pass.
+
+The experiment adds no selector or corpus coverage; the registry remains 439
+selectors / 36 defaults. 0460's fused staging optimization remains accepted,
+the full non-iWork goal remains open, and iWork is untouched. See the
+[0461 comparison summary](results/change-0461/summary.json), [phase summary](results/change-0461/phase-summary.json),
+[source review](results/change-0461/source-review.md), and [assembly receipts](results/change-0461/candidate-assembly.json).
+
 ## Current audit: 0460 evidence (2026-09-07)
 
 0460 retains the private ODP fused staging/source-scanning optimization. The

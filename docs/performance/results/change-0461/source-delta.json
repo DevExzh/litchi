@@ -1,0 +1,19 @@
+{
+  "schema": "litchi-0461-source-delta-v1",
+  "change": 461,
+  "files": [
+    {
+      "path": "crates/litchi-odp/src/codec/parser/codec/xml/validation.rs",
+      "baseline": {
+        "path": "source-artifacts/baseline/crates/litchi-odp/src/codec/parser/codec/xml/validation.rs.txt",
+        "bytes": 54929,
+        "sha256": "0cbf4993e1516a633c63bcce8136dc7265f4fd00583684f993312562bfc26e29"
+      },
+      "candidate": {
+        "path": "source-artifacts/candidate/crates/litchi-odp/src/codec/parser/codec/xml/validation.rs.txt",
+        "bytes": 57430,
+        "sha256": "f95f711722d16bacbbf3951aa76ded3238aa486166f7c6b9c7cb442ec8a41357"
+      }
+    }
+  ]
+}
