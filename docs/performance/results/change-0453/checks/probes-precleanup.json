@@ -1,0 +1,115 @@
+{
+  "change": 453,
+  "stage": "precleanup",
+  "status": "pass",
+  "valid_export": {
+    "exit_code": 0,
+    "stdout": "{\"status\": \"pass\", \"change\": 453, \"pptx_tests\": 850, \"opc_tests\": 471, \"harness_tests\": 381, \"normal_samples\": 480, \"allocator_samples\": 240, \"separate_confirmation_samples\": 240, \"fuzz_runs\": 1000, \"sealed\": true, \"cleanup\": false}\n",
+    "stderr": ""
+  },
+  "rejected": [
+    {
+      "path": "measurements.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 76, in check\n    measurements=d.derive();d.require(measurements==d.load('measurements.json') and d.render(measurements)==d.raw('measurements.md').decode(),'derived measurements')\n                            ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: derived measurements\n"
+    },
+    {
+      "path": "checks/final-opc-r2.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 35, in check\n    d.require(r['source_unchanged'] and r['source_before']==r['source_after'],'frozen command source')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: frozen command source\n"
+    },
+    {
+      "path": "checks/final-opc-r2.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 41, in check\n    for i,key in enumerate(['passed_tests','failed_tests','ignored_tests']):d.require(r[key]==sum(int(x[i]) for x in rows),'test log count')\n                                                                            ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: test log count\n"
+    },
+    {
+      "path": "checks/fuzz-smoke.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 79, in check\n    smoke=d.load('checks/fuzz-smoke.json');d.require('Done 1000 runs' in artifact(smoke['log']).decode() and '-runs=1000' in smoke['argv'] and '-seed=453' in smoke['argv'],'fuzz completion')\n                                           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: fuzz completion\n"
+    },
+    {
+      "path": "decision.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 77, in check\n    decision=d.load('decision.json');d.require(decision['goal_complete'] is False and decision['native_coverage_promoted'] is False and decision['decision']=='retain shared PPTX decoded payloads','scoped decision')\n                                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: scoped decision\n"
+    },
+    {
+      "path": "candidate-build.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 52, in check\n    for n,h in protocol['bound_files'].items():d.require(sha(d.raw(n))==h,'frozen dependency '+n)\n                                               ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: frozen dependency candidate-build.json\n"
+    },
+    {
+      "path": "runs/0/receipt.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 63, in check\n    d.require(r['binary']==binary and r['build_sha256']==sha(d.raw(lane['build']+'-build.json')),'binary binding')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: binary binding\n"
+    },
+    {
+      "path": "runs/0/report.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 65, in check\n    for a in r['artifacts'].values():artifact(a)\n                                     ~~~~~~~~^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 13, in artifact\n    member(r['path']);raw=d.raw(r['path']);d.require(len(raw)==r['bytes'] and sha(raw)==r['sha256'],'artifact '+r['path']);return raw\n                                           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: artifact runs/0/report.json\n"
+    },
+    {
+      "path": "regression-review.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 78, in check\n    review=d.load('regression-review.json');d.require(review['flags']==measurements['review_flags'] and len(review['dispositions'])==len(review['flags']) and all(x['reviewed'] is True and x['reason'] and x['flag']==f for x,f in zip(review['dispositions'],review['flags'])),'all flags reviewed')\n                                            ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: all flags reviewed\n"
+    },
+    {
+      "path": "checks/fuzz-prepared.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 83, in check\n    d.require(inputs['Cargo.toml']['sha256']==sha(d.raw('checks/fuzz-Cargo.toml.txt')),'fuzz manifest')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: fuzz manifest\n"
+    },
+    {
+      "path": "checks/fuzz-artifacts.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 88, in check\n    d.require(artifacts['status']=='pass' and artifacts['task']==prepared['task'] and artifacts['files']==len(a) and artifacts['bytes']==sum(r['bytes'] for r in a.values()),'fuzz inventory')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: fuzz inventory\n"
+    },
+    {
+      "path": "confirmation-summary.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 75, in check\n    module('confirmation-derive').check(final,builds)\n    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/confirmation-derive.py\", line 49, in check\n    v=derive();d.require(v==d.load('confirmation-summary.json') and render(v)==d.raw('confirmation-summary.md').decode(),'confirmation derivation')\n               ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: confirmation derivation\n"
+    },
+    {
+      "path": "runs/16/report.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 65, in check\n    for a in r['artifacts'].values():artifact(a)\n                                     ~~~~~~~~^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 13, in artifact\n    member(r['path']);raw=d.raw(r['path']);d.require(len(raw)==r['bytes'] and sha(raw)==r['sha256'],'artifact '+r['path']);return raw\n                                           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: artifact runs/16/report.json\n"
+    },
+    {
+      "path": "runs/16/report.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 65, in check\n    for a in r['artifacts'].values():artifact(a)\n                                     ~~~~~~~~^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 13, in artifact\n    member(r['path']);raw=d.raw(r['path']);d.require(len(raw)==r['bytes'] and sha(raw)==r['sha256'],'artifact '+r['path']);return raw\n                                           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: artifact runs/16/report.json\n"
+    },
+    {
+      "path": "protocol.json",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 51, in check\n    d.require(protocol['status']=='frozen' and protocol['cpu']==2 and protocol['workers']==1 and protocol['samples']==30 and protocol['warmups']==3 and protocol['reports']==24,'frozen protocol')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: frozen protocol\n"
+    },
+    {
+      "path": "candidate/after-source_cross_copy.rs.txt",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 20, in check\n    for label,m in [('before',base),('after',final)]:d.require(sha(d.raw('candidate/'+label+'-'+Path(n).name+'.txt'))==m[n],'exact source '+label+' '+n)\n                                                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: exact source after crates/litchi-pptx/src/presentation/source_cross_copy.rs\n"
+    },
+    {
+      "path": "unsealed.txt",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 107, in <module>\n    p=argparse.ArgumentParser();p.add_argument('--sealed',action='store_true');p.add_argument('--cleanup',action='store_true');a=p.parse_args();print(json.dumps(check(a.sealed,a.cleanup)))\n                                                                                                                                                                 ~~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/verify.py\", line 104, in check\n    d.require(set(inventory)=={str(p.relative_to(ROOT)) for p in ROOT.rglob('*') if p.is_file() and p.name!='SHA256SUMS'},'seal coverage')\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-goal-0453-portable-mlgo94c4/export/derive.py\", line 7, in require\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: seal coverage\n"
+    }
+  ],
+  "scratch_removed": true
+}

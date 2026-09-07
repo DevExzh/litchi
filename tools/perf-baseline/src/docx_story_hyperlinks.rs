@@ -129,7 +129,7 @@ where
 
 fn story_file_name(index: usize) -> Result<String, Box<dyn std::error::Error>> {
     generated_string(32, "DOCX story file name", |value| {
-        if index % 2 == 0 {
+        if index.is_multiple_of(2) {
             write!(value, "header{:03}.xml", index / 2 + 1)
         } else {
             write!(value, "footer{:03}.xml", index / 2 + 1)
@@ -138,11 +138,15 @@ fn story_file_name(index: usize) -> Result<String, Box<dyn std::error::Error>> {
 }
 
 fn story_root(index: usize) -> &'static str {
-    if index % 2 == 0 { "hdr" } else { "ftr" }
+    if index.is_multiple_of(2) {
+        "hdr"
+    } else {
+        "ftr"
+    }
 }
 
 fn story_content_type(index: usize) -> &'static str {
-    if index % 2 == 0 {
+    if index.is_multiple_of(2) {
         ct::WML_HEADER
     } else {
         ct::WML_FOOTER
@@ -150,7 +154,7 @@ fn story_content_type(index: usize) -> &'static str {
 }
 
 fn story_relationship_type(index: usize) -> &'static str {
-    if index % 2 == 0 {
+    if index.is_multiple_of(2) {
         rt::HEADER
     } else {
         rt::FOOTER
@@ -553,8 +557,10 @@ pub(super) fn run(
         deterministic_output_verified: prepared.deterministic_output_verified,
         source_immutability_verified: prepared.source_immutability_verified,
     };
-    let mut source = SourceSummary::default();
-    source.docx_story_hyperlinks = Some(summary);
+    let source = SourceSummary {
+        docx_story_hyperlinks: Some(summary),
+        ..SourceSummary::default()
+    };
     Ok(CaseResult {
         case: case.name(),
         cache_state: None,

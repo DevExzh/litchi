@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    PackURI, PartView, Relationships, RetainedPrecompressedPart, SourceBackedPackage,
+    PackURI, PartData, PartView, Relationships, RetainedPrecompressedPart, SourceBackedPackage,
     SourceLineage, SourceTopologyPlan, TargetMode,
 };
 use quick_xml::XmlVersion;
@@ -116,12 +116,67 @@ pub struct SourceBackedCrossSlideCopyPlan {
     _memory_reservation: Option<Arc<Reservation>>,
 }
 
+// Managed shared bytes keep their original memory/object reservations. Owned
+// bytes retain the existing planning-time copy when initial capture is refused.
+#[derive(Clone)]
+enum PreparedPayload {
+    Shared(PartData),
+    Owned(Arc<Vec<u8>>),
+}
+
+impl PreparedPayload {
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Self::Shared(data) => data.as_bytes(),
+            Self::Owned(bytes) => bytes.as_slice(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.as_slice().len()
+    }
+
+    // The aggregate destination staging reservation still covers this copy.
+    // Managed PartData must never escape as an unreserved bare Arc.
+    fn owned_arc(
+        &self,
+        resource: &'static str,
+        execution_context: Option<&ExecutionContext>,
+    ) -> Result<Arc<Vec<u8>>> {
+        check_execution(execution_context)?;
+        match self {
+            Self::Owned(bytes) => Ok(Arc::clone(bytes)),
+            Self::Shared(data) => Ok(Arc::new(clone_bytes_checked(
+                data.as_bytes(),
+                resource,
+                execution_context,
+            )?)),
+        }
+    }
+
+    #[cfg(test)]
+    fn shares_allocation_with(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Shared(a), Self::Shared(b)) => a.shares_allocation_with(b),
+            (Self::Owned(a), Self::Owned(b)) => Arc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq for PreparedPayload {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slice() == other.as_slice()
+    }
+}
+impl Eq for PreparedPayload {}
+
 struct PreparedImage {
     source_uri: PackURI,
     target_uri: PackURI,
     content_type: String,
     declared_size: u64,
-    bytes: Arc<Vec<u8>>,
+    bytes: PreparedPayload,
     precompressed: Option<RetainedPrecompressedPart>,
 }
 
@@ -151,7 +206,7 @@ struct PreparedChart {
     target_uri: PackURI,
     content_type: String,
     declared_size: u64,
-    bytes: Arc<Vec<u8>>,
+    bytes: PreparedPayload,
     precompressed: Option<RetainedPrecompressedPart>,
 }
 
@@ -174,7 +229,7 @@ struct PreparedPayloadHint<'a> {
     target_uri: &'a PackURI,
     content_type: &'a str,
     declared_size: u64,
-    bytes: &'a Arc<Vec<u8>>,
+    bytes: &'a PreparedPayload,
 }
 
 #[derive(Clone, Copy)]
@@ -527,7 +582,11 @@ impl Prepared {
             let source_part = source_package.part(&image.source_uri)?;
             let authorization = match &image.precompressed {
                 Some(capture) => capture.authorize_for_publication(),
-                None => source_part.authorize_precompressed(Arc::clone(&image.bytes)),
+                None => source_part.authorize_precompressed(
+                    image
+                        .bytes
+                        .owned_arc("source-backed copied image", execution_context)?,
+                ),
             };
             match authorization {
                 Ok(payload) => match topology.try_add_precompressed_part(
@@ -540,7 +599,9 @@ impl Prepared {
                         topology.try_add_part_shared(
                             image.target_uri,
                             image.content_type,
-                            image.bytes,
+                            image
+                                .bytes
+                                .owned_arc("source-backed copied image", execution_context)?,
                         )?;
                     },
                     Err(error) => return Err(Error::Opc(error)),
@@ -549,7 +610,9 @@ impl Prepared {
                     topology.try_add_part_shared(
                         image.target_uri,
                         image.content_type,
-                        image.bytes,
+                        image
+                            .bytes
+                            .owned_arc("source-backed copied image", execution_context)?,
                     )?;
                 },
                 Err(error) => return Err(Error::Opc(error)),
@@ -560,7 +623,11 @@ impl Prepared {
             let source_part = source_package.part(&chart.source_uri)?;
             let authorization = match &chart.precompressed {
                 Some(capture) => capture.authorize_for_publication(),
-                None => source_part.authorize_precompressed(Arc::clone(&chart.bytes)),
+                None => source_part.authorize_precompressed(
+                    chart
+                        .bytes
+                        .owned_arc("source-backed copied chart", execution_context)?,
+                ),
             };
             match authorization {
                 Ok(payload) => match topology.try_add_precompressed_part(
@@ -573,7 +640,9 @@ impl Prepared {
                         topology.try_add_part_shared(
                             chart.target_uri,
                             chart.content_type,
-                            chart.bytes,
+                            chart
+                                .bytes
+                                .owned_arc("source-backed copied chart", execution_context)?,
                         )?;
                     },
                     Err(error) => return Err(Error::Opc(error)),
@@ -582,7 +651,9 @@ impl Prepared {
                     topology.try_add_part_shared(
                         chart.target_uri,
                         chart.content_type,
-                        chart.bytes,
+                        chart
+                            .bytes
+                            .owned_arc("source-backed copied chart", execution_context)?,
                     )?;
                 },
                 Err(error) => return Err(Error::Opc(error)),
@@ -1643,12 +1714,24 @@ fn prepare(
     for relationship_id in &target_relationship_ids {
         add_metadata_size(&mut retained_metadata_size, relationship_id)?;
     }
+    // The shared variant stores a managed handle inline. Charge its additional
+    // per-leaf storage even when decoded bytes are tiny or empty; keep the full
+    // decoded staging allowance for a possible publication-time fallback copy.
+    let payload_metadata_size = source_image_parts
+        .len()
+        .checked_add(source_chart_parts.len())
+        .and_then(|count| {
+            count
+                .checked_mul(size_of::<PreparedPayload>().saturating_sub(size_of::<Arc<Vec<u8>>>()))
+        })
+        .ok_or_else(|| invalid("source-backed copied payload metadata size overflow"))?;
     let staging_request = original_slide_size
         .checked_add(rewritten_slide_len)
         .and_then(|bytes| bytes.checked_add(target_presentation_xml.len()))
         .and_then(|bytes| bytes.checked_add(image_size))
         .and_then(|bytes| bytes.checked_add(chart_size))
         .and_then(|bytes| bytes.checked_add(retained_metadata_size))
+        .and_then(|bytes| bytes.checked_add(payload_metadata_size))
         .ok_or_else(|| invalid("source-backed cross-copy staging size overflow"))?;
     let memory_reservation = reserve_memory(execution_context, staging_request, editor.limits)?;
     let mut images = Vec::new();
@@ -1675,7 +1758,7 @@ fn prepare(
         let target_uri = target_image_uris
             .get(index)
             .ok_or_else(|| invalid("prepared target image URI index is invalid"))?;
-        let bytes = reuse_or_clone_payload(
+        let (bytes, reused_previous) = reuse_or_clone_payload(
             reuse_plan
                 .and_then(|plan| plan.images.get(index))
                 .map(PreparedImage::payload_hint),
@@ -1686,13 +1769,14 @@ fn prepare(
                 declared_size: image_part.declared_size,
                 bytes: data.as_bytes(),
             },
+            captured.as_ref().map(|_| &data),
             "source-backed copied image",
             execution_context,
         )?;
         let precompressed = captured.or_else(|| {
             reuse_plan
                 .and_then(|plan| plan.images.get(index))
-                .filter(|previous| Arc::ptr_eq(&bytes, &previous.bytes))
+                .filter(|_| reused_previous)
                 .and_then(|previous| previous.precompressed.clone())
         });
         images.push(PreparedImage {
@@ -1740,7 +1824,7 @@ fn prepare(
         let target_uri = target_chart_uris
             .get(index)
             .ok_or_else(|| invalid("prepared target chart URI index is invalid"))?;
-        let bytes = reuse_or_clone_payload(
+        let (bytes, reused_previous) = reuse_or_clone_payload(
             reuse_plan
                 .and_then(|plan| plan.charts.get(index))
                 .map(PreparedChart::payload_hint),
@@ -1751,13 +1835,14 @@ fn prepare(
                 declared_size: chart_part.declared_size,
                 bytes: data.as_bytes(),
             },
+            captured.as_ref().map(|_| &data),
             "source-backed copied chart",
             execution_context,
         )?;
         let precompressed = captured.or_else(|| {
             reuse_plan
                 .and_then(|plan| plan.charts.get(index))
-                .filter(|previous| Arc::ptr_eq(&bytes, &previous.bytes))
+                .filter(|_| reused_previous)
                 .and_then(|previous| previous.precompressed.clone())
         });
         charts.push(PreparedChart {
@@ -2176,7 +2261,7 @@ fn verify_candidate(
     for chart in &prepared.charts {
         check_execution(execution_context)?;
         validate_chart_xml(
-            &chart.bytes,
+            chart.bytes.as_slice(),
             staged_source_dialect,
             "staged source chart",
             execution_context,
@@ -5365,7 +5450,7 @@ fn digest_touched(
         }
         digest.update(image.declared_size.to_le_bytes());
         digest.update((image.bytes.len() as u64).to_le_bytes());
-        digest_bytes(&mut digest, &image.bytes, execution_context)?;
+        digest_bytes(&mut digest, image.bytes.as_slice(), execution_context)?;
     }
     digest.update((image_relationships.len() as u64).to_le_bytes());
     for relationship in image_relationships {
@@ -5393,7 +5478,7 @@ fn digest_touched(
         }
         digest.update(chart.declared_size.to_le_bytes());
         digest.update((chart.bytes.len() as u64).to_le_bytes());
-        digest_bytes(&mut digest, &chart.bytes, execution_context)?;
+        digest_bytes(&mut digest, chart.bytes.as_slice(), execution_context)?;
     }
     digest.update((chart_relationships.len() as u64).to_le_bytes());
     for relationship in chart_relationships {
@@ -5544,7 +5629,7 @@ fn clone_bytes_checked(
 fn read_copy_payload(
     part: &PartView<'_>,
     capture: bool,
-) -> Result<(litchi_opc::PartData, Option<RetainedPrecompressedPart>)> {
+) -> Result<(PartData, Option<RetainedPrecompressedPart>)> {
     if capture {
         match part.data_and_authorize_precompressed() {
             Ok((data, token)) => return Ok((data, Some(token.into_retained()))),
@@ -5558,9 +5643,11 @@ fn read_copy_payload(
 fn reuse_or_clone_payload(
     hint: Option<PreparedPayloadHint<'_>>,
     current: PreparedPayloadIdentity<'_>,
+    shared: Option<&PartData>,
     resource: &'static str,
     execution_context: Option<&ExecutionContext>,
-) -> Result<Arc<Vec<u8>>> {
+) -> Result<(PreparedPayload, bool)> {
+    check_execution(execution_context)?;
     if let Some(hint) = hint {
         let metadata_matches = hint.source_uri == current.source_uri
             && hint.target_uri == current.target_uri
@@ -5569,14 +5656,18 @@ fn reuse_or_clone_payload(
         if metadata_matches
             && bytes_equal_checked(hint.bytes.as_slice(), current.bytes, execution_context)?
         {
-            return Ok(Arc::clone(hint.bytes));
+            return Ok((hint.bytes.clone(), true));
         }
     }
-    Ok(Arc::new(clone_bytes_checked(
-        current.bytes,
-        resource,
-        execution_context,
-    )?))
+    let bytes = match shared {
+        Some(data) => PreparedPayload::Shared(data.clone()),
+        None => PreparedPayload::Owned(Arc::new(clone_bytes_checked(
+            current.bytes,
+            resource,
+            execution_context,
+        )?)),
+    };
+    Ok((bytes, false))
 }
 
 fn bytes_equal_checked(
@@ -5748,18 +5839,20 @@ mod tests {
             target_uri: PackURI::new("/ppt/media/copy.png").unwrap(),
             content_type: ct::PNG.to_owned(),
             declared_size: 3,
-            bytes: Arc::new(vec![1, 2, 3]),
+            bytes: PreparedPayload::Owned(Arc::new(vec![1, 2, 3])),
             precompressed: None,
         };
 
         let reused = reuse_or_clone_payload(
             Some(donor.payload_hint()),
             donor.payload_identity(),
+            None,
             "test prepared payload",
             None,
         )
-        .unwrap();
-        assert!(Arc::ptr_eq(&reused, &donor.bytes));
+        .unwrap()
+        .0;
+        assert!(reused.shares_allocation_with(&donor.bytes));
 
         let other_source_uri = PackURI::new("/ppt/media/other-source.png").unwrap();
         let other_target_uri = PackURI::new("/ppt/media/other-copy.png").unwrap();
@@ -5784,11 +5877,13 @@ mod tests {
             let metadata_mismatch = reuse_or_clone_payload(
                 Some(donor.payload_hint()),
                 current,
+                None,
                 "test prepared payload",
                 None,
             )
-            .unwrap();
-            assert!(!Arc::ptr_eq(&metadata_mismatch, &donor.bytes));
+            .unwrap()
+            .0;
+            assert!(!metadata_mismatch.shares_allocation_with(&donor.bytes));
             assert_eq!(metadata_mismatch.as_slice(), donor.bytes.as_slice());
         }
 
@@ -5798,11 +5893,13 @@ mod tests {
                 bytes: &[3, 2, 1],
                 ..donor.payload_identity()
             },
+            None,
             "test prepared payload",
             None,
         )
-        .unwrap();
-        assert!(!Arc::ptr_eq(&same_length_bytes_mismatch, &donor.bytes));
+        .unwrap()
+        .0;
+        assert!(!same_length_bytes_mismatch.shares_allocation_with(&donor.bytes));
         assert_eq!(same_length_bytes_mismatch.as_slice(), &[3, 2, 1]);
 
         let chart_donor = PreparedChart {
@@ -5810,31 +5907,32 @@ mod tests {
             target_uri: PackURI::new("/ppt/charts/copy.xml").unwrap(),
             content_type: TRANSITIONAL_CHART_CONTENT_TYPE.to_owned(),
             declared_size: 4,
-            bytes: Arc::new(vec![4, 5, 6, 7]),
+            bytes: PreparedPayload::Owned(Arc::new(vec![4, 5, 6, 7])),
             precompressed: None,
         };
         let chart_reused = reuse_or_clone_payload(
             Some(chart_donor.payload_hint()),
             chart_donor.payload_identity(),
+            None,
             "test prepared chart",
             None,
         )
-        .unwrap();
-        assert!(Arc::ptr_eq(&chart_reused, &chart_donor.bytes));
+        .unwrap()
+        .0;
+        assert!(chart_reused.shares_allocation_with(&chart_donor.bytes));
         let chart_declared_size_mismatch = reuse_or_clone_payload(
             Some(chart_donor.payload_hint()),
             PreparedPayloadIdentity {
                 declared_size: chart_donor.declared_size + 1,
                 ..chart_donor.payload_identity()
             },
+            None,
             "test prepared chart",
             None,
         )
-        .unwrap();
-        assert!(!Arc::ptr_eq(
-            &chart_declared_size_mismatch,
-            &chart_donor.bytes
-        ));
+        .unwrap()
+        .0;
+        assert!(!chart_declared_size_mismatch.shares_allocation_with(&chart_donor.bytes));
         assert_eq!(
             chart_declared_size_mismatch.as_slice(),
             chart_donor.bytes.as_slice()
@@ -5858,11 +5956,166 @@ mod tests {
             reuse_or_clone_payload(
                 Some(donor.payload_hint()),
                 donor.payload_identity(),
+                None,
                 "test prepared payload",
                 Some(&context),
             ),
             Err(Error::Opc(litchi_opc::OpcError::Cancelled))
         ));
+    }
+
+    #[test]
+    fn shared_payload_pins_managed_bytes_across_cache_bypass_and_lazy_fallback() {
+        let budget = Budget::root(
+            "prepared-shared-payload",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (cancel, token) = CancellationSource::pair();
+        let context = ExecutionContext::new(
+            budget.clone(),
+            token,
+            ExecutionLimits::new(
+                NonZeroUsize::new(1).unwrap(),
+                NonZeroUsize::new(1).unwrap(),
+                NonZeroU64::new(u64::MAX).unwrap(),
+                0,
+            )
+            .unwrap(),
+        );
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                Arc::new(litchi_core::OwnedSource::new(
+                    include_bytes!(
+                        "../../../../test-data/poi/test-data/slideshow/EmbeddedVideo.pptx"
+                    )
+                    .to_vec(),
+                )),
+                litchi_opc::ReadLimits::default(),
+                litchi_opc::SourceCacheLimits::new(1, 1).unwrap(),
+                context.clone(),
+            )
+            .unwrap();
+        let source_uri = PackURI::new("/ppt/media/image1.png").unwrap();
+        let target_uri = PackURI::new("/ppt/media/copy.png").unwrap();
+        let (data, capture) = read_copy_payload(&package.part(&source_uri).unwrap(), true).unwrap();
+        assert!(capture.is_some());
+        let identity = PreparedPayloadIdentity {
+            source_uri: &source_uri,
+            target_uri: &target_uri,
+            content_type: ct::PNG,
+            declared_size: data.as_bytes().len() as u64,
+            bytes: data.as_bytes(),
+        };
+        let charged = budget.used(Resource::Memory);
+        let (payload, reused) =
+            reuse_or_clone_payload(None, identity, Some(&data), "test shared", Some(&context))
+                .unwrap();
+        assert!(!reused);
+        assert!(
+            matches!(&payload, PreparedPayload::Shared(shared) if shared.shares_allocation_with(&data))
+        );
+        assert_eq!(budget.used(Resource::Memory), charged);
+        assert!(matches!(
+            data.into_arc(),
+            Err(litchi_opc::OpcError::ManagedPartDataArcEscape)
+        ));
+        let donor = PreparedImage {
+            source_uri: source_uri.clone(),
+            target_uri: target_uri.clone(),
+            content_type: ct::PNG.to_owned(),
+            declared_size: identity.declared_size,
+            bytes: payload,
+            precompressed: capture,
+        };
+        let fresh = package.part(&source_uri).unwrap().data().unwrap();
+        assert!(
+            !fresh.shares_allocation_with(&data),
+            "one-byte cache must bypass this payload"
+        );
+        let (reused, reuse_capture) = reuse_or_clone_payload(
+            Some(donor.payload_hint()),
+            PreparedPayloadIdentity {
+                bytes: fresh.as_bytes(),
+                ..identity
+            },
+            None,
+            "test reuse",
+            Some(&context),
+        )
+        .unwrap();
+        assert!(reuse_capture);
+        assert!(reused.shares_allocation_with(&donor.bytes));
+        let other_uri = PackURI::new("/ppt/media/different.png").unwrap();
+        for current in [
+            PreparedPayloadIdentity {
+                source_uri: &other_uri,
+                ..identity
+            },
+            PreparedPayloadIdentity {
+                target_uri: &other_uri,
+                ..identity
+            },
+            PreparedPayloadIdentity {
+                content_type: "image/jpeg",
+                ..identity
+            },
+            PreparedPayloadIdentity {
+                declared_size: identity.declared_size + 1,
+                ..identity
+            },
+        ] {
+            let (changed, reuse_capture) = reuse_or_clone_payload(
+                Some(donor.payload_hint()),
+                current,
+                None,
+                "test mismatch",
+                Some(&context),
+            )
+            .unwrap();
+            assert!(!reuse_capture);
+            assert!(!changed.shares_allocation_with(&donor.bytes));
+        }
+        let mut different = fresh.as_bytes().to_vec();
+        different[0] ^= 1;
+        let (_, reuse_capture) = reuse_or_clone_payload(
+            Some(donor.payload_hint()),
+            PreparedPayloadIdentity {
+                bytes: &different,
+                ..identity
+            },
+            None,
+            "test bytes mismatch",
+            Some(&context),
+        )
+        .unwrap();
+        assert!(!reuse_capture);
+        drop(fresh);
+        drop(data);
+        drop(package);
+        drop(reused);
+        let size = donor.bytes.len() as u64;
+        let PreparedImage {
+            bytes,
+            precompressed,
+            ..
+        } = donor;
+        drop(precompressed);
+        assert_eq!(budget.used(Resource::Memory), size);
+        assert_eq!(budget.used(Resource::Objects), 1);
+        let staging = budget.reserve(Resource::Memory, size).unwrap();
+        let fallback = bytes.owned_arc("test fallback", Some(&context)).unwrap();
+        assert_eq!(fallback.as_slice(), bytes.as_slice());
+        assert_ne!(fallback.as_ptr(), bytes.as_slice().as_ptr());
+        drop(fallback);
+        drop(staging);
+        cancel.cancel();
+        assert!(matches!(
+            bytes.owned_arc("test cancelled fallback", Some(&context)),
+            Err(Error::Opc(litchi_opc::OpcError::Cancelled))
+        ));
+        drop(bytes);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
     }
 
     #[test]

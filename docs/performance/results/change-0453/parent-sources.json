@@ -1,0 +1,19 @@
+{
+  "revision": "456e19246506ffba230052df2b25b072ce4a8749",
+  "sources": {
+    "crates/litchi-pptx/src/presentation/source_cross_copy.rs": "d7ed547e0e9baa5bad04bbcc5c7fcc383d1bdb8dcdfefca2f5fbc683bba0465a",
+    "crates/litchi-pptx/tests/source_backed_cross_copy.rs": "6eac8ca40990a562c5fdeb32fc3d805d6ad072bed51b487703dbc35a98e13c08",
+    "tools/perf-baseline/src/pptx_provider_lifecycle.rs": "5b9784297f209317ec4870bd0edade0b8d86279054c49b047b9fe3868d3c0a08",
+    "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs": "58706c8bb99235649c8c6577bb779bda73f6bba3c0f8e8b0c57d20f84febbaa3",
+    "tools/perf-baseline/src/filesystem.rs": "35a560bf657a63e1db81d9ec580003459858a6e52afe1e1fb394dd947122d210",
+    "tools/perf-baseline/src/docx_story_hyperlinks.rs": "3cc94798d9f718e5f5ce36a739e4c3df8642c82c182a79fc31e2e18010e1ab4e",
+    "tools/perf-baseline/src/parallel_metrics.rs": "5df6490d2023f7de0ddf157a96bb0222060421bb7cc674a2de8fde9518358713",
+    "tools/perf-baseline/src/xls_numeric.rs": "2cc7ed96ce7e7fbf49de5a8a6ee13d6f19a768a1fe3401595d875056a7f74366",
+    "tools/perf-baseline/src/lib.rs": "4121a9d0eda820a4a1944b11607c46b990e84901eb3d2e942361b47f851a9eeb",
+    "tools/perf-baseline/src/operation_metrics.rs": "5455e040782a58f9efaef8107fcf7b2f4ff7e9a4fdd99403ca9480bb47838cbc",
+    "tools/perf-baseline/src/bin/xls_source_attribution.rs": "c570ac2cf974d3634c69217689833159dbe96280363fcbbd44333afda238c2ca",
+    "tools/perf-baseline/src/bin/xlsb_crud.rs": "fd4676bc06478c1d9c1f5d3978ca754f1a86602f687f15dee1cf74ba94642f5c",
+    "tools/perf-baseline/src/bin/docx_source_selected_paragraph.rs": "9f428058d634d940a65ca99b80b8b02d7a5ad9b2e00c345b4f43854bbfabb3d2",
+    "tools/perf-baseline/src/bin/xlsx_cell_values_abba.rs": "9e90afcc259d0c6906d5967ba81c058059eb9d243ef3f107e6f88d7e8833671c"
+  }
+}

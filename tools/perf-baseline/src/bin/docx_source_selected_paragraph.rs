@@ -504,7 +504,7 @@ impl CountingSource {
         }
         loop {
             let before = self.sequence.load(Ordering::SeqCst);
-            if before % 2 != 0 {
+            if !before.is_multiple_of(2) {
                 std::hint::spin_loop();
                 continue;
             }
@@ -521,7 +521,7 @@ impl CountingSource {
                     .len(),
             };
             let after = self.sequence.load(Ordering::SeqCst);
-            if before == after && after % 2 == 0 {
+            if before == after && after.is_multiple_of(2) {
                 return Ok(snapshot);
             }
         }
@@ -530,7 +530,7 @@ impl CountingSource {
     fn delta(&self, before: ReadSnapshot) -> AnyResult<ReadDelta> {
         let (after, new_records) = loop {
             let sequence_before = self.sequence.load(Ordering::SeqCst);
-            if sequence_before % 2 != 0 {
+            if !sequence_before.is_multiple_of(2) {
                 std::hint::spin_loop();
                 continue;
             }
@@ -546,7 +546,7 @@ impl CountingSource {
                 .ok_or("source range-record interval was invalid")?
                 .to_vec();
             let sequence_after = self.sequence.load(Ordering::SeqCst);
-            if sequence_before == sequence_after && sequence_after % 2 == 0 {
+            if sequence_before == sequence_after && sequence_after.is_multiple_of(2) {
                 break (after, new_records);
             }
         };
@@ -1207,7 +1207,7 @@ fn parse_zip_ranges(bytes: &[u8]) -> AnyResult<Vec<ZipMemberRange>> {
     for _ in 0..entries {
         if bytes
             .get(cursor..cursor + 46)
-            .map_or(true, |header| !header.starts_with(b"PK\x01\x02"))
+            .is_none_or(|header| !header.starts_with(b"PK\x01\x02"))
         {
             return Err("invalid ZIP central directory entry".into());
         }
@@ -1236,7 +1236,7 @@ fn parse_zip_ranges(bytes: &[u8]) -> AnyResult<Vec<ZipMemberRange>> {
         if central_next > central_end
             || bytes
                 .get(local_offset..local_offset + 30)
-                .map_or(true, |header| !header.starts_with(b"PK\x03\x04"))
+                .is_none_or(|header| !header.starts_with(b"PK\x03\x04"))
         {
             return Err("invalid ZIP local header".into());
         }
@@ -2242,7 +2242,7 @@ mod tests {
     fn deterministic_corpus_shape_is_pinned_without_hashes() {
         assert_eq!(MEDIA_COUNT, 8);
         assert_eq!(MEDIA_PAYLOAD_BYTES, 2 * 1024 * 1024);
-        assert!(MIN_ARCHIVE_BYTES < MAX_ARCHIVE_BYTES);
+        const { assert!(MIN_ARCHIVE_BYTES < MAX_ARCHIVE_BYTES) };
         assert_eq!(expected_paragraph_text(0), "source-selected-paragraph-0000");
         assert_eq!(expected_paragraph_text(TARGET_INDEX), TARGET_TEXT);
         assert_eq!(

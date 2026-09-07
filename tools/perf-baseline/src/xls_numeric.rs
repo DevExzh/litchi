@@ -788,8 +788,7 @@ impl Publication {
             },
             Self::SourceBacked(commit) => {
                 let diagnostics = commit.diagnostics();
-                let target_bytes =
-                    u64::try_from(commit.snapshot().bytes().len()).unwrap_or(0);
+                let target_bytes = u64::try_from(commit.snapshot().bytes().len()).unwrap_or(0);
                 let target_materialized = !commit.is_noop();
                 NumericDiagnostics {
                     source_bytes: diagnostics.source_bytes(),
@@ -798,12 +797,16 @@ impl Publication {
                     operation_shape: Some(diagnostics.operation_shape()),
                     candidate_reopen_logical_artifact_bytes: target_bytes,
                     selected_stream_logical_bytes: diagnostics.target_workbook_bytes(),
-                    target_materialization_vec_bytes: target_materialized
-                        .then_some(target_bytes)
-                        .unwrap_or(0),
-                    target_materialization_clone_bytes: target_materialized
-                        .then_some(target_bytes)
-                        .unwrap_or(0),
+                    target_materialization_vec_bytes: if target_materialized {
+                        target_bytes
+                    } else {
+                        0
+                    },
+                    target_materialization_clone_bytes: if target_materialized {
+                        target_bytes
+                    } else {
+                        0
+                    },
                     splice_count: Some(diagnostics.splice_count()),
                     replacement_bytes: Some(diagnostics.replacement_bytes()),
                     changed_spans: Some(diagnostics.changed_spans()),
@@ -1687,20 +1690,30 @@ pub(crate) fn run(
         let diagnostics = publication.diagnostics(source_workbook_bytes);
 
         if diagnostics.operation_shape.is_some() != source_backed {
-            return Err("XLS numeric operation-shape diagnostics presence differs from implementation".into());
+            return Err(
+                "XLS numeric operation-shape diagnostics presence differs from implementation"
+                    .into(),
+            );
         }
         if let Some(shape) = diagnostics.operation_shape {
             match source_summary.operation_evidence_schema {
-                None => source_summary.operation_evidence_schema = Some(XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA),
+                None => {
+                    source_summary.operation_evidence_schema =
+                        Some(XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA)
+                },
                 Some(schema) if schema != XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA => {
-                    return Err("XLS numeric operation evidence schema changed between samples".into());
+                    return Err(
+                        "XLS numeric operation evidence schema changed between samples".into(),
+                    );
                 },
                 Some(_) => {},
             }
             if shape.source_bytes != diagnostics.source_bytes
                 || shape.source_bytes != u64::try_from(corpus.archive.len())?
             {
-                return Err("XLS numeric operation shape source length differs from diagnostics".into());
+                return Err(
+                    "XLS numeric operation shape source length differs from diagnostics".into(),
+                );
             }
         }
 
@@ -1751,10 +1764,8 @@ pub(crate) fn run(
 
         if iteration >= warmup_iterations {
             if diagnostics.operation_shape.is_some() {
-                let evidence = operation_evidence_from_diagnostics(
-                    &diagnostics,
-                    sink.summary().write_calls,
-                )?;
+                let evidence =
+                    operation_evidence_from_diagnostics(&diagnostics, sink.summary().write_calls)?;
                 let values = source_summary
                     .operation_evidence
                     .as_mut()
@@ -1992,8 +2003,7 @@ mod tests {
 
     const XLS_NUMERIC_OPERATION_COUNTER_SCOPE: &str =
         "validated overlay logical pass shape; no runtime, allocator, or syscall counters";
-    const XLS_NUMERIC_OPERATION_ATOMIC_SCOPE: &str =
-        "public save durability contract; temporary-file, flush, fsync, rename, and parent-sync stage counters are not observable";
+    const XLS_NUMERIC_OPERATION_ATOMIC_SCOPE: &str = "public save durability contract; temporary-file, flush, fsync, rename, and parent-sync stage counters are not observable";
 
     #[test]
     fn selectors_are_opt_in_and_have_stable_families() {
@@ -2087,22 +2097,27 @@ mod tests {
             let source_read_calls = source.read_calls;
             let source_read_bytes = source.read_bytes;
             let evidence = source.xls_numeric.unwrap();
-            let (expected_output, expected_workbook, expected_replacement, expected_spans, expected_writes) =
-                match family_for(case).unwrap().1 {
-                    Family::Number => (
-                        "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03",
-                        80_946,
-                        8,
-                        1,
-                        260,
-                    ),
-                    Family::RkMulrk => (
-                        "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260",
-                        1_665,
-                        12,
-                        3,
-                        4,
-                    ),
+            let (
+                expected_output,
+                expected_workbook,
+                expected_replacement,
+                expected_spans,
+                expected_writes,
+            ) = match family_for(case).unwrap().1 {
+                Family::Number => (
+                    "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03",
+                    80_946,
+                    8,
+                    1,
+                    260,
+                ),
+                Family::RkMulrk => (
+                    "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260",
+                    1_665,
+                    12,
+                    3,
+                    4,
+                ),
             };
             assert_eq!(evidence.sample_count, 1);
             assert_eq!(evidence.input_cfb_bytes, corpus_bytes);
@@ -2139,13 +2154,12 @@ mod tests {
                 !matches!(
                     case,
                     Case::XlsNumericPlanOnlyNumberEditSave
-                    | Case::XlsNumericPlanOnlyRkMulrkEditSave
+                        | Case::XlsNumericPlanOnlyRkMulrkEditSave
                 )
             );
             if !matches!(
                 case,
-                Case::XlsNumericEagerNumberEditSave
-                    | Case::XlsNumericEagerRkMulrkEditSave
+                Case::XlsNumericEagerNumberEditSave | Case::XlsNumericEagerRkMulrkEditSave
             ) {
                 assert_eq!(evidence.splice_count, Some(vec![expected_spans]));
                 assert_eq!(evidence.replacement_bytes, Some(vec![expected_replacement]));
@@ -2178,9 +2192,15 @@ mod tests {
                 let fenced_scans = u64::from(operation.source_mode == "generic_read_at");
                 assert_eq!(operation.planning_fingerprint_scans, 1 + fenced_scans);
                 assert_eq!(operation.composed_source_preflight_scans, 1);
-                assert_eq!(operation.target_materialization_write_pre_scans, fenced_scans);
+                assert_eq!(
+                    operation.target_materialization_write_pre_scans,
+                    fenced_scans
+                );
                 assert_eq!(operation.target_materialization_emission_scans, 1);
-                assert_eq!(operation.target_materialization_write_post_scans, fenced_scans);
+                assert_eq!(
+                    operation.target_materialization_write_post_scans,
+                    fenced_scans
+                );
                 assert_eq!(operation.direct_write_pre_scans, fenced_scans);
                 assert_eq!(operation.direct_emission_scans, 1);
                 assert_eq!(operation.direct_write_post_scans, fenced_scans);
@@ -2200,7 +2220,10 @@ mod tests {
                     operation.selected_stream_logical_bytes,
                     evidence.target_workbook_bytes
                 );
-                assert_eq!(operation.publication_write_calls, evidence.sink_write_calls[0]);
+                assert_eq!(
+                    operation.publication_write_calls,
+                    evidence.sink_write_calls[0]
+                );
                 assert_eq!(
                     operation.splice_count,
                     evidence.splice_count.as_ref().unwrap()[0]

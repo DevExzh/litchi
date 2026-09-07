@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## Change 0453: duplicate staged decoded media removed from PPTX plans
+
+[0453](changes/0453-pptx-shared-decoded-payload.md) shares managed OPC decoded bytes after successful capture, eliminating
+16,777,408 allocated/retained bytes during media planning in both repeats.
+Bytes/media API medians improve about 3%; simulated-range latency is essentially
+unchanged. Publication absolute live peak falls because its entry storage is
+smaller; publication allocation and peak growth are unchanged. Plan allocation
+calls fall 3,404→3,388. Exact reread, source work and semantic checks remain.
+
+Late Memory refusals still need a decoded fallback copy, covered by conservative
+destination staging. Inline handle storage adds 128 reserved bytes for this
+corpus. Remaining captures/decoded buffers, source work, semantic validation,
+destination passthrough and fixture construction are not removed. Broader native,
+cold-I/O, bounded append, repackaging and scaling evidence remains required.
+The primary plain p99 flags and separate confirmation remain in the review.
+
 ## Change 0452: compressed capture is retained through PPTX publication
 
 [0452](changes/0452-pptx-retained-capture.md) removes repeated source capture/verification for prepared images/charts

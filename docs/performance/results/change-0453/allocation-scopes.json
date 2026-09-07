@@ -1,0 +1,7 @@
+{
+  "allocation_scope": "optional operation-scoped global-system-allocator counters; four non-nested regions surround only the existing source-open, destination-open, planning, and publication timers, while diagnostics, correctness checks, report construction, and serialization remain outside",
+  "allocation_open_source_scope": "source presentation open allocation region begins immediately before the source-open timer and finishes immediately after it; source-open correctness checks and cache diagnostics are outside",
+  "allocation_open_destination_scope": "destination editor open allocation region begins immediately before the destination-open timer and finishes immediately after it; destination-open correctness checks and cache diagnostics are outside",
+  "allocation_plan_scope": "cross-slide planning allocation region begins immediately before the planning timer and finishes immediately after it; plan metadata checks and cache diagnostics are outside",
+  "allocation_publication_scope": "cross-slide publication allocation region begins immediately before the publication timer and finishes immediately after it; output checks, cache diagnostics, and drops are outside"
+}

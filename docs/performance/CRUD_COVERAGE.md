@@ -1,5 +1,18 @@
 # Performance CRUD coverage
 
+## 2026-09-07: change 0453 measures category 9 PPTX decoded sharing
+
+[0453](changes/0453-pptx-shared-decoded-payload.md) adds 480 ordinary timing samples, 240 separate allocator samples and a
+240-sample plain-tail investigation for existing cross-slide-copy workloads.
+Actual media planning allocation/retention falls about 16 MiB; exact output,
+source/destination reads and source work remain unchanged. Native-input ownership
+and budget-pressure fallback tests pass, without new Office-application coverage.
+
+Registry/default counts remain 438/36; representative coverage remains 15
+categories/33 mappings/10 measured/23 correctness-only. No new selector, default,
+native application, cold-I/O or scaling contract is promoted. Bounded existing
+append, repackaging and broader native/scaling work remain open.
+
 ## 2026-09-06: change 0452 measures category 9/15 PPTX capture adoption
 
 [0452](changes/0452-pptx-retained-capture.md) measures complete image/chart copy planning/publication under owned

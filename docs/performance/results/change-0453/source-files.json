@@ -1,0 +1,16 @@
+[
+  "crates/litchi-pptx/src/presentation/source_cross_copy.rs",
+  "crates/litchi-pptx/tests/source_backed_cross_copy.rs",
+  "tools/perf-baseline/src/pptx_provider_lifecycle.rs",
+  "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+  "tools/perf-baseline/src/filesystem.rs",
+  "tools/perf-baseline/src/docx_story_hyperlinks.rs",
+  "tools/perf-baseline/src/parallel_metrics.rs",
+  "tools/perf-baseline/src/xls_numeric.rs",
+  "tools/perf-baseline/src/lib.rs",
+  "tools/perf-baseline/src/operation_metrics.rs",
+  "tools/perf-baseline/src/bin/xls_source_attribution.rs",
+  "tools/perf-baseline/src/bin/xlsb_crud.rs",
+  "tools/perf-baseline/src/bin/docx_source_selected_paragraph.rs",
+  "tools/perf-baseline/src/bin/xlsx_cell_values_abba.rs"
+]

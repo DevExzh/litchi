@@ -23,7 +23,7 @@ const DEFAULT_SAMPLES: usize = 20;
 const MAX_WARMUP: usize = 100;
 const MAX_SAMPLES: usize = 100_000;
 const MAX_CHILD_JSON_BYTES: u64 = 64 * 1024 * 1024;
-const MAX_ROW_BYTES: usize = 1 * 1024 * 1024;
+const MAX_ROW_BYTES: usize = 1024 * 1024;
 const MAX_FAILURE_ROWS: usize = 10_000;
 const MAX_WRITE_BYTES: u64 = 64 * 1024;
 const SAME_SIDE_GATE_PERCENT: f64 = 5.0;
@@ -1056,9 +1056,7 @@ impl<'a> RunState<'a> {
             "A1" => state.eager_output = Some(observation.output_sha256.clone()),
             "B1" => {
                 let expected_untouched_member_count = expected_cell_untouched_member_count(
-                    usize::try_from(observation.corpus.archive_member_count).map_err(|_| {
-                        "source corpus member count does not fit usize".to_owned()
-                    })?,
+                    observation.corpus.archive_member_count,
                     cell.workload,
                 )
                 .ok_or_else(|| "source untouched-member count underflows closure".to_owned())?;
@@ -1305,7 +1303,7 @@ fn parse_child_report(
     let (expected_archive_bytes, expected_archive_sha256) =
         pinned_cell_corpus_identity(cell.shape)?;
     if corpus.archive_member_count != 17
-        || usize::try_from(corpus.archive_bytes).ok() != Some(expected_archive_bytes)
+        || corpus.archive_bytes != expected_archive_bytes
         || corpus.archive_sha256 != expected_archive_sha256
     {
         return Err(format!(
@@ -1536,23 +1534,21 @@ fn parse_source_evidence(
     if untouched_member_count.is_none() || untouched_member_sha256.is_none() {
         complete = false;
     }
-    if let Some(count) = untouched_member_count {
-        if count == 0 {
-            return Err("source untouched_member_count is zero".to_owned());
-        }
+    if untouched_member_count == Some(0) {
+        return Err("source untouched_member_count is zero".to_owned());
     }
     if let Some(hash) = &untouched_member_sha256 {
         validate_sha256(hash, "source untouched_member_sha256")?;
     }
-    if let Some(reads) = values.get("unselected_worksheet_read_calls") {
-        if reads != &json!(0) {
-            return Err("source unselected worksheet logical reads are nonzero".to_owned());
-        }
+    if let Some(reads) = values.get("unselected_worksheet_read_calls")
+        && reads != &json!(0)
+    {
+        return Err("source unselected worksheet logical reads are nonzero".to_owned());
     }
-    if let Some(bytes) = values.get("unselected_worksheet_read_bytes") {
-        if bytes != &json!(0) {
-            return Err("source unselected worksheet logical bytes are nonzero".to_owned());
-        }
+    if let Some(bytes) = values.get("unselected_worksheet_read_bytes")
+        && bytes != &json!(0)
+    {
+        return Err("source unselected worksheet logical bytes are nonzero".to_owned());
     }
     Ok(SourceEvidence {
         update_count,
@@ -1925,46 +1921,6 @@ fn expected_cell_untouched_member_count(
     archive_member_count
         .checked_sub(expected_touched_worksheets(workload))
         .and_then(|count| count.checked_sub(1))
-}
-
-#[cfg(test)]
-mod xlsx_cell_values_abba_identity_tests {
-    use super::*;
-
-    #[test]
-    fn pinned_current_shape_identities_are_exact() {
-        assert_eq!(
-            pinned_cell_corpus_identity("medium").unwrap(),
-            (
-                4_226_429,
-                "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
-            )
-        );
-        assert_eq!(
-            pinned_cell_corpus_identity("dense-sparse").unwrap(),
-            (
-                4_251_863,
-                "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a"
-            )
-        );
-        assert!(pinned_cell_corpus_identity("unknown").is_err());
-    }
-
-    #[test]
-    fn pinned_current_shape_untouched_counts_are_exact() {
-        assert_eq!(
-            expected_cell_untouched_member_count(17, Workload::OneEdit),
-            Some(15)
-        );
-        assert_eq!(
-            expected_cell_untouched_member_count(17, Workload::OnePercent),
-            Some(12)
-        );
-        assert_eq!(
-            expected_cell_untouched_member_count(17, Workload::Batch),
-            Some(12)
-        );
-    }
 }
 
 fn case_name(cell: CellSpec, implementation: Implementation) -> String {
@@ -2459,4 +2415,44 @@ fn sha256_hex(bytes: &[u8]) -> String {
         output.push(HEX[usize::from(byte & 0x0f)] as char);
     }
     output
+}
+
+#[cfg(test)]
+mod xlsx_cell_values_abba_identity_tests {
+    use super::*;
+
+    #[test]
+    fn pinned_current_shape_identities_are_exact() {
+        assert_eq!(
+            pinned_cell_corpus_identity("medium").unwrap(),
+            (
+                4_226_429,
+                "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+            )
+        );
+        assert_eq!(
+            pinned_cell_corpus_identity("dense-sparse").unwrap(),
+            (
+                4_251_863,
+                "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a"
+            )
+        );
+        assert!(pinned_cell_corpus_identity("unknown").is_err());
+    }
+
+    #[test]
+    fn pinned_current_shape_untouched_counts_are_exact() {
+        assert_eq!(
+            expected_cell_untouched_member_count(17, Workload::OneEdit),
+            Some(15)
+        );
+        assert_eq!(
+            expected_cell_untouched_member_count(17, Workload::OnePercent),
+            Some(12)
+        );
+        assert_eq!(
+            expected_cell_untouched_member_count(17, Workload::Batch),
+            Some(12)
+        );
+    }
 }

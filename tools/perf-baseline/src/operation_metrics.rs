@@ -1505,7 +1505,6 @@ mod tests {
             nonvoluntary_context_switches: 8,
             rss_bytes: 9,
             peak_rss_bytes: 10,
-            ..crate::process_metrics::Delta::default()
         }
     }
 

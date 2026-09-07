@@ -1,5 +1,21 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0453: managed decoded sharing and bounded lazy fallback
+
+[0453](changes/0453-pptx-shared-decoded-payload.md) retains OPC `PartData` ownership and its original memory/object reservations
+inside PPTX plans (0002/0005/0010/0011/0024). Exact metadata and decoded-byte
+identity, not fresh allocation identity, permits prior-capture reuse. A late
+Memory-only refusal copies under existing decoded staging; checked inline-handle
+storage is additionally charged. Cancellation, source checks, semantic rerun and
+fail-closed errors remain (0003/0005/0006). No managed bare-Arc escape is added.
+
+All 1,702 final tests, strict lint, warning-denied docs, workspace/format/boundary
+checks and 1,000 existing OPC ASan/sancov runs pass. Native-input cache-bypass
+ownership and finite independent-budget Store→Deflate fallback tests verify the
+new lifetime and fallback path. Standalone allocator instrumentation adds no
+production unsafe code, dependency, provider or runtime pool. Accepted ADRs remain
+unchanged. See [source review](results/change-0453/source-review.md).
+
 ## Change 0452: shared OPC capture with independent publication reservations
 
 [0452](changes/0452-pptx-retained-capture.md) keeps physical ZIP proof behind an opaque OPC retained handle

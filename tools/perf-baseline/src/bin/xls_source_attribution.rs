@@ -1034,11 +1034,12 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn remove_staged_file(path: &Path) {
-    if fs::remove_file(path).is_ok() {
-        return;
-    }
+    #[cfg(not(windows))]
+    let _ = fs::remove_file(path);
     #[cfg(windows)]
-    if let Ok(metadata) = fs::metadata(path) {
+    if fs::remove_file(path).is_err()
+        && let Ok(metadata) = fs::metadata(path)
+    {
         let mut permissions = metadata.permissions();
         permissions.set_readonly(false);
         let _ = fs::set_permissions(path, permissions);

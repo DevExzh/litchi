@@ -248,41 +248,41 @@ fn source_chunk_evidence(source: Option<&SourceSummary>) -> Result<ChunkEvidence
             values: simulation.physical_request_count.clone(),
         });
     }
-    if let Some(cfb_selective) = source.cfb_selective.as_ref() {
-        if let Some(simulation) = cfb_selective.simulation.as_ref() {
-            candidates.push(ChunkVector {
-                scope: CFB_SELECTIVE_CHUNK_SCOPE,
-                values: simulation
-                    .read
-                    .iter()
-                    .map(|phase| phase.physical_request_count)
-                    .collect(),
-            });
-        }
+    if let Some(cfb_selective) = source.cfb_selective.as_ref()
+        && let Some(simulation) = cfb_selective.simulation.as_ref()
+    {
+        candidates.push(ChunkVector {
+            scope: CFB_SELECTIVE_CHUNK_SCOPE,
+            values: simulation
+                .read
+                .iter()
+                .map(|phase| phase.physical_request_count)
+                .collect(),
+        });
     }
-    if let Some(cfb_open_stream) = source.cfb_open_stream.as_ref() {
-        if let Some(simulation) = cfb_open_stream.simulation.as_ref() {
-            candidates.push(ChunkVector {
-                scope: CFB_OPEN_STREAM_CHUNK_SCOPE,
-                values: simulation
-                    .samples
-                    .iter()
-                    .enumerate()
-                    .map(|(sample_index, sample)| {
-                        sample.per_operation.iter().try_fold(0_u64, |total, phase| {
-                            total
-                                .checked_add(phase.physical_request_count)
-                                .ok_or_else(|| {
-                                    InputError(format!(
-                                        "source.cfb_open_stream.simulation.samples[{sample_index}] \
-                                         per-operation request count overflows u64"
-                                    ))
-                                })
-                        })
+    if let Some(cfb_open_stream) = source.cfb_open_stream.as_ref()
+        && let Some(simulation) = cfb_open_stream.simulation.as_ref()
+    {
+        candidates.push(ChunkVector {
+            scope: CFB_OPEN_STREAM_CHUNK_SCOPE,
+            values: simulation
+                .samples
+                .iter()
+                .enumerate()
+                .map(|(sample_index, sample)| {
+                    sample.per_operation.iter().try_fold(0_u64, |total, phase| {
+                        total
+                            .checked_add(phase.physical_request_count)
+                            .ok_or_else(|| {
+                                InputError(format!(
+                                    "source.cfb_open_stream.simulation.samples[{sample_index}] \
+                                     per-operation request count overflows u64"
+                                ))
+                            })
                     })
-                    .collect::<Result<Vec<_>, _>>()?,
-            });
-        }
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        });
     }
     Ok(match candidates.len() {
         0 => ChunkEvidence::None,

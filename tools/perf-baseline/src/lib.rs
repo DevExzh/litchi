@@ -464,7 +464,9 @@ impl XlsbShape {
     const fn stores_cell(self, row: usize, column: usize) -> bool {
         match self {
             Self::Tiny | Self::Medium | Self::Large => true,
-            Self::Sparse => (row == 0 && column == 0) || (row % 17 == 0 && column % 19 == 0),
+            Self::Sparse => {
+                (row == 0 && column == 0) || (row.is_multiple_of(17) && column.is_multiple_of(19))
+            },
         }
     }
 }
@@ -15494,19 +15496,18 @@ fn run_pptx_source_image_query(
             )
             .into());
         }
-        if let Some(images) = output.all_images.as_ref() {
-            if images != &corpus.expected_images {
-                return Err(
-                    "PPTX images query returned an unexpected ordered picture inventory".into(),
-                );
-            }
+        if let Some(images) = output.all_images.as_ref()
+            && images != &corpus.expected_images
+        {
+            return Err(
+                "PPTX images query returned an unexpected ordered picture inventory".into(),
+            );
         }
-        if let Some(payload) = output.payload.as_ref() {
-            if payload != &corpus.selected_payload
-                || sha256_hex(payload) != corpus.selected_payload_sha256
-            {
-                return Err("PPTX read_image query returned an unexpected payload".into());
-            }
+        if let Some(payload) = output.payload.as_ref()
+            && (payload != &corpus.selected_payload
+                || sha256_hex(payload) != corpus.selected_payload_sha256)
+        {
+            return Err("PPTX read_image query returned an unexpected payload".into());
         }
         std::hint::black_box(&output);
         if iteration >= warmup_iterations {
@@ -15536,12 +15537,10 @@ fn run_pptx_source_image_query(
         selected_image: corpus.selected_image.clone(),
         selected_image_metadata_sha256: corpus.selected_image_sha256.clone(),
         selected_media_part: corpus.selected_media_part.clone(),
-        selected_media_compressed_range_bytes: u64::try_from(
-            corpus
-                .selected_media_compressed_range
-                .end
-                .saturating_sub(corpus.selected_media_compressed_range.start),
-        )?,
+        selected_media_compressed_range_bytes: corpus
+            .selected_media_compressed_range
+            .end
+            .saturating_sub(corpus.selected_media_compressed_range.start),
         selected_payload_bytes: u64::try_from(corpus.selected_payload.len())?,
         selected_payload_sha256: corpus.selected_payload_sha256.clone(),
         observed_picture_metadata_sha256: Vec::with_capacity(samples),
@@ -20450,14 +20449,15 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
     let target_payload = xlsx_value(target).to_string().into_bytes();
     let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
     let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
-    let vendor_payload_bytes = (shape == XlsxCellCrudShape::VendorExtension)
-        .then_some(
-            XLSX_VENDOR_EXTENSION_XML
-                .len()
-                .checked_add(XLSX_VENDOR_EXTENSION_BIN.len())
-                .ok_or("XLSX vendor extension logical byte count overflows usize")?,
-        )
-        .unwrap_or(0);
+    let vendor_bytes = XLSX_VENDOR_EXTENSION_XML
+        .len()
+        .checked_add(XLSX_VENDOR_EXTENSION_BIN.len())
+        .ok_or("XLSX vendor extension logical byte count overflows usize")?;
+    let vendor_payload_bytes = if shape == XlsxCellCrudShape::VendorExtension {
+        vendor_bytes
+    } else {
+        0
+    };
     let logical_payload_bytes = cell_count
         .checked_mul(std::mem::size_of::<i32>())
         .and_then(|bytes| {
@@ -25972,14 +25972,14 @@ fn cfb_fat_and_directory(archive: &[u8]) -> Result<CfbArchiveLayout, Box<dyn Err
     if !matches!(sector_size, 512 | 4096) {
         return Err("XLS source corpus has an unsupported CFB sector size".into());
     }
-    if (archive.len() - 512) % sector_size != 0 {
+    if !(archive.len() - 512).is_multiple_of(sector_size) {
         return Err("XLS source corpus has a partial CFB sector".into());
     }
     let sector_count = (archive.len() - 512) / sector_size;
     let fat_sector_count = usize::try_from(cfb_read_u32(archive, 44, "FAT sector count")?)?;
     let first_difat = cfb_read_u32(archive, 68, "first DIFAT sector")?;
     let difat_sector_count = usize::try_from(cfb_read_u32(archive, 72, "DIFAT sector count")?)?;
-    let mut structural_ranges = vec![0_u64..512_u64];
+    let mut structural_ranges = std::iter::once(0_u64..512_u64).collect::<Vec<_>>();
     let mut fat_sectors = Vec::with_capacity(fat_sector_count);
     for index in 0..109 {
         let sector = cfb_read_u32(archive, 76 + index * 4, "header DIFAT entry")?;
@@ -52251,15 +52251,15 @@ fn xlsx_xml_strip_direct_element(
                     return Err("unexpected XML closing tag".into());
                 }
                 let namespace = xlsx_xml_resolved_namespace(qualified_name, &namespace_frames);
-                if depth == 2 {
-                    if let Some(start) = active_start.take() {
-                        if name != wanted_local_name
-                            || !xlsx_xml_namespace_matches(wanted_local_name, namespace)
-                        {
-                            return Err("XML direct element nesting is malformed".into());
-                        }
-                        removed = Some((start, token.end));
+                if depth == 2
+                    && let Some(start) = active_start.take()
+                {
+                    if name != wanted_local_name
+                        || !xlsx_xml_namespace_matches(wanted_local_name, namespace)
+                    {
+                        return Err("XML direct element nesting is malformed".into());
                     }
+                    removed = Some((start, token.end));
                 }
                 depth -= 1;
                 if depth == 0 {
@@ -53364,9 +53364,9 @@ fn execute_opc_casefold_eager_lookup<'a>(
     outcomes: &mut [[Option<&'a PackURI>; OPC_CASEFOLD_QUERY_COUNT];
              OPC_CASEFOLD_QUERY_REPETITIONS],
 ) -> Result<(), Box<dyn Error>> {
-    for repetition in 0..OPC_CASEFOLD_QUERY_REPETITIONS {
+    for repetition in outcomes.iter_mut() {
         for (query_index, query) in corpus.queries.iter().enumerate() {
-            outcomes[repetition][query_index] = match package.get_part(&query.partname) {
+            repetition[query_index] = match package.get_part(&query.partname) {
                 Ok(part) => Some(part.partname()),
                 Err(OpcError::PartNotFound(_)) => None,
                 Err(error) => return Err(error.into()),
@@ -53383,9 +53383,9 @@ fn execute_opc_casefold_source_lookup<'a>(
     outcomes: &mut [[Option<&'a PackURI>; OPC_CASEFOLD_QUERY_COUNT];
              OPC_CASEFOLD_QUERY_REPETITIONS],
 ) -> Result<(), Box<dyn Error>> {
-    for repetition in 0..OPC_CASEFOLD_QUERY_REPETITIONS {
+    for repetition in outcomes.iter_mut() {
         for (query_index, query) in corpus.queries.iter().enumerate() {
-            outcomes[repetition][query_index] = match package.part(&query.partname) {
+            repetition[query_index] = match package.part(&query.partname) {
                 Ok(part) => Some(part.partname()),
                 Err(OpcError::PartNotFound(_)) => None,
                 Err(error) => return Err(error.into()),
@@ -57250,7 +57250,7 @@ pub fn current_executable_identity() -> io::Result<BinaryIdentity> {
             match file.read(&mut buffer) {
                 Ok(count) => break count,
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
-                Err(error) => return Err(error.into()),
+                Err(error) => return Err(error),
             }
         };
         if count == 0 {
@@ -57278,7 +57278,7 @@ pub fn current_executable_identity() -> io::Result<BinaryIdentity> {
         let _ = write!(binary_sha256, "{byte:02x}");
     }
     let executable =
-        executable_mode_bits(&metadata_before).map_or(true, |mode_bits| mode_bits & 0o111 != 0);
+        executable_mode_bits(&metadata_before).is_none_or(|mode_bits| mode_bits & 0o111 != 0);
     Ok(BinaryIdentity {
         path: path.to_string_lossy().into_owned(),
         binary_sha256,

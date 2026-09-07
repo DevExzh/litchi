@@ -785,7 +785,7 @@ fn open_direct(bytes: &[u8]) -> Result<litchi_xlsb::Workbook> {
 }
 
 fn facade_text(bytes: &[u8]) -> Result<String> {
-    Ok(litchi::sheet::Workbook::from_bytes(bytes.to_vec())?.text()?)
+    litchi::sheet::Workbook::from_bytes(bytes.to_vec())?.text()
 }
 
 fn save_workbook(workbook: &litchi_xlsb::Workbook) -> Result<Vec<u8>> {

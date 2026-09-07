@@ -5247,3 +5247,140 @@ fn source_backed_cross_copy_retains_verified_image_and_chart_captures() -> TestR
     }
     Ok(())
 }
+
+#[test]
+fn source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusal() -> TestResult {
+    for charts in [false, true] {
+        let (source_bytes, member) = if charts {
+            (
+                chart_source_fixture_0383(&[("rIdChartOne", "chart-one.xml")])?,
+                "ppt/charts/chart-one.xml",
+            )
+        } else {
+            (picture_source_fixture()?, "ppt/media/source-only.png")
+        };
+        let source_bytes = rewrite_archive(&source_bytes, |_, payload| Ok(payload.to_vec()))?;
+        let destination = destination_fixture()?;
+        let expected = publish(&source_bytes, &destination, 0, 1, 1)?;
+        let range = zip_member_data_range(&source_bytes, member)?;
+        // Zero headroom refuses writer authorization. C + 4096 admits its
+        // payload/fixed charge but refuses the additional target-name charge.
+        for headroom in [0, range.1 - range.0 + 4096] {
+            let memory_limit = 64 * 1024 * 1024;
+            let budget = Budget::root(
+                "cross-copy-lazy-fallback",
+                Limits::new(
+                    memory_limit,
+                    u64::MAX,
+                    u64::MAX,
+                    u64::MAX,
+                    u64::MAX,
+                    u64::MAX,
+                ),
+            );
+            let (_cancel, token) = CancellationSource::pair();
+            let context = ExecutionContext::new(budget.clone(), token, single_execution_limits()?);
+            let overlaps = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let provider =
+                MultiRangeCountingSource::new(source_bytes.clone(), vec![range], overlaps.clone());
+            let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+                Arc::new(provider),
+                ReadLimits::default(),
+                context,
+            )?;
+            let destination_budget = Budget::root(
+                "cross-copy-lazy-fallback-destination",
+                Limits::new(
+                    memory_limit,
+                    u64::MAX,
+                    u64::MAX,
+                    u64::MAX,
+                    u64::MAX,
+                    u64::MAX,
+                ),
+            );
+            let (_destination_cancel, destination_token) = CancellationSource::pair();
+            let destination_context = ExecutionContext::new(
+                destination_budget.clone(),
+                destination_token,
+                single_execution_limits()?,
+            );
+            let editor =
+                SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+                    Arc::new(OwnedSource::new(destination.clone())),
+                    ReadLimits::default(),
+                    destination_context,
+                )?;
+            let plan = editor.plan_cross_slide_copy(&source, 0, 1, 1)?;
+            let before = overlaps.load(std::sync::atomic::Ordering::SeqCst);
+            let filler = budget
+                .reserve(
+                    Resource::Memory,
+                    memory_limit - budget.used(Resource::Memory) - headroom,
+                )
+                .map_err(|error| {
+                    Error::Invalid(format!("cannot reserve fallback pressure: {error}"))
+                })?;
+            let mut output = Vec::new();
+            editor.publish_cross_slide_copy_to_stream(&mut output, &plan)?;
+            assert_eq!(
+                overlaps.load(std::sync::atomic::Ordering::SeqCst),
+                before,
+                "fallback must use the already-validated decoded payload"
+            );
+            let destination_raw = raw_archive(&destination)?;
+            let old_raw = raw_archive(&expected)?;
+            let new_raw = raw_archive(&output)?;
+            let prefix = if charts { "ppt/charts/" } else { "ppt/media/" };
+            let target_members: Vec<_> = old_raw
+                .members
+                .keys()
+                .filter(|name| {
+                    name.starts_with(prefix) && !destination_raw.members.contains_key(*name)
+                })
+                .collect();
+            assert_eq!(
+                target_members.len(),
+                1,
+                "fixture must have exactly one copied leaf"
+            );
+            let target_member = target_members[0];
+            assert_eq!(
+                &old_raw.members[target_member].local[8..10],
+                &[0, 0],
+                "control must preserve Store"
+            );
+            assert_eq!(
+                &new_raw.members[target_member].local[8..10],
+                &[8, 0],
+                "pressure must exercise decoded Deflate fallback"
+            );
+            let old =
+                ArchiveReader::new(&expected).map_err(|error| Error::Invalid(error.to_string()))?;
+            let new =
+                ArchiveReader::new(&output).map_err(|error| Error::Invalid(error.to_string()))?;
+            let old_names: BTreeSet<_> = old.file_names().collect();
+            let new_names: BTreeSet<_> = new.file_names().collect();
+            assert_eq!(old_names, new_names);
+            for name in old_names {
+                assert_eq!(
+                    old.read(name)
+                        .map_err(|error| Error::Invalid(error.to_string()))?,
+                    new.read(name)
+                        .map_err(|error| Error::Invalid(error.to_string()))?,
+                    "fallback changed {name}"
+                );
+            }
+            Package::from_vec(output.clone())?;
+            open_source(&output)?;
+            drop(plan);
+            drop(source);
+            drop(filler);
+            assert_eq!(budget.used(Resource::Memory), 0);
+            assert_eq!(budget.used(Resource::Objects), 0);
+            assert_eq!(destination_budget.used(Resource::Memory), 0);
+            assert_eq!(destination_budget.used(Resource::Objects), 0);
+        }
+    }
+    Ok(())
+}

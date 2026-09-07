@@ -81,7 +81,7 @@ mod allocator {
             assert!(!pointer.is_null());
             let during = allocation_metrics::snapshot();
             assert!(
-                during.allocation_calls >= before.allocation_calls + 1,
+                during.allocation_calls > before.allocation_calls,
                 "successful alloc must increment allocation calls"
             );
             assert!(during.allocated_bytes >= before.allocated_bytes + 256);
@@ -91,7 +91,7 @@ mod allocator {
             unsafe { GLOBAL_ALLOCATOR.dealloc(pointer, layout) };
             let after = allocation_metrics::snapshot();
             assert!(
-                after.deallocation_calls >= before.deallocation_calls + 1,
+                after.deallocation_calls > before.deallocation_calls,
                 "successful dealloc must increment deallocation calls"
             );
             assert!(after.deallocated_bytes >= before.deallocated_bytes + layout.size() as u64);
@@ -115,7 +115,7 @@ mod allocator {
             assert!(bytes.iter().all(|byte| *byte == 0));
             let during = allocation_metrics::snapshot();
             assert!(
-                during.allocation_calls >= before.allocation_calls + 1,
+                during.allocation_calls > before.allocation_calls,
                 "successful alloc_zeroed must increment allocation calls"
             );
             assert!(during.allocated_bytes >= before.allocated_bytes + layout.size() as u64);
@@ -171,7 +171,7 @@ mod allocator {
             let pointer = unsafe { GLOBAL_ALLOCATOR.alloc(layout) };
             assert!(pointer.is_null(), "the maximal layout should be rejected");
             let after = allocation_metrics::snapshot();
-            assert!(after.failed_allocation_calls >= before.failed_allocation_calls + 1);
+            assert!(after.failed_allocation_calls > before.failed_allocation_calls);
         }
 
         #[test]
@@ -196,9 +196,7 @@ mod allocator {
             let failed = unsafe { GLOBAL_ALLOCATOR.realloc(pointer, layout, maximal_size) };
             assert!(failed.is_null(), "the maximal realloc should be rejected");
             let after_failed = allocation_metrics::snapshot();
-            assert!(
-                after_failed.failed_allocation_calls >= after_alloc.failed_allocation_calls + 1
-            );
+            assert!(after_failed.failed_allocation_calls > after_alloc.failed_allocation_calls);
             // SAFETY: a failed realloc preserves the original allocation and
             // its contents, which remain valid until the deallocation below.
             assert_eq!(unsafe { *pointer }, 0xa5);
@@ -215,18 +213,15 @@ mod allocator {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     litchi_perf_baseline::allocation_metrics::enable();
-    let retention_args = {
-        let mut args = std::env::args_os();
-        let _executable = args.next();
-        match args.next() {
-            Some(subcommand) if subcommand == std::ffi::OsStr::new("retention") => {
-                Some(args.collect::<Vec<_>>())
-            },
-            _ => None,
-        }
-    };
-    match retention_args {
-        Some(args) => litchi_perf_baseline::pptx_retention::run_from_args(args),
-        None => litchi_perf_baseline::run(),
+    let mut args = std::env::args_os();
+    let _executable = args.next();
+    match args.next() {
+        Some(selector) if selector == std::ffi::OsStr::new("retention") => {
+            litchi_perf_baseline::pptx_retention::run_from_args(args)
+        },
+        Some(selector) if selector == std::ffi::OsStr::new("provider-lifecycle") => {
+            litchi_perf_baseline::pptx_provider_lifecycle::run_from_args(args)
+        },
+        _ => litchi_perf_baseline::run(),
     }
 }

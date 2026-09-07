@@ -1,0 +1,52 @@
+{
+  "change": 453,
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0453-pptx-payload/baseline-alloc",
+    "provider-lifecycle",
+    "--corpus",
+    "media-rich",
+    "--provider",
+    "bytes",
+    "--samples",
+    "3",
+    "--warmup",
+    "1",
+    "--source-revision",
+    "456e19246e00000000000000000000000000000000",
+    "--output",
+    "docs/performance/results/change-0453/baseline-preflight.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "456e19246506ffba230052df2b25b072ce4a8749",
+  "driver_sha256": "c4b6be7e702447436993623beb658b8c0e1d562a5ec6920a9cfc3846c1329af4",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-07T00:05:21.412800+00:00",
+  "source_before": {
+    "path": "sources/70ee04f4540d36ed3b25c6c8244210eed3914985232f5a157d3572e5e647b845.json",
+    "sha256": "70ee04f4540d36ed3b25c6c8244210eed3914985232f5a157d3572e5e647b845",
+    "files": 6668
+  },
+  "status": "failed",
+  "exit_code": 1,
+  "finished_utc": "2026-09-07T00:05:21.560710+00:00",
+  "source_after": {
+    "path": "sources/70ee04f4540d36ed3b25c6c8244210eed3914985232f5a157d3572e5e647b845.json",
+    "sha256": "70ee04f4540d36ed3b25c6c8244210eed3914985232f5a157d3572e5e647b845",
+    "files": 6668
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/baseline-alloc-preflight.log",
+    "bytes": 66,
+    "sha256": "9c31107895d0064c62d367338caa3f3f67f82a97bca82683c3e8ac08d02ec8fe"
+  }
+}

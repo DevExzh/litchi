@@ -33,6 +33,11 @@ const TIMING_SCOPE: &str = "open, plan, and publication durations contain only t
 const RANGE_SCOPE: &str = "PptxRangeSource logical adapter counters; request lengths and returned bytes describe caller-visible ReadAt calls, not physical network or filesystem I/O";
 const FILE_SCOPE: &str = "fresh task-owned files are staged once before warmups and reopened through FileSource for every iteration; files are recently written and warm-cache, with no cold-cache claim";
 const RSS_SCOPE: &str = "optional process-wide VmRSS/VmHWM snapshots from procfs; setup and unrelated process memory remain in scope and no comparative RSS claim is authorized";
+const ALLOCATION_SCOPE: &str = "optional operation-scoped global-system-allocator counters; four non-nested regions surround only the existing source-open, destination-open, planning, and publication timers, while diagnostics, correctness checks, report construction, and serialization remain outside";
+const ALLOCATION_OPEN_SOURCE_SCOPE: &str = "source presentation open allocation region begins immediately before the source-open timer and finishes immediately after it; source-open correctness checks and cache diagnostics are outside";
+const ALLOCATION_OPEN_DESTINATION_SCOPE: &str = "destination editor open allocation region begins immediately before the destination-open timer and finishes immediately after it; destination-open correctness checks and cache diagnostics are outside";
+const ALLOCATION_PLAN_SCOPE: &str = "cross-slide planning allocation region begins immediately before the planning timer and finishes immediately after it; plan metadata checks and cache diagnostics are outside";
+const ALLOCATION_PUBLICATION_SCOPE: &str = "cross-slide publication allocation region begins immediately before the publication timer and finishes immediately after it; output checks, cache diagnostics, and drops are outside";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CorpusKind {
@@ -102,7 +107,7 @@ struct ProviderConfigRecord {
     range_scope: &'static str,
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 struct TimingRecord {
     open_source_ns: u64,
     open_destination_ns: u64,
@@ -110,6 +115,14 @@ struct TimingRecord {
     plan_ns: u64,
     publication_ns: u64,
     api_sum_ns: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    open_source_allocation_metrics: Option<crate::allocation_metrics::Sample>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    open_destination_allocation_metrics: Option<crate::allocation_metrics::Sample>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    plan_allocation_metrics: Option<crate::allocation_metrics::Sample>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    publication_allocation_metrics: Option<crate::allocation_metrics::Sample>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]
@@ -258,6 +271,11 @@ struct Report {
     provider: &'static str,
     provider_scope: &'static str,
     timing_scope: &'static str,
+    allocation_scope: &'static str,
+    allocation_open_source_scope: &'static str,
+    allocation_open_destination_scope: &'static str,
+    allocation_plan_scope: &'static str,
+    allocation_publication_scope: &'static str,
     range_scope: &'static str,
     file_scope: &'static str,
     rss_scope: &'static str,
@@ -268,6 +286,10 @@ struct Report {
     binary_sha256: String,
     binary_bytes: u64,
     current_exe: String,
+    allocator: &'static str,
+    instrumentation: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    allocator_counter_revision: Option<&'static str>,
     source_archive_sha256: String,
     source_archive_bytes: usize,
     destination_archive_sha256: String,
@@ -752,6 +774,7 @@ fn run_lifecycle_iteration(
     );
     sink.reserve_budget()?;
 
+    let source_allocation_region = crate::allocation_metrics::begin();
     let source_started = Instant::now();
     let source_view =
         litchi_pptx::SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
@@ -761,6 +784,9 @@ fn run_lifecycle_iteration(
             source_context.context.clone(),
         )?;
     let open_source_ns = crate::elapsed_ns(source_started.elapsed())?;
+    let open_source_allocation_metrics = source_allocation_region.finish();
+
+    let destination_allocation_region = crate::allocation_metrics::begin();
     let destination_started = Instant::now();
     let editor =
         litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
@@ -770,6 +796,7 @@ fn run_lifecycle_iteration(
             destination_context.context.clone(),
         )?;
     let open_destination_ns = crate::elapsed_ns(destination_started.elapsed())?;
+    let open_destination_allocation_metrics = destination_allocation_region.finish();
     if source_view.slide_count() != crate::PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT
         || editor.slide_count() != corpus.destination_slide_count
     {
@@ -806,6 +833,7 @@ fn run_lifecycle_iteration(
     source_before = source_after;
     destination_before = destination_after;
 
+    let plan_allocation_region = crate::allocation_metrics::begin();
     let plan_started = Instant::now();
     let plan = editor.plan_cross_slide_copy(
         &source_view,
@@ -814,6 +842,7 @@ fn run_lifecycle_iteration(
         corpus.insertion_position,
     )?;
     let plan_ns = crate::elapsed_ns(plan_started.elapsed())?;
+    let plan_allocation_metrics = plan_allocation_region.finish();
     if plan.source_position() != corpus.source_slide
         || plan.destination_slide_position() != corpus.destination_slide
         || plan.insertion_position() != corpus.insertion_position
@@ -852,9 +881,11 @@ fn run_lifecycle_iteration(
     source_before = source_after;
     destination_before = destination_after;
 
+    let publication_allocation_region = crate::allocation_metrics::begin();
     let publication_started = Instant::now();
     let published = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
     let publication_ns = crate::elapsed_ns(publication_started.elapsed())?;
+    let publication_allocation_metrics = publication_allocation_region.finish();
     if published.destination_slide_count() != corpus.destination_slide_count + 1
         || published.insertion_position() != corpus.insertion_position
         || published.name() != corpus.source_slide_name
@@ -1024,6 +1055,10 @@ fn run_lifecycle_iteration(
             plan_ns,
             publication_ns,
             api_sum_ns,
+            open_source_allocation_metrics,
+            open_destination_allocation_metrics,
+            plan_allocation_metrics,
+            publication_allocation_metrics,
         },
         phases,
     })
@@ -1074,6 +1109,11 @@ fn run_capture(config: &Config) -> Result<Report, Box<dyn Error>> {
         provider: config.provider.name(),
         provider_scope: PROVIDER_SCOPE,
         timing_scope: TIMING_SCOPE,
+        allocation_scope: ALLOCATION_SCOPE,
+        allocation_open_source_scope: ALLOCATION_OPEN_SOURCE_SCOPE,
+        allocation_open_destination_scope: ALLOCATION_OPEN_DESTINATION_SCOPE,
+        allocation_plan_scope: ALLOCATION_PLAN_SCOPE,
+        allocation_publication_scope: ALLOCATION_PUBLICATION_SCOPE,
         range_scope: RANGE_SCOPE,
         file_scope: FILE_SCOPE,
         rss_scope: RSS_SCOPE,
@@ -1084,6 +1124,9 @@ fn run_capture(config: &Config) -> Result<Report, Box<dyn Error>> {
         binary_sha256: binary.binary_sha256.clone(),
         binary_bytes: binary.binary_bytes,
         current_exe: binary.path.clone(),
+        allocator: crate::allocation_metrics::allocator_identity(),
+        instrumentation: crate::allocation_metrics::instrumentation_identity(),
+        allocator_counter_revision: crate::allocation_metrics::counter_revision(),
         source_archive_sha256: crate::sha256_hex(&corpus.source_archive),
         source_archive_bytes: corpus.source_archive.len(),
         destination_archive_sha256: crate::sha256_hex(&corpus.destination_archive),
@@ -1257,6 +1300,41 @@ mod tests {
             assert_eq!(report.samples_raw.len(), 1);
             assert!(report.samples_raw[0].exact_output_verified);
             assert!(report.final_memory_objects_depth_zero_checked);
+            assert_eq!(report.allocator, "Rust system allocator");
+            assert_eq!(report.instrumentation, "none");
+            assert!(report.allocator_counter_revision.is_none());
+            assert_eq!(report.allocation_scope, ALLOCATION_SCOPE);
+            assert_eq!(
+                report.allocation_open_source_scope,
+                ALLOCATION_OPEN_SOURCE_SCOPE
+            );
+            assert_eq!(
+                report.allocation_open_destination_scope,
+                ALLOCATION_OPEN_DESTINATION_SCOPE
+            );
+            assert_eq!(report.allocation_plan_scope, ALLOCATION_PLAN_SCOPE);
+            assert_eq!(
+                report.allocation_publication_scope,
+                ALLOCATION_PUBLICATION_SCOPE
+            );
+            let timings = &report.samples_raw[0].timings;
+            assert!(timings.open_source_allocation_metrics.is_none());
+            assert!(timings.open_destination_allocation_metrics.is_none());
+            assert!(timings.plan_allocation_metrics.is_none());
+            assert!(timings.publication_allocation_metrics.is_none());
+            let serialized = serde_json::to_value(&report).unwrap();
+            let serialized_timings = &serialized["samples_raw"][0]["timings"];
+            for field in [
+                "open_source_allocation_metrics",
+                "open_destination_allocation_metrics",
+                "plan_allocation_metrics",
+                "publication_allocation_metrics",
+            ] {
+                assert!(
+                    serialized_timings.get(field).is_none(),
+                    "disabled allocation sample {field} must be absent"
+                );
+            }
             digests.push(report.samples_raw[0].output_sha256.clone());
         }
         assert_eq!(digests[0], digests[1]);

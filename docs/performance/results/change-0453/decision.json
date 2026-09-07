@@ -1,0 +1,9 @@
+{
+  "change": 453,
+  "decision": "retain shared PPTX decoded payloads",
+  "goal_complete": false,
+  "native_coverage_promoted": false,
+  "basis": "Both media allocation gates pass with identical I/O/work/output; bytes/media API medians improve about 3%. Primary plain p99 triggers are retained and not reproduced by separate fixed two-ABBA investigation.",
+  "memory_admission": "Full decoded fallback allowance plus checked inline handle storage remains; measured media destination staging rises 128 bytes.",
+  "tail_scope": "No stable population-p99 or universal latency claim."
+}
