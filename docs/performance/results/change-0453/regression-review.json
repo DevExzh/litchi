@@ -1,0 +1,294 @@
+{
+  "flags": [
+    {
+      "kind": "paired",
+      "from_lane": 0,
+      "to_lane": 2,
+      "instrumentation": "normal",
+      "provider": "bytes",
+      "corpus": "plain",
+      "metric": "api_p99_ms",
+      "percent_change": 10.882553061725178
+    },
+    {
+      "kind": "paired",
+      "from_lane": 15,
+      "to_lane": 13,
+      "instrumentation": "normal",
+      "provider": "bytes",
+      "corpus": "plain",
+      "metric": "api_p99_ms",
+      "percent_change": 10.174022105301175
+    },
+    {
+      "kind": "paired",
+      "from_lane": 17,
+      "to_lane": 19,
+      "instrumentation": "alloc",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "metric": "plan_allocated_bytes",
+      "percent_change": -32.41335381473119
+    },
+    {
+      "kind": "paired",
+      "from_lane": 17,
+      "to_lane": 19,
+      "instrumentation": "alloc",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "metric": "plan_region_peak_live_bytes",
+      "percent_change": -7.585446928449824
+    },
+    {
+      "kind": "paired",
+      "from_lane": 17,
+      "to_lane": 19,
+      "instrumentation": "alloc",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "metric": "plan_live_growth",
+      "percent_change": -33.27140880890936
+    },
+    {
+      "kind": "paired",
+      "from_lane": 17,
+      "to_lane": 19,
+      "instrumentation": "alloc",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "metric": "plan_peak_growth",
+      "percent_change": -33.191800115335795
+    },
+    {
+      "kind": "paired",
+      "from_lane": 17,
+      "to_lane": 19,
+      "instrumentation": "alloc",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "metric": "publication_region_peak_live_bytes",
+      "percent_change": -7.046447360000682
+    },
+    {
+      "kind": "paired",
+      "from_lane": 22,
+      "to_lane": 20,
+      "instrumentation": "alloc",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "metric": "plan_allocated_bytes",
+      "percent_change": -32.41335381473119
+    },
+    {
+      "kind": "paired",
+      "from_lane": 22,
+      "to_lane": 20,
+      "instrumentation": "alloc",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "metric": "plan_region_peak_live_bytes",
+      "percent_change": -7.585446928449824
+    },
+    {
+      "kind": "paired",
+      "from_lane": 22,
+      "to_lane": 20,
+      "instrumentation": "alloc",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "metric": "plan_live_growth",
+      "percent_change": -33.27140880890936
+    },
+    {
+      "kind": "paired",
+      "from_lane": 22,
+      "to_lane": 20,
+      "instrumentation": "alloc",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "metric": "plan_peak_growth",
+      "percent_change": -33.191800115335795
+    },
+    {
+      "kind": "paired",
+      "from_lane": 22,
+      "to_lane": 20,
+      "instrumentation": "alloc",
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "metric": "publication_region_peak_live_bytes",
+      "percent_change": -7.046447360000682
+    }
+  ],
+  "dispositions": [
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 0,
+        "to_lane": 2,
+        "instrumentation": "normal",
+        "provider": "bytes",
+        "corpus": "plain",
+        "metric": "api_p99_ms",
+        "percent_change": 10.882553061725178
+      },
+      "reviewed": true,
+      "reason": "Primary p99 2.227084 to 2.469448 ms is retained. Each candidate process has one approximately 0.33 ms spike, in planning for R1 and publication for R2; no cause is established. Separate fixed two-ABBA confirmation gives block p99 changes +1.508%/+0.001%, with pooled descriptive p50/p95/p99 +0.132%/+0.122%/+1.082%. The >5% tail increase was not reproduced. Retain for deterministic allocation benefit; no stable population-p99 or universal latency claim."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 15,
+        "to_lane": 13,
+        "instrumentation": "normal",
+        "provider": "bytes",
+        "corpus": "plain",
+        "metric": "api_p99_ms",
+        "percent_change": 10.174022105301175
+      },
+      "reviewed": true,
+      "reason": "Primary p99 2.244439 to 2.472789 ms is retained. Each candidate process has one approximately 0.33 ms spike, in planning for R1 and publication for R2; no cause is established. Separate fixed two-ABBA confirmation gives block p99 changes +1.508%/+0.001%, with pooled descriptive p50/p95/p99 +0.132%/+0.122%/+1.082%. The >5% tail increase was not reproduced. Retain for deterministic allocation benefit; no stable population-p99 or universal latency claim."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 17,
+        "to_lane": 19,
+        "instrumentation": "alloc",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "metric": "plan_allocated_bytes",
+        "percent_change": -32.41335381473119
+      },
+      "reviewed": true,
+      "reason": "51760790 to 34983382 bytes. Removing the staged decoded copy reduces actual planning allocation by 16,777,408 bytes; both repeats pass the frozen allocation gate."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 17,
+        "to_lane": 19,
+        "instrumentation": "alloc",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "metric": "plan_region_peak_live_bytes",
+        "percent_change": -7.585446928449824
+      },
+      "reviewed": true,
+      "reason": "220706178 to 203964628 bytes. Absolute planning-region live peak falls with decoded sharing. This includes preexisting live owners and is not RSS or a lower admission limit."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 17,
+        "to_lane": 19,
+        "instrumentation": "alloc",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "metric": "plan_live_growth",
+        "percent_change": -33.27140880890936
+      },
+      "reviewed": true,
+      "reason": "50425902 to 33648494 bytes. Managed sharing removes duplicate retained decoded storage; both repeats show the same 16,777,408-byte reduction. Source reservations remain intact."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 17,
+        "to_lane": 19,
+        "instrumentation": "alloc",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "metric": "plan_peak_growth",
+        "percent_change": -33.191800115335795
+      },
+      "reviewed": true,
+      "reason": "50438807 to 33697259 bytes. Planning transient growth above region entry falls; the difference need not equal payload size because the maximum occurs at a different operation boundary."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 17,
+        "to_lane": 19,
+        "instrumentation": "alloc",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "metric": "publication_region_peak_live_bytes",
+        "percent_change": -7.046447360000682
+      },
+      "reviewed": true,
+      "reason": "238097429 to 221320019 bytes. Absolute publication-region peak falls because less memory is already live at entry. Publication peak growth remains exactly 17,404,156 bytes; publication itself does not allocate fewer bytes."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 22,
+        "to_lane": 20,
+        "instrumentation": "alloc",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "metric": "plan_allocated_bytes",
+        "percent_change": -32.41335381473119
+      },
+      "reviewed": true,
+      "reason": "51760790 to 34983382 bytes. Removing the staged decoded copy reduces actual planning allocation by 16,777,408 bytes; both repeats pass the frozen allocation gate."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 22,
+        "to_lane": 20,
+        "instrumentation": "alloc",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "metric": "plan_region_peak_live_bytes",
+        "percent_change": -7.585446928449824
+      },
+      "reviewed": true,
+      "reason": "220706178 to 203964628 bytes. Absolute planning-region live peak falls with decoded sharing. This includes preexisting live owners and is not RSS or a lower admission limit."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 22,
+        "to_lane": 20,
+        "instrumentation": "alloc",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "metric": "plan_live_growth",
+        "percent_change": -33.27140880890936
+      },
+      "reviewed": true,
+      "reason": "50425902 to 33648494 bytes. Managed sharing removes duplicate retained decoded storage; both repeats show the same 16,777,408-byte reduction. Source reservations remain intact."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 22,
+        "to_lane": 20,
+        "instrumentation": "alloc",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "metric": "plan_peak_growth",
+        "percent_change": -33.191800115335795
+      },
+      "reviewed": true,
+      "reason": "50438807 to 33697259 bytes. Planning transient growth above region entry falls; the difference need not equal payload size because the maximum occurs at a different operation boundary."
+    },
+    {
+      "flag": {
+        "kind": "paired",
+        "from_lane": 22,
+        "to_lane": 20,
+        "instrumentation": "alloc",
+        "provider": "bytes",
+        "corpus": "media-rich",
+        "metric": "publication_region_peak_live_bytes",
+        "percent_change": -7.046447360000682
+      },
+      "reviewed": true,
+      "reason": "238097429 to 221320019 bytes. Absolute publication-region peak falls because less memory is already live at entry. Publication peak growth remains exactly 17,404,156 bytes; publication itself does not allocate fewer bytes."
+    }
+  ]
+}

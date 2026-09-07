@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0453: PPTX plans share decoded payloads with allocator evidence
+
+[0453](changes/0453-pptx-shared-decoded-payload.md) removes 16,777,408 planning allocated and retained bytes in both media-rich
+repeats: allocation falls 51,760,790→34,983,382 bytes (32.413%), live growth
+50,425,902→33,648,494 bytes (33.271%). The 480 ordinary samples show bytes/media
+API p50 improvements 2.995%/3.217%; 240 allocator samples are measured separately.
+Source/destination reads and source work remain identical; destination staging
+admission grows 128 bytes and retains the full decoded fallback allowance.
+
+Primary plain p99 increases 10.883%/10.174% remain reported. A separate fixed
+240-sample two-ABBA investigation does not reproduce them (block p99
++1.508%/+0.001%). No population-tail, timed RSS, cold/network or scaling claim.
+See [measurements](results/change-0453/measurements.md),
+[confirmation](results/change-0453/confirmation-summary.md) and
+[review](results/change-0453/regression-review.md).
+
 ## Change 0452: PPTX retained captures remove a publication source pass
 
 [0452](changes/0452-pptx-retained-capture.md) adopts combined OPC capture in image/chart copy planning and reserves

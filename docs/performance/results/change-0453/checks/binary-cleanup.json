@@ -1,0 +1,49 @@
+{
+  "status": "pass",
+  "task": "/tmp/litchi-goal-0453-pptx-payload",
+  "temporary_directory_absent": true,
+  "binaries": {
+    "baseline": {
+      "path": "/tmp/litchi-goal-0453-pptx-payload/baseline",
+      "bytes": 57560488,
+      "sha256": "7a7d6a15e06e419681a29daa6d1ca5fb4c7fa9b6875ccc441250344e0291d653"
+    },
+    "baseline-alloc": {
+      "path": "/tmp/litchi-goal-0453-pptx-payload/baseline-alloc",
+      "bytes": 57267616,
+      "sha256": "38ffa2be8e521d47bdc467607735d2cfb5d47193ae04083ab485a6583a573dea"
+    },
+    "baseline-r2": {
+      "path": "/tmp/litchi-goal-0453-pptx-payload/baseline-r2",
+      "bytes": 57560488,
+      "sha256": "7a7d6a15e06e419681a29daa6d1ca5fb4c7fa9b6875ccc441250344e0291d653"
+    },
+    "baseline-r2-alloc": {
+      "path": "/tmp/litchi-goal-0453-pptx-payload/baseline-r2-alloc",
+      "bytes": 57382672,
+      "sha256": "09d7d8e7dea583b284d687751dcc5b1585d9044e25d988529043d9856b1bf6e4"
+    },
+    "baseline-r3": {
+      "path": "/tmp/litchi-goal-0453-pptx-payload/baseline-r3",
+      "bytes": 57558024,
+      "sha256": "0d7558e327fac9ecf2aa005c58309683dafc2491f4a09765660c56e3dddec64d"
+    },
+    "baseline-r3-alloc": {
+      "path": "/tmp/litchi-goal-0453-pptx-payload/baseline-r3-alloc",
+      "bytes": 57380696,
+      "sha256": "1a17877fcb557a8dc9d62428213ee3d6c24c748b056fc6261b86c867d8cf0683"
+    },
+    "candidate": {
+      "path": "/tmp/litchi-goal-0453-pptx-payload/candidate",
+      "bytes": 57560744,
+      "sha256": "c1c41042d3b440b2f6f1937676cbe10f828a7dbcc9bd63d91a0fbdb77957f4dd"
+    },
+    "candidate-alloc": {
+      "path": "/tmp/litchi-goal-0453-pptx-payload/candidate-alloc",
+      "bytes": 57383472,
+      "sha256": "7059bd2b4c645ad0c8774a1252a22683e5590a2d9dd684c75696165741f5abf1"
+    }
+  },
+  "files_removed": 8,
+  "bytes_removed": 459654200
+}

@@ -1,6 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0452
+## Current evidence through 0453
+
+[0453](changes/0453-pptx-shared-decoded-payload.md) removes the duplicate staged decoded payload after successful PPTX image/chart
+capture. Both allocator repeats save 16,777,408 planning allocated/retained bytes;
+bytes/media API medians improve about 3%. Full fallback allowance remains and
+media destination staging grows 128 bytes. All 1,702 final tests and 1,000 existing
+OPC fuzz runs pass. Primary plain p99 increases remain visible; a separate fixed
+240-sample ABBA investigation does not reproduce them.
+
+Registry/default counts remain 438/36; representative coverage remains 15
+categories/33 mappings/10 measured/23 correctness-only. Native application
+breadth, cold I/O, bounded existing append, repackaging and scaling remain
+required. This is progress; the full non-iWork goal remains active and uncompleted.
+
+## Earlier evidence through 0452
 
 [0452](changes/0452-pptx-retained-capture.md) integrates retained OPC captures into PPTX image/chart plans with
 independent publication reservations. Complete simulated-range API p50 improves

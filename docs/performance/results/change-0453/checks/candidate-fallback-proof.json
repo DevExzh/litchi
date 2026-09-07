@@ -1,0 +1,51 @@
+{
+  "change": 453,
+  "argv": [
+    "cargo",
+    "test",
+    "--locked",
+    "--release",
+    "-p",
+    "litchi-pptx",
+    "--all-features",
+    "--test",
+    "source_backed_cross_copy",
+    "source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusal",
+    "--",
+    "--exact",
+    "--test-threads=1"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "456e19246506ffba230052df2b25b072ce4a8749",
+  "driver_sha256": "c4b6be7e702447436993623beb658b8c0e1d562a5ec6920a9cfc3846c1329af4",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-07T00:13:37.915799+00:00",
+  "source_before": {
+    "path": "sources/43f8ea59b45e09bd367c2c41510e913545324afca83e0b238c37acc2037f7917.json",
+    "sha256": "43f8ea59b45e09bd367c2c41510e913545324afca83e0b238c37acc2037f7917",
+    "files": 6668
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T00:14:10.563011+00:00",
+  "source_after": {
+    "path": "sources/43f8ea59b45e09bd367c2c41510e913545324afca83e0b238c37acc2037f7917.json",
+    "sha256": "43f8ea59b45e09bd367c2c41510e913545324afca83e0b238c37acc2037f7917",
+    "files": 6668
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/candidate-fallback-proof.log",
+    "bytes": 455,
+    "sha256": "e632cfc27dc836559c4bbdebe16b4a218ccba0c139000b5a46007049b5d1445d"
+  },
+  "passed_tests": 1,
+  "failed_tests": 0,
+  "ignored_tests": 0
+}

@@ -1,0 +1,231 @@
+{
+  "change": 453,
+  "status": "frozen",
+  "frozen_utc": "2026-09-07T00:47:18.347081+00:00",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "order": [
+    {
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "baseline",
+      "instrumentation": "normal",
+      "repeat": "R1"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "instrumentation": "normal",
+      "repeat": "R1"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "candidate",
+      "instrumentation": "normal",
+      "repeat": "R1"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "candidate",
+      "instrumentation": "normal",
+      "repeat": "R1"
+    },
+    {
+      "provider": "range",
+      "corpus": "plain",
+      "build": "baseline",
+      "instrumentation": "normal",
+      "repeat": "R1"
+    },
+    {
+      "provider": "range",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "instrumentation": "normal",
+      "repeat": "R1"
+    },
+    {
+      "provider": "range",
+      "corpus": "plain",
+      "build": "candidate",
+      "instrumentation": "normal",
+      "repeat": "R1"
+    },
+    {
+      "provider": "range",
+      "corpus": "media-rich",
+      "build": "candidate",
+      "instrumentation": "normal",
+      "repeat": "R1"
+    },
+    {
+      "provider": "range",
+      "corpus": "media-rich",
+      "build": "candidate",
+      "instrumentation": "normal",
+      "repeat": "R2"
+    },
+    {
+      "provider": "range",
+      "corpus": "plain",
+      "build": "candidate",
+      "instrumentation": "normal",
+      "repeat": "R2"
+    },
+    {
+      "provider": "range",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "instrumentation": "normal",
+      "repeat": "R2"
+    },
+    {
+      "provider": "range",
+      "corpus": "plain",
+      "build": "baseline",
+      "instrumentation": "normal",
+      "repeat": "R2"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "candidate",
+      "instrumentation": "normal",
+      "repeat": "R2"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "candidate",
+      "instrumentation": "normal",
+      "repeat": "R2"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "instrumentation": "normal",
+      "repeat": "R2"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "baseline",
+      "instrumentation": "normal",
+      "repeat": "R2"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "baseline",
+      "instrumentation": "alloc",
+      "repeat": "R1"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "instrumentation": "alloc",
+      "repeat": "R1"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "candidate",
+      "instrumentation": "alloc",
+      "repeat": "R1"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "candidate",
+      "instrumentation": "alloc",
+      "repeat": "R1"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "candidate",
+      "instrumentation": "alloc",
+      "repeat": "R2"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "candidate",
+      "instrumentation": "alloc",
+      "repeat": "R2"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "media-rich",
+      "build": "baseline",
+      "instrumentation": "alloc",
+      "repeat": "R2"
+    },
+    {
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "baseline",
+      "instrumentation": "alloc",
+      "repeat": "R2"
+    }
+  ],
+  "reports": 24,
+  "normal_reports": 16,
+  "normal_samples": 480,
+  "allocator_reports": 8,
+  "allocator_samples": 240,
+  "pilot_lanes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    16,
+    17,
+    18,
+    19
+  ],
+  "acceptance": {
+    "media_plan_allocated_bytes_reduction_minimum": 16773120,
+    "media_plan_live_growth_reduction_minimum": 16773120,
+    "both_repeats": true,
+    "absolute_regression_review_percent": 5
+  },
+  "claims": "Normal API latency separate from instrumented allocator diagnostics. Simulated range 64KiB/200us/25MiB per second separate sleeps. No cold/native/scaling claim. Keep all phase and repeat flags.",
+  "corpora": {
+    "plain": {
+      "source_archive_sha256": "8ab4513642f48d99fa46e83b2c2764e8b20d417d3933ce3d5efe0825b21f918e",
+      "source_archive_bytes": 31498,
+      "destination_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+      "destination_archive_bytes": 30539,
+      "expected_output_sha256": "ab5109b0584aacb070b9b33a5769f469464ede991c12fd4da7e9e7bce53f159b",
+      "expected_output_bytes": 31514
+    },
+    "media-rich": {
+      "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+      "source_archive_bytes": 16815621,
+      "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "destination_archive_bytes": 16814664,
+      "expected_output_sha256": "809c61728c9e059e7b30758fbd668d2f6bb161cb3bd5f5fbdf0c9465bc611cea",
+      "expected_output_bytes": 33599715
+    }
+  },
+  "bound_files": {
+    "baseline-build.json": "68c18b355a45f29c1857d6979ee9ca530fab4b8fe6d5225cb3eacb38c027f941",
+    "candidate-build.json": "29fbb5c15d4a466d07d27cab978ea2f94b4ad6cce5abd6e0329c2ef3d63aae63",
+    "capture.py": "f6941bee9e1ba7b8b44426b49ab5a7ab3b13f089cc79aed541baf9084f96572d",
+    "verify-report.py": "436e0f9a926e2713ff030c9b9ed9c32b4312d0a6734096729b631074c0872316",
+    "base-verify-report.py": "d8ec5862592192dbb3b3f08205f6faec19eba10c5f4b9d0a64d536a373474b00",
+    "allocation-scopes.json": "7c48b16e1ac61a8620063d05627b3670e502ca8991f14b2bbf6e6b3a7e2b01e7"
+  }
+}

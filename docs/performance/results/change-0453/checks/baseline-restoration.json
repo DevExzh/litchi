@@ -1,0 +1,20 @@
+{
+  "status": "pass",
+  "build_exit_code": 0,
+  "restored": {
+    "crates/litchi-pptx/src/presentation/source_cross_copy.rs": "b5b745412b59a66fb0b5bdced92dd0ae46900f2eb67d8365bdf4edb9ad6f206d",
+    "crates/litchi-pptx/tests/source_backed_cross_copy.rs": "e192a72d2f95aa772be3c4d54f4062453dc928b061bbffe5928387377e331bb9",
+    "tools/perf-baseline/src/pptx_provider_lifecycle.rs": "ca3c57af857052f6b0cbc5f8fbab43128af1edd708276591af9ec7db7b63ddd2",
+    "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs": "b522ea68e0a3ce4b3a4592e156283e30c4e585e539fd23eeb87174b9aa21d051",
+    "tools/perf-baseline/src/filesystem.rs": "6d43007bd84cecef4c8bcab353344cce477f453234886c98493380c95fe3084f",
+    "tools/perf-baseline/src/docx_story_hyperlinks.rs": "61b4796e420867ed8bb65ca6f9be34d25bf4af5044e99ab463b04941fcc7ef57",
+    "tools/perf-baseline/src/parallel_metrics.rs": "fc2125088a4cea7ab1bba97f8059afe020e71e810ca20aedf889eec331f049d0",
+    "tools/perf-baseline/src/xls_numeric.rs": "bc2e448d138d77c31d44a6df6e8fff96aacfde791eb32ffaef6524f312068bb0",
+    "tools/perf-baseline/src/lib.rs": "2a04d7637e2b6b2fbf653562c82005d849a1df99f199f753d0907ce5ea22bf77",
+    "tools/perf-baseline/src/operation_metrics.rs": "9ad3786448e8b977d2c718dac2f3a77409ea679e5b3376f684142b0a304f60f4",
+    "tools/perf-baseline/src/bin/xls_source_attribution.rs": "b98da8803637363df3cc419350cab75faca4fa914b8e9fd4f68921da349f063b",
+    "tools/perf-baseline/src/bin/xlsb_crud.rs": "31a99658d7ac44b0e3f83090d43eda2fc4b3be8121f3a8f0789e08911ec3d7c0",
+    "tools/perf-baseline/src/bin/docx_source_selected_paragraph.rs": "b08b00f640db33dba4a5fb1715ca1d38984c3fcbb753102c9de0ccc6de6072dd",
+    "tools/perf-baseline/src/bin/xlsx_cell_values_abba.rs": "3385a924d9a7c1d40efd7e71dc990c2b536065a569beb69aa8298ade6c5b6228"
+  }
+}

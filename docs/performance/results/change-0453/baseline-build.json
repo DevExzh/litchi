@@ -1,0 +1,20 @@
+{
+  "revision": "456e19246506ffba230052df2b25b072ce4a8749",
+  "source_manifest": {
+    "path": "sources/427b47cad4a1540fc79f145b09704674853beecbf8d57a6b86d4e625a4572820.json",
+    "sha256": "427b47cad4a1540fc79f145b09704674853beecbf8d57a6b86d4e625a4572820",
+    "files": 6668
+  },
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0453-pptx-payload/baseline-r3",
+      "bytes": 57558024,
+      "sha256": "0d7558e327fac9ecf2aa005c58309683dafc2491f4a09765660c56e3dddec64d"
+    },
+    "alloc": {
+      "path": "/tmp/litchi-goal-0453-pptx-payload/baseline-r3-alloc",
+      "bytes": 57380696,
+      "sha256": "1a17877fcb557a8dc9d62428213ee3d6c24c748b056fc6261b86c867d8cf0683"
+    }
+  }
+}

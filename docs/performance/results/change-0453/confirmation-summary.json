@@ -1,0 +1,248 @@
+{
+  "change": 453,
+  "scope": "separate two-ABBA plain/bytes tail investigation; per-block 60 and overall 120 samples per build combine process distributions, not population p99 estimates; primary reports unchanged",
+  "samples": 240,
+  "rows": [
+    {
+      "lane": 0,
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "baseline",
+      "instrumentation": "normal",
+      "repeat": "C1",
+      "samples": 30,
+      "api_p50_ms": 2.2148399999999997,
+      "api_p95_ms": 2.2270105,
+      "api_p99_ms": 2.23531489,
+      "api_max_ms": 2.238319,
+      "phase_p50_ms": {
+        "open": 0.442487,
+        "plan": 0.7630785,
+        "publication": 1.0062090000000001
+      }
+    },
+    {
+      "lane": 1,
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "candidate",
+      "instrumentation": "normal",
+      "repeat": "C1",
+      "samples": 30,
+      "api_p50_ms": 2.22394,
+      "api_p95_ms": 2.2408525,
+      "api_p99_ms": 2.270132,
+      "api_max_ms": 2.28063,
+      "phase_p50_ms": {
+        "open": 0.438062,
+        "plan": 0.768848,
+        "publication": 1.0129394999999999
+      }
+    },
+    {
+      "lane": 2,
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "candidate",
+      "instrumentation": "normal",
+      "repeat": "C1",
+      "samples": 30,
+      "api_p50_ms": 2.224875,
+      "api_p95_ms": 2.240345,
+      "api_p99_ms": 2.2597283,
+      "api_max_ms": 2.26748,
+      "phase_p50_ms": {
+        "open": 0.441002,
+        "plan": 0.769498,
+        "publication": 1.011315
+      }
+    },
+    {
+      "lane": 3,
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "baseline",
+      "instrumentation": "normal",
+      "repeat": "C1",
+      "samples": 30,
+      "api_p50_ms": 2.22432,
+      "api_p95_ms": 2.23584095,
+      "api_p99_ms": 2.23927441,
+      "api_max_ms": 2.23944,
+      "phase_p50_ms": {
+        "open": 0.44805700000000004,
+        "plan": 0.7667984999999999,
+        "publication": 1.0113545
+      }
+    },
+    {
+      "lane": 4,
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "baseline",
+      "instrumentation": "normal",
+      "repeat": "C2",
+      "samples": 30,
+      "api_p50_ms": 2.2187395,
+      "api_p95_ms": 2.237399,
+      "api_p99_ms": 2.2388394,
+      "api_max_ms": 2.23888,
+      "phase_p50_ms": {
+        "open": 0.441917,
+        "plan": 0.7648334999999999,
+        "publication": 1.009914
+      }
+    },
+    {
+      "lane": 5,
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "candidate",
+      "instrumentation": "normal",
+      "repeat": "C2",
+      "samples": 30,
+      "api_p50_ms": 2.2192295,
+      "api_p95_ms": 2.2338765,
+      "api_p99_ms": 2.2405919,
+      "api_max_ms": 2.2423,
+      "phase_p50_ms": {
+        "open": 0.4406215,
+        "plan": 0.7682035,
+        "publication": 1.0104695000000001
+      }
+    },
+    {
+      "lane": 6,
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "candidate",
+      "instrumentation": "normal",
+      "repeat": "C2",
+      "samples": 30,
+      "api_p50_ms": 2.22326,
+      "api_p95_ms": 2.23352995,
+      "api_p99_ms": 2.2348889,
+      "api_max_ms": 2.23506,
+      "phase_p50_ms": {
+        "open": 0.44076649999999995,
+        "plan": 0.7701985,
+        "publication": 1.0115345
+      }
+    },
+    {
+      "lane": 7,
+      "provider": "bytes",
+      "corpus": "plain",
+      "build": "baseline",
+      "instrumentation": "normal",
+      "repeat": "C2",
+      "samples": 30,
+      "api_p50_ms": 2.2235300000000002,
+      "api_p95_ms": 2.23357095,
+      "api_p99_ms": 2.2346163000000003,
+      "api_max_ms": 2.234799,
+      "phase_p50_ms": {
+        "open": 0.44314200000000004,
+        "plan": 0.766948,
+        "publication": 1.0097845
+      }
+    }
+  ],
+  "blocks": [
+    {
+      "block": 1,
+      "baseline": {
+        "samples": 60,
+        "api_p50_ms": 2.21923,
+        "api_p95_ms": 2.2324489499999998,
+        "api_p99_ms": 2.2391031100000003,
+        "api_max_ms": 2.23944,
+        "phase_p50_ms": {
+          "open": 0.44326699999999997,
+          "plan": 0.7653635,
+          "publication": 1.0081745
+        }
+      },
+      "candidate": {
+        "samples": 60,
+        "api_p50_ms": 2.2245295,
+        "api_p95_ms": 2.2409339999999998,
+        "api_p99_ms": 2.2728715,
+        "api_max_ms": 2.28063,
+        "phase_p50_ms": {
+          "open": 0.44001199999999996,
+          "plan": 0.7692490000000001,
+          "publication": 1.01253
+        }
+      },
+      "percent_change": {
+        "api_p50_ms": 0.2387990429112806,
+        "api_p95_ms": 0.38007812003943003,
+        "api_p99_ms": 1.5081212584265333
+      }
+    },
+    {
+      "block": 2,
+      "baseline": {
+        "samples": 60,
+        "api_p50_ms": 2.2209494999999997,
+        "api_p95_ms": 2.2348470500000004,
+        "api_p99_ms": 2.2387974,
+        "api_max_ms": 2.23888,
+        "phase_p50_ms": {
+          "open": 0.442902,
+          "plan": 0.766223,
+          "publication": 1.009824
+        }
+      },
+      "candidate": {
+        "samples": 60,
+        "api_p50_ms": 2.222875,
+        "api_p95_ms": 2.2344995,
+        "api_p99_ms": 2.2388249,
+        "api_max_ms": 2.2423,
+        "phase_p50_ms": {
+          "open": 0.44076649999999995,
+          "plan": 0.769718,
+          "publication": 1.0107845
+        }
+      },
+      "percent_change": {
+        "api_p50_ms": 0.08669715362733231,
+        "api_p95_ms": -0.01555139981504807,
+        "api_p99_ms": 0.001228338035404503
+      }
+    }
+  ],
+  "pooled": {
+    "baseline": {
+      "samples": 120,
+      "api_p50_ms": 2.22044,
+      "api_p95_ms": 2.2348470500000004,
+      "api_p99_ms": 2.2388779100000002,
+      "api_max_ms": 2.23944,
+      "phase_p50_ms": {
+        "open": 0.443212,
+        "plan": 0.766058,
+        "publication": 1.0090495000000002
+      }
+    },
+    "candidate": {
+      "samples": 120,
+      "api_p50_ms": 2.2233795,
+      "api_p95_ms": 2.23757855,
+      "api_p99_ms": 2.2631005,
+      "api_max_ms": 2.28063,
+      "phase_p50_ms": {
+        "open": 0.4405015,
+        "plan": 0.7694185,
+        "publication": 1.0115745
+      }
+    }
+  },
+  "pooled_percent_change": {
+    "api_p50_ms": 0.13238367170471144,
+    "api_p95_ms": 0.12222312931882484,
+    "api_p99_ms": 1.0819075882525424
+  }
+}
