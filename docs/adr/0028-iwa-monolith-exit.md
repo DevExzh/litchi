@@ -10072,3 +10072,97 @@ with the edit owner, but does not materialize media merely to read properties.
 Edit preparation, commit verification, and patch replay still validate complete
 media assets. This carries forward the former raw reader's missing-content
 support while preventing a read-only success from authorizing an unsafe edit.
+
+
+## 2026-09-08 focused Keynote file-movie creation and host retirement
+
+`litchi-keynote::Package::{add_slide_movie,apply_slide_movie_creation}` now owns
+creation of one file-backed movie through a semantic slide selector, borrowed
+movie and poster bytes, safe preferred filenames, and validated movie options.
+The commit exposes a strict typed patch, semantic diagnostics, exact replay,
+inverse, and preview restoration. Native identities remain private. Movie and
+poster input failures retain distinct provenance; resource limits account for
+their aggregate media bytes. Filename admission bounds input before metadata
+planning, and collision retries retain a bounded fallback stem.
+
+Audio and file movies share source admission, graph context, identity
+allocation, stylesheet selection, reference transitions, node-cache updates,
+exact package assembly, and publication. Metadata planning scans and rewrites
+once for either one or two assets, with charged digests and exact comparisons.
+Each movie asset can independently reuse an exact validated data record or
+create one; new paths reserve both assets before publication. Tests cover both
+reuse, both fresh, and each mixed case. New data retains distinct identities,
+while the movie header orders its poster and content edges consistently.
+
+The movie transaction creates five objects: a movie, two caption stand-ins,
+and a movie-start build/chunk pair. Neutral Buffa projections write the movie,
+`apple:movie-start` build, and 0.5-second chunk under sizing and allocation
+preflights. Generated native messages remain test oracles. The shared candidate
+witness verifies the complete closure, movie and poster ownership and bytes,
+geometry, duration, natural dimensions, stylesheet, UUID maps, selected slide,
+and node event cache before returning a commit. The two-asset insertion view
+uses fixed stack storage rather than an additional staging heap allocation.
+
+Computer Use supplied both a native authoring reference and acceptance of two
+focused candidates in Keynote 14.4. Each was saved, actually closed to the theme
+chooser, reopened from its exact path, inspected, and closed again. The reuse
+candidate retained the baseline's exact video and poster at (120.5, 240.25),
+320 by 180 display size, with a two-second trim. The fresh candidate registered
+two distinct valid assets at (321, 42), 640 by 360 display size, with a
+1.25-second trim. Both retained 320 by 180 natural dimensions and Start movie
+on click. Permanent native-saved fixtures, hashes, and observations are recorded
+in `test-data/iwork/README.md`.
+
+The native oracle follows the presentation's rooted slide rather than layout
+or master archives. It compares the five new objects in that slide component;
+Keynote also adds view-state and metadata objects elsewhere during authoring.
+Mandatory saved-candidate tests cover both asset profiles and preservation of
+existing media, captions, and comments. The retirement boundary requires the
+fixtures and their consuming tests once the focused owner is wired; deleting
+evidence cannot silently disable the gate.
+
+After native acceptance, the raw `KeynoteEditor::add_slide_movie` route and its
+private graph constructor are removed. Host compatibility tests create movies
+through the focused transaction and retain raw listing only for observations.
+Three obsolete raw creation examples are deleted. The standalone movie fuzz
+target exercises bounded arbitrary packages and a mandatory native-baseline
+success path, checking refusal without mutation, semantic readback, replay,
+and exact inverse. The monolith's eleven ordered dependencies remain open;
+this increment retires file-movie creation, not the complete migration host.
+
+Caption and title editing compose with the newly created movie. Their private
+ownership guard admits a movie-start build's inbound header edge only when the
+selected slide registers a unique same-component build whose bounded payload
+and header name that movie. Unrelated audio builds retain their admission.
+All 1,742 migration-host library tests and eight focused compatibility tests
+pass, including caption CRUD after movie creation and source-order selection
+after audio creation.
+
+The final optimized AddressSanitizer smoke passed 256 inputs, reaching 11,797
+edges and 11,893 features with reported RSS 469 MB. This is bounded smoke coverage,
+not exhaustive fuzzing. The boundary policy passes 985 unit tests and reports
+64 workspace packages, 238 internal dependency declarations, and 11 existing
+explicit debt items.
+
+Final review hardened identity reservations and allocation accounting. Fresh
+object IDs now follow dangling aggregate and field-level header references as
+well as physical IDs and the metadata watermark. Fresh data IDs reserve every
+key of an admitted external `DataMetadataMap`, including keys without a current
+DataInfo. This preserves the meaning of opaque existing references. Focused
+regressions cover both domains and exact inverse restoration. Reference staging
+uses fallible exact reservations, and archive clone accounting includes both
+retained raw and canonical header buffers.
+
+The saved fresh-asset fixture exposed repeated metadata work when creating a
+second movie. Candidate content and poster verification now share one bounded
+slide/movie selection and one metadata inspection/visitor result. Each selected
+asset still receives its own full ownership and materialized-byte checks; the
+payload-global data-metadata map is checked once. The final independent graph
+witness remains separate. Configured ceilings are unchanged, and codec budget
+refusals retain typed limit errors instead of becoming generic verification
+failures. Existing single-asset replacement readers retain their behavior.
+
+Final focused verification passes 49 integration cases across movie creation,
+audio creation, and movie captions, including all three native movie fixtures,
+both metadata-map admission profiles, and dangling header identity reservation.
+Strict workspace all-feature library Clippy passes with warnings denied.

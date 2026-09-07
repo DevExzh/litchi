@@ -32,6 +32,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "keynote_slide_movie_creation"
+path = "fuzz_targets/keynote_slide_movie_creation.rs"
+test = false
+doc = false
+bench = false
+
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi-iwa-common = { path = "../../litchi-iwa-common" }

@@ -1413,3 +1413,38 @@ media controls, and five builds (the baseline has four of each). The play
 control was activated without an error appearing; no separate audible-output
 measurement is claimed. The native-saved file also retains the four existing
 media controls and their playback settings.
+
+## Keynote file-movie creation reference (2026-09-07)
+
+[slide-movie-creation-source-native.key](keynote/slide-movie-creation-source-native.key)
+is a native authoring reference. Computer Use opened an exact scratch copy of
+`media-comments-baseline-native.key` in Keynote 14.4 and inserted the baseline's
+self-authored MJPEG movie through Media > Choose. The movie retained its
+320-by-180 natural size, two-second trim, and Start movie on click. The file was
+saved, actually closed to the theme chooser, reopened through its exact path,
+inspected with five media controls, and closed again. Its 755,911 saved bytes
+have SHA-256 `aa6acb490a7e64844586560c312e686aa87bdac7d968c86090b4fe81205f9338`.
+
+Native insertion reused the existing content and poster data records and added
+one movie, two caption stand-ins, and a movie-start build/chunk pair. The build
+uses `apple:movie-start` with a 0.5-second animation. This native-authored source
+alone does not establish acceptance of a focused creation candidate.
+
+Both focused candidates below were generated from the exact baseline, opened
+in Keynote 14.4, saved, actually closed to the theme chooser, reopened through
+their exact paths, inspected, and closed again. The retained fixtures contain
+the resulting native-saved bytes.
+
+| Fixture | SHA-256 | Native observations |
+| --- | --- | --- |
+| [slide-movie-creation-focused-native.key](keynote/slide-movie-creation-focused-native.key) | `52154e753fa0b0b5cb5a6cecd0a4fac3f12b8aae19a3be53882f56c75d4c47ea` | Reused video and poster; 320×180 display size, position (120.5, 240.25), two-second trim, Start movie on click. |
+| [slide-movie-creation-fresh-focused-native.key](keynote/slide-movie-creation-fresh-focused-native.key) | `e2e1c58351b3b091b806451613acb01568c5a29ef8afb4aa61d6027bcae1d083` | New video and poster; 640×360 display size, position (321, 42), 1.25-second trim, Start movie on click. |
+
+The saved files contain 752,411 and 796,954 bytes, respectively. Both retain
+320×180 natural dimensions. The reused input is the baseline's exact 34,651-byte
+movie and 4,408-byte poster. The fresh input adds a valid ISO-BMFF `free` atom
+to that movie and a valid PNG `tEXt` chunk before the poster's `IEND`, producing
+34,667 and 4,447 bytes. Native readback retains these exact bytes. The fresh
+movie's playback control was activated without an error appearing. Both files
+retain the two original audio controls and two captioned movies, including
+the existing comment marker.

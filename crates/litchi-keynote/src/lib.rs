@@ -481,6 +481,10 @@ pub use slide::audio::creation::{
 pub use slide::image::ImageSelector;
 pub use slide::media::{MediaInfo, MediaProperties, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;
+pub use slide::movie::creation::{
+    SlideMovieCreationCommit, SlideMovieCreationDiagnostics, SlideMovieCreationError,
+    SlideMovieCreationLimitKind, SlideMovieCreationPatch,
+};
 pub use slide::table::TableSelector;
 pub use slide::table::name::{Error as SlideTableNameValueError, Name as SlideTableName};
 pub use slide::table::number_format::{

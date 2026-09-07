@@ -29,6 +29,7 @@ use crate::slide::audio::creation::{
     SlideAudioCreationCommit, SlideAudioCreationDiagnostics, SlideAudioCreationError,
     SlideAudioCreationLimitKind, SlideAudioCreationPatch,
 };
+use crate::soundtrack::items::MAX_FILENAME_BYTES;
 use crate::{MovieKind, SlideSelector};
 
 mod data;
@@ -36,22 +37,22 @@ mod metadata;
 pub(super) mod playback_build;
 mod verification;
 
-const SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
-const SLIDE_MESSAGE_TYPE: u32 = 5;
-const MOVIE_MESSAGE_TYPE: u32 = 3_007;
-const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
-const STYLESHEET_MESSAGE_TYPE: u32 = 401;
-const MEDIA_STYLE_MESSAGE_TYPE: u32 = 3_016;
-const SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
-const SLIDE_BUILDS_FIELD: u32 = 2;
-const SLIDE_BUILD_CHUNKS_FIELD: u32 = 43;
-const SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
-const METADATA_COMPONENT: &str = "Index/Metadata.iwa";
-const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
-const DATA_PREFIX: &str = "Data/";
-const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
-const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
-const STANDIN_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];
+pub(super) const SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
+pub(super) const SLIDE_MESSAGE_TYPE: u32 = 5;
+pub(super) const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+pub(super) const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
+pub(super) const STYLESHEET_MESSAGE_TYPE: u32 = 401;
+pub(super) const MEDIA_STYLE_MESSAGE_TYPE: u32 = 3_016;
+pub(super) const SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
+pub(super) const SLIDE_BUILDS_FIELD: u32 = 2;
+pub(super) const SLIDE_BUILD_CHUNKS_FIELD: u32 = 43;
+pub(super) const SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
+pub(super) const METADATA_COMPONENT: &str = "Index/Metadata.iwa";
+pub(super) const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
+pub(super) const DATA_PREFIX: &str = "Data/";
+pub(super) const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
+pub(super) const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
+pub(super) const STANDIN_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];
 
 /// Native identities reserved by one fresh slide-audio transaction.
 ///
@@ -561,88 +562,6 @@ impl Package {
             make_audio_objects(&context, &ids, &metadata_plan, options, &mut budget)?;
         let builds = playback_build::prepare_start_audio_builds(&ids, &context, &mut budget)?;
 
-        let source_component = self
-            .state
-            .source
-            .components()
-            .get(context.slide_component.as_ref())
-            .ok_or(SlideAudioCreationError::InvalidSource)?;
-        let clone_bound =
-            archive_clone_allocation_bound(source_component.archive(), context.archive_limits)?;
-        budget.charge_allocations(clone_bound)?;
-        budget.charge_allocation_events(1)?;
-        let mut slide_archive = source_component.archive().clone();
-        let append_bound = 5usize
-            .checked_mul(size_of::<ArchiveObject>())
-            .ok_or(SlideAudioCreationError::InvalidSource)?;
-        budget.charge_allocations(append_bound)?;
-        budget.charge_allocation_events(1)?;
-        let appended = media_objects.into_iter().chain(builds).collect::<Vec<_>>();
-        slide_archive
-            .append_objects_with_limits(appended, context.archive_limits)
-            .map_err(|_| SlideAudioCreationError::InvalidSource)?;
-        rewrite_slide_archive(
-            &mut slide_archive,
-            &context,
-            &ids,
-            context.archive_limits,
-            context.wire_limits,
-            &mut budget,
-        )?;
-
-        let event_count = slide_build_count(&slide_archive, &context, &mut budget)?;
-        let node_edit =
-            prepare_node_cache_edit(self, &context, &mut slide_archive, event_count, &mut budget)?;
-        let snappy_limits = self
-            .limits()
-            .snappy_limits()
-            .map_err(|_| SlideAudioCreationError::InvalidSource)?;
-        let slide_bytes = serialize_component(
-            &slide_archive,
-            context.archive_limits,
-            snappy_limits,
-            &mut budget,
-        )?;
-        let node_bytes = node_edit
-            .as_ref()
-            .map(|(_, archive)| {
-                serialize_component(archive, context.archive_limits, snappy_limits, &mut budget)
-            })
-            .transpose()?;
-
-        let preview_plan = super::rendering_invalidation::root_preview_deletions(catalog.package())
-            .map_err(|_| SlideAudioCreationError::InvalidSource)?;
-        let preview_capacity = preview_plan
-            .len()
-            .checked_mul(size_of::<&str>())
-            .ok_or(SlideAudioCreationError::InvalidSource)?;
-        budget.charge_allocations(preview_capacity)?;
-        let mut deleted_names = Vec::new();
-        deleted_names
-            .try_reserve_exact(preview_plan.len())
-            .map_err(|_| SlideAudioCreationError::Allocation {
-                amount: preview_plan.len(),
-            })?;
-        deleted_names.extend(preview_plan.names());
-
-        let slide_edit = EntryEdit::new(context.slide_component.as_ref(), &slide_bytes);
-        let metadata_edit = EntryEdit::new(METADATA_COMPONENT, &metadata_plan.compressed);
-        let node_entry_edit = node_edit
-            .as_ref()
-            .zip(node_bytes.as_ref())
-            .map(|((name, _), bytes)| EntryEdit::new(name.as_ref(), bytes));
-        let edit_count: usize = if node_entry_edit.is_some() { 3 } else { 2 };
-        let edit_capacity = edit_count
-            .checked_mul(size_of::<EntryEdit<'static>>())
-            .ok_or(SlideAudioCreationError::InvalidSource)?;
-        budget.charge_allocations(edit_capacity)?;
-        let mut edits = Vec::with_capacity(edit_count);
-        edits.push(slide_edit);
-        edits.push(metadata_edit);
-        if let Some(edit) = node_entry_edit {
-            edits.push(edit);
-        }
-
         let data_path = metadata_plan
             .data_entry_name
             .as_deref()
@@ -650,19 +569,19 @@ impl Package {
         let data_path_ref = data_path.as_deref();
         let insertion = data_path_ref.map(|path| EntryInsertion::new(path, data));
         let insertions = insertion.as_slice();
-        let prepared = catalog
-            .package()
-            .prepare_reassembly_with_changes(insertions, &edits, &deleted_names, catalog.limits())
-            .map_err(|_| SlideAudioCreationError::InvalidSource)?;
-        let requirements = prepared.execution_requirements();
-        budget.charge_output(requirements.output_bytes())?;
-        budget.charge_allocations(requirements.retained_bytes())?;
-        budget.charge_allocations(requirements.scratch_bytes())?;
-        budget.charge_allocation_events(requirements.allocations())?;
-        let target: Arc<[u8]> = prepared
-            .execute(requirements.exact_limits())
-            .map_err(|_| SlideAudioCreationError::InvalidSource)?
-            .into();
+        let publication = publish_candidate(
+            self,
+            catalog,
+            &context,
+            &ids,
+            media_objects,
+            builds,
+            &metadata_plan.compressed,
+            insertions,
+            &mut budget,
+        )?;
+        let target = publication.target;
+        let event_count = publication.event_count;
         let candidate = Package::from_source_with_options(Arc::clone(&target), self.state.options)
             .map_err(|_| SlideAudioCreationError::Verification)?;
         verify_candidate(
@@ -698,12 +617,8 @@ impl Package {
             removed_objects: 0,
             created_data: metadata_plan.created_data,
             removed_data: 0,
-            touched_members: edits
-                .len()
-                .checked_add(insertions.len())
-                .and_then(|count| count.checked_add(deleted_names.len()))
-                .ok_or(SlideAudioCreationError::InvalidSource)?,
-            deleted_previews: preview_plan.len(),
+            touched_members: publication.touched_members,
+            deleted_previews: publication.deleted_previews,
             restored_previews: 0,
         };
         let diagnostics = SlideAudioCreationDiagnostics::for_patch(&patch);
@@ -752,14 +667,298 @@ impl Package {
     }
 }
 
+/// Exact publication artifacts shared by fresh audio and movie creation.
+#[derive(Debug)]
+pub(super) struct CreationPublication {
+    pub(super) target: Arc<[u8]>,
+    pub(super) event_count: usize,
+    pub(super) touched_members: usize,
+    pub(super) deleted_previews: usize,
+}
+
+/// Package-level projection of the metadata planner's two-asset result.
+///
+/// The metadata adapter remains private to the audio creation module.  Movie
+/// creation only needs these staged values, so exposing this narrow projection
+/// keeps the sibling transaction independent of metadata codec internals.
+#[derive(Debug)]
+pub(super) struct MovieMetadataPlan {
+    pub(super) data_identifier: u64,
+    pub(super) digest: [u8; 20],
+    pub(super) compressed: Vec<u8>,
+    pub(super) data_entry_name: Option<Box<str>>,
+    pub(super) created_data: usize,
+    pub(super) poster: MovieMetadataAsset,
+}
+
+#[derive(Debug)]
+pub(super) struct MovieMetadataAsset {
+    pub(super) data_identifier: u64,
+    pub(super) digest: [u8; 20],
+    pub(super) data_entry_name: Option<Box<str>>,
+    pub(super) created_data: usize,
+}
+
+/// Adapt the shared metadata planner to the movie transaction's compact
+/// package-level vocabulary.
+pub(super) fn plan_movie_metadata(
+    source: &Package,
+    context: &CreationContext,
+    ids: &CreationIds,
+    movie_filename: &str,
+    movie_data: &[u8],
+    poster_filename: &str,
+    poster_data: &[u8],
+    budget: &mut CreationBudget,
+) -> Result<MovieMetadataPlan, SlideAudioCreationError> {
+    let plan = metadata::plan_and_rewrite_movie(
+        source,
+        context,
+        ids,
+        movie_filename,
+        movie_data,
+        poster_filename,
+        poster_data,
+        budget,
+    )?;
+    let metadata::MetadataPlan {
+        data_identifier,
+        digest,
+        compressed,
+        data_entry_name,
+        created_data,
+        poster,
+    } = plan;
+    let poster = poster.ok_or(SlideAudioCreationError::InvalidSource)?;
+    Ok(MovieMetadataPlan {
+        data_identifier,
+        digest,
+        compressed,
+        data_entry_name,
+        created_data,
+        poster: MovieMetadataAsset {
+            data_identifier: poster.data_identifier,
+            digest: poster.digest,
+            data_entry_name: poster.data_entry_name,
+            created_data: poster.created_data,
+        },
+    })
+}
+
+/// Adapt the movie-specific playback writer without exposing its codec enum.
+pub(super) fn prepare_movie_builds(
+    ids: &CreationIds,
+    context: &CreationContext,
+    budget: &mut CreationBudget,
+) -> Result<[ArchiveObject; 2], SlideAudioCreationError> {
+    playback_build::prepare_start_movie_builds(ids, context, budget)
+}
+
+/// Verify a freshly published movie graph through the shared bounded witness.
+pub(super) fn verify_movie_graph(
+    package: &Package,
+    context: &CreationContext,
+    ids: &CreationIds,
+    movie_data_identifier: u64,
+    poster_data_identifier: u64,
+    position: [f32; 2],
+    size: [f32; 2],
+    duration_seconds: f32,
+    natural_size: [f32; 2],
+    expected_event_count: usize,
+    budget: &mut CreationBudget,
+) -> Result<(), SlideAudioCreationError> {
+    let media = verification::CreatedMediaExpectation::movie(
+        movie_data_identifier,
+        poster_data_identifier,
+        position,
+        size,
+        duration_seconds,
+        natural_size,
+        true,
+        Some(DEFAULT_DRAWABLE_FLAGS),
+        Some(0.0),
+    );
+    verification::verify_created_graph_with_media(
+        package,
+        context,
+        ids,
+        media,
+        expected_event_count,
+        budget,
+    )
+}
+
+/// Read both materialized edges of one movie through one metadata witness.
+pub(super) fn read_movie_content_and_poster<'a>(
+    package: &'a Package,
+    slide: Position,
+    movie: Position,
+    budget: &mut CreationBudget,
+) -> Result<(&'a [u8], &'a [u8]), SlideAudioCreationError> {
+    data::read_content_and_poster(package, slide, movie, budget)
+}
+
+/// Stage one media graph, update the selected slide and node cache, invalidate
+/// previews, and perform one exact source reassembly.
+///
+/// Keeping publication in one helper is significant: audio and movie
+/// creation must debit the same clone, archive, ZIP, and preview allocations,
+/// and they must produce identical save-token and unknown-header behavior.
+pub(super) fn publish_candidate(
+    source: &Package,
+    catalog: &SourceCatalog,
+    context: &CreationContext,
+    ids: &CreationIds,
+    media_objects: [ArchiveObject; 3],
+    builds: [ArchiveObject; 2],
+    metadata_bytes: &[u8],
+    insertions: &[EntryInsertion<'_>],
+    budget: &mut CreationBudget,
+) -> Result<CreationPublication, SlideAudioCreationError> {
+    let source_component = source
+        .state
+        .source
+        .components()
+        .get(context.slide_component.as_ref())
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    let clone_bound =
+        archive_clone_allocation_bound(source_component.archive(), context.archive_limits)?;
+    budget.charge_allocations(clone_bound)?;
+    budget.charge_allocation_events(1)?;
+    let mut slide_archive = source_component.archive().clone();
+    let append_bound = 5usize
+        .checked_mul(size_of::<ArchiveObject>())
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    budget.charge_allocations(append_bound)?;
+    budget.charge_allocation_events(1)?;
+    let appended = media_objects.into_iter().chain(builds).collect::<Vec<_>>();
+    slide_archive
+        .append_objects_with_limits(appended, context.archive_limits)
+        .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+    rewrite_slide_archive(
+        &mut slide_archive,
+        context,
+        ids,
+        context.archive_limits,
+        context.wire_limits,
+        budget,
+    )?;
+
+    let event_count = slide_build_count(&slide_archive, context, budget)?;
+    let node_edit =
+        prepare_node_cache_edit(source, context, &mut slide_archive, event_count, budget)?;
+    let snappy_limits = source
+        .limits()
+        .snappy_limits()
+        .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+    let slide_bytes = serialize_component(
+        &slide_archive,
+        context.archive_limits,
+        snappy_limits,
+        budget,
+    )?;
+    let node_bytes = node_edit
+        .as_ref()
+        .map(|(_, archive)| {
+            serialize_component(archive, context.archive_limits, snappy_limits, budget)
+        })
+        .transpose()?;
+
+    let preview_plan = super::rendering_invalidation::root_preview_deletions(catalog.package())
+        .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+    let preview_capacity = preview_plan
+        .len()
+        .checked_mul(size_of::<&str>())
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    budget.charge_allocations(preview_capacity)?;
+    let mut deleted_names = Vec::new();
+    deleted_names
+        .try_reserve_exact(preview_plan.len())
+        .map_err(|_| SlideAudioCreationError::Allocation {
+            amount: preview_plan.len(),
+        })?;
+    deleted_names.extend(preview_plan.names());
+
+    let slide_edit = EntryEdit::new(context.slide_component.as_ref(), &slide_bytes);
+    let metadata_edit = EntryEdit::new(METADATA_COMPONENT, metadata_bytes);
+    let node_entry_edit = node_edit
+        .as_ref()
+        .zip(node_bytes.as_ref())
+        .map(|((name, _), bytes)| EntryEdit::new(name.as_ref(), bytes));
+    let edit_count: usize = if node_entry_edit.is_some() { 3 } else { 2 };
+    let edit_capacity = edit_count
+        .checked_mul(size_of::<EntryEdit<'static>>())
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    budget.charge_allocations(edit_capacity)?;
+    // The insertion slice is caller-owned and already has a bounded capacity;
+    // only charge the operation's view of its descriptors here.
+    let insertion_capacity = insertions
+        .len()
+        .checked_mul(size_of::<EntryInsertion<'static>>())
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    budget.charge_allocations(insertion_capacity)?;
+    let mut edits = Vec::with_capacity(edit_count);
+    edits.push(slide_edit);
+    edits.push(metadata_edit);
+    if let Some(edit) = node_entry_edit {
+        edits.push(edit);
+    }
+
+    let prepared = catalog
+        .package()
+        .prepare_reassembly_with_changes(insertions, &edits, &deleted_names, catalog.limits())
+        .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+    let requirements = prepared.execution_requirements();
+    budget.charge_output(requirements.output_bytes())?;
+    budget.charge_allocations(requirements.retained_bytes())?;
+    budget.charge_allocations(requirements.scratch_bytes())?;
+    budget.charge_allocation_events(requirements.allocations())?;
+    let target: Arc<[u8]> = prepared
+        .execute(requirements.exact_limits())
+        .map_err(|_| SlideAudioCreationError::InvalidSource)?
+        .into();
+    let touched_members = edits
+        .len()
+        .checked_add(insertions.len())
+        .and_then(|count| count.checked_add(deleted_names.len()))
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    Ok(CreationPublication {
+        target,
+        event_count,
+        touched_members,
+        deleted_previews: preview_plan.len(),
+    })
+}
+
 fn validate_audio_input(
     package: &Package,
     filename: &str,
     data: &[u8],
 ) -> Result<(), SlideAudioCreationError> {
+    validate_media_input(
+        package,
+        filename,
+        data,
+        litchi_iwa_common::media::Type::Audio,
+    )
+}
+
+/// Validate one caller-owned media member before any package allocation.
+///
+/// The error vocabulary remains the audio creation vocabulary because this is
+/// an internal seam; the movie owner maps the two input failures into its
+/// format-specific public error without exposing this implementation detail.
+pub(super) fn validate_media_input(
+    package: &Package,
+    filename: &str,
+    data: &[u8],
+    expected: litchi_iwa_common::media::Type,
+) -> Result<(), SlideAudioCreationError> {
     let maximum = usize::try_from(package.limits().max_entry_bytes())
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     if filename.is_empty()
+        || filename.len() > MAX_FILENAME_BYTES
         || filename.len() > maximum
         || filename
             .bytes()
@@ -775,9 +974,7 @@ fn validate_audio_input(
     if dot == 0 || dot + 1 >= filename.len() {
         return Err(SlideAudioCreationError::InvalidFilename);
     }
-    if litchi_iwa_common::media::Type::from_extension(&filename[dot + 1..])
-        != litchi_iwa_common::media::Type::Audio
-    {
+    if litchi_iwa_common::media::Type::from_extension(&filename[dot + 1..]) != expected {
         return Err(SlideAudioCreationError::InvalidFilename);
     }
     if data.len() > maximum {
@@ -787,15 +984,15 @@ fn validate_audio_input(
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
         });
     }
-    if data.is_empty()
-        || litchi_iwa_common::media::Type::from_bytes(data) != litchi_iwa_common::media::Type::Audio
-    {
+    if data.is_empty() || litchi_iwa_common::media::Type::from_bytes(data) != expected {
         return Err(SlideAudioCreationError::UnsupportedAudio);
     }
     Ok(())
 }
 
-fn physical_catalog(package: &Package) -> Result<&SourceCatalog, SlideAudioCreationError> {
+pub(super) fn physical_catalog(
+    package: &Package,
+) -> Result<&SourceCatalog, SlideAudioCreationError> {
     match &package.state.source {
         PhysicalSource::Package(catalog) if catalog.source_is_exact() => Ok(catalog),
         PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
@@ -804,7 +1001,7 @@ fn physical_catalog(package: &Package) -> Result<&SourceCatalog, SlideAudioCreat
     }
 }
 
-fn resolve_context(
+pub(super) fn resolve_context(
     package: &Package,
     selector: SlideSelector<'_>,
     budget: &mut CreationBudget,
@@ -1005,7 +1202,64 @@ fn count_new_unique_references(existing: &[u64], candidates: &[u64]) -> usize {
         .count()
 }
 
-fn count_slide_movies(
+fn collect_lifecycle_reference_ids<'source>(
+    references: impl ExactSizeIterator<Item = lifecycle_codec::Reference<'source>>,
+    budget: &mut CreationBudget,
+) -> Result<Vec<u64>, SlideAudioCreationError> {
+    let count = references.len();
+    let bytes = count
+        .checked_mul(size_of::<u64>())
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    let mut identifiers = Vec::new();
+    if count != 0 {
+        budget.charge_allocations(bytes)?;
+        identifiers
+            .try_reserve_exact(count)
+            .map_err(|_| SlideAudioCreationError::Allocation { amount: bytes })?;
+    }
+    for reference in references {
+        if identifiers.len() == count {
+            return Err(SlideAudioCreationError::InvalidSource);
+        }
+        identifiers.push(reference.identifier());
+    }
+    if identifiers.len() != count {
+        return Err(SlideAudioCreationError::InvalidSource);
+    }
+    Ok(identifiers)
+}
+
+fn clone_u32_values(values: &[u32]) -> Result<Vec<u32>, SlideAudioCreationError> {
+    let bytes = values
+        .len()
+        .checked_mul(size_of::<u32>())
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    let mut clone = Vec::new();
+    if !values.is_empty() {
+        clone
+            .try_reserve_exact(values.len())
+            .map_err(|_| SlideAudioCreationError::Allocation { amount: bytes })?;
+    }
+    clone.extend_from_slice(values);
+    Ok(clone)
+}
+
+fn clone_u64_values(values: &[u64]) -> Result<Vec<u64>, SlideAudioCreationError> {
+    let bytes = values
+        .len()
+        .checked_mul(size_of::<u64>())
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    let mut clone = Vec::new();
+    if !values.is_empty() {
+        clone
+            .try_reserve_exact(values.len())
+            .map_err(|_| SlideAudioCreationError::Allocation { amount: bytes })?;
+    }
+    clone.extend_from_slice(values);
+    Ok(clone)
+}
+
+pub(super) fn count_slide_movies(
     package: &Package,
     context: &CreationContext,
     budget: &mut CreationBudget,
@@ -1045,7 +1299,7 @@ fn count_slide_movies(
     Ok(count)
 }
 
-fn references_in_field(
+pub(super) fn references_in_field(
     payload: &[u8],
     number: u32,
     limits: WireLimits,
@@ -1078,7 +1332,7 @@ fn references_in_field(
     Ok(identifiers)
 }
 
-fn reference_identifier(
+pub(super) fn reference_identifier(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut CreationBudget,
@@ -1111,7 +1365,7 @@ fn reference_identifier(
     identifier.ok_or(SlideAudioCreationError::InvalidSource)
 }
 
-fn allocate_ids(
+pub(super) fn allocate_ids(
     package: &Package,
     budget: &mut CreationBudget,
 ) -> Result<CreationIds, SlideAudioCreationError> {
@@ -1125,6 +1379,14 @@ fn allocate_ids(
                 .filter(|identifier| *identifier != 0)
                 .ok_or(SlideAudioCreationError::InvalidSource)?;
             maximum = maximum.max(identifier);
+            for message_info in &object.archive_info.message_infos {
+                observe_object_references(&mut maximum, &message_info.object_references, budget)?;
+                budget.charge_wire_fields(message_info.field_infos.len())?;
+                budget.charge_work(message_info.field_infos.len())?;
+                for field_info in &message_info.field_infos {
+                    observe_object_references(&mut maximum, &field_info.object_references, budget)?;
+                }
+            }
         }
     }
     let expected_last_identifier = metadata_last_object_identifier(package, budget)?;
@@ -1166,6 +1428,26 @@ fn allocate_ids(
         build_uuid,
         random_number_seed,
     })
+}
+
+/// Include every object-reference-bearing header collection when reserving a
+/// fresh native identifier range.  These references are intentionally allowed
+/// to be dangling: preserving an unknown or forward-compatible header edge is
+/// part of the package round trip, but allocating below it would make a new
+/// object collide with that edge.
+fn observe_object_references(
+    maximum: &mut u64,
+    references: &[u64],
+    budget: &mut CreationBudget,
+) -> Result<(), SlideAudioCreationError> {
+    budget.charge_references(references.len())?;
+    budget.charge_work(references.len())?;
+    for &identifier in references {
+        if identifier != 0 {
+            *maximum = (*maximum).max(identifier);
+        }
+    }
+    Ok(())
 }
 
 /// Read the PackageMetadata object watermark through its bounded neutral
@@ -1322,7 +1604,110 @@ fn make_audio_objects(
     Ok([movie, title, caption])
 }
 
-fn new_archive_object(
+/// Encode the native movie drawable and its two caption stand-ins through the
+/// same bounded Buffa writer used by audio creation.
+///
+/// The package transaction owns the identifiers and metadata plan; keeping
+/// this writer here makes the media graph construction shared without making
+/// the public movie vocabulary depend on native archive types.
+pub(super) fn make_movie_objects(
+    context: &CreationContext,
+    ids: &CreationIds,
+    movie_data_identifier: u64,
+    poster_data_identifier: u64,
+    position: (f32, f32),
+    size: (f32, f32),
+    natural_size: (f32, f32),
+    duration_seconds: f32,
+    budget: &mut CreationBudget,
+) -> Result<[ArchiveObject; 3], SlideAudioCreationError> {
+    if movie_data_identifier == 0 || poster_data_identifier == 0 {
+        return Err(SlideAudioCreationError::InvalidSource);
+    }
+    let write = media_creation_codec::MediaArchiveWrite::movie(
+        context.slide_identifier,
+        context.style_identifier,
+        ids.title,
+        ids.caption,
+        movie_data_identifier,
+        Some(poster_data_identifier),
+        media_creation_codec::Geometry::new(
+            media_creation_codec::Point::new(position.0, position.1),
+            media_creation_codec::Size::new(size.0, size.1),
+            Some(DEFAULT_DRAWABLE_FLAGS),
+            Some(0.0),
+        ),
+        duration_seconds,
+        media_creation_codec::Size::new(natural_size.0, natural_size.1),
+        true,
+    );
+    let output_remaining = nonzero_residual(
+        budget.remaining_output(),
+        SlideAudioCreationLimitKind::OutputBytes,
+    )?;
+    let references_remaining = nonzero_residual(
+        budget.remaining_references(),
+        SlideAudioCreationLimitKind::References,
+    )?;
+    let fields_remaining = nonzero_residual(
+        budget.remaining_wire_fields(),
+        SlideAudioCreationLimitKind::WireFields,
+    )?;
+    let work_remaining = nonzero_residual(
+        budget.remaining_work(),
+        SlideAudioCreationLimitKind::WireWork,
+    )?;
+    let allocations_remaining = nonzero_residual(
+        budget.remaining_allocations(),
+        SlideAudioCreationLimitKind::Allocations,
+    )?;
+    let encode_options = media_creation_codec::EncodeOptions::for_write(&write)
+        .with_max_output_bytes(output_remaining)
+        .with_max_references(references_remaining)
+        .with_max_work_bytes(work_remaining)
+        .with_max_fields(fields_remaining)
+        .with_max_allocations(allocations_remaining);
+    let encoded = media_creation_codec::encode_media_archive_with_report(&write, encode_options)
+        .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+    let report = encoded.report();
+    budget.charge_output(report.output_bytes())?;
+    budget.charge_references(report.references())?;
+    budget.charge_wire_fields(report.fields())?;
+    budget.charge_work(report.work_bytes())?;
+    budget.charge_allocation_events(report.allocations())?;
+    let movie_payload = encoded.into_bytes();
+    let movie = new_archive_object(
+        ids.drawable,
+        MOVIE_MESSAGE_TYPE,
+        movie_payload,
+        &STANDARD_MESSAGE_VERSION,
+        &[ids.caption, ids.title, context.style_identifier],
+        &[poster_data_identifier, movie_data_identifier],
+        context.archive_limits,
+    )?;
+    let standin_payload = media_creation_codec::canonical_standin_payload().to_vec();
+    let title = new_archive_object(
+        ids.title,
+        STANDIN_CAPTION_MESSAGE_TYPE,
+        standin_payload.clone(),
+        &STANDIN_CAPTION_MESSAGE_VERSION,
+        &[],
+        &[],
+        context.archive_limits,
+    )?;
+    let caption = new_archive_object(
+        ids.caption,
+        STANDIN_CAPTION_MESSAGE_TYPE,
+        standin_payload,
+        &STANDIN_CAPTION_MESSAGE_VERSION,
+        &[],
+        &[],
+        context.archive_limits,
+    )?;
+    Ok([movie, title, caption])
+}
+
+pub(super) fn new_archive_object(
     identifier: u64,
     message_type: u32,
     data: Vec<u8>,
@@ -1428,7 +1813,7 @@ fn nonzero_residual(
     Ok(residual)
 }
 
-fn rewrite_slide_archive(
+pub(super) fn rewrite_slide_archive(
     archive: &mut Archive,
     context: &CreationContext,
     ids: &CreationIds,
@@ -1512,67 +1897,26 @@ fn replace_slide_message_with_refs(
     budget.charge_wire_fields(after_report.fields())?;
     budget.charge_work(after_report.work_bytes())?;
     budget.charge_nesting(after_report.max_depth() as usize)?;
-    let grouped_reference_count = before
-        .builds()
-        .count()
-        .checked_add(before.owned_drawables().count())
-        .and_then(|count| count.checked_add(before.drawables_z_order().count()))
-        .and_then(|count| count.checked_add(before.build_chunks().count()))
-        .and_then(|count| count.checked_add(after.builds().count()))
-        .and_then(|count| count.checked_add(after.owned_drawables().count()))
-        .and_then(|count| count.checked_add(after.drawables_z_order().count()))
-        .and_then(|count| count.checked_add(after.build_chunks().count()))
-        .ok_or(SlideAudioCreationError::InvalidSource)?;
-    budget.charge_allocations(
-        grouped_reference_count
-            .checked_mul(size_of::<u64>())
-            .ok_or(SlideAudioCreationError::InvalidSource)?,
-    )?;
-    budget.charge_allocation_events(8)?;
     let groups = [
         (
             SLIDE_BUILDS_FIELD,
-            before
-                .builds()
-                .map(|reference| reference.identifier())
-                .collect::<Vec<_>>(),
-            after
-                .builds()
-                .map(|reference| reference.identifier())
-                .collect::<Vec<_>>(),
+            collect_lifecycle_reference_ids(before.builds(), budget)?,
+            collect_lifecycle_reference_ids(after.builds(), budget)?,
         ),
         (
             SLIDE_OWNED_DRAWABLES_FIELD,
-            before
-                .owned_drawables()
-                .map(|reference| reference.identifier())
-                .collect::<Vec<_>>(),
-            after
-                .owned_drawables()
-                .map(|reference| reference.identifier())
-                .collect::<Vec<_>>(),
+            collect_lifecycle_reference_ids(before.owned_drawables(), budget)?,
+            collect_lifecycle_reference_ids(after.owned_drawables(), budget)?,
         ),
         (
             SLIDE_DRAWABLES_Z_ORDER_FIELD,
-            before
-                .drawables_z_order()
-                .map(|reference| reference.identifier())
-                .collect::<Vec<_>>(),
-            after
-                .drawables_z_order()
-                .map(|reference| reference.identifier())
-                .collect::<Vec<_>>(),
+            collect_lifecycle_reference_ids(before.drawables_z_order(), budget)?,
+            collect_lifecycle_reference_ids(after.drawables_z_order(), budget)?,
         ),
         (
             SLIDE_BUILD_CHUNKS_FIELD,
-            before
-                .build_chunks()
-                .map(|reference| reference.identifier())
-                .collect::<Vec<_>>(),
-            after
-                .build_chunks()
-                .map(|reference| reference.identifier())
-                .collect::<Vec<_>>(),
+            collect_lifecycle_reference_ids(before.build_chunks(), budget)?,
+            collect_lifecycle_reference_ids(after.build_chunks(), budget)?,
         ),
     ];
     let expected = [
@@ -1692,7 +2036,7 @@ fn replace_slide_message_with_refs(
         }) {
             return Err(SlideAudioCreationError::InvalidSource);
         }
-        let aggregate_before = info.object_references.clone();
+        let aggregate_before = clone_u64_values(&info.object_references)?;
         let appended_identifiers = [drawables[0], z_order[0], builds[0], chunks[0]];
         let aggregate_growth =
             count_new_unique_references(&aggregate_before, &appended_identifiers);
@@ -1700,11 +2044,22 @@ fn replace_slide_message_with_refs(
             .len()
             .checked_add(aggregate_growth)
             .ok_or(SlideAudioCreationError::InvalidSource)?;
-        let mut aggregate_after = Vec::with_capacity(aggregate_after_capacity);
+        let aggregate_after_bytes = aggregate_after_capacity
+            .checked_mul(size_of::<u64>())
+            .ok_or(SlideAudioCreationError::InvalidSource)?;
+        let mut aggregate_after = Vec::new();
+        aggregate_after
+            .try_reserve_exact(aggregate_after_capacity)
+            .map_err(|_| SlideAudioCreationError::Allocation {
+                amount: aggregate_after_bytes,
+            })?;
         aggregate_after.extend_from_slice(&aggregate_before);
         for (_, _, after) in &groups {
             for identifier in after {
                 if !aggregate_after.contains(identifier) {
+                    if aggregate_after.len() == aggregate_after_capacity {
+                        return Err(SlideAudioCreationError::InvalidSource);
+                    }
                     aggregate_after.push(*identifier);
                 }
             }
@@ -1725,7 +2080,15 @@ fn replace_slide_message_with_refs(
                 })
             })
             .count();
-        let mut field_records = Vec::with_capacity(selected_fields);
+        let field_record_bytes = selected_fields
+            .checked_mul(size_of::<(usize, Vec<u32>, Vec<u64>, Vec<u64>)>())
+            .ok_or(SlideAudioCreationError::InvalidSource)?;
+        let mut field_records = Vec::new();
+        field_records
+            .try_reserve_exact(selected_fields)
+            .map_err(|_| SlideAudioCreationError::Allocation {
+                amount: field_record_bytes,
+            })?;
         for (number, before, after) in &groups {
             for (field_info_index, field) in info.field_infos.iter().enumerate() {
                 if field.path.as_slice() != [*number] || field.object_references.is_empty() {
@@ -1734,17 +2097,29 @@ fn replace_slide_message_with_refs(
                 if field.object_references != *before {
                     return Err(SlideAudioCreationError::InvalidSource);
                 }
+                if field_records.len() == selected_fields {
+                    return Err(SlideAudioCreationError::InvalidSource);
+                }
                 field_records.push((
                     field_info_index,
-                    field.path.path.clone(),
-                    field.object_references.clone(),
-                    after.clone(),
+                    clone_u32_values(&field.path.path)?,
+                    clone_u64_values(&field.object_references)?,
+                    clone_u64_values(after)?,
                 ));
             }
         }
         (aggregate_before, aggregate_after, field_records)
     };
-    let mut field_transitions = Vec::with_capacity(field_records.len());
+    let field_transition_bytes = field_records
+        .len()
+        .checked_mul(size_of::<FieldObjectReferenceTransition<'static>>())
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    let mut field_transitions = Vec::new();
+    field_transitions
+        .try_reserve_exact(field_records.len())
+        .map_err(|_| SlideAudioCreationError::Allocation {
+            amount: field_transition_bytes,
+        })?;
     for (field_info_index, expected_path, before, after) in &field_records {
         field_transitions.push(FieldObjectReferenceTransition {
             field_info_index: *field_info_index,
@@ -1771,7 +2146,7 @@ fn replace_slide_message_with_refs(
     Ok(())
 }
 
-fn slide_build_count(
+pub(super) fn slide_build_count(
     archive: &Archive,
     context: &CreationContext,
     budget: &mut CreationBudget,
@@ -1792,7 +2167,7 @@ fn slide_build_count(
 /// Upper-bound the heap retained by `Archive::clone` before invoking it.
 /// Serialized bytes cover payload/header buffers; the additional structural
 /// term covers cloned vectors and their element storage.
-fn archive_clone_allocation_bound(
+pub(super) fn archive_clone_allocation_bound(
     archive: &Archive,
     limits: ArchiveLimits,
 ) -> Result<usize, SlideAudioCreationError> {
@@ -1811,6 +2186,20 @@ fn archive_clone_allocation_bound(
         })
         .ok_or(SlideAudioCreationError::InvalidSource)?;
     for object in &archive.objects {
+        // ArchiveObject keeps raw and canonical header copies private in the
+        // neutral archive layer.  `encoded_len_with_limits` accounts for the
+        // serialized framing, so reserve two additional header-sized buffers
+        // for the retained source-preserving pair without exposing either
+        // buffer or changing the archive's preservation behavior.
+        let header_length = usize::try_from(object.header_length)
+            .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+        amount = amount
+            .checked_add(
+                header_length
+                    .checked_mul(2)
+                    .ok_or(SlideAudioCreationError::InvalidSource)?,
+            )
+            .ok_or(SlideAudioCreationError::InvalidSource)?;
         amount = amount
             .checked_add(size_of_val(&object.archive_info))
             .and_then(|value| {
@@ -1910,7 +2299,7 @@ fn archive_clone_allocation_bound(
 /// Return a source-owned node-cache component edit when the slide node lives
 /// outside the selected slide component.  The `None` case means the selected
 /// slide archive was edited in place.
-fn prepare_node_cache_edit(
+pub(super) fn prepare_node_cache_edit(
     source: &Package,
     context: &CreationContext,
     slide_archive: &mut Archive,
@@ -1990,7 +2379,7 @@ fn unique_message_index(
     index.ok_or(SlideAudioCreationError::InvalidSource)
 }
 
-fn serialize_component(
+pub(super) fn serialize_component(
     archive: &Archive,
     archive_limits: ArchiveLimits,
     snappy_limits: litchi_iwa_core::SnappyLimits,
@@ -2022,7 +2411,7 @@ fn serialize_component(
     Ok(compressed)
 }
 
-fn normalize_data_path(name: &str) -> Box<str> {
+pub(super) fn normalize_data_path(name: &str) -> Box<str> {
     if name.starts_with(DATA_PREFIX) {
         name.into()
     } else {

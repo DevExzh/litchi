@@ -7,6 +7,9 @@ use litchi_iwa_common::shape::geometry::{Point, Size};
 
 use crate::{Error, Result};
 
+/// Exact-source transaction vocabulary for creating slide movies.
+pub mod creation;
+
 /// Selects one movie by its zero-based position in the slide's source order.
 ///
 /// The selector is deliberately archive-free: it contains a typed semantic

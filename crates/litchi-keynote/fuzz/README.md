@@ -18,3 +18,15 @@ mandatory, so a restrictive budget cannot turn the entire campaign into
 rejection-only coverage. Use a scratch corpus directory when preserving the
 checked-in seeds unchanged; remove generated artifacts and the standalone
 build directory after the campaign.
+
+The `keynote_slide_movie_creation` target uses the same native package and
+borrows its source-order file movie's video and poster bytes. Its checked-in
+`target-file-movie` seed reaches a successful transaction; mutations cover
+both asset payloads, both filenames, selectors, finite placement/dimensions,
+duration, replay, inverse restoration, and bounded semantic rejection.
+
+Run its bounded smoke pass with:
+
+```sh
+cargo +nightly fuzz run keynote_slide_movie_creation -- -runs=256 -max_len=4096 -timeout=60 -rss_limit_mb=2048
+```

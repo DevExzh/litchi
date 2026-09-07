@@ -1,10 +1,9 @@
 //! Compatibility coverage for selector-first Keynote media lifecycle edits.
 //!
-//! The fixture uses focused package audio creation alongside the public
-//! source-built host movie editor. The focused package then performs the
-//! lifecycle transaction using source-order selectors, and the candidate is
-//! reopened by the host editor before its semantic projection is compared
-//! with the expected state.
+//! The fixture uses focused package creation for both movies and audio. The
+//! focused package then performs the lifecycle transaction using source-order
+//! selectors, and each candidate is reopened by the host editor before its
+//! semantic projection is compared with the expected state.
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -103,6 +102,33 @@ fn add_audio(
         .last()
         .map(|audio| audio.drawable_object_id)
         .ok_or_else(|| io::Error::other("focused audio creation produced no host audio").into())
+}
+
+fn add_movie(
+    editor: &mut KeynoteEditor,
+    preferred_movie_filename: &str,
+    movie_data: &[u8],
+    preferred_poster_filename: &str,
+    poster_data: &[u8],
+    options: SlideMovieOptions,
+) -> Result<u64, Box<dyn Error>> {
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package.add_slide_movie(
+        SlideSelector::index(0),
+        preferred_movie_filename,
+        movie_data,
+        preferred_poster_filename,
+        poster_data,
+        options,
+    )?;
+    let bytes = package_bytes(commit.package())?;
+    *editor = KeynoteEditor::from_bytes(&bytes)?;
+    editor
+        .slide_movies(0)?
+        .into_iter()
+        .last()
+        .map(|movie| movie.drawable_object_id)
+        .ok_or_else(|| io::Error::other("focused movie creation produced no host movie").into())
 }
 
 fn package_watermark(bytes: &[u8]) -> Result<u64, Box<dyn Error>> {
@@ -227,8 +253,8 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
 
     // Keep the source order mixed so MovieSelector exercises one stable
     // sequence for both movies and audio: movie A, audio A, movie B, audio B.
-    let movie_a = editor.add_slide_movie(
-        0,
+    let movie_a_id = add_movie(
+        &mut editor,
         "movie-a.mov",
         MOVIE_A,
         "poster-a.png",
@@ -248,8 +274,8 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
         AUDIO_A,
         audio_options(Point { x: 960.0, y: 540.0 }, Duration::from_secs(12)),
     )?;
-    let movie_b = editor.add_slide_movie(
-        0,
+    let movie_b_id = add_movie(
+        &mut editor,
         "movie-b.mov",
         MOVIE_B,
         "poster-b.png",
@@ -270,24 +296,20 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
         audio_options(Point { x: 240.0, y: 300.0 }, Duration::from_secs(7)),
     )?;
 
-    // The source-built editor creates one native build/chunk per media.  Add
+    // Focused creation creates one native build/chunk per media. Add
     // a second build to movie A so the focused clone must preserve more than
     // the common one-build case.
     let source_build = editor
         .slide_builds(0)?
         .into_iter()
-        .find(|build| build.drawable_object_id == movie_a.drawable_object_id)
-        .ok_or_else(|| io::Error::other("source-built movie A has no automatic build"))?;
+        .find(|build| build.drawable_object_id == movie_a_id)
+        .ok_or_else(|| io::Error::other("created movie A has no automatic build"))?;
     let mut second_build = source_build.settings;
     second_build.set_start(BuildStart::AfterPrevious)?;
-    editor.add_slide_build(0, movie_a.drawable_object_id, second_build)?;
+    editor.add_slide_build(0, movie_a_id, second_build)?;
 
     #[allow(deprecated)]
-    editor.set_slide_drawable_comment(
-        0,
-        movie_b.drawable_object_id,
-        "unselected movie B lifecycle comment",
-    )?;
+    editor.set_slide_drawable_comment(0, movie_b_id, "unselected movie B lifecycle comment")?;
 
     let package = set_movie_labels(
         Package::from_bytes(&editor.to_bytes()?)?,
@@ -305,15 +327,15 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
     assert_eq!(reopened.slide_builds(0)?.len(), 5);
     assert_eq!(
         reopened
-            .slide_drawable_comment(0, movie_b.drawable_object_id)?
+            .slide_drawable_comment(0, movie_b_id)?
             .map(|comment| comment.comment.text),
         Some("unselected movie B lifecycle comment".to_owned())
     );
 
     Ok(SourceFixture {
         bytes,
-        movie_a_id: movie_a.drawable_object_id,
-        movie_b_id: movie_b.drawable_object_id,
+        movie_a_id,
+        movie_b_id,
         audio_a_id,
     })
 }

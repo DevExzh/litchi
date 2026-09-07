@@ -1,10 +1,10 @@
-//! Bounded Buffa authoring for a fresh Keynote audio-start build.
+//! Bounded Buffa authoring for fresh Keynote audio/movie-start builds.
 //!
 //! The native build and chunk archives contain many fields that are not part
-//! of the audio-start contract.  This module owns the small canonical writer
-//! used by the focused Keynote package adapter.  It emits typed Buffa views;
-//! it never constructs the generated native Prost messages and it never
-//! decodes an existing build to manufacture a replacement.
+//! of the audio/movie-start contract.  This module owns the small canonical
+//! writer used by the focused Keynote package adapter. It emits typed Buffa
+//! views; it never constructs the generated native Prost messages and it
+//! never decodes an existing build to manufacture a replacement.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -31,12 +31,12 @@ const CHUNK_FIELDS: usize = 14;
 const BUILD_VIEW_ALLOCATIONS: usize = 3;
 const CHUNK_VIEW_ALLOCATIONS: usize = 4;
 
-/// The identifiers and UUID halves needed to author one audio-start pair.
+/// The identifiers and UUID halves needed to author one audio/movie-start pair.
 ///
 /// The object identifiers are used only for archive references.  The UUID is
 /// copied into both native chunk UUID locations, matching Keynote's writer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct StartAudioBuildWrite {
+struct StartBuildWrite {
     drawable_identifier: u64,
     build_identifier: u64,
     chunk_identifier: u64,
@@ -45,10 +45,8 @@ pub struct StartAudioBuildWrite {
     random_number_seed: u32,
 }
 
-impl StartAudioBuildWrite {
-    /// Construct a typed audio-start build request.
-    #[must_use]
-    pub const fn new(
+impl StartBuildWrite {
+    const fn new(
         drawable_identifier: u64,
         build_identifier: u64,
         chunk_identifier: u64,
@@ -65,41 +63,158 @@ impl StartAudioBuildWrite {
             random_number_seed,
         }
     }
+}
+
+/// The identifiers and UUID halves needed to author one audio-start pair.
+///
+/// This low-level value is consumed only by the package adapter's bounded
+/// writer. The semantic Keynote API allocates these identities privately.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StartAudioBuildWrite {
+    inner: StartBuildWrite,
+}
+
+impl StartAudioBuildWrite {
+    /// Construct a typed audio-start build request.
+    #[must_use]
+    pub const fn new(
+        drawable_identifier: u64,
+        build_identifier: u64,
+        chunk_identifier: u64,
+        uuid_lower: u64,
+        uuid_upper: u64,
+        random_number_seed: u32,
+    ) -> Self {
+        Self {
+            inner: StartBuildWrite::new(
+                drawable_identifier,
+                build_identifier,
+                chunk_identifier,
+                uuid_lower,
+                uuid_upper,
+                random_number_seed,
+            ),
+        }
+    }
 
     /// Return the drawable object identifier.
     #[must_use]
     pub const fn drawable_identifier(self) -> u64 {
-        self.drawable_identifier
+        self.inner.drawable_identifier
     }
 
     /// Return the build object identifier.
     #[must_use]
     pub const fn build_identifier(self) -> u64 {
-        self.build_identifier
+        self.inner.build_identifier
     }
 
     /// Return the build-chunk object identifier.
     #[must_use]
     pub const fn chunk_identifier(self) -> u64 {
-        self.chunk_identifier
+        self.inner.chunk_identifier
     }
 
     /// Return the lower UUID half.
     #[must_use]
     pub const fn uuid_lower(self) -> u64 {
-        self.uuid_lower
+        self.inner.uuid_lower
     }
 
     /// Return the upper UUID half.
     #[must_use]
     pub const fn uuid_upper(self) -> u64 {
-        self.uuid_upper
+        self.inner.uuid_upper
     }
 
     /// Return the random seed copied into the animation attributes.
     #[must_use]
     pub const fn random_number_seed(self) -> u32 {
-        self.random_number_seed
+        self.inner.random_number_seed
+    }
+}
+
+/// The identifiers and UUID halves needed to author one movie-start pair.
+///
+/// The semantic movie API does not expose this value. It is the typed seam
+/// between its private identity allocator and the neutral Buffa writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StartMovieBuildWrite {
+    inner: StartBuildWrite,
+}
+
+impl StartMovieBuildWrite {
+    /// Construct a typed movie-start build request.
+    #[must_use]
+    pub const fn new(
+        drawable_identifier: u64,
+        build_identifier: u64,
+        chunk_identifier: u64,
+        uuid_lower: u64,
+        uuid_upper: u64,
+        random_number_seed: u32,
+    ) -> Self {
+        Self {
+            inner: StartBuildWrite::new(
+                drawable_identifier,
+                build_identifier,
+                chunk_identifier,
+                uuid_lower,
+                uuid_upper,
+                random_number_seed,
+            ),
+        }
+    }
+
+    /// Return the drawable object identifier.
+    #[must_use]
+    pub const fn drawable_identifier(self) -> u64 {
+        self.inner.drawable_identifier
+    }
+
+    /// Return the build object identifier.
+    #[must_use]
+    pub const fn build_identifier(self) -> u64 {
+        self.inner.build_identifier
+    }
+
+    /// Return the build-chunk object identifier.
+    #[must_use]
+    pub const fn chunk_identifier(self) -> u64 {
+        self.inner.chunk_identifier
+    }
+
+    /// Return the lower UUID half.
+    #[must_use]
+    pub const fn uuid_lower(self) -> u64 {
+        self.inner.uuid_lower
+    }
+
+    /// Return the upper UUID half.
+    #[must_use]
+    pub const fn uuid_upper(self) -> u64 {
+        self.inner.uuid_upper
+    }
+
+    /// Return the random seed copied into the animation attributes.
+    #[must_use]
+    pub const fn random_number_seed(self) -> u32 {
+        self.inner.random_number_seed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StartBuildKind {
+    Audio,
+    Movie,
+}
+
+impl StartBuildKind {
+    const fn effect(self) -> &'static str {
+        match self {
+            Self::Audio => "apple:audio-start",
+            Self::Movie => "apple:movie-start",
+        }
     }
 }
 
@@ -129,9 +244,21 @@ impl EncodeOptions {
         }
     }
 
-    /// Construct the conservative default policy for a fresh build payload.
+    /// Construct the conservative default policy for a fresh audio build payload.
     #[must_use]
     pub const fn for_write(_write: &StartAudioBuildWrite) -> Self {
+        Self::new(
+            MAX_DEFAULT_OUTPUT_BYTES,
+            MAX_DEFAULT_FIELDS,
+            MAX_DEFAULT_WORK_BYTES,
+            MAX_DEFAULT_ALLOCATIONS,
+        )
+    }
+
+    /// Construct the conservative default policy for a fresh movie build
+    /// payload.
+    #[must_use]
+    pub const fn for_movie_write(_write: &StartMovieBuildWrite) -> Self {
         Self::new(
             MAX_DEFAULT_OUTPUT_BYTES,
             MAX_DEFAULT_FIELDS,
@@ -305,20 +432,51 @@ pub fn encode_start_audio_build(
     write: &StartAudioBuildWrite,
     options: EncodeOptions,
 ) -> Result<EncodeOutput, EncodeError> {
-    validate_write(write)?;
-    let report = encode_report(
-        build_encoded_len(write)?,
-        BUILD_FIELDS,
-        BUILD_VIEW_ALLOCATIONS,
-    )?;
-    preflight(report, options)?;
-    let view = build_view(write);
-    encode_view(&view, report, options)
+    encode_start_build(&write.inner, StartBuildKind::Audio, options)
+}
+
+/// Encode the canonical `KN.BuildArchive` movie-start payload.
+pub fn encode_start_movie_build(
+    write: &StartMovieBuildWrite,
+    options: EncodeOptions,
+) -> Result<EncodeOutput, EncodeError> {
+    encode_start_build(&write.inner, StartBuildKind::Movie, options)
 }
 
 /// Encode the canonical `KN.BuildChunkArchive` audio-start payload.
 pub fn encode_start_audio_chunk(
     write: &StartAudioBuildWrite,
+    options: EncodeOptions,
+) -> Result<EncodeOutput, EncodeError> {
+    encode_start_chunk(&write.inner, options)
+}
+
+/// Encode the canonical `KN.BuildChunkArchive` movie-start payload.
+pub fn encode_start_movie_chunk(
+    write: &StartMovieBuildWrite,
+    options: EncodeOptions,
+) -> Result<EncodeOutput, EncodeError> {
+    encode_start_chunk(&write.inner, options)
+}
+
+fn encode_start_build(
+    write: &StartBuildWrite,
+    kind: StartBuildKind,
+    options: EncodeOptions,
+) -> Result<EncodeOutput, EncodeError> {
+    validate_write(write)?;
+    let report = encode_report(
+        build_encoded_len(write, kind)?,
+        BUILD_FIELDS,
+        BUILD_VIEW_ALLOCATIONS,
+    )?;
+    preflight(report, options)?;
+    let view = build_view(write, kind);
+    encode_view(&view, report, options)
+}
+
+fn encode_start_chunk(
+    write: &StartBuildWrite,
     options: EncodeOptions,
 ) -> Result<EncodeOutput, EncodeError> {
     validate_write(write)?;
@@ -332,7 +490,7 @@ pub fn encode_start_audio_chunk(
     encode_view(&view, report, options)
 }
 
-fn validate_write(write: &StartAudioBuildWrite) -> Result<(), EncodeError> {
+fn validate_write(write: &StartBuildWrite) -> Result<(), EncodeError> {
     for (identifier, name) in [
         (write.drawable_identifier, "drawable_identifier"),
         (write.build_identifier, "build_identifier"),
@@ -440,7 +598,7 @@ fn preflight(report: EncodeReport, options: EncodeOptions) -> Result<(), EncodeE
     Ok(())
 }
 
-fn build_encoded_len(write: &StartAudioBuildWrite) -> Result<usize, EncodeError> {
+fn build_encoded_len(write: &StartBuildWrite, kind: StartBuildKind) -> Result<usize, EncodeError> {
     let drawable = required_len(message_field_len(
         1,
         varint_field_len(1, write.drawable_identifier),
@@ -448,7 +606,7 @@ fn build_encoded_len(write: &StartAudioBuildWrite) -> Result<usize, EncodeError>
     let mut animation_attributes = required_len(string_field_len(1, b"In"))?;
     animation_attributes = add_len(
         animation_attributes,
-        required_len(string_field_len(2, b"apple:audio-start"))?,
+        required_len(string_field_len(2, kind.effect().as_bytes()))?,
     )?;
     animation_attributes = add_len(animation_attributes, fixed64_field_len(3))?;
     animation_attributes = add_len(animation_attributes, fixed64_field_len(5))?;
@@ -472,7 +630,7 @@ fn build_encoded_len(write: &StartAudioBuildWrite) -> Result<usize, EncodeError>
     add_len(total, varint_field_len(5, 1))
 }
 
-fn chunk_encoded_len(write: &StartAudioBuildWrite) -> Result<usize, EncodeError> {
+fn chunk_encoded_len(write: &StartBuildWrite) -> Result<usize, EncodeError> {
     let build = required_len(message_field_len(
         1,
         varint_field_len(1, write.build_identifier),
@@ -555,10 +713,13 @@ fn uuid(lower: u64, upper: u64) -> projection::UUIDView<'static> {
     }
 }
 
-fn build_view(write: &StartAudioBuildWrite) -> projection::BuildArchiveView<'static> {
+fn build_view(
+    write: &StartBuildWrite,
+    kind: StartBuildKind,
+) -> projection::BuildArchiveView<'static> {
     let animation_attributes = projection::AnimationAttributesArchiveView {
         animation_type: Some("In"),
-        effect: Some("apple:audio-start"),
+        effect: Some(kind.effect()),
         duration: Some(0.5),
         delay: Some(0.0),
         random_number_seed: Some(write.random_number_seed),
@@ -579,7 +740,7 @@ fn build_view(write: &StartAudioBuildWrite) -> projection::BuildArchiveView<'sta
     }
 }
 
-fn chunk_view(write: &StartAudioBuildWrite) -> projection::BuildChunkArchiveView<'static> {
+fn chunk_view(write: &StartBuildWrite) -> projection::BuildChunkArchiveView<'static> {
     let identifier = projection::BuildChunkIdentifierArchiveView {
         build_id: buffa::MessageFieldView::set(uuid(write.uuid_lower, write.uuid_upper)),
         build_chunk_id: Some(1),
@@ -604,6 +765,10 @@ mod tests {
         StartAudioBuildWrite::new(11, 17, 19, 0x0102_0304_0506_0708, 0x1112_1314_1516_1718, 23)
     }
 
+    fn movie_write() -> StartMovieBuildWrite {
+        StartMovieBuildWrite::new(11, 17, 19, 0x0102_0304_0506_0708, 0x1112_1314_1516_1718, 23)
+    }
+
     #[allow(deprecated)]
     #[test]
     fn build_matches_native_wire_shape() -> Result<(), Box<dyn std::error::Error>> {
@@ -611,7 +776,7 @@ mod tests {
         let output = encode_start_audio_build(&input, EncodeOptions::for_write(&input))?;
         let expected = crate::kn::BuildArchive {
             drawable: Some(crate::tsp::Reference {
-                identifier: input.drawable_identifier,
+                identifier: input.drawable_identifier(),
                 ..Default::default()
             }),
             delivery: "All at Once".to_owned(),
@@ -622,7 +787,7 @@ mod tests {
                     effect: Some("apple:audio-start".to_owned()),
                     duration: Some(0.5),
                     delay: Some(0.0),
-                    random_number_seed: Some(input.random_number_seed),
+                    random_number_seed: Some(input.random_number_seed()),
                     writing_direction_is_rtl: Some(false),
                     ..Default::default()
                 }),
@@ -641,12 +806,12 @@ mod tests {
         let input = write();
         let output = encode_start_audio_chunk(&input, EncodeOptions::for_write(&input))?;
         let uuid = crate::tsp::Uuid {
-            lower: input.uuid_lower,
-            upper: input.uuid_upper,
+            lower: input.uuid_lower(),
+            upper: input.uuid_upper(),
         };
         let expected = crate::kn::BuildChunkArchive {
             build: Some(crate::tsp::Reference {
-                identifier: input.build_identifier,
+                identifier: input.build_identifier(),
                 ..Default::default()
             }),
             delay: Some(0.0),
@@ -662,6 +827,124 @@ mod tests {
         };
         assert_eq!(output.bytes(), expected.encode_to_vec());
         Ok(())
+    }
+
+    #[allow(deprecated)]
+    #[test]
+    fn movie_build_matches_native_wire_shape() -> Result<(), Box<dyn std::error::Error>> {
+        let input = movie_write();
+        let output = encode_start_movie_build(&input, EncodeOptions::for_movie_write(&input))?;
+        let expected = crate::kn::BuildArchive {
+            drawable: Some(crate::tsp::Reference {
+                identifier: input.drawable_identifier(),
+                ..Default::default()
+            }),
+            delivery: "All at Once".to_owned(),
+            duration: Some(0.0),
+            attributes: crate::kn::BuildAttributesArchive {
+                animation_attributes: Some(crate::kn::AnimationAttributesArchive {
+                    animation_type: Some("In".to_owned()),
+                    effect: Some("apple:movie-start".to_owned()),
+                    duration: Some(0.5),
+                    delay: Some(0.0),
+                    random_number_seed: Some(input.random_number_seed()),
+                    writing_direction_is_rtl: Some(false),
+                    ..Default::default()
+                }),
+                event_trigger: Some(1),
+                chart_rotation3_d: Some(60.0),
+                ..Default::default()
+            },
+            chunk_id_seed: Some(1),
+        };
+        assert_eq!(output.bytes(), expected.encode_to_vec());
+        Ok(())
+    }
+
+    #[test]
+    fn movie_chunk_shares_the_audio_wire_shape() -> Result<(), Box<dyn std::error::Error>> {
+        let audio = write();
+        let movie = movie_write();
+        let audio_output = encode_start_audio_chunk(&audio, EncodeOptions::for_write(&audio))?;
+        let movie_output =
+            encode_start_movie_chunk(&movie, EncodeOptions::for_movie_write(&movie))?;
+        assert_eq!(movie_output.bytes(), audio_output.bytes());
+        assert_eq!(movie_output.report(), audio_output.report());
+        Ok(())
+    }
+
+    #[test]
+    fn movie_build_enforces_the_same_finite_field_budget() {
+        let input = movie_write();
+        let options = EncodeOptions::for_movie_write(&input).with_max_fields(BUILD_FIELDS - 1);
+        let error = encode_start_movie_build(&input, options).expect_err("field budget");
+        assert_eq!(
+            error,
+            EncodeError::Resource(EncodeLimit::Fields {
+                observed: BUILD_FIELDS,
+                maximum: BUILD_FIELDS - 1,
+            })
+        );
+    }
+
+    #[test]
+    fn movie_and_audio_builds_differ_only_by_the_typed_effect() {
+        let audio = write();
+        let movie = movie_write();
+        let audio = crate::kn::BuildArchive::decode(
+            encode_start_audio_build(&audio, EncodeOptions::for_write(&audio))
+                .expect("audio build")
+                .bytes(),
+        )
+        .expect("decode audio build");
+        let movie = crate::kn::BuildArchive::decode(
+            encode_start_movie_build(&movie, EncodeOptions::for_movie_write(&movie))
+                .expect("movie build")
+                .bytes(),
+        )
+        .expect("decode movie build");
+        let audio_attributes = audio
+            .attributes
+            .animation_attributes
+            .expect("audio animation attributes");
+        let movie_attributes = movie
+            .attributes
+            .animation_attributes
+            .expect("movie animation attributes");
+        assert_eq!(audio.drawable, movie.drawable);
+        assert_eq!(audio.delivery, movie.delivery);
+        assert_eq!(audio.duration, movie.duration);
+        assert_eq!(
+            audio.attributes.event_trigger,
+            movie.attributes.event_trigger
+        );
+        assert_eq!(
+            audio.attributes.chart_rotation3_d,
+            movie.attributes.chart_rotation3_d
+        );
+        assert_eq!(audio.chunk_id_seed, movie.chunk_id_seed);
+        assert_eq!(
+            audio_attributes.animation_type,
+            movie_attributes.animation_type
+        );
+        assert_eq!(audio_attributes.duration, movie_attributes.duration);
+        assert_eq!(audio_attributes.delay, movie_attributes.delay);
+        assert_eq!(
+            audio_attributes.random_number_seed,
+            movie_attributes.random_number_seed
+        );
+        assert_eq!(
+            audio_attributes.writing_direction_is_rtl,
+            movie_attributes.writing_direction_is_rtl
+        );
+        assert_eq!(
+            audio_attributes.effect.as_deref(),
+            Some("apple:audio-start")
+        );
+        assert_eq!(
+            movie_attributes.effect.as_deref(),
+            Some("apple:movie-start")
+        );
     }
 
     #[test]

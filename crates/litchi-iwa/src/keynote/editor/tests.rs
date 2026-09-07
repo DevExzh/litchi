@@ -3093,9 +3093,10 @@ fn hand_built_slide_movie_admission_rejection_is_transactional() {
 #[test]
 fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
-    let created = editor
+    let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let commit = package
         .add_slide_movie(
-            0,
+            SlideSelector::index(0),
             "movie.mov",
             TEST_MOVIE_VIDEO,
             "poster.png",
@@ -3116,6 +3117,8 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
             .unwrap(),
         )
         .unwrap();
+    reopen_focused_package(&mut editor, commit.package());
+    let created = editor.slide_movies(0).unwrap().remove(0);
     let source_chunk_id = editor
         .slide_builds(0)
         .unwrap()

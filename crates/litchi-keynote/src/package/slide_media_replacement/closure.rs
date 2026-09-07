@@ -41,77 +41,110 @@ pub(super) fn validate_selected_media_closure(
     identifier: u64,
     budget: &mut MediaBudget,
 ) -> Result<(), SlideMediaDataError> {
-    let expected_path = selected_field_path(selection, identifier)?;
+    validate_selected_media_closures(
+        package,
+        metadata_payload,
+        facts,
+        selection,
+        std::slice::from_ref(&identifier),
+        budget,
+    )
+}
+
+/// Validate one or both selected data edges against one shared metadata
+/// witness. Each selected edge keeps its own owner, ArchiveInfo, field-path,
+/// and record checks; the optional DataMetadataMap is package-global and is
+/// therefore checked only once for the complete selected set.
+pub(super) fn validate_selected_media_closures(
+    package: &Package,
+    metadata_payload: &[u8],
+    facts: &OwnedMetadataFacts,
+    selection: &MediaSelection,
+    identifiers: &[u64],
+    budget: &mut MediaBudget,
+) -> Result<(), SlideMediaDataError> {
+    if identifiers.is_empty()
+        || identifiers.len() > 2
+        || identifiers.iter().enumerate().any(|(index, identifier)| {
+            *identifier == 0 || identifiers[..index].contains(identifier)
+        })
+    {
+        return Err(SlideMediaDataError::InvalidSource);
+    }
     let locator = selection
         .component_name
         .strip_prefix("Index/")
         .and_then(|name| name.strip_suffix(".iwa"))
         .ok_or(SlideMediaDataError::InvalidSource)?;
     let component = unique_current_component(facts, locator)?;
-    let expected_owner_count =
-        unique_current_reference_count(facts, component.identifier, identifier)?;
 
-    let mut owner_count = 0usize;
-    let mut selected_owner_count = 0usize;
-    for (index, owner) in facts.owners.iter().enumerate() {
-        if owner.component_identifier != component.identifier
-            || owner.data_identifier != identifier
-            || owner.versioned
-        {
-            continue;
-        }
-        if owner.count == 0 || owner.object_identifier == 0 {
-            return Err(SlideMediaDataError::InvalidSource);
-        }
-        // The duplicate-owner audit is a bounded prefix scan. Charge its
-        // work before walking the prefix so hostile owner lists cannot hide
-        // quadratic work outside the operation ledger.
-        budget.wire_work(index)?;
-        if facts.owners[..index].iter().any(|previous| {
-            !previous.versioned
-                && previous.component_identifier == owner.component_identifier
-                && previous.data_identifier == owner.data_identifier
-                && previous.object_identifier == owner.object_identifier
-        }) {
-            return Err(SlideMediaDataError::InvalidSource);
-        }
-        owner_count = owner_count
-            .checked_add(1)
-            .ok_or(SlideMediaDataError::InvalidSource)?;
-        if owner.object_identifier == selection.movie_identifier {
-            selected_owner_count = selected_owner_count
+    for &identifier in identifiers {
+        let expected_path = selected_field_path(selection, identifier)?;
+        let expected_owner_count =
+            unique_current_reference_count(facts, component.identifier, identifier)?;
+
+        let mut owner_count = 0usize;
+        let mut selected_owner_count = 0usize;
+        for (index, owner) in facts.owners.iter().enumerate() {
+            if owner.component_identifier != component.identifier
+                || owner.data_identifier != identifier
+                || owner.versioned
+            {
+                continue;
+            }
+            if owner.count == 0 || owner.object_identifier == 0 {
+                return Err(SlideMediaDataError::InvalidSource);
+            }
+            // The duplicate-owner audit is a bounded prefix scan. Charge its
+            // work before walking the prefix so hostile owner lists cannot hide
+            // quadratic work outside the operation ledger.
+            budget.wire_work(index)?;
+            if facts.owners[..index].iter().any(|previous| {
+                !previous.versioned
+                    && previous.component_identifier == owner.component_identifier
+                    && previous.data_identifier == owner.data_identifier
+                    && previous.object_identifier == owner.object_identifier
+            }) {
+                return Err(SlideMediaDataError::InvalidSource);
+            }
+            owner_count = owner_count
                 .checked_add(1)
                 .ok_or(SlideMediaDataError::InvalidSource)?;
+            if owner.object_identifier == selection.movie_identifier {
+                selected_owner_count = selected_owner_count
+                    .checked_add(1)
+                    .ok_or(SlideMediaDataError::InvalidSource)?;
+            }
         }
-    }
-    if owner_count != expected_owner_count || selected_owner_count != 1 {
-        return Err(SlideMediaDataError::InvalidSource);
-    }
+        if owner_count != expected_owner_count || selected_owner_count != 1 {
+            return Err(SlideMediaDataError::InvalidSource);
+        }
 
-    for owner in facts.owners.iter().filter(|owner| {
-        owner.component_identifier == component.identifier
-            && owner.data_identifier == identifier
-            && !owner.versioned
-    }) {
-        let (owner_component, object) = package
-            .object_with_component(owner.object_identifier)
-            .ok_or(SlideMediaDataError::InvalidSource)?;
-        if owner_component != selection.component_name {
-            return Err(SlideMediaDataError::InvalidSource);
-        }
-        let selected_owner = owner.object_identifier == selection.movie_identifier;
-        let occurrences = validate_owner_archive_info(
-            facts,
-            object,
-            owner.object_identifier,
-            identifier,
-            selected_owner.then_some(expected_path),
-            budget,
-        )?;
-        if occurrences
-            != usize::try_from(owner.count).map_err(|_| SlideMediaDataError::InvalidSource)?
-        {
-            return Err(SlideMediaDataError::InvalidSource);
+        for owner in facts.owners.iter().filter(|owner| {
+            owner.component_identifier == component.identifier
+                && owner.data_identifier == identifier
+                && !owner.versioned
+        }) {
+            let (owner_component, object) = package
+                .object_with_component(owner.object_identifier)
+                .ok_or(SlideMediaDataError::InvalidSource)?;
+            if owner_component != selection.component_name {
+                return Err(SlideMediaDataError::InvalidSource);
+            }
+            let selected_owner = owner.object_identifier == selection.movie_identifier;
+            let occurrences = validate_owner_archive_info(
+                facts,
+                object,
+                owner.object_identifier,
+                identifier,
+                selected_owner.then_some(expected_path),
+                budget,
+            )?;
+            if occurrences
+                != usize::try_from(owner.count).map_err(|_| SlideMediaDataError::InvalidSource)?
+            {
+                return Err(SlideMediaDataError::InvalidSource);
+            }
         }
     }
 

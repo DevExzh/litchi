@@ -226,8 +226,18 @@ archive, package, or native media identifiers. Movie creation uses the adjacent
 `litchi_keynote::slide::movie::Options` value, which validates finite placement,
 strictly positive displayed and natural dimensions, and a positive duration in
 the native finite `f32`-seconds domain. `litchi-iwa` retains
-`KeynoteSlideMovieInfo`, graph-aware CRUD, native media identifiers, and the
-mapping from native movie flags to this product value.
+`KeynoteSlideMovieInfo`, remaining graph-aware operations, native media
+identifiers, and the mapping from native movie flags to this product value.
+
+Fresh file movies use `Package::add_slide_movie` with a semantic slide
+selector, borrowed video and poster bytes, safe preferred filenames, and
+`slide::movie::Options`. The adjacent `slide::movie::creation` module exposes
+typed commits, diagnostics, errors, and exact-source patches. A patch retains
+the movie and poster fingerprints and validated options, supports exact inverse
+and replay, and reports semantic positions and resource counts. Callers never
+allocate native object, component, build, UUID, or media identifiers. Audio and
+movie creation share private bounded graph and metadata machinery while their
+public options and errors remain distinct.
 
 Keynote media properties use `Package::{slide_media_properties,
 edit_slide_media_properties,apply_slide_media_properties}` with semantic slide

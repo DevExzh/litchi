@@ -1,20 +1,15 @@
-//! Standalone movie-object creation and editing for Keynote slides.
+//! Host-side movie listing and compatibility projections for Keynote slides.
 
-use litchi_iwa_common::{WireLimits, media::Type as MediaType};
+use litchi_iwa_common::WireLimits;
 use litchi_iwa_protos::keynote_media_codec;
 use litchi_keynote::slide::media::MovieKind;
-use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
 use super::*;
-use crate::data_reference_registry::add_component_data_reference;
 use crate::media::MediaAssetId;
 use crate::shapes::{DrawableGeometry, DrawableProperties, DrawableSize, geometry_from_drawable};
 use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 pub(in crate::keynote::editor) mod geometry;
-pub(in crate::keynote::editor) mod graph;
-
-use graph::*;
 
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
@@ -73,6 +68,7 @@ pub struct KeynoteSlideMovieInfo {
     pub natural_size: Option<DrawableSize>,
 }
 
+#[cfg(test)]
 pub(in crate::keynote::editor) struct SlideMovieGraph {
     pub(in crate::keynote::editor) object_ids: Vec<u64>,
 }
@@ -119,119 +115,7 @@ impl KeynoteEditor {
             .collect()
     }
 
-    /// Add an independently editable, file-backed movie to a slide.
-    ///
-    /// The movie, poster, title/caption stand-ins, automatic playback build,
-    /// component registrations, UUIDs, and package media records are built from
-    /// typed values. No source drawable or package template is copied.
-    pub fn add_slide_movie(
-        &mut self,
-        slide_index: usize,
-        preferred_movie_filename: &str,
-        movie_data: &[u8],
-        preferred_poster_filename: &str,
-        poster_data: &[u8],
-        options: SlideMovieOptions,
-    ) -> Result<KeynoteSlideMovieInfo> {
-        let (geometry, duration_seconds) = movie_creation_values(options)?;
-        let context = movie_creation_context(self, slide_index)?;
-        let ids = MovieObjectIds::allocate(next_object_identifier(self.package())?)?;
-
-        let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
-        let movie_asset = media.insert_unreferenced(preferred_movie_filename, movie_data)?;
-        if movie_asset.media_type != MediaType::Video {
-            return Err(Error::ParseError(format!(
-                "Keynote slide movies require video data, not {}",
-                movie_asset.media_type.name()
-            )));
-        }
-        let poster_asset = media.insert_unreferenced(preferred_poster_filename, poster_data)?;
-        if poster_asset.media_type != MediaType::Image {
-            return Err(Error::ParseError(format!(
-                "Keynote movie posters require image data, not {}",
-                poster_asset.media_type.name()
-            )));
-        }
-
-        let mut staged = media.into_package();
-        let objects = movie_objects(
-            ids,
-            context.slide_id,
-            context.style_id,
-            movie_asset.data_identifier.get(),
-            poster_asset.data_identifier.get(),
-            geometry,
-            options.natural_size(),
-            duration_seconds,
-        )?;
-        staged.update_archive(&context.archive_name, |archive| {
-            for object in objects {
-                archive.insert_object(object)?;
-            }
-            Ok(())
-        })?;
-        patch_slide_drawable_references(
-            &mut staged,
-            &context.archive_name,
-            context.slide_id,
-            None,
-            Some(ids.drawable),
-        )?;
-        add_component_object_uuids(&mut staged, context.component_id, &ids.all())?;
-        for data_identifier in [movie_asset.data_identifier, poster_asset.data_identifier] {
-            add_component_data_reference(
-                &mut staged,
-                context.component_id,
-                data_identifier.get(),
-                ids.drawable,
-            )?;
-        }
-        add_component_external_reference(
-            &mut staged,
-            context.component_id,
-            context.stylesheet_component_id,
-            context.style_id,
-        )?;
-        set_package_last_object_identifier(&mut staged, ids.last())?;
-
-        let mut verified = Self::from_bytes(&staged.to_bytes()?)?;
-        let created = verified
-            .slide_movies(slide_index)?
-            .into_iter()
-            .find(|movie| movie.drawable_object_id == ids.drawable)
-            .ok_or_else(|| {
-                Error::InvalidFormat("Keynote movie creation failed validation".to_owned())
-            })?;
-        let created_graph = verified.slide_movie_graph(slide_index, ids.drawable)?;
-        if created.kind != MovieKind::File
-            || created.movie_data_identifier != Some(movie_asset.data_identifier)
-            || created.poster_image_data_identifier != Some(poster_asset.data_identifier)
-            || created.geometry != geometry
-            || created.original_size != Some(options.natural_size())
-            || created.natural_size != Some(options.natural_size())
-            || created_graph.object_ids != ids.all()
-            || verified.extract_media(movie_asset.data_identifier)? != movie_data
-            || verified.extract_media(poster_asset.data_identifier)? != poster_data
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote movie creation produced an inconsistent graph".to_owned(),
-            ));
-        }
-
-        let build = verified.add_slide_build(
-            slide_index,
-            ids.drawable,
-            KeynoteBuildSettings::movie_start(),
-        )?;
-        if build.drawable_object_id != ids.drawable || build.chunks.len() != 1 {
-            return Err(Error::InvalidFormat(
-                "Keynote movie creation produced an inconsistent playback build".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(created)
-    }
-
+    #[cfg(test)]
     pub(in crate::keynote::editor) fn slide_movie_graph(
         &self,
         slide_index: usize,
@@ -411,6 +295,7 @@ mod tests {
         MediaProperties as KeynoteMediaProperties, MediaVolume as KeynoteMediaVolume,
     };
     use litchi_keynote::slide::media::{Point as KeynotePoint, Size as KeynoteSize};
+    use litchi_keynote::slide::movie::Options as SlideMovieOptions;
     use litchi_keynote::{MovieSelector, Package as KeynotePackage, SlideSelector};
     use std::time::Duration;
 
@@ -463,6 +348,54 @@ mod tests {
             .unwrap();
         replace_with_focused_movie_package(editor, commit.package());
         editor.slide_audio(0).unwrap().into_iter().last().unwrap()
+    }
+
+    fn add_movie(
+        editor: &mut KeynoteEditor,
+        preferred_movie_filename: &str,
+        movie_data: &[u8],
+        preferred_poster_filename: &str,
+        poster_data: &[u8],
+        options: SlideMovieOptions,
+    ) -> Result<KeynoteSlideMovieInfo> {
+        add_movie_at(
+            editor,
+            0,
+            preferred_movie_filename,
+            movie_data,
+            preferred_poster_filename,
+            poster_data,
+            options,
+        )
+    }
+
+    fn add_movie_at(
+        editor: &mut KeynoteEditor,
+        slide_index: usize,
+        preferred_movie_filename: &str,
+        movie_data: &[u8],
+        preferred_poster_filename: &str,
+        poster_data: &[u8],
+        options: SlideMovieOptions,
+    ) -> Result<KeynoteSlideMovieInfo> {
+        let package = focused_movie_package(editor);
+        let commit = package
+            .add_slide_movie(
+                SlideSelector::index(slide_index),
+                preferred_movie_filename,
+                movie_data,
+                preferred_poster_filename,
+                poster_data,
+                options,
+            )
+            .map_err(|error| {
+                Error::InvalidFormat(format!("focused movie creation failed: {error}"))
+            })?;
+        replace_with_focused_movie_package(editor, commit.package());
+        editor
+            .slide_movies(0)
+            .map(|movies| movies.into_iter().last())?
+            .ok_or_else(|| Error::InvalidFormat("focused movie creation produced no movie".into()))
     }
 
     fn remove_movie_poster(
@@ -679,8 +612,15 @@ mod tests {
             .title("Movie properties projection")
             .build()
             .unwrap();
-        seed.add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
-            .unwrap();
+        add_movie(
+            &mut seed,
+            "movie.mov",
+            MOVIE,
+            "poster.png",
+            POSTER,
+            options(),
+        )
+        .unwrap();
         let baseline = seed.slide_movies(0).unwrap().remove(0);
         let mut editor = KeynoteEditor::from_bytes(&seed.to_bytes().unwrap()).unwrap();
         let focused_before = focused_movie_package(&editor)
@@ -757,9 +697,15 @@ mod tests {
             .title("Movie properties without poster")
             .build()
             .unwrap();
-        let created = seed
-            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
-            .unwrap();
+        let created = add_movie(
+            &mut seed,
+            "movie.mov",
+            MOVIE,
+            "poster.png",
+            POSTER,
+            options(),
+        )
+        .unwrap();
         let poster_data_identifier = created.poster_image_data_identifier.unwrap();
         remove_movie_poster(
             &mut seed,
@@ -796,9 +742,15 @@ mod tests {
             .title("Movie properties without content")
             .build()
             .unwrap();
-        let created = seed
-            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
-            .unwrap();
+        let created = add_movie(
+            &mut seed,
+            "movie.mov",
+            MOVIE,
+            "poster.png",
+            POSTER,
+            options(),
+        )
+        .unwrap();
         remove_movie_data(
             &mut seed,
             created.drawable_object_id,
@@ -852,9 +804,15 @@ mod tests {
 
         assert!(editor.slide_movies(0).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        let created = editor
-            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
-            .unwrap();
+        let created = add_movie(
+            &mut editor,
+            "movie.mov",
+            MOVIE,
+            "poster.png",
+            POSTER,
+            options(),
+        )
+        .unwrap();
         assert_eq!(created.kind, MovieKind::File);
         assert_eq!(created.original_size, Some(NATURAL_SIZE));
         assert_eq!(created.natural_size, Some(NATURAL_SIZE));
@@ -1045,9 +1003,15 @@ mod tests {
             .title("Movie labels")
             .build()
             .unwrap();
-        editor
-            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
-            .unwrap();
+        add_movie(
+            &mut editor,
+            "movie.mov",
+            MOVIE,
+            "poster.png",
+            POSTER,
+            options(),
+        )
+        .unwrap();
 
         assert_eq!(movie_title(&editor, MovieSelector::index(0)), None);
         assert_eq!(movie_caption(&editor, MovieSelector::index(0)), None);
@@ -1113,9 +1077,15 @@ mod tests {
             AUDIO,
             SlideAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap(),
         );
-        let movie = editor
-            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
-            .unwrap();
+        let movie = add_movie(
+            &mut editor,
+            "movie.mov",
+            MOVIE,
+            "poster.png",
+            POSTER,
+            options(),
+        )
+        .unwrap();
 
         assert_eq!(
             editor.slide_audio(0).unwrap()[0].drawable_object_id,
@@ -1146,23 +1116,31 @@ mod tests {
         let baseline = editor.to_bytes().unwrap();
 
         for result in [
-            editor.add_slide_movie(
-                0,
+            add_movie(
+                &mut editor,
                 "payload.bin",
                 b"not video",
                 "poster.png",
                 POSTER,
                 options(),
             ),
-            editor.add_slide_movie(
-                0,
+            add_movie(
+                &mut editor,
                 "movie.mov",
                 MOVIE,
                 "payload.bin",
                 b"not image",
                 options(),
             ),
-            editor.add_slide_movie(1, "movie.mov", MOVIE, "poster.png", POSTER, options()),
+            add_movie_at(
+                &mut editor,
+                1,
+                "movie.mov",
+                MOVIE,
+                "poster.png",
+                POSTER,
+                options(),
+            ),
         ] {
             assert!(result.is_err());
             assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -1181,9 +1159,15 @@ mod tests {
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-        editor
-            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
-            .unwrap();
+        add_movie(
+            &mut editor,
+            "movie.mov",
+            MOVIE,
+            "poster.png",
+            POSTER,
+            options(),
+        )
+        .unwrap();
         let before_flip = editor.to_bytes().unwrap();
         assert!(
             editor
