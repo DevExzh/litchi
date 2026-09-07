@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/tmp/litchi-goal-0455-portable-kf5u6t8k/docs/performance/results/change-0455/formal/verify.py"
+  ],
+  "cwd": "/tmp/litchi-goal-0455-portable-kf5u6t8k",
+  "exit_code": 0,
+  "started_utc": "2026-09-07T08:44:29.651976+00:00",
+  "finished_utc": "2026-09-07T08:44:32.779636+00:00",
+  "verifier_sha256": "619da5fe218b57d8db0b2195d6d43f5b48401d15db32c24a8b1020dda52b4994",
+  "driver_sha256": "5cdd98736ca11ed7ee73d735cb91f7bd20ccf6da242a09dd300ea645afa6791a",
+  "mode": "separate bundle copy without owned binaries, fuzz build, native outputs or raw perf data",
+  "stdout": "{\"allocator_policy_diagnostic_samples\": 240, \"change\": 455, \"confirmation_samples\": 240, \"fuzz_gates\": 3, \"lanes\": 24, \"passed_tests\": 2188, \"required_release_gates\": 10, \"review_flags\": 19, \"samples\": 720, \"status\": \"pass\"}\n",
+  "stderr": "",
+  "temporary_directory_absent": true
+}

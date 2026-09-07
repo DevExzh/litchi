@@ -1,0 +1,98 @@
+{
+  "status": "pass",
+  "lane": 13,
+  "lane_definition": {
+    "build": "baseline",
+    "provider": "range",
+    "corpus": "plain",
+    "repeat": "R2",
+    "instrumentation": "normal"
+  },
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0455/formal/runs/13/resource.log",
+    "/tmp/litchi-goal-0455/formal-baseline-normal",
+    "provider-lifecycle",
+    "--corpus",
+    "plain",
+    "--provider",
+    "range",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "cf35acf048b33b9e0fdfc87ba032749da3a3bcc8",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0455/formal/runs/13/report.json",
+    "--max-range",
+    "65536",
+    "--delay-us",
+    "200",
+    "--transfer-bytes-per-second",
+    "26214400",
+    "--transfer-delay-policy",
+    "separate-sleeps"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-09-07T08:07:00.218320+00:00",
+  "binary": {
+    "path": "/tmp/litchi-goal-0455/formal-baseline-normal",
+    "sha256": "51a54694b7ac375ed6b939d0f99e094eec7594cfd07f706e74c54389fb1ab1c3",
+    "bytes": 57784160
+  },
+  "build_manifest": {
+    "path": "baseline-build.json",
+    "sha256": "eebfb29c293c07b3f3ea927fc0c1890e6b7adbb85ab31b9313695ca87178cca8",
+    "bytes": 743
+  },
+  "source_before": {
+    "path": "sources/c65afdff205766047a72c447f4fb076009993073a5cce6f7befabb04f7d5612b.json",
+    "sha256": "c65afdff205766047a72c447f4fb076009993073a5cce6f7befabb04f7d5612b",
+    "files": 6672
+  },
+  "protocol_sha256": "7e3a151de76e8bf7ce7e31bbd6e8ae1a52844f8c6d3b641c8f8efb2759515882",
+  "capture_sha256": "b5c2abf39f515f19b0ebee88c70408dd2857f5e4b717f2d69c35cd350db22ea1",
+  "exit_code": 0,
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0455/formal/verify-report.py",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0455/formal/runs/13/report.json"
+  ],
+  "oracle_exit_code": 0,
+  "finished_utc": "2026-09-07T08:07:05.440667+00:00",
+  "source_after": {
+    "path": "sources/c65afdff205766047a72c447f4fb076009993073a5cce6f7befabb04f7d5612b.json",
+    "sha256": "c65afdff205766047a72c447f4fb076009993073a5cce6f7befabb04f7d5612b",
+    "files": 6672
+  },
+  "source_unchanged": true,
+  "artifacts": {
+    "report.json": {
+      "path": "runs/13/report.json",
+      "sha256": "fcc7d7d0174b07f8c6bd130446c21be73d8a4ec8f6e4ca8e3902735abee01da4",
+      "bytes": 1830206
+    },
+    "resource.log": {
+      "path": "runs/13/resource.log",
+      "sha256": "e05e46c3dcbb4b8a5c995e35e68e4558d1073378317c654c3414f84f4fd98f6f",
+      "bytes": 1106
+    },
+    "workload.log": {
+      "path": "runs/13/workload.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "oracle.log": {
+      "path": "runs/13/oracle.log",
+      "sha256": "c4b869a93b441411731b01d6290d9b69f0d59c5fa705238f820f9ef78a98ebe9",
+      "bytes": 310
+    }
+  }
+}

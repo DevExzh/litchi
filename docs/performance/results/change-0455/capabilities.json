@@ -1,0 +1,35 @@
+{
+  "observed_utc": "2026-09-07T08:02:58.774051+00:00",
+  "scope": "environment capabilities only; no workload hardware-counter measurement",
+  "commands": [
+    {
+      "argv": [
+        "df",
+        "-T",
+        "."
+      ],
+      "exit_code": 0,
+      "stdout": "Filesystem     Type  1K-blocks      Used  Available Use% Mounted on\n/dev/root      ext4 2033087068 688091876 1344978808  34% /\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "perf",
+        "stat",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+        "true"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "\n Performance counter stats for 'true':\n\n            991662      cycles                                                                \n            750752      instructions                                                          \n            137819      branches                                                              \n              7174      branch-misses                                                         \n             23729      cache-misses                                                          \n                58      page-faults                                                           \n\n       0.030986481 seconds time elapsed\n\n       0.014788000 seconds user\n       0.014788000 seconds sys\n\n\n"
+    }
+  ],
+  "optional_tools": {
+    "perf": "/usr/bin/perf",
+    "strace": "/usr/bin/strace",
+    "heaptrack": "/usr/bin/heaptrack",
+    "cargo-flamegraph": "/home/zhuhe/.cargo/bin/cargo-flamegraph",
+    "samply": null
+  }
+}

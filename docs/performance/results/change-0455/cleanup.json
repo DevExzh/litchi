@@ -1,0 +1,14 @@
+{
+  "status": "pass",
+  "task": "/tmp/litchi-goal-0455",
+  "temporary_directory_absent": true,
+  "files_removed": 937,
+  "bytes_removed": 1032052420,
+  "inventory": {
+    "path": "temporary-artifacts.json",
+    "bytes": 203219,
+    "sha256": "54691b87f22c31222cd4b21201444025f9845089a63a7297f74cc15c44163dfc"
+  },
+  "precleanup_sha256": "3c6ff85c4fe029890b68fa073f5cb92c001fb218c4e0ddb6be6735a33078fc61",
+  "driver_sha256": "b500106a400a2e9d2779926d3b404611e9fbe54e779d84bfb30e9aed0d8409d6"
+}

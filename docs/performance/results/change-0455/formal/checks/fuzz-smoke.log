@@ -1,0 +1,152 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 455
+INFO: Loaded 1 modules   (80116 inline 8-bit counters): 80116 [0x5da3b8da4c63, 0x5da3b8db8557), 
+INFO: Loaded 1 PC tables (80116 PCs): 80116 [0x5da3b8db8558,0x5da3b8ef1498), 
+INFO:       22 files found in /tmp/litchi-goal-0455/fuzz/corpus
+INFO: seed corpus: files: 22 min: 156b max: 263054b total: 443834b rss: 37Mb
+#24	INITED cov: 8724 ft: 14047 corp: 21/390Kb exec/s: 0 rss: 69Mb
+#25	NEW    cov: 8726 ft: 14049 corp: 22/421Kb lim: 263054 exec/s: 0 rss: 69Mb L: 31766/263054 MS: 1 ChangeBit-
+	NEW_FUNC[1/3]: 0x5da3b8ad4410  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x556410) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+	NEW_FUNC[2/3]: 0x5da3b8c0abb0  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x68cbb0) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#26	NEW    cov: 8767 ft: 14254 corp: 23/430Kb lim: 263054 exec/s: 0 rss: 70Mb L: 9105/263054 MS: 1 InsertByte-
+	NEW_FUNC[1/1]: 0x5da3b8c7ee40  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x700e40) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#28	NEW    cov: 8782 ft: 14302 corp: 24/431Kb lim: 263054 exec/s: 0 rss: 71Mb L: 858/263054 MS: 2 ChangeByte-EraseBytes-
+#29	NEW    cov: 8803 ft: 14337 corp: 25/431Kb lim: 263054 exec/s: 0 rss: 71Mb L: 820/263054 MS: 1 CrossOver-
+	NEW_FUNC[1/4]: 0x5da3b89878d0  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x4098d0) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+	NEW_FUNC[2/4]: 0x5da3b89962b0  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x4182b0) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#30	NEW    cov: 8898 ft: 14446 corp: 26/432Kb lim: 263054 exec/s: 0 rss: 71Mb L: 546/263054 MS: 1 InsertByte-
+#31	NEW    cov: 8898 ft: 14452 corp: 27/433Kb lim: 263054 exec/s: 0 rss: 71Mb L: 988/263054 MS: 1 CrossOver-
+	NEW_FUNC[1/6]: 0x5da3b895dac0  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x3dfac0) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+	NEW_FUNC[2/6]: 0x5da3b8960f30  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x3e2f30) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#32	NEW    cov: 8993 ft: 15061 corp: 28/690Kb lim: 263054 exec/s: 0 rss: 74Mb L: 263054/263054 MS: 1 ShuffleBytes-
+#35	NEW    cov: 9009 ft: 15094 corp: 29/690Kb lim: 263054 exec/s: 0 rss: 75Mb L: 160/263054 MS: 3 ShuffleBytes-ChangeBinInt-CrossOver-
+	NEW_FUNC[1/5]: 0x5da3b8abdfe0  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x53ffe0) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+	NEW_FUNC[2/5]: 0x5da3b8c0ae50  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x68ce50) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#36	NEW    cov: 9034 ft: 15307 corp: 30/691Kb lim: 263054 exec/s: 0 rss: 75Mb L: 1036/263054 MS: 1 ChangeBit-
+#37	NEW    cov: 9034 ft: 15308 corp: 31/691Kb lim: 263054 exec/s: 0 rss: 76Mb L: 373/263054 MS: 1 CrossOver-
+#39	NEW    cov: 9034 ft: 15309 corp: 32/692Kb lim: 263054 exec/s: 0 rss: 76Mb L: 469/263054 MS: 2 ChangeASCIIInt-CMP- DE: "\000\000\000\267"-
+#40	NEW    cov: 9037 ft: 15410 corp: 33/693Kb lim: 263054 exec/s: 0 rss: 76Mb L: 1040/263054 MS: 1 PersAutoDict- DE: "\000\000\000\267"-
+#45	NEW    cov: 9037 ft: 15414 corp: 34/694Kb lim: 263054 exec/s: 0 rss: 77Mb L: 740/263054 MS: 5 ShuffleBytes-EraseBytes-ShuffleBytes-InsertRepeatedBytes-CrossOver-
+	NEW_FUNC[1/1]: 0x5da3b8c80550  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x702550) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#47	NEW    cov: 9045 ft: 15449 corp: 35/694Kb lim: 263054 exec/s: 0 rss: 77Mb L: 403/263054 MS: 2 PersAutoDict-EraseBytes- DE: "\000\000\000\267"-
+	NEW_FUNC[1/3]: 0x5da3b898ac80  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x40cc80) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+	NEW_FUNC[2/3]: 0x5da3b899fc10  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x421c10) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#48	NEW    cov: 9067 ft: 15478 corp: 36/694Kb lim: 263054 exec/s: 0 rss: 77Mb L: 545/263054 MS: 1 ChangeBinInt-
+	NEW_FUNC[1/11]: 0x5da3b898b2d0  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x40d2d0) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+	NEW_FUNC[2/11]: 0x5da3b8a98240  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x51a240) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#49	NEW    cov: 9149 ft: 15967 corp: 37/696Kb lim: 263054 exec/s: 0 rss: 79Mb L: 1107/263054 MS: 1 ChangeByte-
+#53	NEW    cov: 9149 ft: 15968 corp: 38/696Kb lim: 263054 exec/s: 0 rss: 79Mb L: 431/263054 MS: 4 ShuffleBytes-ChangeByte-PersAutoDict-InsertRepeatedBytes- DE: "\000\000\000\267"-
+#54	NEW    cov: 9151 ft: 15971 corp: 39/705Kb lim: 263054 exec/s: 0 rss: 80Mb L: 9104/263054 MS: 1 ChangeBit-
+#55	NEW    cov: 9156 ft: 16268 corp: 40/743Kb lim: 263054 exec/s: 0 rss: 80Mb L: 38935/263054 MS: 1 InsertByte-
+#58	NEW    cov: 9165 ft: 16299 corp: 41/960Kb lim: 263054 exec/s: 0 rss: 82Mb L: 222134/263054 MS: 3 ShuffleBytes-ShuffleBytes-CrossOver-
+#59	NEW    cov: 9169 ft: 16305 corp: 42/961Kb lim: 263054 exec/s: 0 rss: 83Mb L: 1084/263054 MS: 1 ChangeBinInt-
+	NEW_FUNC[1/1]: 0x5da3b8c43c70  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x6c5c70) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#70	NEW    cov: 9182 ft: 16335 corp: 43/1089Kb lim: 263054 exec/s: 0 rss: 85Mb L: 130881/263054 MS: 1 CrossOver-
+	NEW_FUNC[1/2]: 0x5da3b89ddeb0  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x45feb0) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+	NEW_FUNC[2/2]: 0x5da3b8ccc960  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x74e960) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#71	NEW    cov: 9212 ft: 16477 corp: 44/1090Kb lim: 263054 exec/s: 0 rss: 86Mb L: 1036/263054 MS: 1 CrossOver-
+#72	NEW    cov: 9219 ft: 16521 corp: 45/1091Kb lim: 263054 exec/s: 0 rss: 86Mb L: 1023/263054 MS: 1 PersAutoDict- DE: "\000\000\000\267"-
+	NEW_FUNC[1/1]: 0x5da3b8c15b70  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x697b70) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#88	NEW    cov: 9232 ft: 16546 corp: 46/1092Kb lim: 263054 exec/s: 0 rss: 91Mb L: 1023/263054 MS: 1 PersAutoDict- DE: "\000\000\000\267"-
+#95	NEW    cov: 9238 ft: 16570 corp: 47/1092Kb lim: 263054 exec/s: 0 rss: 92Mb L: 469/263054 MS: 2 ShuffleBytes-PersAutoDict- DE: "\000\000\000\267"-
+#99	NEW    cov: 9246 ft: 16578 corp: 48/1093Kb lim: 263054 exec/s: 0 rss: 92Mb L: 550/263054 MS: 4 PersAutoDict-ChangeByte-ShuffleBytes-ChangeBit- DE: "\000\000\000\267"-
+#110	NEW    cov: 9250 ft: 16608 corp: 49/1093Kb lim: 263054 exec/s: 0 rss: 94Mb L: 469/263054 MS: 1 ChangeBit-
+#111	NEW    cov: 9268 ft: 16788 corp: 50/1094Kb lim: 263054 exec/s: 0 rss: 95Mb L: 1084/263054 MS: 1 CMP- DE: "\020\000\000\000"-
+#114	NEW    cov: 9269 ft: 16789 corp: 51/1095Kb lim: 263054 exec/s: 0 rss: 95Mb L: 469/263054 MS: 3 PersAutoDict-ChangeBit-CrossOver- DE: "\000\000\000\267"-
+#118	NEW    cov: 9269 ft: 16791 corp: 52/1104Kb lim: 263054 exec/s: 0 rss: 96Mb L: 9487/263054 MS: 4 ShuffleBytes-ChangeBinInt-InsertByte-CrossOver-
+#119	NEW    cov: 9270 ft: 16793 corp: 53/1113Kb lim: 263054 exec/s: 0 rss: 96Mb L: 9105/263054 MS: 1 ChangeASCIIInt-
+#134	NEW    cov: 9270 ft: 16795 corp: 54/1122Kb lim: 263054 exec/s: 0 rss: 101Mb L: 9292/263054 MS: 5 ChangeASCIIInt-ShuffleBytes-CrossOver-CMP-EraseBytes- DE: "\377\377\377\377\377\377\377%"-
+#136	NEW    cov: 9274 ft: 16806 corp: 55/1122Kb lim: 263054 exec/s: 0 rss: 101Mb L: 545/263054 MS: 2 ChangeASCIIInt-CrossOver-
+#142	NEW    cov: 9295 ft: 17579 corp: 56/1124Kb lim: 263054 exec/s: 0 rss: 102Mb L: 1348/263054 MS: 1 ChangeASCIIInt-
+#148	NEW    cov: 9301 ft: 17742 corp: 57/1125Kb lim: 263054 exec/s: 0 rss: 103Mb L: 1348/263054 MS: 1 ChangeASCIIInt-
+#155	NEW    cov: 9301 ft: 17747 corp: 58/1126Kb lim: 263054 exec/s: 0 rss: 104Mb L: 673/263054 MS: 2 ChangeBit-InsertRepeatedBytes-
+#159	NEW    cov: 9301 ft: 17748 corp: 59/1144Kb lim: 263054 exec/s: 0 rss: 105Mb L: 19190/263054 MS: 4 ChangeBinInt-CrossOver-InsertRepeatedBytes-CopyPart-
+#165	NEW    cov: 9307 ft: 17785 corp: 60/1145Kb lim: 263054 exec/s: 0 rss: 107Mb L: 1107/263054 MS: 1 CopyPart-
+#186	NEW    cov: 9308 ft: 17788 corp: 61/1184Kb lim: 263054 exec/s: 0 rss: 110Mb L: 38935/263054 MS: 1 ChangeByte-
+#187	NEW    cov: 9312 ft: 17825 corp: 62/1185Kb lim: 263054 exec/s: 0 rss: 111Mb L: 1107/263054 MS: 1 ChangeBinInt-
+#193	NEW    cov: 9322 ft: 17901 corp: 63/1187Kb lim: 263054 exec/s: 0 rss: 114Mb L: 2077/263054 MS: 1 CrossOver-
+#205	NEW    cov: 9322 ft: 17914 corp: 64/1326Kb lim: 263054 exec/s: 0 rss: 117Mb L: 142833/263054 MS: 2 CrossOver-EraseBytes-
+#222	NEW    cov: 9332 ft: 17951 corp: 65/1327Kb lim: 263054 exec/s: 0 rss: 120Mb L: 1036/263054 MS: 2 ChangeBinInt-ChangeBit-
+#223	NEW    cov: 9334 ft: 17956 corp: 66/1328Kb lim: 263054 exec/s: 0 rss: 121Mb L: 673/263054 MS: 1 InsertRepeatedBytes-
+#244	NEW    cov: 9337 ft: 17969 corp: 67/1541Kb lim: 263054 exec/s: 0 rss: 125Mb L: 218408/263054 MS: 1 CrossOver-
+#255	NEW    cov: 9339 ft: 17985 corp: 68/1542Kb lim: 263054 exec/s: 0 rss: 127Mb L: 1107/263054 MS: 1 ChangeASCIIInt-
+#256	NEW    cov: 9344 ft: 18119 corp: 69/1543Kb lim: 263054 exec/s: 0 rss: 127Mb L: 1084/263054 MS: 1 PersAutoDict- DE: "\020\000\000\000"-
+#267	NEW    cov: 9344 ft: 18133 corp: 70/1544Kb lim: 263054 exec/s: 0 rss: 129Mb L: 1023/263054 MS: 1 ChangeASCIIInt-
+#268	NEW    cov: 9344 ft: 18135 corp: 71/1582Kb lim: 263054 exec/s: 0 rss: 129Mb L: 38935/263054 MS: 1 ChangeByte-
+#269	NEW    cov: 9344 ft: 18137 corp: 72/1591Kb lim: 263054 exec/s: 0 rss: 130Mb L: 9104/263054 MS: 1 CrossOver-
+#270	NEW    cov: 9344 ft: 18337 corp: 73/1592Kb lim: 263054 exec/s: 0 rss: 130Mb L: 1092/263054 MS: 1 PersAutoDict- DE: "\377\377\377\377\377\377\377%"-
+#281	NEW    cov: 9346 ft: 18344 corp: 74/1594Kb lim: 263054 exec/s: 0 rss: 134Mb L: 2077/263054 MS: 1 PersAutoDict- DE: "\020\000\000\000"-
+#312	NEW    cov: 9346 ft: 18346 corp: 75/1595Kb lim: 263054 exec/s: 0 rss: 140Mb L: 1024/263054 MS: 1 InsertByte-
+#343	NEW    cov: 9346 ft: 18349 corp: 76/1596Kb lim: 263054 exec/s: 0 rss: 145Mb L: 1107/263054 MS: 1 ChangeASCIIInt-
+#347	NEW    cov: 9348 ft: 18351 corp: 77/1598Kb lim: 263054 exec/s: 0 rss: 146Mb L: 1435/263054 MS: 4 CrossOver-ChangeASCIIInt-ChangeBinInt-CMP- DE: "\375\377\377\377"-
+#353	NEW    cov: 9348 ft: 18352 corp: 78/1599Kb lim: 263054 exec/s: 0 rss: 148Mb L: 1107/263054 MS: 1 ShuffleBytes-
+#355	NEW    cov: 9348 ft: 18364 corp: 79/1600Kb lim: 263054 exec/s: 0 rss: 149Mb L: 1072/263054 MS: 2 ChangeBit-ChangeASCIIInt-
+#359	NEW    cov: 9348 ft: 18365 corp: 80/1600Kb lim: 263054 exec/s: 0 rss: 150Mb L: 483/263054 MS: 4 CMP-InsertRepeatedBytes-ShuffleBytes-CMP- DE: "\006\000\000\000\000\000\000\000"-"\377\020\000\000"-
+#365	NEW    cov: 9348 ft: 18368 corp: 81/1609Kb lim: 263054 exec/s: 0 rss: 151Mb L: 9104/263054 MS: 1 ChangeBit-
+#372	NEW    cov: 9351 ft: 18421 corp: 82/1610Kb lim: 263054 exec/s: 0 rss: 152Mb L: 673/263054 MS: 2 PersAutoDict-CopyPart- DE: "\006\000\000\000\000\000\000\000"-
+#428	NEW    cov: 9351 ft: 18432 corp: 83/1611Kb lim: 263054 exec/s: 0 rss: 165Mb L: 1072/263054 MS: 1 ChangeByte-
+#439	NEW    cov: 9351 ft: 18440 corp: 84/1613Kb lim: 263054 exec/s: 0 rss: 169Mb L: 2077/263054 MS: 1 ChangeBit-
+#443	NEW    cov: 9351 ft: 18441 corp: 85/1725Kb lim: 263054 exec/s: 0 rss: 171Mb L: 114803/263054 MS: 4 CrossOver-EraseBytes-CMP-InsertRepeatedBytes- DE: "'\000\000\000\000\000\000\000"-
+#450	NEW    cov: 9360 ft: 18511 corp: 86/1727Kb lim: 263054 exec/s: 0 rss: 175Mb L: 2077/263054 MS: 2 ChangeByte-ChangeByte-
+#459	REDUCE cov: 9360 ft: 18511 corp: 86/1723Kb lim: 263054 exec/s: 0 rss: 176Mb L: 5181/263054 MS: 4 ChangeBinInt-ChangeBit-InsertRepeatedBytes-EraseBytes-
+#465	NEW    cov: 9364 ft: 18517 corp: 87/1732Kb lim: 263054 exec/s: 0 rss: 177Mb L: 9104/263054 MS: 1 ChangeBit-
+#472	NEW    cov: 9367 ft: 18520 corp: 88/1733Kb lim: 263054 exec/s: 0 rss: 178Mb L: 695/263054 MS: 2 InsertRepeatedBytes-InsertRepeatedBytes-
+#473	NEW    cov: 9370 ft: 18562 corp: 89/1734Kb lim: 263054 exec/s: 0 rss: 179Mb L: 1107/263054 MS: 1 ChangeBinInt-
+#483	NEW    cov: 9372 ft: 18564 corp: 90/1991Kb lim: 263054 exec/s: 0 rss: 188Mb L: 263054/263054 MS: 5 ChangeBit-ChangeBinInt-CopyPart-CopyPart-ChangeBit-
+#484	NEW    cov: 9372 ft: 18565 corp: 91/1992Kb lim: 263054 exec/s: 0 rss: 188Mb L: 1244/263054 MS: 1 CrossOver-
+#486	NEW    cov: 9372 ft: 18566 corp: 92/1992Kb lim: 263054 exec/s: 0 rss: 189Mb L: 377/263054 MS: 2 ChangeByte-CMP- DE: "\372\377\377\377"-
+#493	NEW    cov: 9375 ft: 18570 corp: 93/1993Kb lim: 263054 exec/s: 0 rss: 190Mb L: 550/263054 MS: 2 PersAutoDict-PersAutoDict- DE: "\000\000\000\267"-"\377\020\000\000"-
+#494	NEW    cov: 9378 ft: 18612 corp: 94/2002Kb lim: 263054 exec/s: 0 rss: 190Mb L: 9104/263054 MS: 1 ChangeBinInt-
+#502	NEW    cov: 9379 ft: 18613 corp: 95/2002Kb lim: 263054 exec/s: 0 rss: 191Mb L: 915/263054 MS: 3 ChangeBit-ChangeASCIIInt-CrossOver-
+#517	NEW    cov: 9381 ft: 18627 corp: 96/2004Kb lim: 263054 exec/s: 0 rss: 194Mb L: 1092/263054 MS: 5 PersAutoDict-ChangeBinInt-ChangeASCIIInt-ChangeBinInt-ChangeByte- DE: "'\000\000\000\000\000\000\000"-
+#526	NEW    cov: 9387 ft: 18633 corp: 97/2012Kb lim: 263054 exec/s: 0 rss: 196Mb L: 9104/263054 MS: 4 ChangeBit-ShuffleBytes-ChangeBit-ChangeASCIIInt-
+#531	REDUCE cov: 9387 ft: 18633 corp: 97/2009Kb lim: 263054 exec/s: 0 rss: 197Mb L: 15885/263054 MS: 5 InsertRepeatedBytes-ChangeByte-ChangeByte-ChangeASCIIInt-EraseBytes-
+#532	NEW    cov: 9387 ft: 18640 corp: 98/2010Kb lim: 263054 exec/s: 0 rss: 197Mb L: 1107/263054 MS: 1 ShuffleBytes-
+#553	NEW    cov: 9387 ft: 18641 corp: 99/2011Kb lim: 263054 exec/s: 0 rss: 200Mb L: 1107/263054 MS: 1 CMP- DE: "\201\"\000\000\000\000\000\000"-
+#590	NEW    cov: 9388 ft: 18651 corp: 100/2012Kb lim: 263054 exec/s: 0 rss: 209Mb L: 1107/263054 MS: 2 ShuffleBytes-ChangeBinInt-
+#608	NEW    cov: 9390 ft: 18658 corp: 101/2014Kb lim: 263054 exec/s: 0 rss: 212Mb L: 1107/263054 MS: 3 EraseBytes-PersAutoDict-InsertRepeatedBytes- DE: "'\000\000\000\000\000\000\000"-
+#611	NEW    cov: 9390 ft: 18662 corp: 102/2123Kb lim: 263054 exec/s: 0 rss: 214Mb L: 112025/263054 MS: 3 CrossOver-InsertRepeatedBytes-PersAutoDict- DE: "'\000\000\000\000\000\000\000"-
+	NEW_FUNC[1/1]: 0x5da3b8c61300  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x6e3300) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#628	NEW    cov: 9400 ft: 18704 corp: 103/2154Kb lim: 263054 exec/s: 0 rss: 218Mb L: 31766/263054 MS: 2 ChangeASCIIInt-ChangeASCIIInt-
+#643	NEW    cov: 9400 ft: 18706 corp: 104/2155Kb lim: 263054 exec/s: 0 rss: 222Mb L: 644/263054 MS: 5 InsertRepeatedBytes-ShuffleBytes-CrossOver-ShuffleBytes-EraseBytes-
+#646	NEW    cov: 9400 ft: 18707 corp: 105/2274Kb lim: 263054 exec/s: 0 rss: 223Mb L: 121956/263054 MS: 3 InsertByte-ChangeASCIIInt-EraseBytes-
+#700	NEW    cov: 9401 ft: 18708 corp: 106/2275Kb lim: 263054 exec/s: 0 rss: 244Mb L: 1107/263054 MS: 4 ShuffleBytes-ShuffleBytes-PersAutoDict-ChangeByte- DE: "\372\377\377\377"-
+#706	NEW    cov: 9402 ft: 18710 corp: 107/2276Kb lim: 263054 exec/s: 0 rss: 246Mb L: 1348/263054 MS: 1 PersAutoDict- DE: "\000\000\000\267"-
+#714	NEW    cov: 9402 ft: 18714 corp: 108/2314Kb lim: 263054 exec/s: 0 rss: 248Mb L: 38934/263054 MS: 3 ChangeASCIIInt-ChangeASCIIInt-ChangeByte-
+	NEW_FUNC[1/5]: 0x5da3b89226f0  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x3a46f0) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+	NEW_FUNC[2/5]: 0x5da3b8922780  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x3a4780) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#715	NEW    cov: 9426 ft: 18776 corp: 109/2315Kb lim: 263054 exec/s: 0 rss: 249Mb L: 1036/263054 MS: 1 ChangeByte-
+#738	NEW    cov: 9426 ft: 18832 corp: 110/2358Kb lim: 263054 exec/s: 0 rss: 253Mb L: 44055/263054 MS: 3 ChangeASCIIInt-InsertByte-ChangeByte-
+#754	NEW    cov: 9426 ft: 18833 corp: 111/2396Kb lim: 263054 exec/s: 0 rss: 256Mb L: 38935/263054 MS: 1 ShuffleBytes-
+#770	NEW    cov: 9426 ft: 18845 corp: 112/2397Kb lim: 263054 exec/s: 0 rss: 260Mb L: 1084/263054 MS: 1 ShuffleBytes-
+#771	NEW    cov: 9426 ft: 18853 corp: 113/2398Kb lim: 263054 exec/s: 0 rss: 260Mb L: 1024/263054 MS: 1 InsertByte-
+#782	NEW    cov: 9426 ft: 18854 corp: 114/2436Kb lim: 263054 exec/s: 0 rss: 266Mb L: 38935/263054 MS: 1 PersAutoDict- DE: "\372\377\377\377"-
+#798	NEW    cov: 9426 ft: 18855 corp: 115/2467Kb lim: 263054 exec/s: 0 rss: 268Mb L: 31766/263054 MS: 1 ChangeASCIIInt-
+#807	NEW    cov: 9427 ft: 18856 corp: 116/2468Kb lim: 263054 exec/s: 0 rss: 270Mb L: 1044/263054 MS: 4 ChangeASCIIInt-ChangeByte-ShuffleBytes-CopyPart-
+#823	NEW    cov: 9427 ft: 18860 corp: 117/2469Kb lim: 263054 exec/s: 0 rss: 277Mb L: 1107/263054 MS: 1 ShuffleBytes-
+#840	NEW    cov: 9427 ft: 18861 corp: 118/2479Kb lim: 263054 exec/s: 0 rss: 279Mb L: 9487/263054 MS: 2 ChangeASCIIInt-ChangeByte-
+#841	NEW    cov: 9428 ft: 18862 corp: 119/2674Kb lim: 263054 exec/s: 0 rss: 280Mb L: 199750/263054 MS: 1 CopyPart-
+#842	NEW    cov: 9428 ft: 18863 corp: 120/2712Kb lim: 263054 exec/s: 0 rss: 280Mb L: 38977/263054 MS: 1 InsertRepeatedBytes-
+#860	NEW    cov: 9429 ft: 18868 corp: 121/2713Kb lim: 263054 exec/s: 0 rss: 283Mb L: 1072/263054 MS: 3 ShuffleBytes-ShuffleBytes-ChangeBinInt-
+	NEW_FUNC[1/1]: 0x5da3b8a01f80  (/tmp/litchi-goal-0455/fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc+0x483f80) (BuildId: e27ef3461003ed59bd018042868cffe78bdcb5fb)
+#951	NEW    cov: 9452 ft: 19304 corp: 122/2714Kb lim: 263054 exec/s: 0 rss: 298Mb L: 1023/263054 MS: 1 PersAutoDict- DE: "\006\000\000\000\000\000\000\000"-
+#957	NEW    cov: 9452 ft: 19305 corp: 123/2723Kb lim: 263054 exec/s: 0 rss: 299Mb L: 9104/263054 MS: 1 ChangeByte-
+#961	NEW    cov: 9454 ft: 19344 corp: 124/2980Kb lim: 263054 exec/s: 0 rss: 305Mb L: 263054/263054 MS: 4 CrossOver-ChangeByte-PersAutoDict-PersAutoDict- DE: "\201\"\000\000\000\000\000\000"-"'\000\000\000\000\000\000\000"-
+#963	NEW    cov: 9463 ft: 19353 corp: 125/2981Kb lim: 263054 exec/s: 0 rss: 306Mb L: 1107/263054 MS: 2 ChangeBit-PersAutoDict- DE: "\006\000\000\000\000\000\000\000"-
+#974	NEW    cov: 9463 ft: 19397 corp: 126/2982Kb lim: 263054 exec/s: 0 rss: 308Mb L: 1348/263054 MS: 1 ChangeByte-
+#995	NEW    cov: 9465 ft: 19434 corp: 127/2983Kb lim: 263054 exec/s: 0 rss: 311Mb L: 1072/263054 MS: 1 CopyPart-
+#996	NEW    cov: 9469 ft: 19438 corp: 128/2984Kb lim: 263054 exec/s: 0 rss: 312Mb L: 1107/263054 MS: 1 ShuffleBytes-
+#997	NEW    cov: 9469 ft: 19461 corp: 129/2986Kb lim: 263054 exec/s: 0 rss: 314Mb L: 2077/263054 MS: 1 PersAutoDict- DE: "\201\"\000\000\000\000\000\000"-
+#1000	DONE   cov: 9469 ft: 19461 corp: 129/2986Kb lim: 263054 exec/s: 0 rss: 314Mb
+###### Recommended dictionary. ######
+"\000\000\000\267" # Uses: 19
+"\020\000\000\000" # Uses: 11
+"\377\377\377\377\377\377\377%" # Uses: 14
+"\375\377\377\377" # Uses: 5
+"\006\000\000\000\000\000\000\000" # Uses: 3
+"\377\020\000\000" # Uses: 3
+"'\000\000\000\000\000\000\000" # Uses: 7
+"\372\377\377\377" # Uses: 7
+"\201\"\000\000\000\000\000\000" # Uses: 4
+###### End of recommended dictionary. ######
+Done 1000 runs in 0 second(s)

@@ -4346,3 +4346,18 @@ not implement a shared-link scheduler or measure physical network bandwidth.
 See `docs/performance/results/change-0448/measurements.md` for the matched
 calibration and its repeat flags. Production behavior and default cases remain
 unchanged.
+
+## PPTX publication sink observations (0455)
+
+The `provider-lifecycle` journal now retains
+`samples_raw[*].publication_sink`: accepted bytes, write calls, largest accepted
+write and write-size buckets from the existing bounded `CountingSink`. The
+snapshot is taken after the publication timer and operation allocator region
+close. These are caller-sink observations, not physical writes or ZIP raw-copy
+accounting. Earlier strict report verifiers reject this additive field; the
+extended verifier is retained at
+`docs/performance/results/change-0455/formal/verify-report.py`.
+
+The 0455 experiment keeps ordinary latency lanes separate from allocator and
+whole-process hardware-counter runs. See its frozen protocols and exact-output
+checks before comparing reports across instrumentation modes.

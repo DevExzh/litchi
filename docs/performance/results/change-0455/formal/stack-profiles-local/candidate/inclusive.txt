@@ -1,0 +1,370 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 972  of event 'instructions'
+# Event count (approx.): 48600000000
+#
+# Children      Self  Command          Shared Object            Symbol                                                                                                                                                                                       
+# ........  ........  ...............  .......................  .............................................................................................................................................................................................
+#
+    40.64%    40.64%  formal-candidat  formal-candidate-normal  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |          
+            |--1.65%--0x5ffffffffffffff
+            |          zlib_rs::deflate::algorithm::medium::deflate_medium
+            |          
+            |--1.23%--0x56abffffffff
+            |          zlib_rs::deflate::algorithm::medium::deflate_medium
+            |          
+             --1.13%--zlib_rs::deflate::algorithm::medium::deflate_medium
+
+    24.28%    24.28%  formal-candidat  formal-candidate-normal  [.] sha2::sha256::x86_sha::compress
+    14.61%    14.61%  formal-candidat  formal-candidate-normal  [.] zlib_rs::deflate::longest_match::longest_match
+            |          
+            |--0.72%--zlib_rs::deflate::longest_match::longest_match
+            |          
+             --0.62%--0x7fff
+                       zlib_rs::deflate::longest_match::longest_match
+
+     3.70%     1.54%  formal-candidat  libc.so.6                [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+               |          
+                --1.95%--0xffffffff8c800bb7
+                          0xffffffff8df1c2e3
+                          |          
+                           --1.65%--0xffffffff8cc1a38e
+                                     0xffffffff8d0004de
+                                     0xffffffff8d000153
+                                     0xffffffff8cfffc80
+                                     |          
+                                      --0.82%--0xffffffff8cffe882
+                                                |          
+                                                 --0.62%--0xffffffff8cffe429
+                                                           0xffffffff8d0807bb
+                                                           0xffffffff8d07cf38
+                                                           0xffffffff8d03b34c
+                                                           |          
+                                                            --0.51%--0xffffffff8d039cc2
+                                                                      0xffffffff8d037cad
+                                                                      0xffffffff8df2e39b
+
+     3.40%     3.40%  formal-candidat  formal-candidate-normal  [.] litchi_perf_baseline::payload_bytes
+            |          
+            |--0.72%--0xdb3e96c1d3476d75
+            |          litchi_perf_baseline::payload_bytes
+            |          
+             --0.62%--litchi_perf_baseline::payload_bytes
+
+     3.09%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8c800bb7
+            |
+            ---0xffffffff8c800bb7
+               0xffffffff8df1c2e3
+               |          
+                --2.67%--0xffffffff8cc1a38e
+                          0xffffffff8d0004de
+                          0xffffffff8d000153
+                          |          
+                           --2.47%--0xffffffff8cfffc80
+                                     |          
+                                     |--1.44%--0xffffffff8cffe882
+                                     |          |          
+                                     |           --1.23%--0xffffffff8cffe429
+                                     |                     0xffffffff8d0807bb
+                                     |                     |          
+                                     |                      --1.13%--0xffffffff8d07cf38
+                                     |                                0xffffffff8d03b34c
+                                     |                                |          
+                                     |                                 --0.82%--0xffffffff8d039cc2
+                                     |                                           0xffffffff8d037cad
+                                     |                                           0xffffffff8df2e39b
+                                     |          
+                                      --0.51%--0xffffffff8cffea04
+                                                0xffffffff8cf9bccf
+
+     3.09%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8df1c2e3
+            |
+            ---0xffffffff8df1c2e3
+               |          
+                --2.67%--0xffffffff8cc1a38e
+                          0xffffffff8d0004de
+                          0xffffffff8d000153
+                          |          
+                           --2.47%--0xffffffff8cfffc80
+                                     |          
+                                     |--1.44%--0xffffffff8cffe882
+                                     |          |          
+                                     |           --1.23%--0xffffffff8cffe429
+                                     |                     0xffffffff8d0807bb
+                                     |                     |          
+                                     |                      --1.13%--0xffffffff8d07cf38
+                                     |                                0xffffffff8d03b34c
+                                     |                                |          
+                                     |                                 --0.82%--0xffffffff8d039cc2
+                                     |                                           0xffffffff8d037cad
+                                     |                                           0xffffffff8df2e39b
+                                     |          
+                                      --0.51%--0xffffffff8cffea04
+                                                0xffffffff8cf9bccf
+
+     2.98%     2.98%  formal-candidat  formal-candidate-normal  [.] <zlib_rs::deflate::Heap>::pqdownheap
+     2.67%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8cc1a38e
+            |
+            ---0xffffffff8cc1a38e
+               0xffffffff8d0004de
+               0xffffffff8d000153
+               |          
+                --2.47%--0xffffffff8cfffc80
+                          |          
+                          |--1.44%--0xffffffff8cffe882
+                          |          |          
+                          |           --1.23%--0xffffffff8cffe429
+                          |                     0xffffffff8d0807bb
+                          |                     |          
+                          |                      --1.13%--0xffffffff8d07cf38
+                          |                                0xffffffff8d03b34c
+                          |                                |          
+                          |                                 --0.82%--0xffffffff8d039cc2
+                          |                                           0xffffffff8d037cad
+                          |                                           0xffffffff8df2e39b
+                          |          
+                           --0.51%--0xffffffff8cffea04
+                                     0xffffffff8cf9bccf
+
+     2.67%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8d0004de
+            |
+            ---0xffffffff8d0004de
+               0xffffffff8d000153
+               |          
+                --2.47%--0xffffffff8cfffc80
+                          |          
+                          |--1.44%--0xffffffff8cffe882
+                          |          |          
+                          |           --1.23%--0xffffffff8cffe429
+                          |                     0xffffffff8d0807bb
+                          |                     |          
+                          |                      --1.13%--0xffffffff8d07cf38
+                          |                                0xffffffff8d03b34c
+                          |                                |          
+                          |                                 --0.82%--0xffffffff8d039cc2
+                          |                                           0xffffffff8d037cad
+                          |                                           0xffffffff8df2e39b
+                          |          
+                           --0.51%--0xffffffff8cffea04
+                                     0xffffffff8cf9bccf
+
+     2.67%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8d000153
+            |
+            ---0xffffffff8d000153
+               |          
+                --2.47%--0xffffffff8cfffc80
+                          |          
+                          |--1.44%--0xffffffff8cffe882
+                          |          |          
+                          |           --1.23%--0xffffffff8cffe429
+                          |                     0xffffffff8d0807bb
+                          |                     |          
+                          |                      --1.13%--0xffffffff8d07cf38
+                          |                                0xffffffff8d03b34c
+                          |                                |          
+                          |                                 --0.82%--0xffffffff8d039cc2
+                          |                                           0xffffffff8d037cad
+                          |                                           0xffffffff8df2e39b
+                          |          
+                           --0.51%--0xffffffff8cffea04
+                                     0xffffffff8cf9bccf
+
+     2.47%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8cfffc80
+            |
+            ---0xffffffff8cfffc80
+               |          
+               |--1.44%--0xffffffff8cffe882
+               |          |          
+               |           --1.23%--0xffffffff8cffe429
+               |                     0xffffffff8d0807bb
+               |                     |          
+               |                      --1.13%--0xffffffff8d07cf38
+               |                                0xffffffff8d03b34c
+               |                                |          
+               |                                 --0.82%--0xffffffff8d039cc2
+               |                                           0xffffffff8d037cad
+               |                                           0xffffffff8df2e39b
+               |          
+                --0.51%--0xffffffff8cffea04
+                          0xffffffff8cf9bccf
+
+     1.65%     0.00%  formal-candidat  [unknown]                [.] 0x05ffffffffffffff
+            |
+            ---0x5ffffffffffffff
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+
+     1.65%     1.65%  formal-candidat  libc.so.6                [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+
+     1.54%     0.41%  formal-candidat  libc.so.6                [.] __memset_avx512_unaligned_erms
+            |
+            ---__memset_avx512_unaligned_erms
+               |          
+                --1.13%--0xffffffff8c800bb7
+                          0xffffffff8df1c2e3
+                          |          
+                           --1.03%--0xffffffff8cc1a38e
+                                     0xffffffff8d0004de
+                                     0xffffffff8d000153
+                                     |          
+                                      --0.82%--0xffffffff8cfffc80
+                                                |          
+                                                 --0.62%--0xffffffff8cffe882
+                                                           0xffffffff8cffe429
+                                                           0xffffffff8d0807bb
+                                                           |          
+                                                            --0.51%--0xffffffff8d07cf38
+                                                                      0xffffffff8d03b34c
+
+     1.54%     1.54%  formal-candidat  formal-candidate-normal  [.] crc32fast::specialized::pclmulqdq::calculate
+     1.44%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8cffe882
+            |
+            ---0xffffffff8cffe882
+               |          
+                --1.23%--0xffffffff8cffe429
+                          0xffffffff8d0807bb
+                          |          
+                           --1.13%--0xffffffff8d07cf38
+                                     0xffffffff8d03b34c
+                                     |          
+                                      --0.82%--0xffffffff8d039cc2
+                                                0xffffffff8d037cad
+                                                0xffffffff8df2e39b
+
+     1.23%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8cffe429
+            |
+            ---0xffffffff8cffe429
+               0xffffffff8d0807bb
+               |          
+                --1.13%--0xffffffff8d07cf38
+                          0xffffffff8d03b34c
+                          |          
+                           --0.82%--0xffffffff8d039cc2
+                                     0xffffffff8d037cad
+                                     0xffffffff8df2e39b
+
+     1.23%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8d0807bb
+            |
+            ---0xffffffff8d0807bb
+               |          
+                --1.13%--0xffffffff8d07cf38
+                          0xffffffff8d03b34c
+                          |          
+                           --0.82%--0xffffffff8d039cc2
+                                     0xffffffff8d037cad
+                                     0xffffffff8df2e39b
+
+     1.23%     0.00%  formal-candidat  [unknown]                [.] 0x000056abffffffff
+            |
+            ---0x56abffffffff
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+
+     1.13%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8d07cf38
+            |
+            ---0xffffffff8d07cf38
+               0xffffffff8d03b34c
+               |          
+                --0.82%--0xffffffff8d039cc2
+                          0xffffffff8d037cad
+                          0xffffffff8df2e39b
+
+     1.13%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8d03b34c
+            |
+            ---0xffffffff8d03b34c
+               |          
+                --0.82%--0xffffffff8d039cc2
+                          0xffffffff8d037cad
+                          0xffffffff8df2e39b
+
+     0.82%     0.82%  formal-candidat  [unknown]                [k] 0xffffffff8df2e39b
+            |          
+             --0.51%--__memmove_avx512_unaligned_erms
+                       0xffffffff8c800bb7
+                       0xffffffff8df1c2e3
+                       0xffffffff8cc1a38e
+                       0xffffffff8d0004de
+                       0xffffffff8d000153
+                       0xffffffff8cfffc80
+                       0xffffffff8cffe882
+                       0xffffffff8cffe429
+                       0xffffffff8d0807bb
+                       0xffffffff8d07cf38
+                       0xffffffff8d03b34c
+                       0xffffffff8d039cc2
+                       0xffffffff8d037cad
+                       0xffffffff8df2e39b
+
+     0.82%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8d039cc2
+            |
+            ---0xffffffff8d039cc2
+               0xffffffff8d037cad
+               0xffffffff8df2e39b
+
+     0.82%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8d037cad
+            |
+            ---0xffffffff8d037cad
+               0xffffffff8df2e39b
+
+     0.72%     0.00%  formal-candidat  [unknown]                [.] 0xdb3e96c1d3476d75
+            |
+            ---0xdb3e96c1d3476d75
+               litchi_perf_baseline::payload_bytes
+
+     0.62%     0.00%  formal-candidat  libc.so.6                [.] _int_free_chunk
+            |
+            ---_int_free_chunk
+
+     0.62%     0.00%  formal-candidat  [unknown]                [.] 0x0000000000007fff
+            |
+            ---0x7fff
+               zlib_rs::deflate::longest_match::longest_match
+
+     0.51%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8c80012b
+            |
+            ---0xffffffff8c80012b
+               0xffffffff8df13b65
+
+     0.51%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8df13b65
+            |
+            ---0xffffffff8df13b65
+
+     0.51%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8d029615
+            |
+            ---0xffffffff8d029615
+               0xffffffff8d028247
+
+     0.51%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8d028247
+            |
+            ---0xffffffff8d028247
+
+     0.51%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8cffea04
+            |
+            ---0xffffffff8cffea04
+               0xffffffff8cf9bccf
+
+     0.51%     0.00%  formal-candidat  [unknown]                [.] 0xffffffff8cf9bccf
+            |
+            ---0xffffffff8cf9bccf
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
+Warning:
+Kernel address maps (/proc/{kallsyms,modules}) were restricted.
+
+Check /proc/sys/kernel/kptr_restrict before running 'perf record'.
+
+As no suitable kallsyms nor vmlinux was found, kernel samples
+can't be resolved.
+
+Samples in kernel modules can't be resolved as well.
+

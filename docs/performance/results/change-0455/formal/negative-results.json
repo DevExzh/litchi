@@ -1,0 +1,32 @@
+{
+  "status": "pass",
+  "report_sha256": "581d275f0cf10b8c41e2b3812450b71a8845e3c6122587f910b5572a2dd5963b",
+  "oracle_sha256": "b0505644bb6be304ac217889455539a6926bbdd7731974c2b1d0aaf85c77a629",
+  "results": [
+    {
+      "mutation": "accepted",
+      "status": "rejected",
+      "error": "sink accepted bytes"
+    },
+    {
+      "mutation": "histogram",
+      "status": "rejected",
+      "error": "sink histogram count"
+    },
+    {
+      "mutation": "cap",
+      "status": "rejected",
+      "error": "sink write cap"
+    },
+    {
+      "mutation": "missing",
+      "status": "rejected",
+      "error": "'publication_sink'"
+    },
+    {
+      "mutation": "output",
+      "status": "rejected",
+      "error": "report.samples_raw[0].output_sha256: row output identity differs from expected output"
+    }
+  ]
+}

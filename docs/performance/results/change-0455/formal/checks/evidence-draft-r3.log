@@ -1,0 +1,1 @@
+{"allocator_policy_diagnostic_samples": 240, "change": 455, "confirmation_samples": 240, "fuzz_gates": 3, "lanes": 24, "passed_tests": 2188, "required_release_gates": 10, "review_flags": 19, "samples": 720, "status": "pass"}

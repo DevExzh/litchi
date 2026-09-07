@@ -1,0 +1,45 @@
+{
+  "purpose": "Test whether fixed glibc mmap policy reproduces slow/high-page-fault process regimes independently of copy-buffer size. Diagnostic only; preserve original perf and ordinary results. No causal attribution beyond controlled allocator-policy comparison.",
+  "reference": "https://sourceware.org/glibc/manual/latest/html_node/Malloc-Tunable-Parameters.html",
+  "driver_sha256": "0230c4e4217caa68b9794cc3b93ca4aa268fd4210cbc5f52bb978fade9203a17",
+  "inherited_allocator_environment": {},
+  "samples": 30,
+  "warmups": 3,
+  "cpu": 2,
+  "workers": 1,
+  "events": "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+  "lanes": [
+    {
+      "build": "baseline",
+      "mmap_threshold": 131072
+    },
+    {
+      "build": "candidate",
+      "mmap_threshold": 131072
+    },
+    {
+      "build": "candidate",
+      "mmap_threshold": 131072
+    },
+    {
+      "build": "baseline",
+      "mmap_threshold": 131072
+    },
+    {
+      "build": "baseline",
+      "mmap_threshold": 33554432
+    },
+    {
+      "build": "candidate",
+      "mmap_threshold": 33554432
+    },
+    {
+      "build": "candidate",
+      "mmap_threshold": 33554432
+    },
+    {
+      "build": "baseline",
+      "mmap_threshold": 33554432
+    }
+  ]
+}
