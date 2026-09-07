@@ -1,0 +1,112 @@
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+    Checking litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+error[E0277]: `?` couldn't convert the error to `CallbackFailure`
+   --> crates/litchi-odf-common/tests/source_member_reader.rs:471:43
+    |
+471 |             reader.read_exact(&mut prefix)?;
+    |                    -----------------------^ the trait `From<std::io::Error>` is not implemented for `CallbackFailure`
+    |                    |
+    |                    this can't be annotated with `?` because it has type `Result<_, std::io::Error>`
+    |
+note: `CallbackFailure` needs to implement `From<std::io::Error>`
+   --> crates/litchi-odf-common/tests/source_member_reader.rs:28:1
+    |
+ 28 | struct CallbackFailure;
+    | ^^^^^^^^^^^^^^^^^^^^^^
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+
+error[E0277]: `?` couldn't convert the error to `CallbackFailure`
+   --> crates/litchi-odf-common/tests/source_member_reader.rs:482:43
+    |
+482 |             reader.read_exact(&mut prefix)?;
+    |                    -----------------------^ the trait `From<std::io::Error>` is not implemented for `CallbackFailure`
+    |                    |
+    |                    this can't be annotated with `?` because it has type `Result<_, std::io::Error>`
+    |
+note: `CallbackFailure` needs to implement `From<std::io::Error>`
+   --> crates/litchi-odf-common/tests/source_member_reader.rs:28:1
+    |
+ 28 | struct CallbackFailure;
+    | ^^^^^^^^^^^^^^^^^^^^^^
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+
+error[E0277]: `?` couldn't convert the error to `CallbackFailure`
+   --> crates/litchi-odf-common/tests/source_member_reader.rs:501:43
+    |
+501 |             reader.read_exact(&mut prefix)?;
+    |                    -----------------------^ the trait `From<std::io::Error>` is not implemented for `CallbackFailure`
+    |                    |
+    |                    this can't be annotated with `?` because it has type `Result<_, std::io::Error>`
+    |
+note: `CallbackFailure` needs to implement `From<std::io::Error>`
+   --> crates/litchi-odf-common/tests/source_member_reader.rs:28:1
+    |
+ 28 | struct CallbackFailure;
+    | ^^^^^^^^^^^^^^^^^^^^^^
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+
+error[E0277]: `?` couldn't convert the error to `CallbackFailure`
+   --> crates/litchi-odf-common/tests/source_member_reader.rs:515:43
+    |
+515 |             reader.read_exact(&mut prefix)?;
+    |                    -----------------------^ the trait `From<std::io::Error>` is not implemented for `CallbackFailure`
+    |                    |
+    |                    this can't be annotated with `?` because it has type `Result<_, std::io::Error>`
+    |
+note: `CallbackFailure` needs to implement `From<std::io::Error>`
+   --> crates/litchi-odf-common/tests/source_member_reader.rs:28:1
+    |
+ 28 | struct CallbackFailure;
+    | ^^^^^^^^^^^^^^^^^^^^^^
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+
+error[E0277]: `?` couldn't convert the error to `CallbackFailure`
+   --> crates/litchi-odf-common/tests/source_member_reader.rs:530:43
+    |
+530 |             reader.read_exact(&mut prefix)?;
+    |                    -----------------------^ the trait `From<std::io::Error>` is not implemented for `CallbackFailure`
+    |                    |
+    |                    this can't be annotated with `?` because it has type `Result<_, std::io::Error>`
+    |
+note: `CallbackFailure` needs to implement `From<std::io::Error>`
+   --> crates/litchi-odf-common/tests/source_member_reader.rs:28:1
+    |
+ 28 | struct CallbackFailure;
+    | ^^^^^^^^^^^^^^^^^^^^^^
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+
+error: unused import: `Read`
+  --> crates/litchi-odf-common/tests/source_member_reader.rs:13:21
+   |
+13 | use std::io::{self, Read};
+   |                     ^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `litchi-odf-common` (test "source_member_reader") due to 6 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0631]: type mismatch in function arguments
+   --> crates/litchi-odp/src/package/source_append.rs:546:14
+    |
+105 |     Plan(SourceContentPublicationError),
+    |     ---- found signature defined here
+...
+546 |     .map_err(TailAppendError::Plan)?;
+    |      ------- ^^^^^^^^^^^^^^^^^^^^^ expected due to this
+    |      |
+    |      required by a bound introduced by this call
+    |
+    = note: expected function signature `fn(litchi_odf_common::core::source_publication::SourceContentScanError) -> _`
+               found function signature `fn(SourceContentPublicationError) -> _`
+note: required by a bound in `Result::<T, E>::map_err`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:960:4
+help: consider wrapping the function in a closure
+    |
+546 |     .map_err(|arg0: litchi_odf_common::core::source_publication::SourceContentScanError| TailAppendError::Plan(/* SourceContentPublicationError */))?;
+    |              +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                      +++++++++++++++++++++++++++++++++++++
+
+For more information about this error, try `rustc --explain E0631`.
+error: could not compile `litchi-odp` (lib) due to 1 previous error
+error: could not compile `litchi-odp` (lib) due to 1 previous error

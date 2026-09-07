@@ -1,0 +1,339 @@
+{
+  "schema": "litchi-0457-odp-source-tail-profiling-v1",
+  "change": 457,
+  "status": "frozen-diagnostic-plan",
+  "frozen_utc": "2026-09-07T12:57:30.452474+00:00",
+  "purpose": "Bounded whole-process sampled-CPU diagnostics for the remaining large normal source-tail endpoint and its owned existing-append control. The profile is for hotspot discovery and retains no ordinary speedup claim.",
+  "scope": {
+    "shape": "large",
+    "mode": "normal",
+    "cpu": 2,
+    "workers": 1,
+    "samples": 100,
+    "warmups": 3,
+    "expected_workload_seconds": 15,
+    "event": "cycles:u",
+    "frequency_hz": 99,
+    "call_graph": {
+      "policy": "use dwarf,8192 only when perf record --call-graph help advertises dwarf; otherwise omit --call-graph and retain the unsupported result",
+      "dwarf": "dwarf,8192",
+      "fallback": null
+    },
+    "cache_state": "the workload's normal large semantic-shape endpoint with its existing fresh-child/cache behavior",
+    "allocator": "normal binary with ambient allocator variables required to be empty; no allocator tuning"
+  },
+  "roles": {
+    "candidate": {
+      "label": "candidate-large-normal",
+      "selector": "odp_source_tail_append_lifecycle",
+      "workload_protocol": {
+        "path": "candidate/protocol.json",
+        "sha256": "f033f5c015343cd85589f62a2122cc4e7ab42f8b78c4f72fbcc521adc9c4d1e0"
+      },
+      "binary_binding": {
+        "path": "candidate/binary-bindings.json",
+        "sha256": "555e2c4b685e4686b3fe4e3efbbcaeb560e1dcfb5296eb52547ea4bd26cd825c"
+      },
+      "build_receipt": {
+        "path": "candidate/build-receipt.json",
+        "sha256": "756814f2a77bcc4ba86377a028dd8b899126cc9bb02ac2ddd3a1e2a79c33b92e"
+      },
+      "source_manifest": {
+        "path": "candidate/source-manifest.json",
+        "sha256": "8eff4cebced4d8831ed987b6cfb8ecb905caa296acdd590236c5c4e3c82ae4d4",
+        "files": 7023
+      },
+      "binary": {
+        "mode": "normal",
+        "path": "/tmp/litchi-goal-0457/candidate/litchi-perf-baseline",
+        "bytes": 58035160,
+        "sha256": "ea02082d6da1ed46c72876c441f952588618cad1af6e627bb6ad9174a12370bd"
+      },
+      "oracle": {
+        "verifier_path": "candidate/oracle/verify-report.py",
+        "verifier_sha256": "ea8c712f0a2499d5b1e76a3dcf8a5a03c913302ed4e6cba3f94cb6d2bc791d14",
+        "argv": [
+          "{python}",
+          "-B",
+          "{verifier}",
+          "--report",
+          "{report}",
+          "--mode",
+          "normal",
+          "--shape",
+          "large",
+          "--samples",
+          "100",
+          "--warmups",
+          "3",
+          "--samples",
+          "100",
+          "--warmups",
+          "3"
+        ]
+      }
+    },
+    "control": {
+      "label": "control-large-normal",
+      "selector": "odp_existing_append_lifecycle",
+      "workload_protocol": {
+        "path": "control/protocol.json",
+        "sha256": "a451ae1d963d441321fad486bcfef7834f5d3487b4ed19fb150d0342ec53bd80"
+      },
+      "binary_binding": {
+        "path": "control/binary-bindings.json",
+        "sha256": "1423e0f091681aaf87537246d96b2e7dd73c434c229218c53b966eaa5dbe7e9e"
+      },
+      "build_receipt": {
+        "path": "control/build-receipt.json",
+        "sha256": "d984795360d6572fcd569c41a40cf5064f328dcb528d4e5923231c759c0116f0"
+      },
+      "source_manifest": {
+        "path": "control/source-manifest.json",
+        "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89",
+        "files": 7007
+      },
+      "binary": {
+        "mode": "normal",
+        "path": "/tmp/litchi-goal-0457/control/litchi-perf-baseline",
+        "bytes": 57528080,
+        "sha256": "746ac15348863c13f3ee3aae79d63d37ffda255e77471981540842088c9b8356"
+      },
+      "oracle": {
+        "verifier_path": "control/oracle/verify-report.py",
+        "verifier_sha256": "e4bca2715391cfb31637b86507c98f121df24b96405cb64df29902c09ef0aa4b",
+        "argv": [
+          "{python}",
+          "-B",
+          "{verifier}",
+          "--report",
+          "{report}",
+          "--mode",
+          "normal",
+          "--shape",
+          "large",
+          "--samples",
+          "100",
+          "--warmups",
+          "3",
+          "--samples",
+          "100",
+          "--warmups",
+          "3"
+        ]
+      }
+    }
+  },
+  "workload_cli": {
+    "case_flag": "--case",
+    "shape_flag": "--semantic-shape",
+    "workers_flag": "--workers",
+    "samples_flag": "--samples",
+    "warmup_flag": "--warmup",
+    "report_flag": "--json",
+    "catalog_flag": "--corpus-manifest"
+  },
+  "commands": {
+    "check_wrapper": {
+      "candidate_tag": "profile-candidate-large",
+      "control_tag": "profile-control-large",
+      "candidate": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0457/check.py",
+        "--tag",
+        "profile-candidate-large-r2",
+        "--",
+        "python3",
+        "-B",
+        "docs/performance/results/change-0457/profiling/capture-r2.py",
+        "--role",
+        "candidate"
+      ],
+      "control": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0457/check.py",
+        "--tag",
+        "profile-control-large-r2",
+        "--",
+        "python3",
+        "-B",
+        "docs/performance/results/change-0457/profiling/capture-r2.py",
+        "--role",
+        "control"
+      ]
+    },
+    "record_template": [
+      "taskset",
+      "-c",
+      "2",
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "{resource}",
+      "perf",
+      "record",
+      "--no-buildid-cache",
+      "-F",
+      "99",
+      "-e",
+      "cycles:u",
+      "[--call-graph, dwarf,8192 if supported]",
+      "-o",
+      "{perf_data}",
+      "--",
+      "{binary}",
+      "--case",
+      "{selector}",
+      "--semantic-shape",
+      "large",
+      "--workers",
+      "1",
+      "--samples",
+      "100",
+      "--warmup",
+      "3",
+      "--json",
+      "{report}",
+      "--corpus-manifest",
+      "{catalog}"
+    ],
+    "call_graph_probe": [
+      "perf",
+      "record",
+      "--call-graph",
+      "help"
+    ],
+    "flat_report": [
+      "perf",
+      "report",
+      "--stdio",
+      "--no-inline",
+      "--no-children",
+      "--call-graph",
+      "none",
+      "--percent-limit",
+      "0",
+      "-i",
+      "{perf_data}"
+    ],
+    "script": [
+      "perf",
+      "script",
+      "--no-inline",
+      "-i",
+      "{perf_data}"
+    ]
+  },
+  "artifacts": {
+    "required": [
+      "profile-receipt.json",
+      "perf.data",
+      "perf-record.stdout",
+      "perf-record.stderr",
+      "resource.log",
+      "report.json",
+      "catalog.json",
+      "top-symbols.txt",
+      "perf-script.txt",
+      "stacks.folded"
+    ],
+    "optional": [
+      "perf-help.stdout",
+      "perf-help.stderr",
+      "perf-script.stderr",
+      "top-symbols.stderr",
+      "oracle.log"
+    ],
+    "folded_format": "perf-script frames collapsed to root-to-leaf semicolon stacks with period weights; a comment records unavailability or parse diagnostics"
+  },
+  "claims": {
+    "allowed": [
+      "retained whole-process cycles:u sample stacks and flat top-symbol observations for the named normal large endpoint",
+      "binary, workload-protocol, build-receipt, source-manifest, and runner identity for each profile",
+      "process-level GNU time resource observation retained in resource.log"
+    ],
+    "withheld": [
+      "API-attributed CPU percentage or causal hotspot proof",
+      "speedup, regression, or ordinary Commit/Patch comparison",
+      "perf hardware counter totals or allocation counts",
+      "physical I/O, request attribution, bounded-memory, scaling, or cancellation claim",
+      "cross-machine reproducibility"
+    ]
+  },
+  "limitations": {
+    "counter_status": "unavailable: this bounded diagnostic records sampled cycles only and does not run perf stat",
+    "rss": "GNU /usr/bin/time -v Maximum resident set size is retained for the perf-recorded process tree; it is process-level and includes profiler overhead",
+    "allocation": "ordinary allocator counters are unavailable; no allocator tuning or allocator profile is run",
+    "scope": "fresh normal binary process including workload setup, warmups, 100 measured samples, report writing, and profiler overhead; the oracle and post-processing run outside the perf sample",
+    "symbolization": "symbols depend on the retained binary and local perf build-id/debug information; unresolved frames remain visible in raw script/top output",
+    "control": "no retained 0457 control profile was present at freeze, so the owned control is captured with the same protocol"
+  },
+  "custody": {
+    "wrapper": "check.py",
+    "wrapper_path": "check.py",
+    "wrapper_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+    "runner_path": "profiling/capture-r2.py",
+    "runner_sha256": "4a658eb52ef9d777c191a68c081efb3af11cef2064bfe297150d6e67f7a6d5f4",
+    "source_policy": "R1 records the current ambient source epoch. Candidate production sources must equal its bound build subset after the four explicit archived fuzz inputs are excluded; the old control binary is authenticated only by its retained binding/build/source records."
+  },
+  "amendment": {
+    "schema": "litchi-0457-large-profile-r1-amendment-v1",
+    "reason": "The final release gate archived four fuzz fixture sources after the candidate build. The original profile-candidate-large attempt failed before perf/workload execution because current custody was 7027 files while the candidate build subset was 7023.",
+    "previous_attempt": {
+      "check_tag": "profile-candidate-large",
+      "receipt_path": "checks/profile-candidate-large.json",
+      "receipt_sha256": "5bf9053072aee0a6e73e668cd1c59ac67fb0ea0d4cfbf6649258344dc1f866b0",
+      "log_path": "checks/profile-candidate-large.log",
+      "log_sha256": "a0f64f651143746d747bf8c06d690281e00ad9cc68d33a1887d1fc5be64776fb",
+      "status": "failed-before-workload",
+      "failure": "ambient source manifest differs from bound candidate source"
+    },
+    "retry_tags": {
+      "candidate": "profile-candidate-large-r1",
+      "control": "profile-control-large-r1"
+    },
+    "ambient_source_epoch": {
+      "path": "sources/faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422.json",
+      "sha256": "faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422",
+      "files": 7027
+    },
+    "candidate_bound_source": {
+      "path": "candidate/source-manifest.json",
+      "sha256": "8eff4cebced4d8831ed987b6cfb8ecb905caa296acdd590236c5c4e3c82ae4d4",
+      "files": 7023
+    },
+    "candidate_ambient_exclusions": [
+      {
+        "path": "docs/performance/results/change-0457/fuzz/artifacts/pre-run/xml/source/Cargo.toml",
+        "sha256": "9bdd11a2594f9d046359b4df8ce6430e793b1616890aaafafb1d72937f625aae"
+      },
+      {
+        "path": "docs/performance/results/change-0457/fuzz/artifacts/pre-run/xml/source/scan_xml.rs",
+        "sha256": "1faf58709a267ebb8972d81342cdb0421c26e684a0ba44da793b2fac7847aba1"
+      },
+      {
+        "path": "docs/performance/results/change-0457/fuzz/artifacts/pre-run/zip/source/Cargo.toml",
+        "sha256": "a6b3701d83415bd0b574f60391c15ed710271f2df7d913fdcec8ee3d5521d1e6"
+      },
+      {
+        "path": "docs/performance/results/change-0457/fuzz/artifacts/pre-run/zip/source/parse_zip.rs",
+        "sha256": "3c0a99513cfca93486493140caec770c19557792b5b26bd565ff110c834511ae"
+      }
+    ],
+    "control_bound_source": {
+      "path": "control/source-manifest.json",
+      "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89",
+      "files": 7007
+    },
+    "control_source_policy": "Authenticate the retained old control binary against its old build receipt, binary binding, and old source manifest. Record the current 7027-file ambient source epoch separately; do not compare it to the old control build subset."
+  },
+  "sample_count_amendment": {
+    "reason": "Original recorder hardcoded oracle argv without the 100-sample override. R1 workload and perf succeeded; oracle rejected its default 30-sample expectation. R2 records and invokes --samples 100 --warmups 3.",
+    "previous_runner_sha256": "6986ae8175879f3e3d1d8725f572b5e37bd68876a1f835f4cbfe9369b8000d79",
+    "previous_protocol_sha256": "54e3417062489e67080cf2350faa6108467f2808bf0e574ff8170fe95d7b5620",
+    "failed_receipt_path": "profiling/r1/runs/candidate-large/profile-receipt.json",
+    "failed_receipt_sha256": "ff00c355002e14c55d22ea7b202474411e90ad43ea9334768882f5e50c5afd89"
+  }
+}

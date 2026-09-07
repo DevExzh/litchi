@@ -314,7 +314,10 @@ fn xlsx_repeated_store_reacquisition_controls_report_structural_scope() {
             repeated["claim_scope"],
             "structural cache/read control only; elapsed/query_ns must not be compared with candidate"
         );
-        assert_eq!(repeated["implementation"], "explicit_part_data_reacquisition_structural_control");
+        assert_eq!(
+            repeated["implementation"],
+            "explicit_part_data_reacquisition_structural_control"
+        );
         assert_eq!(repeated["query_iterations"], 8);
         assert_eq!(repeated["control_reacquire_count"], 32);
         assert_eq!(
@@ -330,10 +333,10 @@ fn xlsx_repeated_store_reacquisition_controls_report_structural_scope() {
             .map(|elapsed| elapsed.as_u64().expect("query timing"))
             .sum::<u64>();
         assert_eq!(repeated["timed_elapsed_total_ns"], query_total);
-        let selected_member_read_calls = repeated["diagnostics_delta"]
-            ["selected_member_read_calls"]
-            .as_u64()
-            .expect("selected-member read calls");
+        let selected_member_read_calls =
+            repeated["diagnostics_delta"]["selected_member_read_calls"]
+                .as_u64()
+                .expect("selected-member read calls");
         let source_read_calls = repeated["diagnostics_delta"]["source_read_calls"]
             .as_u64()
             .expect("source read calls");
@@ -344,7 +347,10 @@ fn xlsx_repeated_store_reacquisition_controls_report_structural_scope() {
                 assert_eq!(repeated["diagnostics_delta"]["cache_bypasses"], 0);
             },
             "oversized" => {
-                assert_eq!(repeated["diagnostics_delta"]["cache_oversized_bypasses"], 32);
+                assert_eq!(
+                    repeated["diagnostics_delta"]["cache_oversized_bypasses"],
+                    32
+                );
                 assert_eq!(repeated["diagnostics_delta"]["cache_evictions"], 0);
             },
             scenario => panic!("unexpected repeated-store scenario {scenario}"),

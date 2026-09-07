@@ -1,0 +1,13 @@
+callchain: Unknown --call-graph option value: help
+
+ Usage: perf record [<options>] [<command>]
+    or: perf record [<options>] -- <command> [<options>]
+
+        --call-graph <record_mode[,record_size]>
+                          setup and enables call-graph (stack chain/backtrace):
+
+				record_mode:	call graph recording mode (fp|dwarf|lbr)
+				record_size:	if record_mode is 'dwarf', max size of stack recording (<bytes>)
+						default: 8192 (bytes)
+
+				Default: fp

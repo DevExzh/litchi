@@ -1,5 +1,63 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0457: bounded source-backed ODP tail publication
+
+0457 records a current-revision formal baseline for the ordinary
+`odp_existing_append_lifecycle` selector: two repeats, normal and allocator
+lanes, 64/4,096/8,192 source slides, three warmups and 30 retained samples per
+lane on CPU 2 with one worker. The final control and candidate summaries retain
+360 samples across 12 reports each. The paired `odp_source_tail_append_lifecycle`
+candidate is a specialized source-backed publication plan with a different
+retained-result contract; its numbers are numeric endpoint comparisons only and
+are not an ordinary Commit/Patch speedup or regression claim.
+
+The ordinary ODP owner already exposes the owned `edit::Snapshot`,
+`edit::Transaction`, `edit::Patch` and `edit::Commit` surface. This source-tail
+plan is a separate publication path and does not integrate that surface into
+the measured selector.
+
+| Source slides | Control normal p50 R1 / R2 | Source-tail normal p50 R1 / R2 | Candidate minus control p50 R1 / R2 |
+|---:|---:|---:|---:|
+| 64 | 1.900 / 1.911 ms | 1.266 / 1.277 ms | -33.352% / -33.185% |
+| 4,096 | 74.708 / 75.685 ms | 77.145 / 73.822 ms | +3.262% / -2.461% |
+| 8,192 | 150.684 / 153.802 ms | 147.761 / 147.311 ms | -1.940% / -4.221% |
+
+The allocator lanes repeat the same operation-scoped working-set values. At
+64/4,096/8,192 slides, control allocated bytes are 10,613,383 / 110,226,105 /
+211,442,207 and source-tail allocated bytes are 2,607,922 / 36,593,937 /
+71,164,177. Control regional peak above entry is 781,342 / 18,027,568 /
+35,958,388 bytes; source-tail is 620,381 / 620,385 / 620,385 bytes. These
+measurements exclude source and fixture ownership already live at operation
+entry, and allocation volume still grows with document size.
+
+The [final comparison](results/change-0457/comparison-final.json),
+[final candidate summary](results/change-0457/candidate-final/summary.json),
+and control summary retain the exact vectors, bootstrap intervals, source/sink
+counters and result contract. The shared release suites pass 1,348 tests with
+three ignored (ODF-common 499, ZIP 481, and ODP 368); the harness and OPC
+receipts remain separate. The final identity-bound set has ten native records
+and three synthetic source/output pairs, all passing independent replay. ZIP
+and XML ASAN fuzz lanes each retain 1,000 runs. The [final source read
+review](results/change-0457/final-code-review.md) records the retained-fragment
+lease fix as resolved and found no additional
+verified blocker. The initial pre-fix large-normal profile retains 1,000 sampled
+`cycles:u` observations: candidate top symbols
+are SHA-256 compression 11.00%, XML `validate_name` 9.08%, `memcmp` 6.01%
+and `validate_start_element` 5.42%; control top symbols are `memcmp` 9.67%,
+Quick-XML attribute iteration 6.00%, `memmove` 5.76% and namespace-prefix
+resolution 5.24%. These are whole-process sampled stacks, not API-attributed
+CPU percentages or causal proof, and no hard perf-counter totals were
+collected. These whole-process samples remain initial pre-fix diagnostics, not
+final candidate attribution; no sampling profile was captured for the final
+candidate epoch. The initial candidate profile check passes, and the initial
+control
+report/raw profile are validated by the existing amended oracle after the
+original frame-pointer expectation was rejected, with the correction bound by
+[the amendment](results/change-0457/profiling/control-oracle-amendment.json).
+Sealed precleanup, portable-copy replay and three altered-copy rejection checks
+pass; owned staging cleanup is recorded in the
+[bundle](results/change-0457/README.md). The full non-iWork goal remains open.
+
 ## Change 0456: retain shared payloads during ZIP publication
 
 [0456](changes/0456-zip-shared-payload-framing.md) removes the complete-member

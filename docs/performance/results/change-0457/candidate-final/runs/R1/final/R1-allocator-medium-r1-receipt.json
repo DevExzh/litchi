@@ -1,0 +1,112 @@
+{
+  "allocator_environment": {},
+  "allocator_environment_after": {},
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R1/final/R1-allocator-medium-r1-resource.log",
+    "/tmp/litchi-goal-0457/candidate-final/litchi-perf-baseline-alloc",
+    "--case",
+    "odp_source_tail_append_lifecycle",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R1/final/R1-allocator-medium-r1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R1/final/R1-allocator-medium-r1-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4954,
+      "path": "runs/R1/final/R1-allocator-medium-r1-catalog.json",
+      "sha256": "ccf454208b249b20933bb0fc34bab281fc673e0dd562b415ec80369095e08758"
+    },
+    "oracle_log": {
+      "bytes": 334,
+      "path": "runs/R1/final/R1-allocator-medium-r1-oracle.log",
+      "sha256": "e7a0766551fc696391b82bf3fc025905ec33de96d71f63df11c99886ada1b79c"
+    },
+    "report": {
+      "bytes": 63819,
+      "path": "runs/R1/final/R1-allocator-medium-r1.json",
+      "sha256": "7f08bbed8beb8c120db8750edb47920e208fc2dd45a16e17dfba41904e3d3540"
+    },
+    "resource_log": {
+      "bytes": 1155,
+      "path": "runs/R1/final/R1-allocator-medium-r1-resource.log",
+      "sha256": "c15b38e65ac3b665e555d10dc5bc06941a4feca988c3843e4fee168434176708"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/R1/final/R1-allocator-medium-r1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "final",
+  "binary": {
+    "bytes": 57880592,
+    "copy_path": "/tmp/litchi-goal-0457/candidate-final/litchi-perf-baseline-alloc",
+    "executable": true,
+    "profile": "release",
+    "sha256": "fe0a0bc8bafa976682dc03adcf16f80ee8602eefc0e4123c3c5da45a9214ab26",
+    "source_path": "tools/perf-baseline/target/release/litchi-perf-baseline-alloc"
+  },
+  "binary_binding_sha256": "34dfe25667c8ebb4233412778165e3aa931146b3ee5cef46bcbde57c6122bd6d",
+  "change": 457,
+  "custody_driver": "/home/zhuhe/code/litchi/docs/performance/results/change-0457/check.py",
+  "custody_driver_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "609a705bf61c8863e6e526d51d6571b89e12d101fb535002819865479412e614",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T13:37:58.112778+00:00",
+  "lane": {
+    "mode": "allocator",
+    "phase": "R1",
+    "repeat": "R1",
+    "shape": "medium"
+  },
+  "name": "R1-allocator-medium-r1",
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/oracle/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R1/final/R1-allocator-medium-r1.json",
+    "--mode",
+    "allocator",
+    "--shape",
+    "medium"
+  ],
+  "oracle_exit_code": 0,
+  "oracle_stdout_sha256": "e7a0766551fc696391b82bf3fc025905ec33de96d71f63df11c99886ada1b79c",
+  "output_binding_sha256": "b6ffcd0b6e4ceb1e04eb00c480f44932f9e4648124e7daa9aac9cdc9bbf3a7c3",
+  "phase": "R1",
+  "protocol_sha256": "d8e1d48aacf76337529dd76ee1bfc021ac91d52a02f71d7327ab0e8c118169f7",
+  "revision": "48f11c7745f8f798a00e11a14f1f34dc1c9c7954",
+  "role": "candidate",
+  "schema": "litchi-0457-source-tail-candidate-capture-receipt-v1",
+  "selector": "odp_source_tail_append_lifecycle",
+  "source_after": {
+    "files": 7027,
+    "path": "sources/02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8.json",
+    "sha256": "02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8"
+  },
+  "source_before": {
+    "files": 7027,
+    "path": "sources/02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8.json",
+    "sha256": "02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-07T13:37:54.780270+00:00",
+  "status": "pass"
+}

@@ -18,7 +18,7 @@ use soapberry_zip::office::{
 };
 use soapberry_zip::{ErrorKind as ZipErrorKind, ReaderAt as ZipReaderAt};
 use std::cell::RefCell;
-use std::io::{self, Read};
+use std::io::{self, BufRead, Read};
 #[cfg(any(unix, windows))]
 use std::path::Path;
 use std::sync::Arc;
@@ -189,6 +189,130 @@ impl Default for SourcePackageLimits {
             archive: ArchiveLimits::default(),
             max_mimetype_bytes: 4 * 1024,
             max_manifest_bytes: 16 * 1024 * 1024,
+        }
+    }
+}
+
+/// Failure from a callback-scoped, verified source member read.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum SourceMemberReaderError<E> {
+    /// A source, archive, freshness, or policy failure occurred.
+    ///
+    /// When the callback had already returned an error, it is retained in
+    /// `callback_error` as secondary diagnostic information.
+    Core {
+        /// The primary typed common-core failure.
+        error: Error,
+        /// A callback failure observed before the primary failure.
+        callback_error: Option<E>,
+    },
+    /// The callback failed after the member was fully drained and verified,
+    /// or before abortable verification observed another failure.
+    Callback(E),
+}
+
+impl<E> SourceMemberReaderError<E> {
+    /// Return the primary common-core error, when present.
+    #[must_use]
+    pub fn core(&self) -> Option<&Error> {
+        match self {
+            Self::Core { error, .. } => Some(error),
+            Self::Callback(_) => None,
+        }
+    }
+
+    /// Alias for [`Self::core`].
+    #[must_use]
+    pub fn core_error(&self) -> Option<&Error> {
+        self.core()
+    }
+
+    /// Alias for [`Self::core`] using the conventional `error` name.
+    #[must_use]
+    pub fn error(&self) -> Option<&Error> {
+        self.core()
+    }
+
+    /// Return the callback failure, including one retained by a primary
+    /// source or archive failure.
+    #[must_use]
+    pub fn callback(&self) -> Option<&E> {
+        match self {
+            Self::Core { callback_error, .. } => callback_error.as_ref(),
+            Self::Callback(error) => Some(error),
+        }
+    }
+
+    /// Alias for [`Self::callback`].
+    #[must_use]
+    pub fn callback_error(&self) -> Option<&E> {
+        self.callback()
+    }
+
+    /// Extract the primary common-core error, if present.
+    pub fn into_core(self) -> Option<Error> {
+        match self {
+            Self::Core { error, .. } => Some(error),
+            Self::Callback(_) => None,
+        }
+    }
+
+    /// Alias for [`Self::into_core`].
+    pub fn into_core_error(self) -> Option<Error> {
+        self.into_core()
+    }
+
+    /// Alias for [`Self::into_core`] using the conventional `error` name.
+    pub fn into_error(self) -> Option<Error> {
+        self.into_core()
+    }
+
+    /// Extract the callback failure, if one was returned.
+    pub fn into_callback(self) -> Option<E> {
+        match self {
+            Self::Core { callback_error, .. } => callback_error,
+            Self::Callback(error) => Some(error),
+        }
+    }
+
+    /// Alias for [`Self::into_callback`].
+    pub fn into_callback_error(self) -> Option<E> {
+        self.into_callback()
+    }
+}
+
+impl<E: std::fmt::Display> std::fmt::Display for SourceMemberReaderError<E> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Core {
+                error,
+                callback_error,
+            } => match callback_error {
+                Some(callback_error) => write!(
+                    formatter,
+                    "verified ODF source member reader failed: {error} (callback also failed: {callback_error})"
+                ),
+                None => write!(
+                    formatter,
+                    "verified ODF source member reader failed: {error}"
+                ),
+            },
+            Self::Callback(error) => {
+                write!(
+                    formatter,
+                    "verified ODF source member reader callback failed: {error}"
+                )
+            },
+        }
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for SourceMemberReaderError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Core { error, .. } => Some(error),
+            Self::Callback(error) => Some(error),
         }
     }
 }
@@ -826,6 +950,90 @@ impl SourceBackedPackage {
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
+    /// Run a callback against one verified, unencrypted member without
+    /// retaining its decoded payload.
+    ///
+    /// The callback receives a fixed-buffer [`BufRead`] view. It may consume a
+    /// valid prefix early; the reader drains and verifies the complete member
+    /// before returning. A callback error is returned only after successful
+    /// archive finalization, and a callback panic unwinds without a drain.
+    pub fn with_verified_member_reader<T, E, F>(
+        &self,
+        path: &str,
+        callback: F,
+    ) -> std::result::Result<T, SourceMemberReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> std::result::Result<T, E>,
+    {
+        self.with_verified_member_reader_inner(path, callback, false)
+    }
+
+    /// Run a callback against one verified, unencrypted member without
+    /// retaining its decoded payload, aborting when the callback returns an
+    /// error.
+    ///
+    /// A successful callback is still drained and fully verified. If the
+    /// callback returns an error, the remaining member is not read or
+    /// checksum-verified unless a source or archive failure was already
+    /// observed by the callback. This advanced form is intended for callers
+    /// whose cancellation or sink failure must stop source traversal. A
+    /// callback panic unwinds without a drain.
+    pub fn with_verified_member_reader_abortable<T, E, F>(
+        &self,
+        path: &str,
+        callback: F,
+    ) -> std::result::Result<T, SourceMemberReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> std::result::Result<T, E>,
+    {
+        self.with_verified_member_reader_inner(path, callback, true)
+    }
+
+    fn with_verified_member_reader_inner<T, E, F>(
+        &self,
+        path: &str,
+        callback: F,
+        abortable: bool,
+    ) -> std::result::Result<T, SourceMemberReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> std::result::Result<T, E>,
+    {
+        let result = (|| {
+            self.ensure_current().map_err(source_member_core_error)?;
+            let path = normalize_member_path(path).map_err(source_member_core_error)?;
+            let entry_id = self.archive.entry_id(path).ok_or_else(|| {
+                source_member_core_error(Error::InvalidFormat(format!(
+                    "ODF package member '{path}' was not found"
+                )))
+            })?;
+            self.archive
+                .metadata_for(entry_id)
+                .map_err(map_source_member_zip_error)
+                .map_err(source_member_core_error)?;
+            let manifest_entry =
+                manifest_entry_for_path(&self.manifest, path).map_err(source_member_core_error)?;
+            if manifest_entry.is_some_and(|entry| entry.encryption.is_some()) {
+                return Err(source_member_core_error(Error::InvalidFormat(format!(
+                    "Encrypted ODF entry '{path}' cannot be streamed without decryption"
+                ))));
+            }
+            self.ensure_current().map_err(source_member_core_error)?;
+
+            let result = if abortable {
+                self.archive
+                    .with_verified_entry_reader_abortable(entry_id, callback)
+            } else {
+                self.archive.with_verified_entry_reader(entry_id, callback)
+            };
+            result.map_err(map_source_member_reader_error)
+        })();
+
+        match self.ensure_current() {
+            Err(error) => Err(with_verified_member_primary_error(result, error)),
+            Ok(()) => result,
+        }
+    }
+
     /// List package members without reading payload bytes.
     pub fn files(&self) -> Result<Vec<String>> {
         self.ensure_current()?;
@@ -1320,6 +1528,91 @@ pub(crate) fn map_zip_error(error: soapberry_zip::Error) -> Error {
             }
         },
         kind => Error::InvalidFormat(soapberry_zip::Error::from(kind).to_string()),
+    }
+}
+
+fn source_member_core_error<E>(error: Error) -> SourceMemberReaderError<E> {
+    SourceMemberReaderError::Core {
+        error,
+        callback_error: None,
+    }
+}
+
+fn map_source_member_reader_error<E>(
+    error: soapberry_zip::office::VerifiedEntryReaderError<E>,
+) -> SourceMemberReaderError<E> {
+    match error {
+        soapberry_zip::office::VerifiedEntryReaderError::Archive {
+            error,
+            callback_error,
+        } => SourceMemberReaderError::Core {
+            error: map_source_member_zip_error(error),
+            callback_error,
+        },
+        soapberry_zip::office::VerifiedEntryReaderError::Transport {
+            error,
+            callback_error,
+        } => SourceMemberReaderError::Core {
+            error: map_source_member_transport_error(error),
+            callback_error,
+        },
+        soapberry_zip::office::VerifiedEntryReaderError::Callback(error) => {
+            SourceMemberReaderError::Callback(error)
+        },
+        _ => SourceMemberReaderError::Core {
+            error: Error::InvalidFormat(
+                "unrecognized verified ZIP entry-reader failure".to_string(),
+            ),
+            callback_error: None,
+        },
+    }
+}
+
+fn map_source_member_zip_error(error: soapberry_zip::Error) -> Error {
+    match error.into_kind() {
+        ZipErrorKind::IO(error) | ZipErrorKind::Io(error) => {
+            map_source_member_transport_error(error)
+        },
+        kind => map_zip_error(soapberry_zip::Error::from(kind)),
+    }
+}
+
+fn map_source_member_transport_error(error: io::Error) -> Error {
+    if let Some(source) = error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<SourceChangedIo>())
+    {
+        return Error::SourceChanged {
+            expected: source.expected,
+            observed: source.observed,
+        };
+    }
+    // Preserve SourceReadIo and SourceExecutionIo wrappers. The source-backed
+    // publication mapper unwraps those markers into its typed source or
+    // execution failures; stripping them here would silently downgrade those
+    // failures to an unclassified I/O error.
+    Error::Io(error)
+}
+
+fn with_verified_member_primary_error<T, E>(
+    result: std::result::Result<T, SourceMemberReaderError<E>>,
+    error: Error,
+) -> SourceMemberReaderError<E> {
+    match result {
+        Ok(_) => SourceMemberReaderError::Core {
+            error,
+            callback_error: None,
+        },
+        Err(SourceMemberReaderError::Core { callback_error, .. }) => {
+            SourceMemberReaderError::Core {
+                error,
+                callback_error,
+            }
+        },
+        Err(SourceMemberReaderError::Callback(callback_error)) => SourceMemberReaderError::Core {
+            error,
+            callback_error: Some(callback_error),
+        },
     }
 }
 

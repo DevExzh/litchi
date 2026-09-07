@@ -1,0 +1,3 @@
+argv=["/usr/bin/python3", "-B", "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate/oracle/verify-report.py", "--report", "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate/runs/R1/formal/R1-allocator-large-r1.json", "--mode", "allocator", "--shape", "large"]
+stdout=VALID
+stderr=

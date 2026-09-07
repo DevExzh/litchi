@@ -77,6 +77,8 @@ pub mod metadata;
 pub mod package;
 /// Source-backed, content-only raw ZIP publication.
 pub mod source_publication;
+/// Fixed-window XML scanning for source-backed publication.
+mod stream_xml;
 /// ODF package writing
 pub mod writer;
 /// ODF XML utilities
@@ -92,6 +94,7 @@ pub use crate::package::ArchiveLimits;
 pub mod private {
     pub use super::binding_tracker::{BindingTracker, BindingTrackerError};
     pub use super::content_validation::ContentDocumentValidator;
+    pub use super::stream_xml::{XmlStreamEvent, XmlStreamLimits, XmlStreamReport, scan_xml};
 }
 
 pub use encryption::{Cipher, Kdf, Profile, StartKey};
@@ -114,13 +117,16 @@ pub use metadata::{
 };
 pub use metadata::{MetaXmlPatch, patch_meta_xml};
 pub use package::{
-    OwnedPackage, SourceBackedPackage, SourcePackageLimits, is_signature_owner_path,
+    OwnedPackage, SourceBackedPackage, SourceMemberReaderError, SourcePackageLimits,
+    is_signature_owner_path,
 };
 pub use source_publication::{
+    SourceContentInsertionCallbackError, SourceContentInsertionError, SourceContentInsertionPlan,
     SourceContentPublicationError, SourceContentPublicationOptions,
     SourceContentPublicationProgress, SourceContentPublicationReport, write_content_xml_to_stream,
     write_content_xml_to_stream_with_options,
 };
+pub use stream_xml::XmlStreamLimits;
 pub use writer::{
     PackageCompression, PackageWriter, PackageWriterError, PackageWriterLimitExceeded,
     PackageWriterLimitResource, PackageWriterLimits, PackageWriterResult, Structure,

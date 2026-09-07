@@ -1,0 +1,267 @@
+{
+  "allocation": {
+    "reason": "ordinary allocator counters were not collected and allocator variables were not tuned",
+    "status": "unavailable"
+  },
+  "allocator_environment": {},
+  "artifacts": {
+    "catalog": {
+      "bytes": 4951,
+      "path": "runs/candidate-large/catalog.json",
+      "sha256": "9812408ecb52dc2713ea96068c1872ac0524614f5c948350d34c8ccfa78fad84"
+    },
+    "oracle": {
+      "bytes": 336,
+      "path": "runs/candidate-large/oracle.log",
+      "sha256": "0b88d8e08f1705c6e0306f4625541d474c32ad94e08b03c05093470f359ff78a"
+    },
+    "perf_data": {
+      "bytes": 14479128,
+      "path": "runs/candidate-large/perf.data",
+      "sha256": "8ed8c04726ad3e4099f44cf2b2831ebe346e1180a4b4c6e77ef5556d8d4829bc"
+    },
+    "perf_help_stderr": {
+      "bytes": 469,
+      "path": "runs/candidate-large/perf-help.stderr",
+      "sha256": "0d0fb5d56368819238f62b804bd641c11bf1529d330f1cb18f5a72155ab4164a"
+    },
+    "perf_help_stdout": {
+      "bytes": 0,
+      "path": "runs/candidate-large/perf-help.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf_record_stderr": {
+      "bytes": 200,
+      "path": "runs/candidate-large/perf-record.stderr",
+      "sha256": "5defaa67d73c4db6f379d32925a76274fa1afcdbb6ab5219cbe7713f5121951f"
+    },
+    "perf_record_stdout": {
+      "bytes": 0,
+      "path": "runs/candidate-large/perf-record.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf_script": {
+      "bytes": 438011,
+      "path": "runs/candidate-large/perf-script.txt",
+      "sha256": "4035e970ee1837ad54c651fae5a7d23ef6c20be8945341859a734e8706ad9a81"
+    },
+    "perf_script_stderr": {
+      "bytes": 0,
+      "path": "runs/candidate-large/perf-script.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "report": {
+      "bytes": 116368,
+      "path": "runs/candidate-large/report.json",
+      "sha256": "2e6d232f33e4fa30f2678f1449168b57d290ad11645deb63ff4cc946965a6cf8"
+    },
+    "resource": {
+      "bytes": 1301,
+      "path": "runs/candidate-large/resource.log",
+      "sha256": "9d5b67dac56d5897003333cf9d452d6f7b41be3fd90d1671124ca6fa46de83f7"
+    },
+    "stacks_folded": {
+      "bytes": 216729,
+      "path": "runs/candidate-large/stacks.folded",
+      "sha256": "1c92ac4939bbfc938c3f901e048edf2465ca054a63f00f045f42e137081d6f4b"
+    },
+    "top_symbols": {
+      "bytes": 17132,
+      "path": "runs/candidate-large/top-symbols.txt",
+      "sha256": "b7e894ac13a1094d0cb892f4d58f87dd5b044a1ddff01611fa33361c757b3296"
+    },
+    "top_symbols_stderr": {
+      "bytes": 0,
+      "path": "runs/candidate-large/top-symbols.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "bytes": 58035160,
+    "copy_path": "/tmp/litchi-goal-0457/candidate/litchi-perf-baseline",
+    "executable": true,
+    "profile": "release",
+    "sha256": "ea02082d6da1ed46c72876c441f952588618cad1af6e627bb6ad9174a12370bd",
+    "source_path": "tools/perf-baseline/target/release/litchi-perf-baseline"
+  },
+  "bound_files": {
+    "binary_binding": {
+      "path": "candidate/binary-bindings.json",
+      "sha256": "555e2c4b685e4686b3fe4e3efbbcaeb560e1dcfb5296eb52547ea4bd26cd825c"
+    },
+    "build_receipt": {
+      "path": "candidate/build-receipt.json",
+      "sha256": "756814f2a77bcc4ba86377a028dd8b899126cc9bb02ac2ddd3a1e2a79c33b92e"
+    },
+    "source_manifest": {
+      "path": "candidate/source-manifest.json",
+      "sha256": "8eff4cebced4d8831ed987b6cfb8ecb905caa296acdd590236c5c4e3c82ae4d4"
+    },
+    "workload_protocol": {
+      "path": "candidate/protocol.json",
+      "sha256": "f033f5c015343cd85589f62a2122cc4e7ab42f8b78c4f72fbcc521adc9c4d1e0"
+    }
+  },
+  "call_graph": {
+    "dwarf_advertised": true,
+    "probe_exit_code": 129,
+    "requested": "dwarf,8192",
+    "selected": "dwarf,8192"
+  },
+  "change": 457,
+  "check_tag": "profile-candidate-large-r2",
+  "commands": {
+    "call_graph_probe": [
+      "perf",
+      "record",
+      "--call-graph",
+      "help"
+    ],
+    "flat_report": [
+      "perf",
+      "report",
+      "--stdio",
+      "--no-inline",
+      "--no-children",
+      "--call-graph",
+      "none",
+      "--percent-limit",
+      "0",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/candidate-large/perf.data"
+    ],
+    "oracle": [
+      "/usr/bin/python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate/oracle/verify-report.py",
+      "--report",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/candidate-large/report.json",
+      "--mode",
+      "normal",
+      "--shape",
+      "large",
+      "--samples",
+      "100",
+      "--warmups",
+      "3"
+    ],
+    "record": [
+      "taskset",
+      "-c",
+      "2",
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/candidate-large/resource.log",
+      "perf",
+      "record",
+      "--no-buildid-cache",
+      "-F",
+      "99",
+      "-e",
+      "cycles:u",
+      "--call-graph",
+      "dwarf,8192",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/candidate-large/perf.data",
+      "--",
+      "/tmp/litchi-goal-0457/candidate/litchi-perf-baseline",
+      "--case",
+      "odp_source_tail_append_lifecycle",
+      "--semantic-shape",
+      "large",
+      "--workers",
+      "1",
+      "--samples",
+      "100",
+      "--warmup",
+      "3",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/candidate-large/report.json",
+      "--corpus-manifest",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/candidate-large/catalog.json"
+    ],
+    "script": [
+      "perf",
+      "script",
+      "--no-inline",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/profiling/r2/runs/candidate-large/perf.data"
+    ]
+  },
+  "counters": {
+    "reason": "sampled cycles:u profile only; perf stat counters were not collected",
+    "status": "unavailable"
+  },
+  "custody_wrapper_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+  "failures": [],
+  "finished_utc": "2026-09-07T13:12:11.608337+00:00",
+  "label": "candidate-large-normal",
+  "oracle_exit_code": 0,
+  "postprocess": {
+    "flat_report_exit_code": 0,
+    "folded": {
+      "malformed_blocks": 0,
+      "parsed_blocks": 1657,
+      "total_period": 73099227037,
+      "unique_stacks": 1041
+    },
+    "script_exit_code": 0
+  },
+  "protocol_sha256": "21f1b3e9d227e09d8bd2c6b7bb2340d90d69a543a486a3378524cff0d640f0ac",
+  "r1_provenance": {
+    "ambient_source_epoch": {
+      "files": 7027,
+      "path": "sources/faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422.json",
+      "sha256": "faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422"
+    },
+    "amendment": "r2",
+    "bound_source": {
+      "files": 7023,
+      "path": "sources/8eff4cebced4d8831ed987b6cfb8ecb905caa296acdd590236c5c4e3c82ae4d4.json",
+      "sha256": "8eff4cebced4d8831ed987b6cfb8ecb905caa296acdd590236c5c4e3c82ae4d4"
+    },
+    "candidate_ambient_exclusions": [
+      {
+        "path": "docs/performance/results/change-0457/fuzz/artifacts/pre-run/xml/source/Cargo.toml",
+        "sha256": "9bdd11a2594f9d046359b4df8ce6430e793b1616890aaafafb1d72937f625aae"
+      },
+      {
+        "path": "docs/performance/results/change-0457/fuzz/artifacts/pre-run/xml/source/scan_xml.rs",
+        "sha256": "1faf58709a267ebb8972d81342cdb0421c26e684a0ba44da793b2fac7847aba1"
+      },
+      {
+        "path": "docs/performance/results/change-0457/fuzz/artifacts/pre-run/zip/source/Cargo.toml",
+        "sha256": "a6b3701d83415bd0b574f60391c15ed710271f2df7d913fdcec8ee3d5521d1e6"
+      },
+      {
+        "path": "docs/performance/results/change-0457/fuzz/artifacts/pre-run/zip/source/parse_zip.rs",
+        "sha256": "3c0a99513cfca93486493140caec770c19557792b5b26bd565ff110c834511ae"
+      }
+    ],
+    "control_ambient_comparison": null,
+    "source_policy": "candidate bound production subset equals current ambient source after the explicitly archived fuzz inputs are excluded"
+  },
+  "record_exit_code": 0,
+  "role": "candidate",
+  "rss": {
+    "scope": "perf-recorded process tree, including profiler overhead",
+    "source": "GNU /usr/bin/time -v Maximum resident set size (kbytes) in resource.log",
+    "status": "retained"
+  },
+  "runner_sha256": "4a658eb52ef9d777c191a68c081efb3af11cef2064bfe297150d6e67f7a6d5f4",
+  "schema": "litchi-0457-large-profile-receipt-v1",
+  "source_after": {
+    "files": 7027,
+    "path": "sources/faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422.json",
+    "sha256": "faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422"
+  },
+  "source_before": {
+    "files": 7027,
+    "path": "sources/faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422.json",
+    "sha256": "faf4ff3d2bb85719c564b91679354d117b2e7f5197357dff131c3a2bd3b8d422"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-07T13:11:53.773156+00:00",
+  "status": "pass"
+}

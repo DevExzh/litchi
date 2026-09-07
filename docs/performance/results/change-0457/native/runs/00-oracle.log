@@ -1,0 +1,135 @@
+{
+  "content": {
+    "exact_source_prefix_verified": true,
+    "exact_source_suffix_verified": true,
+    "generated_page": {
+      "name": "page4",
+      "roles": [
+        {
+          "role": "title",
+          "text_bytes": 26
+        },
+        {
+          "role": "object",
+          "text_bytes": 19
+        }
+      ]
+    },
+    "generated_page_sha256": "f83cd1fa0474105c77cb607a7ba25f0c6f8ff1d9dfa168c38a38b4ce6cf50d7c",
+    "one_extra_direct_draw_page_verified": true,
+    "output_content_xml_bytes": 17230,
+    "output_content_xml_sha256": "025d9326917cf7c0d9fc917684df3ec9fc719fecfc1fc01beb0228bccc322e33",
+    "output_generated_page_end_byte": 17111,
+    "output_generated_page_start_byte": 16407,
+    "output_page_count": 4,
+    "output_page_names": [
+      "page1",
+      "page2",
+      "page3",
+      "page4"
+    ],
+    "source_content_xml_bytes": 16526,
+    "source_content_xml_sha256": "292b6a7e1508dbcfddf80cfaf9c6fdbc5d72af6ec5dce00ea38557fb75633e0e",
+    "source_last_page_end_byte": 16407,
+    "source_leading_direct_children": [
+      "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0}header-decl",
+      "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0}date-time-decl",
+      "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0}footer-decl",
+      "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0}header-decl",
+      "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0}date-time-decl",
+      "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0}footer-decl"
+    ],
+    "source_page_count": 3,
+    "source_page_names": [
+      "page1",
+      "page2",
+      "page3"
+    ],
+    "source_pages_contiguous": true,
+    "source_prefix_sha256": "ead94b21e375c9d3d868a4a2744983849d704f679ebe5de6c715af4a1f01134e",
+    "source_suffix_sha256": "f09756712b92d2f95bfe22dd73b986c26989d4fd2582a92c3918dda5734ccd2b",
+    "source_trailing_direct_children": [
+      "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0}settings"
+    ]
+  },
+  "output": {
+    "bytes": 12711,
+    "path": "/tmp/litchi-goal-0457/native/00.odp",
+    "sha256": "adee86fc02f843e65aa71d546ccdfe139369ed14f4c540e5026a6b9299f0b64a"
+  },
+  "output_archive_sha256": "adee86fc02f843e65aa71d546ccdfe139369ed14f4c540e5026a6b9299f0b64a",
+  "request": {
+    "body": "Native body Ω 😀",
+    "name": "page4",
+    "title": "Native title & <字> café"
+  },
+  "schema": "litchi-0457-native-odp-append-oracle-v1",
+  "source": {
+    "bytes": 12568,
+    "inventory_binding": {
+      "bytes": 12568,
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf169979.odp",
+      "sha256": "160908f993c6ba901233695b12d34c4b009142971b36dcd57c0549bf8ee5656b",
+      "static_only": true
+    },
+    "path": "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf169979.odp",
+    "sha256": "160908f993c6ba901233695b12d34c4b009142971b36dcd57c0549bf8ee5656b"
+  },
+  "source_archive_sha256": "160908f993c6ba901233695b12d34c4b009142971b36dcd57c0549bf8ee5656b",
+  "source_hash_verified": true,
+  "static_only_classification": "independent ZIP/XML append oracle; no native application or semantic Rust reopen claim",
+  "status": "validated",
+  "zip": {
+    "archive_comment_verified": true,
+    "central_member_order_verified": true,
+    "local_member_order_verified": true,
+    "target_dynamic_central_fields": {
+      "output_compressed_size": 2286,
+      "output_crc32": 2188171882,
+      "output_date": 0,
+      "output_flags": 0,
+      "output_time": 0,
+      "output_uncompressed_size": 17230,
+      "source_compressed_size": 2143,
+      "source_crc32": 172844710,
+      "source_uncompressed_size": 16526
+    },
+    "target_local_central_self_consistent": true,
+    "target_member": "content.xml",
+    "target_output_compression_method": 8,
+    "target_output_dynamic_sizes": {
+      "compressed_size": 2286,
+      "crc32": 2188171882,
+      "uncompressed_size": 17230
+    },
+    "target_source_compression_method": 8,
+    "untouched_member_count": 7,
+    "untouched_members_central_records_offset_only_verified": [
+      "mimetype",
+      "META-INF/manifest.xml",
+      "styles.xml",
+      "settings.xml",
+      "meta.xml",
+      "Configurations2/accelerator/current.xml",
+      "OleobjectM2230000"
+    ],
+    "untouched_members_compressed_payload_verified": [
+      "mimetype",
+      "META-INF/manifest.xml",
+      "styles.xml",
+      "settings.xml",
+      "meta.xml",
+      "Configurations2/accelerator/current.xml",
+      "OleobjectM2230000"
+    ],
+    "untouched_members_raw_local_spans_verified": [
+      "mimetype",
+      "META-INF/manifest.xml",
+      "styles.xml",
+      "settings.xml",
+      "meta.xml",
+      "Configurations2/accelerator/current.xml",
+      "OleobjectM2230000"
+    ]
+  }
+}

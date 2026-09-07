@@ -18,6 +18,15 @@ use std::io::Write;
 use std::ops::Range;
 use std::sync::Arc;
 
+mod replay;
+#[cfg(test)]
+mod replay_tests;
+
+pub use replay::{
+    ReplayLimits, ReplayMeasurement, ReplayPass, ReplayProgress, ReplayPublicationError,
+    ReplayResource,
+};
+
 const COPY_CHUNK_SIZE: usize = 64 * 1024;
 const CENTRAL_LOCAL_HEADER_OFFSET: Range<usize> = 42..46;
 const ZIP64_LOCATOR_SIZE: usize = 20;
@@ -1091,6 +1100,7 @@ where
         Ok(OutputLayout {
             central_patches,
             tail,
+            output_size,
         })
     }
 }
@@ -1121,6 +1131,7 @@ enum PreparedTail {
 struct OutputLayout {
     central_patches: Vec<CentralOffsetPatch>,
     tail: PreparedTail,
+    output_size: u64,
 }
 
 fn write_prepared_central<W: Write>(
@@ -1820,6 +1831,12 @@ enum PreparedLocal {
         payload: PreparedPayload,
         range: Range<usize>,
     },
+    /// Sized local framing for a replayable generated member. The logical
+    /// payload is emitted by the replay callback after layout preflight.
+    Replay {
+        framing: Vec<u8>,
+        compressed_len: u64,
+    },
 }
 
 enum PreparedPayload {
@@ -1874,6 +1891,12 @@ impl PreparedLocal {
                     )?)
                     .ok_or_else(|| unsupported("generated local length overflow"))
             },
+            Self::Replay {
+                framing,
+                compressed_len,
+            } => usize_to_u64(framing.len(), "generated replay local framing")?
+                .checked_add(*compressed_len)
+                .ok_or_else(|| unsupported("generated replay local length overflow")),
         }
     }
 }
@@ -1927,6 +1950,10 @@ fn validate_prepared_local(entry: &PreparedEntry, source_end: u64) -> Result<(),
         },
         (PreparedLocal::FramedPayload { .. }, None) => {
             Err(unsupported("generated payload metadata missing"))
+        },
+        (PreparedLocal::Replay { .. }, None) => Ok(()),
+        (PreparedLocal::Replay { .. }, Some(_)) => {
+            Err(unsupported("generated payload metadata on replay member"))
         },
         (PreparedLocal::Copy(_), Some(_)) => Err(unsupported("generated payload on copied member")),
         (PreparedLocal::Generated(_), Some(_)) => {
@@ -2271,6 +2298,9 @@ where
                 generated.kind,
             )?;
             Ok(())
+        },
+        (PreparedLocal::Replay { .. }, _) => {
+            Err(unsupported("replay local requires replay publication"))
         },
         (PreparedLocal::FramedPayload { .. }, None)
         | (PreparedLocal::Copy(_), Some(_))

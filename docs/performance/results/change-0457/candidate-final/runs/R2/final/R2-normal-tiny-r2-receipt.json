@@ -1,0 +1,112 @@
+{
+  "allocator_environment": {},
+  "allocator_environment_after": {},
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R2/final/R2-normal-tiny-r2-resource.log",
+    "/tmp/litchi-goal-0457/candidate-final/litchi-perf-baseline",
+    "--case",
+    "odp_source_tail_append_lifecycle",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R2/final/R2-normal-tiny-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R2/final/R2-normal-tiny-r2-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4927,
+      "path": "runs/R2/final/R2-normal-tiny-r2-catalog.json",
+      "sha256": "0f4c0d0cf899265795b7c03e9f6ff9ab4e6c9f764bfcd6344d4a605453468db0"
+    },
+    "oracle_log": {
+      "bytes": 324,
+      "path": "runs/R2/final/R2-normal-tiny-r2-oracle.log",
+      "sha256": "35f1a634c106f201148e24af8fc1113e7d9779c71a9c74c51683ba267ca8f560"
+    },
+    "report": {
+      "bytes": 53811,
+      "path": "runs/R2/final/R2-normal-tiny-r2.json",
+      "sha256": "2cc159eca2a3a0d2259c395e6decb655a307156fa5a03228056dd12b522e8a2f"
+    },
+    "resource_log": {
+      "bytes": 1136,
+      "path": "runs/R2/final/R2-normal-tiny-r2-resource.log",
+      "sha256": "1d510a59b22854de141350502abd70bac9cae6fa662480c25054d704ead786ae"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/R2/final/R2-normal-tiny-r2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "final",
+  "binary": {
+    "bytes": 58037952,
+    "copy_path": "/tmp/litchi-goal-0457/candidate-final/litchi-perf-baseline",
+    "executable": true,
+    "profile": "release",
+    "sha256": "3c8b2503ab692838cd5f36ad72fc1a3afce49e9b0411f4d9db0d7095ded34a52",
+    "source_path": "tools/perf-baseline/target/release/litchi-perf-baseline"
+  },
+  "binary_binding_sha256": "34dfe25667c8ebb4233412778165e3aa931146b3ee5cef46bcbde57c6122bd6d",
+  "change": 457,
+  "custody_driver": "/home/zhuhe/code/litchi/docs/performance/results/change-0457/check.py",
+  "custody_driver_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "609a705bf61c8863e6e526d51d6571b89e12d101fb535002819865479412e614",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T13:38:53.687270+00:00",
+  "lane": {
+    "mode": "normal",
+    "phase": "R2",
+    "repeat": "R2",
+    "shape": "tiny"
+  },
+  "name": "R2-normal-tiny-r2",
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/oracle/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R2/final/R2-normal-tiny-r2.json",
+    "--mode",
+    "normal",
+    "--shape",
+    "tiny"
+  ],
+  "oracle_exit_code": 0,
+  "oracle_stdout_sha256": "35f1a634c106f201148e24af8fc1113e7d9779c71a9c74c51683ba267ca8f560",
+  "output_binding_sha256": "b6ffcd0b6e4ceb1e04eb00c480f44932f9e4648124e7daa9aac9cdc9bbf3a7c3",
+  "phase": "R2",
+  "protocol_sha256": "d8e1d48aacf76337529dd76ee1bfc021ac91d52a02f71d7327ab0e8c118169f7",
+  "revision": "48f11c7745f8f798a00e11a14f1f34dc1c9c7954",
+  "role": "candidate",
+  "schema": "litchi-0457-source-tail-candidate-capture-receipt-v1",
+  "selector": "odp_source_tail_append_lifecycle",
+  "source_after": {
+    "files": 7027,
+    "path": "sources/02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8.json",
+    "sha256": "02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8"
+  },
+  "source_before": {
+    "files": 7027,
+    "path": "sources/02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8.json",
+    "sha256": "02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-07T13:38:53.478369+00:00",
+  "status": "pass"
+}

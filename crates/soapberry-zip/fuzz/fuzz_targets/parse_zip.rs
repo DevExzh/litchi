@@ -7,7 +7,7 @@ use libfuzzer_sys::fuzz_target;
 use soapberry_zip::office::{ArchiveLimits, ArchiveReader, IndexedArchive};
 use soapberry_zip::{
     CompressionMethod, ErrorKind, PreservationPlan, RECOMMENDED_BUFFER_SIZE, ReaderAt,
-    RegeneratedEntry, ZipArchive, ZipOperationAccounting,
+    RegeneratedEntry, ReplayLimits, ZipArchive, ZipOperationAccounting,
 };
 
 const MAX_INPUT_BYTES: usize = 1 << 20;
@@ -19,6 +19,7 @@ const MAX_PRECOMPRESSED_PROGRESS_EVENTS: usize = 8;
 const MAX_REPUBLISHED_OUTPUT_BYTES: usize = 3 * MAX_INPUT_BYTES;
 const MAX_REPUBLISHED_WRITE_CHUNK: usize = 4096;
 const REPUBLISHED_MEMBER_NAME: &str = "__fuzz_precompressed_member__";
+const MAX_REPLAY_PAYLOAD_BYTES: usize = 4096;
 
 /// A forward-only sink with both a finite output ceiling and optional failure
 /// point.  The fuzz target must not let a valid source turn into an
@@ -418,6 +419,92 @@ fn exercise_fused_precompressed<R: ReaderAt>(
     }
 }
 
+fn exercise_replay<R: ReaderAt>(archive: &IndexedArchive<R>, data: &[u8]) {
+    let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
+    let Ok(index) = archive.preservation_index(&mut scratch) else {
+        return;
+    };
+    let Some(target) = index.entries().iter().find(|entry| {
+        std::str::from_utf8(entry.raw_name_bytes()).is_ok_and(|name| !name.ends_with('/'))
+    }) else {
+        return;
+    };
+    let name = std::str::from_utf8(target.raw_name_bytes()).expect("selected UTF-8 member");
+    let payload = &data[..data.len().min(MAX_REPLAY_PAYLOAD_BYTES)];
+    let method = if data.len() & 1 != 0 {
+        CompressionMethod::Store
+    } else {
+        CompressionMethod::Deflate
+    };
+    let limits = ReplayLimits::new(
+        MAX_REPLAY_PAYLOAD_BYTES as u64,
+        (MAX_REPLAY_PAYLOAD_BYTES * 2) as u64,
+        MAX_REPUBLISHED_OUTPUT_BYTES as u64,
+    )
+    .expect("finite fuzz replay limits");
+    let mut sink = BoundedSink::new(MAX_REPUBLISHED_OUTPUT_BYTES, 37, None);
+    let mut calls = 0;
+    let result = index.write_replacing_with_replay(target.id(), method, limits, &mut sink, |out| {
+        calls += 1;
+        // Logical identity must not depend on producer write boundaries.
+        let chunk = if calls == 1 { 127 } else { 31 };
+        for bytes in payload.chunks(chunk) {
+            out.write_all(bytes)?;
+        }
+        Ok::<_, io::Error>(())
+    });
+    if result.is_err() {
+        // Unsupported source names/layouts remain a permitted typed refusal.
+        // Stable bounded input and an accepting sink cannot justify a replay
+        // failure after publication has begun.
+        assert!(
+            sink.bytes.is_empty(),
+            "stable replay failed after writing output"
+        );
+        return;
+    }
+    assert_eq!(calls, 2);
+    let output = sink.bytes;
+    let mut output_limits = fuzz_limits();
+    output_limits.max_total_size += MAX_REPLAY_PAYLOAD_BYTES as u64;
+    let reopened = ArchiveReader::new_with_limits(&output, output_limits)
+        .expect("successful bounded replay must have readable metadata");
+    assert_eq!(
+        reopened.read(name).expect("replayed member verifies"),
+        payload
+    );
+
+    let fail_after = output.len() / 2;
+    let mut partial = BoundedSink::new(MAX_REPUBLISHED_OUTPUT_BYTES, 19, Some(fail_after));
+    let error = index
+        .write_replacing_with_replay(target.id(), method, limits, &mut partial, |out| {
+            out.write_all(payload)
+        })
+        .expect_err("replay sink must fail at its accepted prefix");
+    assert_eq!(partial.bytes, output[..fail_after]);
+    assert_eq!(error.progress().accepted(), fail_after as u64);
+
+    if !payload.is_empty() {
+        let mut drift = BoundedSink::new(MAX_REPUBLISHED_OUTPUT_BYTES, 53, None);
+        let mut pass = 0;
+        let result =
+            index.write_replacing_with_replay(target.id(), method, limits, &mut drift, |out| {
+                pass += 1;
+                let first = if pass == 1 {
+                    payload[0]
+                } else {
+                    payload[0] ^ 1
+                };
+                out.write_all(&[first])?;
+                out.write_all(&payload[1..])
+            });
+        assert!(
+            result.is_err(),
+            "changed replay must never publish successfully"
+        );
+    }
+}
+
 fn exercise_bounded_paths(data: &[u8]) {
     let limits = fuzz_limits();
     let borrowed = ArchiveReader::new_with_limits(data, limits);
@@ -435,6 +522,7 @@ fn exercise_bounded_paths(data: &[u8]) {
     // successful results keeps this target sensitive to drift between the
     // contiguous borrowed source and the positional ReaderAt source.
     if let (Ok(reader), Ok(archive)) = (&borrowed, &reader_at) {
+        exercise_replay(archive, data);
         exercise_fused_precompressed(archive, reader);
         exercise_precompressed(archive, reader, limits);
         for name in reader.file_names() {

@@ -1,0 +1,113 @@
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+error: the `Err`-variant returned from this function is very large
+   --> crates/soapberry-zip/src/preserve/replay.rs:343:10
+    |
+222 | /     NonDeterministic {
+223 | |         expected: ReplayMeasurement,
+224 | |         actual: ReplayMeasurement,
+225 | |         progress: ReplayProgress,
+226 | |     },
+    | |_____- the largest variant contains at least 192 bytes
+...
+343 |       ) -> Result<W, ReplayPublicationError<E>>
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try reducing the size of `preserve::replay::ReplayPublicationError<E>`, for example by boxing large elements or replacing it with `Box<preserve::replay::ReplayPublicationError<E>>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+    = note: `-D clippy::result-large-err` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::result_large_err)]`
+
+error: the `Err`-variant returned from this function is very large
+   --> crates/soapberry-zip/src/preserve/replay.rs:369:10
+    |
+222 | /     NonDeterministic {
+223 | |         expected: ReplayMeasurement,
+224 | |         actual: ReplayMeasurement,
+225 | |         progress: ReplayProgress,
+226 | |     },
+    | |_____- the largest variant contains at least 192 bytes
+...
+369 |       ) -> Result<W, ReplayPublicationError<E>>
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try reducing the size of `preserve::replay::ReplayPublicationError<E>`, for example by boxing large elements or replacing it with `Box<preserve::replay::ReplayPublicationError<E>>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: this `match` expression can be replaced with `?`
+   --> crates/soapberry-zip/src/preserve/replay.rs:429:27
+    |
+429 |           let measurement = match measure_callback(&mut callback, compression, limits) {
+    |  ___________________________^
+430 | |             Ok(measurement) => measurement,
+431 | |             Err(error) => return Err(error),
+432 | |         };
+    | |_________^ help: try instead: `measure_callback(&mut callback, compression, limits)?`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#question_mark
+    = note: `-D clippy::question-mark` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::question_mark)]`
+
+error: this `match` expression can be replaced with `?`
+   --> crates/soapberry-zip/src/preserve/replay.rs:498:30
+    |
+498 |                   let actual = match emit_callback(
+    |  ______________________________^
+499 | |                     &mut callback,
+500 | |                     compression,
+501 | |                     limits,
+...   |
+506 | |                     Err(error) => return Err(error),
+507 | |                 };
+    | |_________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#question_mark
+help: try instead
+    |
+498 ~                 let actual = emit_callback(
+499 +                     &mut callback,
+500 +                     compression,
+501 +                     limits,
+502 +                     &mut sink,
+503 +                     accounting,
+504 ~                 )?;
+    |
+
+error: the `Err`-variant returned from this function is very large
+   --> crates/soapberry-zip/src/preserve/replay.rs:635:6
+    |
+222 | /     NonDeterministic {
+223 | |         expected: ReplayMeasurement,
+224 | |         actual: ReplayMeasurement,
+225 | |         progress: ReplayProgress,
+226 | |     },
+    | |_____- the largest variant contains at least 192 bytes
+...
+635 |   ) -> Result<ReplayMeasurement, ReplayPublicationError<E>>
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try reducing the size of `preserve::replay::ReplayPublicationError<E>`, for example by boxing large elements or replacing it with `Box<preserve::replay::ReplayPublicationError<E>>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: the `Err`-variant returned from this function is very large
+   --> crates/soapberry-zip/src/preserve/replay.rs:661:6
+    |
+222 | /     NonDeterministic {
+223 | |         expected: ReplayMeasurement,
+224 | |         actual: ReplayMeasurement,
+225 | |         progress: ReplayProgress,
+226 | |     },
+    | |_____- the largest variant contains at least 192 bytes
+...
+661 |   ) -> Result<ReplayMeasurement, ReplayPublicationError<E>>
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try reducing the size of `preserve::replay::ReplayPublicationError<E>`, for example by boxing large elements or replacing it with `Box<preserve::replay::ReplayPublicationError<E>>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#result_large_err
+
+error: could not compile `soapberry-zip` (lib) due to 6 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `soapberry-zip` (lib) due to 6 previous errors
+error: could not compile `soapberry-zip` (lib test) due to 6 previous errors

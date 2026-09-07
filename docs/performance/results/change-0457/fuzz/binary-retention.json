@@ -1,0 +1,42 @@
+{
+  "schema": "litchi-0457-fuzz-binary-retention-v1",
+  "original_inventory": {
+    "path": "artifacts/post-run/inventory.json",
+    "bytes": 2739,
+    "sha256": "00131bd0f9e6747ff81c25504d8d1f54db1690b7c49916c396c001099564c1ad"
+  },
+  "driver": {
+    "path": "retain-binaries.py",
+    "bytes": 2771,
+    "sha256": "ba1202aeeeff0d65601626497d0ebe7169fbefd4794ebe08478aabc3fb04211b"
+  },
+  "records": [
+    {
+      "original": {
+        "path": "zip/parse_zip",
+        "bytes": 23226512,
+        "sha256": "7e93608293e7c6be739c6ea62284e6800935b7fe5e2c25fd7540fba18c94f48e"
+      },
+      "retained": {
+        "path": "zip/parse_zip.gz",
+        "bytes": 6502115,
+        "sha256": "950a37fe3efa1f99a7f10d8c17dbb18b4f86d07ba4849f7f32ec0b34c5287590"
+      },
+      "encoding": "gzip"
+    },
+    {
+      "original": {
+        "path": "xml/scan_xml",
+        "bytes": 51801704,
+        "sha256": "95050b64489f7fcd651b6ff9e5d9e7de029ed4e703fb4eab0c85b4152a817b99"
+      },
+      "retained": {
+        "path": "xml/scan_xml.gz",
+        "bytes": 11656721,
+        "sha256": "762a00923b29761d9f354025996775546959b638b187f56b1afc7035e973ca53"
+      },
+      "encoding": "gzip"
+    }
+  ],
+  "scope": "lossless storage transformation; original capture inventory unchanged; shared target cache preserved"
+}

@@ -1,0 +1,56 @@
+{
+  "fixture": "3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/2slides.odp",
+  "source_sha256": "9c81dff29ada5e2c3a6631d6f24167d9a41a9eb7d3b76caeed4bfc4af5b3aee9",
+  "argv": [
+    "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+    "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/2slides.odp",
+    "/tmp/litchi-goal-0457/native-final/05.odp",
+    "Native title & <字> café",
+    "Native body Ω 😀"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-09-07T13:37:26.747447+00:00",
+  "exit_code": 0,
+  "log": "05-probe.log",
+  "log_sha256": "973ae964c9337118d80f140e319ea24f2ed130dc4d73d6992951e9e210ac253e",
+  "title": "Native title & <字> café",
+  "body": "Native body Ω 😀",
+  "retained_source": {
+    "path": "05-source.odp.gz",
+    "bytes": 9502,
+    "sha256": "682ad1a10f1f42e9a92806cfe3aba1eb5b129c8820846b20779b3db70bafe2eb",
+    "decoded_bytes": 10984,
+    "decoded_sha256": "9c81dff29ada5e2c3a6631d6f24167d9a41a9eb7d3b76caeed4bfc4af5b3aee9"
+  },
+  "output": {
+    "path": "/tmp/litchi-goal-0457/native-final/05.odp",
+    "bytes": 11076,
+    "sha256": "aac013018e664f88b6eda455cfae8192c383e1f49d17563e7ffc2fdeef6d9672"
+  },
+  "retained_output": {
+    "path": "05-output.odp.gz",
+    "bytes": 9618,
+    "sha256": "bad4c25fe61e12fe328e691cf88835fe6e4f564734beed2ec207b67e85d52763",
+    "decoded_bytes": 11076,
+    "decoded_sha256": "aac013018e664f88b6eda455cfae8192c383e1f49d17563e7ffc2fdeef6d9672"
+  },
+  "oracle": {
+    "argv": [
+      "python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+      "--source",
+      "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/2slides.odp",
+      "--output",
+      "/tmp/litchi-goal-0457/native-final/05.odp",
+      "--title",
+      "Native title & <字> café",
+      "--body",
+      "Native body Ω 😀"
+    ],
+    "exit_code": 0,
+    "log": "05-oracle.log",
+    "sha256": "fda27d7c16511bc14230afbdd1c68e0e17fdcda75d685d27e334853783055b2c"
+  },
+  "status": "validated"
+}

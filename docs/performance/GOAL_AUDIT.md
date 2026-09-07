@@ -1,5 +1,66 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0457 evidence (2026-09-07)
+
+The full non-iWork goal remains open, but the bounded existing-ODP evidence
+now has a formal current-revision ordinary control. The
+`odp_existing_append_lifecycle` baseline retains two repeats, normal and
+allocator lanes, 64/4,096/8,192 source slides, three warmups and 30 samples
+per lane (360 samples across 12 reports); the final candidate summary retains
+the same 360-sample, 12-report matrix. The paired
+`odp_source_tail_append_lifecycle` path validates bounded source XML and
+replays the changed ZIP member through a sequential sink. It is a specialized
+publication plan with a different retained-result contract and does not
+integrate the ordinary `edit::Snapshot`/`edit::Transaction`/`edit::Patch`/
+`edit::Commit` lifecycle. Those owned ordinary APIs are implemented; source-tail
+integration with them is the remaining gap.
+
+Normal p50 candidate-minus-control deltas are -33.352% / -33.185% for the
+64-slide shape, +3.262% / -2.461% for 4,096 slides, and -1.940% / -4.221% for
+8,192 slides in R1/R2. The allocator evidence reports control versus
+source-tail regional peak above entry of 781,342 vs 620,381 bytes (tiny),
+18,027,568 vs 620,385 (medium), and 35,958,388 vs 620,385 (large). Allocated
+bytes are 10,613,383 vs 2,607,922, 110,226,105 vs 36,593,937, and 211,442,207
+vs 71,164,177. These are operation-scoped allocator observations; source and
+fixture ownership at entry are excluded, and candidate allocation volume
+continues to grow with document size.
+
+The comparison receipt explicitly withholds ordinary Commit/Patch speedup or
+regression, general CRUD or retained-result equivalence, causal, bounded-memory,
+scaling, cancellation and physical-I/O claims. R1 normal tiny is +8.301% and
+R2 normal tiny is +6.517%; allocator tiny is +10.184% in R1, while allocator
+large is -5.113% / -5.740% in R1/R2. The remaining process-peak rows are
+within the five-percent threshold. The final identity-bound set has ten native
+records and three synthetic source/output pairs passing the independent ZIP/XML
+oracle, with no Office application launch. ZIP, ODF-common and ODP suites pass
+1,348 tests with three ignored (ODF-common 499, ZIP 481, and ODP 368); the
+harness passes 383 with one ignored, OPC passes 497 with one ignored, both
+ZIP/XML sanitizer fuzz lanes retain 1,000 runs, and candidate derivation and
+comparison receipts pass. Initial pre-fix large-normal profiles retain 1,000 sampled
+`cycles:u` observations: candidate SHA-256 compression is 11.00%, XML
+`validate_name` 9.08%, `memcmp` 6.01% and `validate_start_element` 5.42%;
+control `memcmp` is 9.67%, Quick-XML attribute iteration 6.00%, `memmove`
+5.76% and namespace-prefix resolution 5.24%. These are whole-process sampled
+stacks, not API-attributed CPU percentages or causal hotspots, and no hard
+counter totals were collected. These whole-process samples remain initial
+pre-fix diagnostics, not final candidate attribution; no sampling profile was
+captured for the final candidate epoch. Candidate profile checking passes for
+this initial capture; the unchanged control report/raw profile passes the
+existing amended oracle after the original frame-pointer expectation failed.
+
+The source mapping verifies 439 selectable selectors and 36 defaults. The
+coverage index keeps 15 categories, 33 representative mappings, 10 measured
+mappings and 23 correctness-only mappings; its ODP append row remains
+correctness-only because generated-per-run 0457 corpora do not satisfy the
+index's checked-catalog/default measured-status contract. The ordinary control
+is nevertheless recorded as the formal baseline in the 0457 evidence and
+reports. The [final source read review](results/change-0457/final-code-review.md)
+records the retained-fragment lease fix as resolved and found no additional
+verified blocker. The sealed batch passes precleanup, portable-copy replay,
+and three altered-copy rejection checks. Owned temporary artifacts are removed
+with a retained inventory; see the [bundle](results/change-0457/README.md). See the [final candidate summary](results/change-0457/candidate-final/summary.json)
+and [final comparison](results/change-0457/comparison-final.json).
+
 ## Current audit: 0456 evidence (2026-09-07)
 
 The full non-iWork goal remains open. [0456](changes/0456-zip-shared-payload-framing.md)

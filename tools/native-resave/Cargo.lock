@@ -1001,7 +1001,6 @@ dependencies = [
  "litchi-drawingml",
  "litchi-ooxml-common",
  "litchi-opc",
- "memchr",
  "quick-xml",
  "serde_json",
  "sha2 0.11.0",
@@ -1064,6 +1063,7 @@ dependencies = [
  "chrono",
  "flate2",
  "litchi-core",
+ "memchr",
  "p256",
  "pbkdf2",
  "phf",
@@ -1203,6 +1203,7 @@ dependencies = [
  "chrono",
  "litchi-core",
  "litchi-opc",
+ "memchr",
  "quick-xml",
  "ryu",
  "thiserror",
@@ -1939,6 +1940,7 @@ dependencies = [
  "crc32fast",
  "flate2",
  "rayon",
+ "sha2 0.10.9",
 ]
 
 [[package]]

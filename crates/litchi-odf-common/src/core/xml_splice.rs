@@ -129,6 +129,25 @@ impl XmlSourcePart {
 }
 
 impl AuthoredXmlFragment {
+    /// Return the audited authored bytes.
+    ///
+    /// The returned slice is the exact compact fragment supplied to the
+    /// constructor.  It is intended for bounded streaming composition; the
+    /// source document remains free to retain its original lexical bytes.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Return the capacity retained by the audited fragment allocation.
+    ///
+    /// This crate-private measure is used by bounded source-publication plans
+    /// because a plan retains the backing allocation until it is dropped.
+    #[must_use]
+    pub(crate) fn retention_bytes(&self) -> usize {
+        self.bytes.capacity()
+    }
+
     /// Audit one or more balanced markup nodes as compact authored XML.
     ///
     /// # Errors

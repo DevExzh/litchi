@@ -1,0 +1,594 @@
+{
+  "control_reference": {
+    "oracle_path": "control/oracle/verify-report-r1.py",
+    "oracle_sha256": "cb7c76d6f2522e838bc26c72ed4e470380d846a63152f468fe9b79df1c088f41",
+    "protocol_path": "control/protocol-r1.json",
+    "protocol_sha256": "9ad033b9a9fd3787f9d6c9b2bbe1fa3cc7476072430551329708ba50d86f2c5e"
+  },
+  "purpose": "Independent deterministic ODP corpus and semantic/ZIP identity binding for the source-tail candidate. Source identities are taken from the frozen 0457 owned control reports; output archive bytes remain a candidate observation but output semantic/content/member identities are checked against the same deterministic append fixture.",
+  "schema": "litchi-0457-odp-source-tail-candidate-corpus-binding-v1",
+  "shapes": {
+    "large": {
+      "append": {
+        "body_sha256": "0ad3c2d1bdd203bc83691d8547d122fc1520e562e4540f11e85e257794c3770a",
+        "count": 1,
+        "title_sha256": "2c88d17b8f757a025fef121013235c2dd4dc76cc1fa849125b4286586f4a1f1a"
+      },
+      "control_report": {
+        "path": "control/runs/R1/formal-r1/R1-normal-large-r1.json",
+        "sha256": "5009b23b7e767fdd9bc2fce827e3006a61534a4b43e59fbae139f96bfcbf5967"
+      },
+      "corpus": {
+        "archive_bytes": 105112,
+        "archive_member_count": 6,
+        "archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+        "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+        "entry_bytes": 96,
+        "entry_count": 8192,
+        "generator": "litchi-odp-existing-append-lifecycle-v1",
+        "name": "odp-existing-append-lifecycle-large",
+        "package_format": "ODP/ODF/ZIP",
+        "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+        "shape": "large",
+        "target_entry": "content.xml",
+        "target_payload_bytes": 6087143,
+        "target_payload_sha256": "57e3c83e7153ee5e35be58a1a0c3ae725c813b00752a45366e29d00840d41538",
+        "uncompressed_payload_bytes": 942078,
+        "xlsx": null
+      },
+      "expected_output": {
+        "archive_bytes": 105124,
+        "archive_sha256": "a7dbfb18387dc546beb567c231bc7762e9efd440d72883e5e2ac2dcd24294bf1",
+        "content_xml_bytes": 6087854,
+        "content_xml_sha256": "5f3c2a1043a9aecf0d021838da475f9b311ab9fac39bb15a17db00ad65e8bb5a",
+        "members": [
+          {
+            "compressed_bytes": 241,
+            "compressed_sha256": "e6d8e2248c50893d5d4b6c0c4dce27941a7abec7547c1f987b4ec5ec525e45f1",
+            "compression_method": "Deflate",
+            "crc32": 3471906969,
+            "data_descriptor": false,
+            "decoded_bytes": 700,
+            "decoded_sha256": "5f954010f2ebcd5112cd76c30bb9f40abe040cbb5073edeccf513fb0cddae643",
+            "media_type": "application/octet-stream",
+            "path": "META-INF/manifest.xml"
+          },
+          {
+            "compressed_bytes": 1283,
+            "compressed_sha256": "f29e5e6d2c32c0555488d7a3a3ae823a13e24c66d6c86399d2453d88968f1e4a",
+            "compression_method": "Deflate",
+            "crc32": 1152070139,
+            "data_descriptor": false,
+            "decoded_bytes": 65536,
+            "decoded_sha256": "f5bfbc95927c2b0cbc5be85fc8830d148ddfeb345e626bdeb1594e8496da3e5c",
+            "media_type": "application/octet-stream",
+            "path": "Opaque/litchi-perf-odp-existing-append-opaque.bin"
+          },
+          {
+            "compressed_bytes": 102129,
+            "compressed_sha256": "5f9d981cb188d7017bdc3d68ee31a0261bf9088d9ad49a6a6c041644d1c92d7a",
+            "compression_method": "Deflate",
+            "crc32": 832934337,
+            "data_descriptor": false,
+            "decoded_bytes": 6087854,
+            "decoded_sha256": "5f3c2a1043a9aecf0d021838da475f9b311ab9fac39bb15a17db00ad65e8bb5a",
+            "media_type": "text/xml",
+            "path": "content.xml"
+          },
+          {
+            "compressed_bytes": 200,
+            "compressed_sha256": "4bbaa6cd7216b154d0a05e0638eb29939ffadef3884564e826ebeadabfa57c15",
+            "compression_method": "Deflate",
+            "crc32": 2238965655,
+            "data_descriptor": false,
+            "decoded_bytes": 387,
+            "decoded_sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719",
+            "media_type": "text/xml",
+            "path": "meta.xml"
+          },
+          {
+            "compressed_bytes": 47,
+            "compressed_sha256": "3c03c9c6a27bc0026fe221d13b8492e15a7b16186970543818510e89f0a247b5",
+            "compression_method": "Store",
+            "crc32": 2829854259,
+            "data_descriptor": false,
+            "decoded_bytes": 47,
+            "decoded_sha256": "3c03c9c6a27bc0026fe221d13b8492e15a7b16186970543818510e89f0a247b5",
+            "media_type": "application/octet-stream",
+            "path": "mimetype"
+          },
+          {
+            "compressed_bytes": 532,
+            "compressed_sha256": "e183fffa7258c0b4cae2e951af4bf9d3d997292dbed1d104f39d1241711ae2bf",
+            "compression_method": "Deflate",
+            "crc32": 2785960818,
+            "data_descriptor": false,
+            "decoded_bytes": 1960,
+            "decoded_sha256": "d9881e91085516246a19c30d9e5cde39a8b10d7e42120b135f48f5ca8afef8d2",
+            "media_type": "text/xml",
+            "path": "styles.xml"
+          }
+        ],
+        "order_sha256": "20922138f0b702b74bb397587ae9a5dce8540a25f70184488285b861ad9658c1",
+        "semantic_sha256": "2e88b8262fb3048324059e2ff6c3c1d04e7421c61994294e7c9678a019b6a797",
+        "slide_count": 8193,
+        "text_projection_bytes": 942176,
+        "text_projection_sha256": "30a57e480e284be83c3cfaac930544f1a40c4f07f881eb19d892bbceeeecb4bf"
+      },
+      "opaque": {
+        "bytes": 65536,
+        "compressed_bytes": 1283,
+        "compressed_sha256": "f29e5e6d2c32c0555488d7a3a3ae823a13e24c66d6c86399d2453d88968f1e4a",
+        "path": "Opaque/litchi-perf-odp-existing-append-opaque.bin",
+        "sha256": "f5bfbc95927c2b0cbc5be85fc8830d148ddfeb345e626bdeb1594e8496da3e5c"
+      },
+      "source": {
+        "archive_bytes": 105112,
+        "archive_sha256": "bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
+        "content_xml_bytes": 6087143,
+        "content_xml_sha256": "57e3c83e7153ee5e35be58a1a0c3ae725c813b00752a45366e29d00840d41538",
+        "members": [
+          {
+            "compressed_bytes": 241,
+            "compressed_sha256": "e6d8e2248c50893d5d4b6c0c4dce27941a7abec7547c1f987b4ec5ec525e45f1",
+            "compression_method": "Deflate",
+            "crc32": 3471906969,
+            "data_descriptor": false,
+            "decoded_bytes": 700,
+            "decoded_sha256": "5f954010f2ebcd5112cd76c30bb9f40abe040cbb5073edeccf513fb0cddae643",
+            "media_type": "application/octet-stream",
+            "path": "META-INF/manifest.xml"
+          },
+          {
+            "compressed_bytes": 1283,
+            "compressed_sha256": "f29e5e6d2c32c0555488d7a3a3ae823a13e24c66d6c86399d2453d88968f1e4a",
+            "compression_method": "Deflate",
+            "crc32": 1152070139,
+            "data_descriptor": false,
+            "decoded_bytes": 65536,
+            "decoded_sha256": "f5bfbc95927c2b0cbc5be85fc8830d148ddfeb345e626bdeb1594e8496da3e5c",
+            "media_type": "application/octet-stream",
+            "path": "Opaque/litchi-perf-odp-existing-append-opaque.bin"
+          },
+          {
+            "compressed_bytes": 102117,
+            "compressed_sha256": "9840774884a1dd6505ab45eb463deeb298d791dedda72cfbfdb7bd10a3855d98",
+            "compression_method": "Deflate",
+            "crc32": 3403578599,
+            "data_descriptor": false,
+            "decoded_bytes": 6087143,
+            "decoded_sha256": "57e3c83e7153ee5e35be58a1a0c3ae725c813b00752a45366e29d00840d41538",
+            "media_type": "text/xml",
+            "path": "content.xml"
+          },
+          {
+            "compressed_bytes": 200,
+            "compressed_sha256": "4bbaa6cd7216b154d0a05e0638eb29939ffadef3884564e826ebeadabfa57c15",
+            "compression_method": "Deflate",
+            "crc32": 2238965655,
+            "data_descriptor": false,
+            "decoded_bytes": 387,
+            "decoded_sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719",
+            "media_type": "text/xml",
+            "path": "meta.xml"
+          },
+          {
+            "compressed_bytes": 47,
+            "compressed_sha256": "3c03c9c6a27bc0026fe221d13b8492e15a7b16186970543818510e89f0a247b5",
+            "compression_method": "Store",
+            "crc32": 2829854259,
+            "data_descriptor": false,
+            "decoded_bytes": 47,
+            "decoded_sha256": "3c03c9c6a27bc0026fe221d13b8492e15a7b16186970543818510e89f0a247b5",
+            "media_type": "application/octet-stream",
+            "path": "mimetype"
+          },
+          {
+            "compressed_bytes": 532,
+            "compressed_sha256": "e183fffa7258c0b4cae2e951af4bf9d3d997292dbed1d104f39d1241711ae2bf",
+            "compression_method": "Deflate",
+            "crc32": 2785960818,
+            "data_descriptor": false,
+            "decoded_bytes": 1960,
+            "decoded_sha256": "d9881e91085516246a19c30d9e5cde39a8b10d7e42120b135f48f5ca8afef8d2",
+            "media_type": "text/xml",
+            "path": "styles.xml"
+          }
+        ],
+        "order_sha256": "810109d266172334fb9e5f44331b19fcd1a5c3ca0316c15a99cf57efd5c3002f",
+        "semantic_sha256": "9fb3e3c5f97292e4e19980f5aa1ed00c8eba71e2aacd1bdfb27a354fe059d08a",
+        "slide_count": 8192,
+        "text_projection_bytes": 942078,
+        "text_projection_sha256": "75c1dfc509836d9aad1db11fd93b4cd495d4c29de2b3986fbce90015214f8670"
+      }
+    },
+    "medium": {
+      "append": {
+        "body_sha256": "bc9765780608a363f14ef827b409dbf41ebcdc689308ccb44c3789987d609106",
+        "count": 1,
+        "title_sha256": "5918183de42dc4a1e507a3bbe5bd2336287b7ae5bab2123fcc635aa06ae8e612"
+      },
+      "control_report": {
+        "path": "control/runs/R1/formal-r1/R1-normal-medium-r1.json",
+        "sha256": "b5b4335f17a9f2191c2192bce8379d6f2964c28c157c444659f562925befc39a"
+      },
+      "corpus": {
+        "archive_bytes": 54646,
+        "archive_member_count": 6,
+        "archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+        "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+        "entry_bytes": 96,
+        "entry_count": 4096,
+        "generator": "litchi-odp-existing-append-lifecycle-v1",
+        "name": "odp-existing-append-lifecycle-medium",
+        "package_format": "ODP/ODF/ZIP",
+        "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+        "shape": "medium",
+        "target_entry": "content.xml",
+        "target_payload_bytes": 3043815,
+        "target_payload_sha256": "53b6c3426ab2cbd140fa2a92a6d3b6d981fa15c769e6c5236a8ee2dc2b7644e7",
+        "uncompressed_payload_bytes": 471038,
+        "xlsx": null
+      },
+      "expected_output": {
+        "archive_bytes": 54658,
+        "archive_sha256": "743d0d0a02c6316a7ccb4da15de6d8359173d815f8fc9496d53ace6a948b091b",
+        "content_xml_bytes": 3044526,
+        "content_xml_sha256": "0af329456656207cbdd4659054ae0774c373a7fdee00ad4e4141ae6c933e5db5",
+        "members": [
+          {
+            "compressed_bytes": 241,
+            "compressed_sha256": "e6d8e2248c50893d5d4b6c0c4dce27941a7abec7547c1f987b4ec5ec525e45f1",
+            "compression_method": "Deflate",
+            "crc32": 3471906969,
+            "data_descriptor": false,
+            "decoded_bytes": 700,
+            "decoded_sha256": "5f954010f2ebcd5112cd76c30bb9f40abe040cbb5073edeccf513fb0cddae643",
+            "media_type": "application/octet-stream",
+            "path": "META-INF/manifest.xml"
+          },
+          {
+            "compressed_bytes": 1283,
+            "compressed_sha256": "f29e5e6d2c32c0555488d7a3a3ae823a13e24c66d6c86399d2453d88968f1e4a",
+            "compression_method": "Deflate",
+            "crc32": 1152070139,
+            "data_descriptor": false,
+            "decoded_bytes": 65536,
+            "decoded_sha256": "f5bfbc95927c2b0cbc5be85fc8830d148ddfeb345e626bdeb1594e8496da3e5c",
+            "media_type": "application/octet-stream",
+            "path": "Opaque/litchi-perf-odp-existing-append-opaque.bin"
+          },
+          {
+            "compressed_bytes": 51663,
+            "compressed_sha256": "83705be61905c8953b3bb37b7226c0cb9c38fb05f1503321802c8ed236a8e940",
+            "compression_method": "Deflate",
+            "crc32": 2483841920,
+            "data_descriptor": false,
+            "decoded_bytes": 3044526,
+            "decoded_sha256": "0af329456656207cbdd4659054ae0774c373a7fdee00ad4e4141ae6c933e5db5",
+            "media_type": "text/xml",
+            "path": "content.xml"
+          },
+          {
+            "compressed_bytes": 200,
+            "compressed_sha256": "4bbaa6cd7216b154d0a05e0638eb29939ffadef3884564e826ebeadabfa57c15",
+            "compression_method": "Deflate",
+            "crc32": 2238965655,
+            "data_descriptor": false,
+            "decoded_bytes": 387,
+            "decoded_sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719",
+            "media_type": "text/xml",
+            "path": "meta.xml"
+          },
+          {
+            "compressed_bytes": 47,
+            "compressed_sha256": "3c03c9c6a27bc0026fe221d13b8492e15a7b16186970543818510e89f0a247b5",
+            "compression_method": "Store",
+            "crc32": 2829854259,
+            "data_descriptor": false,
+            "decoded_bytes": 47,
+            "decoded_sha256": "3c03c9c6a27bc0026fe221d13b8492e15a7b16186970543818510e89f0a247b5",
+            "media_type": "application/octet-stream",
+            "path": "mimetype"
+          },
+          {
+            "compressed_bytes": 532,
+            "compressed_sha256": "e183fffa7258c0b4cae2e951af4bf9d3d997292dbed1d104f39d1241711ae2bf",
+            "compression_method": "Deflate",
+            "crc32": 2785960818,
+            "data_descriptor": false,
+            "decoded_bytes": 1960,
+            "decoded_sha256": "d9881e91085516246a19c30d9e5cde39a8b10d7e42120b135f48f5ca8afef8d2",
+            "media_type": "text/xml",
+            "path": "styles.xml"
+          }
+        ],
+        "order_sha256": "37dc048b23c0d57b09d6fca058da19fa14be7936e30693e57dec71adb32690e6",
+        "semantic_sha256": "6e4148cf6c58e35fd8a0c5da89fa4377e39497acf1366899311e045d7ec8551d",
+        "slide_count": 4097,
+        "text_projection_bytes": 471136,
+        "text_projection_sha256": "a4eb7da5f320fe0b4952dc39577d1e97b6d2bfdb43e68fe064d88bb13f3d4bc4"
+      },
+      "opaque": {
+        "bytes": 65536,
+        "compressed_bytes": 1283,
+        "compressed_sha256": "f29e5e6d2c32c0555488d7a3a3ae823a13e24c66d6c86399d2453d88968f1e4a",
+        "path": "Opaque/litchi-perf-odp-existing-append-opaque.bin",
+        "sha256": "f5bfbc95927c2b0cbc5be85fc8830d148ddfeb345e626bdeb1594e8496da3e5c"
+      },
+      "source": {
+        "archive_bytes": 54646,
+        "archive_sha256": "62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+        "content_xml_bytes": 3043815,
+        "content_xml_sha256": "53b6c3426ab2cbd140fa2a92a6d3b6d981fa15c769e6c5236a8ee2dc2b7644e7",
+        "members": [
+          {
+            "compressed_bytes": 241,
+            "compressed_sha256": "e6d8e2248c50893d5d4b6c0c4dce27941a7abec7547c1f987b4ec5ec525e45f1",
+            "compression_method": "Deflate",
+            "crc32": 3471906969,
+            "data_descriptor": false,
+            "decoded_bytes": 700,
+            "decoded_sha256": "5f954010f2ebcd5112cd76c30bb9f40abe040cbb5073edeccf513fb0cddae643",
+            "media_type": "application/octet-stream",
+            "path": "META-INF/manifest.xml"
+          },
+          {
+            "compressed_bytes": 1283,
+            "compressed_sha256": "f29e5e6d2c32c0555488d7a3a3ae823a13e24c66d6c86399d2453d88968f1e4a",
+            "compression_method": "Deflate",
+            "crc32": 1152070139,
+            "data_descriptor": false,
+            "decoded_bytes": 65536,
+            "decoded_sha256": "f5bfbc95927c2b0cbc5be85fc8830d148ddfeb345e626bdeb1594e8496da3e5c",
+            "media_type": "application/octet-stream",
+            "path": "Opaque/litchi-perf-odp-existing-append-opaque.bin"
+          },
+          {
+            "compressed_bytes": 51651,
+            "compressed_sha256": "ecf6983ce00a3874039fe036062f9f01e536e3f506d695322d145d29de41d287",
+            "compression_method": "Deflate",
+            "crc32": 2309589492,
+            "data_descriptor": false,
+            "decoded_bytes": 3043815,
+            "decoded_sha256": "53b6c3426ab2cbd140fa2a92a6d3b6d981fa15c769e6c5236a8ee2dc2b7644e7",
+            "media_type": "text/xml",
+            "path": "content.xml"
+          },
+          {
+            "compressed_bytes": 200,
+            "compressed_sha256": "4bbaa6cd7216b154d0a05e0638eb29939ffadef3884564e826ebeadabfa57c15",
+            "compression_method": "Deflate",
+            "crc32": 2238965655,
+            "data_descriptor": false,
+            "decoded_bytes": 387,
+            "decoded_sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719",
+            "media_type": "text/xml",
+            "path": "meta.xml"
+          },
+          {
+            "compressed_bytes": 47,
+            "compressed_sha256": "3c03c9c6a27bc0026fe221d13b8492e15a7b16186970543818510e89f0a247b5",
+            "compression_method": "Store",
+            "crc32": 2829854259,
+            "data_descriptor": false,
+            "decoded_bytes": 47,
+            "decoded_sha256": "3c03c9c6a27bc0026fe221d13b8492e15a7b16186970543818510e89f0a247b5",
+            "media_type": "application/octet-stream",
+            "path": "mimetype"
+          },
+          {
+            "compressed_bytes": 532,
+            "compressed_sha256": "e183fffa7258c0b4cae2e951af4bf9d3d997292dbed1d104f39d1241711ae2bf",
+            "compression_method": "Deflate",
+            "crc32": 2785960818,
+            "data_descriptor": false,
+            "decoded_bytes": 1960,
+            "decoded_sha256": "d9881e91085516246a19c30d9e5cde39a8b10d7e42120b135f48f5ca8afef8d2",
+            "media_type": "text/xml",
+            "path": "styles.xml"
+          }
+        ],
+        "order_sha256": "537a93c223a025bfab91211caa466210e93a2c0624fc304802eccd358dfe0b92",
+        "semantic_sha256": "0af38a123018d91665024301a916e134be575c685ee396fd7706101c3d4a6aba",
+        "slide_count": 4096,
+        "text_projection_bytes": 471038,
+        "text_projection_sha256": "3fd40ae14c4bc7d1299feb1ea1b4c41715a2e5571d210095929d6e7a25673ef7"
+      }
+    },
+    "tiny": {
+      "append": {
+        "body_sha256": "51a09af4df06d92f727574edc59f181c6a849d3adf0ae455519492605f35e2b2",
+        "count": 1,
+        "title_sha256": "7458ac3c943b0902b7559d2ada552d31e089f1c6cefe6e229ff1894201143dbc"
+      },
+      "control_report": {
+        "path": "control/runs/R1/formal-r1/R1-normal-tiny-r1.json",
+        "sha256": "95dd53aebe2d3dc0422a793b71ffbec47c8de3ca608123f4364b27d5269caa44"
+      },
+      "corpus": {
+        "archive_bytes": 4684,
+        "archive_member_count": 6,
+        "archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+        "compression": "mimetype=stored;xml=deflate;opaque=deflate",
+        "entry_bytes": 96,
+        "entry_count": 64,
+        "generator": "litchi-odp-existing-append-lifecycle-v1",
+        "name": "odp-existing-append-lifecycle-tiny",
+        "package_format": "ODP/ODF/ZIP",
+        "payload_kind": "deterministic-buffered-plain-titled-slides-with-opaque-member",
+        "shape": "tiny",
+        "target_entry": "content.xml",
+        "target_payload_bytes": 49009,
+        "target_payload_sha256": "6085294e5d6a363515b71c9131fa1c49af5bf5b34374e26a7436fd509fde3037",
+        "uncompressed_payload_bytes": 7358,
+        "xlsx": null
+      },
+      "expected_output": {
+        "archive_bytes": 4697,
+        "archive_sha256": "43533f3c8464983121760e20537585652afe6d2cbe4bab53136e9de19ea1b3f5",
+        "content_xml_bytes": 49718,
+        "content_xml_sha256": "fa4228b4dbc76c00726bfa1f9c331f08ea519b8c01de8e877bf3cb5c608e9cdb",
+        "members": [
+          {
+            "compressed_bytes": 241,
+            "compressed_sha256": "e6d8e2248c50893d5d4b6c0c4dce27941a7abec7547c1f987b4ec5ec525e45f1",
+            "compression_method": "Deflate",
+            "crc32": 3471906969,
+            "data_descriptor": false,
+            "decoded_bytes": 700,
+            "decoded_sha256": "5f954010f2ebcd5112cd76c30bb9f40abe040cbb5073edeccf513fb0cddae643",
+            "media_type": "application/octet-stream",
+            "path": "META-INF/manifest.xml"
+          },
+          {
+            "compressed_bytes": 1283,
+            "compressed_sha256": "f29e5e6d2c32c0555488d7a3a3ae823a13e24c66d6c86399d2453d88968f1e4a",
+            "compression_method": "Deflate",
+            "crc32": 1152070139,
+            "data_descriptor": false,
+            "decoded_bytes": 65536,
+            "decoded_sha256": "f5bfbc95927c2b0cbc5be85fc8830d148ddfeb345e626bdeb1594e8496da3e5c",
+            "media_type": "application/octet-stream",
+            "path": "Opaque/litchi-perf-odp-existing-append-opaque.bin"
+          },
+          {
+            "compressed_bytes": 1702,
+            "compressed_sha256": "d3e2c4aaaa510d8d07e895227a43c07fabf200df5cc16bf356d23cbc3d44d06b",
+            "compression_method": "Deflate",
+            "crc32": 2682562542,
+            "data_descriptor": false,
+            "decoded_bytes": 49718,
+            "decoded_sha256": "fa4228b4dbc76c00726bfa1f9c331f08ea519b8c01de8e877bf3cb5c608e9cdb",
+            "media_type": "text/xml",
+            "path": "content.xml"
+          },
+          {
+            "compressed_bytes": 200,
+            "compressed_sha256": "4bbaa6cd7216b154d0a05e0638eb29939ffadef3884564e826ebeadabfa57c15",
+            "compression_method": "Deflate",
+            "crc32": 2238965655,
+            "data_descriptor": false,
+            "decoded_bytes": 387,
+            "decoded_sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719",
+            "media_type": "text/xml",
+            "path": "meta.xml"
+          },
+          {
+            "compressed_bytes": 47,
+            "compressed_sha256": "3c03c9c6a27bc0026fe221d13b8492e15a7b16186970543818510e89f0a247b5",
+            "compression_method": "Store",
+            "crc32": 2829854259,
+            "data_descriptor": false,
+            "decoded_bytes": 47,
+            "decoded_sha256": "3c03c9c6a27bc0026fe221d13b8492e15a7b16186970543818510e89f0a247b5",
+            "media_type": "application/octet-stream",
+            "path": "mimetype"
+          },
+          {
+            "compressed_bytes": 532,
+            "compressed_sha256": "e183fffa7258c0b4cae2e951af4bf9d3d997292dbed1d104f39d1241711ae2bf",
+            "compression_method": "Deflate",
+            "crc32": 2785960818,
+            "data_descriptor": false,
+            "decoded_bytes": 1960,
+            "decoded_sha256": "d9881e91085516246a19c30d9e5cde39a8b10d7e42120b135f48f5ca8afef8d2",
+            "media_type": "text/xml",
+            "path": "styles.xml"
+          }
+        ],
+        "order_sha256": "b3a019f7da5c37ceea1f969f9e1e0438dabc5f05f9da04038f168c7d7cbfb4ff",
+        "semantic_sha256": "ec4e149d7694d08f71e5be7a6feed14642f26802580416abca5b226bd91d0e90",
+        "slide_count": 65,
+        "text_projection_bytes": 7456,
+        "text_projection_sha256": "c9b9772bf70caa6b44a74f37d35a2fec4c8b982df8ad5c6dffcca7f02634a91b"
+      },
+      "opaque": {
+        "bytes": 65536,
+        "compressed_bytes": 1283,
+        "compressed_sha256": "f29e5e6d2c32c0555488d7a3a3ae823a13e24c66d6c86399d2453d88968f1e4a",
+        "path": "Opaque/litchi-perf-odp-existing-append-opaque.bin",
+        "sha256": "f5bfbc95927c2b0cbc5be85fc8830d148ddfeb345e626bdeb1594e8496da3e5c"
+      },
+      "source": {
+        "archive_bytes": 4684,
+        "archive_sha256": "92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+        "content_xml_bytes": 49009,
+        "content_xml_sha256": "6085294e5d6a363515b71c9131fa1c49af5bf5b34374e26a7436fd509fde3037",
+        "members": [
+          {
+            "compressed_bytes": 241,
+            "compressed_sha256": "e6d8e2248c50893d5d4b6c0c4dce27941a7abec7547c1f987b4ec5ec525e45f1",
+            "compression_method": "Deflate",
+            "crc32": 3471906969,
+            "data_descriptor": false,
+            "decoded_bytes": 700,
+            "decoded_sha256": "5f954010f2ebcd5112cd76c30bb9f40abe040cbb5073edeccf513fb0cddae643",
+            "media_type": "application/octet-stream",
+            "path": "META-INF/manifest.xml"
+          },
+          {
+            "compressed_bytes": 1283,
+            "compressed_sha256": "f29e5e6d2c32c0555488d7a3a3ae823a13e24c66d6c86399d2453d88968f1e4a",
+            "compression_method": "Deflate",
+            "crc32": 1152070139,
+            "data_descriptor": false,
+            "decoded_bytes": 65536,
+            "decoded_sha256": "f5bfbc95927c2b0cbc5be85fc8830d148ddfeb345e626bdeb1594e8496da3e5c",
+            "media_type": "application/octet-stream",
+            "path": "Opaque/litchi-perf-odp-existing-append-opaque.bin"
+          },
+          {
+            "compressed_bytes": 1689,
+            "compressed_sha256": "c344b48f68e2fdda718a71879ca6f7b2fe1c42b5d9eb69c8af0be29fbec87c77",
+            "compression_method": "Deflate",
+            "crc32": 3626835073,
+            "data_descriptor": false,
+            "decoded_bytes": 49009,
+            "decoded_sha256": "6085294e5d6a363515b71c9131fa1c49af5bf5b34374e26a7436fd509fde3037",
+            "media_type": "text/xml",
+            "path": "content.xml"
+          },
+          {
+            "compressed_bytes": 200,
+            "compressed_sha256": "4bbaa6cd7216b154d0a05e0638eb29939ffadef3884564e826ebeadabfa57c15",
+            "compression_method": "Deflate",
+            "crc32": 2238965655,
+            "data_descriptor": false,
+            "decoded_bytes": 387,
+            "decoded_sha256": "c7e55a3560c73aa42da85eec4751c3e78b5cc53ff964f50acba6c5cd105e6719",
+            "media_type": "text/xml",
+            "path": "meta.xml"
+          },
+          {
+            "compressed_bytes": 47,
+            "compressed_sha256": "3c03c9c6a27bc0026fe221d13b8492e15a7b16186970543818510e89f0a247b5",
+            "compression_method": "Store",
+            "crc32": 2829854259,
+            "data_descriptor": false,
+            "decoded_bytes": 47,
+            "decoded_sha256": "3c03c9c6a27bc0026fe221d13b8492e15a7b16186970543818510e89f0a247b5",
+            "media_type": "application/octet-stream",
+            "path": "mimetype"
+          },
+          {
+            "compressed_bytes": 532,
+            "compressed_sha256": "e183fffa7258c0b4cae2e951af4bf9d3d997292dbed1d104f39d1241711ae2bf",
+            "compression_method": "Deflate",
+            "crc32": 2785960818,
+            "data_descriptor": false,
+            "decoded_bytes": 1960,
+            "decoded_sha256": "d9881e91085516246a19c30d9e5cde39a8b10d7e42120b135f48f5ca8afef8d2",
+            "media_type": "text/xml",
+            "path": "styles.xml"
+          }
+        ],
+        "order_sha256": "c0fd008b550232237afd595a774ee48ab52cf078b01aefca7928320ae5dddc03",
+        "semantic_sha256": "167428219fc1603b63046c349a06ef8d0033ac9f720567c5383bb79e379d10d1",
+        "slide_count": 64,
+        "text_projection_bytes": 7358,
+        "text_projection_sha256": "d6fa57c70837d7ad9b778a93a1298a06d0a1ec4a462b7c0931dd0e4b5c35e0f0"
+      }
+    }
+  }
+}

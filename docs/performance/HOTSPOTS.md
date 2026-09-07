@@ -1,5 +1,62 @@
 # Performance hotspot inventory
 
+## Change 0457: source-tail ODP publication work remains specialized
+
+The ordinary `odp_existing_append_lifecycle` control is now a formal
+current-revision baseline over 64/4,096/8,192 source slides. Its final 360
+retained samples (12 reports across two repeats and normal/allocator lanes),
+matched by 360 final candidate samples, are the reference for the specialized
+`odp_source_tail_append_lifecycle` candidate.
+The candidate scans bounded source XML, validates a finite insertion window,
+and replays the changed ZIP member through a sequential sink. It has a
+different retained-result contract from ordinary open/append/commit/output,
+so the paired rows are numeric endpoint comparisons only.
+
+The ordinary ODP owner has the implemented owned `edit::Snapshot`,
+`edit::Transaction`, `edit::Patch` and `edit::Commit` lifecycle. The hotspot
+here is the separate source-tail publication path and its integration with
+that lifecycle, not an absent ordinary editor.
+
+The allocator lane identifies the working-set change: source-tail regional
+peak above entry is 620,381 / 620,385 / 620,385 bytes for 64/4,096/8,192
+slides, versus 781,342 / 18,027,568 / 35,958,388 for the ordinary control.
+Allocated bytes are 2,607,922 / 36,593,937 / 71,164,177 versus
+10,613,383 / 110,226,105 / 211,442,207. The candidate's allocation volume
+still grows with document size, and the operation peak excludes source and
+fixture ownership already live at entry; these rows do not establish a flat
+whole-process memory bound.
+
+Normal p50 deltas are -33.352% / -33.185% for tiny, +3.262% / -2.461% for
+medium, and -1.940% / -4.221% for large in R1/R2. Allocator p50 deltas are
+-38.056% / -38.004%, -8.911% / -9.868%, and -9.873% / -7.967% in the same
+shape order. The final comparison receipt defines candidate minus control and
+withholds ordinary Commit/Patch, causal, scaling, physical-I/O and general
+CRUD claims. Process peak RSS remains over the five-percent review threshold
+for R1 normal tiny (+8.301%), R2 normal tiny (+6.517%), R1 allocator tiny
+(+10.184%), and allocator large in both repeats (-5.113% / -5.740%). Process
+RSS is separate from the allocator-region evidence.
+
+The source-tail path makes four content passes and adds bounded parser,
+replay and fixed Deflate-window work. The initial pre-fix large-normal sampled profile
+puts candidate SHA-256 compression at 11.00%, XML `validate_name` at 9.08%,
+`memcmp` at 6.01% and `validate_start_element` at 5.42%. The corresponding
+control profile puts `memcmp` at 9.67%, Quick-XML attribute iteration at 6.00%,
+`memmove` at 5.76% and namespace-prefix resolution at 5.24%. The 1,000
+`cycles:u` samples are whole-process observations; they do not attribute CPU
+percentages to the timed API, establish causality, or provide hard counter
+totals. These whole-process samples remain initial pre-fix diagnostics, not
+final candidate attribution; no sampling profile was captured for the final
+candidate epoch. Candidate profile validation passes for this initial capture.
+The
+control's unchanged report
+and raw profile pass the existing amended oracle after the original
+frame-pointer expectation failed; the correction is bound in
+[the amendment](results/change-0457/profiling/control-oracle-amendment.json).
+See the [final candidate summary](results/change-0457/candidate-final/summary.json)
+and [final comparison](results/change-0457/comparison-final.json). Sealed
+precleanup, portable-copy replay and three altered-copy rejection checks pass;
+owned staging cleanup is recorded in the [bundle](results/change-0457/README.md).
+
 ## Change 0456: eliminate the verified-payload preparation copy
 
 [0456](changes/0456-zip-shared-payload-framing.md) retains shared payload storage

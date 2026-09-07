@@ -25,7 +25,7 @@ pub(crate) const ODP_EXISTING_APPEND_CORPUS_GENERATOR: &str =
     "litchi-odp-existing-append-lifecycle-v1";
 const ODP_MIME: &str = "application/vnd.oasis.opendocument.presentation";
 const ODP_XML_MEDIA_TYPE: &str = "text/xml";
-const OPAQUE_PATH: &str = "Opaque/litchi-perf-odp-existing-append-opaque.bin";
+pub(crate) const OPAQUE_PATH: &str = "Opaque/litchi-perf-odp-existing-append-opaque.bin";
 const OPAQUE_MEDIA_TYPE: &str = "application/octet-stream";
 const OPAQUE_BYTES: usize = 64 * 1024;
 
@@ -93,13 +93,13 @@ pub(crate) struct OdpExistingAppendSummary {
     pub(crate) stale_source_refusal_verified: bool,
     pub(crate) exact_noop_verified: bool,
     pub(crate) text_contract: &'static str,
-    pub(crate) source_semantic_sha256: String,
+    source_semantic_sha256: String,
     pub(crate) output_semantic_sha256: String,
-    pub(crate) source_order_sha256: String,
+    source_order_sha256: String,
     pub(crate) output_order_sha256: String,
-    pub(crate) source_text_projection_sha256: String,
+    source_text_projection_sha256: String,
     pub(crate) output_text_projection_sha256: String,
-    pub(crate) source_text_projection_bytes: usize,
+    source_text_projection_bytes: usize,
     pub(crate) output_text_projection_bytes: usize,
     pub(crate) runtime_output_digest_verified: bool,
     pub(crate) runtime_sink_length_verified: bool,
@@ -111,11 +111,11 @@ pub(crate) struct OdpExistingAppendSummary {
 #[derive(Debug)]
 pub(crate) struct OdpExistingAppendCorpus {
     pub(crate) corpus: Corpus,
-    shape: SemanticShape,
-    source_members: Vec<OdpExistingAppendMemberIdentity>,
+    pub(crate) shape: SemanticShape,
+    pub(crate) source_members: Vec<OdpExistingAppendMemberIdentity>,
     expected_output: Vec<u8>,
     expected_output_members: Vec<OdpExistingAppendMemberIdentity>,
-    source_content_xml: Vec<u8>,
+    pub(crate) source_content_xml: Vec<u8>,
     output_content_xml: Vec<u8>,
     expected_output_sha256: String,
     source_semantic_sha256: String,
@@ -171,11 +171,11 @@ fn source_archive_from_base(
     Ok(writer.finish_to_bytes()?)
 }
 
-fn appended_title(shape: SemanticShape) -> String {
+pub(crate) fn appended_title(shape: SemanticShape) -> String {
     odp_buffered_create::odp_buffered_title(odp_buffered_create::odp_buffered_slide_count(shape))
 }
 
-fn appended_body(shape: SemanticShape) -> String {
+pub(crate) fn appended_body(shape: SemanticShape) -> String {
     odp_buffered_create::odp_buffered_body(odp_buffered_create::odp_buffered_slide_count(shape))
 }
 
@@ -192,7 +192,9 @@ fn append_once(source_bytes: &[u8], shape: SemanticShape) -> Result<Vec<u8>, Box
     Ok(commit.snapshot().bytes().to_vec())
 }
 
-fn member_identities(bytes: &[u8]) -> Result<Vec<OdpExistingAppendMemberIdentity>, Box<dyn Error>> {
+pub(crate) fn member_identities(
+    bytes: &[u8],
+) -> Result<Vec<OdpExistingAppendMemberIdentity>, Box<dyn Error>> {
     let package = OwnedPackage::from_bytes(bytes.to_vec())?;
     let package_view = package.package()?;
     let manifest = package_view.manifest();
@@ -232,7 +234,7 @@ fn member_identities(bytes: &[u8]) -> Result<Vec<OdpExistingAppendMemberIdentity
     Ok(records)
 }
 
-fn find_member<'a>(
+pub(crate) fn find_member<'a>(
     members: &'a [OdpExistingAppendMemberIdentity],
     path: &str,
 ) -> Result<&'a OdpExistingAppendMemberIdentity, Box<dyn Error>> {
@@ -242,7 +244,9 @@ fn find_member<'a>(
         .ok_or_else(|| format!("ODP member '{path}' is missing").into())
 }
 
-fn semantic_slides(bytes: &[u8]) -> Result<Vec<(Option<String>, String)>, Box<dyn Error>> {
+pub(crate) fn semantic_slides(
+    bytes: &[u8],
+) -> Result<Vec<(Option<String>, String)>, Box<dyn Error>> {
     let presentation = litchi_odp::Presentation::from_bytes(bytes.to_vec())?;
     let slides = presentation.slides()?;
     slides
@@ -251,7 +255,9 @@ fn semantic_slides(bytes: &[u8]) -> Result<Vec<(Option<String>, String)>, Box<dy
         .collect()
 }
 
-fn semantic_digest(slides: &[(Option<String>, String)]) -> Result<String, Box<dyn Error>> {
+pub(crate) fn semantic_digest(
+    slides: &[(Option<String>, String)],
+) -> Result<String, Box<dyn Error>> {
     let mut hasher = Sha256::new();
     hasher.update(b"litchi-odp-buffered-semantic-v1\0");
     hasher.update(u64::try_from(slides.len())?.to_le_bytes());
@@ -265,7 +271,7 @@ fn semantic_digest(slides: &[(Option<String>, String)]) -> Result<String, Box<dy
     Ok(hex_digest(hasher.finalize().as_slice()))
 }
 
-fn order_digest(slides: &[(Option<String>, String)]) -> Result<String, Box<dyn Error>> {
+pub(crate) fn order_digest(slides: &[(Option<String>, String)]) -> Result<String, Box<dyn Error>> {
     let mut hasher = Sha256::new();
     hasher.update(b"litchi-odp-existing-append-order-v1\0");
     hasher.update(u64::try_from(slides.len())?.to_le_bytes());
@@ -280,7 +286,9 @@ fn order_digest(slides: &[(Option<String>, String)]) -> Result<String, Box<dyn E
     Ok(hex_digest(hasher.finalize().as_slice()))
 }
 
-fn text_projection(slides: &[(Option<String>, String)]) -> Result<Vec<u8>, Box<dyn Error>> {
+pub(crate) fn text_projection(
+    slides: &[(Option<String>, String)],
+) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut output = Vec::new();
     for (index, (title, body)) in slides.iter().enumerate() {
         let title = title.as_deref().ok_or("ODP slide has no title")?;
@@ -302,7 +310,7 @@ fn hex_digest(bytes: &[u8]) -> String {
     output
 }
 
-fn expected_manifest_bindings(package: &OwnedPackage) -> Result<bool, Box<dyn Error>> {
+pub(crate) fn expected_manifest_bindings(package: &OwnedPackage) -> Result<bool, Box<dyn Error>> {
     let view = package.package()?;
     let manifest = view.manifest();
     let expected = [
@@ -323,7 +331,7 @@ fn expected_manifest_bindings(package: &OwnedPackage) -> Result<bool, Box<dyn Er
         }))
 }
 
-fn expected_archive_shape(bytes: &[u8]) -> Result<bool, Box<dyn Error>> {
+pub(crate) fn expected_archive_shape(bytes: &[u8]) -> Result<bool, Box<dyn Error>> {
     let archive = ZipArchive::from_slice(bytes)?;
     let mut entries = archive.entries();
     let first = entries.next().ok_or("ODP archive has no members")??;
@@ -379,7 +387,7 @@ fn expected_buffered_base_shape(bytes: &[u8]) -> Result<bool, Box<dyn Error>> {
     Ok(methods_are_contract && names == expected)
 }
 
-fn verify_append_output(
+pub(crate) fn verify_append_output(
     shape: SemanticShape,
     source_bytes: &[u8],
     output_bytes: &[u8],

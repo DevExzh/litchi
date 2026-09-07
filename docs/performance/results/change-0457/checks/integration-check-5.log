@@ -1,0 +1,21 @@
+    Checking litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+error: constant `PRESENTATION_NAMESPACE` is never used
+  --> crates/litchi-odp/src/package/source_append.rs:39:7
+   |
+39 | const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `-D dead-code` implied by `-D unused`
+   = help: to override `-D unused` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: constant `TEXT_NAMESPACE` is never used
+  --> crates/litchi-odp/src/package/source_append.rs:40:7
+   |
+40 | const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+   |       ^^^^^^^^^^^^^^
+
+error: could not compile `litchi-odp` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-odp` (lib) due to 2 previous errors
+error: could not compile `litchi-odp` (lib test) due to 2 previous errors

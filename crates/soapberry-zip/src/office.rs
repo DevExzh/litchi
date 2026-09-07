@@ -1517,6 +1517,10 @@ impl<'accounting, D> VerifiedEntryBufReader<'accounting, D> {
             })
             .map_err(VerifiedReaderFailure::Archive)
     }
+
+    fn abort(&mut self) -> Result<(), VerifiedReaderFailure> {
+        self.problem.take().map_or(Ok(()), Err)
+    }
 }
 
 impl<D: Read> Read for VerifiedEntryBufReader<'_, D> {
@@ -3640,7 +3644,38 @@ where
         F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> Result<T, E>,
     {
         let mut accounting = ZipOperationAccounting::default();
-        self.with_verified_entry_reader_with_accounting(entry_id, callback, &mut accounting)
+        self.with_verified_entry_reader_with_accounting_mode(
+            entry_id,
+            callback,
+            &mut accounting,
+            true,
+        )
+    }
+
+    /// Run a callback against one indexed member without retaining the
+    /// complete decoded payload, aborting as soon as the callback returns an
+    /// error.
+    ///
+    /// A successful callback is still drained and fully verified. When the
+    /// callback returns an error, the reader is dropped immediately after any
+    /// archive or transport failure already observed by the callback is
+    /// retained. The remaining member is therefore not verified on that
+    /// error path. Callback panics unwind without a drain.
+    pub fn with_verified_entry_reader_abortable<T, E, F>(
+        &self,
+        entry_id: EntryId,
+        callback: F,
+    ) -> Result<T, VerifiedEntryReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> Result<T, E>,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.with_verified_entry_reader_with_accounting_mode(
+            entry_id,
+            callback,
+            &mut accounting,
+            false,
+        )
     }
 
     /// Run a callback against one verified indexed member while recording
@@ -3655,6 +3690,19 @@ where
         entry_id: EntryId,
         callback: F,
         accounting: &mut ZipOperationAccounting,
+    ) -> Result<T, VerifiedEntryReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> Result<T, E>,
+    {
+        self.with_verified_entry_reader_with_accounting_mode(entry_id, callback, accounting, true)
+    }
+
+    fn with_verified_entry_reader_with_accounting_mode<T, E, F>(
+        &self,
+        entry_id: EntryId,
+        callback: F,
+        accounting: &mut ZipOperationAccounting,
+        drain_on_callback_error: bool,
     ) -> Result<T, VerifiedEntryReaderError<E>>
     where
         F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> Result<T, E>,
@@ -3733,7 +3781,11 @@ where
                         AccountingReadKind::Stored,
                     );
                     let callback_result = callback(&mut reader);
-                    let finalization = reader.finish();
+                    let finalization = if drain_on_callback_error || callback_result.is_ok() {
+                        reader.finish()
+                    } else {
+                        reader.abort()
+                    };
                     (callback_result, finalization)
                 };
                 let compressed_consumed = source.count();
@@ -3742,7 +3794,7 @@ where
                     .map_err(VerifiedReaderFailure::Accounting);
                 let verification = match finalization {
                     Err(failure) => Err(failure),
-                    Ok(()) => {
+                    Ok(()) if drain_on_callback_error || callback_result.is_ok() => {
                         if compressed_consumed != wayfinder.compressed_size_hint() {
                             Err(VerifiedReaderFailure::Archive(
                                 ErrorKind::InvalidSize {
@@ -3755,6 +3807,7 @@ where
                             accounting_result
                         }
                     },
+                    Ok(()) => accounting_result,
                 };
                 complete_verified_callback(callback_result, verification)
             },
@@ -3783,7 +3836,11 @@ where
                             AccountingReadKind::Deflate,
                         );
                         let callback_result = callback(&mut reader);
-                        let finalization = reader.finish();
+                        let finalization = if drain_on_callback_error || callback_result.is_ok() {
+                            reader.finish()
+                        } else {
+                            reader.abort()
+                        };
                         (callback_result, finalization)
                     };
                     let compressed_consumed = decoder.total_in();
@@ -3800,7 +3857,7 @@ where
                     .map_err(VerifiedReaderFailure::Accounting);
                 let verification = match finalization {
                     Err(failure) => Err(failure),
-                    Ok(()) => {
+                    Ok(()) if drain_on_callback_error || callback_result.is_ok() => {
                         if compressed_consumed != wayfinder.compressed_size_hint() {
                             Err(VerifiedReaderFailure::Archive(
                                 ErrorKind::InvalidSize {
@@ -3813,6 +3870,7 @@ where
                             accounting_result
                         }
                     },
+                    Ok(()) => accounting_result,
                 };
                 complete_verified_callback(callback_result, verification)
             },
@@ -13106,6 +13164,78 @@ mod tests {
     }
 
     #[test]
+    fn callback_scoped_abortable_reader_stops_short_source_after_callback_error() {
+        let payload = vec![b'a'; 256 * 1024 + 11];
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("payload.bin", &payload).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let length = u64::try_from(bytes.len()).unwrap();
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let indexed = IndexedArchive::from_reader_with_limits(
+            InstrumentedChunkedReaderAt {
+                bytes,
+                max_chunk: 7,
+                requests: Arc::clone(&requests),
+            },
+            length,
+            ArchiveLimits::default(),
+        )
+        .unwrap();
+        let entry_id = indexed.entry_id("payload.bin").unwrap();
+
+        requests.lock().unwrap().clear();
+        let decoded = indexed
+            .with_verified_entry_reader(entry_id, |reader| {
+                let mut decoded = Vec::new();
+                reader.read_to_end(&mut decoded)?;
+                Ok::<_, io::Error>(decoded)
+            })
+            .unwrap();
+        assert_eq!(decoded, payload);
+        let full_read: usize = requests
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(_, actual)| *actual)
+            .sum();
+        assert!(full_read >= payload.len());
+
+        requests.lock().unwrap().clear();
+        let error = indexed
+            .with_verified_entry_reader_abortable(entry_id, |reader| {
+                let mut prefix = [0_u8; 1];
+                reader.read_exact(&mut prefix)?;
+                Err::<(), _>(io::Error::other("callback stopped"))
+            })
+            .unwrap_err();
+        assert!(matches!(error, VerifiedEntryReaderError::Callback(_)));
+        let abort_read: usize = requests
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(_, actual)| *actual)
+            .sum();
+
+        requests.lock().unwrap().clear();
+        let error = indexed
+            .with_verified_entry_reader(entry_id, |reader| {
+                let mut prefix = [0_u8; 1];
+                reader.read_exact(&mut prefix)?;
+                Err::<(), _>(io::Error::other("callback stopped"))
+            })
+            .unwrap_err();
+        assert!(matches!(error, VerifiedEntryReaderError::Callback(_)));
+        let drained_read: usize = requests
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(_, actual)| *actual)
+            .sum();
+        assert!(drained_read > abort_read);
+        assert!(drained_read >= payload.len());
+    }
+
+    #[test]
     fn callback_scoped_reader_retains_callback_error_on_archive_failure() {
         let payload = b"callback secondary error payload";
         let mut writer = StreamingArchiveWriter::new();
@@ -13126,6 +13256,68 @@ mod tests {
             matches!(error.archive(), Some(error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. }))
         );
         assert!(error.callback().is_some());
+    }
+
+    #[test]
+    fn callback_scoped_reader_drains_descriptor_failures_but_abortable_reader_stops() {
+        let payload = b"descriptor callback payload";
+        for signature in [false, true] {
+            let mut bytes = stored_descriptor_fixture(payload, signature);
+            let payload_start = 30 + b"stored.bin".len();
+            bytes[payload_start] ^= 0x80;
+
+            let indexed = indexed_archive(bytes.clone());
+            let entry_id = indexed.entry_id("stored.bin").unwrap();
+            let error = indexed
+                .with_verified_entry_reader(entry_id, |_reader| {
+                    Err::<(), _>(io::Error::other("callback stopped"))
+                })
+                .unwrap_err();
+            assert!(matches!(
+                error.archive(),
+                Some(error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. })
+            ));
+            assert!(error.callback().is_some());
+
+            let indexed = indexed_archive(bytes);
+            let entry_id = indexed.entry_id("stored.bin").unwrap();
+            let error = indexed
+                .with_verified_entry_reader_abortable(entry_id, |_reader| {
+                    Err::<(), _>(io::Error::other("callback stopped"))
+                })
+                .unwrap_err();
+            assert!(matches!(error, VerifiedEntryReaderError::Callback(_)));
+
+            let mut bytes = stored_descriptor_fixture(payload, signature);
+            let descriptor = descriptor_start(payload, signature);
+            bytes[descriptor..descriptor + 4].copy_from_slice(&0_u32.to_le_bytes());
+            for abortable in [false, true] {
+                let indexed = indexed_archive(bytes.clone());
+                let entry_id = indexed.entry_id("stored.bin").unwrap();
+                let mut called = false;
+                let error = if abortable {
+                    indexed
+                        .with_verified_entry_reader_abortable(entry_id, |_reader| {
+                            called = true;
+                            Err::<(), _>(io::Error::other("callback stopped"))
+                        })
+                        .unwrap_err()
+                } else {
+                    indexed
+                        .with_verified_entry_reader(entry_id, |_reader| {
+                            called = true;
+                            Err::<(), _>(io::Error::other("callback stopped"))
+                        })
+                        .unwrap_err()
+                };
+                assert!(!called);
+                assert!(matches!(
+                    error.archive(),
+                    Some(error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. })
+                ));
+                assert!(error.callback().is_none());
+            }
+        }
     }
 
     #[test]

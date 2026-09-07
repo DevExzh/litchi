@@ -1,0 +1,193 @@
+{
+  "amendment": {
+    "base_protocol": "protocol.json",
+    "base_protocol_sha256": "a451ae1d963d441321fad486bcfef7834f5d3487b4ed19fb150d0342ec53bd80",
+    "oracle_change": "environment.rustflags must be null",
+    "reason": "The preserved baseline report records rustflags null; this amendment changes only the copied report oracle expectation and makes no frame-pointer build claim.",
+    "schema": "litchi-0457-control-protocol-amendment-v1",
+    "scope": "R1 retry and R2 current-build control"
+  },
+  "capture_driver_sha256": "1240fb87b02da86c9e34a1399efdcb5268c34654479898b0a6bb30665c492a6f",
+  "change": 457,
+  "claims": {
+    "allowed": [
+      "current-revision baseline timing, allocation, process-RSS, and CPU-counter observations for the named selector and scope",
+      "output identity and deterministic semantic checks"
+    ],
+    "withheld": [
+      "before/after speedup or regression",
+      "causal hotspot attribution",
+      "bounded-memory, source-backed, physical-I/O, scaling, or cancellation claim"
+    ]
+  },
+  "cpu": 2,
+  "custody": {
+    "driver_path": "../check.py",
+    "driver_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+    "expected_source_manifest": {
+      "files": 7007,
+      "path": "sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json",
+      "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89"
+    }
+  },
+  "environment": {
+    "allocator_observation": {
+      "keys": [
+        "GLIBC_TUNABLES"
+      ],
+      "policy": "record ambient values and pass them through unchanged; never tune",
+      "prefixes": [
+        "MALLOC_"
+      ]
+    },
+    "fixed": {
+      "DEBUGINFOD_URLS": "",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "RUSTUP_TOOLCHAIN": "1.98.1"
+    }
+  },
+  "matrix": {
+    "reports": 12,
+    "reports_per_phase": 6,
+    "retained_samples": 360,
+    "samples_per_report": 30
+  },
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "oracle": {
+    "argv": [
+      "{python}",
+      "-B",
+      "{verifier}",
+      "--report",
+      "{report}",
+      "--mode",
+      "{mode}",
+      "--shape",
+      "{shape}"
+    ],
+    "protocol_path": "oracle/protocol.json",
+    "protocol_sha256": "8d98a7c4e1efd74cf20d4cab414c202e5e64b4295cfc664ad976a4ee9d752a8f",
+    "success_stdout": "VALID",
+    "verifier_path": "oracle/verify-report-r1.py",
+    "verifier_sha256": "cb7c76d6f2522e838bc26c72ed4e470380d846a63152f468fe9b79df1c088f41"
+  },
+  "order": [
+    {
+      "mode": "normal",
+      "phase": "R1",
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "mode": "normal",
+      "phase": "R1",
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "mode": "normal",
+      "phase": "R1",
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "mode": "allocator",
+      "phase": "R1",
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "mode": "allocator",
+      "phase": "R1",
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "mode": "allocator",
+      "phase": "R1",
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "mode": "allocator",
+      "phase": "R2",
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "mode": "allocator",
+      "phase": "R2",
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "mode": "allocator",
+      "phase": "R2",
+      "repeat": "R2",
+      "shape": "tiny"
+    },
+    {
+      "mode": "normal",
+      "phase": "R2",
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "mode": "normal",
+      "phase": "R2",
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "mode": "normal",
+      "phase": "R2",
+      "repeat": "R2",
+      "shape": "tiny"
+    }
+  ],
+  "purpose": "single current-revision ODP existing-document append control; no before/after or bounded claim",
+  "repeats": 2,
+  "roles": {
+    "control": {
+      "binary_binding": {
+        "path": "binary-bindings.json",
+        "sha256": "1423e0f091681aaf87537246d96b2e7dd73c434c229218c53b966eaa5dbe7e9e"
+      },
+      "build_receipt": {
+        "path": "build-receipt.json",
+        "sha256": "d984795360d6572fcd569c41a40cf5064f328dcb528d4e5923231c759c0116f0"
+      },
+      "revision": "48f11c7745f8f798a00e11a14f1f34dc1c9c7954",
+      "selector": "odp_existing_append_lifecycle",
+      "source_field": "odp_append",
+      "source_manifest": {
+        "files": 7007,
+        "path": "source-manifest.json",
+        "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89"
+      }
+    }
+  },
+  "samples": 30,
+  "schema": "litchi-0457-odp-existing-append-control-v1",
+  "selector": "odp_existing_append_lifecycle",
+  "shapes": {
+    "large": 8192,
+    "medium": 4096,
+    "tiny": 64
+  },
+  "status": "amended-r1-no-frame-pointer-claim",
+  "warmups": 3,
+  "workers": 1,
+  "workload_cli": {
+    "case_flag": "--case",
+    "catalog_flag": "--corpus-manifest",
+    "report_flag": "--json",
+    "samples_flag": "--samples",
+    "shape_flag": "--semantic-shape",
+    "warmup_flag": "--warmup",
+    "workers_flag": "--workers"
+  }
+}

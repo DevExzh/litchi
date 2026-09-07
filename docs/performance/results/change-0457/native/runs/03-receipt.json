@@ -1,0 +1,56 @@
+{
+  "fixture": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/masterpage_style_parent.odp",
+  "source_sha256": "ef36a19185beb776c54d367758ebe8b7d815b5c7bd39ed869473e45255d50e60",
+  "argv": [
+    "/tmp/litchi-goal-0457/candidate/odp_native_tail_append_probe",
+    "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/masterpage_style_parent.odp",
+    "/tmp/litchi-goal-0457/native/03.odp",
+    "Native title & <字> café",
+    "Native body Ω 😀"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-09-07T12:43:22.424230+00:00",
+  "exit_code": 0,
+  "log": "03-probe.log",
+  "log_sha256": "1e86c1fe10c626896fe610fb364588aa7d111c4d8ffb617ad1cbae8fa2719d5c",
+  "title": "Native title & <字> café",
+  "body": "Native body Ω 😀",
+  "retained_source": {
+    "path": "03-source.odp.gz",
+    "bytes": 16108,
+    "sha256": "e8bc693ac6b1ddd77f9af667ac6922af2b4d4c81cbc890bd9ca2c579488d961e",
+    "decoded_bytes": 17790,
+    "decoded_sha256": "ef36a19185beb776c54d367758ebe8b7d815b5c7bd39ed869473e45255d50e60"
+  },
+  "output": {
+    "path": "/tmp/litchi-goal-0457/native/03.odp",
+    "bytes": 17912,
+    "sha256": "65005344ada734e9a0bb1fedfd99d86beea4678a95cc97502056f0d442619f01"
+  },
+  "retained_output": {
+    "path": "03-output.odp.gz",
+    "bytes": 16233,
+    "sha256": "1ba21aab92b99a71cb3b7f6df46fd4af8b44c899e987ea68f8975163021a1a1e",
+    "decoded_bytes": 17912,
+    "decoded_sha256": "65005344ada734e9a0bb1fedfd99d86beea4678a95cc97502056f0d442619f01"
+  },
+  "oracle": {
+    "argv": [
+      "python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native/verify-output.py",
+      "--source",
+      "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/masterpage_style_parent.odp",
+      "--output",
+      "/tmp/litchi-goal-0457/native/03.odp",
+      "--title",
+      "Native title & <字> café",
+      "--body",
+      "Native body Ω 😀"
+    ],
+    "exit_code": 0,
+    "log": "03-oracle.log",
+    "sha256": "19f4b6630ee2222d1e2617a8afb62bf330d28c08a50b0cedc1f802048bd9d76d"
+  },
+  "status": "validated"
+}

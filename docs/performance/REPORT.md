@@ -1,5 +1,82 @@
 # Performance program phase report
 
+## Change 0457: bounded existing-ODP baseline and source-tail evidence
+
+0457 recaptures the ordinary `odp_existing_append_lifecycle` selector at the
+current revision and measures a separate `odp_source_tail_append_lifecycle`
+publication plan. The final comparison retains 12 rows with 30 samples each;
+the final control and candidate summaries each retain 360 samples: R1/R2,
+normal/allocator, three warmups and 30 operations for each 64/4,096/8,192-slide
+shape on CPU 2 with one worker. The ordinary ODP owner already implements the owned
+`edit::Snapshot`/`edit::Transaction`/`edit::Patch`/`edit::Commit` lifecycle;
+this candidate does not reuse that surface, so the comparison reports numeric
+endpoints for a specialized publication contract only.
+
+| Shape | Control normal p50 R1 / R2 | Candidate normal p50 R1 / R2 | Delta R1 / R2 |
+|---|---:|---:|---:|
+| Tiny, 64 slides | 1.900 / 1.911 ms | 1.266 / 1.277 ms | -33.352% / -33.185% |
+| Medium, 4,096 slides | 74.708 / 75.685 ms | 77.145 / 73.822 ms | +3.262% / -2.461% |
+| Large, 8,192 slides | 150.684 / 153.802 ms | 147.761 / 147.311 ms | -1.940% / -4.221% |
+
+The allocator matrix reports operation-scoped working sets. Control versus
+source-tail allocated bytes are 10,613,383 vs 2,607,922 (tiny), 110,226,105 vs
+36,593,937 (medium), and 211,442,207 vs 71,164,177 (large). Regional peak
+above entry is 781,342 vs 620,381, 18,027,568 vs 620,385, and 35,958,388 vs
+620,385 bytes respectively. These are allocator vectors, not process RSS or
+total document memory; source and fixture ownership already live at entry are
+excluded, and candidate allocation volume grows with document size.
+
+The complete p50/p95/p99 rows, process-RSS and GNU-time scopes, allocator
+vectors, and independent bootstrap intervals are in the
+[final comparison receipt](results/change-0457/comparison-final.json). R1
+normal tiny is +8.301% and R2 normal tiny is +6.517%; allocator tiny is
++10.184% in R1, while allocator large is -5.113% / -5.740% in R1/R2. The
+remaining process-peak rows are within the five-percent threshold.
+Normal-binary medium/large p50 deltas stay within 4.221% in both repeats.
+These are descriptive comparisons of distinct
+result contracts, not ordinary Commit/Patch speedup, regression, retained
+result equivalence, causal, bounded-memory, scaling or physical-I/O evidence.
+
+The ordinary ODP control is now the formal current-revision baseline for this
+append matrix. The machine-readable coverage index still keeps its row
+`correctness-only`: its `measured` status is reserved for checked-catalog
+default timing contracts, while this 0457 matrix uses generated-per-run
+corpora. The source registry mapping verifies 439 selectable selectors and 36
+defaults; ODP selectors remain opt-in. This records the reproducible formal
+baseline without promoting a generated specialized plan into the default CRUD
+timing matrix. The remaining implementation gap is integration of the
+source-tail publisher with the existing ordinary editor lifecycle.
+
+The [final source read review](results/change-0457/final-code-review.md)
+records the retained-fragment lease fix as
+resolved and found no additional verified blocker. The final identity-bound
+set has ten native records and three synthetic source/output pairs, all passing
+independent replay. ZIP, ODF-common and ODP release suites pass 1,348 tests
+with three ignored (ODF-common 499, ZIP 481, and ODP 368);
+the harness passes 383 with one ignored and OPC passes 497 with one ignored.
+The focused append suite passes 10/10, non-iWork formatting and workspace /
+boundary receipts pass, and both ZIP/XML ASAN lanes retain 1,000 runs. Initial
+pre-fix large-normal
+profiling retains 1,000 sampled `cycles:u` observations. Candidate top symbols are
+SHA-256 compression 11.00%, XML `validate_name` 9.08%, `memcmp` 6.01% and
+`validate_start_element` 5.42%; control top symbols are `memcmp` 9.67%,
+Quick-XML attribute iteration 6.00%, `memmove` 5.76% and namespace-prefix
+resolution 5.24%. The profiles are whole-process sampled stacks, not
+API-attributed CPU percentages or causal hotspots, and perf hard-counter totals
+were not collected. These whole-process samples remain initial pre-fix
+diagnostics, not final candidate attribution; no sampling profile was captured
+for the final candidate epoch. Candidate profile checking passes for this
+initial
+capture. The control's report
+and raw profile are unchanged and pass the existing amended oracle after the
+original frame-pointer expectation failed; the correction is retained in
+[the amendment](results/change-0457/profiling/control-oracle-amendment.json).
+Sealed precleanup, portable-copy replay and three altered-copy rejection checks
+pass, and owned staging cleanup is recorded in the
+[bundle](results/change-0457/README.md). The full non-iWork goal remains open; see the
+[final candidate summary](results/change-0457/candidate-final/summary.json)
+and [final comparison](results/change-0457/comparison-final.json).
+
 ## Change 0456: smaller shared-payload publication working set
 
 The [0456 batch](changes/0456-zip-shared-payload-framing.md) removes a duplicate

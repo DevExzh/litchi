@@ -1,0 +1,91 @@
+   Compiling der_derive v0.7.3
+   Compiling thiserror-impl v2.0.18
+    Checking rand v0.8.8
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling phf_macros v0.14.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+error[E0432]: unresolved import `crate::ZipFilePath`
+  --> crates/soapberry-zip/src/preserve/replay.rs:16:60
+   |
+16 | use crate::{CompressionMethod, Error, ErrorKind, ReaderAt, ZipFilePath};
+   |                                                            ^^^^^^^^^^^ no `ZipFilePath` in the root
+   |
+   = help: consider importing this struct instead:
+           crate::path::ZipFilePath
+
+    Checking der v0.7.10
+error[E0603]: module `mem` is private
+   --> crates/soapberry-zip/src/preserve/replay.rs:17:13
+    |
+ 17 | use flate2::mem::{FlushCompress, Status};
+    |             ^^^   ------------- enum `FlushCompress` is not publicly re-exported
+    |             |
+    |             private module
+    |
+note: the module `mem` is defined here
+   --> /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/flate2-1.1.10/src/lib.rs:155:1
+    |
+155 | mod mem;
+    | ^^^^^^^
+
+error[E0603]: module `mem` is private
+   --> crates/soapberry-zip/src/preserve/replay.rs:17:13
+    |
+ 17 | use flate2::mem::{FlushCompress, Status};
+    |             ^^^ private module   ------ enum `Status` is not publicly re-exported
+    |
+note: the module `mem` is defined here
+   --> /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/flate2-1.1.10/src/lib.rs:155:1
+    |
+155 | mod mem;
+    | ^^^^^^^
+
+    Checking num-bigint-dig v0.8.6
+    Checking thiserror v2.0.18
+    Checking bergshamra-core v0.7.0
+    Checking bergshamra-xml v0.7.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking spki v0.7.3
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking pkcs8 v0.10.2
+    Checking sec1 v0.7.3
+    Checking pkcs1 v0.7.5
+error[E0382]: borrow of moved value: `sink`
+   --> crates/soapberry-zip/src/preserve/replay.rs:682:35
+    |
+651 |     sink: &mut ReplaySink<W>,
+    |     ---- move occurs because `sink` has type `&mut ReplaySink<W>`, which does not implement the `Copy` trait
+...
+674 |         sink,
+    |         ---- value moved here
+...
+682 |         if let Some(sink_error) = sink.take_error() {
+    |                                   ^^^^ value borrowed here after move
+    |
+help: consider creating a fresh reborrow of `sink` here
+    |
+674 |         &mut *sink,
+    |         ++++++
+
+error: lifetime may not live long enough
+   --> crates/soapberry-zip/src/preserve/replay.rs:771:9
+    |
+769 |           accounting: Option<(&mut ZipOperationAccounting, AccountingWriteKind)>,
+    |                               - let's call the lifetime of this reference `'1`
+770 |       ) -> Self {
+    |            ---- return type is ReplayPayloadWriter<'2, W>
+771 | /         Self {
+772 | |             compression,
+773 | |             limits,
+774 | |             sink,
+...   |
+784 | |             finished: false,
+785 | |         }
+    | |_________^ associated function was supposed to return data with lifetime `'2` but it is returning data with lifetime `'1`
+
+    Checking elliptic-curve v0.13.8
+    Checking rsa v0.9.10
+Some errors have detailed explanations: E0382, E0432, E0603.
+For more information about an error, try `rustc --explain E0382`.
+error: could not compile `soapberry-zip` (lib) due to 5 previous errors
+warning: build failed, waiting for other jobs to finish...

@@ -1,0 +1,151 @@
+{
+  "content": {
+    "exact_source_prefix_verified": true,
+    "exact_source_suffix_verified": true,
+    "generated_page": {
+      "name": "page2",
+      "roles": [
+        {
+          "role": "title",
+          "text_bytes": 26
+        },
+        {
+          "role": "object",
+          "text_bytes": 19
+        }
+      ]
+    },
+    "generated_page_sha256": "3f214f9dd044b21f40fba0e238a4c909e846d48e517671181a48fce3d7311e8e",
+    "one_extra_direct_draw_page_verified": true,
+    "output_content_xml_bytes": 14802,
+    "output_content_xml_sha256": "ff9bbc402b321fd5484953494b413f129d395c866b666211ef19edaf26d8f352",
+    "output_generated_page_end_byte": 14681,
+    "output_generated_page_start_byte": 13977,
+    "output_page_count": 2,
+    "output_page_names": [
+      "page1",
+      "page2"
+    ],
+    "source_content_xml_bytes": 14098,
+    "source_content_xml_sha256": "aabdbfc96d5d36b7083b11ea92d339ff0f3fdd734bc7ffa862fefe5daacb2b49",
+    "source_last_page_end_byte": 13977,
+    "source_leading_direct_children": [],
+    "source_page_count": 1,
+    "source_page_names": [
+      "page1"
+    ],
+    "source_pages_contiguous": true,
+    "source_prefix_sha256": "a4f274e58f500b20759ab926e8ea87bf92cff35286126aafb581bcaaa8899f24",
+    "source_suffix_sha256": "1cefe969866c9f7b23991e5c00fe33a3dfe5240d95b780434b5a1ff6e10874fe",
+    "source_trailing_direct_children": [
+      "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0}settings"
+    ]
+  },
+  "output": {
+    "bytes": 17441,
+    "path": "/tmp/litchi-goal-0457/native/06.odp",
+    "sha256": "be5d0d22888e49e27ee5ee9d8e1f187861071b8dd9f0677d38854a5cf23c76a0"
+  },
+  "output_archive_sha256": "be5d0d22888e49e27ee5ee9d8e1f187861071b8dd9f0677d38854a5cf23c76a0",
+  "request": {
+    "body": "Native body Ω 😀",
+    "name": "page2",
+    "title": "Native title & <字> café"
+  },
+  "schema": "litchi-0457-native-odp-append-oracle-v1",
+  "source": {
+    "bytes": 17335,
+    "inventory_binding": {
+      "bytes": 17335,
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf102223.odp",
+      "sha256": "0dcb0606e5d7352faee806ebb02fa6414773574bf6082bcde07725be2a744ee2",
+      "static_only": true
+    },
+    "path": "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf102223.odp",
+    "sha256": "0dcb0606e5d7352faee806ebb02fa6414773574bf6082bcde07725be2a744ee2"
+  },
+  "source_archive_sha256": "0dcb0606e5d7352faee806ebb02fa6414773574bf6082bcde07725be2a744ee2",
+  "source_hash_verified": true,
+  "static_only_classification": "independent ZIP/XML append oracle; no native application or semantic Rust reopen claim",
+  "status": "validated",
+  "zip": {
+    "archive_comment_verified": true,
+    "central_member_order_verified": true,
+    "local_member_order_verified": true,
+    "target_dynamic_central_fields": {
+      "output_compressed_size": 2070,
+      "output_crc32": 2591439687,
+      "output_date": 0,
+      "output_flags": 0,
+      "output_time": 0,
+      "output_uncompressed_size": 14802,
+      "source_compressed_size": 1948,
+      "source_crc32": 3377278083,
+      "source_uncompressed_size": 14098
+    },
+    "target_local_central_self_consistent": true,
+    "target_member": "content.xml",
+    "target_output_compression_method": 8,
+    "target_output_dynamic_sizes": {
+      "compressed_size": 2070,
+      "crc32": 2591439687,
+      "uncompressed_size": 14802
+    },
+    "target_source_compression_method": 8,
+    "untouched_member_count": 16,
+    "untouched_members_central_records_offset_only_verified": [
+      "mimetype",
+      "Thumbnails/thumbnail.png",
+      "meta.xml",
+      "settings.xml",
+      "Configurations2/toolpanel/",
+      "Configurations2/menubar/",
+      "Configurations2/floater/",
+      "Configurations2/accelerator/",
+      "Configurations2/statusbar/",
+      "Configurations2/popupmenu/",
+      "Configurations2/images/Bitmaps/",
+      "Configurations2/progressbar/",
+      "Configurations2/toolbar/",
+      "styles.xml",
+      "Pictures/TablePreview1.svm",
+      "META-INF/manifest.xml"
+    ],
+    "untouched_members_compressed_payload_verified": [
+      "mimetype",
+      "Thumbnails/thumbnail.png",
+      "meta.xml",
+      "settings.xml",
+      "Configurations2/toolpanel/",
+      "Configurations2/menubar/",
+      "Configurations2/floater/",
+      "Configurations2/accelerator/",
+      "Configurations2/statusbar/",
+      "Configurations2/popupmenu/",
+      "Configurations2/images/Bitmaps/",
+      "Configurations2/progressbar/",
+      "Configurations2/toolbar/",
+      "styles.xml",
+      "Pictures/TablePreview1.svm",
+      "META-INF/manifest.xml"
+    ],
+    "untouched_members_raw_local_spans_verified": [
+      "mimetype",
+      "Thumbnails/thumbnail.png",
+      "meta.xml",
+      "settings.xml",
+      "Configurations2/toolpanel/",
+      "Configurations2/menubar/",
+      "Configurations2/floater/",
+      "Configurations2/accelerator/",
+      "Configurations2/statusbar/",
+      "Configurations2/popupmenu/",
+      "Configurations2/images/Bitmaps/",
+      "Configurations2/progressbar/",
+      "Configurations2/toolbar/",
+      "styles.xml",
+      "Pictures/TablePreview1.svm",
+      "META-INF/manifest.xml"
+    ]
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "change": 457,
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0457/candidate-final/bind-output.py",
+    "--repo-root",
+    "/home/zhuhe/code/litchi",
+    "--native-oracle",
+    "docs/performance/results/change-0457/native/verify-output.py",
+    "--protocol",
+    "docs/performance/results/change-0457/candidate-final/protocol.json",
+    "--fixture",
+    "tiny",
+    "/tmp/litchi-goal-0457/candidate-final-probe/tiny-source.odp",
+    "/tmp/litchi-goal-0457/candidate-final-probe/tiny-candidate.odp",
+    "--fixture",
+    "medium",
+    "/tmp/litchi-goal-0457/candidate-final-probe/medium-source.odp",
+    "/tmp/litchi-goal-0457/candidate-final-probe/medium-candidate.odp",
+    "--fixture",
+    "large",
+    "/tmp/litchi-goal-0457/candidate-final-probe/large-source.odp",
+    "/tmp/litchi-goal-0457/candidate-final-probe/large-candidate.odp"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "revision": "48f11c7745f8f798a00e11a14f1f34dc1c9c7954",
+  "driver_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_scope": "workspace and standalone tools",
+  "started_utc": "2026-09-07T13:36:56.591560+00:00",
+  "source_before": {
+    "path": "sources/02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8.json",
+    "sha256": "02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8",
+    "files": 7027
+  },
+  "status": "pass",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T13:36:58.701091+00:00",
+  "source_after": {
+    "path": "sources/02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8.json",
+    "sha256": "02bccec20b3cc3129c34c7d1f8927595235df0ce015a7eecbc08b73785dcd3b8",
+    "files": 7027
+  },
+  "source_unchanged": true,
+  "log": {
+    "path": "checks/output-binding-final.log",
+    "bytes": 215,
+    "sha256": "2262c9dfa0481226fb7e7b4219051730c9f346f4c56cf60ed07423c695017edc"
+  }
+}

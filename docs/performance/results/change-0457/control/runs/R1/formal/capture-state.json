@@ -1,0 +1,47 @@
+{
+  "allocator_environment": {},
+  "allocator_environment_after": {},
+  "attempt": "formal",
+  "change": 457,
+  "completed_lanes": 1,
+  "driver_sha256": "1240fb87b02da86c9e34a1399efdcb5268c34654479898b0a6bb30665c492a6f",
+  "expected_lanes": 6,
+  "finished_utc": "2026-09-07T10:18:43.292441+00:00",
+  "index": [
+    "runs/R1/formal/R1-normal-tiny-r1-receipt.json"
+  ],
+  "outside_bundle_status_unchanged": true,
+  "phase": "R1",
+  "protocol_sha256": "a451ae1d963d441321fad486bcfef7834f5d3487b4ed19fb150d0342ec53bd80",
+  "schema": "litchi-0457-control-capture-state-v1",
+  "source_after": {
+    "files": 7007,
+    "path": "sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json",
+    "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89"
+  },
+  "source_before": {
+    "files": 7007,
+    "path": "sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json",
+    "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89"
+  },
+  "source_unchanged": true,
+  "status": "failed",
+  "status_after": [
+    "?? docs/GOAL.md",
+    "?? docs/performance/results/change-0457/check.py",
+    "?? docs/performance/results/change-0457/checks/baseline-build.json",
+    "?? docs/performance/results/change-0457/checks/control-r1.json",
+    "?? docs/performance/results/change-0457/hypothesis.md",
+    "?? docs/performance/results/change-0457/parent.json",
+    "?? docs/performance/results/change-0457/sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json"
+  ],
+  "status_before": [
+    "?? docs/GOAL.md",
+    "?? docs/performance/results/change-0457/check.py",
+    "?? docs/performance/results/change-0457/checks/baseline-build.json",
+    "?? docs/performance/results/change-0457/checks/control-r1.json",
+    "?? docs/performance/results/change-0457/hypothesis.md",
+    "?? docs/performance/results/change-0457/parent.json",
+    "?? docs/performance/results/change-0457/sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json"
+  ]
+}

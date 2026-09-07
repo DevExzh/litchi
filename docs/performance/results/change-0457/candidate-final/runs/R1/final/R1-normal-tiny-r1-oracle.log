@@ -1,0 +1,3 @@
+argv=["/usr/bin/python3", "-B", "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/oracle/verify-report.py", "--report", "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate-final/runs/R1/final/R1-normal-tiny-r1.json", "--mode", "normal", "--shape", "tiny"]
+stdout=VALID
+stderr=

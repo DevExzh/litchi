@@ -1,0 +1,56 @@
+{
+  "fixture": "3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf102223.odp",
+  "source_sha256": "0dcb0606e5d7352faee806ebb02fa6414773574bf6082bcde07725be2a744ee2",
+  "argv": [
+    "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+    "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf102223.odp",
+    "/tmp/litchi-goal-0457/native-final/06.odp",
+    "Native title & <字> café",
+    "Native body Ω 😀"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-09-07T13:37:26.789818+00:00",
+  "exit_code": 0,
+  "log": "06-probe.log",
+  "log_sha256": "7930484bb7c7823bf3d29838dc90ad4efffb18242824260baf82dcb5334f267f",
+  "title": "Native title & <字> café",
+  "body": "Native body Ω 😀",
+  "retained_source": {
+    "path": "06-source.odp.gz",
+    "bytes": 15849,
+    "sha256": "fa80d4778b8b7f0472ab6f13d54fa47ee53a31bc3bd1114c6d21c6989453d5c2",
+    "decoded_bytes": 17335,
+    "decoded_sha256": "0dcb0606e5d7352faee806ebb02fa6414773574bf6082bcde07725be2a744ee2"
+  },
+  "output": {
+    "path": "/tmp/litchi-goal-0457/native-final/06.odp",
+    "bytes": 17441,
+    "sha256": "be5d0d22888e49e27ee5ee9d8e1f187861071b8dd9f0677d38854a5cf23c76a0"
+  },
+  "retained_output": {
+    "path": "06-output.odp.gz",
+    "bytes": 15978,
+    "sha256": "0e9e1a3ca93d7039d6986e42143bcd2a4f2b79f83b66747c6b618f5f7a8e0654",
+    "decoded_bytes": 17441,
+    "decoded_sha256": "be5d0d22888e49e27ee5ee9d8e1f187861071b8dd9f0677d38854a5cf23c76a0"
+  },
+  "oracle": {
+    "argv": [
+      "python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+      "--source",
+      "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf102223.odp",
+      "--output",
+      "/tmp/litchi-goal-0457/native-final/06.odp",
+      "--title",
+      "Native title & <字> café",
+      "--body",
+      "Native body Ω 😀"
+    ],
+    "exit_code": 0,
+    "log": "06-oracle.log",
+    "sha256": "6093fc6fdd7d4b43c6e84b7d99c5aa655b27e04a98212ab3d665f4b3780ba3e5"
+  },
+  "status": "validated"
+}

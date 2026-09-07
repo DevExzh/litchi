@@ -1,0 +1,139 @@
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+    Checking litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+error: the borrowed expression implements the required traits
+   --> crates/litchi-odf-common/tests/source_content_insertion.rs:433:36
+    |
+433 |             .write_to(&mut output, &SourceContentPublicationOptions::new())
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `SourceContentPublicationOptions::new()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+    = note: `-D clippy::needless-borrows-for-generic-args` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::needless_borrows_for_generic_args)]`
+
+error: the borrowed expression implements the required traits
+   --> crates/litchi-odf-common/tests/source_content_insertion.rs:510:32
+    |
+510 |         .write_to(&mut output, &SourceContentPublicationOptions::new())
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `SourceContentPublicationOptions::new()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> crates/litchi-odf-common/tests/source_content_insertion.rs:528:32
+    |
+528 |         .write_to(&mut output, &SourceContentPublicationOptions::new())
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `SourceContentPublicationOptions::new()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> crates/litchi-odf-common/tests/source_content_insertion.rs:547:30
+    |
+547 |         .write_to(&mut sink, &SourceContentPublicationOptions::new())
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `SourceContentPublicationOptions::new()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> crates/litchi-odf-common/tests/source_content_insertion.rs:566:29
+    |
+566 |         .write_to(ZeroSink, &SourceContentPublicationOptions::new())
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `SourceContentPublicationOptions::new()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> crates/litchi-odf-common/tests/source_content_insertion.rs:572:30
+    |
+572 |         .write_to(ErrorSink, &SourceContentPublicationOptions::new())
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `SourceContentPublicationOptions::new()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> crates/litchi-odf-common/tests/source_content_insertion.rs:583:13
+    |
+583 |             &SourceContentPublicationOptions::new(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `SourceContentPublicationOptions::new()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> crates/litchi-odf-common/tests/source_content_insertion.rs:613:13
+    |
+613 |             &SourceContentPublicationOptions::new().with_max_output_bytes(1),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `SourceContentPublicationOptions::new().with_max_output_bytes(1)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> crates/litchi-odf-common/tests/source_content_insertion.rs:668:13
+    |
+668 |             &SourceContentPublicationOptions::new().with_cancellation(token),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `SourceContentPublicationOptions::new().with_cancellation(token)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> crates/litchi-odf-common/tests/source_content_insertion.rs:755:9
+    |
+755 |         &SourceContentPublicationOptions::new().with_payload_verification(true),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `SourceContentPublicationOptions::new().with_payload_verification(true)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> crates/litchi-odf-common/tests/source_content_insertion.rs:850:13
+    |
+850 |             &SourceContentPublicationOptions::new().with_cancellation(token),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `SourceContentPublicationOptions::new().with_cancellation(token)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+
+error: could not compile `litchi-odf-common` (test "source_content_insertion") due to 11 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: clamp-like pattern without using clamp function
+   --> crates/litchi-odp/src/package/source_append.rs:444:37
+    |
+444 |           let candidate_token_bytes = limits
+    |  _____________________________________^
+445 | |             .max_fragment_bytes
+446 | |             .saturating_add(1024)
+447 | |             .min(64 * 1024 * 1024)
+448 | |             .max(1);
+    | |___________________^
+    |
+    = note: clamp will panic if max < min
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_clamp
+    = note: `-D clippy::manual-clamp` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::manual_clamp)]`
+help: replace with clamp
+    |
+444 ~         let candidate_token_bytes = limits
+445 +             .max_fragment_bytes
+446 ~             .saturating_add(1024).clamp(1, 64 * 1024 * 1024);
+    |
+
+error: this `impl` can be derived
+   --> crates/litchi-odp/src/package/source_append.rs:630:1
+    |
+630 | / impl Default for ElementKind {
+631 | |     fn default() -> Self {
+632 | |         Self::Other
+633 | |     }
+634 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#derivable_impls
+    = note: `-D clippy::derivable-impls` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::derivable_impls)]`
+help: replace the manual implementation with a derive attribute and mark the default variant
+    |
+622 + #[derive(Default)]
+623 | enum ElementKind {
+624 ~     #[default]
+625 ~     Other,
+    |
+
+error: could not compile `litchi-odp` (lib) due to 2 previous errors
+error: could not compile `litchi-odp` (lib) due to 2 previous errors

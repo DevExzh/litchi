@@ -1,0 +1,112 @@
+{
+  "allocator_environment": {},
+  "allocator_environment_after": {},
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate/runs/R2/formal/R2-normal-tiny-r2-resource.log",
+    "/tmp/litchi-goal-0457/candidate/litchi-perf-baseline",
+    "--case",
+    "odp_source_tail_append_lifecycle",
+    "--semantic-shape",
+    "tiny",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate/runs/R2/formal/R2-normal-tiny-r2.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate/runs/R2/formal/R2-normal-tiny-r2-catalog.json"
+  ],
+  "artifacts": {
+    "catalog": {
+      "bytes": 4927,
+      "path": "runs/R2/formal/R2-normal-tiny-r2-catalog.json",
+      "sha256": "0f4c0d0cf899265795b7c03e9f6ff9ab4e6c9f764bfcd6344d4a605453468db0"
+    },
+    "oracle_log": {
+      "bytes": 313,
+      "path": "runs/R2/formal/R2-normal-tiny-r2-oracle.log",
+      "sha256": "2849628f825d765fd870fd1a6456b9a55580fd24b74a9e769a73e26d28b7dd0e"
+    },
+    "report": {
+      "bytes": 53806,
+      "path": "runs/R2/formal/R2-normal-tiny-r2.json",
+      "sha256": "e81cd73fe418c0eca754225aab8627083237c019b3e3e8ae3d4769c0edc4d9d7"
+    },
+    "resource_log": {
+      "bytes": 1120,
+      "path": "runs/R2/formal/R2-normal-tiny-r2-resource.log",
+      "sha256": "436899606541ded0fb05685e56d4a9ea91974a300f6f57f9801226d6ae7e742e"
+    },
+    "workload_log": {
+      "bytes": 0,
+      "path": "runs/R2/formal/R2-normal-tiny-r2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": "formal",
+  "binary": {
+    "bytes": 58035160,
+    "copy_path": "/tmp/litchi-goal-0457/candidate/litchi-perf-baseline",
+    "executable": true,
+    "profile": "release",
+    "sha256": "ea02082d6da1ed46c72876c441f952588618cad1af6e627bb6ad9174a12370bd",
+    "source_path": "tools/perf-baseline/target/release/litchi-perf-baseline"
+  },
+  "binary_binding_sha256": "555e2c4b685e4686b3fe4e3efbbcaeb560e1dcfb5296eb52547ea4bd26cd825c",
+  "change": 457,
+  "custody_driver": "/home/zhuhe/code/litchi/docs/performance/results/change-0457/check.py",
+  "custody_driver_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "609a705bf61c8863e6e526d51d6571b89e12d101fb535002819865479412e614",
+  "exit_code": 0,
+  "finished_utc": "2026-09-07T12:50:33.888812+00:00",
+  "lane": {
+    "mode": "normal",
+    "phase": "R2",
+    "repeat": "R2",
+    "shape": "tiny"
+  },
+  "name": "R2-normal-tiny-r2",
+  "oracle_argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate/oracle/verify-report.py",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0457/candidate/runs/R2/formal/R2-normal-tiny-r2.json",
+    "--mode",
+    "normal",
+    "--shape",
+    "tiny"
+  ],
+  "oracle_exit_code": 0,
+  "oracle_stdout_sha256": "2849628f825d765fd870fd1a6456b9a55580fd24b74a9e769a73e26d28b7dd0e",
+  "output_binding_sha256": "b6ffcd0b6e4ceb1e04eb00c480f44932f9e4648124e7daa9aac9cdc9bbf3a7c3",
+  "phase": "R2",
+  "protocol_sha256": "f033f5c015343cd85589f62a2122cc4e7ab42f8b78c4f72fbcc521adc9c4d1e0",
+  "revision": "48f11c7745f8f798a00e11a14f1f34dc1c9c7954",
+  "role": "candidate",
+  "schema": "litchi-0457-source-tail-candidate-capture-receipt-v1",
+  "selector": "odp_source_tail_append_lifecycle",
+  "source_after": {
+    "files": 7023,
+    "path": "sources/8eff4cebced4d8831ed987b6cfb8ecb905caa296acdd590236c5c4e3c82ae4d4.json",
+    "sha256": "8eff4cebced4d8831ed987b6cfb8ecb905caa296acdd590236c5c4e3c82ae4d4"
+  },
+  "source_before": {
+    "files": 7023,
+    "path": "sources/8eff4cebced4d8831ed987b6cfb8ecb905caa296acdd590236c5c4e3c82ae4d4.json",
+    "sha256": "8eff4cebced4d8831ed987b6cfb8ecb905caa296acdd590236c5c4e3c82ae4d4"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-07T12:50:33.678301+00:00",
+  "status": "pass"
+}

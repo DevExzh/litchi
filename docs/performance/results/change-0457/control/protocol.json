@@ -1,0 +1,185 @@
+{
+  "schema": "litchi-0457-odp-existing-append-control-v1",
+  "change": 457,
+  "status": "frozen",
+  "purpose": "single current-revision ODP existing-document append control; no before/after or bounded claim",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 30,
+  "warmups": 3,
+  "repeats": 2,
+  "modes": [
+    "normal",
+    "allocator"
+  ],
+  "shapes": {
+    "tiny": 64,
+    "medium": 4096,
+    "large": 8192
+  },
+  "selector": "odp_existing_append_lifecycle",
+  "capture_driver_sha256": "1240fb87b02da86c9e34a1399efdcb5268c34654479898b0a6bb30665c492a6f",
+  "environment": {
+    "fixed": {
+      "DEBUGINFOD_URLS": "",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "RUSTUP_TOOLCHAIN": "1.98.1"
+    },
+    "allocator_observation": {
+      "keys": [
+        "GLIBC_TUNABLES"
+      ],
+      "prefixes": [
+        "MALLOC_"
+      ],
+      "policy": "record ambient values and pass them through unchanged; never tune"
+    }
+  },
+  "order": [
+    {
+      "phase": "R1",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R1",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R1"
+    },
+    {
+      "phase": "R2",
+      "mode": "allocator",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "allocator",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "allocator",
+      "shape": "tiny",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "normal",
+      "shape": "large",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "normal",
+      "shape": "medium",
+      "repeat": "R2"
+    },
+    {
+      "phase": "R2",
+      "mode": "normal",
+      "shape": "tiny",
+      "repeat": "R2"
+    }
+  ],
+  "matrix": {
+    "reports": 12,
+    "retained_samples": 360,
+    "reports_per_phase": 6,
+    "samples_per_report": 30
+  },
+  "roles": {
+    "control": {
+      "selector": "odp_existing_append_lifecycle",
+      "source_field": "odp_append",
+      "build_receipt": {
+        "path": "build-receipt.json",
+        "sha256": "d984795360d6572fcd569c41a40cf5064f328dcb528d4e5923231c759c0116f0"
+      },
+      "source_manifest": {
+        "path": "source-manifest.json",
+        "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89",
+        "files": 7007
+      },
+      "revision": "48f11c7745f8f798a00e11a14f1f34dc1c9c7954",
+      "binary_binding": {
+        "path": "binary-bindings.json",
+        "sha256": "1423e0f091681aaf87537246d96b2e7dd73c434c229218c53b966eaa5dbe7e9e"
+      }
+    }
+  },
+  "workload_cli": {
+    "case_flag": "--case",
+    "shape_flag": "--semantic-shape",
+    "workers_flag": "--workers",
+    "samples_flag": "--samples",
+    "warmup_flag": "--warmup",
+    "report_flag": "--json",
+    "catalog_flag": "--corpus-manifest"
+  },
+  "oracle": {
+    "verifier_path": "oracle/verify-report.py",
+    "verifier_sha256": "e4bca2715391cfb31637b86507c98f121df24b96405cb64df29902c09ef0aa4b",
+    "protocol_path": "oracle/protocol.json",
+    "protocol_sha256": "8d98a7c4e1efd74cf20d4cab414c202e5e64b4295cfc664ad976a4ee9d752a8f",
+    "argv": [
+      "{python}",
+      "-B",
+      "{verifier}",
+      "--report",
+      "{report}",
+      "--mode",
+      "{mode}",
+      "--shape",
+      "{shape}"
+    ],
+    "success_stdout": "VALID"
+  },
+  "custody": {
+    "driver_path": "../check.py",
+    "driver_sha256": "3c14bda87fae090f534a32d1c6d10b78cd9090d99c86f3484daadb1ecc18f5e6",
+    "expected_source_manifest": {
+      "path": "sources/aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89.json",
+      "sha256": "aebc0e84e8f98c41ad89e6c938892f3014d52cf338d59081c34ce43ca9e56c89",
+      "files": 7007
+    }
+  },
+  "claims": {
+    "allowed": [
+      "current-revision baseline timing, allocation, process-RSS, and CPU-counter observations for the named selector and scope",
+      "output identity and deterministic semantic checks"
+    ],
+    "withheld": [
+      "before/after speedup or regression",
+      "causal hotspot attribution",
+      "bounded-memory, source-backed, physical-I/O, scaling, or cancellation claim"
+    ]
+  }
+}

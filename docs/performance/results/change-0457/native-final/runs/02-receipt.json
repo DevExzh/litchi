@@ -1,0 +1,56 @@
+{
+  "fixture": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs-compat.odp",
+  "source_sha256": "c3807045610afa87e5e217284f236a0cbb7aaca2ca2eea6b0f0acc0c6a7746cf",
+  "argv": [
+    "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+    "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs-compat.odp",
+    "/tmp/litchi-goal-0457/native-final/02.odp",
+    "Native title & <字> café",
+    "Native body Ω 😀"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-09-07T13:37:26.615315+00:00",
+  "exit_code": 0,
+  "log": "02-probe.log",
+  "log_sha256": "4a9244038959a0739274287a649cadd1be10fb0b5ec71578ce695a6075d4407f",
+  "title": "Native title & <字> café",
+  "body": "Native body Ω 😀",
+  "retained_source": {
+    "path": "02-source.odp.gz",
+    "bytes": 10557,
+    "sha256": "2b2d41821264df4087694e541316d4827c6b60d5a9f40606165c1158b7cbf1c0",
+    "decoded_bytes": 11466,
+    "decoded_sha256": "c3807045610afa87e5e217284f236a0cbb7aaca2ca2eea6b0f0acc0c6a7746cf"
+  },
+  "output": {
+    "path": "/tmp/litchi-goal-0457/native-final/02.odp",
+    "bytes": 11589,
+    "sha256": "a724fbcf5fa0b2b7dd8fa0eab0051359eb90f25ed90483a09983837c99d0b1a8"
+  },
+  "retained_output": {
+    "path": "02-output.odp.gz",
+    "bytes": 10705,
+    "sha256": "eb85fb1bdd3eb3ed0982c02a93d1e2d5f3f23533c2c624e242a9860158821de0",
+    "decoded_bytes": 11589,
+    "decoded_sha256": "a724fbcf5fa0b2b7dd8fa0eab0051359eb90f25ed90483a09983837c99d0b1a8"
+  },
+  "oracle": {
+    "argv": [
+      "python3",
+      "-B",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+      "--source",
+      "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs-compat.odp",
+      "--output",
+      "/tmp/litchi-goal-0457/native-final/02.odp",
+      "--title",
+      "Native title & <字> café",
+      "--body",
+      "Native body Ω 😀"
+    ],
+    "exit_code": 0,
+    "log": "02-oracle.log",
+    "sha256": "f6c98355dbd2bc01f176fa6b5aa5ea020e4b519418dad07fe6f5d6d945fca1c8"
+  },
+  "status": "validated"
+}

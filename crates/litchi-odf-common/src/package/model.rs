@@ -227,6 +227,10 @@ impl ArchiveMetadata {
 pub(crate) type PreparedArchive = Arc<IndexedArchive<Arc<Vec<u8>>>>;
 
 /// A borrowed archive reader or an already-indexed owned archive.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "retain the existing inline borrowed reader to avoid an extra allocation on borrowed archive opens"
+)]
 pub(super) enum ArchiveReaderKind<'data> {
     Borrowed(ArchiveReader<'data>),
     Prepared(PreparedArchive),

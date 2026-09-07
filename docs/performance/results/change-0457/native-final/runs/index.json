@@ -1,0 +1,565 @@
+{
+  "binding_sha256": "599f1927b7ebbc8eeb1edf4a975dee4a7d086c47ded1055d9e2b1d6b04eb5f9e",
+  "records": [
+    {
+      "fixture": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf169979.odp",
+      "source_sha256": "160908f993c6ba901233695b12d34c4b009142971b36dcd57c0549bf8ee5656b",
+      "argv": [
+        "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+        "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf169979.odp",
+        "/tmp/litchi-goal-0457/native-final/00.odp",
+        "Native title & <字> café",
+        "Native body Ω 😀"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-09-07T13:37:26.511048+00:00",
+      "exit_code": 0,
+      "log": "00-probe.log",
+      "log_sha256": "f4887063214db3657bc69fedb0d9c757f1607f0ba1f8d9f388269bd265048963",
+      "title": "Native title & <字> café",
+      "body": "Native body Ω 😀",
+      "retained_source": {
+        "path": "00-source.odp.gz",
+        "bytes": 10763,
+        "sha256": "b43450193f7f6af45456842f9517b0cb1c17413126bfe1eea816e707982880cf",
+        "decoded_bytes": 12568,
+        "decoded_sha256": "160908f993c6ba901233695b12d34c4b009142971b36dcd57c0549bf8ee5656b"
+      },
+      "output": {
+        "path": "/tmp/litchi-goal-0457/native-final/00.odp",
+        "bytes": 12711,
+        "sha256": "adee86fc02f843e65aa71d546ccdfe139369ed14f4c540e5026a6b9299f0b64a"
+      },
+      "retained_output": {
+        "path": "00-output.odp.gz",
+        "bytes": 10905,
+        "sha256": "659ec730c8ed7b5ddacb6baa7602bde803b890ece2dd7da6f5ed791c88ad6707",
+        "decoded_bytes": 12711,
+        "decoded_sha256": "adee86fc02f843e65aa71d546ccdfe139369ed14f4c540e5026a6b9299f0b64a"
+      },
+      "oracle": {
+        "argv": [
+          "python3",
+          "-B",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+          "--source",
+          "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf169979.odp",
+          "--output",
+          "/tmp/litchi-goal-0457/native-final/00.odp",
+          "--title",
+          "Native title & <字> café",
+          "--body",
+          "Native body Ω 😀"
+        ],
+        "exit_code": 0,
+        "log": "00-oracle.log",
+        "sha256": "9e7899c824feabaffd6ea6393b26ff4bb2c09457c3ce80777000bcc92caaa863"
+      },
+      "status": "validated"
+    },
+    {
+      "fixture": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp",
+      "source_sha256": "06e7fb8bb06d3b2625c3c82bf1a9b2a6bc84ff2a25704596e5e31ee28a8c248b",
+      "argv": [
+        "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+        "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp",
+        "/tmp/litchi-goal-0457/native-final/01.odp",
+        "Native title & <字> café",
+        "Native body Ω 😀"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-09-07T13:37:26.569409+00:00",
+      "exit_code": 0,
+      "log": "01-probe.log",
+      "log_sha256": "aedcc082cd207ada96278d4361cb5677ef415432690b67cc17daa7b6f6dcf5d0",
+      "title": "Native title & <字> café",
+      "body": "Native body Ω 😀",
+      "retained_source": {
+        "path": "01-source.odp.gz",
+        "bytes": 10502,
+        "sha256": "6d0ecc48228e4bb6f5b109eb47c4a3dc3f76446115a6a2068ff45fd813ddad29",
+        "decoded_bytes": 11416,
+        "decoded_sha256": "06e7fb8bb06d3b2625c3c82bf1a9b2a6bc84ff2a25704596e5e31ee28a8c248b"
+      },
+      "output": {
+        "path": "/tmp/litchi-goal-0457/native-final/01.odp",
+        "bytes": 11539,
+        "sha256": "2e4f605c8d6264caf83b27950d11c3ae84fa6f79fa9ddc315681036a03662ff4"
+      },
+      "retained_output": {
+        "path": "01-output.odp.gz",
+        "bytes": 10645,
+        "sha256": "e5c92fe42ac49c8120e0cc5cf9b4cea5430e529fa518e77761795d0e3b7b76aa",
+        "decoded_bytes": 11539,
+        "decoded_sha256": "2e4f605c8d6264caf83b27950d11c3ae84fa6f79fa9ddc315681036a03662ff4"
+      },
+      "oracle": {
+        "argv": [
+          "python3",
+          "-B",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+          "--source",
+          "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp",
+          "--output",
+          "/tmp/litchi-goal-0457/native-final/01.odp",
+          "--title",
+          "Native title & <字> café",
+          "--body",
+          "Native body Ω 😀"
+        ],
+        "exit_code": 0,
+        "log": "01-oracle.log",
+        "sha256": "1b202e532707e2d209a5a08ab2c0f33b98fc3ee18f6cfcf7c356ec0d91acf64f"
+      },
+      "status": "validated"
+    },
+    {
+      "fixture": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs-compat.odp",
+      "source_sha256": "c3807045610afa87e5e217284f236a0cbb7aaca2ca2eea6b0f0acc0c6a7746cf",
+      "argv": [
+        "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+        "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs-compat.odp",
+        "/tmp/litchi-goal-0457/native-final/02.odp",
+        "Native title & <字> café",
+        "Native body Ω 😀"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-09-07T13:37:26.615315+00:00",
+      "exit_code": 0,
+      "log": "02-probe.log",
+      "log_sha256": "4a9244038959a0739274287a649cadd1be10fb0b5ec71578ce695a6075d4407f",
+      "title": "Native title & <字> café",
+      "body": "Native body Ω 😀",
+      "retained_source": {
+        "path": "02-source.odp.gz",
+        "bytes": 10557,
+        "sha256": "2b2d41821264df4087694e541316d4827c6b60d5a9f40606165c1158b7cbf1c0",
+        "decoded_bytes": 11466,
+        "decoded_sha256": "c3807045610afa87e5e217284f236a0cbb7aaca2ca2eea6b0f0acc0c6a7746cf"
+      },
+      "output": {
+        "path": "/tmp/litchi-goal-0457/native-final/02.odp",
+        "bytes": 11589,
+        "sha256": "a724fbcf5fa0b2b7dd8fa0eab0051359eb90f25ed90483a09983837c99d0b1a8"
+      },
+      "retained_output": {
+        "path": "02-output.odp.gz",
+        "bytes": 10705,
+        "sha256": "eb85fb1bdd3eb3ed0982c02a93d1e2d5f3f23533c2c624e242a9860158821de0",
+        "decoded_bytes": 11589,
+        "decoded_sha256": "a724fbcf5fa0b2b7dd8fa0eab0051359eb90f25ed90483a09983837c99d0b1a8"
+      },
+      "oracle": {
+        "argv": [
+          "python3",
+          "-B",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+          "--source",
+          "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs-compat.odp",
+          "--output",
+          "/tmp/litchi-goal-0457/native-final/02.odp",
+          "--title",
+          "Native title & <字> café",
+          "--body",
+          "Native body Ω 😀"
+        ],
+        "exit_code": 0,
+        "log": "02-oracle.log",
+        "sha256": "f6c98355dbd2bc01f176fa6b5aa5ea020e4b519418dad07fe6f5d6d945fca1c8"
+      },
+      "status": "validated"
+    },
+    {
+      "fixture": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/masterpage_style_parent.odp",
+      "source_sha256": "ef36a19185beb776c54d367758ebe8b7d815b5c7bd39ed869473e45255d50e60",
+      "argv": [
+        "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+        "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/masterpage_style_parent.odp",
+        "/tmp/litchi-goal-0457/native-final/03.odp",
+        "Native title & <字> café",
+        "Native body Ω 😀"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-09-07T13:37:26.659220+00:00",
+      "exit_code": 0,
+      "log": "03-probe.log",
+      "log_sha256": "1e86c1fe10c626896fe610fb364588aa7d111c4d8ffb617ad1cbae8fa2719d5c",
+      "title": "Native title & <字> café",
+      "body": "Native body Ω 😀",
+      "retained_source": {
+        "path": "03-source.odp.gz",
+        "bytes": 16108,
+        "sha256": "e8bc693ac6b1ddd77f9af667ac6922af2b4d4c81cbc890bd9ca2c579488d961e",
+        "decoded_bytes": 17790,
+        "decoded_sha256": "ef36a19185beb776c54d367758ebe8b7d815b5c7bd39ed869473e45255d50e60"
+      },
+      "output": {
+        "path": "/tmp/litchi-goal-0457/native-final/03.odp",
+        "bytes": 17912,
+        "sha256": "65005344ada734e9a0bb1fedfd99d86beea4678a95cc97502056f0d442619f01"
+      },
+      "retained_output": {
+        "path": "03-output.odp.gz",
+        "bytes": 16233,
+        "sha256": "1ba21aab92b99a71cb3b7f6df46fd4af8b44c899e987ea68f8975163021a1a1e",
+        "decoded_bytes": 17912,
+        "decoded_sha256": "65005344ada734e9a0bb1fedfd99d86beea4678a95cc97502056f0d442619f01"
+      },
+      "oracle": {
+        "argv": [
+          "python3",
+          "-B",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+          "--source",
+          "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/masterpage_style_parent.odp",
+          "--output",
+          "/tmp/litchi-goal-0457/native-final/03.odp",
+          "--title",
+          "Native title & <字> café",
+          "--body",
+          "Native body Ω 😀"
+        ],
+        "exit_code": 0,
+        "log": "03-oracle.log",
+        "sha256": "04c1a129be17e7dab8f58743da8fc5736bf5948894dcc32f4fbe11c4cb82c804"
+      },
+      "status": "validated"
+    },
+    {
+      "fixture": "3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf123658_SearchAfterSlideChange.odp",
+      "source_sha256": "f1a4ac949addd581d704adf38098b0a0a757aad1fcf4ff884463a67d1e6baca4",
+      "argv": [
+        "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+        "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf123658_SearchAfterSlideChange.odp",
+        "/tmp/litchi-goal-0457/native-final/04.odp",
+        "Native title & <字> café",
+        "Native body Ω 😀"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-09-07T13:37:26.702382+00:00",
+      "exit_code": 0,
+      "log": "04-probe.log",
+      "log_sha256": "fc47ec8dade592452bac8fbfeb3916d4591e551a1f33969a07d1d00934479c69",
+      "title": "Native title & <字> café",
+      "body": "Native body Ω 😀",
+      "retained_source": {
+        "path": "04-source.odp.gz",
+        "bytes": 9824,
+        "sha256": "2bee130c47cea49139cc03ffd100fe35dd6aedec9978ce171a1ef1cc0837dbea",
+        "decoded_bytes": 11749,
+        "decoded_sha256": "f1a4ac949addd581d704adf38098b0a0a757aad1fcf4ff884463a67d1e6baca4"
+      },
+      "output": {
+        "path": "/tmp/litchi-goal-0457/native-final/04.odp",
+        "bytes": 11860,
+        "sha256": "409412099235d02e3cb90f152d74c61bd2956e2e8ffc1638a0c6b9d9253ffc5b"
+      },
+      "retained_output": {
+        "path": "04-output.odp.gz",
+        "bytes": 9945,
+        "sha256": "ecee48733bedcfd71e9c922100cd084709877bdf74cfddfd6dd283af490d897f",
+        "decoded_bytes": 11860,
+        "decoded_sha256": "409412099235d02e3cb90f152d74c61bd2956e2e8ffc1638a0c6b9d9253ffc5b"
+      },
+      "oracle": {
+        "argv": [
+          "python3",
+          "-B",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+          "--source",
+          "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/odp/tdf123658_SearchAfterSlideChange.odp",
+          "--output",
+          "/tmp/litchi-goal-0457/native-final/04.odp",
+          "--title",
+          "Native title & <字> café",
+          "--body",
+          "Native body Ω 😀"
+        ],
+        "exit_code": 0,
+        "log": "04-oracle.log",
+        "sha256": "f276e4bece6893c85043f48be9aa2587e62af1a9122e95bb6d95914d84dd0802"
+      },
+      "status": "validated"
+    },
+    {
+      "fixture": "3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/2slides.odp",
+      "source_sha256": "9c81dff29ada5e2c3a6631d6f24167d9a41a9eb7d3b76caeed4bfc4af5b3aee9",
+      "argv": [
+        "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+        "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/2slides.odp",
+        "/tmp/litchi-goal-0457/native-final/05.odp",
+        "Native title & <字> café",
+        "Native body Ω 😀"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-09-07T13:37:26.747447+00:00",
+      "exit_code": 0,
+      "log": "05-probe.log",
+      "log_sha256": "973ae964c9337118d80f140e319ea24f2ed130dc4d73d6992951e9e210ac253e",
+      "title": "Native title & <字> café",
+      "body": "Native body Ω 😀",
+      "retained_source": {
+        "path": "05-source.odp.gz",
+        "bytes": 9502,
+        "sha256": "682ad1a10f1f42e9a92806cfe3aba1eb5b129c8820846b20779b3db70bafe2eb",
+        "decoded_bytes": 10984,
+        "decoded_sha256": "9c81dff29ada5e2c3a6631d6f24167d9a41a9eb7d3b76caeed4bfc4af5b3aee9"
+      },
+      "output": {
+        "path": "/tmp/litchi-goal-0457/native-final/05.odp",
+        "bytes": 11076,
+        "sha256": "aac013018e664f88b6eda455cfae8192c383e1f49d17563e7ffc2fdeef6d9672"
+      },
+      "retained_output": {
+        "path": "05-output.odp.gz",
+        "bytes": 9618,
+        "sha256": "bad4c25fe61e12fe328e691cf88835fe6e4f564734beed2ec207b67e85d52763",
+        "decoded_bytes": 11076,
+        "decoded_sha256": "aac013018e664f88b6eda455cfae8192c383e1f49d17563e7ffc2fdeef6d9672"
+      },
+      "oracle": {
+        "argv": [
+          "python3",
+          "-B",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+          "--source",
+          "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/2slides.odp",
+          "--output",
+          "/tmp/litchi-goal-0457/native-final/05.odp",
+          "--title",
+          "Native title & <字> café",
+          "--body",
+          "Native body Ω 😀"
+        ],
+        "exit_code": 0,
+        "log": "05-oracle.log",
+        "sha256": "fda27d7c16511bc14230afbdd1c68e0e17fdcda75d685d27e334853783055b2c"
+      },
+      "status": "validated"
+    },
+    {
+      "fixture": "3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf102223.odp",
+      "source_sha256": "0dcb0606e5d7352faee806ebb02fa6414773574bf6082bcde07725be2a744ee2",
+      "argv": [
+        "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+        "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf102223.odp",
+        "/tmp/litchi-goal-0457/native-final/06.odp",
+        "Native title & <字> café",
+        "Native body Ω 😀"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-09-07T13:37:26.789818+00:00",
+      "exit_code": 0,
+      "log": "06-probe.log",
+      "log_sha256": "7930484bb7c7823bf3d29838dc90ad4efffb18242824260baf82dcb5334f267f",
+      "title": "Native title & <字> café",
+      "body": "Native body Ω 😀",
+      "retained_source": {
+        "path": "06-source.odp.gz",
+        "bytes": 15849,
+        "sha256": "fa80d4778b8b7f0472ab6f13d54fa47ee53a31bc3bd1114c6d21c6989453d5c2",
+        "decoded_bytes": 17335,
+        "decoded_sha256": "0dcb0606e5d7352faee806ebb02fa6414773574bf6082bcde07725be2a744ee2"
+      },
+      "output": {
+        "path": "/tmp/litchi-goal-0457/native-final/06.odp",
+        "bytes": 17441,
+        "sha256": "be5d0d22888e49e27ee5ee9d8e1f187861071b8dd9f0677d38854a5cf23c76a0"
+      },
+      "retained_output": {
+        "path": "06-output.odp.gz",
+        "bytes": 15978,
+        "sha256": "0e9e1a3ca93d7039d6986e42143bcd2a4f2b79f83b66747c6b618f5f7a8e0654",
+        "decoded_bytes": 17441,
+        "decoded_sha256": "be5d0d22888e49e27ee5ee9d8e1f187861071b8dd9f0677d38854a5cf23c76a0"
+      },
+      "oracle": {
+        "argv": [
+          "python3",
+          "-B",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+          "--source",
+          "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf102223.odp",
+          "--output",
+          "/tmp/litchi-goal-0457/native-final/06.odp",
+          "--title",
+          "Native title & <字> café",
+          "--body",
+          "Native body Ω 😀"
+        ],
+        "exit_code": 0,
+        "log": "06-oracle.log",
+        "sha256": "6093fc6fdd7d4b43c6e84b7d99c5aa655b27e04a98212ab3d665f4b3780ba3e5"
+      },
+      "status": "validated"
+    },
+    {
+      "fixture": "3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf105502.odp",
+      "source_sha256": "ae92fb371ff0c4778f7ac9739fb63d467306f5994c5a9f2a2a9c741134e33d40",
+      "argv": [
+        "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+        "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf105502.odp",
+        "/tmp/litchi-goal-0457/native-final/07.odp",
+        "Native title & <字> café",
+        "Native body Ω 😀"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-09-07T13:37:26.835717+00:00",
+      "exit_code": 0,
+      "log": "07-probe.log",
+      "log_sha256": "b5961e75bcbbc7bf73e211dee7eccde3bb837f29c2ffd463bfb94760c3971e5f",
+      "title": "Native title & <字> café",
+      "body": "Native body Ω 😀",
+      "retained_source": {
+        "path": "07-source.odp.gz",
+        "bytes": 10004,
+        "sha256": "219cac00ac78369e5c6f1468993e739368c6ec245f0a8f024943c37f871e5c2f",
+        "decoded_bytes": 11629,
+        "decoded_sha256": "ae92fb371ff0c4778f7ac9739fb63d467306f5994c5a9f2a2a9c741134e33d40"
+      },
+      "output": {
+        "path": "/tmp/litchi-goal-0457/native-final/07.odp",
+        "bytes": 11762,
+        "sha256": "db158173aa73b5e96f3af3ca0849a4c8d7c04ec89e9db01809deb03b7a3d2d74"
+      },
+      "retained_output": {
+        "path": "07-output.odp.gz",
+        "bytes": 10155,
+        "sha256": "0c5fa7482e81a3038e71a5a14958e0581ef847e4b8c3fdd9694b7c5381e6e804",
+        "decoded_bytes": 11762,
+        "decoded_sha256": "db158173aa73b5e96f3af3ca0849a4c8d7c04ec89e9db01809deb03b7a3d2d74"
+      },
+      "oracle": {
+        "argv": [
+          "python3",
+          "-B",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+          "--source",
+          "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/tiledrendering/data/tdf105502.odp",
+          "--output",
+          "/tmp/litchi-goal-0457/native-final/07.odp",
+          "--title",
+          "Native title & <字> café",
+          "--body",
+          "Native body Ω 😀"
+        ],
+        "exit_code": 0,
+        "log": "07-oracle.log",
+        "sha256": "d9a2bb02c05c5ef2cfcddc90c288eb8859aebb76fbbe520055885fc7cd384e81"
+      },
+      "status": "validated"
+    },
+    {
+      "fixture": "3rdparty/libreoffice-core/sd/qa/unit/data/slide_with_text.odp",
+      "source_sha256": "4042d79e4d59750c2590b01b817fb826ab593407496cb0c3fdcc889acb06e96f",
+      "argv": [
+        "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+        "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/slide_with_text.odp",
+        "/tmp/litchi-goal-0457/native-final/08.odp",
+        "Native title & <字> café",
+        "Native body Ω 😀"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-09-07T13:37:26.880084+00:00",
+      "exit_code": 0,
+      "log": "08-probe.log",
+      "log_sha256": "d540c12bd8876c62566952ab5ca759dc138e44328318c98e3f99fc6d3b8359c9",
+      "title": "Native title & <字> café",
+      "body": "Native body Ω 😀",
+      "retained_source": {
+        "path": "08-source.odp.gz",
+        "bytes": 17785,
+        "sha256": "90c40e94620b5d133d7fd42980bd1768cffc3a540f7b2e399f5294d60d24dcd0",
+        "decoded_bytes": 19483,
+        "decoded_sha256": "4042d79e4d59750c2590b01b817fb826ab593407496cb0c3fdcc889acb06e96f"
+      },
+      "output": {
+        "path": "/tmp/litchi-goal-0457/native-final/08.odp",
+        "bytes": 19587,
+        "sha256": "461307c8d8ef80163219257bcd28bb01b435f0ff2acba25f07c8bcd1816844b2"
+      },
+      "retained_output": {
+        "path": "08-output.odp.gz",
+        "bytes": 17922,
+        "sha256": "889630c1563d6d0396bf29b30c669948d561706863fc058a5ef3d555bf798098",
+        "decoded_bytes": 19587,
+        "decoded_sha256": "461307c8d8ef80163219257bcd28bb01b435f0ff2acba25f07c8bcd1816844b2"
+      },
+      "oracle": {
+        "argv": [
+          "python3",
+          "-B",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+          "--source",
+          "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sd/qa/unit/data/slide_with_text.odp",
+          "--output",
+          "/tmp/litchi-goal-0457/native-final/08.odp",
+          "--title",
+          "Native title & <字> café",
+          "--body",
+          "Native body Ω 😀"
+        ],
+        "exit_code": 0,
+        "log": "08-oracle.log",
+        "sha256": "d90b8145e6207d97be724d31369952081962c38d905f7355fd7a249566fc9f27"
+      },
+      "status": "validated"
+    },
+    {
+      "fixture": "3rdparty/libreoffice-core/libreofficekit/qa/data/impress_slidenames.odp",
+      "source_sha256": "a60f9138d9653709fa303b7cf7bf4c79c1fd378800cf37615a5a2a7e97f1a403",
+      "argv": [
+        "/tmp/litchi-goal-0457/candidate-final/odp_native_tail_append_probe",
+        "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/libreofficekit/qa/data/impress_slidenames.odp",
+        "/tmp/litchi-goal-0457/native-final/09.odp",
+        "Native title & <字> café",
+        "Native body Ω 😀"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-09-07T13:37:26.923527+00:00",
+      "exit_code": 0,
+      "log": "09-probe.log",
+      "log_sha256": "fb47f117f02ecaf8a47f44ca49bf8c1ce68a121022700c04f35a48a1eec27664",
+      "title": "Native title & <字> café",
+      "body": "Native body Ω 😀",
+      "retained_source": {
+        "path": "09-source.odp.gz",
+        "bytes": 14173,
+        "sha256": "5cc93895a5730c1ab637cd27960a1059d6cf6acc250837492855de75b30dbdf3",
+        "decoded_bytes": 15799,
+        "decoded_sha256": "a60f9138d9653709fa303b7cf7bf4c79c1fd378800cf37615a5a2a7e97f1a403"
+      },
+      "output": {
+        "path": "/tmp/litchi-goal-0457/native-final/09.odp",
+        "bytes": 15918,
+        "sha256": "7f09faceb2cf46bf2f9170298aca8d34a5258acf6916bf13a8ae47006d6a0adf"
+      },
+      "retained_output": {
+        "path": "09-output.odp.gz",
+        "bytes": 14315,
+        "sha256": "04b896ee5eec10f2b38c0d63738a692433703da7e979356f85c7c5493245bc34",
+        "decoded_bytes": 15918,
+        "decoded_sha256": "7f09faceb2cf46bf2f9170298aca8d34a5258acf6916bf13a8ae47006d6a0adf"
+      },
+      "oracle": {
+        "argv": [
+          "python3",
+          "-B",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0457/native-final/verify-output.py",
+          "--source",
+          "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/libreofficekit/qa/data/impress_slidenames.odp",
+          "--output",
+          "/tmp/litchi-goal-0457/native-final/09.odp",
+          "--title",
+          "Native title & <字> café",
+          "--body",
+          "Native body Ω 😀"
+        ],
+        "exit_code": 0,
+        "log": "09-oracle.log",
+        "sha256": "b6160e2a41ca75b5c7ee73e59731ab87e7f6fe7b498bc44591ab6c7fb1d2f1d8"
+      },
+      "status": "validated"
+    }
+  ]
+}

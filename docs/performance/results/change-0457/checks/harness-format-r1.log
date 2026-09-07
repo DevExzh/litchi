@@ -1,0 +1,39 @@
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/tests/xlsx_filesystem.rs:314:
+             repeated["claim_scope"],
+             "structural cache/read control only; elapsed/query_ns must not be compared with candidate"
+         );
+[31m-        assert_eq!(repeated["implementation"], "explicit_part_data_reacquisition_structural_control");
+[m[32m+        assert_eq!(
+[m[32m+            repeated["implementation"],
+[m[32m+            "explicit_part_data_reacquisition_structural_control"
+[m[32m+        );
+[m         assert_eq!(repeated["query_iterations"], 8);
+         assert_eq!(repeated["control_reacquire_count"], 32);
+         assert_eq!(
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/tests/xlsx_filesystem.rs:330:
+             .map(|elapsed| elapsed.as_u64().expect("query timing"))
+             .sum::<u64>();
+         assert_eq!(repeated["timed_elapsed_total_ns"], query_total);
+[31m-        let selected_member_read_calls = repeated["diagnostics_delta"]
+[m[31m-            ["selected_member_read_calls"]
+[m[31m-            .as_u64()
+[m[31m-            .expect("selected-member read calls");
+[m[32m+        let selected_member_read_calls =
+[m[32m+            repeated["diagnostics_delta"]["selected_member_read_calls"]
+[m[32m+                .as_u64()
+[m[32m+                .expect("selected-member read calls");
+[m         let source_read_calls = repeated["diagnostics_delta"]["source_read_calls"]
+             .as_u64()
+             .expect("source read calls");
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/tests/xlsx_filesystem.rs:344:
+                 assert_eq!(repeated["diagnostics_delta"]["cache_bypasses"], 0);
+             },
+             "oversized" => {
+[31m-                assert_eq!(repeated["diagnostics_delta"]["cache_oversized_bypasses"], 32);
+[m[32m+                assert_eq!(
+[m[32m+                    repeated["diagnostics_delta"]["cache_oversized_bypasses"],
+[m[32m+                    32
+[m[32m+                );
+[m                 assert_eq!(repeated["diagnostics_delta"]["cache_evictions"], 0);
+             },
+             scenario => panic!("unexpected repeated-store scenario {scenario}"),

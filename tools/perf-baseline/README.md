@@ -1,5 +1,14 @@
 # OPC, CFB, OLE2 Office, OOXML, RTF, and ODF performance baseline
 
+The opt-in `odp_source_tail_append_lifecycle` selector added in
+[0457](../../docs/performance/results/change-0457/README.md) measures source-backed
+ODP opening, bounded tail-insertion planning, and sequential replay publication.
+It uses the same 64/4,096/8,192-slide source corpus as the owned append control,
+but returns a specialized publication report rather than an ordinary Commit or
+Patch. Its 360 samples and the recaptured 360-sample control support a scoped
+working-memory comparison, not ordinary Commit/Patch speedup or equivalence.
+The current registry has 439 selectors and 36 defaults.
+
 The opt-in `odp_existing_append_lifecycle` selector measures owned ODP opening,
 one public slide append, commit, and sequential output of the committed bytes.
 The source has 64/4,096/8,192 titled slides and a deterministic 64 KiB opaque
@@ -8,8 +17,8 @@ semantic/member/patch checks and destruction follow it. Source and commit
 remain alive at the allocator endpoint, so retained live bytes are reported.
 This is a materialized existing-document append baseline; fresh streaming
 creation, Part addition, and arbitrary repackaging are separate scenarios.
-The default 36-case selection is unchanged; the selector registry now has 436
-names. [Change 0439](../../docs/performance/changes/0439-odp-existing-append-lifecycle.md)
+The default 36-case selection was unchanged; change 0439 brought the registry
+to 436 names. [Change 0439](../../docs/performance/changes/0439-odp-existing-append-lifecycle.md)
 retains the 12-report, 360-sample baseline and two profiles.
 
 Operation-region evidence: [change 0422](../../docs/performance/changes/0422-operation-region-allocator-peak.md)

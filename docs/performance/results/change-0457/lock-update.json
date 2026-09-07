@@ -1,0 +1,53 @@
+{
+  "scope": "Only dependency-lock updates; source implementation was in progress, no build or benchmark ran.",
+  "rows": [
+    {
+      "argv": [
+        "cargo",
+        "update",
+        "--offline",
+        "--manifest-path",
+        "Cargo.toml",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit_code": 0,
+      "log": "     Locking 0 packages to latest Rust 1.70 compatible versions\nnote: pass `--verbose` to see 46 unchanged dependencies behind latest\n",
+      "lock": "Cargo.lock",
+      "before_sha256": "c14b122a53a49b4c602353bf52ac2b77b7acf190030f11e859290958c80407ef",
+      "after_sha256": "885ae5344951ad1640745dc4095166dcd91106cd959514d94ad6ddbb2dd5924c"
+    },
+    {
+      "argv": [
+        "cargo",
+        "update",
+        "--offline",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit_code": 0,
+      "log": "     Locking 0 packages to latest Rust 1.98.1 compatible versions\nnote: pass `--verbose` to see 38 unchanged dependencies behind latest\n",
+      "lock": "tools/perf-baseline/Cargo.lock",
+      "before_sha256": "239db7b24e2339f00ece02306bd4748329ca72fc870415906b4f54daa82fad8e",
+      "after_sha256": "8c731d7506bef3a4c05df553a0cd1cadb7d12da641099a2f9a0adc7e3fb4c518"
+    },
+    {
+      "argv": [
+        "cargo",
+        "update",
+        "--offline",
+        "--manifest-path",
+        "tools/native-resave/Cargo.toml",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit_code": 0,
+      "log": "     Locking 0 packages to latest Rust 1.98.1 compatible versions\nnote: pass `--verbose` to see 38 unchanged dependencies behind latest\n",
+      "lock": "tools/native-resave/Cargo.lock",
+      "before_sha256": "e8d4bed6c73e1b1944858a0328222824bd194414347bbf3e83e6899dbcdeae48",
+      "after_sha256": "703cde346b1082700c0c0774b4fb9a7cb56af032e45936f8e3d835f32610e263"
+    }
+  ]
+}
