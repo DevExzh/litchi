@@ -1,0 +1,3973 @@
+{
+  "modes": {
+    "dwarf": {
+      "groups": {
+        "add": {
+          "inclusive": [
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_odp::authoring::edit::Transaction>::add"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_odp::authoring::mutable::MutablePresentation>::insert_slide"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_call_main"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_main@@GLIBC_2.34"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "_start"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::main"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::phase_add"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_capture"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_from_args::<std::env::ArgsOs>"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_phases_iteration"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "main"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start_internal"
+            },
+            {
+              "period": 1031633302,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>"
+            },
+            {
+              "period": 672790023,
+              "share_phase_period_pct": 65.2160047272301,
+              "symbol": "litchi_odp::model::page_metadata::metadata_after_page_insert"
+            },
+            {
+              "period": 583066642,
+              "share_phase_period_pct": 56.51878830100039,
+              "symbol": "litchi_odp::model::page_metadata::effective_page_names"
+            },
+            {
+              "period": 359026106,
+              "share_phase_period_pct": 34.80171736449043,
+              "symbol": "<litchi_odp::model::page_metadata::Collection>::validate_for_slide_count"
+            },
+            {
+              "period": 359026106,
+              "share_phase_period_pct": 34.80171736449043,
+              "symbol": "<litchi_odp::model::page_metadata::Page>::validate"
+            },
+            {
+              "period": 313766764,
+              "share_phase_period_pct": 30.414563332892484,
+              "symbol": "<alloc::vec::Vec<alloc::string::String> as alloc::vec::spec_from_iter::SpecFromIter<alloc::string::String, core::iter::adapters::GenericShunt<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}>, core::result::Result<core::convert::Infallible, litchi_core::error::types::Error>>>>::from_iter"
+            },
+            {
+              "period": 313766764,
+              "share_phase_period_pct": 30.414563332892484,
+              "symbol": "core::iter::adapters::try_process::<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}>, alloc::string::String, core::result::Result<core::convert::Infallible, litchi_core::error::types::Error>, <core::result::Result<alloc::vec::Vec<alloc::string::String>, litchi_core::error::types::Error> as core::iter::traits::collect::FromIterator<core::result::Result<alloc::string::String, litchi_core::error::types::Error>>>::from_iter<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}>>::{closure#0}, alloc::vec::Vec<alloc::string::String>>"
+            },
+            {
+              "period": 269026565,
+              "share_phase_period_pct": 26.077731736504177,
+              "symbol": "litchi_odp::model::page_metadata::validate_text"
+            },
+            {
+              "period": 268867159,
+              "share_phase_period_pct": 26.062279928222015,
+              "symbol": "<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}> as core::iter::traits::iterator::Iterator>::try_fold::<(), <core::iter::adapters::GenericShunt<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}>, core::result::Result<core::convert::Infallible, litchi_core::error::types::Error>> as core::iter::traits::iterator::Iterator>::try_fold<(), core::iter::traits::iterator::Iterator::try_for_each::call<alloc::string::String, core::ops::control_flow::ControlFlow<alloc::string::String>, core::ops::control_flow::ControlFlow<alloc::string::String>::Break>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::string::String>>::{closure#0}, core::ops::control_flow::ControlFlow<core::ops::control_flow::ControlFlow<alloc::string::String>>>"
+            },
+            {
+              "period": 179380659,
+              "share_phase_period_pct": 17.388025246203227,
+              "symbol": "<litchi_odp::model::page_metadata::Page as core::clone::Clone>::clone"
+            },
+            {
+              "period": 89756981,
+              "share_phase_period_pct": 8.700473397474715,
+              "symbol": "<alloc::vec::Vec<litchi_odp::model::page_metadata::Page> as core::ops::drop::Drop>::drop"
+            },
+            {
+              "period": 89726228,
+              "share_phase_period_pct": 8.697492396382527,
+              "symbol": "<litchi_odp::model::page_metadata::Collection>::new"
+            },
+            {
+              "period": 45200040,
+              "share_phase_period_pct": 4.381405671217853,
+              "symbol": "<<std::hash::random::RandomState>::new::KEYS::{K#0}::{closure#1} as core::ops::function::FnOnce<(core::option::Option<&mut core::option::Option<core::cell::Cell<(u64, u64)>>>,)>>::call_once"
+            },
+            {
+              "period": 45200040,
+              "share_phase_period_pct": 4.381405671217853,
+              "symbol": "<std::thread::local::LocalKey<core::cell::Cell<(u64, u64)>>>::with::<<std::hash::random::RandomState>::new::{closure#0}, std::hash::random::RandomState>"
+            },
+            {
+              "period": 44909553,
+              "share_phase_period_pct": 4.353247700799794,
+              "symbol": "_int_free_chunk"
+            },
+            {
+              "period": 44909553,
+              "share_phase_period_pct": 4.353247700799794,
+              "symbol": "_int_free_merge_chunk"
+            },
+            {
+              "period": 44909553,
+              "share_phase_period_pct": 4.353247700799794,
+              "symbol": "core::ptr::drop_glue::<litchi_odp::model::page_metadata::Page>"
+            },
+            {
+              "period": 44899605,
+              "share_phase_period_pct": 4.35228340467047,
+              "symbol": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>"
+            },
+            {
+              "period": 44899605,
+              "share_phase_period_pct": 4.35228340467047,
+              "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow"
+            },
+            {
+              "period": 44899605,
+              "share_phase_period_pct": 4.35228340467047,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 44899605,
+              "share_phase_period_pct": 4.35228340467047,
+              "symbol": "_int_realloc"
+            },
+            {
+              "period": 44899605,
+              "share_phase_period_pct": 4.35228340467047,
+              "symbol": "realloc"
+            },
+            {
+              "period": 44847428,
+              "share_phase_period_pct": 4.347225696674921,
+              "symbol": "__rustc::__rust_dealloc"
+            },
+            {
+              "period": 44799501,
+              "share_phase_period_pct": 4.3425799567683985,
+              "symbol": "<hashbrown::raw::RawTable<((usize, litchi_odp::model::declaration::Target),"
+            }
+          ],
+          "leaves": [
+            {
+              "period": 269026565,
+              "share_phase_period_pct": 26.077731736504177,
+              "symbol": "litchi_odp::model::page_metadata::validate_text"
+            },
+            {
+              "period": 268867159,
+              "share_phase_period_pct": 26.062279928222015,
+              "symbol": "<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}> as core::iter::traits::iterator::Iterator>::try_fold::<(), <core::iter::adapters::GenericShunt<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}>, core::result::Result<core::convert::Infallible, litchi_core::error::types::Error>> as core::iter::traits::iterator::Iterator>::try_fold<(), core::iter::traits::iterator::Iterator::try_for_each::call<alloc::string::String, core::ops::control_flow::ControlFlow<alloc::string::String>, core::ops::control_flow::ControlFlow<alloc::string::String>::Break>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::string::String>>::{closure#0}, core::ops::control_flow::ControlFlow<core::ops::control_flow::ControlFlow<alloc::string::String>>>"
+            },
+            {
+              "period": 179380659,
+              "share_phase_period_pct": 17.388025246203227,
+              "symbol": "<litchi_odp::model::page_metadata::Page as core::clone::Clone>::clone"
+            },
+            {
+              "period": 89702792,
+              "share_phase_period_pct": 8.695220658939139,
+              "symbol": "litchi_odp::model::page_metadata::metadata_after_page_insert"
+            },
+            {
+              "period": 45200040,
+              "share_phase_period_pct": 4.381405671217853,
+              "symbol": "<<std::hash::random::RandomState>::new::KEYS::{K#0}::{closure#1} as core::ops::function::FnOnce<(core::option::Option<&mut core::option::Option<core::cell::Cell<(u64, u64)>>>,)>>::call_once"
+            },
+            {
+              "period": 44909553,
+              "share_phase_period_pct": 4.353247700799794,
+              "symbol": "_int_free_merge_chunk"
+            },
+            {
+              "period": 44899605,
+              "share_phase_period_pct": 4.35228340467047,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 44847428,
+              "share_phase_period_pct": 4.347225696674921,
+              "symbol": "__rustc::__rust_dealloc"
+            },
+            {
+              "period": 44799501,
+              "share_phase_period_pct": 4.3425799567683985,
+              "symbol": "<hashbrown::raw::RawTable<((usize, litchi_odp::model::declaration::Target),"
+            }
+          ],
+          "period": 1031633302,
+          "samples": 23,
+          "share_total_period_pct": 1.4063169784403322
+        },
+        "commit": {
+          "inclusive": [
+            {
+              "period": 30009443567,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_odp::authoring::edit::Transaction>::commit"
+            },
+            {
+              "period": 30009443567,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::main"
+            },
+            {
+              "period": 30009443567,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::phase_commit"
+            },
+            {
+              "period": 30009443567,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_capture"
+            },
+            {
+              "period": 30009443567,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_from_args::<std::env::ArgsOs>"
+            },
+            {
+              "period": 30009443567,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_phases_iteration"
+            },
+            {
+              "period": 30009443567,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}"
+            },
+            {
+              "period": 30009443567,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start_internal"
+            },
+            {
+              "period": 30009443567,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>"
+            },
+            {
+              "period": 29964753730,
+              "share_phase_period_pct": 99.85108075429582,
+              "symbol": "__libc_start_call_main"
+            },
+            {
+              "period": 29964753730,
+              "share_phase_period_pct": 99.85108075429582,
+              "symbol": "__libc_start_main@@GLIBC_2.34"
+            },
+            {
+              "period": 29964753730,
+              "share_phase_period_pct": 99.85108075429582,
+              "symbol": "_start"
+            },
+            {
+              "period": 29964753730,
+              "share_phase_period_pct": 99.85108075429582,
+              "symbol": "main"
+            },
+            {
+              "period": 18007261777,
+              "share_phase_period_pct": 60.00531711558209,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::from_owned_package"
+            },
+            {
+              "period": 17917636421,
+              "share_phase_period_pct": 59.70665994188309,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles"
+            },
+            {
+              "period": 11062021170,
+              "share_phase_period_pct": 36.86180033729247,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_pages_with_styles::<false>::{closure#0}"
+            },
+            {
+              "period": 8996139728,
+              "share_phase_period_pct": 29.977695880681505,
+              "symbol": "<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded"
+            },
+            {
+              "period": 8192050290,
+              "share_phase_period_pct": 27.29824120767244,
+              "symbol": "<litchi_odf_common::core::writer::PackageWriter<litchi_odf_common::core::writer::BoundedBytes>>::write_file"
+            },
+            {
+              "period": 6761632277,
+              "share_phase_period_pct": 22.531681608503582,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder"
+            },
+            {
+              "period": 5551521405,
+              "share_phase_period_pct": 18.499248053718503,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+            },
+            {
+              "period": 4389186815,
+              "share_phase_period_pct": 14.626018657095615,
+              "symbol": "xml_minifier::audit::verify_authored"
+            },
+            {
+              "period": 4299664454,
+              "share_phase_period_pct": 14.327704692026156,
+              "symbol": "xml_minifier::audit::verify_with_policy"
+            },
+            {
+              "period": 3802863475,
+              "share_phase_period_pct": 12.672222550576823,
+              "symbol": "<soapberry_zip::office::StreamingArchiveWriter<litchi_odf_common::core::writer::BoundedBytes>>::write_deflated_sized_with_accounting"
+            },
+            {
+              "period": 3668708934,
+              "share_phase_period_pct": 12.225181469323577,
+              "symbol": "<flate2::mem::Compress as flate2::zio::Ops>::run_vec"
+            },
+            {
+              "period": 3668708934,
+              "share_phase_period_pct": 12.225181469323577,
+              "symbol": "<zlib_rs::stable::Deflate>::compress_uninit"
+            },
+            {
+              "period": 3668708934,
+              "share_phase_period_pct": 12.225181469323577,
+              "symbol": "zlib_rs::deflate::deflate"
+            },
+            {
+              "period": 3624019097,
+              "share_phase_period_pct": 12.07626222361939,
+              "symbol": "<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::CompressedScratch> as std::io::Write>::write_all"
+            },
+            {
+              "period": 3624019097,
+              "share_phase_period_pct": 12.07626222361939,
+              "symbol": "<flate2::zio::Writer<&mut soapberry_zip::office::CompressedScratch, flate2::mem::Compress>>::write_with_status"
+            },
+            {
+              "period": 3623911609,
+              "share_phase_period_pct": 12.075904043036134,
+              "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium"
+            },
+            {
+              "period": 3397518381,
+              "share_phase_period_pct": 11.321497426017237,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 2961353858,
+              "share_phase_period_pct": 9.868073199652606,
+              "symbol": "litchi_odp::authoring::edit::validate_compact_xml_parts_against"
+            },
+            {
+              "period": 2871472610,
+              "share_phase_period_pct": 9.568563321039468,
+              "symbol": "litchi_odf_common::package::edit::xml_splice_publication"
+            },
+            {
+              "period": 2693343014,
+              "share_phase_period_pct": 8.974984850974527,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+            },
+            {
+              "period": 2283788707,
+              "share_phase_period_pct": 7.610233431690074,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 2063717018,
+              "share_phase_period_pct": 6.876891980327733,
+              "symbol": "<litchi_odf_common::core::xml_splice::XmlSourcePart>::load::<&str>"
+            },
+            {
+              "period": 2016045877,
+              "share_phase_period_pct": 6.718038181877363,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 1929308009,
+              "share_phase_period_pct": 6.429002939333308,
+              "symbol": "litchi_odf_common::core::xml_splice::verify_well_formed"
+            },
+            {
+              "period": 1835438778,
+              "share_phase_period_pct": 6.116203967268315,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup"
+            },
+            {
+              "period": 1829561021,
+              "share_phase_period_pct": 6.09661760943773,
+              "symbol": "xml_minifier::audit::inspect_attributes"
+            },
+            {
+              "period": 1790540103,
+              "share_phase_period_pct": 5.966588813959131,
+              "symbol": "zlib_rs::deflate::longest_match::longest_match"
+            }
+          ],
+          "leaves": [
+            {
+              "period": 1747467154,
+              "share_phase_period_pct": 5.823057498878816,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 1699133908,
+              "share_phase_period_pct": 5.661997378280146,
+              "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium"
+            },
+            {
+              "period": 1611389463,
+              "share_phase_period_pct": 5.369607934923428,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+            },
+            {
+              "period": 1610629117,
+              "share_phase_period_pct": 5.367074245825519,
+              "symbol": "zlib_rs::deflate::longest_match::longest_match"
+            },
+            {
+              "period": 1253637575,
+              "share_phase_period_pct": 4.177476907231187,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 1213042039,
+              "share_phase_period_pct": 4.042201036789387,
+              "symbol": "xml_minifier::audit::verify_with_policy"
+            },
+            {
+              "period": 1123168304,
+              "share_phase_period_pct": 3.7427161936287825,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+            },
+            {
+              "period": 1030654107,
+              "share_phase_period_pct": 3.4344325801940654,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 1030038247,
+              "share_phase_period_pct": 3.4323803595368405,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 987106227,
+              "share_phase_period_pct": 3.289318659961676,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles"
+            },
+            {
+              "period": 939812840,
+              "share_phase_period_pct": 3.131723645264349,
+              "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>"
+            },
+            {
+              "period": 851133402,
+              "share_phase_period_pct": 2.8362185393399035,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder"
+            },
+            {
+              "period": 807755592,
+              "share_phase_period_pct": 2.6916713407117334,
+              "symbol": "litchi_odf_common::package::edit::xml_splice_publication"
+            },
+            {
+              "period": 717695301,
+              "share_phase_period_pct": 2.39156483990665,
+              "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates"
+            },
+            {
+              "period": 672262749,
+              "share_phase_period_pct": 2.2401706566104287,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2"
+            },
+            {
+              "period": 672194100,
+              "share_phase_period_pct": 2.2399418986201423,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix"
+            },
+            {
+              "period": 628188270,
+              "share_phase_period_pct": 2.093301958756708,
+              "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+            },
+            {
+              "period": 627405350,
+              "share_phase_period_pct": 2.0906930466712446,
+              "symbol": "<litchi_odp::codec::parser::model::ParagraphText>::push_text"
+            },
+            {
+              "period": 627124088,
+              "share_phase_period_pct": 2.0897558017024327,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+            },
+            {
+              "period": 618506928,
+              "share_phase_period_pct": 2.0610409740490607,
+              "symbol": "_int_malloc"
+            },
+            {
+              "period": 493152999,
+              "share_phase_period_pct": 1.6433260346829544,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "period": 492327631,
+              "share_phase_period_pct": 1.6405756737901998,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 448170587,
+              "share_phase_period_pct": 1.4934318458767843,
+              "symbol": "<quick_xml::encoding::Decoder>::decode_cow"
+            },
+            {
+              "period": 447953220,
+              "share_phase_period_pct": 1.4927075172183248,
+              "symbol": "_int_free_merge_chunk"
+            },
+            {
+              "period": 403460482,
+              "share_phase_period_pct": 1.344445061432818,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "period": 358672800,
+              "share_phase_period_pct": 1.1951997683636357,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_pages_with_styles::<false>::{closure#0}"
+            },
+            {
+              "period": 358157419,
+              "share_phase_period_pct": 1.1934823723084595,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_start"
+            },
+            {
+              "period": 313692927,
+              "share_phase_period_pct": 1.0453140402275023,
+              "symbol": "xml_minifier::audit::check_attribute_layout"
+            },
+            {
+              "period": 313332603,
+              "share_phase_period_pct": 1.0441133381911734,
+              "symbol": "<quick_xml::name::NamespaceResolver>::push"
+            },
+            {
+              "period": 313266365,
+              "share_phase_period_pct": 1.043892614338523,
+              "symbol": "core::str::converts::from_utf8"
+            },
+            {
+              "period": 268836744,
+              "share_phase_period_pct": 0.8958404823461217,
+              "symbol": "xml_minifier::audit::inspect_attributes"
+            },
+            {
+              "period": 268692455,
+              "share_phase_period_pct": 0.8953596703654603,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup"
+            },
+            {
+              "period": 224184836,
+              "share_phase_period_pct": 0.7470476268561198,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_end"
+            },
+            {
+              "period": 223775218,
+              "share_phase_period_pct": 0.7456826631936464,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::finish_shape"
+            },
+            {
+              "period": 223675074,
+              "share_phase_period_pct": 0.7453489549068653,
+              "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow"
+            },
+            {
+              "period": 223657646,
+              "share_phase_period_pct": 0.7452908798547201,
+              "symbol": "unlink_chunk.isra.0"
+            },
+            {
+              "period": 220970413,
+              "share_phase_period_pct": 0.736336255307949,
+              "symbol": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>"
+            },
+            {
+              "period": 179910986,
+              "share_phase_period_pct": 0.5995145681336118,
+              "symbol": "zlib_rs::deflate::compare256::avx2::compare256"
+            },
+            {
+              "period": 179428893,
+              "share_phase_period_pct": 0.5979080971608206,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw"
+            },
+            {
+              "period": 179364330,
+              "share_phase_period_pct": 0.597692954884504,
+              "symbol": "litchi_odp::model::page_metadata::validate_text"
+            }
+          ],
+          "period": 30009443567,
+          "samples": 670,
+          "share_total_period_pct": 40.90871234963206
+        },
+        "publication": {
+          "inclusive": [
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_perf_baseline::HashingDiscardSink as std::io::Write>::write"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_perf_baseline::HashingDiscardSink as std::io::Write>::write_all"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_call_main"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_main@@GLIBC_2.34"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "_start"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::main"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::phase_publication"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_capture"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_from_args::<std::env::ArgsOs>"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_phases_iteration"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "main"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "sha2::sha256::x86_sha::compress"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start_internal"
+            },
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>"
+            }
+          ],
+          "leaves": [
+            {
+              "period": 44654971,
+              "share_phase_period_pct": 100.0,
+              "symbol": "sha2::sha256::x86_sha::compress"
+            }
+          ],
+          "period": 44654971,
+          "samples": 1,
+          "share_total_period_pct": 0.06087341671436335
+        },
+        "snapshot_open": {
+          "inclusive": [
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::from_bytes"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::from_owned_package"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_call_main"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_main@@GLIBC_2.34"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "_start"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::main"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::phase_snapshot_open"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_capture"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_from_args::<std::env::ArgsOs>"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_phases_iteration"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "main"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start_internal"
+            },
+            {
+              "period": 18384539644,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>"
+            },
+            {
+              "period": 18159890602,
+              "share_phase_period_pct": 98.77805457003478,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles"
+            },
+            {
+              "period": 11841090658,
+              "share_phase_period_pct": 64.40787143595664,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_pages_with_styles::<false>::{closure#0}"
+            },
+            {
+              "period": 6950080469,
+              "share_phase_period_pct": 37.80394072183492,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder"
+            },
+            {
+              "period": 5604223244,
+              "share_phase_period_pct": 30.483348250871217,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+            },
+            {
+              "period": 2464361918,
+              "share_phase_period_pct": 13.404534275647592,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 1836710008,
+              "share_phase_period_pct": 9.99051400560596,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup"
+            },
+            {
+              "period": 1703743462,
+              "share_phase_period_pct": 9.267262030986105,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 1658069829,
+              "share_phase_period_pct": 9.018827020458625,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 1483291945,
+              "share_phase_period_pct": 8.06814842102445,
+              "symbol": "<litchi_odp::codec::parser::model::ParagraphText>::push_text"
+            },
+            {
+              "period": 1388729593,
+              "share_phase_period_pct": 7.553790412441616,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 1299553280,
+              "share_phase_period_pct": 7.06872897099778,
+              "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow"
+            },
+            {
+              "period": 1254801620,
+              "share_phase_period_pct": 6.825308897030329,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 1120418417,
+              "share_phase_period_pct": 6.094351224974301,
+              "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value"
+            },
+            {
+              "period": 1076038071,
+              "share_phase_period_pct": 5.852950858909198,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "period": 1031683641,
+              "share_phase_period_pct": 5.611691459115222,
+              "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next"
+            },
+            {
+              "period": 986030221,
+              "share_phase_period_pct": 5.363366394228979,
+              "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>"
+            },
+            {
+              "period": 940956784,
+              "share_phase_period_pct": 5.118196061586409,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix"
+            },
+            {
+              "period": 853166741,
+              "share_phase_period_pct": 4.6406750319605665,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::drawing_attributes"
+            },
+            {
+              "period": 851483578,
+              "share_phase_period_pct": 4.631519714326332,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "period": 763589621,
+              "share_phase_period_pct": 4.153433459777743,
+              "symbol": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>"
+            },
+            {
+              "period": 717209400,
+              "share_phase_period_pct": 3.901155067725992,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::get_attr"
+            },
+            {
+              "period": 716626763,
+              "share_phase_period_pct": 3.897985899439582,
+              "symbol": "__libc_malloc2"
+            },
+            {
+              "period": 716553954,
+              "share_phase_period_pct": 3.897589865590436,
+              "symbol": "_int_malloc"
+            },
+            {
+              "period": 672140129,
+              "share_phase_period_pct": 3.656007395427823,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_end"
+            },
+            {
+              "period": 629181132,
+              "share_phase_period_pct": 3.4223382482429483,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::harvest_drawing_attribute"
+            },
+            {
+              "period": 627625769,
+              "share_phase_period_pct": 3.4138780799160924,
+              "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+            }
+          ],
+          "leaves": [
+            {
+              "period": 1795199336,
+              "share_phase_period_pct": 9.764722809286571,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+            },
+            {
+              "period": 1703743462,
+              "share_phase_period_pct": 9.267262030986105,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 1254801620,
+              "share_phase_period_pct": 6.825308897030329,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 1075368249,
+              "share_phase_period_pct": 5.8493074606355915,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 985398367,
+              "share_phase_period_pct": 5.359929517308288,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 943509588,
+              "share_phase_period_pct": 5.132081663561943,
+              "symbol": "<litchi_odp::codec::parser::model::ParagraphText>::push_text"
+            },
+            {
+              "period": 851828151,
+              "share_phase_period_pct": 4.633393968491366,
+              "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>"
+            },
+            {
+              "period": 807864878,
+              "share_phase_period_pct": 4.394262209680381,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder"
+            },
+            {
+              "period": 538162921,
+              "share_phase_period_pct": 2.9272580734739013,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "period": 537689097,
+              "share_phase_period_pct": 2.924680777500354,
+              "symbol": "_int_malloc"
+            },
+            {
+              "period": 537389330,
+              "share_phase_period_pct": 2.923050238983727,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles"
+            },
+            {
+              "period": 403899752,
+              "share_phase_period_pct": 2.1969533087102193,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+            },
+            {
+              "period": 403249946,
+              "share_phase_period_pct": 2.193418784525318,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup"
+            },
+            {
+              "period": 358884018,
+              "share_phase_period_pct": 1.9520968430510894,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix"
+            },
+            {
+              "period": 358717600,
+              "share_phase_period_pct": 1.9511916368113766,
+              "symbol": "core::str::converts::from_utf8"
+            },
+            {
+              "period": 358439767,
+              "share_phase_period_pct": 1.9496804050624177,
+              "symbol": "_int_free_merge_chunk"
+            },
+            {
+              "period": 313347244,
+              "share_phase_period_pct": 1.704406256929389,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "period": 268912650,
+              "share_phase_period_pct": 1.4627108168452978,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_pages_with_styles::<false>::{closure#0}"
+            },
+            {
+              "period": 268476433,
+              "share_phase_period_pct": 1.4603380786182496,
+              "symbol": "<quick_xml::encoding::Decoder>::decode_cow"
+            },
+            {
+              "period": 224727378,
+              "share_phase_period_pct": 1.2223715271181257,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::finish_shape"
+            },
+            {
+              "period": 224371396,
+              "share_phase_period_pct": 1.220435215375252,
+              "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates"
+            },
+            {
+              "period": 224341541,
+              "share_phase_period_pct": 1.2202728234928437,
+              "symbol": "__rustc::__rust_dealloc"
+            },
+            {
+              "period": 223726017,
+              "share_phase_period_pct": 1.2169247712058728,
+              "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+            },
+            {
+              "period": 223708460,
+              "share_phase_period_pct": 1.2168292724860792,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 179417280,
+              "share_phase_period_pct": 0.975913911766373,
+              "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow"
+            },
+            {
+              "period": 179311937,
+              "share_phase_period_pct": 0.9753409140082572,
+              "symbol": "realloc"
+            },
+            {
+              "period": 179152315,
+              "share_phase_period_pct": 0.9744726736112119,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2"
+            },
+            {
+              "period": 136008448,
+              "share_phase_period_pct": 0.7397979532459377,
+              "symbol": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>"
+            },
+            {
+              "period": 134607411,
+              "share_phase_period_pct": 0.7321772185028883,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::harvest_drawing_attribute"
+            },
+            {
+              "period": 134591317,
+              "share_phase_period_pct": 0.7320896775564646,
+              "symbol": "_int_free_maybe_trim"
+            },
+            {
+              "period": 134506907,
+              "share_phase_period_pct": 0.7316305417737117,
+              "symbol": "cfree@GLIBC_2.2.5"
+            },
+            {
+              "period": 134357360,
+              "share_phase_period_pct": 0.7308171028576668,
+              "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2"
+            },
+            {
+              "period": 134202070,
+              "share_phase_period_pct": 0.7299724257376133,
+              "symbol": "quick_xml::escape::normalize_attribute_value::<quick_xml::escape::is_xml10_normalization_char, quick_xml::escape::normalize_xml10_eol_step, quick_xml::escape::resolve_predefined_entity>"
+            },
+            {
+              "period": 134118947,
+              "share_phase_period_pct": 0.7295202904021109,
+              "symbol": "core::ptr::drop_glue::<alloc::vec::Vec<litchi_odp::model::slide::DrawingAttribute>>"
+            },
+            {
+              "period": 91246336,
+              "share_phase_period_pct": 0.49632102716142396,
+              "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next"
+            },
+            {
+              "period": 90043407,
+              "share_phase_period_pct": 0.48977787175316445,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_start"
+            },
+            {
+              "period": 89766334,
+              "share_phase_period_pct": 0.4882707739124501,
+              "symbol": "__libc_malloc2"
+            },
+            {
+              "period": 89752202,
+              "share_phase_period_pct": 0.48819390497652,
+              "symbol": "_int_free_chunk"
+            },
+            {
+              "period": 89742167,
+              "share_phase_period_pct": 0.48813932106963775,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw"
+            },
+            {
+              "period": 89622073,
+              "share_phase_period_pct": 0.4874860874161142,
+              "symbol": "<litchi_odp::model::slide::DrawingAttribute>::new::<alloc::string::String, alloc::string::String>"
+            }
+          ],
+          "period": 18384539644,
+          "samples": 410,
+          "share_total_period_pct": 25.061705735985036
+        },
+        "transaction": {
+          "inclusive": [
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::transaction"
+            },
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_call_main"
+            },
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_main@@GLIBC_2.34"
+            },
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "_start"
+            },
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::main"
+            },
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::phase_transaction"
+            },
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_capture"
+            },
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_from_args::<std::env::ArgsOs>"
+            },
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_phases_iteration"
+            },
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "main"
+            },
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}"
+            },
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start_internal"
+            },
+            {
+              "period": 17721263638,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>"
+            },
+            {
+              "period": 17497325225,
+              "share_phase_period_pct": 98.73632931841381,
+              "symbol": "<litchi_odp::authoring::mutable::MutablePresentation>::from_presentation_with_validated_slides"
+            },
+            {
+              "period": 11485724160,
+              "share_phase_period_pct": 64.81323451094634,
+              "symbol": "litchi_odp::model::staging::parse"
+            },
+            {
+              "period": 5966709316,
+              "share_phase_period_pct": 33.669773430860126,
+              "symbol": "<litchi_odp::codec::content_source::ContentSource>::parse"
+            },
+            {
+              "period": 5877034343,
+              "share_phase_period_pct": 33.163743077540914,
+              "symbol": "<litchi_odp::codec::content_source::scanner::Scanner>::run"
+            },
+            {
+              "period": 5250373502,
+              "share_phase_period_pct": 29.627534521531167,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix"
+            },
+            {
+              "period": 4264386800,
+              "share_phase_period_pct": 24.063672247704755,
+              "symbol": "<litchi_odp::model::declaration::Scanner>::step"
+            },
+            {
+              "period": 3544557729,
+              "share_phase_period_pct": 20.00172110412796,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 3407704893,
+              "share_phase_period_pct": 19.229468973605258,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 3365632631,
+              "share_phase_period_pct": 18.992057788604974,
+              "symbol": "litchi_odp::model::declaration::element_is"
+            },
+            {
+              "period": 2064235300,
+              "share_phase_period_pct": 11.648352748240965,
+              "symbol": "<litchi_odp::model::page_metadata::Scanner>::step"
+            },
+            {
+              "period": 1749038265,
+              "share_phase_period_pct": 9.869715279499076,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 1704566010,
+              "share_phase_period_pct": 9.618761081714686,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 1660808144,
+              "share_phase_period_pct": 9.371838137088043,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+            },
+            {
+              "period": 1480692967,
+              "share_phase_period_pct": 8.3554592790151,
+              "symbol": "<quick_xml::name::NamespaceResolver>::push"
+            },
+            {
+              "period": 1301446810,
+              "share_phase_period_pct": 7.343984247315671,
+              "symbol": "litchi_odp::model::page_metadata::element_is"
+            },
+            {
+              "period": 1256727268,
+              "share_phase_period_pct": 7.091634624210312,
+              "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+            },
+            {
+              "period": 1076007591,
+              "share_phase_period_pct": 6.071844609843166,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "period": 898014957,
+              "share_phase_period_pct": 5.0674431312808395,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "period": 851883158,
+              "share_phase_period_pct": 4.807124228846146,
+              "symbol": "<litchi_odp::model::settings::Scanner>::step"
+            },
+            {
+              "period": 851883158,
+              "share_phase_period_pct": 4.807124228846146,
+              "symbol": "litchi_odp::model::settings::element_is"
+            },
+            {
+              "period": 763214641,
+              "share_phase_period_pct": 4.3067732447895315,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+            },
+            {
+              "period": 762788490,
+              "share_phase_period_pct": 4.304368500925295,
+              "symbol": "litchi_odp::model::page_metadata::parse_page"
+            },
+            {
+              "period": 762192246,
+              "share_phase_period_pct": 4.301003932730952,
+              "symbol": "<quick_xml::name::QName>::decompose"
+            },
+            {
+              "period": 717860728,
+              "share_phase_period_pct": 4.050843905175471,
+              "symbol": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2"
+            },
+            {
+              "period": 538682723,
+              "share_phase_period_pct": 3.0397534510174187,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::One>::find_raw"
+            },
+            {
+              "period": 538250966,
+              "share_phase_period_pct": 3.037317072840221,
+              "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2"
+            },
+            {
+              "period": 448481735,
+              "share_phase_period_pct": 2.5307548274284075,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_end"
+            }
+          ],
+          "leaves": [
+            {
+              "period": 3544557729,
+              "share_phase_period_pct": 20.00172110412796,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 2199144005,
+              "share_phase_period_pct": 12.409634267188142,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix"
+            },
+            {
+              "period": 1837474010,
+              "share_phase_period_pct": 10.368752745486354,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 1478945743,
+              "share_phase_period_pct": 8.345599801521333,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 986190401,
+              "share_phase_period_pct": 5.565011734746136,
+              "symbol": "<litchi_odp::codec::content_source::scanner::Scanner>::run"
+            },
+            {
+              "period": 852696532,
+              "share_phase_period_pct": 4.811714048266562,
+              "symbol": "litchi_odp::model::staging::parse"
+            },
+            {
+              "period": 718331505,
+              "share_phase_period_pct": 4.0535004708110645,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+            },
+            {
+              "period": 538682723,
+              "share_phase_period_pct": 3.0397534510174187,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::One>::find_raw"
+            },
+            {
+              "period": 493173380,
+              "share_phase_period_pct": 2.7829470294797725,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+            },
+            {
+              "period": 403766031,
+              "share_phase_period_pct": 2.278426861920827,
+              "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+            },
+            {
+              "period": 359162054,
+              "share_phase_period_pct": 2.026729364997668,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw"
+            },
+            {
+              "period": 316062008,
+              "share_phase_period_pct": 1.7835184581434869,
+              "symbol": "<litchi_odp::model::declaration::Scanner>::step"
+            },
+            {
+              "period": 269291568,
+              "share_phase_period_pct": 1.5195957438529024,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "period": 269271403,
+              "share_phase_period_pct": 1.5194819539990188,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_start"
+            },
+            {
+              "period": 269024766,
+              "share_phase_period_pct": 1.5180901965880453,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2"
+            },
+            {
+              "period": 268880817,
+              "share_phase_period_pct": 1.5172779012408257,
+              "symbol": "core::slice::memchr::memrchr"
+            },
+            {
+              "period": 224397698,
+              "share_phase_period_pct": 1.266262398573092,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "period": 224349350,
+              "share_phase_period_pct": 1.2659895737848172,
+              "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2"
+            },
+            {
+              "period": 224179625,
+              "share_phase_period_pct": 1.2650318260560602,
+              "symbol": "litchi_odp::model::declaration::element_is"
+            },
+            {
+              "period": 224177635,
+              "share_phase_period_pct": 1.2650205966085408,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 224040856,
+              "share_phase_period_pct": 1.2642487611300217,
+              "symbol": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2"
+            },
+            {
+              "period": 180822248,
+              "share_phase_period_pct": 1.0203688162071007,
+              "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates"
+            },
+            {
+              "period": 179312203,
+              "share_phase_period_pct": 1.011847725212427,
+              "symbol": "core::str::converts::from_utf8"
+            },
+            {
+              "period": 179204253,
+              "share_phase_period_pct": 1.0112385700065392,
+              "symbol": "<quick_xml::name::NamespaceResolver>::push"
+            },
+            {
+              "period": 178953086,
+              "share_phase_period_pct": 1.0098212500843784,
+              "symbol": "<quick_xml::name::QName>::decompose"
+            },
+            {
+              "period": 135002078,
+              "share_phase_period_pct": 0.76180841703925,
+              "symbol": "litchi_odp::model::page_metadata::parse_page"
+            },
+            {
+              "period": 89829601,
+              "share_phase_period_pct": 0.5069029096061576,
+              "symbol": "litchi_odp::model::declaration::parse_binding"
+            },
+            {
+              "period": 89787446,
+              "share_phase_period_pct": 0.5066650315357156,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_end"
+            },
+            {
+              "period": 89783841,
+              "share_phase_period_pct": 0.5066446887425963,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw"
+            },
+            {
+              "period": 89726302,
+              "share_phase_period_pct": 0.5063199997070096,
+              "symbol": "litchi_odp::model::settings::element_is"
+            },
+            {
+              "period": 89717591,
+              "share_phase_period_pct": 0.5062708440701547,
+              "symbol": "[unknown]"
+            },
+            {
+              "period": 44912868,
+              "share_phase_period_pct": 0.25344054982452036,
+              "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>"
+            },
+            {
+              "period": 44906501,
+              "share_phase_period_pct": 0.2534046212353968,
+              "symbol": "<<std::hash::random::RandomState>::new::KEYS::{K#0}::{closure#1} as core::ops::function::FnOnce<(core::option::Option<&mut core::option::Option<core::cell::Cell<(u64, u64)>>>,)>>::call_once"
+            },
+            {
+              "period": 44903968,
+              "share_phase_period_pct": 0.253390327672298,
+              "symbol": "litchi_odp::model::declaration::end_is"
+            },
+            {
+              "period": 44891749,
+              "share_phase_period_pct": 0.25332137660735365,
+              "symbol": "<litchi_odp::model::slide::Slide as core::clone::Clone>::clone"
+            },
+            {
+              "period": 44880961,
+              "share_phase_period_pct": 0.253260500587334,
+              "symbol": "_int_malloc"
+            },
+            {
+              "period": 44875065,
+              "share_phase_period_pct": 0.25322722982222134,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 44866167,
+              "share_phase_period_pct": 0.2531770189558759,
+              "symbol": "litchi_odp::model::page_metadata::element_is"
+            },
+            {
+              "period": 44864252,
+              "share_phase_period_pct": 0.2531662127287404,
+              "symbol": "litchi_odp::model::page_metadata::validate_text"
+            },
+            {
+              "period": 44811874,
+              "share_phase_period_pct": 0.2528706468985042,
+              "symbol": "<litchi_odf_common::core::package::OwnedPackage>::package"
+            }
+          ],
+          "period": 17721263638,
+          "samples": 395,
+          "share_total_period_pct": 24.157531445739128
+        },
+        "unattributed": {
+          "inclusive": [
+            {
+              "period": 3608591354,
+              "share_phase_period_pct": 58.52818864573551,
+              "symbol": "_start"
+            },
+            {
+              "period": 3608039413,
+              "share_phase_period_pct": 58.51923664652022,
+              "symbol": "__libc_start_call_main"
+            },
+            {
+              "period": 3608039413,
+              "share_phase_period_pct": 58.51923664652022,
+              "symbol": "__libc_start_main@@GLIBC_2.34"
+            },
+            {
+              "period": 3608039413,
+              "share_phase_period_pct": 58.51923664652022,
+              "symbol": "litchi_perf_baseline::main"
+            },
+            {
+              "period": 3608039413,
+              "share_phase_period_pct": 58.51923664652022,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_capture"
+            },
+            {
+              "period": 3608039413,
+              "share_phase_period_pct": 58.51923664652022,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_from_args::<std::env::ArgsOs>"
+            },
+            {
+              "period": 3608039413,
+              "share_phase_period_pct": 58.51923664652022,
+              "symbol": "main"
+            },
+            {
+              "period": 3608039413,
+              "share_phase_period_pct": 58.51923664652022,
+              "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}"
+            },
+            {
+              "period": 3608039413,
+              "share_phase_period_pct": 58.51923664652022,
+              "symbol": "std::rt::lang_start_internal"
+            },
+            {
+              "period": 3608039413,
+              "share_phase_period_pct": 58.51923664652022,
+              "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>"
+            },
+            {
+              "period": 3204447412,
+              "share_phase_period_pct": 51.973328159471876,
+              "symbol": "litchi_perf_baseline::odp_existing_append::build_odp_existing_append_corpus"
+            },
+            {
+              "period": 1928881470,
+              "share_phase_period_pct": 31.284766679464703,
+              "symbol": "<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&alloc::sync::Arc<alloc::vec::Vec<u8>>>>>>, &alloc::sync::Arc<alloc::vec::Vec<u8>>>> as std::io::Read>::read_buf"
+            },
+            {
+              "period": 1928881470,
+              "share_phase_period_pct": 31.284766679464703,
+              "symbol": "<litchi_odf_common::core::package::Package>::get_file"
+            },
+            {
+              "period": 1928881470,
+              "share_phase_period_pct": 31.284766679464703,
+              "symbol": "<soapberry_zip::office::IndexedArchive<alloc::sync::Arc<alloc::vec::Vec<u8>>>>::read_with_accounting"
+            },
+            {
+              "period": 1928881470,
+              "share_phase_period_pct": 31.284766679464703,
+              "symbol": "std::io::default_read_to_end::<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&alloc::sync::Arc<alloc::vec::Vec<u8>>>>>>, &alloc::sync::Arc<alloc::vec::Vec<u8>>>>>"
+            },
+            {
+              "period": 1890359627,
+              "share_phase_period_pct": 30.659976152383763,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles"
+            },
+            {
+              "period": 1658914560,
+              "share_phase_period_pct": 26.90614003916314,
+              "symbol": "[unknown]"
+            },
+            {
+              "period": 1569943677,
+              "share_phase_period_pct": 25.463110304463605,
+              "symbol": "<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&alloc::sync::Arc<alloc::vec::Vec<u8>>>>>>, &alloc::sync::Arc<alloc::vec::Vec<u8>>> as std::io::Read>::read"
+            },
+            {
+              "period": 1242851081,
+              "share_phase_period_pct": 20.157955110847475,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_pages_with_styles::<false>::{closure#0}"
+            },
+            {
+              "period": 936389425,
+              "share_phase_period_pct": 15.187415679950057,
+              "symbol": "litchi_perf_baseline::odp_existing_append::verify_patch_contract"
+            },
+            {
+              "period": 898385265,
+              "share_phase_period_pct": 14.571021517353303,
+              "symbol": "<flate2::mem::Decompress as flate2::zio::Ops>::run"
+            },
+            {
+              "period": 898385265,
+              "share_phase_period_pct": 14.571021517353303,
+              "symbol": "<zlib_rs::stable::Inflate>::decompress"
+            },
+            {
+              "period": 898385265,
+              "share_phase_period_pct": 14.571021517353303,
+              "symbol": "flate2::zio::read::<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&alloc::sync::Arc<alloc::vec::Vec<u8>>>>>, flate2::mem::Decompress>"
+            },
+            {
+              "period": 898385265,
+              "share_phase_period_pct": 14.571021517353303,
+              "symbol": "zlib_rs::inflate::inflate"
+            },
+            {
+              "period": 884466530,
+              "share_phase_period_pct": 14.345271836141269,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::from_owned_package"
+            },
+            {
+              "period": 808800074,
+              "share_phase_period_pct": 13.11802824536636,
+              "symbol": "zlib_rs::inflate::inflate_fast_help_avx2"
+            },
+            {
+              "period": 799171125,
+              "share_phase_period_pct": 12.961855132855998,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder"
+            },
+            {
+              "period": 703561207,
+              "share_phase_period_pct": 11.411146069912514,
+              "symbol": "litchi_perf_baseline::odp_existing_append::append_once"
+            },
+            {
+              "period": 682001083,
+              "share_phase_period_pct": 11.061459757191427,
+              "symbol": "litchi_perf_baseline::odp_buffered_create::build_odp_buffered_corpus"
+            },
+            {
+              "period": 671558412,
+              "share_phase_period_pct": 10.8920887871103,
+              "symbol": "<crc32fast::Hasher>::update"
+            },
+            {
+              "period": 671558412,
+              "share_phase_period_pct": 10.8920887871103,
+              "symbol": "crc32fast::specialized::pclmulqdq::calculate"
+            },
+            {
+              "period": 658153482,
+              "share_phase_period_pct": 10.674672572621725,
+              "symbol": "litchi_perf_baseline::odp_existing_append::semantic_slides"
+            },
+            {
+              "period": 591425201,
+              "share_phase_period_pct": 9.592398345576163,
+              "symbol": "litchi_perf_baseline::odp_buffered_create::inspect_odp_buffered_archive"
+            },
+            {
+              "period": 575861090,
+              "share_phase_period_pct": 9.33996210790092,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 574873784,
+              "share_phase_period_pct": 9.32394887000547,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+            },
+            {
+              "period": 572622197,
+              "share_phase_period_pct": 9.28743010249742,
+              "symbol": "<litchi_odp::authoring::edit::Transaction>::commit"
+            },
+            {
+              "period": 528728830,
+              "share_phase_period_pct": 8.575518164553863,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::from_bytes"
+            },
+            {
+              "period": 493702372,
+              "share_phase_period_pct": 8.007419718287972,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::transaction"
+            },
+            {
+              "period": 448902403,
+              "share_phase_period_pct": 7.280803490587753,
+              "symbol": "<litchi_odp::authoring::mutable::MutablePresentation>::from_presentation_with_validated_slides"
+            },
+            {
+              "period": 403592001,
+              "share_phase_period_pct": 6.545908487048345,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_phases_iteration"
+            }
+          ],
+          "leaves": [
+            {
+              "period": 808800074,
+              "share_phase_period_pct": 13.11802824536636,
+              "symbol": "zlib_rs::inflate::inflate_fast_help_avx2"
+            },
+            {
+              "period": 671558412,
+              "share_phase_period_pct": 10.8920887871103,
+              "symbol": "crc32fast::specialized::pclmulqdq::calculate"
+            },
+            {
+              "period": 486148470,
+              "share_phase_period_pct": 7.88490204923206,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 358937793,
+              "share_phase_period_pct": 5.821656375001104,
+              "symbol": "__memset_avx512_unaligned_erms"
+            },
+            {
+              "period": 269071005,
+              "share_phase_period_pct": 4.364095846508433,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 223273248,
+              "share_phase_period_pct": 3.6212963720607774,
+              "symbol": "sha2::sha256::x86_sha::compress"
+            },
+            {
+              "period": 179308372,
+              "share_phase_period_pct": 2.9082246208185425,
+              "symbol": "_int_free_merge_chunk"
+            },
+            {
+              "period": 170682431,
+              "share_phase_period_pct": 2.7683194188800173,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 134753266,
+              "share_phase_period_pct": 2.185579856343295,
+              "symbol": "<quick_xml::name::NamespaceResolver>::push"
+            },
+            {
+              "period": 134285606,
+              "share_phase_period_pct": 2.1779948210713673,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles"
+            },
+            {
+              "period": 133431973,
+              "share_phase_period_pct": 2.164149642064649,
+              "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>"
+            },
+            {
+              "period": 90259079,
+              "share_phase_period_pct": 1.4639231446494079,
+              "symbol": "[unknown]"
+            },
+            {
+              "period": 89713339,
+              "share_phase_period_pct": 1.4550717202186207,
+              "symbol": "<litchi_odp::codec::parser::model::ParagraphText>::push_text"
+            },
+            {
+              "period": 89709187,
+              "share_phase_period_pct": 1.4550043784180624,
+              "symbol": "cfree@GLIBC_2.2.5"
+            },
+            {
+              "period": 89697452,
+              "share_phase_period_pct": 1.4548140470043942,
+              "symbol": "xml_minifier::audit::verify_with_policy"
+            },
+            {
+              "period": 89677668,
+              "share_phase_period_pct": 1.454493167866089,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+            },
+            {
+              "period": 89645056,
+              "share_phase_period_pct": 1.4539642298121862,
+              "symbol": "zlib_rs::inflate::inftrees::inflate_table"
+            },
+            {
+              "period": 89594976,
+              "share_phase_period_pct": 1.453151976109885,
+              "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium"
+            },
+            {
+              "period": 89469058,
+              "share_phase_period_pct": 1.4511096965234962,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::harvest_drawing_attribute"
+            },
+            {
+              "period": 89214526,
+              "share_phase_period_pct": 1.4469814105939012,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup"
+            },
+            {
+              "period": 89010567,
+              "share_phase_period_pct": 1.4436733743944674,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder"
+            },
+            {
+              "period": 88956305,
+              "share_phase_period_pct": 1.4427932923179045,
+              "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates"
+            },
+            {
+              "period": 88675178,
+              "share_phase_period_pct": 1.4382336588001967,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "period": 87752401,
+              "share_phase_period_pct": 1.4232670247217551,
+              "symbol": "malloc"
+            },
+            {
+              "period": 87015346,
+              "share_phase_period_pct": 1.411312638688417,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+            },
+            {
+              "period": 86987044,
+              "share_phase_period_pct": 1.4108536050565774,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 86287485,
+              "share_phase_period_pct": 1.3995073712760642,
+              "symbol": "zlib_rs::deflate::longest_match::longest_match"
+            },
+            {
+              "period": 82248283,
+              "share_phase_period_pct": 1.333995055404614,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "period": 64355180,
+              "share_phase_period_pct": 1.0437846089707905,
+              "symbol": "core::slice::memchr::memrchr"
+            },
+            {
+              "period": 46144332,
+              "share_phase_period_pct": 0.7484206171568215,
+              "symbol": "quick_xml::escape::normalize_attribute_value::<quick_xml::escape::is_xml10_normalization_char, quick_xml::escape::normalize_xml10_eol_step, quick_xml::escape::resolve_predefined_entity>"
+            },
+            {
+              "period": 46111066,
+              "share_phase_period_pct": 0.7478810717961835,
+              "symbol": "xml_minifier::audit::inspect_attributes"
+            },
+            {
+              "period": 44990803,
+              "share_phase_period_pct": 0.7297113879043904,
+              "symbol": "<quick_xml::name::NamespaceResolver>::set_level"
+            },
+            {
+              "period": 44957863,
+              "share_phase_period_pct": 0.7291771299779967,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+            },
+            {
+              "period": 44955948,
+              "share_phase_period_pct": 0.7291460703565927,
+              "symbol": "core::ptr::drop_glue::<litchi_odp::model::slide::Slide>"
+            },
+            {
+              "period": 44924912,
+              "share_phase_period_pct": 0.7286426936412449,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw"
+            },
+            {
+              "period": 44922097,
+              "share_phase_period_pct": 0.7285970368087374,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_start"
+            },
+            {
+              "period": 44917577,
+              "share_phase_period_pct": 0.7285237263707501,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::drawing_attributes"
+            },
+            {
+              "period": 44910376,
+              "share_phase_period_pct": 0.7284069324627974,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix"
+            },
+            {
+              "period": 44898914,
+              "share_phase_period_pct": 0.7282210288698306,
+              "symbol": "litchi_odf_common::package::edit::xml_splice_publication"
+            },
+            {
+              "period": 44897439,
+              "share_phase_period_pct": 0.7281971056627441,
+              "symbol": "<litchi_odp::codec::content_source::scanner::Scanner>::run"
+            }
+          ],
+          "period": 6165561309,
+          "samples": 144,
+          "share_total_period_pct": 8.404860073489077
+        }
+      },
+      "malformed": 0,
+      "samples": 1643,
+      "total_period": 73357096431
+    },
+    "fp": {
+      "groups": {
+        "add": {
+          "inclusive": [
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_odp::authoring::edit::Transaction>::add"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_odp::authoring::mutable::MutablePresentation>::insert_slide"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_call_main"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_main@@GLIBC_2.34"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "_start"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::main"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::phase_add"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_capture"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_from_args::<std::env::ArgsOs>"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_phases_iteration"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "main"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start_internal"
+            },
+            {
+              "period": 1211478066,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>"
+            },
+            {
+              "period": 672759570,
+              "share_phase_period_pct": 55.5321296258615,
+              "symbol": "litchi_odp::model::page_metadata::metadata_after_page_insert"
+            },
+            {
+              "period": 403820111,
+              "share_phase_period_pct": 33.33284541694707,
+              "symbol": "litchi_odp::model::page_metadata::effective_page_names"
+            },
+            {
+              "period": 314080954,
+              "share_phase_period_pct": 25.92543462524397,
+              "symbol": "<alloc::vec::Vec<alloc::string::String> as alloc::vec::spec_from_iter::SpecFromIter<alloc::string::String, core::iter::adapters::GenericShunt<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}>, core::result::Result<core::convert::Infallible, litchi_core::error::types::Error>>>>::from_iter"
+            },
+            {
+              "period": 314080954,
+              "share_phase_period_pct": 25.92543462524397,
+              "symbol": "core::iter::adapters::try_process::<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}>, alloc::string::String, core::result::Result<core::convert::Infallible, litchi_core::error::types::Error>, <core::result::Result<alloc::vec::Vec<alloc::string::String>, litchi_core::error::types::Error> as core::iter::traits::collect::FromIterator<core::result::Result<alloc::string::String, litchi_core::error::types::Error>>>::from_iter<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}>>::{closure#0}, alloc::vec::Vec<alloc::string::String>>"
+            },
+            {
+              "period": 269412728,
+              "share_phase_period_pct": 22.23834962935268,
+              "symbol": "<alloc::vec::Vec<litchi_odp::model::page_metadata::Page> as core::ops::drop::Drop>::drop"
+            },
+            {
+              "period": 269185268,
+              "share_phase_period_pct": 22.219574217202542,
+              "symbol": "<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}> as core::iter::traits::iterator::Iterator>::try_fold::<(), <core::iter::adapters::GenericShunt<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}>, core::result::Result<core::convert::Infallible, litchi_core::error::types::Error>> as core::iter::traits::iterator::Iterator>::try_fold<(), core::iter::traits::iterator::Iterator::try_for_each::call<alloc::string::String, core::ops::control_flow::ControlFlow<alloc::string::String>, core::ops::control_flow::ControlFlow<alloc::string::String>::Break>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::string::String>>::{closure#0}, core::ops::control_flow::ControlFlow<core::ops::control_flow::ControlFlow<alloc::string::String>>>"
+            },
+            {
+              "period": 268959373,
+              "share_phase_period_pct": 22.20092798609529,
+              "symbol": "<litchi_odp::model::page_metadata::Page as core::clone::Clone>::clone"
+            },
+            {
+              "period": 179576649,
+              "share_phase_period_pct": 14.822938527720734,
+              "symbol": "_int_free_chunk"
+            },
+            {
+              "period": 179556833,
+              "share_phase_period_pct": 14.821302839832018,
+              "symbol": "core::ptr::drop_glue::<litchi_odp::model::page_metadata::Page>"
+            },
+            {
+              "period": 134646438,
+              "share_phase_period_pct": 11.114228295075051,
+              "symbol": "_int_free_merge_chunk"
+            },
+            {
+              "period": 134611763,
+              "share_phase_period_pct": 11.111366088901192,
+              "symbol": "<hashbrown::map::HashMap<&str,"
+            },
+            {
+              "period": 89739157,
+              "share_phase_period_pct": 7.407410791703099,
+              "symbol": "<litchi_odp::model::page_metadata::Collection>::validate_for_slide_count"
+            },
+            {
+              "period": 89739157,
+              "share_phase_period_pct": 7.407410791703099,
+              "symbol": "<litchi_odp::model::page_metadata::Page>::validate"
+            },
+            {
+              "period": 89739157,
+              "share_phase_period_pct": 7.407410791703099,
+              "symbol": "litchi_odp::model::page_metadata::validate_text"
+            },
+            {
+              "period": 89539182,
+              "share_phase_period_pct": 7.39090409582372,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 44925684,
+              "share_phase_period_pct": 3.7083365568749804,
+              "symbol": "__rustc::__rust_dealloc"
+            },
+            {
+              "period": 44895686,
+              "share_phase_period_pct": 3.705860408041428,
+              "symbol": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>"
+            },
+            {
+              "period": 44895686,
+              "share_phase_period_pct": 3.705860408041428,
+              "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow"
+            },
+            {
+              "period": 44895686,
+              "share_phase_period_pct": 3.705860408041428,
+              "symbol": "realloc"
+            },
+            {
+              "period": 44888091,
+              "share_phase_period_pct": 3.705233487900391,
+              "symbol": "unlink_chunk.isra.0"
+            },
+            {
+              "period": 44860478,
+              "share_phase_period_pct": 3.70295420602357,
+              "symbol": "<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write"
+            },
+            {
+              "period": 44860478,
+              "share_phase_period_pct": 3.70295420602357,
+              "symbol": "<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&&str>"
+            },
+            {
+              "period": 44819354,
+              "share_phase_period_pct": 3.6995596749004616,
+              "symbol": "<alloc::string::String as core::clone::Clone>::clone"
+            },
+            {
+              "period": 44819354,
+              "share_phase_period_pct": 3.6995596749004616,
+              "symbol": "__libc_malloc2"
+            }
+          ],
+          "leaves": [
+            {
+              "period": 224365914,
+              "share_phase_period_pct": 18.52001454230208,
+              "symbol": "<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}> as core::iter::traits::iterator::Iterator>::try_fold::<(), <core::iter::adapters::GenericShunt<core::iter::adapters::map::Map<core::ops::range::Range<usize>, litchi_odp::model::page_metadata::effective_page_names::{closure#0}>, core::result::Result<core::convert::Infallible, litchi_core::error::types::Error>> as core::iter::traits::iterator::Iterator>::try_fold<(), core::iter::traits::iterator::Iterator::try_for_each::call<alloc::string::String, core::ops::control_flow::ControlFlow<alloc::string::String>, core::ops::control_flow::ControlFlow<alloc::string::String>::Break>::{closure#0}, core::ops::control_flow::ControlFlow<alloc::string::String>>::{closure#0}, core::ops::control_flow::ControlFlow<core::ops::control_flow::ControlFlow<alloc::string::String>>>"
+            },
+            {
+              "period": 224315877,
+              "share_phase_period_pct": 18.515884298312997,
+              "symbol": "<litchi_odp::model::page_metadata::Page as core::clone::Clone>::clone"
+            },
+            {
+              "period": 134674091,
+              "share_phase_period_pct": 11.116510878703767,
+              "symbol": "litchi_odp::model::page_metadata::metadata_after_page_insert"
+            },
+            {
+              "period": 89758347,
+              "share_phase_period_pct": 7.408994807174659,
+              "symbol": "_int_free_merge_chunk"
+            },
+            {
+              "period": 89751285,
+              "share_phase_period_pct": 7.408411882877622,
+              "symbol": "<hashbrown::map::HashMap<&str,"
+            },
+            {
+              "period": 89739157,
+              "share_phase_period_pct": 7.407410791703099,
+              "symbol": "litchi_odp::model::page_metadata::validate_text"
+            },
+            {
+              "period": 89539182,
+              "share_phase_period_pct": 7.39090409582372,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 44930211,
+              "share_phase_period_pct": 3.708710232645681,
+              "symbol": "_int_free_chunk"
+            },
+            {
+              "period": 44925684,
+              "share_phase_period_pct": 3.7083365568749804,
+              "symbol": "__rustc::__rust_dealloc"
+            },
+            {
+              "period": 44910395,
+              "share_phase_period_pct": 3.707074544756966,
+              "symbol": "core::ptr::drop_glue::<litchi_odp::model::page_metadata::Page>"
+            },
+            {
+              "period": 44888091,
+              "share_phase_period_pct": 3.705233487900391,
+              "symbol": "unlink_chunk.isra.0"
+            },
+            {
+              "period": 44860478,
+              "share_phase_period_pct": 3.70295420602357,
+              "symbol": "<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write"
+            },
+            {
+              "period": 44819354,
+              "share_phase_period_pct": 3.6995596749004616,
+              "symbol": "__libc_malloc2"
+            }
+          ],
+          "period": 1211478066,
+          "samples": 27,
+          "share_total_period_pct": 1.6394311531758368
+        },
+        "commit": {
+          "inclusive": [
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_odp::authoring::edit::Transaction>::commit"
+            },
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_call_main"
+            },
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_main@@GLIBC_2.34"
+            },
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "_start"
+            },
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::main"
+            },
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::phase_commit"
+            },
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_capture"
+            },
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_from_args::<std::env::ArgsOs>"
+            },
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_phases_iteration"
+            },
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "main"
+            },
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}"
+            },
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start_internal"
+            },
+            {
+              "period": 31561725334,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>"
+            },
+            {
+              "period": 18735388914,
+              "share_phase_period_pct": 59.361104995794456,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::from_owned_package"
+            },
+            {
+              "period": 18063284485,
+              "share_phase_period_pct": 57.23161295476218,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles"
+            },
+            {
+              "period": 10802988461,
+              "share_phase_period_pct": 34.22813026435673,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_pages_with_styles::<false>::{closure#0}"
+            },
+            {
+              "period": 8651421519,
+              "share_phase_period_pct": 27.411117191620132,
+              "symbol": "<litchi_odp::authoring::mutable::MutablePresentation>::to_bytes_bounded"
+            },
+            {
+              "period": 7978477301,
+              "share_phase_period_pct": 25.278964367658162,
+              "symbol": "<litchi_odf_common::core::writer::PackageWriter<litchi_odf_common::core::writer::BoundedBytes>>::write_file"
+            },
+            {
+              "period": 6589074659,
+              "share_phase_period_pct": 20.876788544579,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder"
+            },
+            {
+              "period": 5334455984,
+              "share_phase_period_pct": 16.90166151421841,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+            },
+            {
+              "period": 4398532681,
+              "share_phase_period_pct": 13.936287178387117,
+              "symbol": "xml_minifier::audit::verify_authored"
+            },
+            {
+              "period": 4263933334,
+              "share_phase_period_pct": 13.50982333467892,
+              "symbol": "xml_minifier::audit::verify_with_policy"
+            },
+            {
+              "period": 3770895655,
+              "share_phase_period_pct": 11.947685416734132,
+              "symbol": "litchi_odp::authoring::edit::validate_compact_xml_parts_against"
+            },
+            {
+              "period": 3624780712,
+              "share_phase_period_pct": 11.484735620885687,
+              "symbol": "<soapberry_zip::office::StreamingArchiveWriter<litchi_odf_common::core::writer::BoundedBytes>>::write_deflated_sized_with_accounting"
+            },
+            {
+              "period": 3535157030,
+              "share_phase_period_pct": 11.200772431131126,
+              "symbol": "<flate2::mem::Compress as flate2::zio::Ops>::run_vec"
+            },
+            {
+              "period": 3535157030,
+              "share_phase_period_pct": 11.200772431131126,
+              "symbol": "<zlib_rs::stable::Deflate>::compress_uninit"
+            },
+            {
+              "period": 3535157030,
+              "share_phase_period_pct": 11.200772431131126,
+              "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium"
+            },
+            {
+              "period": 3535157030,
+              "share_phase_period_pct": 11.200772431131126,
+              "symbol": "zlib_rs::deflate::deflate"
+            },
+            {
+              "period": 3445513521,
+              "share_phase_period_pct": 10.916746421616901,
+              "symbol": "<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::CompressedScratch> as std::io::Write>::write_all"
+            },
+            {
+              "period": 3445513521,
+              "share_phase_period_pct": 10.916746421616901,
+              "symbol": "<flate2::zio::Writer<&mut soapberry_zip::office::CompressedScratch, flate2::mem::Compress>>::write_with_status"
+            },
+            {
+              "period": 3094409730,
+              "share_phase_period_pct": 9.804311067451481,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 2962970446,
+              "share_phase_period_pct": 9.387859550276637,
+              "symbol": "litchi_odf_common::package::edit::xml_splice_publication"
+            },
+            {
+              "period": 2873311474,
+              "share_phase_period_pct": 9.10378454787677,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+            },
+            {
+              "period": 2379485576,
+              "share_phase_period_pct": 7.5391492411116365,
+              "symbol": "<litchi_odf_common::core::xml_splice::XmlSourcePart>::load::<&str>"
+            },
+            {
+              "period": 2240911500,
+              "share_phase_period_pct": 7.100091887517849,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 2150621810,
+              "share_phase_period_pct": 6.8140185216149565,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 2020228260,
+              "share_phase_period_pct": 6.400880302394942,
+              "symbol": "litchi_odf_common::core::xml_splice::verify_well_formed"
+            },
+            {
+              "period": 1658807782,
+              "share_phase_period_pct": 5.2557576128863985,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 1615414168,
+              "share_phase_period_pct": 5.118269520772327,
+              "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+            },
+            {
+              "period": 1570287833,
+              "share_phase_period_pct": 4.975291484804859,
+              "symbol": "<soapberry_zip::office::IndexedArchive<alloc::sync::Arc<alloc::vec::Vec<u8>>>>::read_with_accounting"
+            }
+          ],
+          "leaves": [
+            {
+              "period": 2150621810,
+              "share_phase_period_pct": 6.8140185216149565,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 2061893012,
+              "share_phase_period_pct": 6.532890677490362,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+            },
+            {
+              "period": 1793806647,
+              "share_phase_period_pct": 5.683487287266942,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 1609535126,
+              "share_phase_period_pct": 5.099642395867762,
+              "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium"
+            },
+            {
+              "period": 1432915790,
+              "share_phase_period_pct": 4.5400426460729175,
+              "symbol": "zlib_rs::deflate::longest_match::longest_match"
+            },
+            {
+              "period": 1301944922,
+              "share_phase_period_pct": 4.125075255621321,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+            },
+            {
+              "period": 1211850714,
+              "share_phase_period_pct": 3.839621253830914,
+              "symbol": "xml_minifier::audit::verify_with_policy"
+            },
+            {
+              "period": 1210905678,
+              "share_phase_period_pct": 3.83662700687515,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 942492830,
+              "share_phase_period_pct": 2.986189189678727,
+              "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+            },
+            {
+              "period": 896411942,
+              "share_phase_period_pct": 2.840186753144121,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles"
+            },
+            {
+              "period": 807481534,
+              "share_phase_period_pct": 2.5584201289849546,
+              "symbol": "crc32fast::specialized::pclmulqdq::calculate"
+            },
+            {
+              "period": 807233159,
+              "share_phase_period_pct": 2.5576331789770843,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder"
+            },
+            {
+              "period": 717143099,
+              "share_phase_period_pct": 2.2721923196874623,
+              "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>"
+            },
+            {
+              "period": 672918556,
+              "share_phase_period_pct": 2.1320715166198334,
+              "symbol": "zlib_rs::inflate::inflate_fast_help_avx2"
+            },
+            {
+              "period": 672451711,
+              "share_phase_period_pct": 2.1305923674444966,
+              "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates"
+            },
+            {
+              "period": 672168087,
+              "share_phase_period_pct": 2.1296937346954987,
+              "symbol": "<litchi_odp::codec::parser::model::ParagraphText>::push_text"
+            },
+            {
+              "period": 628138916,
+              "share_phase_period_pct": 1.9901919472169498,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+            },
+            {
+              "period": 583484870,
+              "share_phase_period_pct": 1.8487103091650015,
+              "symbol": "litchi_odf_common::package::edit::xml_splice_publication"
+            },
+            {
+              "period": 582931169,
+              "share_phase_period_pct": 1.8469559659086032,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix"
+            },
+            {
+              "period": 538642536,
+              "share_phase_period_pct": 1.7066321004312939,
+              "symbol": "xml_minifier::audit::check_attribute_layout"
+            },
+            {
+              "period": 538340444,
+              "share_phase_period_pct": 1.7056749537708908,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_start"
+            },
+            {
+              "period": 537377474,
+              "share_phase_period_pct": 1.7026238848264355,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "period": 493022260,
+              "share_phase_period_pct": 1.562089064468506,
+              "symbol": "core::str::converts::from_utf8"
+            },
+            {
+              "period": 403856747,
+              "share_phase_period_pct": 1.2795775348977632,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_end"
+            },
+            {
+              "period": 403586541,
+              "share_phase_period_pct": 1.2787214156674596,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup"
+            },
+            {
+              "period": 403395242,
+              "share_phase_period_pct": 1.2781153049495706,
+              "symbol": "_int_malloc"
+            },
+            {
+              "period": 403363419,
+              "share_phase_period_pct": 1.2780144771283308,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "period": 358783613,
+              "share_phase_period_pct": 1.1367680606912158,
+              "symbol": "<quick_xml::encoding::Decoder>::decode_cow"
+            },
+            {
+              "period": 358724468,
+              "share_phase_period_pct": 1.1365806659928142,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_pages_with_styles::<false>::{closure#0}"
+            },
+            {
+              "period": 314155816,
+              "share_phase_period_pct": 0.9953695898290272,
+              "symbol": "_int_free_merge_chunk"
+            },
+            {
+              "period": 314021920,
+              "share_phase_period_pct": 0.9949453544661533,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::finish_shape"
+            },
+            {
+              "period": 313629904,
+              "share_phase_period_pct": 0.9937032930900671,
+              "symbol": "cfree@GLIBC_2.2.5"
+            },
+            {
+              "period": 313492766,
+              "share_phase_period_pct": 0.9932687857919117,
+              "symbol": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>"
+            },
+            {
+              "period": 268983703,
+              "share_phase_period_pct": 0.8522465110937272,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::resolve_at_scan"
+            },
+            {
+              "period": 224278706,
+              "share_phase_period_pct": 0.7106034401686996,
+              "symbol": "_int_realloc"
+            },
+            {
+              "period": 224217724,
+              "share_phase_period_pct": 0.7104102251294245,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 224188698,
+              "share_phase_period_pct": 0.7103182593078705,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 224183104,
+              "share_phase_period_pct": 0.7103005353084986,
+              "symbol": "realloc"
+            },
+            {
+              "period": 224103930,
+              "share_phase_period_pct": 0.7100496808347264,
+              "symbol": "<quick_xml::name::NamespaceResolver>::push"
+            },
+            {
+              "period": 223895612,
+              "share_phase_period_pct": 0.7093896472092023,
+              "symbol": "unlink_chunk.isra.0"
+            }
+          ],
+          "period": 31561725334,
+          "samples": 704,
+          "share_total_period_pct": 42.71086469718936
+        },
+        "publication": {
+          "inclusive": [
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_perf_baseline::HashingDiscardSink as std::io::Write>::write"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_perf_baseline::HashingDiscardSink as std::io::Write>::write_all"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_call_main"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_main@@GLIBC_2.34"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "_start"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::main"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::phase_publication"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_capture"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_from_args::<std::env::ArgsOs>"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_phases_iteration"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "main"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "sha2::sha256::x86_sha::compress"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start_internal"
+            },
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>"
+            }
+          ],
+          "leaves": [
+            {
+              "period": 44898932,
+              "share_phase_period_pct": 100.0,
+              "symbol": "sha2::sha256::x86_sha::compress"
+            }
+          ],
+          "period": 44898932,
+          "samples": 1,
+          "share_total_period_pct": 0.06075942266801508
+        },
+        "snapshot_open": {
+          "inclusive": [
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::from_bytes"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::from_owned_package"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_call_main"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_main@@GLIBC_2.34"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "_start"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::main"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::phase_snapshot_open"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_capture"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_from_args::<std::env::ArgsOs>"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_phases_iteration"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "main"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start_internal"
+            },
+            {
+              "period": 18790550797,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>"
+            },
+            {
+              "period": 17982636226,
+              "share_phase_period_pct": 95.70042102688663,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles"
+            },
+            {
+              "period": 11973053614,
+              "share_phase_period_pct": 63.718481397104945,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_pages_with_styles::<false>::{closure#0}"
+            },
+            {
+              "period": 7129360188,
+              "share_phase_period_pct": 37.94119855783172,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder"
+            },
+            {
+              "period": 6143386310,
+              "share_phase_period_pct": 32.694019331146066,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+            },
+            {
+              "period": 2242839523,
+              "share_phase_period_pct": 11.935996699777847,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 1794060909,
+              "share_phase_period_pct": 9.547676001527481,
+              "symbol": "<litchi_odp::codec::parser::model::ParagraphText>::push_text"
+            },
+            {
+              "period": 1659670416,
+              "share_phase_period_pct": 8.832473480580326,
+              "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow"
+            },
+            {
+              "period": 1569455022,
+              "share_phase_period_pct": 8.352363051808842,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 1480743663,
+              "share_phase_period_pct": 7.880256832260647,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 1434503066,
+              "share_phase_period_pct": 7.63417252371881,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 1434483067,
+              "share_phase_period_pct": 7.63406609256511,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup"
+            },
+            {
+              "period": 1345196301,
+              "share_phase_period_pct": 7.158897658363303,
+              "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next"
+            },
+            {
+              "period": 1166126350,
+              "share_phase_period_pct": 6.205918935522516,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "period": 1121807429,
+              "share_phase_period_pct": 5.970061448007697,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 1120672695,
+              "share_phase_period_pct": 5.9640225936267965,
+              "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value"
+            },
+            {
+              "period": 1076656767,
+              "share_phase_period_pct": 5.729777581463409,
+              "symbol": "realloc"
+            },
+            {
+              "period": 1076217473,
+              "share_phase_period_pct": 5.727439736209453,
+              "symbol": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>"
+            },
+            {
+              "period": 1031292602,
+              "share_phase_period_pct": 5.488357489577425,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::drawing_attributes"
+            },
+            {
+              "period": 986206984,
+              "share_phase_period_pct": 5.2484197757388396,
+              "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>"
+            },
+            {
+              "period": 897004973,
+              "share_phase_period_pct": 4.773702392711187,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::resolve_at_scan"
+            },
+            {
+              "period": 896953846,
+              "share_phase_period_pct": 4.77343030382698,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::get_attr"
+            },
+            {
+              "period": 807410682,
+              "share_phase_period_pct": 4.296897364652594,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "period": 807193078,
+              "share_phase_period_pct": 4.29573931451159,
+              "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates"
+            },
+            {
+              "period": 807105399,
+              "share_phase_period_pct": 4.295272702324715,
+              "symbol": "_int_malloc"
+            },
+            {
+              "period": 762467810,
+              "share_phase_period_pct": 4.05771931987077,
+              "symbol": "<alloc::raw_vec::RawVec<litchi_odp::codec::parser::codec::xml::validation::ResolvedAttribute>>::grow_one"
+            },
+            {
+              "period": 762019469,
+              "share_phase_period_pct": 4.05533332807711,
+              "symbol": "<quick_xml::name::NamespaceResolver>::push"
+            }
+          ],
+          "leaves": [
+            {
+              "period": 1480743663,
+              "share_phase_period_pct": 7.880256832260647,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 1434901982,
+              "share_phase_period_pct": 7.636295484372331,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+            },
+            {
+              "period": 1121807429,
+              "share_phase_period_pct": 5.970061448007697,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 986206984,
+              "share_phase_period_pct": 5.2484197757388396,
+              "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>"
+            },
+            {
+              "period": 897062767,
+              "share_phase_period_pct": 4.774009962194511,
+              "symbol": "<litchi_odp::codec::parser::model::ParagraphText>::push_text"
+            },
+            {
+              "period": 807105399,
+              "share_phase_period_pct": 4.295272702324715,
+              "symbol": "_int_malloc"
+            },
+            {
+              "period": 717334233,
+              "share_phase_period_pct": 3.8175263766856995,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 717128166,
+              "share_phase_period_pct": 3.8164297244256025,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 672775645,
+              "share_phase_period_pct": 3.5803934236319024,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles"
+            },
+            {
+              "period": 582863672,
+              "share_phase_period_pct": 3.101897747952428,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder"
+            },
+            {
+              "period": 538410712,
+              "share_phase_period_pct": 2.8653269285004663,
+              "symbol": "core::str::converts::from_utf8"
+            },
+            {
+              "period": 493181065,
+              "share_phase_period_pct": 2.624622717705213,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "period": 493105600,
+              "share_phase_period_pct": 2.62422110627394,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix"
+            },
+            {
+              "period": 448485272,
+              "share_phase_period_pct": 2.3867595838201976,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_pages_with_styles::<false>::{closure#0}"
+            },
+            {
+              "period": 448292514,
+              "share_phase_period_pct": 2.385733759712738,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup"
+            },
+            {
+              "period": 403773988,
+              "share_phase_period_pct": 2.1488140095630643,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "period": 403562113,
+              "share_phase_period_pct": 2.1476864481504747,
+              "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates"
+            },
+            {
+              "period": 358896541,
+              "share_phase_period_pct": 1.9099841451018003,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+            },
+            {
+              "period": 313942296,
+              "share_phase_period_pct": 1.6707455752181695,
+              "symbol": "realloc"
+            },
+            {
+              "period": 313720791,
+              "share_phase_period_pct": 1.6695667646426149,
+              "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next"
+            },
+            {
+              "period": 269257332,
+              "share_phase_period_pct": 1.4329400713628266,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 269180138,
+              "share_phase_period_pct": 1.432529258498244,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::resolve_at_scan"
+            },
+            {
+              "period": 269118627,
+              "share_phase_period_pct": 1.4322019077959443,
+              "symbol": "cfree@GLIBC_2.2.5"
+            },
+            {
+              "period": 268888857,
+              "share_phase_period_pct": 1.430979112346879,
+              "symbol": "<quick_xml::name::NamespaceResolver>::push"
+            },
+            {
+              "period": 224421763,
+              "share_phase_period_pct": 1.194333074237664,
+              "symbol": "_int_free_merge_chunk"
+            },
+            {
+              "period": 224311424,
+              "share_phase_period_pct": 1.1937458695240184,
+              "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+            },
+            {
+              "period": 224165472,
+              "share_phase_period_pct": 1.1929691387002295,
+              "symbol": "litchi_odp::model::slide::is_xml_local_name"
+            },
+            {
+              "period": 179302805,
+              "share_phase_period_pct": 0.9542179307943784,
+              "symbol": "<litchi_odp::codec::parser::model::ParagraphText>::finish"
+            },
+            {
+              "period": 179266416,
+              "share_phase_period_pct": 0.9540242749489851,
+              "symbol": "<alloc::raw_vec::RawVec<litchi_odp::codec::parser::codec::xml::validation::ResolvedAttribute>>::grow_one"
+            },
+            {
+              "period": 179145425,
+              "share_phase_period_pct": 0.9533803821684749,
+              "symbol": "<quick_xml::encoding::Decoder>::decode_cow"
+            },
+            {
+              "period": 134665664,
+              "share_phase_period_pct": 0.7166669325174864,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_start"
+            },
+            {
+              "period": 134607264,
+              "share_phase_period_pct": 0.7163561380089544,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw"
+            },
+            {
+              "period": 134591387,
+              "share_phase_period_pct": 0.7162716434128591,
+              "symbol": "alloc_perturb"
+            },
+            {
+              "period": 134582832,
+              "share_phase_period_pct": 0.7162261152104534,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::drawing_attributes"
+            },
+            {
+              "period": 134548706,
+              "share_phase_period_pct": 0.7160445026522657,
+              "symbol": "_int_realloc"
+            },
+            {
+              "period": 134532055,
+              "share_phase_period_pct": 0.7159558889645676,
+              "symbol": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>"
+            },
+            {
+              "period": 134494955,
+              "share_phase_period_pct": 0.7157584493024693,
+              "symbol": "<alloc::raw_vec::RawVec<core::ops::range::Range<usize>>>::grow_one"
+            },
+            {
+              "period": 134482092,
+              "share_phase_period_pct": 0.7156899946832357,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::harvest_drawing_attribute"
+            },
+            {
+              "period": 89756949,
+              "share_phase_period_pct": 0.4776706652703875,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::finish_shape"
+            },
+            {
+              "period": 89751819,
+              "share_phase_period_pct": 0.47764336431441545,
+              "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow"
+            }
+          ],
+          "period": 18790550797,
+          "samples": 419,
+          "share_total_period_pct": 25.42828898557611
+        },
+        "transaction": {
+          "inclusive": [
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::transaction"
+            },
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_call_main"
+            },
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "__libc_start_main@@GLIBC_2.34"
+            },
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "_start"
+            },
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::main"
+            },
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::phase_transaction"
+            },
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_capture"
+            },
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_from_args::<std::env::ArgsOs>"
+            },
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_phases_iteration"
+            },
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "main"
+            },
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}"
+            },
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::rt::lang_start_internal"
+            },
+            {
+              "period": 18309600667,
+              "share_phase_period_pct": 100.0,
+              "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>"
+            },
+            {
+              "period": 17770886216,
+              "share_phase_period_pct": 97.05774876908734,
+              "symbol": "<litchi_odp::authoring::mutable::MutablePresentation>::from_presentation_with_validated_slides"
+            },
+            {
+              "period": 11713566803,
+              "share_phase_period_pct": 63.97499877816423,
+              "symbol": "litchi_odp::model::staging::parse"
+            },
+            {
+              "period": 5922718419,
+              "share_phase_period_pct": 32.34761110696812,
+              "symbol": "<litchi_odp::codec::content_source::ContentSource>::parse"
+            },
+            {
+              "period": 5922718419,
+              "share_phase_period_pct": 32.34761110696812,
+              "symbol": "<litchi_odp::codec::content_source::scanner::Scanner>::run"
+            },
+            {
+              "period": 4487984604,
+              "share_phase_period_pct": 24.511646570691425,
+              "symbol": "<litchi_odp::model::declaration::Scanner>::step"
+            },
+            {
+              "period": 3813585406,
+              "share_phase_period_pct": 20.828337413569873,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 3366373895,
+              "share_phase_period_pct": 18.385840064045347,
+              "symbol": "litchi_odp::model::declaration::element_is"
+            },
+            {
+              "period": 2603621464,
+              "share_phase_period_pct": 14.219979514313458,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 2468065113,
+              "share_phase_period_pct": 13.479622837696702,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix"
+            },
+            {
+              "period": 2064226513,
+              "share_phase_period_pct": 11.274011654008511,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 1929660799,
+              "share_phase_period_pct": 10.539065455850666,
+              "symbol": "<litchi_odp::model::page_metadata::Scanner>::step"
+            },
+            {
+              "period": 1525866563,
+              "share_phase_period_pct": 8.333696571275418,
+              "symbol": "<quick_xml::name::NamespaceResolver>::push"
+            },
+            {
+              "period": 1480644735,
+              "share_phase_period_pct": 8.086712331572665,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 1166713381,
+              "share_phase_period_pct": 6.372139962084515,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+            },
+            {
+              "period": 1077624974,
+              "share_phase_period_pct": 5.885573331712467,
+              "symbol": "<litchi_odp::model::settings::Scanner>::step"
+            },
+            {
+              "period": 1077426345,
+              "share_phase_period_pct": 5.884488496474318,
+              "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+            },
+            {
+              "period": 942727712,
+              "share_phase_period_pct": 5.148816345837129,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "period": 942384461,
+              "share_phase_period_pct": 5.146941640832674,
+              "symbol": "litchi_odp::model::page_metadata::element_is"
+            },
+            {
+              "period": 898044332,
+              "share_phase_period_pct": 4.90477290211236,
+              "symbol": "litchi_odp::model::settings::element_is"
+            },
+            {
+              "period": 852383357,
+              "share_phase_period_pct": 4.655390210318889,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "period": 807930786,
+              "share_phase_period_pct": 4.412607356621166,
+              "symbol": "<quick_xml::name::QName>::decompose"
+            },
+            {
+              "period": 807742082,
+              "share_phase_period_pct": 4.411576727917503,
+              "symbol": "litchi_odp::model::page_metadata::parse_page"
+            },
+            {
+              "period": 673219483,
+              "share_phase_period_pct": 3.676866007314762,
+              "symbol": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2"
+            },
+            {
+              "period": 538732327,
+              "share_phase_period_pct": 2.9423488627525076,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+            },
+            {
+              "period": 493784223,
+              "share_phase_period_pct": 2.6968595983087913,
+              "symbol": "<litchi_odf_common::core::family::Package>::from_owned_package"
+            },
+            {
+              "period": 448539807,
+              "share_phase_period_pct": 2.449751991633647,
+              "symbol": "litchi_odp::model::declaration::parse_binding"
+            },
+            {
+              "period": 404221094,
+              "share_phase_period_pct": 2.207700218872283,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::One>::find_raw"
+            }
+          ],
+          "leaves": [
+            {
+              "period": 2603621464,
+              "share_phase_period_pct": 14.219979514313458,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 2468065113,
+              "share_phase_period_pct": 13.479622837696702,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix"
+            },
+            {
+              "period": 2153326100,
+              "share_phase_period_pct": 11.76063934524258,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 1211750618,
+              "share_phase_period_pct": 6.618116036708427,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 897510119,
+              "share_phase_period_pct": 4.901855236076296,
+              "symbol": "<litchi_odp::codec::content_source::scanner::Scanner>::run"
+            },
+            {
+              "period": 673137468,
+              "share_phase_period_pct": 3.6764180729141622,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "period": 538732327,
+              "share_phase_period_pct": 2.9423488627525076,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+            },
+            {
+              "period": 448879170,
+              "share_phase_period_pct": 2.4516054618767833,
+              "symbol": "litchi_odp::model::staging::parse"
+            },
+            {
+              "period": 404221094,
+              "share_phase_period_pct": 2.207700218872283,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::One>::find_raw"
+            },
+            {
+              "period": 404053335,
+              "share_phase_period_pct": 2.2067839837066394,
+              "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+            },
+            {
+              "period": 403962073,
+              "share_phase_period_pct": 2.2062855457469057,
+              "symbol": "core::slice::memchr::memrchr"
+            },
+            {
+              "period": 403831134,
+              "share_phase_period_pct": 2.2055704072663813,
+              "symbol": "<quick_xml::name::NamespaceResolver>::push"
+            },
+            {
+              "period": 403485600,
+              "share_phase_period_pct": 2.2036832333935905,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 359122882,
+              "share_phase_period_pct": 1.9613911222392693,
+              "symbol": "<quick_xml::name::QName>::decompose"
+            },
+            {
+              "period": 359059836,
+              "share_phase_period_pct": 1.96104678922433,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "period": 359015062,
+              "share_phase_period_pct": 1.9608022508490026,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+            },
+            {
+              "period": 358925193,
+              "share_phase_period_pct": 1.9603114209197514,
+              "symbol": "<litchi_odp::model::declaration::Scanner>::step"
+            },
+            {
+              "period": 314109407,
+              "share_phase_period_pct": 1.7155448265244244,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_start"
+            },
+            {
+              "period": 269302039,
+              "share_phase_period_pct": 1.470824208008927,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 268998389,
+              "share_phase_period_pct": 1.4691657884424791,
+              "symbol": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2"
+            },
+            {
+              "period": 224180082,
+              "share_phase_period_pct": 1.2243854253143116,
+              "symbol": "litchi_odp::model::page_metadata::parse_page"
+            },
+            {
+              "period": 179574133,
+              "share_phase_period_pct": 0.9807648799443912,
+              "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates"
+            },
+            {
+              "period": 179557087,
+              "share_phase_period_pct": 0.9806717812454626,
+              "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>"
+            },
+            {
+              "period": 179540255,
+              "share_phase_period_pct": 0.9805798513322649,
+              "symbol": "crc32fast::specialized::pclmulqdq::calculate"
+            },
+            {
+              "period": 179537977,
+              "share_phase_period_pct": 0.9805674097720068,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_end"
+            },
+            {
+              "period": 179501510,
+              "share_phase_period_pct": 0.9803682410371818,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2"
+            },
+            {
+              "period": 179474210,
+              "share_phase_period_pct": 0.9802191389322451,
+              "symbol": "litchi_odp::model::declaration::parse_binding"
+            },
+            {
+              "period": 134685909,
+              "share_phase_period_pct": 0.7356026570407342,
+              "symbol": "<litchi_odp::model::settings::Scanner>::step"
+            },
+            {
+              "period": 134628302,
+              "share_phase_period_pct": 0.7352880297528556,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw"
+            },
+            {
+              "period": 134589068,
+              "share_phase_period_pct": 0.7350737487277609,
+              "symbol": "zlib_rs::inflate::inflate_fast_help_avx2"
+            },
+            {
+              "period": 134569579,
+              "share_phase_period_pct": 0.7349673073020058,
+              "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2"
+            },
+            {
+              "period": 134487748,
+              "share_phase_period_pct": 0.7345203778386697,
+              "symbol": "litchi_odp::model::page_metadata::element_is"
+            },
+            {
+              "period": 134423941,
+              "share_phase_period_pct": 0.7341718885342854,
+              "symbol": "[unknown]"
+            },
+            {
+              "period": 89865352,
+              "share_phase_period_pct": 0.4908100052775444,
+              "symbol": "core::str::converts::from_utf8"
+            },
+            {
+              "period": 89865091,
+              "share_phase_period_pct": 0.4908085797958818,
+              "symbol": "litchi_odp::model::settings::element_is"
+            },
+            {
+              "period": 89781555,
+              "share_phase_period_pct": 0.4903523382780066,
+              "symbol": "litchi_odp::model::page_metadata::validate_text"
+            },
+            {
+              "period": 89778756,
+              "share_phase_period_pct": 0.49033705121603893,
+              "symbol": "litchi_odp::model::declaration::element_is"
+            },
+            {
+              "period": 89763803,
+              "share_phase_period_pct": 0.49025538367848887,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_text"
+            },
+            {
+              "period": 89742401,
+              "share_phase_period_pct": 0.4901384941821571,
+              "symbol": "<litchi_odp::model::page_metadata::Scanner>::step"
+            },
+            {
+              "period": 44955693,
+              "share_phase_period_pct": 0.24553071264424206,
+              "symbol": "core::ptr::drop_glue::<litchi_odp::model::declaration::Binding>"
+            }
+          ],
+          "period": 18309600667,
+          "samples": 408,
+          "share_total_period_pct": 24.777443833381692
+        },
+        "unattributed": {
+          "inclusive": [
+            {
+              "period": 3753790666,
+              "share_phase_period_pct": 94.36396959598814,
+              "symbol": "_start"
+            },
+            {
+              "period": 3753790665,
+              "share_phase_period_pct": 94.36396957084983,
+              "symbol": "__libc_start_call_main"
+            },
+            {
+              "period": 3753790665,
+              "share_phase_period_pct": 94.36396957084983,
+              "symbol": "__libc_start_main@@GLIBC_2.34"
+            },
+            {
+              "period": 3753790665,
+              "share_phase_period_pct": 94.36396957084983,
+              "symbol": "litchi_perf_baseline::main"
+            },
+            {
+              "period": 3753790665,
+              "share_phase_period_pct": 94.36396957084983,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_capture"
+            },
+            {
+              "period": 3753790665,
+              "share_phase_period_pct": 94.36396957084983,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_from_args::<std::env::ArgsOs>"
+            },
+            {
+              "period": 3753790665,
+              "share_phase_period_pct": 94.36396957084983,
+              "symbol": "main"
+            },
+            {
+              "period": 3753790665,
+              "share_phase_period_pct": 94.36396957084983,
+              "symbol": "std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}"
+            },
+            {
+              "period": 3753790665,
+              "share_phase_period_pct": 94.36396957084983,
+              "symbol": "std::rt::lang_start_internal"
+            },
+            {
+              "period": 3753790665,
+              "share_phase_period_pct": 94.36396957084983,
+              "symbol": "std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>"
+            },
+            {
+              "period": 3349558539,
+              "share_phase_period_pct": 84.20225533540139,
+              "symbol": "litchi_perf_baseline::odp_existing_append::build_odp_existing_append_corpus"
+            },
+            {
+              "period": 1949859997,
+              "share_phase_period_pct": 49.0161934547635,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles"
+            },
+            {
+              "period": 1332066892,
+              "share_phase_period_pct": 33.48591620599187,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_pages_with_styles::<false>::{closure#0}"
+            },
+            {
+              "period": 1025761541,
+              "share_phase_period_pct": 25.785916019339883,
+              "symbol": "litchi_perf_baseline::odp_existing_append::verify_patch_contract"
+            },
+            {
+              "period": 936714410,
+              "share_phase_period_pct": 23.547421252329357,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder"
+            },
+            {
+              "period": 884516122,
+              "share_phase_period_pct": 22.235244282417675,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::from_owned_package"
+            },
+            {
+              "period": 847306296,
+              "share_phase_period_pct": 21.29985198120617,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+            },
+            {
+              "period": 715042360,
+              "share_phase_period_pct": 17.97495958686035,
+              "symbol": "litchi_perf_baseline::odp_existing_append::semantic_slides"
+            },
+            {
+              "period": 686086476,
+              "share_phase_period_pct": 17.24705747389768,
+              "symbol": "litchi_perf_baseline::odp_buffered_create::build_odp_buffered_corpus"
+            },
+            {
+              "period": 653580039,
+              "share_phase_period_pct": 16.42990044366548,
+              "symbol": "litchi_perf_baseline::odp_existing_append::append_once"
+            },
+            {
+              "period": 612209763,
+              "share_phase_period_pct": 15.389921442704951,
+              "symbol": "<litchi_odp::authoring::edit::Transaction>::commit"
+            },
+            {
+              "period": 580617065,
+              "share_phase_period_pct": 14.595734270647224,
+              "symbol": "litchi_perf_baseline::odp_buffered_create::inspect_odp_buffered_archive"
+            },
+            {
+              "period": 580483558,
+              "share_phase_period_pct": 14.592378129719346,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 538734497,
+              "share_phase_period_pct": 13.542877112374907,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::transaction"
+            },
+            {
+              "period": 538734497,
+              "share_phase_period_pct": 13.542877112374907,
+              "symbol": "<litchi_odp::authoring::mutable::MutablePresentation>::from_presentation_with_validated_slides"
+            },
+            {
+              "period": 528397320,
+              "share_phase_period_pct": 13.283017907925506,
+              "symbol": "<litchi_odp::authoring::edit::Snapshot>::from_bytes"
+            },
+            {
+              "period": 404232126,
+              "share_phase_period_pct": 10.16171423544843,
+              "symbol": "litchi_perf_baseline::odp_append_attribution::run_phases_iteration"
+            },
+            {
+              "period": 404086168,
+              "share_phase_period_pct": 10.158045097369143,
+              "symbol": "litchi_odp::model::staging::parse"
+            },
+            {
+              "period": 400067419,
+              "share_phase_period_pct": 10.057020521895412,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>"
+            },
+            {
+              "period": 371257219,
+              "share_phase_period_pct": 9.332780659113906,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 359310224,
+              "share_phase_period_pct": 9.032453343807129,
+              "symbol": "<alloc::sync::Arc<[litchi_odp::model::slide::Slide]>>::drop_slow"
+            },
+            {
+              "period": 356037992,
+              "share_phase_period_pct": 8.950194947313204,
+              "symbol": "litchi_perf_baseline::odp_existing_append::verify_append_output"
+            },
+            {
+              "period": 314384426,
+              "share_phase_period_pct": 7.903094513293294,
+              "symbol": "core::ptr::drop_glue::<litchi_odp::model::slide::Slide>"
+            },
+            {
+              "period": 277236534,
+              "share_phase_period_pct": 6.969259128439938,
+              "symbol": "xml_minifier::audit::verify_authored"
+            },
+            {
+              "period": 269417612,
+              "share_phase_period_pct": 6.772704609679939,
+              "symbol": "_int_free_chunk"
+            },
+            {
+              "period": 239503081,
+              "share_phase_period_pct": 6.020703727124001,
+              "symbol": "<litchi_odf_common::core::writer::PackageWriter>::write_file"
+            },
+            {
+              "period": 232308447,
+              "share_phase_period_pct": 5.83984275632466,
+              "symbol": "xml_minifier::audit::verify_with_policy"
+            },
+            {
+              "period": 224193720,
+              "share_phase_period_pct": 5.635852198501758,
+              "symbol": "[unknown]"
+            },
+            {
+              "period": 221546856,
+              "share_phase_period_pct": 5.56931449934794,
+              "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow"
+            },
+            {
+              "period": 211175823,
+              "share_phase_period_pct": 5.308604212129439,
+              "symbol": "<litchi_odf_common::core::writer::PackageWriter<litchi_odf_common::core::writer::BoundedBytes>>::write_file"
+            }
+          ],
+          "leaves": [
+            {
+              "period": 490837944,
+              "share_phase_period_pct": 12.33883850894879,
+              "symbol": "__memcmp_evex_movbe"
+            },
+            {
+              "period": 224193720,
+              "share_phase_period_pct": 5.635852198501758,
+              "symbol": "[unknown]"
+            },
+            {
+              "period": 188734636,
+              "share_phase_period_pct": 4.744470599952706,
+              "symbol": "core::str::converts::from_utf8"
+            },
+            {
+              "period": 179232236,
+              "share_phase_period_pct": 4.505596282103647,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get"
+            },
+            {
+              "period": 178147249,
+              "share_phase_period_pct": 4.478321537881124,
+              "symbol": "sha2::sha256::x86_sha::compress"
+            },
+            {
+              "period": 177838790,
+              "share_phase_period_pct": 4.470567398589008,
+              "symbol": "__memmove_avx512_unaligned_erms"
+            },
+            {
+              "period": 134796769,
+              "share_phase_period_pct": 3.388563546381155,
+              "symbol": "_int_free_merge_chunk"
+            },
+            {
+              "period": 134246126,
+              "share_phase_period_pct": 3.3747213095774673,
+              "symbol": "<quick_xml::reader::state::ReaderState>::emit_start"
+            },
+            {
+              "period": 133821978,
+              "share_phase_period_pct": 3.3640589438417536,
+              "symbol": "<quick_xml::events::attributes::IterState>::check_for_duplicates"
+            },
+            {
+              "period": 132406668,
+              "share_phase_period_pct": 3.328480436223157,
+              "symbol": "<quick_xml::events::attributes::IterState>::next"
+            },
+            {
+              "period": 89777479,
+              "share_phase_period_pct": 2.256854484586345,
+              "symbol": "<&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>"
+            },
+            {
+              "period": 89775016,
+              "share_phase_period_pct": 2.256792568918213,
+              "symbol": "_int_free_chunk"
+            },
+            {
+              "period": 89352942,
+              "share_phase_period_pct": 2.246182340046367,
+              "symbol": "cfree@GLIBC_2.2.5"
+            },
+            {
+              "period": 89039653,
+              "share_phase_period_pct": 2.2383067826961596,
+              "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>"
+            },
+            {
+              "period": 88899658,
+              "share_phase_period_pct": 2.234787544385072,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix"
+            },
+            {
+              "period": 88878587,
+              "share_phase_period_pct": 2.234257854964357,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::shape_builder"
+            },
+            {
+              "period": 87905445,
+              "share_phase_period_pct": 2.209794705505245,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2"
+            },
+            {
+              "period": 86671152,
+              "share_phase_period_pct": 2.1787666601271436,
+              "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium"
+            },
+            {
+              "period": 84992802,
+              "share_phase_period_pct": 2.1365757703138364,
+              "symbol": "<litchi_odp::codec::parser::codec::Parser>::parse_slides_with_styles"
+            },
+            {
+              "period": 82445367,
+              "share_phase_period_pct": 2.072537548613022,
+              "symbol": "<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>"
+            },
+            {
+              "period": 82429065,
+              "share_phase_period_pct": 2.0721277438132266,
+              "symbol": "<litchi_odp::codec::parser::model::ParagraphText>::push_text"
+            },
+            {
+              "period": 60203468,
+              "share_phase_period_pct": 1.5134137008174458,
+              "symbol": "<alloc::raw_vec::RawVec<core::ops::range::Range<usize>>>::grow_one"
+            },
+            {
+              "period": 44929214,
+              "share_phase_period_pct": 1.1294447029954986,
+              "symbol": "_int_free_maybe_trim"
+            },
+            {
+              "period": 44920972,
+              "share_phase_period_pct": 1.129237513008999,
+              "symbol": "core::ptr::drop_glue::<litchi_odp::model::slide::Slide>"
+            },
+            {
+              "period": 44918596,
+              "share_phase_period_pct": 1.129177784374211,
+              "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event"
+            },
+            {
+              "period": 44916901,
+              "share_phase_period_pct": 1.1291351749314646,
+              "symbol": "zlib_rs::inflate::inflate_fast_help_avx2"
+            },
+            {
+              "period": 44915138,
+              "share_phase_period_pct": 1.1290908560833455,
+              "symbol": "litchi_odf_common::core::xml_splice::verify_well_formed"
+            },
+            {
+              "period": 44912675,
+              "share_phase_period_pct": 1.129028940415213,
+              "symbol": "<litchi_odp::model::declaration::Scanner>::step"
+            },
+            {
+              "period": 44908630,
+              "share_phase_period_pct": 1.1289272559338503,
+              "symbol": "<memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2"
+            },
+            {
+              "period": 44896071,
+              "share_phase_period_pct": 1.1286115438444977,
+              "symbol": "xml_minifier::audit::check_attribute_layout"
+            },
+            {
+              "period": 44864645,
+              "share_phase_period_pct": 1.1278215471791577,
+              "symbol": "<quick_xml::name::NamespaceResolver>::resolve_event"
+            },
+            {
+              "period": 44863184,
+              "share_phase_period_pct": 1.1277848201019587,
+              "symbol": "alloc_perturb"
+            },
+            {
+              "period": 44850960,
+              "share_phase_period_pct": 1.1274775293478978,
+              "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+            },
+            {
+              "period": 44845827,
+              "share_phase_period_pct": 1.1273484943805718,
+              "symbol": "unlink_chunk.isra.0"
+            },
+            {
+              "period": 44821270,
+              "share_phase_period_pct": 1.126731172796191,
+              "symbol": "alloc::fmt::format::format_inner"
+            },
+            {
+              "period": 44817439,
+              "share_phase_period_pct": 1.1266348679140896,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::resolve_at_scan"
+            },
+            {
+              "period": 44812653,
+              "share_phase_period_pct": 1.1265145559418275,
+              "symbol": "<alloc::raw_vec::RawVec<litchi_odp::codec::parser::codec::xml::validation::ResolvedAttribute>>::grow_one"
+            },
+            {
+              "period": 44807209,
+              "share_phase_period_pct": 1.1263777029587525,
+              "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::lookup"
+            },
+            {
+              "period": 44772283,
+              "share_phase_period_pct": 1.1254997221933465,
+              "symbol": "xml_minifier::audit::inspect_attributes"
+            },
+            {
+              "period": 44770027,
+              "share_phase_period_pct": 1.125443010156275,
+              "symbol": "_int_malloc"
+            }
+          ],
+          "period": 3977991475,
+          "samples": 95,
+          "share_total_period_pct": 5.383211908008987
+        }
+      },
+      "malformed": 0,
+      "samples": 1654,
+      "total_period": 73896245271
+    }
+  },
+  "schema": "litchi-0459-diagnostic-summary-v1",
+  "scope": "whole process, including setup and warmups; sampled period estimates, not per-phase hardware counters; inclusive symbol shares overlap"
+}

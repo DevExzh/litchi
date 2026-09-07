@@ -1,0 +1,74 @@
+{
+  "schema": "litchi-0459-capture-v1",
+  "change": 458,
+  "lane": {
+    "id": "R2-allocator-medium-lifecycle",
+    "repeat": "R2",
+    "instrumentation": "allocator",
+    "shape": "medium",
+    "scope": "lifecycle"
+  },
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0459/runs/candidate/R2-allocator-medium-lifecycle/resource.log",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0459/candidate/litchi-perf-baseline-alloc",
+    "odp-append-attribution",
+    "--mode",
+    "lifecycle",
+    "--shape",
+    "medium",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--repeat",
+    "R2",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0459/runs/candidate/R2-allocator-medium-lifecycle/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "protocol_sha256": "1b19c09a341cb6ad58988e7ae5faa0702d570084e5d6c948138b1a7ed5fc1254",
+  "binary_binding_sha256": "40b3480d6710b46548c2020389af17cce2d0922ae3c19728e5d892218dd673e1",
+  "environment_fixed": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "DEBUGINFOD_URLS": "",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "allocator_environment": {},
+  "started_utc": "2026-09-07T15:09:01.956104+00:00",
+  "exit_code": 0,
+  "oracle": {
+    "status": "pass",
+    "rows": 30,
+    "phase_count": 0
+  },
+  "status": "pass",
+  "finished_utc": "2026-09-07T15:09:05.144126+00:00",
+  "artifacts": [
+    {
+      "path": "runs/candidate/R2-allocator-medium-lifecycle/report.json",
+      "bytes": 51136,
+      "sha256": "3ea35de6e3fd6c19ce025217dbb77ec4f10342d2d0d9f58cc00cd31935f48e83"
+    },
+    {
+      "path": "runs/candidate/R2-allocator-medium-lifecycle/resource.log",
+      "bytes": 1009,
+      "sha256": "6aded3b5fc7a7103ba43263140de85f1b184921fe33d1e11eb6843fb1ed350a3"
+    },
+    {
+      "path": "runs/candidate/R2-allocator-medium-lifecycle/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "runs/candidate/R2-allocator-medium-lifecycle/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

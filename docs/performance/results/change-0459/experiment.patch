@@ -1,0 +1,13 @@
+diff --git a/crates/litchi-odp/src/codec/parser/codec/xml/validation.rs b/crates/litchi-odp/src/codec/parser/codec/xml/validation.rs
+index 76f9705b9..dac4e7bcd 100644
+--- a/crates/litchi-odp/src/codec/parser/codec/xml/validation.rs
++++ b/crates/litchi-odp/src/codec/parser/codec/xml/validation.rs
+@@ -437,7 +437,7 @@ impl<'event, 'resolver> ElementAttrs<'event, 'resolver> {
+         namespace_uri: &[u8],
+         local_name: &[u8],
+     ) -> Result<Option<String>> {
+-        if cached.namespace.matches(namespace_uri) && cached.local_name.as_ref() == local_name {
++        if cached.local_name.as_ref() == local_name && cached.namespace.matches(namespace_uri) {
+             return cached
+                 .attribute
+                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())

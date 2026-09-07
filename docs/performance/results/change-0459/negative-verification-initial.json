@@ -1,0 +1,15 @@
+{
+  "schema": "litchi-0459-negative-v1",
+  "status": "pass",
+  "mutation": "increment first lane p50 by one nanosecond and reseal copied bundle",
+  "exit_code": 1,
+  "verifier_output": {
+    "change": 459,
+    "error": "summary.json: recomputed JSON differs from retained file",
+    "portable": true,
+    "precleanup": false,
+    "schema": "litchi-0459-verification-v1",
+    "status": "fail"
+  },
+  "temporary_directory_absent": true
+}

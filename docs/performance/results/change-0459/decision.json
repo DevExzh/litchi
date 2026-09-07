@@ -1,0 +1,42 @@
+{
+  "schema": "litchi-0459-decision-v1",
+  "status": "rejected",
+  "production_change_retained": false,
+  "summary_sha256": "19b9c1caf0733529601b251192f0c7c22c32c2669fe36d33f14244cc896fdd9a",
+  "reason": "Predeclared medium/large normal 5% p50 gate fails; exact allocation metrics unchanged. All six adverse timing flags retained. No confirmation rerun is needed to justify rejection.",
+  "adverse_flags": [
+    {
+      "delta_pct": 43.03897002134289,
+      "lane": "R2-allocator-large-lifecycle",
+      "metric": "p50"
+    },
+    {
+      "delta_pct": 43.84362294612016,
+      "lane": "R2-allocator-large-lifecycle",
+      "metric": "p95"
+    },
+    {
+      "delta_pct": 43.94895372882208,
+      "lane": "R2-allocator-large-lifecycle",
+      "metric": "p99"
+    },
+    {
+      "delta_pct": 13.327307761391062,
+      "lane": "R2-normal-medium-lifecycle",
+      "metric": "p50"
+    },
+    {
+      "delta_pct": 28.46605271917575,
+      "lane": "R2-normal-medium-lifecycle",
+      "metric": "p95"
+    },
+    {
+      "delta_pct": 29.862691461431943,
+      "lane": "R2-normal-medium-lifecycle",
+      "metric": "p99"
+    }
+  ],
+  "restored_file": "crates/litchi-odp/src/codec/parser/codec/xml/validation.rs",
+  "restored_sha256": "0cbf4993e1516a633c63bcce8136dc7265f4fd00583684f993312562bfc26e29",
+  "next_work": "Share staging and ContentSource event traversal with differential preservation and error-priority tests; candidate readback parser remains a measured target. Do not cache the low-cost family reopen."
+}

@@ -1,0 +1,25 @@
+{
+  "schema": "litchi-0458-prior-control-bindings-v1",
+  "change": 458,
+  "scope": "Frozen prior reports bind corpus and ordinary append output identities only; current binary timing will be measured independently.",
+  "shapes": {
+    "tiny": {
+      "original_path": "docs/performance/results/change-0457/control/runs/R1/formal-r1/R1-normal-tiny-r1.json",
+      "path": "prior-control/tiny.json",
+      "sha256": "95dd53aebe2d3dc0422a793b71ffbec47c8de3ca608123f4364b27d5269caa44",
+      "bytes": 44894
+    },
+    "medium": {
+      "original_path": "docs/performance/results/change-0457/control/runs/R1/formal-r1/R1-normal-medium-r1.json",
+      "path": "prior-control/medium.json",
+      "sha256": "b5b4335f17a9f2191c2192bce8379d6f2964c28c157c444659f562925befc39a",
+      "bytes": 45025
+    },
+    "large": {
+      "original_path": "docs/performance/results/change-0457/control/runs/R1/formal-r1/R1-normal-large-r1.json",
+      "path": "prior-control/large.json",
+      "sha256": "5009b23b7e767fdd9bc2fce827e3006a61534a4b43e59fbae139f96bfcbf5967",
+      "bytes": 45178
+    }
+  }
+}

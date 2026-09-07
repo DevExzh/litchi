@@ -1,5 +1,18 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0459 evidence (2026-09-07)
+
+0459 makes measurement progress: it repairs sampled phase ancestry and rejects
+a local-name-first attribute lookup experiment after 720 matched operations.
+No tested production change is retained. Candidate readback and repeated staging
+scans now have stronger profile attribution, while caching family reopen is
+rejected as low impact. Every regression flag remains visible.
+
+The full non-iWork objective remains open. This batch adds neither a CRUD
+selector nor source/output/native/scaling coverage; counts remain 439/36.
+See the [0459 evidence](results/change-0459/README.md). Historical audits below
+retain their original scoped conclusions.
+
 ## Current audit: 0458 evidence (2026-09-07)
 
 0458 completes a supplementary ordinary ODP append phase diagnostic: 24 lanes,

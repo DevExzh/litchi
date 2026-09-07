@@ -1,0 +1,8 @@
+{
+  "status": "fail",
+  "mode": "precleanup",
+  "exit_code": 1,
+  "verifier_sha256": "942658c3cf261db31b96379a0811ee2fd0f69846b87cfb486278b8cd41e9c2fa",
+  "error": "protocol.required_gates.baseline-build: expected names",
+  "cause": "Derived verifier default gate patterns are tuples while its validation accepts lists; no measurement failure."
+}

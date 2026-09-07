@@ -1,5 +1,19 @@
 # Performance program phase report
 
+## Change 0459: reject a lookup reorder; resolve ODP phase ancestry
+
+The 720-sample matched lookup-order experiment does not meet its 5% latency
+gate and reduces no allocator metric. The one-line production experiment is
+reverted. Six adverse timing flags remain, including R2 normal-medium p50
++13.327% and allocator-large +43.039%; their cause is not established.
+
+A separately bound frame-pointer/unwind-table build resolves over 90% of sample
+periods to public API phase markers. It identifies candidate slide readback
+and staging scans as the next targets. The tested candidate passes all 368 ODP
+tests; the final production source equals the baseline. See the
+[evidence and limitations](results/change-0459/README.md). The full non-iWork
+goal remains open, with no new coverage promotion or production speedup claim.
+
 ## Change 0458: ordinary ODP append phase attribution
 
 A harness-only command now separates snapshot opening, transaction creation,

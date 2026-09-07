@@ -1,0 +1,541 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+   Compiling litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+    Finished `release` profile [optimized] target(s) in 2m 19s
+     Running unittests src/lib.rs (target/release/deps/litchi_odp-e8510d1515433f67)
+
+running 182 tests
+test annotation::tests::edits_preserve_unselected_xml_byte_for_byte ... ok
+test annotation::tests::invalid_anchor_names_are_rejected_before_lookup ... ok
+test annotation::tests::inventories_page_and_nested_shape_anchors ... ok
+test annotation::tests::nested_office_annotation_is_retained_as_body_content ... ok
+test annotation::tests::serialization_adds_standard_namespace_bindings_and_keeps_foreign_content ... ok
+test authoring::builder::edit::tests::sets_and_clears_a_typed_slide_transition ... ok
+test authoring::builder::tests::builder_serializes_explicit_utc_and_local_metadata_dates ... ok
+test authoring::builder::tests::embeds_and_round_trips_inert_presentation_media ... ok
+test authoring::builder::tests::fresh_builder_output_is_deterministic_without_ambient_timestamps ... ok
+test authoring::builder::tests::rejects_invalid_programmatic_shape_stacking_index ... ok
+test authoring::builder::tests::rejects_shapes_without_enough_serializable_data ... ok
+test authoring::builder::tests::rejects_unsafe_or_duplicate_embedded_media_paths ... ok
+test authoring::builder::tests::shape_hyperlinks_and_actions_round_trip_through_a_package ... ok
+test authoring::builder::tests::transition_configuration_round_trips_through_a_package ... ok
+test authoring::builder::tests::validates_three_dimensional_scene_hierarchy_and_light_order ... ok
+test authoring::builder::tests::writes_exact_shape_stacking_transform_and_presentation_role ... ok
+test authoring::builder::tests::writes_explicit_drawing_kinds_and_escaped_geometry_attributes ... ok
+test authoring::builder::tests::writes_native_rectangles_and_connectors ... ok
+test authoring::builder::tests::writes_nested_shape_groups_and_rejects_children_on_leaf_shapes ... ok
+test authoring::builder::tests::writes_paragraphs_and_explicit_odf_whitespace ... ok
+test authoring::edit::tests::aggregate_accounting_accepts_n_and_rejects_n_plus_one ... ok
+test authoring::edit::tests::bounded_file_reader_accepts_n_and_rejects_n_plus_one ... ok
+test authoring::edit::tests::owned_package_size_gate_accepts_n_and_rejects_n_plus_one ... ok
+test authoring::mutable::tests::validated_slide_projection_is_cloned_into_isolated_draft_state ... ok
+test authoring::mutable::tests::validated_slide_projection_refuses_incomplete_source_page_coverage ... ok
+test charts::tests::authored_chart_parts_must_be_compact_xml ... ok
+test charts::tests::discovers_typed_part_and_selector_context ... ok
+test charts::tests::inline_replace_preserves_unknown_chart_xml ... ok
+test charts::tests::limits_reject_oversized_parts_before_staging ... ok
+test charts::tests::no_op_commit_returns_exact_archive_bytes ... ok
+test charts::tests::owned_snapshot_add_remove_and_noop_have_verified_readback ... ok
+test charts::tests::owned_snapshot_commit_and_patch_rehydrate_the_presentation ... ok
+test charts::tests::remove_then_add_rebuilds_only_permitted_package_parts ... ok
+test codec::content_source::scanner::tests::compact_frames_match_original_spans_and_namespace_scopes ... ok
+test codec::content_source::scanner::tests::compact_frames_preserve_original_depth_page_and_byte_limits ... ok
+test codec::content_source::scanner::tests::compact_frames_preserve_original_failures_and_fallbacks ... ok
+test codec::content_source::tests::appends_missing_namespace_bindings ... ok
+test codec::content_source::tests::creates_container_when_absent ... ok
+test codec::content_source::tests::expands_self_closing_container ... ok
+test codec::content_source::tests::rejects_conflicting_prefix_binding ... ok
+test codec::content_source::tests::rejects_non_presentation_root ... ok
+test codec::content_source::tests::reports_unmodelled_presentation_children ... ok
+test codec::content_source::tests::retains_pages_prologue_and_style_names ... ok
+test codec::content_source::tests::splices_generated_styles_into_existing_container ... ok
+test codec::parser::codec::xml::oracle::collection_error_beats_slide_scan_error ... ok
+test codec::parser::codec::xml::oracle::collector_matches_standalone_transition_scan_on_fixtures ... ok
+test codec::parser::codec::xml::oracle::content_default_style_overrides_styles_default ... ok
+test codec::parser::codec::xml::oracle::custom_namespace_prefixes ... ok
+test codec::parser::codec::xml::oracle::cyclic_inheritance_error_beats_slide_scan_error ... ok
+test codec::parser::codec::xml::oracle::duplicate_attributes_in_style_region_and_body ... ok
+test codec::parser::codec::xml::oracle::empty_and_missing_style_references ... ok
+test codec::parser::codec::xml::oracle::fused_pass_matches_sequential_oracle_on_fixtures ... ok
+test codec::parser::codec::xml::oracle::select_one_with_errors_around_selected_index ... ok
+test codec::parser::codec::xml::oracle::sheet_shape_tables_match_sequential_oracle ... ok
+test codec::parser::codec::xml::oracle::tokenization_error_after_slide_scan_error_wins ... ok
+test codec::parser::codec::xml::oracle::tokenization_error_inside_enhanced_geometry_uses_read_mapping ... ok
+test codec::parser::codec::xml::oracle::tokenization_error_inside_transition_region ... ok
+test codec::parser::codec::xml::oracle::transition_definition_after_referencing_page ... ok
+test codec::parser::codec::xml::validation::tests::bound_namespace_cache_borrows_long_resolver_uri ... ok
+test codec::parser::codec::xml::validation::tests::cached_resolution_matches_fresh_resolution ... ok
+test codec::parser::codec::xml::validation::tests::duplicate_attribute_is_detected_like_a_fresh_scan ... ok
+test codec::parser::codec::xml::validation::tests::entity_and_whitespace_normalization_matches_one_shot_lookup ... ok
+test codec::parser::codec::xml::validation::tests::harvest_after_exhausted_iterator_uses_cache_only ... ok
+test codec::parser::codec::xml::validation::tests::harvest_decodes_entities_and_normalization_like_fresh_scan ... ok
+test codec::parser::codec::xml::validation::tests::harvest_duplicate_attribute_matches_fresh_scan ... ok
+test codec::parser::codec::xml::validation::tests::harvest_malformed_attribute_maps_to_shape_message_like_fresh_scan ... ok
+test codec::parser::codec::xml::validation::tests::harvest_matches_fresh_scan_and_preserves_document_order ... ok
+test codec::parser::codec::xml::validation::tests::harvest_skips_unknown_prefix_and_foreign_namespaces ... ok
+test codec::parser::codec::xml::validation::tests::lookup_reaching_malformed_first_keeps_xml_message ... ok
+test codec::parser::codec::xml::validation::tests::malformed_attribute_after_match_is_not_reached ... ok
+test codec::parser::codec::xml::validation::tests::malformed_attribute_errors_at_first_reaching_lookup_and_replays ... ok
+test codec::parser::codec::xml::validation::tests::scoped_namespace_rebind_is_safe_after_cache_drop ... ok
+test codec::parser::codec::xml::validation::tests::shadowed_prefix_resolves_with_element_scope_bindings ... ok
+test codec::parser::codec::xml::validation::tests::style_name_fallback_prefers_draw_namespace ... ok
+test codec::parser::codec::xml::validation::tests::unknown_prefix_attributes_are_skipped_without_error ... ok
+test codec::parser::codec::xml::validation::tests::unqualified_attribute_does_not_take_default_namespace ... ok
+test codec::parser::tests::bounds_animation_nesting ... ok
+test codec::parser::tests::bounds_nested_shape_group_depth ... ok
+test codec::parser::tests::indexed_slide_parser_matches_full_parser ... ok
+test codec::parser::tests::indexed_slide_parser_rejects_malformed_xml_after_the_selection ... ok
+test codec::parser::tests::indexed_slide_parser_validates_pages_after_the_selection ... ok
+test codec::parser::tests::parses_arbitrary_odf_namespace_prefixes ... ok
+test codec::parser::tests::parses_complete_namespace_aware_animation_trees ... ok
+test codec::parser::tests::parses_inert_media_plugins_and_parameters ... ok
+test codec::parser::tests::parses_legacy_presentation_effect_trees ... ok
+test codec::parser::tests::parses_picture_shape_and_unescapes_href ... ok
+test codec::parser::tests::parses_shape_hyperlinks_and_inert_event_bindings ... ok
+test codec::parser::tests::preserves_drawing_element_kinds_and_unmodeled_geometry_attributes ... ok
+test codec::parser::tests::preserves_recursive_inert_three_dimensional_scenes ... ok
+test codec::parser::tests::preserves_shape_groups_and_identifies_opaque_frames ... ok
+test codec::parser::tests::preserves_shape_stacking_transform_and_presentation_role ... ok
+test codec::parser::tests::preserves_text_across_spans_and_odf_whitespace_elements ... ok
+test codec::parser::tests::rejects_cyclic_transition_style_inheritance ... ok
+test codec::parser::tests::rejects_excessive_explicit_space_expansion ... ok
+test codec::parser::tests::rejects_invalid_animation_structure ... ok
+test codec::parser::tests::rejects_invalid_legacy_presentation_effects ... ok
+test codec::parser::tests::rejects_invalid_shape_hyperlinks_and_event_bindings ... ok
+test codec::parser::tests::rejects_invalid_shape_stacking_and_boolean_values ... ok
+test codec::parser::tests::rejects_invalid_three_dimensional_shape_hierarchies ... ok
+test codec::parser::tests::rejects_misplaced_or_invalid_enhanced_geometry ... ok
+test codec::parser::tests::rejects_schema_invalid_media_plugins ... ok
+test codec::parser::tests::resolves_transition_styles_across_package_parts_and_inheritance ... ok
+test codec::parser::tests::test_parse_empty_presentation ... ok
+test codec::parser::tests::test_parse_shapes ... ok
+test codec::parser::tests::test_parse_slides ... ok
+test codec::parser::tests::test_shape_builder ... ok
+test codec::parser::tests::test_shape_builder_clone ... ok
+test codec::parser::tests::test_shape_builder_with_data ... ok
+test codec::parser::tests::test_shape_clone ... ok
+test codec::parser::tests::test_shape_debug ... ok
+test codec::parser::tests::test_shape_type_clone ... ok
+test codec::parser::tests::test_shape_type_copy ... ok
+test codec::parser::tests::test_shape_type_equality ... ok
+test codec::parser::tests::test_shape_type_variants ... ok
+test codec::parser::tests::test_slide_clone ... ok
+test codec::parser::tests::test_slide_debug ... ok
+test handout_master::tests::semantic_fragment_round_trip_preserves_shared_shape_children ... ok
+test model::action::tests::exposes_all_schema_effect_values ... ok
+test model::action::tests::rejects_ambiguous_script_bindings_and_invalid_percentages ... ok
+test model::action::tests::serializes_event_metadata_without_executing_it ... ok
+test model::declaration::tests::builder_round_trips_declarations ... ok
+test model::declaration::tests::parses_all_declarations_and_page_bindings ... ok
+test model::declaration::tests::rejects_duplicates_orphans_bad_values_and_active_xml ... ok
+test model::media::tests::recognizes_only_safe_package_relative_targets ... ok
+test model::media::tests::validates_names_values_and_media_types ... ok
+test model::media::tests::writes_escaped_inert_plugin_metadata ... ok
+test model::page_layout::tests::builder_writes_page_layouts ... ok
+test model::page_layout::tests::exhausts_classes_and_geometry_lexicals ... ok
+test model::page_layout::tests::losslessly_inserts_replaces_and_removes ... ok
+test model::page_layout::tests::parses_and_round_trips_page_layouts ... ok
+test model::page_layout::tests::parses_libreoffice_page_layout_fixture ... ok
+test model::page_layout::tests::rejects_identity_duplicates_and_caps ... ok
+test model::page_layout::tests::rejects_malformed_layouts ... ok
+test model::page_metadata::tests::builder_round_trips_page_metadata ... ok
+test model::page_metadata::tests::parses_complete_page_metadata_without_resolving_references ... ok
+test model::page_metadata::tests::rejects_duplicate_ids_bad_navigation_and_active_xml ... ok
+test model::settings::tests::builder_round_trips_inert_settings ... ok
+test model::settings::tests::parses_and_writes_all_presentation_settings ... ok
+test model::settings::tests::rejects_invalid_placement_values_structure_and_references ... ok
+test model::slide::tests::test_shape_clone ... ok
+test model::slide::tests::test_shape_debug ... ok
+test model::slide::tests::test_shape_default ... ok
+test model::slide::tests::test_shape_dimensions ... ok
+test model::slide::tests::test_shape_has_text ... ok
+test model::slide::tests::test_shape_name_method ... ok
+test model::slide::tests::test_shape_name_none ... ok
+test model::slide::tests::test_shape_new ... ok
+test model::slide::tests::test_shape_position ... ok
+test model::slide::tests::test_shape_shape_type_method ... ok
+test model::slide::tests::test_shape_text_method ... ok
+test model::slide::tests::test_slide_clone ... ok
+test model::slide::tests::test_slide_index_method ... ok
+test model::slide::tests::test_slide_new ... ok
+test model::slide::tests::test_slide_notes_method ... ok
+test model::slide::tests::test_slide_notes_none ... ok
+test model::slide::tests::test_slide_shapes_method ... ok
+test model::slide::tests::test_slide_text_method ... ok
+test model::slide::tests::test_slide_title_method ... ok
+test model::slide::tests::test_slide_title_none ... ok
+test model::slide::tests::test_slide_with_content ... ok
+test model::staging::tests::shared_traversal_matches_independent_loops_and_namespace_scopes ... ok
+test model::staging::tests::shared_traversal_preserves_complete_pass_error_priority ... ok
+test model::staging::tests::shared_traversal_preserves_xml_and_page_limits ... ok
+test model::transition::tests::accepts_every_schema_transition_style ... ok
+test model::transition::tests::child_values_override_inherited_transition_values ... ok
+test model::transition::tests::validates_color_and_duration_without_partial_parses ... ok
+test package::catalog::tests::fused_catalog_defers_catalog_only_forms_and_pi_errors ... ok
+test package::catalog::tests::fused_catalog_name_decoding_matches_sequential_oracle ... ok
+test package::catalog::tests::fused_catalog_preserves_alias_rebinding_empty_and_entity_names ... ok
+test package::catalog::tests::fused_catalog_rejects_deep_content_with_shared_limit ... ok
+test package::catalog::tests::later_validation_errors_beat_earlier_catalog_errors ... ok
+test package::source::tests::source_reconciliation_precedes_secondary_parse_errors ... ok
+test package::source_append::tests::candidate_validation_refuses_existing_generated_name_without_source_rescan ... ok
+test package::source_append::tests::carriage_return_text_is_a_typed_refusal ... ok
+test package::source_append::tests::empty_presentation_refuses_with_typed_invalid_error ... ok
+test package::source_append::tests::generated_story_semantics_match_established_readback ... ok
+test package::source_append::tests::large_space_runs_are_split_at_parser_limit ... ok
+test package::source_append::tests::leading_presentation_declaration_does_not_block_page_tail_append ... ok
+test package::source_append::tests::publication_inserts_before_native_trailing_presentation_child ... ok
+test package::source_append::tests::self_closing_presentation_refuses_with_typed_invalid_error ... ok
+test package::source_append::tests::unicode_whitespace_is_a_typed_refusal ... ok
+test package::source_append::tests::whitespace_only_body_is_read_back_from_object_shape ... ok
+
+test result: ok. 182 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/deferred_odp_corpus.rs (target/release/deps/deferred_odp_corpus-e89b74977b2eeee0)
+
+running 1 test
+test three_impress_packages_open_and_expose_slides ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/deferred_odp_flat.rs (target/release/deps/deferred_odp_flat-5cef6fee1066665a)
+
+running 7 tests
+test flat_changed_publication_never_materializes_an_oversized_output ... ok
+test flat_changed_publication_refuses_formatted_source_xml ... ok
+test flat_read_slides_notes_and_byte_exact_noop ... ok
+test flat_rejects_misparented_and_excessive_empty_or_nonempty_pages ... ok
+test flat_rejects_wrong_family_packaged_garbage_and_unsafe_rewrite ... ok
+test flat_transaction_edits_one_slide_and_is_reversible ... ok
+test flat_transaction_preserves_self_closing_direct_notes ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/deferred_odp_hardening.rs (target/release/deps/deferred_odp_hardening-875193a3eaa13778)
+
+running 3 tests
+test flat_odp_malformed_inputs_are_typed_errors ... ok
+test flat_odp_truncation_and_mutation_never_panic ... ok
+test flat_odp_wellformed_foreign_content_is_inert ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/facade_round_trip.rs (target/release/deps/facade_round_trip-3c88abc199a8291b)
+
+running 4 tests
+test builder_and_presentation_facade_round_trip ... ok
+test presentation_facade_reports_empty_packages_without_slides ... ok
+test presentation_slide_matches_the_full_slide_list ... ok
+test semantic_page_and_layout_facades_round_trip ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/odp_annotations.rs (target/release/deps/odp_annotations-a70cf42cf4a42625)
+
+running 2 tests
+test invalid_or_duplicate_edits_leave_the_snapshot_unchanged ... ok
+test inventories_and_mutates_page_and_shape_annotations_atomically ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/odp_cross_slide_transfer.rs (target/release/deps/odp_cross_slide_transfer-5258be568f4797db)
+
+running 7 tests
+test foreign_blank_transfer_is_source_bound_reversible_and_raw_preserving ... ok
+test foreign_blank_transfer_supports_an_empty_retained_destination ... ok
+test foreign_transfer_audits_case_insensitive_macro_and_all_xml_media_parts ... ok
+test foreign_transfer_rejects_dependencies_macros_and_oversized_names_atomically ... ok
+test foreign_transfer_rejects_nested_namespace_rebindings_at_all_insertions ... ok
+test foreign_transfer_rejects_self_closing_presentation_destination ... ok
+test missing_foreign_selector_is_an_exact_noop ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/odp_drawing_style_resources.rs (target/release/deps/odp_drawing_style_resources-8401b4bab82ffba7)
+
+running 1 test
+test presentation_exposes_named_drawing_style_resources ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/odp_embedded_objects.rs (target/release/deps/odp_embedded_objects-114b031bb014bb9e)
+
+running 1 test
+test applets_and_floating_frames_are_bounded_inert_objects ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/odp_handout_master.rs (target/release/deps/odp_handout_master-961ef35568369111)
+
+running 4 tests
+test bom_prefixed_styles_xml_keeps_fragments_exact ... ok
+test handout_master_facade_and_package_round_trip ... ok
+test handout_master_rejects_malformed_xml_and_missing_inheritance ... ok
+test reads_handout_master_from_real_presentations ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/odp_image_authoring.rs (target/release/deps/odp_image_authoring-643999c00bb2fff2)
+
+running 3 tests
+test builder_allocates_picture_numbers_across_image_extensions ... ok
+test builder_inserts_a_picture_that_round_trips_with_exact_payload_and_mime ... ok
+test rejected_image_inputs_do_not_stage_media_or_mutate_the_slide ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/odp_layout_master.rs (target/release/deps/odp_layout_master-d6e3ec22a08cfa70)
+
+running 3 tests
+test invalid_layout_master_edits_are_atomic ... ok
+test master_pages_are_exported_and_commit_lossless_snapshot_edits ... ok
+test reorder_remove_reassign_and_unknown_xml_round_trip ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/odp_media_batch.rs (target/release/deps/odp_media_batch-cba4bea666e90dec)
+
+running 12 tests
+test dtd_in_an_xml_owner_fails_media_removal_closed ... ok
+test every_signature_owner_name_is_read_only ... ok
+test exact_replacement_noop_and_batch_limits_preserve_source ... ok
+test invalid_path_in_a_later_change_is_rejected_before_staging ... ok
+test media_batch_replaces_adds_and_removes_with_untouched_member_preservation ... ok
+test reference_index_decodes_entities_percent_escapes_and_relationship_targets ... ok
+test referenced_removal_and_late_failure_are_failure_atomic ... ok
+test repeated_replacements_account_only_the_current_staged_payload ... ok
+test replace_then_remove_across_calls_removes_the_source_member ... ok
+test restoring_an_exact_source_payload_across_calls_is_a_noop ... ok
+test signed_sources_are_read_only_for_media_batches ... ok
+test zip_encryption_is_classified_by_the_owned_package ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/odp_package_retention.rs (target/release/deps/odp_package_retention-3927d3209482db31)
+
+running 7 tests
+test changed_publication_retains_new_index_and_patch_handoffs_do_not_rebuild_it ... ok
+test noncompact_fallback_keeps_exact_noop_and_retained_index ... ok
+test ordinary_presentation_snapshot_transfers_the_existing_index ... ok
+test password_opened_editing_and_chart_snapshots_drop_credentials_after_validation ... ok
+test signed_and_encrypted_sources_retain_read_reopen_but_refuse_mutation ... ok
+test snapshot_transaction_and_noop_commit_retain_one_archive_index ... ok
+test stale_patch_still_fails_even_when_the_artifact_is_reopened ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/odp_presentation_settings.rs (target/release/deps/odp_presentation_settings-4e6b8daf1de3d166)
+
+running 4 tests
+test builder_rejects_dangling_and_ambiguous_references_but_allows_repeats ... ok
+test explicit_metadata_reindexes_without_losing_identity ... ok
+test libreoffice_and_odfpy_settings_fixtures_parse_save_and_reopen ... ok
+test source_checked_insert_remove_preserves_page_identity_and_references ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/odp_rich_content.rs (target/release/deps/odp_rich_content-2f06eb4bd3de4d59)
+
+running 12 tests
+test content_only_edit_preserves_bom_multiline_custom_manifest_and_opaque_member ... ok
+test content_only_raw_publication_preserves_noncompact_referenced_xml ... ok
+test content_only_text_box_edit_raw_preserves_unchanged_media_and_metadata ... ok
+test media_topology_change_regenerates_custom_source_manifest ... ok
+test noncompact_content_whole_rewrite_is_refused_atomically ... ok
+test producer_bom_remains_source_provenance_during_rich_content_edit ... ok
+test producer_named_drawing_resources_transfer_with_their_payload ... ok
+test real_producer_manifest_config_and_ole_are_exactly_preserved_during_text_box_edit ... ok
+test rich_content_objects_transfer_through_durable_history ... ok
+test rich_content_selectors_and_values_fail_without_partial_publication ... ok
+test rich_text_table_form_and_fine_chart_data_share_one_durable_root ... ok
+test source_backed_story_table_and_form_models_edit_without_flattening ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/odp_save_fidelity.rs (target/release/deps/odp_save_fidelity-8c53ac78d6ce84d5)
+
+running 3 tests
+test empty_style_name_reference_opens_and_is_an_exact_noop ... ok
+test real_fixture_text_and_unknown_markup_survive_exact_noop_commits ... ok
+test table_spans_fonts_and_automatic_styles_are_retained_byte_exactly ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/odp_slide_copy.rs (target/release/deps/odp_slide_copy-0d69ee1aa08a1971)
+
+running 4 tests
+test dependency_bearing_pages_are_refused_without_staging ... ok
+test dependency_free_blank_copy_is_exact_named_reversible_and_source_checked ... ok
+test missing_copy_selector_is_an_exact_noop ... ok
+test noncompact_source_and_name_bound_are_refused_before_copy_allocation ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/odp_slide_move.rs (target/release/deps/odp_slide_move-d788de54ce5c69f1)
+
+running 6 tests
+test compact_source_pages_move_as_exact_fragments_with_durable_inverse ... ok
+test noncompact_source_without_settings_or_declarations_is_refused ... ok
+test page_indexed_operation_conflict_is_refused_without_moving_slides ... ok
+test retained_declarations_and_settings_are_conservatively_refused ... ok
+test staged_coordinates_cover_middle_first_last_noop_and_atomic_failures ... ok
+test unsupported_real_producer_pages_are_refused_before_staging ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/odp_slide_remove.rs (target/release/deps/odp_slide_remove-bf9863a014c39656)
+
+running 4 tests
+test dependency_free_blank_removal_is_exact_durable_reopenable_and_stale_checked ... ok
+test inbound_name_owner_and_macro_storage_are_refused_before_mutation ... ok
+test missing_selector_is_an_exact_noop_and_final_slide_is_refused_atomically ... ok
+test selected_dependency_bearing_pages_are_refused_without_staging ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/odp_text_box_batch.rs (target/release/deps/odp_text_box_batch-aaecb26b79b4b50a)
+
+running 7 tests
+test ambiguous_page_names_and_overlapping_named_owners_fail_atomically ... ok
+test atomic_batch_updates_first_middle_last_and_cross_slide_owners_deterministically ... ok
+test duplicate_missing_collision_and_late_invalid_selectors_are_atomic ... ok
+test exact_batch_limit_mixed_noops_and_all_noop_sharing_are_checked ... ok
+test protected_and_opaque_selected_owners_allow_noops_but_refuse_changes ... ok
+test rename_cycles_are_published_simultaneously_and_read_back_by_destination ... ok
+test signed_encrypted_and_malformed_sources_fail_closed ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/odp_unified_transaction.rs (target/release/deps/odp_unified_transaction-3154d295ada6d110)
+
+running 6 tests
+test encrypted_package_entries_are_refused_before_staging ... ok
+test failed_checked_rdf_selector_leaves_an_exact_noop ... ok
+test merge_planning_is_independent_only_for_disjoint_rdf_work ... ok
+test signed_packages_are_refused_before_a_transaction_can_stage_changes ... ok
+test slide_and_rdf_edits_publish_as_one_reversible_package_commit ... ok
+test typed_chart_data_transfers_and_a_real_impress_deck_fully_reopens ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/presentation_edit.rs (target/release/deps/presentation_edit-dff2dbfc82df4280)
+
+running 16 tests
+test changed_commit_reopens_every_staged_media_part_and_manifest_entry ... ok
+test changed_commit_snapshot_and_patch_output_share_backing_bytes ... ok
+test changed_publication_accepts_semantic_xml_whitespace ... ok
+test changed_publication_preserves_noncompact_referenced_xml ... ok
+test exact_noop_and_inverse_patch_preserve_source_bytes ... ok
+test failed_media_preflight_leaves_an_exact_noop_transaction ... ok
+test identical_transactions_emit_deterministic_bytes ... ok
+test incomplete_source_page_coverage_is_refused_without_panicking ... ok
+test package_input_limit_rejects_n_plus_one_bytes ... ok
+test package_output_limit_rejects_n_plus_one_before_publication ... ok
+test patch_refuses_a_different_source_snapshot ... ok
+test presentation_exposes_the_source_checked_entry_point ... ok
+test retained_unknown_slide_is_preserved_or_rewrite_is_refused ... ok
+test snapshot_clone_and_exact_noop_commit_share_backing_bytes ... ok
+test text_limit_failure_is_atomic_at_n_plus_one ... ok
+test transaction_publishes_compact_xml_without_mutating_source ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/sequential_text.rs (target/release/deps/sequential_text-3087773c3a10cede)
+
+running 16 tests
+test controls_entities_cdata_utf8_and_custom_separators_match_semantics ... ok
+test eventually_successful_short_writes_preserve_complete_progress ... ok
+test malformed_later_slide_returns_document_error_after_prior_progress ... ok
+test object_limit_reports_rejected_slide_with_exact_progress ... ok
+test output_limit_accounts_for_slide_separator_and_next_slide ... ok
+test paired_text_controls_are_applied_on_start_events ... ok
+test paragraph_and_slide_separators_are_applied_without_joining_the_document ... ok
+test semantic_slide_text_matches_all_text_and_preserves_empty_slide_objects ... ok
+test sink_failures_preserve_utf8_prefix_progress_and_write_zero ... ok
+test source_backed_sink_does_not_echo_unsupported_entity_name ... ok
+test source_backed_sink_matches_owned_and_does_not_use_text_cache ... ok
+test source_backed_sink_rejects_oversized_element_name ... ok
+test source_backed_sink_rejects_oversized_text_space_attribute ... ok
+test source_backed_sink_reports_stale_before_call_with_zero_progress ... ok
+test source_change_after_successful_sink_write_takes_precedence ... ok
+test source_change_takes_precedence_over_sink_failure_with_progress ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/source_backed.rs (target/release/deps/source_backed-1f89c0ce06553b70)
+
+running 12 tests
+test source_facade_applies_physical_source_limits ... ok
+test source_facade_can_materialize_the_existing_mutable_owner ... ok
+test source_facade_matches_owned_semantics_and_defers_media ... ok
+test source_facade_oversized_text_falls_back_without_retention ... ok
+test source_facade_rejects_encrypted_oversized_plaintext_before_materialization ... ok
+test source_facade_rejects_oversized_content_before_materialization ... ok
+test source_facade_reports_typed_stale_source_errors ... ok
+test source_facade_supports_password_protected_content ... ok
+test source_facade_text_cache_is_safe_for_concurrent_first_construction ... ok
+test source_facade_text_cache_preserves_projection_and_checks_freshness ... ok
+test source_facade_text_parse_errors_are_not_cached ... ok
+test source_facade_validates_metadata_like_the_owned_family ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running tests/source_catalog.rs (target/release/deps/source_catalog-ba4fa9f377e19788)
+
+running 8 tests
+test catalog_accepts_custom_namespace_prefixes_and_decodes_page_names ... ok
+test catalog_applies_source_limits_before_content_scan ... ok
+test catalog_rejects_malformed_document_prologue_and_entities ... ok
+test catalog_reports_source_changes ... ok
+test catalog_retains_order_and_count_without_slide_payloads ... ok
+test media_stays_cold_until_explicit_selection ... ok
+test out_of_range_selection_does_not_read_payload ... ok
+test selected_slide_rereads_content_and_matches_owned_semantics ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/streaming_provider.rs (target/release/deps/streaming_provider-4c8e588044947d58)
+
+running 12 tests
+test adjacent_control_spacing_keeps_existing_authored_xml_refusal ... ok
+test cancellation_is_checked_before_source_pull_and_prevents_finalization ... ok
+test context_budget_exact_and_one_under_preserve_progress_and_release_memory ... ok
+test control_bytes_are_single_decoded_and_xml_controls_are_rejected ... ok
+test default_limits_round_trip_through_checked_xml_profile ... ok
+test empty_controls_and_geometry_match_builder_and_reopen ... ok
+test exact_provider_limits_reproduce_control_and_one_under_refuses ... ok
+test fallible_and_lazy_sources_preserve_marker_and_stop_at_failure ... ok
+test hierarchical_parent_work_limit_falls_back_from_a_256_byte_span ... ok
+test modeled_memory_exact_and_one_under_is_preflighted_and_released ... ok
+test short_and_interrupted_sinks_retry_while_zero_and_partial_sinks_report_prefix ... ok
+test xml_audit_attribute_depth_and_event_limits_are_typed_refusals ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests litchi_odp
+
+running 21 tests
+test crates/litchi-odp/src/authoring/builder.rs - authoring::builder::Builder (line 45) - compile ... ok
+test crates/litchi-odp/src/authoring/builder.rs - authoring::builder::Builder::add_slide (line 335) ... ok
+test crates/litchi-odp/src/authoring/builder.rs - authoring::builder::Builder::add_slide_element (line 359) ... ok
+test crates/litchi-odp/src/authoring/builder.rs - authoring::builder::Builder::add_slide_with_title (line 311) ... ok
+test crates/litchi-odp/src/authoring/builder.rs - authoring::builder::Builder::build (line 980) - compile ... ok
+test crates/litchi-odp/src/authoring/builder.rs - authoring::builder::Builder::new (line 119) ... ok
+test crates/litchi-odp/src/authoring/builder.rs - authoring::builder::Builder::save (line 1005) - compile ... ok
+test crates/litchi-odp/src/authoring/mutable.rs - authoring::mutable::MutablePresentation (line 99) ... ok
+test crates/litchi-odp/src/authoring/mutable.rs - authoring::mutable::MutablePresentation::add_shape (line 1279) ... ok
+test crates/litchi-odp/src/authoring/mutable.rs - authoring::mutable::MutablePresentation::clear_slide (line 1353) ... ok
+test crates/litchi-odp/src/authoring/mutable.rs - authoring::mutable::MutablePresentation::from_presentation_with_validated_slides (line 180) ... ok
+test crates/litchi-odp/src/authoring/mutable.rs - authoring::mutable::MutablePresentation::insert_slide (line 1058) ... ok
+test crates/litchi-odp/src/authoring/mutable.rs - authoring::mutable::MutablePresentation::remove_shape (line 1315) ... ok
+test crates/litchi-odp/src/authoring/mutable.rs - authoring::mutable::MutablePresentation::remove_slide (line 1127) ... ok
+test crates/litchi-odp/src/authoring/mutable.rs - authoring::mutable::MutablePresentation::to_bytes_bounded (line 1636) ... ok
+test crates/litchi-odp/src/authoring/mutable.rs - authoring::mutable::MutablePresentation::update_slide (line 1243) ... ok
+test crates/litchi-odp/src/package/presentation.rs - package::presentation::Presentation (line 23) - compile ... ok
+test crates/litchi-odp/src/package/presentation.rs - package::presentation::Presentation::from_bytes (line 93) - compile ... ok
+test crates/litchi-odp/src/package/presentation.rs - package::presentation::Presentation::open (line 57) - compile ... ok
+test crates/litchi-odp/src/package/presentation.rs - package::presentation::Presentation::save (line 675) - compile ... ok
+test crates/litchi-odp/src/package/presentation.rs - package::presentation::Presentation::to_bytes (line 704) - compile ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+all doctests ran in 5.80s; merged doctests compilation took 5.78s

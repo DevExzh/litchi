@@ -1,0 +1,19 @@
+{
+  "schema": "litchi-0459-cleanup-v1",
+  "change": 459,
+  "status": "pass",
+  "task": "/tmp/litchi-goal-0459",
+  "temporary_directory_absent": true,
+  "files_removed": 1774,
+  "bytes_removed": 1326833061,
+  "inventory": {
+    "path": "temporary-artifacts.json",
+    "bytes": 374924,
+    "sha256": "b1a83f6e9ecffbecee926b5cd998a7d1c6c1a81bb39c94ebb1f8f574456385e5"
+  },
+  "precleanup_sha256": "1d21f46d4b25feecaecf2bca4b1de5bfea8bbbd0a2e4d9d1eb00bb4a715e7739",
+  "portable_verification_sha256": "424f24801710d322337a539975081f1bd315823908033a33aa0e428c15b6ba81",
+  "verifier_path": "verify.py",
+  "verifier_sha256": "9ff74fc4a04e44498607348305828a0f8923ba7de5e6161aa25fd1693eb8afb6",
+  "driver_sha256": "767913f4b46c4d36ed7c4c84e07a82446303711b440368f14928f0b1d536e516"
+}

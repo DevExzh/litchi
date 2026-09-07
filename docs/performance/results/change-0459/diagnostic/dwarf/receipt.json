@@ -1,0 +1,115 @@
+{
+  "started_utc": "2026-09-07T15:01:01.189543+00:00",
+  "binding_sha256": "45397fb5200f05e9537c9c6285542d3d08196fb480b192aee3e2698b283208ba",
+  "mode": "dwarf",
+  "status": "pass",
+  "workload": {
+    "argv": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0459/diagnostic/dwarf/resource.log",
+      "taskset",
+      "-c",
+      "2",
+      "perf",
+      "record",
+      "--no-buildid-cache",
+      "-F",
+      "99",
+      "-e",
+      "cycles:u",
+      "--call-graph",
+      "dwarf,32768",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0459/diagnostic/dwarf/perf.data",
+      "--",
+      "/tmp/litchi-goal-0459/diagnostic-target/release/litchi-perf-baseline",
+      "odp-append-attribution",
+      "--mode",
+      "phases",
+      "--shape",
+      "large",
+      "--warmup",
+      "3",
+      "--samples",
+      "100",
+      "--repeat",
+      "diagnostic",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0459/diagnostic/dwarf/report.json"
+    ],
+    "exit_code": 0
+  },
+  "oracle": {
+    "status": "pass",
+    "rows": 100,
+    "phase_count": 5
+  },
+  "script": {
+    "argv": [
+      "perf",
+      "script",
+      "--no-inline",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0459/diagnostic/dwarf/perf.data"
+    ],
+    "exit_code": 0
+  },
+  "symbols": {
+    "argv": [
+      "nm",
+      "-C",
+      "/tmp/litchi-goal-0459/diagnostic-target/release/litchi-perf-baseline"
+    ],
+    "exit_code": 0
+  },
+  "finished_utc": "2026-09-07T15:01:18.021656+00:00",
+  "artifacts": [
+    {
+      "path": "diagnostic/dwarf/perf-script.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "diagnostic/dwarf/perf-script.stdout",
+      "bytes": 4530115,
+      "sha256": "12110b11239561dab59a245b8432a4ebcd6577cb24cff85d14275088595510da"
+    },
+    {
+      "path": "diagnostic/dwarf/perf.data",
+      "bytes": 54272112,
+      "sha256": "2331a8a94abfe7a7d9a5f7ae69e8286b3a3eaa4b2e435fad74266264a45f77b2"
+    },
+    {
+      "path": "diagnostic/dwarf/report.json",
+      "bytes": 158855,
+      "sha256": "89cf6ed3ba044c24d9c76c47997c2226cab9d3c2fbcacb4cdcddef7ef7fb95ee"
+    },
+    {
+      "path": "diagnostic/dwarf/resource.log",
+      "bytes": 1170,
+      "sha256": "5bd40768259c732378d85bbd6c581dd855fcce22b80a06904fed13b3e47fc3a9"
+    },
+    {
+      "path": "diagnostic/dwarf/symbols.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "diagnostic/dwarf/symbols.stdout",
+      "bytes": 8746645,
+      "sha256": "43acbc1a6129c07d2da218e04aaea42f66d0e5fad005d1e8ccde616a9dc5d130"
+    },
+    {
+      "path": "diagnostic/dwarf/workload.stderr",
+      "bytes": 184,
+      "sha256": "51d4e675f1d4165a77bf62fd99765471cd5a869cf5954524fa09254fda6d28ae"
+    },
+    {
+      "path": "diagnostic/dwarf/workload.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}
