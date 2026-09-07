@@ -534,6 +534,82 @@ mod buffa_keynote_media_lifecycle_generated {
     ));
 }
 
+/// Private Buffa view projection for fresh Keynote audio/movie authoring.
+///
+/// This generated closure is write-only in production: the public codec
+/// constructs borrowed views for the small canonical media subset and never
+/// materializes the complete native MovieArchive graph.
+#[doc(hidden)]
+mod buffa_keynote_media_creation_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated views are private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-media-creation/iwa_keynote_media_creation_buffa_protos.rs"
+    ));
+}
+
+/// Private Buffa view projection for fresh Keynote build records.
+#[doc(hidden)]
+mod buffa_keynote_build_creation_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated views are private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-build-creation/iwa_keynote_build_creation_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for the selected Keynote chart-title
 /// generated extension fields.
 ///
@@ -1936,6 +2012,16 @@ pub mod keynote_movie_geometry_codec;
 /// projection. Generated Buffa values remain private to this crate.
 #[doc(hidden)]
 pub mod keynote_media_properties_codec;
+
+/// Internal bounded Buffa authoring for fresh Keynote audio/movie archives.
+/// Generated projection types remain private to this crate.
+#[doc(hidden)]
+pub mod keynote_media_creation_codec;
+
+/// Internal bounded Buffa authoring for fresh Keynote build records.
+/// Generated projection types remain private to this crate.
+#[doc(hidden)]
+pub mod keynote_build_creation_codec;
 
 /// Format-neutral strict chart-caption edge projection and wire rewrite.
 ///

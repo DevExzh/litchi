@@ -474,6 +474,10 @@ pub use package::{
     SlideTableCellNumberFormatPath,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
+pub use slide::audio::creation::{
+    SlideAudioCreationCommit, SlideAudioCreationDiagnostics, SlideAudioCreationError,
+    SlideAudioCreationLimitKind, SlideAudioCreationPatch,
+};
 pub use slide::image::ImageSelector;
 pub use slide::media::{MediaInfo, MediaProperties, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;

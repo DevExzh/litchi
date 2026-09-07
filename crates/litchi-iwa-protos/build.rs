@@ -40,6 +40,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_slide_number_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_soundtrack_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_media_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_media_creation_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_build_creation_codec.rs");
+    println!("cargo:rerun-if-changed=src/buffa-projections/TSDKeynoteMediaCreationArchive.proto");
+    println!("cargo:rerun-if-changed=src/buffa-projections/KNKeynoteBuildCreationArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_media_lifecycle_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_media_lifecycle_codec/node_cache.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
@@ -259,6 +263,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_pages_media_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_drawable_parent_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_drawable_container_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_keynote_media_creation_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
+    enforce_keynote_build_creation_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
     enforce_pages_movie_caption_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_footnote_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_footnote_marker_projection_provenance(
@@ -1085,6 +1097,45 @@ fn main() -> Result<(), Box<dyn Error>> {
         &buffa_keynote_media_lifecycle_out_directory,
     )?;
 
+    // Fresh Keynote audio/movie authoring uses a small borrowed Buffa view
+    // closure.  The native MovieArchive graph remains the compatibility
+    // schema; this projection is write-only and cannot widen that ingress.
+    let buffa_keynote_media_creation_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-media-creation");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSDKeynoteMediaCreationArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_media_creation_out_directory)
+        .include_file("iwa_keynote_media_creation_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_media_creation_projection_budget(&buffa_keynote_media_creation_out_directory)?;
+
+    // Fresh Keynote build records use an equally narrow borrowed Buffa view
+    // closure.  Existing build graphs remain source-authoritative.
+    let buffa_keynote_build_creation_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-build-creation");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("KNKeynoteBuildCreationArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_build_creation_out_directory)
+        .include_file("iwa_keynote_build_creation_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_build_creation_projection_budget(&buffa_keynote_build_creation_out_directory)?;
+
     let buffa_formula_out_directory = PathBuf::from(env::var("OUT_DIR")?).join("buffa-formula");
     buffa_build::Config::new()
         .files(&[buffa_projection_directory.join("TSCEFormulaArchive.proto")])
@@ -1608,6 +1659,16 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "4249f536263737ab8a5d7043dbd4cc25aab954bcaeff90d510386f6e9831a699",
         ),
         (
+            "TSDKeynoteMediaCreationArchive.proto",
+            2320,
+            "b7123341bc1a5500152d209ea6d505fefa8f7f99ab69e5914f87adf342b8b0fa",
+        ),
+        (
+            "KNKeynoteBuildCreationArchive.proto",
+            1841,
+            "2cb1528e4787e3a5e645796e1aa68d5b648a4f719c4d0d898dd79b0385b7ae23",
+        ),
+        (
             "TSDMovieAudioFlagArchive.proto",
             287,
             "2bcd9bd1076612f32ed09bafbbb0a0ce6b3ff804e16dd9478444308d7468cda4",
@@ -2107,6 +2168,21 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_pages_body_generated {",
         ),
     ];
+    // Creation codecs use Buffa's borrowed ViewEncode surface to author new
+    // records.  They are intentionally separate from the lazy ingress list:
+    // no untrusted source is decoded and no generated native graph is exposed.
+    const CREATION_CODECS: &[(&str, &str, &str)] = &[
+        (
+            "src/keynote_media_creation_codec.rs",
+            "crate::buffa_keynote_media_creation_generated::",
+            "mod buffa_keynote_media_creation_generated {",
+        ),
+        (
+            "src/keynote_build_creation_codec.rs",
+            "crate::buffa_keynote_build_creation_generated::",
+            "mod buffa_keynote_build_creation_generated {",
+        ),
+    ];
     // This scalar projection deliberately uses Buffa's borrowed eager view
     // only after its own complete strict preflight.  Keep the exception
     // explicit: every other generated ingress remains on the lazy-view path,
@@ -2136,6 +2212,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
     let mut expected_paths = CODECS
         .iter()
         .map(|(path, _generated_marker, _private_module_marker)| *path)
+        .chain(
+            CREATION_CODECS
+                .iter()
+                .map(|(path, _generated_marker, _private_module_marker)| *path),
+        )
         .chain(RAW_CODECS.iter().copied())
         .map(str::to_owned)
         .collect::<Vec<_>>();
@@ -2201,6 +2282,27 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             return Err(format!(
                 "production Buffa ingress ratchet failed for {path}: expected private {generated_marker} {} view decode and no Prost decode",
                 if eager_view { "eager" } else { "lazy" }
+            )
+            .into());
+        }
+    }
+
+    for (path, generated_marker, private_module_marker) in CREATION_CODECS {
+        let source = fs::read_to_string(path)?;
+        let production = production_codec_source(&source);
+        if !production.contains(generated_marker)
+            || !has_exact_private_module_declaration(&lib, private_module_marker)
+            || !production.contains("try_encoded_len")
+            || !production.contains("try_encode_bounded")
+            || FORBIDDEN_PROST_CODEC_MARKERS
+                .iter()
+                .any(|fragment| production.contains(fragment))
+            || FORBIDDEN_BUFFA_OWNERSHIP_MARKERS
+                .iter()
+                .any(|fragment| production.contains(fragment))
+        {
+            return Err(format!(
+                "production Buffa creation ratchet failed for {path}: expected private {generated_marker} ViewEncode bounded encoding and no Prost/owned-view ingress"
             )
             .into());
         }
@@ -7686,6 +7788,207 @@ fn enforce_drawable_container_projection_provenance(
     Ok(())
 }
 
+fn enforce_keynote_media_creation_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\npackage LitchiIwaProjection;\nmessage Reference {\nrequired uint64 identifier = 1;\n}\nmessage DataReference {\nrequired uint64 identifier = 1;\n}\nmessage Point {\nrequired float x = 1;\nrequired float y = 2;\n}\nmessage Size {\nrequired float width = 1;\nrequired float height = 2;\n}\nmessage GeometryArchive {\noptional .LitchiIwaProjection.Point position = 1;\noptional .LitchiIwaProjection.Size size = 2;\noptional uint32 flags = 3;\noptional float angle = 4;\n}\nmessage ExteriorTextWrapArchive {\noptional uint32 type = 1;\noptional uint32 direction = 2;\noptional uint32 fit_type = 3;\noptional float margin = 4;\noptional float alpha_threshold = 5;\noptional bool is_html_wrap = 6;\n}\nmessage DrawableArchive {\noptional .LitchiIwaProjection.GeometryArchive geometry = 1;\noptional .LitchiIwaProjection.Reference parent = 2;\noptional .LitchiIwaProjection.ExteriorTextWrapArchive exterior_text_wrap = 3;\noptional bool locked = 5;\noptional bool aspect_ratio_locked = 7;\noptional .LitchiIwaProjection.Reference title = 10;\noptional .LitchiIwaProjection.Reference caption = 11;\noptional bool title_hidden = 12;\noptional bool caption_hidden = 13;\n}\nmessage MovieArchive {\nrequired .LitchiIwaProjection.DrawableArchive super = 1;\noptional .LitchiIwaProjection.DataReference movie_data = 14;\noptional float start_time = 3;\noptional float end_time = 4;\noptional float poster_time = 5;\noptional int32 loop_option = 24;\noptional float volume = 7;\noptional bool audio_only = 9;\noptional bool streaming = 18;\noptional bool plays_across_slides = 28;\noptional .LitchiIwaProjection.DataReference poster_image_data = 15;\noptional bool poster_image_generated_with_alpha_support = 23;\noptional uint32 flags = 13;\noptional .LitchiIwaProjection.Reference style = 19;\noptional .LitchiIwaProjection.Size original_size = 20;\noptional .LitchiIwaProjection.Size natural_size = 21;\n}";
+    const CODEC_MARKERS: [&str; 11] = [
+        "pub struct MediaArchiveWrite",
+        "pub enum MediaKind",
+        "pub fn encode_media_archive(",
+        "pub fn encode_media_archive_with_report(",
+        "crate::buffa_keynote_media_creation_generated::",
+        "ViewEncode as _",
+        "try_encoded_len",
+        "try_encode_bounded",
+        "fn validate_write(",
+        "const MAX_DEFAULT_OUTPUT_BYTES: usize",
+        "canonical_standin_payload",
+    ];
+    let projection =
+        fs::read_to_string(projection_directory.join("TSDKeynoteMediaCreationArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let codec = fs::read_to_string("src/keynote_media_creation_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let Some(movie) = proto_message_block(&tsd, "MovieArchive") else {
+        return Err("TSD.MovieArchive declaration disappeared from canonical schema".into());
+    };
+    let Some(drawable) = proto_message_block(&tsd, "DrawableArchive") else {
+        return Err("TSD.DrawableArchive declaration disappeared from canonical schema".into());
+    };
+    if projection_schema != PROJECTION_SCHEMA
+        || projection.len() > 4 * 1024
+        || projection.contains("repeated ")
+        || drawable
+            .matches("optional .TSP.Reference parent = 2;")
+            .count()
+            != 1
+        || movie
+            .matches("required .TSD.DrawableArchive super = 1;")
+            .count()
+            != 1
+        || movie
+            .matches("optional .TSP.DataReference movieData = 14;")
+            .count()
+            != 1
+        || movie
+            .matches("optional .TSP.DataReference posterImageData = 15;")
+            .count()
+            != 1
+        || movie.matches("optional .TSP.Reference style = 19;").count() != 1
+        || movie
+            .matches("optional .TSP.Size originalSize = 20;")
+            .count()
+            != 1
+        || movie
+            .matches("optional .TSP.Size naturalSize = 21;")
+            .count()
+            != 1
+        || !CODEC_MARKERS
+            .iter()
+            .all(|marker| production_codec.matches(marker).count() == 1)
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("to_owned_message")
+        || !lib.contains("mod buffa_keynote_media_creation_generated {")
+        || !lib.contains("/buffa-keynote-media-creation/iwa_keynote_media_creation_buffa_protos.rs")
+    {
+        return Err("Keynote media creation projection/codec drifted from TSD.MovieArchive, widened its private schema, or added production native encoding".into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_build_creation_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\npackage LitchiIwaProjection;\nmessage Reference {\nrequired uint64 identifier = 1;\n}\nmessage UUID {\nrequired uint64 lower = 1;\nrequired uint64 upper = 2;\n}\nmessage AnimationAttributesArchive {\noptional string animation_type = 1;\noptional string effect = 2;\noptional double duration = 3;\noptional double delay = 5;\noptional uint32 random_number_seed = 11;\noptional bool writing_direction_is_rtl = 16;\n}\nmessage BuildAttributesArchive {\noptional .LitchiIwaProjection.AnimationAttributesArchive animation_attributes = 18;\noptional uint32 event_trigger = 4;\noptional double chart_rotation_3_d = 17;\n}\nmessage BuildArchive {\noptional .LitchiIwaProjection.Reference drawable = 1;\nrequired string delivery = 2;\noptional double duration = 3;\nrequired .LitchiIwaProjection.BuildAttributesArchive attributes = 4;\noptional int32 chunk_id_seed = 5;\n}\nmessage BuildChunkIdentifierArchive {\noptional .LitchiIwaProjection.UUID build_id = 1;\noptional int32 build_chunk_id = 2;\n}\nmessage BuildChunkArchive {\noptional .LitchiIwaProjection.Reference build = 1;\noptional double delay = 3;\noptional double duration = 4;\noptional bool automatic = 5;\noptional bool referent = 6;\noptional .LitchiIwaProjection.BuildChunkIdentifierArchive build_chunk_identifier = 7;\noptional .LitchiIwaProjection.UUID build_id = 8;\n}";
+    const CODEC_MARKERS: [&str; 9] = [
+        "pub fn encode_start_audio_build(",
+        "pub fn encode_start_audio_chunk(",
+        "use buffa::ViewEncode;",
+        "try_encoded_len",
+        "try_encode_bounded",
+        "crate::buffa_keynote_build_creation_generated::",
+        "fn validate_write(",
+        "pub struct StartAudioBuildWrite",
+        "pub enum EncodeLimit",
+    ];
+    let projection =
+        fs::read_to_string(projection_directory.join("KNKeynoteBuildCreationArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let kn = fs::read_to_string(proto_directory.join("KNArchives.proto"))?;
+    let Some(animation) = proto_message_block(&kn, "AnimationAttributesArchive") else {
+        return Err(
+            "KN.AnimationAttributesArchive declaration disappeared from canonical schema".into(),
+        );
+    };
+    let Some(attributes) = proto_message_block(&kn, "BuildAttributesArchive") else {
+        return Err(
+            "KN.BuildAttributesArchive declaration disappeared from canonical schema".into(),
+        );
+    };
+    let Some(build) = proto_message_block(&kn, "BuildArchive") else {
+        return Err("KN.BuildArchive declaration disappeared from canonical schema".into());
+    };
+    let Some(chunk_identifier) = proto_message_block(&kn, "BuildChunkIdentifierArchive") else {
+        return Err(
+            "KN.BuildChunkIdentifierArchive declaration disappeared from canonical schema".into(),
+        );
+    };
+    let Some(chunk) = proto_message_block(&kn, "BuildChunkArchive") else {
+        return Err("KN.BuildChunkArchive declaration disappeared from canonical schema".into());
+    };
+    let codec = fs::read_to_string("src/keynote_build_creation_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if projection_schema != PROJECTION_SCHEMA
+        || projection.len() > 4 * 1024
+        || projection.contains("repeated ")
+        || animation
+            .matches("optional string animation_type = 1;")
+            .count()
+            != 1
+        || animation.matches("optional string effect = 2;").count() != 1
+        || animation.matches("optional double duration = 3;").count() != 1
+        || animation.matches("optional double delay = 5;").count() != 1
+        || animation
+            .matches("optional uint32 random_number_seed = 11;")
+            .count()
+            != 1
+        || animation
+            .matches("optional bool writing_direction_is_rtl = 16;")
+            .count()
+            != 1
+        || attributes
+            .matches("optional .KN.AnimationAttributesArchive animationAttributes = 18;")
+            .count()
+            != 1
+        || attributes
+            .matches("optional uint32 eventTrigger = 4;")
+            .count()
+            != 1
+        || attributes
+            .matches("optional double ChartRotation3D = 17;")
+            .count()
+            != 1
+        || build
+            .matches("optional .TSP.Reference drawable = 1;")
+            .count()
+            != 1
+        || build.matches("required string delivery = 2;").count() != 1
+        || build
+            .matches("optional double duration = 3 [deprecated = true];")
+            .count()
+            != 1
+        || build
+            .matches("required .KN.BuildAttributesArchive attributes = 4;")
+            .count()
+            != 1
+        || build.matches("optional int32 chunk_id_seed = 5;").count() != 1
+        || chunk_identifier
+            .matches("optional .TSP.UUID build_id = 1;")
+            .count()
+            != 1
+        || chunk_identifier
+            .matches("optional int32 build_chunk_id = 2;")
+            .count()
+            != 1
+        || chunk.matches("optional .TSP.Reference build = 1;").count() != 1
+        || chunk.matches("optional double delay = 3;").count() != 1
+        || chunk.matches("optional double duration = 4;").count() != 1
+        || chunk.matches("optional bool automatic = 5;").count() != 1
+        || chunk.matches("optional bool referent = 6;").count() != 1
+        || chunk
+            .matches("optional .KN.BuildChunkIdentifierArchive build_chunk_identifier = 7;")
+            .count()
+            != 1
+        || chunk.matches("optional .TSP.UUID build_id = 8;").count() != 1
+        || !CODEC_MARKERS
+            .iter()
+            .all(|marker| production_codec.matches(marker).count() == 1)
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("to_owned_message")
+        || !lib.contains("mod buffa_keynote_build_creation_generated {")
+        || !lib.contains("/buffa-keynote-build-creation/iwa_keynote_build_creation_buffa_protos.rs")
+    {
+        return Err("Keynote build creation projection/codec drifted from its reviewed private schema or added production native encoding".into());
+    }
+    Ok(())
+}
+
 fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(), Box<dyn Error>> {
     // Native IWA object type numbers are not part of the protobuf schemas.
     // Keep their workspace routes private and check them only as a build-time
@@ -11130,6 +11433,95 @@ fn enforce_drawable_container_projection_budget(directory: &Path) -> Result<(), 
     {
         return Err(format!(
             "TSD drawable-container projection generated {files} files/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and bounded repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_media_creation_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // The write-only closure contains no repeated fields. Keep a finite
+    // generated-size ceiling so a future schema edit cannot pull in the full
+    // MovieArchive graph.
+    const MAX_GENERATED_BYTES: u64 = 384 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("Keynote media creation generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("Keynote media creation generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated_views = repeated_views
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("Keynote media creation repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("Keynote media creation lazy-repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+    {
+        return Err(format!(
+            "Keynote media creation projection generated {files} files/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_build_creation_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 384 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("Keynote build creation generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("Keynote build creation generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated_views = repeated_views
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("Keynote build creation repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("Keynote build creation lazy-repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+    {
+        return Err(format!(
+            "Keynote build creation projection generated {files} files/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

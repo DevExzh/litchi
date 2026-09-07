@@ -1,6 +1,7 @@
 //! Typed construction of source-built Keynote movie graphs.
 
 use super::*;
+use litchi_iwa_protos::keynote_media_creation_codec;
 use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
@@ -8,31 +9,9 @@ const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const MEDIA_STYLE_MESSAGE_TYPE: u32 = 3_016;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
-const DEFAULT_MOVIE_FLAGS: u32 = 0;
 const DEFAULT_MOVIE_ROTATION_DEGREES: f32 = 0.0;
-const DEFAULT_MOVIE_VOLUME: f32 = 1.0;
-const DEFAULT_TEXT_WRAP_MARGIN_POINTS: f32 = 12.0;
-const DEFAULT_TEXT_WRAP_ALPHA_THRESHOLD: f32 = 0.5;
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const STANDIN_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];
-
-#[derive(Debug, Clone, Copy)]
-#[repr(u32)]
-enum TextWrapType {
-    Square = 4,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[repr(u32)]
-enum TextWrapDirection {
-    BothSides = 2,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[repr(u32)]
-enum TextWrapFit {
-    Text = 1,
-}
 
 #[derive(Debug, Clone, Copy)]
 pub(in crate::keynote::editor) struct MovieObjectIds {
@@ -213,7 +192,6 @@ enum MediaPayload {
     Audio,
 }
 
-#[allow(deprecated)]
 fn media_objects(
     ids: MovieObjectIds,
     slide_id: u64,
@@ -229,87 +207,49 @@ fn media_objects(
     let size = geometry.size.ok_or_else(|| {
         Error::InvalidFormat("validated Keynote movie geometry has no size".to_owned())
     })?;
-    let (poster_image_data, audio_only, alpha_support, natural_size, data_references) =
-        match payload {
-            MediaPayload::Movie {
-                poster_data_identifier,
-                natural_size,
-            } => (
-                Some(tsp::DataReference {
-                    identifier: poster_data_identifier,
-                }),
-                false,
+    let geometry = keynote_media_creation_codec::Geometry::new(
+        keynote_media_creation_codec::Point::new(position.x, position.y),
+        keynote_media_creation_codec::Size::new(size.width, size.height),
+        geometry.flags,
+        geometry.angle,
+    );
+    let (write, data_references) = match payload {
+        MediaPayload::Movie {
+            poster_data_identifier,
+            natural_size,
+        } => (
+            keynote_media_creation_codec::MediaArchiveWrite::movie(
+                slide_id,
+                style_id,
+                ids.title,
+                ids.caption,
+                data_identifier,
+                Some(poster_data_identifier),
+                geometry,
+                duration_seconds,
+                keynote_media_creation_codec::Size::new(natural_size.width, natural_size.height),
                 true,
-                natural_size,
-                vec![poster_data_identifier, data_identifier],
             ),
-            MediaPayload::Audio => (
-                None,
-                true,
-                false,
-                DrawableSize {
-                    width: 0.0,
-                    height: 0.0,
-                },
-                vec![data_identifier],
+            vec![poster_data_identifier, data_identifier],
+        ),
+        MediaPayload::Audio => (
+            keynote_media_creation_codec::MediaArchiveWrite::audio(
+                slide_id,
+                style_id,
+                ids.title,
+                ids.caption,
+                data_identifier,
+                geometry,
+                duration_seconds,
             ),
-        };
-    let movie = tsd::MovieArchive {
-        super_: tsd::DrawableArchive {
-            geometry: Some(tsd::GeometryArchive {
-                position: Some(tsp::Point {
-                    x: position.x,
-                    y: position.y,
-                }),
-                size: Some(tsp::Size {
-                    width: size.width,
-                    height: size.height,
-                }),
-                flags: geometry.flags,
-                angle: geometry.angle,
-            }),
-            parent: Some(reference(slide_id)),
-            exterior_text_wrap: Some(tsd::ExteriorTextWrapArchive {
-                r#type: Some(TextWrapType::Square as u32),
-                direction: Some(TextWrapDirection::BothSides as u32),
-                fit_type: Some(TextWrapFit::Text as u32),
-                margin: Some(DEFAULT_TEXT_WRAP_MARGIN_POINTS),
-                alpha_threshold: Some(DEFAULT_TEXT_WRAP_ALPHA_THRESHOLD),
-                is_html_wrap: Some(false),
-            }),
-            locked: Some(false),
-            aspect_ratio_locked: Some(true),
-            title: Some(reference(ids.title)),
-            caption: Some(reference(ids.caption)),
-            title_hidden: Some(false),
-            caption_hidden: Some(false),
-            ..Default::default()
-        },
-        movie_data: Some(tsp::DataReference {
-            identifier: data_identifier,
-        }),
-        start_time: Some(0.0),
-        end_time: Some(duration_seconds),
-        poster_time: Some(0.0),
-        loop_option: Some(tsd::movie_archive::MovieLoopOption::None as i32),
-        volume: Some(DEFAULT_MOVIE_VOLUME),
-        audio_only: Some(audio_only),
-        streaming: Some(false),
-        plays_across_slides: Some(true),
-        poster_image_data,
-        poster_image_generated_with_alpha_support: Some(alpha_support),
-        flags: Some(DEFAULT_MOVIE_FLAGS),
-        style: Some(reference(style_id)),
-        original_size: Some(tsp::Size {
-            width: natural_size.width,
-            height: natural_size.height,
-        }),
-        natural_size: Some(tsp::Size {
-            width: natural_size.width,
-            height: natural_size.height,
-        }),
-        ..Default::default()
+            vec![data_identifier],
+        ),
     };
+    let movie = keynote_media_creation_codec::encode_media_archive(
+        &write,
+        keynote_media_creation_codec::EncodeOptions::for_write(&write),
+    )
+    .map_err(|error| Error::InvalidFormat(format!("invalid Keynote media creation: {error}")))?;
     Ok([
         keynote_object(
             ids.drawable,
@@ -322,7 +262,7 @@ fn media_objects(
         keynote_object(
             ids.title,
             STANDIN_CAPTION_MESSAGE_TYPE,
-            tsd::StandinCaptionArchive::default(),
+            keynote_media_creation_codec::canonical_standin_payload().to_vec(),
             &STANDIN_CAPTION_MESSAGE_VERSION,
             &[],
             &[],
@@ -330,7 +270,7 @@ fn media_objects(
         keynote_object(
             ids.caption,
             STANDIN_CAPTION_MESSAGE_TYPE,
-            tsd::StandinCaptionArchive::default(),
+            keynote_media_creation_codec::canonical_standin_payload().to_vec(),
             &STANDIN_CAPTION_MESSAGE_VERSION,
             &[],
             &[],
@@ -341,7 +281,7 @@ fn media_objects(
 fn keynote_object(
     identifier: u64,
     message_type: u32,
-    message: impl Message,
+    data: Vec<u8>,
     versions: &[u32],
     object_references: &[u64],
     data_references: &[u64],
@@ -350,7 +290,7 @@ fn keynote_object(
         identifier,
         vec![RawMessage {
             type_: message_type,
-            data: message.encode_to_vec(),
+            data,
         }],
     )?;
     let info = &mut object.archive_info.message_infos[0];
@@ -358,11 +298,4 @@ fn keynote_object(
     info.object_references = object_references.to_vec();
     info.data_references = data_references.to_vec();
     Ok(object)
-}
-
-fn reference(identifier: u64) -> tsp::Reference {
-    tsp::Reference {
-        identifier,
-        ..Default::default()
-    }
 }

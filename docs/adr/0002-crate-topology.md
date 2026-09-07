@@ -261,11 +261,14 @@ Keynote slide-audio creation uses the adjacent archive-free
 `litchi_keynote::slide::audio::Options` value. It owns only a common geometry
 point and one canonical native `f32` duration, validating finite coordinates
 and a positive representable duration before an IWA adapter can mutate a
-package. `litchi-iwa` retains slide and drawable identifiers, `TSD.MovieArchive`
-decoding, object-graph discovery, zero-size control geometry, media insertion,
-raw-wire updates, build construction, and transaction-scoped readback. The
-audio info and removal result remain IWA-owned because they carry native IDs,
-drawable properties, playback presence, and package-GC results.
+package. Fresh source-package creation now belongs to `litchi-keynote` through
+`Package::add_slide_audio`: it resolves semantic slide selectors, stages media,
+stand-ins, playback builds, metadata and cache updates, and publishes an exact
+reversible patch. Private Buffa media/build projections in `litchi-iwa-protos`
+own payload encoding. The retained migration host uses the same media writer;
+its raw creation and info/removal APIs remain until native acceptance permits
+retirement. Those legacy results still carry native IDs, drawable properties,
+playback presence, and package-GC results.
 The shape-path value slice follows the same ownership boundary at
 `litchi-iwa-common::shape::path::{Preset, CornerRadius, PolygonSides,
 StarPoints, InnerRadiusRatio}`. These compact, copyable controls and the

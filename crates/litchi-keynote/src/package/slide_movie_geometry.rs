@@ -43,7 +43,9 @@ const MOVIE_STYLE_MESSAGE_TYPE: u32 = 2_025;
 const MOVIE_AUDIO_STYLE_MESSAGE_TYPE: u32 = 3_016;
 const SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
 const SLIDE_MESSAGE_TYPE: u32 = 5;
+const BUILD_MESSAGE_TYPE: u32 = 8;
 const SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
+const SLIDE_BUILDS_FIELD: u32 = 2;
 const SLIDE_Z_ORDER_FIELD: u32 = 42;
 const MOVIE_SUPER_FIELD: u32 = 1;
 const DRAWABLE_PARENT_FIELD: u32 = 2;
@@ -1585,6 +1587,18 @@ fn select_media_with_budget(
     if before.is_none() && !matches!(media_kind, GeometryMediaKind::Audio) {
         return Err(SlideMovieGeometryError::UnsupportedDependency);
     }
+    let audio_build_identifiers = if matches!(media_kind, GeometryMediaKind::Audio) {
+        selected_audio_build_identifiers(
+            package,
+            component_name,
+            slide_payload,
+            movie_identifier,
+            limits,
+            budget,
+        )?
+    } else {
+        Vec::new()
+    };
     let metadata_capacity = if matches!(media_kind, GeometryMediaKind::Audio) {
         2
     } else {
@@ -1625,6 +1639,7 @@ fn select_media_with_budget(
         movie_message_index: message_index,
         data_ids: &movie_data_ids,
         audio_data_witnesses: &audio_data_witnesses,
+        audio_build_identifiers: &audio_build_identifiers,
         media_kind,
     };
     validate_movie_metadata(package, &graph, &metadata_targets, budget)?;
@@ -2690,6 +2705,85 @@ fn validate_slide_archive_info_references(
     Ok(())
 }
 
+/// Collect the slide's build objects that are an authorized inbound edge to a
+/// selected audio drawable.  Fresh audio creation writes the drawable edge in
+/// both the native BuildArchive payload and its ArchiveInfo header, while
+/// older/native producers may leave that header aggregate empty.  The global
+/// movie census must admit only the explicit fresh edge while continuing to
+/// reject arbitrary cross-graph references.
+fn selected_audio_build_identifiers(
+    package: &Package,
+    component_name: &str,
+    slide_payload: &[u8],
+    movie_identifier: u64,
+    limits: litchi_iwa_common::WireLimits,
+    budget: &mut GeometryBudget,
+) -> Result<Vec<u64>, SlideMovieGeometryError> {
+    let build_identifiers = repeated_references(slide_payload, SLIDE_BUILDS_FIELD, limits, budget)?;
+    let mut selected = Vec::new();
+    budget.allocations(build_identifiers.len())?;
+    selected
+        .try_reserve_exact(build_identifiers.len())
+        .map_err(|_| SlideMovieGeometryError::Allocation {
+            amount: build_identifiers.len(),
+        })?;
+    for identifier in build_identifiers {
+        let (component, object) = package
+            .object_with_component(identifier)
+            .ok_or(SlideMovieGeometryError::InvalidSource)?;
+        if component != component_name {
+            continue;
+        }
+        let has_header_movie_edge = object.archive_info.message_infos.iter().any(|info| {
+            info.type_ == BUILD_MESSAGE_TYPE && info.object_references.contains(&movie_identifier)
+        });
+        if !has_header_movie_edge {
+            continue;
+        }
+        let (message_index, payload) = unique_message(object, BUILD_MESSAGE_TYPE, budget)?;
+        let target = build_target_identifier(payload, limits, budget)?;
+        if target != movie_identifier {
+            continue;
+        }
+        let info = object
+            .archive_info
+            .message_infos
+            .get(message_index)
+            .ok_or(SlideMovieGeometryError::InvalidSource)?;
+        match info.object_references.as_slice() {
+            // Older/native producers can encode the drawable edge only in
+            // BuildArchive and leave ArchiveInfo's aggregate list empty. In
+            // that case there is no inbound header edge to authorize.
+            [] => {},
+            [reference] if *reference == movie_identifier => selected.push(identifier),
+            _ => return Err(SlideMovieGeometryError::UnsupportedDependency),
+        }
+    }
+    Ok(selected)
+}
+
+fn build_target_identifier(
+    payload: &[u8],
+    limits: litchi_iwa_common::WireLimits,
+    budget: &mut GeometryBudget,
+) -> Result<u64, SlideMovieGeometryError> {
+    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    budget.fields(fields.len())?;
+    budget.work(payload.len())?;
+    let mut target = None;
+    for field in fields.fields() {
+        field.validate_canonical_framing().map_err(map_wire_error)?;
+        if field.number() != 1 {
+            continue;
+        }
+        if field.wire_type() != 2 || target.is_some() {
+            return Err(SlideMovieGeometryError::InvalidSource);
+        }
+        target = Some(strict_reference_payload(field.payload(), limits)?);
+    }
+    target.ok_or(SlideMovieGeometryError::InvalidSource)
+}
+
 fn movie_archive_references(
     payload: &[u8],
     limits: litchi_iwa_common::WireLimits,
@@ -2855,6 +2949,7 @@ struct MovieReferenceGraph<'a> {
     movie_message_index: usize,
     data_ids: &'a [u64],
     audio_data_witnesses: &'a [(u64, u64)],
+    audio_build_identifiers: &'a [u64],
     media_kind: GeometryMediaKind,
 }
 
@@ -3269,6 +3364,7 @@ fn validate_global_movie_references(
         movie_message_index,
         data_ids,
         audio_data_witnesses,
+        audio_build_identifiers,
         media_kind,
     } = *graph;
     let archive_limits = package
@@ -3317,6 +3413,7 @@ fn validate_global_movie_references(
         movie_message_index,
         data_ids,
         audio_data_witnesses,
+        audio_build_identifiers,
         component_name,
         allow_audio_shared_data: matches!(media_kind, GeometryMediaKind::Audio),
         movie_references: 0,
@@ -3405,6 +3502,7 @@ struct MovieInboundReferenceVisitor<'a> {
     movie_message_index: usize,
     data_ids: &'a [u64],
     audio_data_witnesses: &'a [(u64, u64)],
+    audio_build_identifiers: &'a [u64],
     component_name: &'a str,
     allow_audio_shared_data: bool,
     movie_references: usize,
@@ -3436,11 +3534,14 @@ impl ArchiveReferenceVisitor for MovieInboundReferenceVisitor<'_> {
                     }
                 }
                 if occurrence.referenced_identifier == self.movie_identifier {
-                    if occurrence.object_identifier != self.slide_identifier
-                        || occurrence.message_index != self.slide_message_index
+                    let direct_slide_reference = occurrence.object_identifier
+                        == self.slide_identifier
+                        && occurrence.message_index == self.slide_message_index;
+                    if !direct_slide_reference
+                        && !self.is_selected_audio_build_reference(occurrence)
                     {
                         self.invalid = true;
-                    } else {
+                    } else if direct_slide_reference {
                         self.movie_references = self.movie_references.saturating_add(1);
                     }
                 }
@@ -3481,6 +3582,26 @@ impl ArchiveReferenceVisitor for MovieInboundReferenceVisitor<'_> {
             },
         }
         Ok(())
+    }
+}
+
+impl MovieInboundReferenceVisitor<'_> {
+    fn is_selected_audio_build_reference(&self, occurrence: ArchiveReferenceOccurrence) -> bool {
+        self.allow_audio_shared_data
+            && self
+                .audio_build_identifiers
+                .contains(&occurrence.object_identifier)
+            && self
+                .package
+                .object_with_component(occurrence.object_identifier)
+                .is_some_and(|(component, object)| {
+                    component == self.component_name
+                        && object
+                            .archive_info
+                            .message_infos
+                            .get(occurrence.message_index)
+                            .is_some_and(|info| info.type_ == BUILD_MESSAGE_TYPE)
+                })
     }
 }
 

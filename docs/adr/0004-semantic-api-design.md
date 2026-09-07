@@ -233,9 +233,12 @@ Keynote slide-audio creation uses the focused
 `litchi_keynote::slide::audio::Options` value. The fields are private, and
 construction validates finite placement plus a positive duration that fits
 the native finite `f32`-seconds domain; accessors expose the canonical point
-and duration without archive state. The IWA adapter retains audio graph
-discovery, native identifiers, zero-size geometry, wire-preserving mutations,
-package transactions, and the IWA-owned info/removal values. Shared
+and duration without archive state. `Package::add_slide_audio` accepts a semantic
+slide selector, preferred filename, borrowed audio bytes, and these options.
+Its commit exposes the candidate package, typed diagnostics, and an exact
+creation patch with inverse/replay support. Native identities and zero-size
+control geometry remain private to the focused package owner. The migration
+host's raw creation and info/removal values remain pending native acceptance. Shared
 `MediaPlaybackSettings` optional fields, loop discriminants, and volume
 validation remain format-neutral IWA playback semantics until their own
 cross-format extraction.

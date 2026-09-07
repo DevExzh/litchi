@@ -14559,6 +14559,207 @@ IWA_DRAWABLE_CONTAINER_PROJECTION_FIELDS = {
         "children": ("Reference", 2),
     },
 }
+
+# Fresh Keynote audio/movie authoring is deliberately narrower than the
+# compatibility graph that still lives in ``litchi-iwa``.  The host owns
+# object/component bookkeeping, while this private Buffa codec owns only the
+# canonical ``TSD.MovieArchive`` payload.  Keep the ratchet scoped to the
+# ``media_objects`` constructor so the two empty stand-in caption archives do
+# not accidentally become part of the migration claim.
+IWA_KEYNOTE_MEDIA_CREATION_SOURCE = Path(
+    "crates/litchi-iwa/src/keynote/editor/slide_movies/graph.rs"
+)
+IWA_KEYNOTE_MEDIA_CREATION_FUNCTION = "media_objects"
+IWA_KEYNOTE_MEDIA_CREATION_CODEC_ROUTE = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
+    r"keynote_media_creation_codec[ \t\r\n]*::[ \t\r\n]*"
+    r"encode_media_archive(?:_with_report)?[ \t\r\n]*\("
+)
+IWA_KEYNOTE_MEDIA_CREATION_FORBIDDEN_GENERATED = (
+    (
+        "generated MovieArchive construction",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)?"
+            r"MovieArchive[ \t\r\n]*\{"
+        ),
+    ),
+    (
+        "generated archive encoding",
+        re.compile(
+            r"\b(?:encode_to_vec|try_encode_to_vec|to_owned_message)[ \t\r\n]*\(|"
+            r"\bMessage[ \t\r\n]*::[ \t\r\n]*encode[ \t\r\n]*\("
+        ),
+    ),
+)
+
+KEYNOTE_MEDIA_CREATION_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/keynote_media_creation_codec.rs"
+)
+KEYNOTE_MEDIA_CREATION_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/buffa-projections/"
+    "TSDKeynoteMediaCreationArchive.proto"
+)
+KEYNOTE_MEDIA_CREATION_BUILD_SOURCE = Path("crates/litchi-iwa-protos/build.rs")
+KEYNOTE_MEDIA_CREATION_CODEC_MODULE = "keynote_media_creation_codec"
+KEYNOTE_MEDIA_CREATION_GENERATED_MODULE = (
+    "buffa_keynote_media_creation_generated"
+)
+KEYNOTE_MEDIA_CREATION_GENERATED_INCLUDE = (
+    "/buffa-keynote-media-creation/"
+    "iwa_keynote_media_creation_buffa_protos.rs"
+)
+KEYNOTE_MEDIA_CREATION_CODEC_REQUIRED_MARKERS = (
+    "pub struct MediaArchiveWrite",
+    "pub enum MediaKind",
+    "pub struct EncodeOptions",
+    "pub struct EncodeReport",
+    "pub struct EncodeOutput",
+    "pub enum EncodeError",
+    "pub fn encode_media_archive(",
+    "pub fn encode_media_archive_with_report(",
+    "try_encoded_len",
+    "try_encode_bounded",
+    "try_reserve_exact",
+    "fn preflight(",
+    "buffa_keynote_media_creation_generated::",
+)
+KEYNOTE_MEDIA_CREATION_CODEC_FORBIDDEN_OPERATIONS = (
+    "prost::",
+    "prost_types",
+    "encode_to_vec",
+    "try_encode_to_vec",
+    "to_owned_message",
+    "OwnedView",
+    "crate::tsd::",
+    "ArchiveObject",
+    "IWorkPackage",
+    "RawMessage",
+)
+KEYNOTE_MEDIA_CREATION_PROJECTION_FIELDS = {
+    "Reference": {
+        "identifier": ("required", "uint64", 1),
+    },
+    "DataReference": {
+        "identifier": ("required", "uint64", 1),
+    },
+    "Point": {
+        "x": ("required", "float", 1),
+        "y": ("required", "float", 2),
+    },
+    "Size": {
+        "width": ("required", "float", 1),
+        "height": ("required", "float", 2),
+    },
+    "GeometryArchive": {
+        "position": ("optional", "Point", 1),
+        "size": ("optional", "Size", 2),
+        "flags": ("optional", "uint32", 3),
+        "angle": ("optional", "float", 4),
+    },
+    "ExteriorTextWrapArchive": {
+        "type": ("optional", "uint32", 1),
+        "direction": ("optional", "uint32", 2),
+        "fit_type": ("optional", "uint32", 3),
+        "margin": ("optional", "float", 4),
+        "alpha_threshold": ("optional", "float", 5),
+        "is_html_wrap": ("optional", "bool", 6),
+    },
+    "DrawableArchive": {
+        "geometry": ("optional", "GeometryArchive", 1),
+        "parent": ("optional", "Reference", 2),
+        "exterior_text_wrap": ("optional", "ExteriorTextWrapArchive", 3),
+        "locked": ("optional", "bool", 5),
+        "aspect_ratio_locked": ("optional", "bool", 7),
+        "title": ("optional", "Reference", 10),
+        "caption": ("optional", "Reference", 11),
+        "title_hidden": ("optional", "bool", 12),
+        "caption_hidden": ("optional", "bool", 13),
+    },
+    "MovieArchive": {
+        "super": ("required", "DrawableArchive", 1),
+        "movie_data": ("optional", "DataReference", 14),
+        "start_time": ("optional", "float", 3),
+        "end_time": ("optional", "float", 4),
+        "poster_time": ("optional", "float", 5),
+        # The canonical field is an enum (wire-compatible with int32).  The
+        # projection keeps the raw scalar so the writer never invents a
+        # generated enum conversion at this boundary.
+        "loop_option": ("optional", "int32", 24),
+        "volume": ("optional", "float", 7),
+        "audio_only": ("optional", "bool", 9),
+        "streaming": ("optional", "bool", 18),
+        "plays_across_slides": ("optional", "bool", 28),
+        "poster_image_data": ("optional", "DataReference", 15),
+        "poster_image_generated_with_alpha_support": ("optional", "bool", 23),
+        "flags": ("optional", "uint32", 13),
+        "style": ("optional", "Reference", 19),
+        "original_size": ("optional", "Size", 20),
+        "natural_size": ("optional", "Size", 21),
+    },
+}
+
+# The focused Package owner and its private children must stay on neutral
+# codecs.  The package crate still needs archive and source-catalog primitives
+# for publication, so this guard targets only generated schema imports/types
+# and direct Prost reads rather than banning the physical transaction layer.
+KEYNOTE_SLIDE_AUDIO_CREATION_OWNER_SOURCE = Path(
+    "crates/litchi-keynote/src/package/slide_audio_creation.rs"
+)
+KEYNOTE_SLIDE_AUDIO_CREATION_CHILD_ROOT = Path(
+    "crates/litchi-keynote/src/package/slide_audio_creation"
+)
+KEYNOTE_SLIDE_AUDIO_CREATION_GENERATED_IMPORT = re.compile(
+    r"(?s)\blitchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*(?:"
+    r"(?:r#)?(?:kn|tn|tp|tsa|tsd|tsp|tss|tswp|"
+    r"knsos|tnsos|tpsos|tsasos|tsdsos|tsssos|tswpsos)\b|"
+    r"\{[^}]*\b(?:kn|tn|tp|tsa|tsd|tsp|tss|tswp|"
+    r"knsos|tnsos|tpsos|tsasos|tsdsos|tsssos|tswpsos)\b"
+    r")"
+)
+KEYNOTE_SLIDE_AUDIO_CREATION_GENERATED_MODULE = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:kn|tn|tp|tsa|tsd|tsp|tss|tswp|"
+    r"knsos|tnsos|tpsos|tsasos|tsdsos|tsssos|tswpsos)"
+    r"[ \t\r\n]*::"
+)
+KEYNOTE_SLIDE_AUDIO_CREATION_GENERATED_TYPE = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:DocumentArchive|ShowArchive|"
+    r"StylesheetArchive|MovieArchive|DrawableArchive)\b"
+)
+KEYNOTE_SLIDE_AUDIO_CREATION_FORBIDDEN_SOURCE_PATTERNS = (
+    (
+        "prost import",
+        re.compile(r"(?<![A-Za-z0-9_#])prost(?:_types)?[ \t\r\n]*::"),
+    ),
+    (
+        "generated protobuf import",
+        KEYNOTE_SLIDE_AUDIO_CREATION_GENERATED_IMPORT,
+    ),
+    (
+        "generated protobuf module",
+        KEYNOTE_SLIDE_AUDIO_CREATION_GENERATED_MODULE,
+    ),
+    (
+        "generated archive type",
+        KEYNOTE_SLIDE_AUDIO_CREATION_GENERATED_TYPE,
+    ),
+    (
+        "generated protobuf decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:Message|[A-Za-z_][A-Za-z0-9_]*)"
+            r"[ \t\r\n]*::[ \t\r\n]*decode[ \t\r\n]*\("
+        ),
+    ),
+    (
+        "eager protobuf encoding",
+        re.compile(
+            r"\b(?:encode_to_vec|try_encode_to_vec|to_owned_message)"
+            r"[ \t\r\n]*\("
+        ),
+    ),
+)
 PAGES_PACKAGE_TEST_MODULE = re.compile(
     r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]",
     re.MULTILINE,
@@ -48357,6 +48558,358 @@ def audit_iwa_drawable_container_codec_source_topology(
     return sorted(set(violations))
 
 
+def _proto_message_body(source: str, name: str) -> str | None:
+    """Return one brace-balanced Protocol Buffer message body.
+
+    The media-creation projection has a nested enum inside ``MovieArchive``;
+    a non-greedy regular expression would stop at that enum's closing brace
+    and silently leave the outer fields unaudited.  This tiny scanner is
+    intentionally limited to the comment-stripped schema used by the boundary
+    checker and does not attempt to be a full protobuf parser.
+    """
+
+    match = re.search(rf"\bmessage\s+{re.escape(name)}\s*\{{", source)
+    if match is None:
+        return None
+    opening = source.find("{", match.start(), match.end())
+    if opening < 0:
+        return None
+    depth = 1
+    cursor = opening + 1
+    while cursor < len(source) and depth:
+        if source[cursor] == "{":
+            depth += 1
+        elif source[cursor] == "}":
+            depth -= 1
+        cursor += 1
+    if depth:
+        return None
+    return source[opening + 1 : cursor - 1]
+
+
+def _audit_keynote_media_creation_projection(root: Path) -> list[str]:
+    """Keep the fresh-media Buffa projection closed and wire-compatible."""
+
+    projection_path = root / KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE
+    if not projection_path.is_file():
+        return [
+            "focused Keynote media-creation codec is missing private Buffa "
+            f"projection: {KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE}"
+        ]
+
+    raw = projection_path.read_text(encoding="utf-8")
+    projection = re.sub(r"//[^\n]*|/\*.*?\*/", "", raw, flags=re.DOTALL)
+    violations: list[str] = []
+    for marker in ('syntax = "proto2"', "package LitchiIwaProjection"):
+        if marker not in projection:
+            violations.append(
+                "focused Keynote media-creation projection is missing marker "
+                f"{marker}: {KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE}"
+            )
+    if "repeated " in projection:
+        violations.append(
+            "focused Keynote media-creation projection must not materialize "
+            f"repeated fields: {KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE}"
+        )
+    if "extensions " in projection or "extend " in projection:
+        violations.append(
+            "focused Keynote media-creation projection must not widen the "
+            f"native extension surface: {KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE}"
+        )
+    if len(raw.encode("utf-8")) > 4 * 1024:
+        violations.append(
+            "focused Keynote media-creation projection exceeds its 4 KiB source "
+            f"budget: {KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE}"
+        )
+
+    message_names = set(
+        re.findall(r"\bmessage\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{", projection)
+    )
+    expected_names = set(KEYNOTE_MEDIA_CREATION_PROJECTION_FIELDS)
+    for unexpected in sorted(message_names - expected_names):
+        violations.append(
+            "focused Keynote media-creation projection has unexpected message "
+            f"{unexpected}: {KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE}"
+        )
+    for missing in sorted(expected_names - message_names):
+        violations.append(
+            "focused Keynote media-creation projection is missing message "
+            f"{missing}: {KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE}"
+        )
+
+    field_pattern = re.compile(
+        r"(?m)^\s*(?P<label>required|optional|repeated)\s+"
+        r"(?P<type>[.A-Za-z_][.A-Za-z0-9_.]*)\s+"
+        r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*"
+        r"(?P<number>[0-9]+)\s*(?:\[[^]]*\])?\s*;"
+    )
+    for message, expected_fields in KEYNOTE_MEDIA_CREATION_PROJECTION_FIELDS.items():
+        body = _proto_message_body(projection, message)
+        if body is None:
+            continue
+        matches = list(field_pattern.finditer(body))
+        actual: dict[str, tuple[str, str, int]] = {}
+        for field in matches:
+            field_type = field.group("type").rsplit(".", 1)[-1]
+            actual[field.group("name")] = (
+                field.group("label"),
+                field_type,
+                int(field.group("number")),
+            )
+        if len(actual) != len(matches):
+            violations.append(
+                "focused Keynote media-creation projection repeats a field "
+                f"name in {message}: {KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE}"
+            )
+        for field, expected in expected_fields.items():
+            if actual.get(field) != expected:
+                violations.append(
+                    "focused Keynote media-creation projection has incorrect or "
+                    f"missing field {message}.{field}={expected[2]}: "
+                    f"{KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE}"
+                )
+        for unexpected in sorted(actual.keys() - expected_fields.keys()):
+            violations.append(
+                "focused Keynote media-creation projection has unexpected field "
+                f"{message}.{unexpected}: {KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_media_creation_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the host fresh-media graph to call the bounded codec.
+
+    The audit activates when the focused codec or its host route appears.  It
+    inspects only ``media_objects``; compatibility construction of the two
+    empty stand-in caption objects remains outside this ownership handoff.
+    """
+
+    path = root / IWA_KEYNOTE_MEDIA_CREATION_SOURCE
+    codec_path = root / KEYNOTE_MEDIA_CREATION_CODEC_SOURCE
+    if not path.is_file():
+        return [] if not codec_path.is_file() else [
+            "litchi-iwa Keynote media-creation host source is missing: "
+            f"{IWA_KEYNOTE_MEDIA_CREATION_SOURCE}"
+        ]
+
+    masked_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    source = _mask_rust_non_code(masked_source)
+    function = _rust_named_function_body(
+        masked_source, IWA_KEYNOTE_MEDIA_CREATION_FUNCTION
+    )
+    if codec_path.is_file() is False and (
+        IWA_KEYNOTE_MEDIA_CREATION_CODEC_ROUTE.search(source) is None
+    ):
+        return []
+    if function is None:
+        return [
+            "litchi-iwa Keynote media-creation host is missing its focused "
+            f"{IWA_KEYNOTE_MEDIA_CREATION_FUNCTION} constructor: "
+            f"{IWA_KEYNOTE_MEDIA_CREATION_SOURCE}"
+        ]
+
+    body, body_offset = function
+    production_body = _mask_rust_non_code(body)
+    violations: list[str] = []
+    if IWA_KEYNOTE_MEDIA_CREATION_CODEC_ROUTE.search(production_body) is None:
+        line = masked_source.count("\n", 0, body_offset) + 1
+        violations.append(
+            "litchi-iwa Keynote media-creation host must route its MovieArchive "
+            f"payload through keynote_media_creation_codec: "
+            f"{IWA_KEYNOTE_MEDIA_CREATION_SOURCE}:{line}"
+        )
+    for description, pattern in IWA_KEYNOTE_MEDIA_CREATION_FORBIDDEN_GENERATED:
+        for match in pattern.finditer(production_body):
+            line = masked_source.count("\n", 0, body_offset + match.start()) + 1
+            violations.append(
+                "litchi-iwa Keynote media-creation host retains "
+                f"{description}: {IWA_KEYNOTE_MEDIA_CREATION_SOURCE}:{line}"
+            )
+    return sorted(set(violations))
+
+
+def audit_keynote_media_creation_codec_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the fresh-media codec, schema, and Buffa build route private."""
+
+    codec_path = root / KEYNOTE_MEDIA_CREATION_CODEC_SOURCE
+    projection_path = root / KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE
+    host_path = root / IWA_KEYNOTE_MEDIA_CREATION_SOURCE
+    host_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(host_path.read_text(encoding="utf-8"))
+        )
+        if host_path.is_file()
+        else ""
+    )
+    if not any(
+        (
+            codec_path.is_file(),
+            IWA_KEYNOTE_MEDIA_CREATION_CODEC_ROUTE.search(host_source) is not None,
+        )
+    ):
+        return []
+
+    violations: list[str] = []
+    if not codec_path.is_file():
+        violations.append(
+            "focused Keynote media-creation codec source is missing: "
+            f"{KEYNOTE_MEDIA_CREATION_CODEC_SOURCE}"
+        )
+    else:
+        codec_source = _mask_rust_cfg_test_items(
+            codec_path.read_text(encoding="utf-8")
+        )
+        codec = _mask_rust_non_code(codec_source)
+        for marker in KEYNOTE_MEDIA_CREATION_CODEC_REQUIRED_MARKERS:
+            if marker not in codec:
+                violations.append(
+                    "focused Keynote media-creation codec is missing marker "
+                    f"{marker}: {KEYNOTE_MEDIA_CREATION_CODEC_SOURCE}"
+                )
+        for operation in KEYNOTE_MEDIA_CREATION_CODEC_FORBIDDEN_OPERATIONS:
+            if operation in codec:
+                violations.append(
+                    "focused Keynote media-creation codec retains forbidden "
+                    f"operation {operation}: {KEYNOTE_MEDIA_CREATION_CODEC_SOURCE}"
+                )
+
+    violations.extend(_audit_keynote_media_creation_projection(root))
+
+    build_path = root / KEYNOTE_MEDIA_CREATION_BUILD_SOURCE
+    if not build_path.is_file():
+        violations.append(
+            "focused Keynote media-creation Buffa build source is missing: "
+            f"{KEYNOTE_MEDIA_CREATION_BUILD_SOURCE}"
+        )
+    else:
+        build = build_path.read_text(encoding="utf-8")
+        route = re.search(
+            r"(?s)\blet\s+buffa_keynote_media_creation_out_directory\b.*?"
+            r"\benforce_keynote_media_creation_projection_budget\s*\(\s*"
+            r"&\s*buffa_keynote_media_creation_out_directory\s*,?\s*\)",
+            build,
+        )
+        if route is None:
+            violations.append(
+                "focused Keynote media-creation Buffa build is missing its "
+                f"dedicated route: {KEYNOTE_MEDIA_CREATION_BUILD_SOURCE}"
+            )
+            build_focus = ""
+        else:
+            build_focus = route.group(0)
+        for marker in (
+            "TSDKeynoteMediaCreationArchive.proto",
+            "buffa-keynote-media-creation",
+            "iwa_keynote_media_creation_buffa_protos.rs",
+            ".includes(&[buffa_projection_directory])",
+            ".generate_views(true)",
+            ".lazy_views(true)",
+            ".preserve_unknown_fields(false)",
+            ".generate_json(false)",
+            ".generate_text(false)",
+            ".reflect_mode(buffa_build::ReflectMode::Off)",
+            ".idiomatic_field_names(true)",
+            ".compile()",
+            "enforce_keynote_media_creation_projection_budget",
+        ):
+            if marker not in build_focus:
+                violations.append(
+                    "focused Keynote media-creation Buffa build is missing marker "
+                    f"{marker}: {KEYNOTE_MEDIA_CREATION_BUILD_SOURCE}"
+                )
+        for marker in (
+            "fn enforce_keynote_media_creation_projection_provenance(",
+            "enforce_keynote_media_creation_projection_provenance(\n"
+            "        proto_directory,",
+        ):
+            if marker not in build:
+                violations.append(
+                    "focused Keynote media-creation build is missing provenance "
+                    f"marker {marker}: {KEYNOTE_MEDIA_CREATION_BUILD_SOURCE}"
+                )
+
+    public_path = root / KEYNOTE_MEDIA_CREATION_CODEC_PUBLIC_SOURCE
+    if not public_path.is_file():
+        violations.append(
+            "focused Keynote media-creation generated module owner is missing: "
+            f"{KEYNOTE_MEDIA_CREATION_CODEC_PUBLIC_SOURCE}"
+        )
+    else:
+        public_source = _mask_rust_cfg_test_items(
+            public_path.read_text(encoding="utf-8")
+        )
+        if re.search(
+            rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+            rf"pub\s+mod\s+{re.escape(KEYNOTE_MEDIA_CREATION_CODEC_MODULE)}\b",
+            public_source,
+        ) is None:
+            violations.append(
+                "focused Keynote media-creation codec is missing its hidden "
+                f"public module {KEYNOTE_MEDIA_CREATION_CODEC_MODULE}: "
+                f"{KEYNOTE_MEDIA_CREATION_CODEC_PUBLIC_SOURCE}"
+            )
+        if re.search(
+            rf"(?ms)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\].{{0,260}}?"
+            rf"^\s*mod\s+{re.escape(KEYNOTE_MEDIA_CREATION_GENERATED_MODULE)}"
+            rf"\s*\{{",
+            public_source,
+        ) is None:
+            violations.append(
+                "focused Keynote media-creation generated Buffa view must remain "
+                f"private: {KEYNOTE_MEDIA_CREATION_CODEC_PUBLIC_SOURCE}"
+            )
+        if KEYNOTE_MEDIA_CREATION_GENERATED_INCLUDE not in public_source:
+            violations.append(
+                "focused Keynote media-creation generated Buffa include is "
+                f"missing: {KEYNOTE_MEDIA_CREATION_CODEC_PUBLIC_SOURCE}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_audio_creation_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the focused slide-audio Package owner generated-free.
+
+    ``slide_audio_creation`` still manipulates physical archive records, so a
+    broad ban on ``litchi_iwa_core`` or archive types would reject its valid
+    transaction layer.  This source-local scan blocks only direct generated
+    schema imports/uses, Prost traits, generated archive values, and eager
+    protobuf reads/encodes in the owner and its private planning children.
+    """
+
+    owner_path = root / KEYNOTE_SLIDE_AUDIO_CREATION_OWNER_SOURCE
+    child_root = root / KEYNOTE_SLIDE_AUDIO_CREATION_CHILD_ROOT
+    paths = ([owner_path] if owner_path.is_file() else []) + (
+        sorted(child_root.rglob("*.rs")) if child_root.is_dir() else []
+    )
+    if not paths:
+        return []
+
+    violations: list[str] = []
+    for path in paths:
+        if path.name in KEYNOTE_TEST_ONLY_SOURCE_NAMES:
+            continue
+        raw_source = path.read_text(encoding="utf-8")
+        production_source = _mask_rust_cfg_test_items(raw_source)
+        production_code = _mask_rust_non_code(production_source)
+        for label, pattern in KEYNOTE_SLIDE_AUDIO_CREATION_FORBIDDEN_SOURCE_PATTERNS:
+            for match in pattern.finditer(production_code):
+                line_number = production_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "focused litchi-keynote slide-audio creation production "
+                    f"source uses {label}: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_pages_package_no_eager_prost_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -65255,6 +65808,9 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_pages_drawable_order_read_source_topology()
         + audit_iwa_drawable_container_reference_source_topology()
         + audit_iwa_drawable_container_codec_source_topology()
+        + audit_iwa_keynote_media_creation_source_topology()
+        + audit_keynote_media_creation_codec_source_topology()
+        + audit_keynote_slide_audio_creation_source_topology()
         + audit_pages_document_public_api()
         + audit_pages_package_output_api_source_topology()
         + audit_iwork_atomic_publication()

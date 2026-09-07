@@ -562,6 +562,46 @@ impl ReferencesSnapshot {
     }
 }
 
+/// Exact finite consumption of one generated-type-free reference projection.
+///
+/// The strict pass accounts for every visited field and source slice, while
+/// the lazy Buffa pass contributes its bounded source work. Reference
+/// projection retains no owned collection, so successful decodes report zero
+/// logical allocations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct DecodeReport {
+    fields: usize,
+    work_bytes: usize,
+    max_depth: u32,
+    allocations: usize,
+}
+
+impl DecodeReport {
+    /// Encoded field records visited by strict routing.
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+
+    /// Bytes visited by the strict and lazy Buffa projection passes.
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    /// Greatest protobuf message or unknown-group depth reached.
+    #[must_use]
+    pub const fn max_depth(self) -> u32 {
+        self.max_depth
+    }
+
+    /// Logical output allocations performed by the reference projection.
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+}
+
 /// Owned, generated-type-free Keynote show projection.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShowSnapshot {
@@ -637,6 +677,9 @@ struct Budget {
     max_fields: usize,
     max_work_bytes: usize,
     max_nesting: u32,
+    root_recursion_limit: u32,
+    max_depth: u32,
+    allocations: usize,
 }
 
 impl Budget {
@@ -647,15 +690,23 @@ impl Budget {
             max_fields: options.max_fields,
             max_work_bytes: options.max_work_bytes,
             max_nesting: options.recursion_limit,
+            root_recursion_limit: options.recursion_limit,
+            max_depth: 0,
+            allocations: 0,
         }
     }
 
-    fn charge_field(&mut self) -> Result<(), DecodeError> {
+    fn charge_field(&mut self, recursion_limit: u32) -> Result<(), DecodeError> {
         let observed = self.fields.saturating_add(1);
         if observed > self.max_fields {
             return Err(DecodeError::field_limit(observed, self.max_fields));
         }
         self.fields = observed;
+        let depth = self
+            .root_recursion_limit
+            .saturating_sub(recursion_limit)
+            .saturating_add(1);
+        self.max_depth = self.max_depth.max(depth);
         Ok(())
     }
 
@@ -666,6 +717,15 @@ impl Budget {
         }
         self.work_bytes = observed;
         Ok(())
+    }
+
+    const fn report(&self) -> DecodeReport {
+        DecodeReport {
+            fields: self.fields,
+            work_bytes: self.work_bytes,
+            max_depth: self.max_depth,
+            allocations: self.allocations,
+        }
     }
 
     const fn nesting_limit(&self) -> DecodeError {
@@ -842,11 +902,24 @@ pub fn decode_references(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<ReferencesSnapshot, DecodeError> {
+    Ok(decode_references_with_report(source, options)?.0)
+}
+
+/// Decode direct object-reference edges and report exact finite consumption.
+///
+/// The report covers the complete strict envelope and slide-tree validation
+/// followed by the selected lazy Buffa projection. It is suitable for
+/// callers that need to debit a separate aggregate resource budget after the
+/// projection succeeds.
+pub fn decode_references_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(ReferencesSnapshot, DecodeReport), DecodeError> {
     validate_decode_input(source, options)?;
     let mut budget = Budget::new(options);
     let preflight = preflight_show(source, options, &mut budget)?;
     let _settings = project_settings(source, options, &preflight, &mut budget)?;
-    Ok(ReferencesSnapshot {
+    let snapshot = ReferencesSnapshot {
         theme_identifier: preflight.references.theme.identifier,
         stylesheet_identifier: preflight.references.stylesheet.identifier,
         ui_state_identifier: preflight
@@ -857,7 +930,8 @@ pub fn decode_references(
             .references
             .recording
             .map(|reference| reference.identifier),
-    })
+    };
+    Ok((snapshot, budget.report()))
 }
 
 /// Decode one selected slide-node reference without allocating the complete
@@ -1495,7 +1569,7 @@ fn parse_strict_field<'source>(
         return Ok(None);
     }
     let (encoded_tag, canonical_key) = take_varint(source)?;
-    budget.charge_field()?;
+    budget.charge_field(recursion_limit)?;
     let raw_tag =
         u32::try_from(encoded_tag).map_err(|_error| buffa::DecodeError::InvalidFieldNumber)?;
     let field_number = raw_tag >> 3;
@@ -1781,7 +1855,7 @@ mod tests {
         let source = expected.encode_to_vec();
         let native = kn::ShowArchive::decode(source.as_slice())?;
         let snapshot = decode_show(&source, options(&source, 3))?;
-        let references = decode_references(&source, options(&source, 3))?;
+        let (references, report) = decode_references_with_report(&source, options(&source, 3))?;
         let settings_only = decode_settings(&source, options(&source, 3))?;
 
         assert_eq!(
@@ -1807,6 +1881,11 @@ mod tests {
             references.recording_identifier(),
             native.recording.map(|reference| reference.identifier)
         );
+        assert!(report.fields() > 0);
+        assert!(report.work_bytes() >= source.len());
+        assert!(report.max_depth() >= 1);
+        assert_eq!(report.allocations(), 0);
+        assert_eq!(decode_references(&source, options(&source, 3))?, references);
         assert_eq!(
             snapshot.size().width().to_bits(),
             native.size.width.to_bits()
@@ -1843,6 +1922,44 @@ mod tests {
         );
         assert!(snapshot.has_deprecated_root_slide_node());
         assert!(snapshot.has_slide_list());
+        Ok(())
+    }
+
+    #[test]
+    fn references_report_replays_exact_field_and_work_limits()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let source = show(&[30, 10, 20]).encode_to_vec();
+        let generous = options(&source, 3);
+        let (expected, report) = decode_references_with_report(&source, generous)?;
+        assert!(report.fields() > 0);
+        assert!(report.work_bytes() > 0);
+        assert!(report.max_depth() > 0);
+        assert_eq!(report.allocations(), 0);
+
+        let exact = generous
+            .with_max_fields(report.fields())
+            .with_max_work_bytes(report.work_bytes());
+        let (replayed, replayed_report) = decode_references_with_report(&source, exact)?;
+        assert_eq!(replayed, expected);
+        assert_eq!(replayed_report, report);
+
+        let fields = assert_error(decode_references_with_report(
+            &source,
+            exact.with_max_fields(report.fields() - 1),
+        ));
+        assert_eq!(
+            fields.field_limit_values(),
+            Some((report.fields(), report.fields() - 1))
+        );
+
+        let work = assert_error(decode_references_with_report(
+            &source,
+            exact.with_max_work_bytes(report.work_bytes() - 1),
+        ));
+        assert_eq!(
+            work.work_limit_values(),
+            Some((report.work_bytes(), report.work_bytes() - 1))
+        );
         Ok(())
     }
 

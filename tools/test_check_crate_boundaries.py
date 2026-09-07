@@ -6843,6 +6843,146 @@ def add_iwa_drawable_container_scaffold(
         build.write_text("fn unrelated_build_step() {}\n", encoding="utf-8")
 
 
+def add_keynote_media_creation_scaffold(
+    root: Path,
+    *,
+    host_generated_archive: bool = False,
+    codec_forbidden_operation: bool = False,
+    missing_build_route: bool = False,
+    projection_extra_field: bool = False,
+) -> None:
+    """Create the focused Keynote fresh-media codec/build topology fixture."""
+
+    host = root / boundaries.IWA_KEYNOTE_MEDIA_CREATION_SOURCE
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        "fn media_objects() {\n"
+        "    litchi_iwa_protos::keynote_media_creation_codec::"
+        "encode_media_archive(&write, options);\n"
+        + (
+            "    let _ = tsd::MovieArchive { ..Default::default() };\n"
+            if host_generated_archive
+            else ""
+        )
+        + "}\n",
+        encoding="utf-8",
+    )
+
+    codec = root / boundaries.KEYNOTE_MEDIA_CREATION_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::ViewEncode as _;\n"
+        "use crate::buffa_keynote_media_creation_generated::LitchiIwaProjection;\n"
+        "pub struct MediaArchiveWrite;\n"
+        "pub enum MediaKind { Audio }\n"
+        "pub struct EncodeOptions;\n"
+        "pub struct EncodeReport;\n"
+        "pub struct EncodeOutput;\n"
+        "pub enum EncodeError {}\n"
+        "pub fn encode_media_archive() {}\n"
+        "pub fn encode_media_archive_with_report() {}\n"
+        "fn preflight() {}\n"
+        "fn encode() { value.try_encoded_len(); value.try_encode_bounded(); "
+        "output.try_reserve_exact(1); }\n"
+        + ("fn eager() { value.encode_to_vec(); }\n" if codec_forbidden_operation else ""),
+        encoding="utf-8",
+    )
+
+    projection = root / boundaries.KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE
+    projection.parent.mkdir(parents=True, exist_ok=True)
+    source_projection = (
+        boundaries.ROOT / boundaries.KEYNOTE_MEDIA_CREATION_PROJECTION_SOURCE
+    ).read_text(encoding="utf-8")
+    if projection_extra_field:
+        source_projection = source_projection.replace(
+            "  optional bool caption_hidden = 13;\n",
+            "  optional bool caption_hidden = 13;\n"
+            "  optional bool unexpected = 99;\n",
+        )
+    projection.write_text(source_projection, encoding="utf-8")
+
+    public = root / boundaries.KEYNOTE_MEDIA_CREATION_CODEC_PUBLIC_SOURCE
+    public.parent.mkdir(parents=True, exist_ok=True)
+    public.write_text(
+        "#[doc(hidden)]\n"
+        "pub mod keynote_media_creation_codec;\n"
+        "#[doc(hidden)]\n"
+        "mod buffa_keynote_media_creation_generated {\n"
+        "    include!(concat!(env!(\"OUT_DIR\"), "
+        "\"/buffa-keynote-media-creation/iwa_keynote_media_creation_buffa_protos.rs\"));\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    build = root / boundaries.KEYNOTE_MEDIA_CREATION_BUILD_SOURCE
+    build.parent.mkdir(parents=True, exist_ok=True)
+    if missing_build_route:
+        build.write_text("fn unrelated_build_step() {}\n", encoding="utf-8")
+    else:
+        build.write_text(
+            "let buffa_keynote_media_creation_out_directory = out.join("
+            "\"buffa-keynote-media-creation\");\n"
+            "buffa_build::Config::new()\n"
+            "    .files(&[buffa_projection_directory.join("
+            "\"TSDKeynoteMediaCreationArchive.proto\")])\n"
+            "    .includes(&[buffa_projection_directory])\n"
+            "    .out_dir(&buffa_keynote_media_creation_out_directory)\n"
+            "    .include_file(\"iwa_keynote_media_creation_buffa_protos.rs\")\n"
+            "    .generate_views(true)\n"
+            "    .lazy_views(true)\n"
+            "    .preserve_unknown_fields(false)\n"
+            "    .generate_json(false)\n"
+            "    .generate_text(false)\n"
+            "    .reflect_mode(buffa_build::ReflectMode::Off)\n"
+            "    .idiomatic_field_names(true)\n"
+            "    .compile()?;\n"
+            "fn enforce_keynote_media_creation_projection_provenance(\n"
+            "    _proto: &str, _projection: &str) {}\n"
+            "enforce_keynote_media_creation_projection_provenance(\n"
+            "    proto_directory, buffa_projection_directory)?;\n"
+            "enforce_keynote_media_creation_projection_budget(\n"
+            "    &buffa_keynote_media_creation_out_directory);\n",
+            encoding="utf-8",
+        )
+
+
+def add_keynote_slide_audio_creation_scaffold(
+    root: Path,
+    *,
+    owner_generated_source: bool = False,
+    child_generated_source: bool = False,
+) -> None:
+    """Create the focused generated-free slide-audio owner fixture."""
+
+    owner = root / boundaries.KEYNOTE_SLIDE_AUDIO_CREATION_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "use litchi_iwa_protos::keynote_media_creation_codec;\n"
+        "fn plan() { keynote_media_creation_codec::encode_media_archive(); }\n"
+        + (
+            "use prost::Message as _;\n"
+            "use litchi_iwa_protos::tsd;\n"
+            "fn legacy() { tsd::MovieArchive::decode(bytes); }\n"
+            if owner_generated_source
+            else ""
+        ),
+        encoding="utf-8",
+    )
+
+    child = root / boundaries.KEYNOTE_SLIDE_AUDIO_CREATION_CHILD_ROOT / "metadata.rs"
+    child.parent.mkdir(parents=True, exist_ok=True)
+    child.write_text(
+        "use litchi_iwa_protos::package_metadata_codec;\n"
+        "fn plan() { package_metadata_codec::decode_package_metadata(); }\n"
+        + (
+            "use prost::Message as _;\n"
+            if child_generated_source
+            else ""
+        ),
+        encoding="utf-8",
+    )
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -27480,6 +27620,126 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_iwa_pages_drawable_order_read_source_topology()",
+            main_source,
+        )
+
+    def test_keynote_media_creation_audits_are_dormant_without_codec_or_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_media_creation_source_topology(root), []
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_media_creation_codec_source_topology(root), []
+            )
+
+    def test_keynote_media_creation_host_rejects_generated_payload_encoding(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_media_creation_scaffold(root, host_generated_archive=True)
+            host = root / boundaries.IWA_KEYNOTE_MEDIA_CREATION_SOURCE
+            host.write_text(
+                host.read_text(encoding="utf-8").replace(
+                    "keynote_media_creation_codec::encode_media_archive(&write, options);",
+                    "tsd::MovieArchive { ..Default::default() };",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_media_creation_source_topology(
+                root
+            )
+            self.assertTrue(any("must route" in item for item in violations), violations)
+            self.assertTrue(
+                any("generated MovieArchive construction" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_media_creation_codec_rejects_schema_and_eager_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_media_creation_scaffold(
+                root,
+                codec_forbidden_operation=True,
+                projection_extra_field=True,
+            )
+            violations = boundaries.audit_keynote_media_creation_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("encode_to_vec" in item for item in violations), violations)
+            self.assertTrue(any("unexpected field" in item for item in violations), violations)
+
+    def test_keynote_media_creation_codec_rejects_missing_build_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_media_creation_scaffold(root, missing_build_route=True)
+            violations = boundaries.audit_keynote_media_creation_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing its dedicated route" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_media_creation_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_keynote_media_creation_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_keynote_media_creation_codec_source_topology()",
+            main_source,
+        )
+
+    def test_keynote_slide_audio_creation_audit_is_dormant_without_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(
+                boundaries.audit_keynote_slide_audio_creation_source_topology(
+                    Path(directory)
+                ),
+                [],
+            )
+
+    def test_keynote_slide_audio_creation_audit_accepts_neutral_owner_and_children(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_audio_creation_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_audio_creation_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_audio_creation_audit_rejects_generated_owner_and_child(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_audio_creation_scaffold(
+                root,
+                owner_generated_source=True,
+                child_generated_source=True,
+            )
+            violations = boundaries.audit_keynote_slide_audio_creation_source_topology(
+                root
+            )
+            self.assertTrue(any("prost import" in item for item in violations), violations)
+            self.assertTrue(
+                any("generated protobuf import" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("generated protobuf decode" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_slide_audio_creation_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_keynote_slide_audio_creation_source_topology()",
             main_source,
         )
 

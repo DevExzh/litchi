@@ -1,0 +1,73 @@
+// Private, write-only Buffa projection for the Keynote audio/movie archive.
+//
+// This is deliberately a strict subset of TSDArchives.proto.  The field
+// numbers and declaration order mirror the canonical TSD archive so that a
+// projection encode is byte-for-byte compatible with the native writer while
+// avoiding construction of the complete generated archive graph.
+syntax = "proto2";
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+}
+
+message DataReference {
+  required uint64 identifier = 1;
+}
+
+message Point {
+  required float x = 1;
+  required float y = 2;
+}
+
+message Size {
+  required float width = 1;
+  required float height = 2;
+}
+
+message GeometryArchive {
+  optional .LitchiIwaProjection.Point position = 1;
+  optional .LitchiIwaProjection.Size size = 2;
+  optional uint32 flags = 3;
+  optional float angle = 4;
+}
+
+message ExteriorTextWrapArchive {
+  optional uint32 type = 1;
+  optional uint32 direction = 2;
+  optional uint32 fit_type = 3;
+  optional float margin = 4;
+  optional float alpha_threshold = 5;
+  optional bool is_html_wrap = 6;
+}
+
+message DrawableArchive {
+  optional .LitchiIwaProjection.GeometryArchive geometry = 1;
+  optional .LitchiIwaProjection.Reference parent = 2;
+  optional .LitchiIwaProjection.ExteriorTextWrapArchive exterior_text_wrap = 3;
+  optional bool locked = 5;
+  optional bool aspect_ratio_locked = 7;
+  optional .LitchiIwaProjection.Reference title = 10;
+  optional .LitchiIwaProjection.Reference caption = 11;
+  optional bool title_hidden = 12;
+  optional bool caption_hidden = 13;
+}
+
+message MovieArchive {
+  required .LitchiIwaProjection.DrawableArchive super = 1;
+  optional .LitchiIwaProjection.DataReference movie_data = 14;
+  optional float start_time = 3;
+  optional float end_time = 4;
+  optional float poster_time = 5;
+  optional int32 loop_option = 24;
+  optional float volume = 7;
+  optional bool audio_only = 9;
+  optional bool streaming = 18;
+  optional bool plays_across_slides = 28;
+  optional .LitchiIwaProjection.DataReference poster_image_data = 15;
+  optional bool poster_image_generated_with_alpha_support = 23;
+  optional uint32 flags = 13;
+  optional .LitchiIwaProjection.Reference style = 19;
+  optional .LitchiIwaProjection.Size original_size = 20;
+  optional .LitchiIwaProjection.Size natural_size = 21;
+}
