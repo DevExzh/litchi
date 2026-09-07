@@ -136,6 +136,54 @@ pub(crate) struct OdpExistingAppendCorpus {
     exact_noop_verified: bool,
 }
 
+/// Correctness gates established while constructing the frozen append corpus.
+///
+/// The attribution harness consumes this narrow value instead of reaching into
+/// the corpus builder's private fields.  No gate is synthesized by the timing
+/// harness; the builder still refuses to return a corpus when any gate fails.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct OdpExistingAppendPreflightGates {
+    pub(crate) source_manifest_bindings_verified: bool,
+    pub(crate) output_manifest_bindings_verified: bool,
+    pub(crate) untouched_members_verified: bool,
+    pub(crate) opaque_member_compressed_identity_verified: bool,
+    pub(crate) patch_replay_verified: bool,
+    pub(crate) inverse_patch_verified: bool,
+    pub(crate) stale_source_refusal_verified: bool,
+    pub(crate) exact_noop_verified: bool,
+}
+
+impl OdpExistingAppendCorpus {
+    /// Borrow the prebuilt exact candidate used by standalone attribution.
+    ///
+    /// The candidate is constructed and fully gated once, outside every timed
+    /// iteration. Keeping this accessor harness-local prevents the attribution
+    /// module from duplicating append planning or relaxing the existing gates.
+    pub(crate) fn expected_output(&self) -> &[u8] {
+        &self.expected_output
+    }
+
+    /// Return the digest bound to [`Self::expected_output`].
+    pub(crate) fn expected_output_sha256(&self) -> &str {
+        &self.expected_output_sha256
+    }
+
+    /// Return the gates verified by corpus construction.
+    pub(crate) fn preflight_gates(&self) -> OdpExistingAppendPreflightGates {
+        OdpExistingAppendPreflightGates {
+            source_manifest_bindings_verified: self.source_manifest_bindings_verified,
+            output_manifest_bindings_verified: self.output_manifest_bindings_verified,
+            untouched_members_verified: self.untouched_members_verified,
+            opaque_member_compressed_identity_verified: self
+                .opaque_member_compressed_identity_verified,
+            patch_replay_verified: self.patch_replay_verified,
+            inverse_patch_verified: self.inverse_patch_verified,
+            stale_source_refusal_verified: self.stale_source_refusal_verified,
+            exact_noop_verified: self.exact_noop_verified,
+        }
+    }
+}
+
 fn opaque_payload(variant: u8) -> Vec<u8> {
     let mut payload = Vec::with_capacity(OPAQUE_BYTES);
     for index in 0..OPAQUE_BYTES {

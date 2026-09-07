@@ -1,0 +1,3667 @@
+{
+  "absolute_5pct_review_flags": [],
+  "change": 458,
+  "instrumentation_overhead": [
+    {
+      "instrumentation": "normal",
+      "p50_delta_95pct_interval": {
+        "high": 0.5627149056984804,
+        "low": 0.06395869614728156,
+        "method": "independent row bootstrap of median ratio; Python Random.choices; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 458
+      },
+      "phase_envelope_vs_lifecycle_delta_pct": {
+        "p50": 0.2886738388642174,
+        "p95": -1.4820491984930184,
+        "p99": -0.9161152749877721
+      },
+      "process_lifetime_maxrss_delta_pct": 0.19493177387914784,
+      "repeat": "R1",
+      "shape": "tiny"
+    },
+    {
+      "instrumentation": "normal",
+      "p50_delta_95pct_interval": {
+        "high": 1.1857831528100604,
+        "low": 0.4281163309597824,
+        "method": "independent row bootstrap of median ratio; Python Random.choices; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 459
+      },
+      "phase_envelope_vs_lifecycle_delta_pct": {
+        "p50": 0.7372867806169969,
+        "p95": 1.783661994431207,
+        "p99": 1.7920286886146553
+      },
+      "process_lifetime_maxrss_delta_pct": 0.2550788011296268,
+      "repeat": "R1",
+      "shape": "medium"
+    },
+    {
+      "instrumentation": "normal",
+      "p50_delta_95pct_interval": {
+        "high": -0.029534828812927127,
+        "low": -0.43575930155110854,
+        "method": "independent row bootstrap of median ratio; Python Random.choices; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 460
+      },
+      "phase_envelope_vs_lifecycle_delta_pct": {
+        "p50": -0.18292675801941938,
+        "p95": 0.09034118504360755,
+        "p99": -0.04735233710083664
+      },
+      "process_lifetime_maxrss_delta_pct": -2.1759598284339376,
+      "repeat": "R1",
+      "shape": "large"
+    },
+    {
+      "allocation_volume_matches_exactly": true,
+      "direct_allocated_bytes": {
+        "count": 30,
+        "max": 10613383,
+        "mean": 10613383,
+        "min": 10613383,
+        "p50": 10613383.0,
+        "p95": 10613383,
+        "p99": 10613383
+      },
+      "instrumentation": "allocator",
+      "p50_delta_95pct_interval": {
+        "high": 0.5409874941619597,
+        "low": -0.6632292538345408,
+        "method": "independent row bootstrap of median ratio; Python Random.choices; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 461
+      },
+      "phase_envelope_vs_lifecycle_delta_pct": {
+        "p50": -0.22207008231487357,
+        "p95": -0.9310472366305556,
+        "p99": -0.8311259242693492
+      },
+      "process_lifetime_maxrss_delta_pct": 0.36508463325588547,
+      "repeat": "R1",
+      "shape": "tiny",
+      "sum_phase_allocated_bytes": {
+        "count": 30,
+        "max": 10613383,
+        "mean": 10613383,
+        "min": 10613383,
+        "p50": 10613383.0,
+        "p95": 10613383,
+        "p99": 10613383
+      }
+    },
+    {
+      "allocation_volume_matches_exactly": true,
+      "direct_allocated_bytes": {
+        "count": 30,
+        "max": 110226105,
+        "mean": 110226105,
+        "min": 110226105,
+        "p50": 110226105.0,
+        "p95": 110226105,
+        "p99": 110226105
+      },
+      "instrumentation": "allocator",
+      "p50_delta_95pct_interval": {
+        "high": 0.0015572232359817306,
+        "low": -0.39176595649176305,
+        "method": "independent row bootstrap of median ratio; Python Random.choices; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 462
+      },
+      "phase_envelope_vs_lifecycle_delta_pct": {
+        "p50": -0.1105329322637183,
+        "p95": -0.09605321648814558,
+        "p99": -0.6264376944379757
+      },
+      "process_lifetime_maxrss_delta_pct": 2.763304800893196,
+      "repeat": "R1",
+      "shape": "medium",
+      "sum_phase_allocated_bytes": {
+        "count": 30,
+        "max": 110226105,
+        "mean": 110226105,
+        "min": 110226105,
+        "p50": 110226105.0,
+        "p95": 110226105,
+        "p99": 110226105
+      }
+    },
+    {
+      "allocation_volume_matches_exactly": true,
+      "direct_allocated_bytes": {
+        "count": 30,
+        "max": 211442207,
+        "mean": 211442207,
+        "min": 211442207,
+        "p50": 211442207.0,
+        "p95": 211442207,
+        "p99": 211442207
+      },
+      "instrumentation": "allocator",
+      "p50_delta_95pct_interval": {
+        "high": 3.5930420472262803,
+        "low": 3.1406513446454953,
+        "method": "independent row bootstrap of median ratio; Python Random.choices; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 463
+      },
+      "phase_envelope_vs_lifecycle_delta_pct": {
+        "p50": 3.4480163456511947,
+        "p95": 2.8931059466912323,
+        "p99": 2.988448734486382
+      },
+      "process_lifetime_maxrss_delta_pct": 0.49850448654038537,
+      "repeat": "R1",
+      "shape": "large",
+      "sum_phase_allocated_bytes": {
+        "count": 30,
+        "max": 211442207,
+        "mean": 211442207,
+        "min": 211442207,
+        "p50": 211442207.0,
+        "p95": 211442207,
+        "p99": 211442207
+      }
+    },
+    {
+      "instrumentation": "normal",
+      "p50_delta_95pct_interval": {
+        "high": 1.0057671001470148,
+        "low": 0.14902519680246584,
+        "method": "independent row bootstrap of median ratio; Python Random.choices; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 464
+      },
+      "phase_envelope_vs_lifecycle_delta_pct": {
+        "p50": 0.3868724761968645,
+        "p95": -0.09840965890801634,
+        "p99": 0.5828644001762973
+      },
+      "process_lifetime_maxrss_delta_pct": 0.13284623048821498,
+      "repeat": "R2",
+      "shape": "tiny"
+    },
+    {
+      "instrumentation": "normal",
+      "p50_delta_95pct_interval": {
+        "high": -0.2989625092891468,
+        "low": -0.8208630844666498,
+        "method": "independent row bootstrap of median ratio; Python Random.choices; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 465
+      },
+      "phase_envelope_vs_lifecycle_delta_pct": {
+        "p50": -0.5659010422750632,
+        "p95": -0.6239949367196407,
+        "p99": -0.598117740478199
+      },
+      "process_lifetime_maxrss_delta_pct": 1.4304291287386306,
+      "repeat": "R2",
+      "shape": "medium"
+    },
+    {
+      "instrumentation": "normal",
+      "p50_delta_95pct_interval": {
+        "high": 0.5452844356265363,
+        "low": 0.11593940428855642,
+        "method": "independent row bootstrap of median ratio; Python Random.choices; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 466
+      },
+      "phase_envelope_vs_lifecycle_delta_pct": {
+        "p50": 0.33748684403365203,
+        "p95": 0.2358235416400012,
+        "p99": 0.6254449746486479
+      },
+      "process_lifetime_maxrss_delta_pct": -3.5186635343252393,
+      "repeat": "R2",
+      "shape": "large"
+    },
+    {
+      "allocation_volume_matches_exactly": true,
+      "direct_allocated_bytes": {
+        "count": 30,
+        "max": 10613383,
+        "mean": 10613383,
+        "min": 10613383,
+        "p50": 10613383.0,
+        "p95": 10613383,
+        "p99": 10613383
+      },
+      "instrumentation": "allocator",
+      "p50_delta_95pct_interval": {
+        "high": 0.545476195288308,
+        "low": -0.047557394010100396,
+        "method": "independent row bootstrap of median ratio; Python Random.choices; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 467
+      },
+      "phase_envelope_vs_lifecycle_delta_pct": {
+        "p50": 0.3248066913584591,
+        "p95": -1.1488001818217408,
+        "p99": -1.4525233193249387
+      },
+      "process_lifetime_maxrss_delta_pct": 2.684563758389258,
+      "repeat": "R2",
+      "shape": "tiny",
+      "sum_phase_allocated_bytes": {
+        "count": 30,
+        "max": 10613383,
+        "mean": 10613383,
+        "min": 10613383,
+        "p50": 10613383.0,
+        "p95": 10613383,
+        "p99": 10613383
+      }
+    },
+    {
+      "allocation_volume_matches_exactly": true,
+      "direct_allocated_bytes": {
+        "count": 30,
+        "max": 110226105,
+        "mean": 110226105,
+        "min": 110226105,
+        "p50": 110226105.0,
+        "p95": 110226105,
+        "p99": 110226105
+      },
+      "instrumentation": "allocator",
+      "p50_delta_95pct_interval": {
+        "high": 0.15450860348111828,
+        "low": -0.33659626924533725,
+        "method": "independent row bootstrap of median ratio; Python Random.choices; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 468
+      },
+      "phase_envelope_vs_lifecycle_delta_pct": {
+        "p50": -0.1003779496538737,
+        "p95": -0.2431452600688666,
+        "p99": 0.05512800830596021
+      },
+      "process_lifetime_maxrss_delta_pct": 0.12014787430683072,
+      "repeat": "R2",
+      "shape": "medium",
+      "sum_phase_allocated_bytes": {
+        "count": 30,
+        "max": 110226105,
+        "mean": 110226105,
+        "min": 110226105,
+        "p50": 110226105.0,
+        "p95": 110226105,
+        "p99": 110226105
+      }
+    },
+    {
+      "allocation_volume_matches_exactly": true,
+      "direct_allocated_bytes": {
+        "count": 30,
+        "max": 211442207,
+        "mean": 211442207,
+        "min": 211442207,
+        "p50": 211442207.0,
+        "p95": 211442207,
+        "p99": 211442207
+      },
+      "instrumentation": "allocator",
+      "p50_delta_95pct_interval": {
+        "high": -0.43361674727783184,
+        "low": -0.8494693406715936,
+        "method": "independent row bootstrap of median ratio; Python Random.choices; nearest-rank 2.5/97.5 percentiles; no multiple-comparison correction",
+        "resamples": 10000,
+        "seed": 469
+      },
+      "phase_envelope_vs_lifecycle_delta_pct": {
+        "p50": -0.654626163827976,
+        "p95": -0.9676458706503799,
+        "p99": -1.2014738771823352
+      },
+      "process_lifetime_maxrss_delta_pct": -4.653534431860873,
+      "repeat": "R2",
+      "shape": "large",
+      "sum_phase_allocated_bytes": {
+        "count": 30,
+        "max": 211442207,
+        "mean": 211442207,
+        "min": 211442207,
+        "p50": 211442207.0,
+        "p95": 211442207,
+        "p99": 211442207
+      }
+    }
+  ],
+  "lanes": [
+    {
+      "allocation": null,
+      "lane": {
+        "id": "R1-normal-tiny-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 1958378,
+        "mean": 1903825.4,
+        "min": 1881258,
+        "p50": 1898163.0,
+        "p95": 1949328,
+        "p99": 1958378
+      },
+      "process_lifetime_maxrss_kib": 12312,
+      "report_sha256": "9e0383f8e4c1172a063bd28e2f1fa1cb1f506f2e9280e273e703cc34a809b514"
+    },
+    {
+      "boundary_gap_ns": {
+        "count": 30,
+        "max": 420,
+        "mean": 342,
+        "min": 290,
+        "p50": 340.0,
+        "p95": 400,
+        "p99": 420
+      },
+      "lane": {
+        "id": "R1-normal-tiny-phases",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "phases",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 1940437,
+        "mean": 1906669.3666666667,
+        "min": 1894558,
+        "p50": 1903642.5,
+        "p95": 1920438,
+        "p99": 1940437
+      },
+      "phase_sum_ns": {
+        "count": 30,
+        "max": 1940047,
+        "mean": 1906327.3666666667,
+        "min": 1894228,
+        "p50": 1903302.5,
+        "p95": 1920018,
+        "p99": 1940047
+      },
+      "phases": {
+        "add": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 22810,
+            "mean": 17097.066666666666,
+            "min": 16510,
+            "p50": 16865.0,
+            "p95": 17560,
+            "p99": 22810
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 1.1996814874577797,
+            "mean": 0.8969013820465678,
+            "min": 0.8675469649781116,
+            "p50": 0.8853990081605634,
+            "p95": 0.9224927477150443,
+            "p99": 1.1996814874577797
+          }
+        },
+        "commit": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 1126584,
+            "mean": 1118838.5,
+            "min": 1106625,
+            "p50": 1118804.5,
+            "p95": 1126335,
+            "p99": 1126584
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 59.20917753159599,
+            "mean": 58.691491233789165,
+            "min": 57.66272672775453,
+            "p50": 58.67714730020067,
+            "p95": 59.06977451717847,
+            "p99": 59.20917753159599
+          }
+        },
+        "publication": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 2190,
+            "mean": 2180.0333333333333,
+            "min": 2160,
+            "p50": 2180.0,
+            "p95": 2190,
+            "p99": 2190
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 0.1156143822179801,
+            "mean": 0.11436016908842055,
+            "min": 0.1126844621168924,
+            "p50": 0.11462729546952002,
+            "p95": 0.11520325220359098,
+            "p99": 0.1156143822179801
+          }
+        },
+        "snapshot_open": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 412121,
+            "mean": 379107.23333333334,
+            "min": 371081,
+            "p50": 378002.0,
+            "p95": 387232,
+            "p99": 412121
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 21.242835869440277,
+            "mean": 19.88595246555298,
+            "min": 19.509296267014165,
+            "p50": 19.82117502017772,
+            "p95": 20.269384661447592,
+            "p99": 21.242835869440277
+          }
+        },
+        "transaction": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 404781,
+            "mean": 389104.5333333333,
+            "min": 383692,
+            "p50": 387166.5,
+            "p95": 400441,
+            "p99": 404781
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 21.082146104880266,
+            "mean": 20.411294749522867,
+            "min": 20.105286109047874,
+            "p50": 20.297885355132053,
+            "p95": 20.901719778602253,
+            "p99": 21.082146104880266
+          }
+        }
+      },
+      "process_lifetime_maxrss_kib": 12336,
+      "report_sha256": "9b5ed18092e407521e008779558f8b2a31a86ed6f2e4b86443c83916d05d440a"
+    },
+    {
+      "allocation": null,
+      "lane": {
+        "id": "R1-normal-medium-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 75763017,
+        "mean": 75399702.3,
+        "min": 74886024,
+        "p50": 75428180.0,
+        "p95": 75731557,
+        "p99": 75763017
+      },
+      "process_lifetime_maxrss_kib": 43908,
+      "report_sha256": "8dd5179a0120c5c1ec61e24046af9c1f933f313c85364838ba5c2685fe8e0c7b"
+    },
+    {
+      "boundary_gap_ns": {
+        "count": 30,
+        "max": 1400,
+        "mean": 1053.6666666666667,
+        "min": 780,
+        "p50": 1045.0,
+        "p95": 1340,
+        "p99": 1400
+      },
+      "lane": {
+        "id": "R1-normal-medium-phases",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "phases",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 77120712,
+        "mean": 76083021.86666666,
+        "min": 74945123,
+        "p50": 75984302.0,
+        "p95": 77082352,
+        "p99": 77120712
+      },
+      "phase_sum_ns": {
+        "count": 30,
+        "max": 77119782,
+        "mean": 76081968.2,
+        "min": 74943863,
+        "p50": 75983222.0,
+        "p95": 77081432,
+        "p99": 77119782
+      },
+      "phases": {
+        "add": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 1078434,
+            "mean": 1067688.3,
+            "min": 1046604,
+            "p50": 1070684.5,
+            "p95": 1078294,
+            "p99": 1078434
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 1.4258620499018084,
+            "mean": 1.4034451913313497,
+            "min": 1.3571148320932753,
+            "p50": 1.4065087777095355,
+            "p95": 1.4245693804702872,
+            "p99": 1.4258620499018084
+          }
+        },
+        "commit": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 34793440,
+            "mean": 34607746.9,
+            "min": 34357329,
+            "p50": 34609615.0,
+            "p95": 34789631,
+            "p99": 34793440
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 45.91478885002618,
+            "mean": 45.489373094239824,
+            "min": 44.885438279223145,
+            "p50": 45.50265299906307,
+            "p95": 45.84408599273833,
+            "p99": 45.91478885002618
+          }
+        },
+        "publication": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 30790,
+            "mean": 25013.166666666668,
+            "min": 24750,
+            "p50": 24810.0,
+            "p95": 24920,
+            "p99": 30790
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 0.04077167985081193,
+            "mean": 0.03288088816931865,
+            "min": 0.032105899884416166,
+            "p50": 0.03263221081745591,
+            "p95": 0.03315815198904279,
+            "p99": 0.04077167985081193
+          }
+        },
+        "snapshot_open": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 20849834,
+            "mean": 20609881.5,
+            "min": 20309352,
+            "p50": 20629148.5,
+            "p95": 20799984,
+            "p99": 20849834
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 27.373314112081133,
+            "mean": 27.089888674860394,
+            "min": 26.781668474291152,
+            "p50": 27.09279442927142,
+            "p95": 27.325991669950156,
+            "p99": 27.373314112081133
+          }
+        },
+        "transaction": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 20624804,
+            "mean": 19771638.333333332,
+            "min": 19040967,
+            "p50": 19684040.0,
+            "p95": 20541063,
+            "p99": 20624804
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 26.763349737616764,
+            "mean": 25.984412151399116,
+            "min": 25.39563428537407,
+            "p50": 25.875986491426055,
+            "p95": 26.64852282453704,
+            "p99": 26.763349737616764
+          }
+        }
+      },
+      "process_lifetime_maxrss_kib": 44020,
+      "report_sha256": "e60a185f9175e6807438ec530b12e8832a54505848b04c0442c717b06924c0ae"
+    },
+    {
+      "allocation": null,
+      "lane": {
+        "id": "R1-normal-large-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 153614382,
+        "mean": 152376859.53333333,
+        "min": 151105782,
+        "p50": 152334466.0,
+        "p95": 153396261,
+        "p99": 153614382
+      },
+      "process_lifetime_maxrss_kib": 76472,
+      "report_sha256": "ab76c1e55a19d6701f33c6ff6881b9bbfc5f6061e8df099f6092be1de83060d2"
+    },
+    {
+      "boundary_gap_ns": {
+        "count": 30,
+        "max": 2960,
+        "mean": 2373.3333333333335,
+        "min": 1900,
+        "p50": 2370.0,
+        "p95": 2940,
+        "p99": 2960
+      },
+      "lane": {
+        "id": "R1-normal-large-phases",
+        "instrumentation": "normal",
+        "repeat": "R1",
+        "scope": "phases",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 153541642,
+        "mean": 152069385.53333333,
+        "min": 151014801,
+        "p50": 152055805.5,
+        "p95": 153534841,
+        "p99": 153541642
+      },
+      "phase_sum_ns": {
+        "count": 30,
+        "max": 153539262,
+        "mean": 152067012.2,
+        "min": 151012601,
+        "p50": 152053400.5,
+        "p95": 153531881,
+        "p99": 153539262
+      },
+      "phases": {
+        "add": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 2388760,
+            "mean": 2345902.1666666665,
+            "min": 2276269,
+            "p50": 2351350.0,
+            "p95": 2370680,
+            "p99": 2388760
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 1.5673629461754306,
+            "mean": 1.5427045507502237,
+            "min": 1.498854387661477,
+            "p50": 1.5463855496907972,
+            "p95": 1.5630904928766496,
+            "p99": 1.5673629461754306
+          }
+        },
+        "commit": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 70091133,
+            "mean": 69338185.8,
+            "min": 68717718,
+            "p50": 69362511.0,
+            "p95": 69987983,
+            "p99": 70091133
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 45.84384801955595,
+            "mean": 45.59722496477115,
+            "min": 45.26607799457626,
+            "p50": 45.63525545401452,
+            "p95": 45.82557372425818,
+            "p99": 45.84384801955595
+          }
+        },
+        "publication": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 48580,
+            "mean": 48169.933333333334,
+            "min": 47861,
+            "p50": 48180.0,
+            "p95": 48420,
+            "p99": 48580
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 0.031937732136671164,
+            "mean": 0.0316772796962129,
+            "min": 0.03123044840478652,
+            "p50": 0.03169080473553323,
+            "p95": 0.03191195799529737,
+            "p99": 0.031937732136671164
+          }
+        },
+        "snapshot_open": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 41763939,
+            "mean": 41170570,
+            "min": 40822935,
+            "p50": 41131527.0,
+            "p95": 41685599,
+            "p99": 41763939
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 27.383060607180116,
+            "mean": 27.07401694099216,
+            "min": 26.82741554016326,
+            "p50": 27.040458639955663,
+            "p95": 27.363147584764636,
+            "p99": 27.383060607180116
+          }
+        },
+        "transaction": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 40112722,
+            "mean": 39164184.3,
+            "min": 38642496,
+            "p50": 39108153.0,
+            "p95": 40056622,
+            "p99": 40112722
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 26.205864173692202,
+            "mean": 25.754376263790256,
+            "min": 25.514565787573567,
+            "p50": 25.727979407158365,
+            "p95": 26.126640108056776,
+            "p99": 26.205864173692202
+          }
+        }
+      },
+      "process_lifetime_maxrss_kib": 74808,
+      "report_sha256": "1c1a84ad864c488a43b311c5d9d852a8274bf394d813d41db91b25ba5d56da14"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 10613383,
+          "mean": 10613383,
+          "min": 10613383,
+          "p50": 10613383.0,
+          "p95": 10613383,
+          "p99": 10613383
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 12075,
+          "mean": 12075,
+          "min": 12075,
+          "p50": 12075.0,
+          "p95": 12075,
+          "p99": 12075
+        },
+        "peak_above_phase_entry_bytes": {
+          "count": 30,
+          "max": 781342,
+          "mean": 781342,
+          "min": 781342,
+          "p50": 781342.0,
+          "p95": 781342,
+          "p99": 781342
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 73324,
+          "mean": 73324,
+          "min": 73324,
+          "p50": 73324.0,
+          "p95": 73324,
+          "p99": 73324
+        }
+      },
+      "lane": {
+        "id": "R1-allocator-tiny-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 2128438,
+        "mean": 2079705.4666666666,
+        "min": 2056148,
+        "p50": 2071193.0,
+        "p95": 2127819,
+        "p99": 2128438
+      },
+      "process_lifetime_maxrss_kib": 12052,
+      "report_sha256": "f9b32cd133fa3ffe9020644b2da18f5d1a96e13d04d21be3ff7a058ce2c0a349"
+    },
+    {
+      "boundary_gap_ns": {
+        "count": 30,
+        "max": 880,
+        "mean": 669.0333333333333,
+        "min": 550,
+        "p50": 655.0,
+        "p95": 840,
+        "p99": 880
+      },
+      "lane": {
+        "id": "R1-allocator-tiny-phases",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "phases",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 2110748,
+        "mean": 2074708.4333333333,
+        "min": 2049238,
+        "p50": 2066593.5,
+        "p95": 2108008,
+        "p99": 2110748
+      },
+      "phase_sum_ns": {
+        "count": 30,
+        "max": 2110118,
+        "mean": 2074039.4,
+        "min": 2048618,
+        "p50": 2066023.5,
+        "p95": 2107248,
+        "p99": 2110118
+      },
+      "phases": {
+        "add": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 91442,
+              "mean": 91442,
+              "min": 91442,
+              "p50": 91442.0,
+              "p95": 91442,
+              "p99": 91442
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 342,
+              "mean": 342,
+              "min": 342,
+              "p50": 342.0,
+              "p95": 342,
+              "p99": 342
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 43747,
+              "mean": 43747,
+              "min": 43747,
+              "p50": 43747.0,
+              "p95": 43747,
+              "p99": 43747
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 26479,
+              "mean": 26479,
+              "min": 26479,
+              "p50": 26479.0,
+              "p95": 26479,
+              "p99": 26479
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 29770,
+            "mean": 22752.066666666666,
+            "min": 21940,
+            "p50": 22310.0,
+            "p95": 28920,
+            "p99": 29770
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 1.4151465843723514,
+            "mean": 1.0967218466158424,
+            "min": 1.0575617103106985,
+            "p50": 1.0796179501024936,
+            "p95": 1.3724060955331314,
+            "p99": 1.4151465843723514
+          }
+        },
+        "commit": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 8020236,
+              "mean": 8020236,
+              "min": 8020236,
+              "p50": 8020236.0,
+              "p95": 8020236,
+              "p99": 8020236
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 6881,
+              "mean": 6881,
+              "min": 6881,
+              "p50": 6881.0,
+              "p95": 6881,
+              "p99": 6881
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 619347,
+              "mean": 619347,
+              "min": 619347,
+              "p50": 619347.0,
+              "p95": 619347,
+              "p99": 619347
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": -88671,
+              "mean": -88671,
+              "min": -88671,
+              "p50": -88671.0,
+              "p95": -88671,
+              "p99": -88671
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 1261025,
+            "mean": 1225153.6666666667,
+            "min": 1203625,
+            "p50": 1216380.0,
+            "p95": 1258765,
+            "p99": 1261025
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 59.76087593205688,
+            "mean": 59.06778486566362,
+            "min": 58.55212825107464,
+            "p50": 58.91865702263165,
+            "p95": 59.75750314938742,
+            "p99": 59.76087593205688
+          }
+        },
+        "publication": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 2190,
+            "mean": 2167,
+            "min": 2150,
+            "p50": 2160.0,
+            "p95": 2190,
+            "p99": 2190
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 0.10644306171072955,
+            "mean": 0.10448852417320507,
+            "min": 0.10262803797997613,
+            "p50": 0.1045881789247687,
+            "p95": 0.10627570149242144,
+            "p99": 0.10644306171072955
+          }
+        },
+        "snapshot_open": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 1330752,
+              "mean": 1330752,
+              "min": 1330752,
+              "p50": 1330752.0,
+              "p95": 1330752,
+              "p99": 1330752
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 3705,
+              "mean": 3705,
+              "min": 3705,
+              "p50": 3705.0,
+              "p95": 3705,
+              "p99": 3705
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 184859,
+              "mean": 184859,
+              "min": 184859,
+              "p50": 184859.0,
+              "p95": 184859,
+              "p99": 184859
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 33289,
+              "mean": 33289,
+              "min": 33289,
+              "p50": 33289.0,
+              "p95": 33289,
+              "p99": 33289
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 431371,
+            "mean": 422261.73333333334,
+            "min": 415902,
+            "p50": 420591.5,
+            "p95": 431052,
+            "p99": 431371
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 20.89016285155849,
+            "mean": 20.360648378922296,
+            "min": 19.899138124866603,
+            "p50": 20.383472852401994,
+            "p95": 20.73353217807138,
+            "p99": 20.89016285155849
+          }
+        },
+        "transaction": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 1170953,
+              "mean": 1170953,
+              "min": 1170953,
+              "p50": 1170953.0,
+              "p95": 1170953,
+              "p99": 1170953
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 1147,
+              "mean": 1147,
+              "min": 1147,
+              "p50": 1147.0,
+              "p95": 1147,
+              "p99": 1147
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 182306,
+              "mean": 182306,
+              "min": 182306,
+              "p50": 182306.0,
+              "p95": 182306,
+              "p99": 182306
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 102227,
+              "mean": 102227,
+              "min": 102227,
+              "p50": 102227.0,
+              "p95": 102227,
+              "p99": 102227
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 411161,
+            "mean": 401704.93333333335,
+            "min": 396112,
+            "p50": 399296.5,
+            "p95": 410591,
+            "p99": 411161
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 19.965106307765666,
+            "mean": 19.370356384625037,
+            "min": 18.804730351572754,
+            "p50": 19.29697101107449,
+            "p95": 19.925044087431417,
+            "p99": 19.965106307765666
+          }
+        }
+      },
+      "process_lifetime_maxrss_kib": 12096,
+      "report_sha256": "68dfd0fde2808b6b59869db71e4c966b112449de0dc15241c95115158c967a3b"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 110226105,
+          "mean": 110226105,
+          "min": 110226105,
+          "p50": 110226105.0,
+          "p95": 110226105,
+          "p99": 110226105
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 491936,
+          "mean": 491936,
+          "min": 491936,
+          "p50": 491936.0,
+          "p95": 491936,
+          "p99": 491936
+        },
+        "peak_above_phase_entry_bytes": {
+          "count": 30,
+          "max": 18027568,
+          "mean": 18027568,
+          "min": 18027568,
+          "p50": 18027568.0,
+          "p95": 18027568,
+          "p99": 18027568
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 4041249,
+          "mean": 4041249,
+          "min": 4041249,
+          "p50": 4041249.0,
+          "p95": 4041249,
+          "p99": 4041249
+        }
+      },
+      "lane": {
+        "id": "R1-allocator-medium-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 83093978,
+        "mean": 82222493.8,
+        "min": 81803202,
+        "p50": 82143844.5,
+        "p95": 82495936,
+        "p99": 83093978
+      },
+      "process_lifetime_maxrss_kib": 42992,
+      "report_sha256": "de180a3beaf2d6d5c677c814159c5bcc6d3ae1daa4350f12847cfbc71df725c2"
+    },
+    {
+      "boundary_gap_ns": {
+        "count": 30,
+        "max": 1970,
+        "mean": 1493,
+        "min": 1130,
+        "p50": 1415.0,
+        "p95": 1910,
+        "p99": 1970
+      },
+      "lane": {
+        "id": "R1-allocator-medium-phases",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "phases",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 82573446,
+        "mean": 82034847.3,
+        "min": 81501822,
+        "p50": 82053048.5,
+        "p95": 82416696,
+        "p99": 82573446
+      },
+      "phase_sum_ns": {
+        "count": 30,
+        "max": 82571956,
+        "mean": 82033354.3,
+        "min": 81500472,
+        "p50": 82051668.5,
+        "p95": 82414786,
+        "p99": 82571956
+      },
+      "phases": {
+        "add": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 5854294,
+              "mean": 5854294,
+              "min": 5854294,
+              "p50": 5854294.0,
+              "p95": 5854294,
+              "p99": 5854294
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 20514,
+              "mean": 20514,
+              "min": 20514,
+              "p50": 20514.0,
+              "p95": 20514,
+              "p99": 20514
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 2795665,
+              "mean": 2795665,
+              "min": 2795665,
+              "p50": 2795665.0,
+              "p95": 2795665,
+              "p99": 2795665
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 1675567,
+              "mean": 1675567,
+              "min": 1675567,
+              "p50": 1675567.0,
+              "p95": 1675567,
+              "p99": 1675567
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 1443866,
+            "mean": 1413351,
+            "min": 1384745,
+            "p50": 1415555.0,
+            "p95": 1440285,
+            "p99": 1443866
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 1.7586294040111015,
+            "mean": 1.7229157589498374,
+            "min": 1.6815760471302021,
+            "p50": 1.7245204224554493,
+            "p95": 1.7579898924219757,
+            "p99": 1.7586294040111015
+          }
+        },
+        "commit": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 62618358,
+              "mean": 62618358,
+              "min": 62618358,
+              "p50": 62618358.0,
+              "p95": 62618358,
+              "p99": 62618358
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 238738,
+              "mean": 238738,
+              "min": 238738,
+              "p50": 238738.0,
+              "p95": 238738,
+              "p99": 238738
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 8243129,
+              "mean": 8243129,
+              "min": 8243129,
+              "p50": 8243129.0,
+              "p95": 8243129,
+              "p99": 8243129
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": -5743190,
+              "mean": -5743190,
+              "min": -5743190,
+              "p50": -5743190.0,
+              "p95": -5743190,
+              "p99": -5743190
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 37959474,
+            "mean": 37673334.333333336,
+            "min": 37364653,
+            "p50": 37681668.5,
+            "p95": 37936584,
+            "p99": 37959474
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 46.15908977488547,
+            "mean": 45.92438816753892,
+            "min": 45.688226013452024,
+            "p50": 45.92942735108993,
+            "p95": 46.148737947552284,
+            "p99": 46.15908977488547
+          }
+        },
+        "publication": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 27311,
+            "mean": 24977.033333333333,
+            "min": 24720,
+            "p50": 24885.0,
+            "p95": 25160,
+            "p99": 27311
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 0.03313847105057095,
+            "mean": 0.030447200838657804,
+            "min": 0.030179738021465785,
+            "p50": 0.03032008671934583,
+            "p95": 0.03072108353896577,
+            "p99": 0.03313847105057095
+          }
+        },
+        "snapshot_open": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 27167884,
+              "mean": 27167884,
+              "min": 27167884,
+              "p50": 27167884.0,
+              "p95": 27167884,
+              "p99": 27167884
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 203301,
+              "mean": 203301,
+              "min": 203301,
+              "p50": 203301.0,
+              "p95": 203301,
+              "p99": 203301
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 6521764,
+              "mean": 6521764,
+              "min": 6521764,
+              "p50": 6521764.0,
+              "p95": 6521764,
+              "p99": 6521764
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 1968649,
+              "mean": 1968649,
+              "min": 1968649,
+              "p50": 1968649.0,
+              "p95": 1968649,
+              "p99": 1968649
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 23360875,
+            "mean": 23136763.1,
+            "min": 23009783,
+            "p50": 23126664.0,
+            "p95": 23300855,
+            "p99": 23360875
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 28.373582197942582,
+            "mean": 28.204154033525775,
+            "min": 28.0586970714367,
+            "p50": 28.193003894112344,
+            "p95": 28.345490092032755,
+            "p99": 28.373582197942582
+          }
+        },
+        "transaction": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 14585569,
+              "mean": 14585569,
+              "min": 14585569,
+              "p50": 14585569.0,
+              "p95": 14585569,
+              "p99": 14585569
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 29383,
+              "mean": 29383,
+              "min": 29383,
+              "p50": 29383.0,
+              "p95": 29383,
+              "p99": 29383
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 9186010,
+              "mean": 9186010,
+              "min": 9186010,
+              "p50": 9186010.0,
+              "p95": 9186010,
+              "p99": 9186010
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 6140223,
+              "mean": 6140223,
+              "min": 6140223,
+              "p50": 6140223.0,
+              "p95": 6140223,
+              "p99": 6140223
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 20187432,
+            "mean": 19784928.833333332,
+            "min": 19572980,
+            "p50": 19764880.5,
+            "p95": 20008221,
+            "p99": 20187432
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 24.448290894307988,
+            "mean": 24.11809483914681,
+            "min": 23.88594538871113,
+            "p50": 24.10661996473737,
+            "p95": 24.370887321539737,
+            "p99": 24.448290894307988
+          }
+        }
+      },
+      "process_lifetime_maxrss_kib": 44180,
+      "report_sha256": "0282b22ade5522e374edf4411de38a6e7bcd5b66902821bac64ddde1f0327a7d"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 211442207,
+          "mean": 211442207,
+          "min": 211442207,
+          "p50": 211442207.0,
+          "p95": 211442207,
+          "p99": 211442207
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 979369,
+          "mean": 979369,
+          "min": 979369,
+          "p50": 979369.0,
+          "p95": 979369,
+          "p99": 979369
+        },
+        "peak_above_phase_entry_bytes": {
+          "count": 30,
+          "max": 35958388,
+          "mean": 35958388,
+          "min": 35958388,
+          "p50": 35958388.0,
+          "p95": 35958388,
+          "p99": 35958388
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 8074341,
+          "mean": 8074341,
+          "min": 8074341,
+          "p50": 8074341.0,
+          "p95": 8074341,
+          "p99": 8074341
+        }
+      },
+      "lane": {
+        "id": "R1-allocator-large-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 167754693,
+        "mean": 165813687.53333333,
+        "min": 164495519,
+        "p50": 165686149.0,
+        "p95": 167488232,
+        "p99": 167754693
+      },
+      "process_lifetime_maxrss_kib": 76228,
+      "report_sha256": "d5c7f1ab563e42dd9aaaa1f9717aec963b971a963c798541f18fc9995ed2c96a"
+    },
+    {
+      "boundary_gap_ns": {
+        "count": 30,
+        "max": 3800,
+        "mean": 3201.3333333333335,
+        "min": 2550,
+        "p50": 3160.0,
+        "p95": 3710,
+        "p99": 3800
+      },
+      "lane": {
+        "id": "R1-allocator-large-phases",
+        "instrumentation": "allocator",
+        "repeat": "R1",
+        "scope": "phases",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 172767956,
+        "mean": 171359592.1,
+        "min": 170161015,
+        "p50": 171399034.5,
+        "p95": 172333844,
+        "p99": 172767956
+      },
+      "phase_sum_ns": {
+        "count": 30,
+        "max": 172764666,
+        "mean": 171356390.76666668,
+        "min": 170157635,
+        "p50": 171395484.5,
+        "p95": 172330874,
+        "p99": 172764666
+      },
+      "phases": {
+        "add": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 11711574,
+              "mean": 11711574,
+              "min": 11711574,
+              "p50": 11711574.0,
+              "p95": 11711574,
+              "p99": 11711574
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 40996,
+              "mean": 40996,
+              "min": 40996,
+              "p50": 40996.0,
+              "p95": 40996,
+              "p99": 40996
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 5593233,
+              "mean": 5593233,
+              "min": 5593233,
+              "p50": 5593233.0,
+              "p95": 5593233,
+              "p99": 5593233
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 3350831,
+              "mean": 3350831,
+              "min": 3350831,
+              "p50": 3350831.0,
+              "p95": 3350831,
+              "p99": 3350831
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 3041442,
+            "mean": 3007017.1333333333,
+            "min": 2977172,
+            "p50": 3006807.0,
+            "p95": 3036292,
+            "p99": 3041442
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 1.7762161266961458,
+            "mean": 1.7548518231646104,
+            "min": 1.737116838903416,
+            "p50": 1.753906718019254,
+            "p95": 1.773680034986382,
+            "p99": 1.7762161266961458
+          }
+        },
+        "commit": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 118096476,
+              "mean": 118096476,
+              "min": 118096476,
+              "p50": 118096476.0,
+              "p95": 118096476,
+              "p99": 118096476
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 474261,
+              "mean": 474261,
+              "min": 474261,
+              "p50": 474261.0,
+              "p95": 474261,
+              "p99": 474261
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 16396797,
+              "mean": 16396797,
+              "min": 16396797,
+              "p50": 16396797.0,
+              "p95": 16396797,
+              "p99": 16396797
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": -11487250,
+              "mean": -11487250,
+              "min": -11487250,
+              "p50": -11487250.0,
+              "p95": -11487250,
+              "p99": -11487250
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 77106535,
+            "mean": 76146098.73333333,
+            "min": 75618178,
+            "p50": 76066995.5,
+            "p95": 76693193,
+            "p99": 77106535
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 44.7433087352647,
+            "mean": 44.43724631076521,
+            "min": 44.220418024938354,
+            "p50": 44.42535453493103,
+            "p95": 44.60827546709273,
+            "p99": 44.7433087352647
+          }
+        },
+        "publication": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 55300,
+            "mean": 48608.2,
+            "min": 47810,
+            "p50": 48175.0,
+            "p95": 54980,
+            "p99": 55300
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 0.03232288204797594,
+            "mean": 0.028368287751310412,
+            "min": 0.02781557735422306,
+            "p50": 0.028105860738998525,
+            "p95": 0.03231121542092425,
+            "p99": 0.03232288204797594
+          }
+        },
+        "snapshot_open": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 53417100,
+              "mean": 53417100,
+              "min": 53417100,
+              "p50": 53417100.0,
+              "p95": 53417100,
+              "p99": 53417100
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 406055,
+              "mean": 406055,
+              "min": 406055,
+              "p50": 406055.0,
+              "p95": 406055,
+              "p99": 406055
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 13038500,
+              "mean": 13038500,
+              "min": 13038500,
+              "p50": 13038500.0,
+              "p95": 13038500,
+              "p99": 13038500
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 3934729,
+              "mean": 3934729,
+              "min": 3934729,
+              "p50": 3934729.0,
+              "p95": 3934729,
+              "p99": 3934729
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 52780425,
+            "mean": 52391188.7,
+            "min": 52074723,
+            "p50": 52427424.0,
+            "p95": 52670315,
+            "p99": 52780425
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 30.89210235832496,
+            "mean": 30.574513352791126,
+            "min": 30.39771331161728,
+            "p50": 30.583380906695176,
+            "p95": 30.710352203069185,
+            "p99": 30.89210235832496
+          }
+        },
+        "transaction": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 28217057,
+              "mean": 28217057,
+              "min": 28217057,
+              "p50": 28217057.0,
+              "p95": 28217057,
+              "p99": 28217057
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 58057,
+              "mean": 58057,
+              "min": 58057,
+              "p50": 58057.0,
+              "p95": 58057,
+              "p99": 58057
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 18365146,
+              "mean": 18365146,
+              "min": 18365146,
+              "p50": 18365146.0,
+              "p95": 18365146,
+              "p99": 18365146
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 12276031,
+              "mean": 12276031,
+              "min": 12276031,
+              "p50": 12276031.0,
+              "p95": 12276031,
+              "p99": 12276031
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 40460546,
+            "mean": 39763478,
+            "min": 39176889,
+            "p50": 39721687.5,
+            "p95": 40210294,
+            "p99": 40460546
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 23.44972448129002,
+            "mean": 23.205020225527743,
+            "min": 22.912678326622448,
+            "p50": 23.20975940653861,
+            "p95": 23.419456615046506,
+            "p99": 23.44972448129002
+          }
+        }
+      },
+      "process_lifetime_maxrss_kib": 76608,
+      "report_sha256": "41c17c0b66e203dafe9fd2cde233b82b2228e48bc811796f96896f97bcbdd664"
+    },
+    {
+      "boundary_gap_ns": {
+        "count": 30,
+        "max": 3530,
+        "mean": 3166,
+        "min": 2350,
+        "p50": 3200.0,
+        "p95": 3450,
+        "p99": 3530
+      },
+      "lane": {
+        "id": "R2-allocator-large-phases",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "phases",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 163954600,
+        "mean": 162980963.83333334,
+        "min": 162138213,
+        "p50": 162933635.5,
+        "p95": 163838479,
+        "p99": 163954600
+      },
+      "phase_sum_ns": {
+        "count": 30,
+        "max": 163951230,
+        "mean": 162977797.83333334,
+        "min": 162135263,
+        "p50": 162930560.5,
+        "p95": 163835059,
+        "p99": 163951230
+      },
+      "phases": {
+        "add": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 11711574,
+              "mean": 11711574,
+              "min": 11711574,
+              "p50": 11711574.0,
+              "p95": 11711574,
+              "p99": 11711574
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 40996,
+              "mean": 40996,
+              "min": 40996,
+              "p50": 40996.0,
+              "p95": 40996,
+              "p99": 40996
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 5593233,
+              "mean": 5593233,
+              "min": 5593233,
+              "p50": 5593233.0,
+              "p95": 5593233,
+              "p99": 5593233
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 3350831,
+              "mean": 3350831,
+              "min": 3350831,
+              "p50": 3350831.0,
+              "p95": 3350831,
+              "p99": 3350831
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 3024012,
+            "mean": 2997601.1666666665,
+            "min": 2897642,
+            "p50": 3002562.5,
+            "p95": 3021122,
+            "p99": 3024012
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 1.8578194428449861,
+            "mean": 1.8392811642112192,
+            "min": 1.7782299657537977,
+            "p50": 1.8417182702639243,
+            "p95": 1.856222238143905,
+            "p99": 1.8578194428449861
+          }
+        },
+        "commit": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 118096476,
+              "mean": 118096476,
+              "min": 118096476,
+              "p50": 118096476.0,
+              "p95": 118096476,
+              "p99": 118096476
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 474261,
+              "mean": 474261,
+              "min": 474261,
+              "p50": 474261.0,
+              "p95": 474261,
+              "p99": 474261
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 16396797,
+              "mean": 16396797,
+              "min": 16396797,
+              "p50": 16396797.0,
+              "p95": 16396797,
+              "p99": 16396797
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": -11487250,
+              "mean": -11487250,
+              "min": -11487250,
+              "p50": -11487250.0,
+              "p95": -11487250,
+              "p99": -11487250
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 75582539,
+            "mean": 74798811.36666666,
+            "min": 74177043,
+            "p50": 74723480.0,
+            "p95": 75572269,
+            "p99": 75582539
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 46.198578565666004,
+            "mean": 45.89505147828384,
+            "min": 45.639438140570896,
+            "p50": 45.868204927731995,
+            "p95": 46.156187989438465,
+            "p99": 46.198578565666004
+          }
+        },
+        "publication": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 54860,
+            "mean": 48233.53333333333,
+            "min": 47630,
+            "p50": 48055.0,
+            "p95": 48990,
+            "p99": 54860
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 0.033604802269582346,
+            "mean": 0.029595173626068068,
+            "min": 0.029151269753563556,
+            "p50": 0.029482209529851984,
+            "p95": 0.030073770978626842,
+            "p99": 0.033604802269582346
+          }
+        },
+        "snapshot_open": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 53417100,
+              "mean": 53417100,
+              "min": 53417100,
+              "p50": 53417100.0,
+              "p95": 53417100,
+              "p99": 53417100
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 406055,
+              "mean": 406055,
+              "min": 406055,
+              "p50": 406055.0,
+              "p95": 406055,
+              "p99": 406055
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 13038500,
+              "mean": 13038500,
+              "min": 13038500,
+              "p50": 13038500.0,
+              "p95": 13038500,
+              "p99": 13038500
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 3934729,
+              "mean": 3934729,
+              "min": 3934729,
+              "p50": 3934729.0,
+              "p95": 3934729,
+              "p99": 3934729
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 46384739,
+            "mean": 45892386.1,
+            "min": 45369006,
+            "p50": 45902192.5,
+            "p95": 46152668,
+            "p99": 46384739
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 28.39760385688465,
+            "mean": 28.15873894387622,
+            "min": 27.89669241710152,
+            "p50": 28.160710470539833,
+            "p95": 28.31405725433801,
+            "p99": 28.39760385688465
+          }
+        },
+        "transaction": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 28217057,
+              "mean": 28217057,
+              "min": 28217057,
+              "p50": 28217057.0,
+              "p95": 28217057,
+              "p99": 28217057
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 58057,
+              "mean": 58057,
+              "min": 58057,
+              "p50": 58057.0,
+              "p95": 58057,
+              "p99": 58057
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 18365146,
+              "mean": 18365146,
+              "min": 18365146,
+              "p50": 18365146.0,
+              "p95": 18365146,
+              "p99": 18365146
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 12276031,
+              "mean": 12276031,
+              "min": 12276031,
+              "p50": 12276031.0,
+              "p95": 12276031,
+              "p99": 12276031
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 39944884,
+            "mean": 39240765.666666664,
+            "min": 38893499,
+            "p50": 39215900.5,
+            "p95": 39887923,
+            "p99": 39944884
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 24.43391360473372,
+            "mean": 24.077333240002652,
+            "min": 23.84391365220554,
+            "p50": 24.06971223984047,
+            "p95": 24.329139220242507,
+            "p99": 24.43391360473372
+          }
+        }
+      },
+      "process_lifetime_maxrss_kib": 71056,
+      "report_sha256": "471f3919951ad635711aee8acaadbfe69ef8146c35f30f77cec337597a7bd172"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 211442207,
+          "mean": 211442207,
+          "min": 211442207,
+          "p50": 211442207.0,
+          "p95": 211442207,
+          "p99": 211442207
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 979369,
+          "mean": 979369,
+          "min": 979369,
+          "p50": 979369.0,
+          "p95": 979369,
+          "p99": 979369
+        },
+        "peak_above_phase_entry_bytes": {
+          "count": 30,
+          "max": 35958388,
+          "mean": 35958388,
+          "min": 35958388,
+          "p50": 35958388.0,
+          "p95": 35958388,
+          "p99": 35958388
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 8074341,
+          "mean": 8074341,
+          "min": 8074341,
+          "p50": 8074341.0,
+          "p95": 8074341,
+          "p99": 8074341
+        }
+      },
+      "lane": {
+        "id": "R2-allocator-large-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 165948427,
+        "mean": 164080391.86666667,
+        "min": 163119906,
+        "p50": 164007270.0,
+        "p95": 165439346,
+        "p99": 165948427
+      },
+      "process_lifetime_maxrss_kib": 74524,
+      "report_sha256": "3963f041694a81de0f22600a35b88f6be4a9ba5cf13fbd17a1f2c25bf23cbb2f"
+    },
+    {
+      "boundary_gap_ns": {
+        "count": 30,
+        "max": 1970,
+        "mean": 1389.0666666666666,
+        "min": 1090,
+        "p50": 1360.0,
+        "p95": 1811,
+        "p99": 1970
+      },
+      "lane": {
+        "id": "R2-allocator-medium-phases",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "phases",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 82235836,
+        "mean": 81415039.13333334,
+        "min": 80628999,
+        "p50": 81459963.0,
+        "p95": 81859244,
+        "p99": 82235836
+      },
+      "phase_sum_ns": {
+        "count": 30,
+        "max": 82234365,
+        "mean": 81413650.06666666,
+        "min": 80627649,
+        "p50": 81458743.0,
+        "p95": 81857804,
+        "p99": 82234365
+      },
+      "phases": {
+        "add": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 5854294,
+              "mean": 5854294,
+              "min": 5854294,
+              "p50": 5854294.0,
+              "p95": 5854294,
+              "p99": 5854294
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 20514,
+              "mean": 20514,
+              "min": 20514,
+              "p50": 20514.0,
+              "p95": 20514,
+              "p99": 20514
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 2795665,
+              "mean": 2795665,
+              "min": 2795665,
+              "p50": 2795665.0,
+              "p95": 2795665,
+              "p99": 2795665
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 1675567,
+              "mean": 1675567,
+              "min": 1675567,
+              "p50": 1675567.0,
+              "p95": 1675567,
+              "p99": 1675567
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 1417916,
+            "mean": 1405718.1333333333,
+            "min": 1390406,
+            "p50": 1406376.0,
+            "p95": 1416836,
+            "p99": 1417916
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 1.75576094277516,
+            "mean": 1.726670130507497,
+            "min": 1.7072523854331199,
+            "p50": 1.7258565746109582,
+            "p95": 1.7468010287691047,
+            "p99": 1.75576094277516
+          }
+        },
+        "commit": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 62618358,
+              "mean": 62618358,
+              "min": 62618358,
+              "p50": 62618358.0,
+              "p95": 62618358,
+              "p99": 62618358
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 238738,
+              "mean": 238738,
+              "min": 238738,
+              "p50": 238738.0,
+              "p95": 238738,
+              "p99": 238738
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 8243129,
+              "mean": 8243129,
+              "min": 8243129,
+              "p50": 8243129.0,
+              "p95": 8243129,
+              "p99": 8243129
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": -5743190,
+              "mean": -5743190,
+              "min": -5743190,
+              "p50": -5743190.0,
+              "p95": -5743190,
+              "p99": -5743190
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 37603683,
+            "mean": 37360840.1,
+            "min": 36898560,
+            "p50": 37380257.0,
+            "p95": 37598723,
+            "p99": 37603683
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 46.17304146991675,
+            "mean": 45.89034589367706,
+            "min": 45.66570439698774,
+            "p50": 45.87891282942441,
+            "p95": 46.125928983275095,
+            "p99": 46.17304146991675
+          }
+        },
+        "publication": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 24850,
+            "mean": 24728.533333333333,
+            "min": 24650,
+            "p50": 24710.0,
+            "p95": 24840,
+            "p99": 24850
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 0.030773788252962127,
+            "mean": 0.030374611505007313,
+            "min": 0.029999623636663333,
+            "p50": 0.0303628833125058,
+            "p95": 0.030647815551252806,
+            "p99": 0.030773788252962127
+          }
+        },
+        "snapshot_open": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 27167884,
+              "mean": 27167884,
+              "min": 27167884,
+              "p50": 27167884.0,
+              "p95": 27167884,
+              "p99": 27167884
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 203301,
+              "mean": 203301,
+              "min": 203301,
+              "p50": 203301.0,
+              "p95": 203301,
+              "p99": 203301
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 6521764,
+              "mean": 6521764,
+              "min": 6521764,
+              "p50": 6521764.0,
+              "p95": 6521764,
+              "p99": 6521764
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 1968649,
+              "mean": 1968649,
+              "min": 1968649,
+              "p50": 1968649.0,
+              "p95": 1968649,
+              "p99": 1968649
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 23023674,
+            "mean": 22836731.433333334,
+            "min": 22596212,
+            "p50": 22844463.5,
+            "p95": 22976714,
+            "p99": 23023674
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 28.16528970065671,
+            "mean": 28.050310989990386,
+            "min": 27.89974824100509,
+            "p50": 28.04762872552545,
+            "p95": 28.15671834105474,
+            "p99": 28.16528970065671
+          }
+        },
+        "transaction": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 14585569,
+              "mean": 14585569,
+              "min": 14585569,
+              "p50": 14585569.0,
+              "p95": 14585569,
+              "p99": 14585569
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 29383,
+              "mean": 29383,
+              "min": 29383,
+              "p50": 29383.0,
+              "p95": 29383,
+              "p99": 29383
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 9186010,
+              "mean": 9186010,
+              "min": 9186010,
+              "p50": 9186010.0,
+              "p95": 9186010,
+              "p99": 9186010
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 6140223,
+              "mean": 6140223,
+              "min": 6140223,
+              "p50": 6140223.0,
+              "p95": 6140223,
+              "p99": 6140223
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 20235333,
+            "mean": 19785631.866666667,
+            "min": 19400119,
+            "p50": 19813016.0,
+            "p95": 20033942,
+            "p99": 20235333
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 24.606906127383606,
+            "mean": 24.302298374320053,
+            "min": 24.00799413762585,
+            "p50": 24.327237222206108,
+            "p95": 24.524644332501072,
+            "p99": 24.606906127383606
+          }
+        }
+      },
+      "process_lifetime_maxrss_kib": 43332,
+      "report_sha256": "4ad9dfbd22672f2c8e9dd93af2311ac5ceb023c4ff3dbffddeded43e6ee86eee"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 110226105,
+          "mean": 110226105,
+          "min": 110226105,
+          "p50": 110226105.0,
+          "p95": 110226105,
+          "p99": 110226105
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 491936,
+          "mean": 491936,
+          "min": 491936,
+          "p50": 491936.0,
+          "p95": 491936,
+          "p99": 491936
+        },
+        "peak_above_phase_entry_bytes": {
+          "count": 30,
+          "max": 18027568,
+          "mean": 18027568,
+          "min": 18027568,
+          "p50": 18027568.0,
+          "p95": 18027568,
+          "p99": 18027568
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 4041249,
+          "mean": 4041249,
+          "min": 4041249,
+          "p50": 4041249.0,
+          "p95": 4041249,
+          "p99": 4041249
+        }
+      },
+      "lane": {
+        "id": "R2-allocator-medium-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 82190526,
+        "mean": 81570859,
+        "min": 81148642,
+        "p50": 81541813.0,
+        "p95": 82058766,
+        "p99": 82190526
+      },
+      "process_lifetime_maxrss_kib": 43280,
+      "report_sha256": "3d220ee4552f7323395836b9ed0ae01b35e55fee4a6ce7ddce8bea0135303552"
+    },
+    {
+      "boundary_gap_ns": {
+        "count": 30,
+        "max": 830,
+        "mean": 613.3333333333334,
+        "min": 510,
+        "p50": 585.0,
+        "p95": 790,
+        "p99": 830
+      },
+      "lane": {
+        "id": "R2-allocator-tiny-phases",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "phases",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 2072008,
+        "mean": 2061554.0666666667,
+        "min": 2052948,
+        "p50": 2061743.5,
+        "p95": 2070299,
+        "p99": 2072008
+      },
+      "phase_sum_ns": {
+        "count": 30,
+        "max": 2071438,
+        "mean": 2060940.7333333334,
+        "min": 2052378,
+        "p50": 2061158.5,
+        "p95": 2069599,
+        "p99": 2071438
+      },
+      "phases": {
+        "add": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 91442,
+              "mean": 91442,
+              "min": 91442,
+              "p50": 91442.0,
+              "p95": 91442,
+              "p99": 91442
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 342,
+              "mean": 342,
+              "min": 342,
+              "p50": 342.0,
+              "p95": 342,
+              "p99": 342
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 43747,
+              "mean": 43747,
+              "min": 43747,
+              "p50": 43747.0,
+              "p95": 43747,
+              "p99": 43747
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 26479,
+              "mean": 26479,
+              "min": 26479,
+              "p50": 26479.0,
+              "p95": 26479,
+              "p99": 26479
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 22711,
+            "mean": 22428.433333333334,
+            "min": 22081,
+            "p50": 22400.0,
+            "p95": 22700,
+            "p99": 22711
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 1.101579757778904,
+            "mean": 1.0882682701398432,
+            "min": 1.067953698952263,
+            "p50": 1.0882745661196611,
+            "p95": 1.10029703320464,
+            "p99": 1.101579757778904
+          }
+        },
+        "commit": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 8020236,
+              "mean": 8020236,
+              "min": 8020236,
+              "p50": 8020236.0,
+              "p95": 8020236,
+              "p99": 8020236
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 6881,
+              "mean": 6881,
+              "min": 6881,
+              "p50": 6881.0,
+              "p95": 6881,
+              "p99": 6881
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 619347,
+              "mean": 619347,
+              "min": 619347,
+              "p50": 619347.0,
+              "p95": 619347,
+              "p99": 619347
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": -88671,
+              "mean": -88671,
+              "min": -88671,
+              "p50": -88671.0,
+              "p95": -88671,
+              "p99": -88671
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 1220255,
+            "mean": 1209597.6666666667,
+            "min": 1202415,
+            "p50": 1209060.0,
+            "p95": 1219235,
+            "p99": 1220255
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 59.11861900634617,
+            "mean": 58.69149361531977,
+            "min": 58.487112084064755,
+            "p50": 58.675046612371986,
+            "p95": 59.084707401933976,
+            "p99": 59.11861900634617
+          }
+        },
+        "publication": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 0,
+              "mean": 0,
+              "min": 0,
+              "p50": 0.0,
+              "p95": 0,
+              "p99": 0
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 2200,
+            "mean": 2166,
+            "min": 2150,
+            "p50": 2165.0,
+            "p95": 2180,
+            "p99": 2200
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 0.10645252290059899,
+            "mean": 0.10509818088317588,
+            "min": 0.10430619641875591,
+            "p50": 0.10507863181640092,
+            "p95": 0.10614377710196327,
+            "p99": 0.10645252290059899
+          }
+        },
+        "snapshot_open": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 1330752,
+              "mean": 1330752,
+              "min": 1330752,
+              "p50": 1330752.0,
+              "p95": 1330752,
+              "p99": 1330752
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 3705,
+              "mean": 3705,
+              "min": 3705,
+              "p50": 3705.0,
+              "p95": 3705,
+              "p99": 3705
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 184859,
+              "mean": 184859,
+              "min": 184859,
+              "p50": 184859.0,
+              "p95": 184859,
+              "p99": 184859
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 33289,
+              "mean": 33289,
+              "min": 33289,
+              "p50": 33289.0,
+              "p95": 33289,
+              "p99": 33289
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 436792,
+            "mean": 427518.3333333333,
+            "min": 421762,
+            "p50": 426586.5,
+            "p95": 436011,
+            "p99": 436792
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 21.112207583933433,
+            "mean": 20.74371479283201,
+            "min": 20.473527619457286,
+            "p50": 20.72990598329681,
+            "p95": 21.105151287761544,
+            "p99": 21.112207583933433
+          }
+        },
+        "transaction": {
+          "allocation": {
+            "allocated_bytes": {
+              "count": 30,
+              "max": 1170953,
+              "mean": 1170953,
+              "min": 1170953,
+              "p50": 1170953.0,
+              "p95": 1170953,
+              "p99": 1170953
+            },
+            "allocation_calls": {
+              "count": 30,
+              "max": 1147,
+              "mean": 1147,
+              "min": 1147,
+              "p50": 1147.0,
+              "p95": 1147,
+              "p99": 1147
+            },
+            "peak_above_phase_entry_bytes": {
+              "count": 30,
+              "max": 182306,
+              "mean": 182306,
+              "min": 182306,
+              "p50": 182306.0,
+              "p95": 182306,
+              "p99": 182306
+            },
+            "retained_live_delta_bytes": {
+              "count": 30,
+              "max": 102227,
+              "mean": 102227,
+              "min": 102227,
+              "p50": 102227.0,
+              "p95": 102227,
+              "p99": 102227
+            }
+          },
+          "elapsed_ns": {
+            "count": 30,
+            "max": 407841,
+            "mean": 399230.3,
+            "min": 392682,
+            "p50": 398142.0,
+            "p95": 407511,
+            "p99": 407841
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 19.791041383771688,
+            "mean": 19.371425140825203,
+            "min": 19.00959623218267,
+            "p50": 19.34578583921359,
+            "p95": 19.739482449695515,
+            "p99": 19.791041383771688
+          }
+        }
+      },
+      "process_lifetime_maxrss_kib": 12240,
+      "report_sha256": "5d51224bd5c635378502f14efbdb9d46df870eea7eaa2733761b65cadc650d29"
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "count": 30,
+          "max": 10613383,
+          "mean": 10613383,
+          "min": 10613383,
+          "p50": 10613383.0,
+          "p95": 10613383,
+          "p99": 10613383
+        },
+        "allocation_calls": {
+          "count": 30,
+          "max": 12075,
+          "mean": 12075,
+          "min": 12075,
+          "p50": 12075.0,
+          "p95": 12075,
+          "p99": 12075
+        },
+        "peak_above_phase_entry_bytes": {
+          "count": 30,
+          "max": 781342,
+          "mean": 781342,
+          "min": 781342,
+          "p50": 781342.0,
+          "p95": 781342,
+          "p99": 781342
+        },
+        "retained_live_delta_bytes": {
+          "count": 30,
+          "max": 73324,
+          "mean": 73324,
+          "min": 73324,
+          "p50": 73324.0,
+          "p95": 73324,
+          "p99": 73324
+        }
+      },
+      "lane": {
+        "id": "R2-allocator-tiny-lifecycle",
+        "instrumentation": "allocator",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 2102548,
+        "mean": 2060758.4,
+        "min": 2043458,
+        "p50": 2055068.5,
+        "p95": 2094359,
+        "p99": 2102548
+      },
+      "process_lifetime_maxrss_kib": 11920,
+      "report_sha256": "eba1814df06e7605a2356014db456a21dc765419cb5e16d5323596dfda98d9c4"
+    },
+    {
+      "boundary_gap_ns": {
+        "count": 30,
+        "max": 2750,
+        "mean": 2318.6666666666665,
+        "min": 1690,
+        "p50": 2335.0,
+        "p95": 2730,
+        "p99": 2750
+      },
+      "lane": {
+        "id": "R2-normal-large-phases",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "phases",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 153921888,
+        "mean": 152393009.26666668,
+        "min": 151581909,
+        "p50": 152333702.5,
+        "p95": 153063695,
+        "p99": 153921888
+      },
+      "phase_sum_ns": {
+        "count": 30,
+        "max": 153919628,
+        "mean": 152390690.6,
+        "min": 151579839,
+        "p50": 152331287.5,
+        "p95": 153060965,
+        "p99": 153919628
+      },
+      "phases": {
+        "add": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 2766032,
+            "mean": 2344787.2333333334,
+            "min": 2256719,
+            "p50": 2348104.5,
+            "p95": 2404809,
+            "p99": 2766032
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 1.7970625552707287,
+            "mean": 1.5386036754567383,
+            "min": 1.4821240035155308,
+            "p50": 1.5391824657098834,
+            "p95": 1.572894591046484,
+            "p99": 1.7970625552707287
+          }
+        },
+        "commit": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 70017676,
+            "mean": 69445666.46666667,
+            "min": 69025162,
+            "p50": 69409764.0,
+            "p95": 69841485,
+            "p99": 70017676
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 45.91745050276074,
+            "mean": 45.57103214123896,
+            "min": 45.23690460549799,
+            "p50": 45.551820086664875,
+            "p95": 45.8139580762197,
+            "p99": 45.91745050276074
+          }
+        },
+        "publication": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 58120,
+            "mean": 48765.76666666667,
+            "min": 47820,
+            "p50": 48175.0,
+            "p95": 56700,
+            "p99": 58120
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 0.03801409327377835,
+            "mean": 0.032000225534469594,
+            "min": 0.03126205299960052,
+            "p50": 0.03162083567042463,
+            "p95": 0.03722477718197053,
+            "p99": 0.03801409327377835
+          }
+        },
+        "snapshot_open": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 41348409,
+            "mean": 40967602.766666666,
+            "min": 40585956,
+            "p50": 40973248.0,
+            "p95": 41179838,
+            "p99": 41348409
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 27.014339678310535,
+            "mean": 26.883379512656777,
+            "min": 26.700464573192978,
+            "p50": 26.894527268322225,
+            "p95": 27.000997603246663,
+            "p99": 27.014339678310535
+          }
+        },
+        "transaction": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 40324004,
+            "mean": 39583868.36666667,
+            "min": 38937049,
+            "p50": 39521246.5,
+            "p95": 40264394,
+            "p99": 40324004
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 26.427074843514593,
+            "mean": 25.974984445113055,
+            "min": 25.599255516704282,
+            "p50": 25.960906242918913,
+            "p95": 26.28482993699895,
+            "p99": 26.427074843514593
+          }
+        }
+      },
+      "process_lifetime_maxrss_kib": 73924,
+      "report_sha256": "e262d5b383feda28c8c66cd6c7bca47706d8cf399537e10aced7c9332671a59c"
+    },
+    {
+      "allocation": null,
+      "lane": {
+        "id": "R2-normal-large-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "large"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 152965175,
+        "mean": 151933683.6,
+        "min": 151123987,
+        "p50": 151821325.5,
+        "p95": 152703584,
+        "p99": 152965175
+      },
+      "process_lifetime_maxrss_kib": 76620,
+      "report_sha256": "3efda688c931c52dacae2d3f1fd590e798e039c10520b3873f7c6089512a6e1b"
+    },
+    {
+      "boundary_gap_ns": {
+        "count": 30,
+        "max": 1530,
+        "mean": 1272,
+        "min": 980,
+        "p50": 1285.0,
+        "p95": 1500,
+        "p99": 1530
+      },
+      "lane": {
+        "id": "R2-normal-medium-phases",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "phases",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 76295371,
+        "mean": 75697596.36666666,
+        "min": 75322967,
+        "p50": 75649284.5,
+        "p95": 76111171,
+        "p99": 76295371
+      },
+      "phase_sum_ns": {
+        "count": 30,
+        "max": 76293961,
+        "mean": 75696324.36666666,
+        "min": 75321677,
+        "p50": 75648304.5,
+        "p95": 76110041,
+        "p99": 76293961
+      },
+      "phases": {
+        "add": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 1080704,
+            "mean": 1056752.5666666667,
+            "min": 1043874,
+            "p50": 1054699.0,
+            "p95": 1072174,
+            "p99": 1080704
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 1.4234600751122417,
+            "mean": 1.3960520730557215,
+            "min": 1.376319775079039,
+            "p50": 1.3951664652557696,
+            "p95": 1.4194379011918496,
+            "p99": 1.4234600751122417
+          }
+        },
+        "commit": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 34816992,
+            "mean": 34401797.3,
+            "min": 34120359,
+            "p50": 34400805.5,
+            "p95": 34698782,
+            "p99": 34816992
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 45.81236203787623,
+            "mean": 45.44729804052853,
+            "min": 44.98294432504297,
+            "p50": 45.425444370400655,
+            "p95": 45.73836889387739,
+            "p99": 45.81236203787623
+          }
+        },
+        "publication": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 30990,
+            "mean": 25396.466666666667,
+            "min": 24800,
+            "p50": 25010.0,
+            "p95": 30930,
+            "p99": 30990
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 0.040780372576761835,
+            "mean": 0.03354924920331573,
+            "min": 0.03263695522119085,
+            "p50": 0.0330553992002581,
+            "p95": 0.04077416441579859,
+            "p99": 0.040780372576761835
+          }
+        },
+        "snapshot_open": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 20724995,
+            "mean": 20496404.8,
+            "min": 20337943,
+            "p50": 20483919.0,
+            "p95": 20699555,
+            "p99": 20724995
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 27.416985378313324,
+            "mean": 27.07725628466798,
+            "min": 26.897606816330672,
+            "p50": 27.06647713117238,
+            "p95": 27.396963926551006,
+            "p99": 27.416985378313324
+          }
+        },
+        "transaction": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 20320604,
+            "mean": 19715973.233333334,
+            "min": 19431150,
+            "p50": 19632600.0,
+            "p95": 20106842,
+            "p99": 20320604
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 26.634616598291444,
+            "mean": 26.045844352544453,
+            "min": 25.626144486182874,
+            "p50": 25.992355876184774,
+            "p95": 26.475561903563978,
+            "p99": 26.634616598291444
+          }
+        }
+      },
+      "process_lifetime_maxrss_kib": 43680,
+      "report_sha256": "b90c01fcc223da1fe622041181e874e99246902773e0d9507cb1b37a604a53b2"
+    },
+    {
+      "allocation": null,
+      "lane": {
+        "id": "R2-normal-medium-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "medium"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 76754453,
+        "mean": 76110301.43333334,
+        "min": 75638109,
+        "p50": 76079821.0,
+        "p95": 76589083,
+        "p99": 76754453
+      },
+      "process_lifetime_maxrss_kib": 43064,
+      "report_sha256": "6acf24b13d7eff87e10fa355392ba189e341e1dfa8b7b2508c0ffc79ee76c30c"
+    },
+    {
+      "boundary_gap_ns": {
+        "count": 30,
+        "max": 1130,
+        "mean": 556,
+        "min": 380,
+        "p50": 510.0,
+        "p95": 900,
+        "p99": 1130
+      },
+      "lane": {
+        "id": "R2-normal-tiny-phases",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "phases",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 1967258,
+        "mean": 1917764.9,
+        "min": 1895178,
+        "p50": 1908628.0,
+        "p95": 1949108,
+        "p99": 1967258
+      },
+      "phase_sum_ns": {
+        "count": 30,
+        "max": 1966748,
+        "mean": 1917208.9,
+        "min": 1894628,
+        "p50": 1908133.0,
+        "p95": 1948608,
+        "p99": 1966748
+      },
+      "phases": {
+        "add": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 19621,
+            "mean": 16972.766666666666,
+            "min": 16570,
+            "p50": 16865.0,
+            "p95": 17370,
+            "p99": 19621
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 1.0315885548927508,
+            "mean": 0.8853856845133408,
+            "min": 0.8567047036017572,
+            "p50": 0.8836399825342807,
+            "p95": 0.8987520632221278,
+            "p99": 1.0315885548927508
+          }
+        },
+        "commit": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 1170824,
+            "mean": 1127556.6,
+            "min": 1112084,
+            "p50": 1120039.5,
+            "p95": 1161625,
+            "p99": 1170824
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 59.686886945727004,
+            "mean": 58.80911200079832,
+            "min": 58.15744833674702,
+            "p50": 58.62636756396843,
+            "p95": 59.66494287357958,
+            "p99": 59.686886945727004
+          }
+        },
+        "publication": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 2230,
+            "mean": 2173,
+            "min": 2150,
+            "p50": 2170.0,
+            "p95": 2230,
+            "p99": 2230
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 0.11537567954431349,
+            "mean": 0.11334593042772498,
+            "min": 0.11033442006805143,
+            "p50": 0.11317299520128161,
+            "p95": 0.11495390503054784,
+            "p99": 0.11537567954431349
+          }
+        },
+        "snapshot_open": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 387652,
+            "mean": 377419,
+            "min": 370242,
+            "p50": 377156.5,
+            "p95": 385722,
+            "p99": 387652
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 20.096721352473367,
+            "mean": 19.68691005839426,
+            "min": 19.043038969508878,
+            "p50": 19.656712699172076,
+            "p95": 20.06753618721425,
+            "p99": 20.096721352473367
+          }
+        },
+        "transaction": {
+          "allocation": null,
+          "elapsed_ns": {
+            "count": 30,
+            "max": 412111,
+            "mean": 393087.5333333333,
+            "min": 387581,
+            "p50": 391061.5,
+            "p95": 401172,
+            "p99": 412111
+          },
+          "paired_share_of_phase_sum_pct": {
+            "count": 30,
+            "max": 21.326183051493,
+            "mean": 20.50524632586635,
+            "min": 19.765216489351968,
+            "p50": 20.4826560117911,
+            "p95": 21.04412808438382,
+            "p99": 21.326183051493
+          }
+        }
+      },
+      "process_lifetime_maxrss_kib": 12060,
+      "report_sha256": "e23e8b93d28155192524ad83a5480ddf66565e672b92251c55e0847b7b5a14e4"
+    },
+    {
+      "allocation": null,
+      "lane": {
+        "id": "R2-normal-tiny-lifecycle",
+        "instrumentation": "normal",
+        "repeat": "R2",
+        "scope": "lifecycle",
+        "shape": "tiny"
+      },
+      "lifecycle_ns": {
+        "count": 30,
+        "max": 1955858,
+        "mean": 1906748.8333333333,
+        "min": 1890458,
+        "p50": 1901272.5,
+        "p95": 1951028,
+        "p99": 1955858
+      },
+      "process_lifetime_maxrss_kib": 12044,
+      "report_sha256": "a634ceae763f9fcea4af5df20b0a18c5cbd45dbaa1a5f507e29fa2f0b103a68c"
+    }
+  ],
+  "quantiles": "median (midpoint for even sample counts); p95/p99 nearest rank; phase shares computed per paired row",
+  "reports": 24,
+  "samples": 720,
+  "schema": "litchi-0458-derived-v1",
+  "scope": "public API phase diagnostic and observed instrumentation overhead; no production speedup or internal commit-stage attribution"
+}

@@ -1,0 +1,18 @@
+{
+  "status": "bound",
+  "binaries": {
+    "normal": {
+      "path": "/tmp/litchi-goal-0458/litchi-perf-baseline",
+      "source": "tools/perf-baseline/target/release/litchi-perf-baseline",
+      "sha256": "b9acbbf3d1b5f64d40e862d743e7d202629670c96394438016d96aee7f98e7a6",
+      "bytes": 58337688
+    },
+    "allocator": {
+      "path": "/tmp/litchi-goal-0458/litchi-perf-baseline-alloc",
+      "source": "tools/perf-baseline/target/release/litchi-perf-baseline-alloc",
+      "sha256": "d7af35881a76fea19fb7cdb9212ce4b6dbd940758aff54ba695ce095c1da50d6",
+      "bytes": 58178752
+    }
+  },
+  "protocol_sha256": "d653c26fda0eebdf54b314e5c17f2ac1d545609e7f3c43ddf36d840eedf31979"
+}

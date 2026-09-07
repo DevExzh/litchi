@@ -12,6 +12,7 @@ mod corpus_manifest;
 mod docx_story_hyperlink_publication;
 mod docx_story_hyperlinks;
 mod filesystem;
+pub mod odp_append_attribution;
 mod odp_buffered_create;
 mod odp_existing_append;
 mod odp_source_tail_append;

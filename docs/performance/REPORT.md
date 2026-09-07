@@ -1,5 +1,23 @@
 # Performance program phase report
 
+## Change 0458: ordinary ODP append phase attribution
+
+A harness-only command now separates snapshot opening, transaction creation,
+append, commit, and sequential output. The frozen matrix passes 24 lanes and
+720 samples. On 8,192 slides, commit consumes about 46% of normal phase time
+and 55.85% of allocated volume; snapshot and transaction setup together consume
+about 53% of phase time. Summed phase allocation volumes equal the direct
+lifecycle totals in all six comparisons. The largest observed instrumentation
+p50 difference is +3.448%; no elapsed quantile or maximum-RSS difference exceeds
+an absolute 5%. Production behavior and the 439/36 registry remain unchanged.
+
+The release harness suite passes 387 tests with one ignored, alongside strict
+lint, build, docs, formatting, boundaries and eighteen oracle checks. Separate
+profiles pass, but sampled stacks do not reach phase markers, so internal
+commit-stage attribution remains open. See the
+[sealed evidence and replay instructions](results/change-0458/README.md).
+The full non-iWork goal remains open.
+
 ## Change 0457: bounded existing-ODP baseline and source-tail evidence
 
 0457 recaptures the ordinary `odp_existing_append_lifecycle` selector at the

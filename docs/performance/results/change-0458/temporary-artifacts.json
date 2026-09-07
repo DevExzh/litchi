@@ -1,0 +1,19 @@
+{
+  "schema": "litchi-0458-temporary-artifacts-v1",
+  "change": 458,
+  "task": "/tmp/litchi-goal-0458",
+  "files": 2,
+  "bytes": 116516440,
+  "artifacts": [
+    {
+      "path": "litchi-perf-baseline",
+      "bytes": 58337688,
+      "sha256": "b9acbbf3d1b5f64d40e862d743e7d202629670c96394438016d96aee7f98e7a6"
+    },
+    {
+      "path": "litchi-perf-baseline-alloc",
+      "bytes": 58178752,
+      "sha256": "d7af35881a76fea19fb7cdb9212ce4b6dbd940758aff54ba695ce095c1da50d6"
+    }
+  ]
+}

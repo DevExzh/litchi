@@ -1,0 +1,138 @@
+{
+  "change": 458,
+  "counter_scope": "separate whole-process run including setup, warmups, checks and reporting; values retain perf's scaling/runtime fields",
+  "counters": {
+    "branch-misses": {
+      "event_runtime": "16577760254",
+      "running_pct": "100.00",
+      "unit": "",
+      "value": "139264448"
+    },
+    "branches": {
+      "event_runtime": "16577760254",
+      "running_pct": "100.00",
+      "unit": "",
+      "value": "71950674602"
+    },
+    "cache-misses": {
+      "event_runtime": "16577760254",
+      "running_pct": "100.00",
+      "unit": "",
+      "value": "70485060"
+    },
+    "context-switches": {
+      "event_runtime": "16577760254",
+      "running_pct": "100.00",
+      "unit": "",
+      "value": "177"
+    },
+    "cycles": {
+      "event_runtime": "16577760254",
+      "running_pct": "100.00",
+      "unit": "",
+      "value": "74335779379"
+    },
+    "instructions": {
+      "event_runtime": "16577760254",
+      "running_pct": "100.00",
+      "unit": "",
+      "value": "309173283687"
+    },
+    "page-faults": {
+      "event_runtime": "16577760254",
+      "running_pct": "100.00",
+      "unit": "",
+      "value": "27879"
+    }
+  },
+  "groups": {
+    "unattributed": {
+      "period": 73990807937,
+      "samples": 1656,
+      "share_total_period_pct": 100.0,
+      "top_leaf_symbols": [
+        {
+          "period": 3409049795,
+          "share_phase_period_pct": 4.607396364562825,
+          "symbol": "__memcmp_evex_movbe+0x25"
+        },
+        {
+          "period": 1702557436,
+          "share_phase_period_pct": 2.3010391202237646,
+          "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event+0x14"
+        },
+        {
+          "period": 1614606461,
+          "share_phase_period_pct": 2.18217168594073,
+          "symbol": "<quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>+0x139"
+        },
+        {
+          "period": 1612893294,
+          "share_phase_period_pct": 2.179856307790705,
+          "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event+0x57"
+        },
+        {
+          "period": 1434387213,
+          "share_phase_period_pct": 1.9386019060926043,
+          "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x1a9"
+        },
+        {
+          "period": 1256260912,
+          "share_phase_period_pct": 1.6978607843688531,
+          "symbol": "xml_minifier::audit::verify_with_policy+0x1bf"
+        },
+        {
+          "period": 1210935404,
+          "share_phase_period_pct": 1.636602488556497,
+          "symbol": "<quick_xml::name::NamespaceResolver>::resolve_prefix+0x74"
+        },
+        {
+          "period": 1164686892,
+          "share_phase_period_pct": 1.5740967350859054,
+          "symbol": "__memcmp_evex_movbe+0x4"
+        },
+        {
+          "period": 1075672718,
+          "share_phase_period_pct": 1.4537923669057502,
+          "symbol": "__memmove_avx512_unaligned_erms+0x13"
+        },
+        {
+          "period": 1036826971,
+          "share_phase_period_pct": 1.401291592710832,
+          "symbol": "zlib_rs::deflate::longest_match::longest_match+0x1a8"
+        },
+        {
+          "period": 983907660,
+          "share_phase_period_pct": 1.329770126091548,
+          "symbol": "<litchi_odp::codec::parser::codec::xml::validation::ElementAttrs>::get+0x23b"
+        },
+        {
+          "period": 941173028,
+          "share_phase_period_pct": 1.2720134490237875,
+          "symbol": "__memcmp_evex_movbe+0x0"
+        },
+        {
+          "period": 853962640,
+          "share_phase_period_pct": 1.1541469323150417,
+          "symbol": "__memcmp_evex_movbe+0x37"
+        },
+        {
+          "period": 717806799,
+          "share_phase_period_pct": 0.9701296945036494,
+          "symbol": "<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event+0xb0"
+        },
+        {
+          "period": 673434871,
+          "share_phase_period_pct": 0.9101601804015992,
+          "symbol": "litchi_odf_common::package::edit::xml_splice_publication+0x1d6"
+        }
+      ]
+    }
+  },
+  "malformed_samples": 0,
+  "parsed_samples": 1656,
+  "sampling_scope": "whole-process cycles:u sample periods; phase markers can include warmup calls; unresolved/truncated stacks remain unattributed; this is not hard-counter phase attribution",
+  "schema": "litchi-0458-profile-derived-v1",
+  "total_period": 73990807937,
+  "whole_process_ipc": 4.1591449806517
+}
