@@ -1,5 +1,47 @@
 # Performance program phase report
 
+## Change 0460: retain fused ODP staging and source scanning
+
+0460 keeps the private staging optimization after the authoritative
+`litchi-0460-comparison-v1` matrix: 24 A1/B1/B2/A2 reports and 720 retained
+samples across two repeats, normal and allocator lanes, three warmups and 30
+samples per lane on CPU 2 with one worker. Negative values are candidate minus
+baseline p50 deltas.
+
+| Shape | Normal p50 R1 / R2 | Bootstrap p50 CI R1 / R2 |
+|---|---:|---:|
+| Tiny, 64 slides | -3.5430% / -3.8257% | [-3.8481%, -3.3203%] / [-4.1121%, -3.6946%] |
+| Medium, 4,096 slides | -6.0849% / -5.0679% | [-6.4084%, -5.8855%] / [-5.2809%, -4.8589%] |
+| Large, 8,192 slides | -5.4732% / -5.8268% | [-5.6598%, -5.2903%] / [-5.9508%, -5.5514%] |
+
+The predeclared keep gate requires at least 3% normal p50 improvement for
+medium and large in both repeats, with each independent bootstrap upper bound
+below zero. All four gated rows pass. There are no adverse >5% elapsed or
+process-RSS flags. Allocator p50 deltas are -4.7840% / -4.1309% for tiny,
+-7.3100% / -6.7785% for medium, and -7.3197% / -6.9282% for large. Across
+all six allocator lanes, allocated bytes fall by 4,642, allocation calls by 16,
+reallocation calls by 12, and deallocation calls by 4; regional peak above
+entry and retained-live deltas are unchanged.
+
+Supplementary large-input phase clocks show transaction p50 reductions of
+-24.2681% / -24.0697% in R1/R2. Add changes -1.6664% / +0.8260%, snapshot-open
++0.3413% / +0.0119%, commit +1.4977% / +1.3278%, and publication -0.1138% /
+-0.3100%. These clocks are separate mechanism evidence, not the lifecycle keep
+decision. Whole-process counters report instructions -6.1959%, cycles -4.9100%
+and branch misses +0.5503%; setup, warmups and checks are included, so these
+are not operation-only or causal counts.
+
+The source review found no semantic blocker: the fused path preserves settings,
+declaration and page state machines, source-error deferral, BOM-relative spans,
+limits, source ownership, candidate readback, patch identity and no-op behavior.
+The corrected owner retry passes 371 tests and warning-denied all-target Clippy
+passes. The optimization is retained under this scoped evidence; no selector or
+corpus coverage is added, the registry remains 439 selectors / 36 defaults, the
+full non-iWork goal remains open, and iWork is excluded. All builds, 387 harness tests (one ignored), documentation, boundaries,
+portable verification and owned temporary cleanup pass.
+See the [comparison summary](results/change-0460/summary.json), [phase summary](results/change-0460/phase-summary.json),
+and [source review](results/change-0460/source-review.md).
+
 ## Change 0459: reject a lookup reorder; resolve ODP phase ancestry
 
 The 720-sample matched lookup-order experiment does not meet its 5% latency

@@ -1,0 +1,647 @@
+--- a/crates/litchi-odp/src/authoring/mutable.rs
++++ b/crates/litchi-odp/src/authoring/mutable.rs
+@@ -197,14 +197,15 @@
+         // isolated by cloning it into the draft, but do not parse every slide
+         // a second time solely to obtain the same semantic values.
+         let slides = validated_slides.to_vec();
+-        let metadata = presentation.staging_metadata()?;
++        let staged = presentation.staging()?;
++        let metadata = staged.metadata;
+         let settings = metadata.settings;
+         let parsed_declarations = metadata.declarations;
+         let parsed_page_metadata = metadata.pages;
+         let mimetype = presentation.owned_package().mimetype()?;
+ 
+         let styles_xml = presentation.styles_xml().map(str::to_owned);
+-        let content_source = ContentSource::parse(presentation.content_xml())?;
++        let content_source = staged.content_source?;
+         let source_package = Some(presentation.owned_package().clone());
+ 
+         let declarations = (!parsed_declarations.is_empty()).then_some(parsed_declarations);
+--- a/crates/litchi-odp/src/codec/content_source/mod.rs
++++ b/crates/litchi-odp/src/codec/content_source/mod.rs
+@@ -17,7 +17,7 @@
+ use litchi_core::{Error, Result};
+ use std::collections::{BTreeMap, BTreeSet};
+ 
+-use scanner::Scanner;
++pub(crate) use scanner::Scanner;
+ 
+ /// OASIS `office` namespace.
+ const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+@@ -175,9 +175,55 @@
+         // `quick-xml` reports byte positions relative to the text after any
+         // byte-order mark, so the mark is split off here and re-emitted
+         // verbatim when the document is written back.
++        let (body, has_byte_order_mark) = Self::source_body(xml);
++        let mut scanner = Scanner::new(body);
++        let mut reader = quick_xml::reader::NsReader::from_str(body);
++        reader.config_mut().check_end_names = true;
++        reader.config_mut().trim_text(false);
++        loop {
++            let event = reader
++                .read_event()
++                .map_err(|error| invalid(format!("invalid presentation content.xml: {error}")))?;
++            if matches!(event, quick_xml::events::Event::Eof) {
++                break;
++            }
++            let end = usize::try_from(reader.buffer_position()).map_err(|_error| {
++                invalid("presentation content.xml position exceeds platform limits")
++            })?;
++            scanner.step(&reader, &event, end)?;
++        }
++        scanner.finish(has_byte_order_mark)
++    }
++
++    /// Split a leading UTF-8 byte-order mark from the source used by the
++    /// namespace reader. The scanner's byte spans are relative to this body;
++    /// [`ContentSource`] retains the fact that the mark was present.
++    pub(crate) fn source_body(xml: &str) -> (&str, bool) {
+         let body = xml.strip_prefix(BYTE_ORDER_MARK).unwrap_or(xml);
+-        let has_byte_order_mark = body.len() != xml.len();
+-        let mut scanner = Scanner::new(body);
++        (body, body.len() != xml.len())
++    }
++
++    /// Return the source-fragment size error without making it the metadata
++    /// traversal's immediate error. The combined staging path reports this
++    /// only after all metadata scanners have finished.
++    pub(crate) fn source_limit_error(xml: &str) -> Option<Error> {
++        (xml.len() > MAX_XML_BYTES).then(|| {
++            invalid(format!(
++                "presentation content.xml exceeds {MAX_XML_BYTES} bytes"
++            ))
++        })
++    }
++
++    /// Run the preserved pre-refactor source scanner for differential tests.
++    #[cfg(test)]
++    pub(crate) fn parse_reference(xml: &str) -> Result<Option<Self>> {
++        if xml.len() > MAX_XML_BYTES {
++            return Err(invalid(format!(
++                "presentation content.xml exceeds {MAX_XML_BYTES} bytes"
++            )));
++        }
++        let (body, has_byte_order_mark) = Self::source_body(xml);
++        let mut scanner = scanner_reference::Scanner::new(body);
+         scanner.run()?;
+         Ok(scanner.finish(body, has_byte_order_mark))
+     }
+--- a/crates/litchi-odp/src/codec/content_source/scanner.rs
++++ b/crates/litchi-odp/src/codec/content_source/scanner.rs
+@@ -26,9 +26,8 @@
+ }
+ 
+ /// Incremental scanner that records the spans a save needs to reuse.
+-pub(super) struct Scanner<'input> {
++pub(crate) struct Scanner<'input> {
+     xml: &'input str,
+-    reader: NsReader<&'input [u8]>,
+     stack: Vec<Frame>,
+     root_open: Option<XmlSpan>,
+     prologue_start: Option<usize>,
+@@ -50,12 +49,9 @@
+ }
+ 
+ impl<'input> Scanner<'input> {
+-    pub(super) fn new(xml: &'input str) -> Self {
+-        let mut reader = NsReader::from_str(xml);
+-        reader.config_mut().check_end_names = true;
++    pub(crate) fn new(xml: &'input str) -> Self {
+         Self {
+             xml,
+-            reader,
+             stack: Vec::new(),
+             root_open: None,
+             prologue_start: None,
+@@ -73,68 +69,66 @@
+         }
+     }
+ 
+-    pub(super) fn run(&mut self) -> Result<()> {
+-        loop {
+-            let (kind, event) = {
+-                let (resolved, event) = self.reader.read_resolved_event().map_err(|error| {
+-                    invalid(format!("invalid presentation content.xml: {error}"))
+-                })?;
+-                let kind = match &event {
+-                    Event::Start(element) | Event::Empty(element) => {
+-                        classify(&resolved, element.local_name().as_ref())
+-                    },
+-                    _ => ElementKind::Other,
+-                };
+-                (kind, event)
+-            };
+-            let end = usize::try_from(self.reader.buffer_position()).map_err(|_error| {
+-                invalid("presentation content.xml position exceeds platform limits")
+-            })?;
+-            match event {
+-                Event::Start(element) => {
+-                    let start = event_start(self.xml, end)?;
+-                    if self.stack.is_empty() {
+-                        self.collect_root_namespaces(&element)?;
+-                    }
+-                    self.on_open(kind, start, end, false)?;
+-                    if self.styles_depth.is_some() && kind == ElementKind::Style {
+-                        self.record_style_name(&element)?;
+-                    }
+-                    if self.stack.len() >= MAX_DEPTH {
+-                        return Err(invalid(format!(
+-                            "presentation content.xml nests deeper than {MAX_DEPTH} elements"
+-                        )));
+-                    }
+-                    self.stack.push(Frame { kind, start });
+-                },
+-                Event::Empty(element) => {
+-                    let start = event_start(self.xml, end)?;
+-                    if self.styles_depth.is_some() && kind == ElementKind::Style {
+-                        self.record_style_name(&element)?;
+-                    }
+-                    self.on_open(kind, start, end, true)?;
+-                    self.on_close(kind, start, start, end);
+-                },
+-                Event::End(_) => {
+-                    let close_start = event_start(self.xml, end)?;
+-                    let frame = self
+-                        .stack
+-                        .pop()
+-                        .ok_or_else(|| invalid("presentation content.xml depth underflow"))?;
+-                    self.on_close(frame.kind, frame.start, close_start, end);
+-                },
+-                Event::Eof => break,
+-                Event::Text(_)
+-                | Event::CData(_)
+-                | Event::Comment(_)
+-                | Event::Decl(_)
+-                | Event::PI(_)
+-                | Event::DocType(_)
+-                | Event::GeneralRef(_) => {},
+-            }
+-        }
+-        if !self.stack.is_empty() {
+-            return Err(invalid("unterminated presentation content.xml element"));
++    /// Consume one event from a caller-owned namespace-aware reader.
++    ///
++    /// The reader and its event buffer are deliberately borrowed here so a
++    /// metadata traversal can feed this source-fragment state machine without
++    /// creating a second tokenizer or namespace stack. `end` is the reader's
++    /// current absolute byte position immediately after `event`.
++    pub(crate) fn step(
++        &mut self,
++        reader: &NsReader<&[u8]>,
++        event: &Event<'_>,
++        end: usize,
++    ) -> Result<()> {
++        let kind = match event {
++            Event::Start(element) | Event::Empty(element) => {
++                let (resolved, local) = reader.resolver().resolve_element(element.name());
++                classify(&resolved, local.as_ref())
++            },
++            _ => ElementKind::Other,
++        };
++        match event {
++            Event::Start(element) => {
++                let start = event_start(self.xml, end)?;
++                if self.stack.is_empty() {
++                    self.collect_root_namespaces(reader, element)?;
++                }
++                self.on_open(kind, start, end, false)?;
++                if self.styles_depth.is_some() && kind == ElementKind::Style {
++                    self.record_style_name(reader, element)?;
++                }
++                if self.stack.len() >= MAX_DEPTH {
++                    return Err(invalid(format!(
++                        "presentation content.xml nests deeper than {MAX_DEPTH} elements"
++                    )));
++                }
++                self.stack.push(Frame { kind, start });
++            },
++            Event::Empty(element) => {
++                let start = event_start(self.xml, end)?;
++                if self.styles_depth.is_some() && kind == ElementKind::Style {
++                    self.record_style_name(reader, element)?;
++                }
++                self.on_open(kind, start, end, true)?;
++                self.on_close(kind, start, start, end);
++            },
++            Event::End(_) => {
++                let close_start = event_start(self.xml, end)?;
++                let frame = self
++                    .stack
++                    .pop()
++                    .ok_or_else(|| invalid("presentation content.xml depth underflow"))?;
++                self.on_close(frame.kind, frame.start, close_start, end);
++            },
++            Event::Eof => {},
++            Event::Text(_)
++            | Event::CData(_)
++            | Event::Comment(_)
++            | Event::Decl(_)
++            | Event::PI(_)
++            | Event::DocType(_)
++            | Event::GeneralRef(_) => {},
+         }
+         Ok(())
+     }
+@@ -241,7 +235,11 @@
+     }
+ 
+     /// Record every namespace binding declared on the root element.
+-    fn collect_root_namespaces(&mut self, element: &BytesStart<'_>) -> Result<()> {
++    fn collect_root_namespaces(
++        &mut self,
++        reader: &NsReader<&[u8]>,
++        element: &BytesStart<'_>,
++    ) -> Result<()> {
+         for raw_attribute in element.attributes() {
+             let attribute = raw_attribute.map_err(|error| {
+                 invalid(format!(
+@@ -259,14 +257,18 @@
+                 continue;
+             };
+             let value = attribute
+-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, self.reader.decoder())
++                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                 .map_err(|error| invalid(format!("invalid namespace declaration: {error}")))?;
+             self.root_namespaces.insert(prefix, value.into_owned());
+         }
+         Ok(())
+     }
+ 
+-    fn record_style_name(&mut self, element: &BytesStart<'_>) -> Result<()> {
++    fn record_style_name(
++        &mut self,
++        reader: &NsReader<&[u8]>,
++        element: &BytesStart<'_>,
++    ) -> Result<()> {
+         if self.style_names.len() >= MAX_STYLE_NAMES {
+             return Err(invalid(format!(
+                 "presentation content.xml declares more than {MAX_STYLE_NAMES} automatic styles"
+@@ -275,14 +277,14 @@
+         for raw_attribute in element.attributes() {
+             let attribute = raw_attribute
+                 .map_err(|error| invalid(format!("invalid style attribute: {error}")))?;
+-            let (namespace, local) = self.reader.resolver().resolve_attribute(attribute.key);
++            let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+             if local.as_ref() != STYLE_NAME_ATTRIBUTE
+                 || !matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == STYLE_NAMESPACE)
+             {
+                 continue;
+             }
+             let value = attribute
+-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, self.reader.decoder())
++                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                 .map_err(|error| invalid(format!("invalid style:name value: {error}")))?;
+             self.style_names.insert(value.into_owned());
+         }
+@@ -290,26 +292,37 @@
+     }
+ 
+     /// Assemble the retained skeleton, or `None` when the shape is unexpected.
+-    pub(super) fn finish(self, xml: &str, has_byte_order_mark: bool) -> Option<ContentSource> {
+-        let root_open = self.root_open?;
+-        let body_open = self.body_open?;
+-        let presentation_open = self.presentation_open?;
+-        let prologue_start = self.prologue_start?;
++    pub(crate) fn finish(self, has_byte_order_mark: bool) -> Result<Option<ContentSource>> {
++        if !self.stack.is_empty() {
++            return Err(invalid("unterminated presentation content.xml element"));
++        }
++        let Some(root_open) = self.root_open else {
++            return Ok(None);
++        };
++        let Some(body_open) = self.body_open else {
++            return Ok(None);
++        };
++        let Some(presentation_open) = self.presentation_open else {
++            return Ok(None);
++        };
++        let Some(prologue_start) = self.prologue_start else {
++            return Ok(None);
++        };
+         if body_open.start < prologue_start {
+-            return None;
++            return Ok(None);
+         }
+         let (splice, styles_site) = self
+             .styles_site
+             .unwrap_or((body_open.start, AutomaticStylesSite::Missing));
+         if splice < prologue_start || splice > body_open.start {
+-            return None;
++            return Ok(None);
+         }
+         let tail_start = match styles_site {
+             AutomaticStylesSite::Empty { span, .. } => span.end,
+             AutomaticStylesSite::Content | AutomaticStylesSite::Missing => splice,
+         };
+-        Some(ContentSource {
+-            xml: xml.to_owned(),
++        Ok(Some(ContentSource {
++            xml: self.xml.to_owned(),
+             prolog: XmlSpan {
+                 start: 0,
+                 end: root_open.start,
+@@ -332,7 +345,7 @@
+             style_names: self.style_names,
+             root_namespaces: self.root_namespaces,
+             has_byte_order_mark,
+-        })
++        }))
+     }
+ }
+ 
+--- a/crates/litchi-odp/src/model/staging.rs
++++ b/crates/litchi-odp/src/model/staging.rs
+@@ -5,7 +5,8 @@
+ //! error or a settings XML read failure.
+ 
+ use super::{declaration, page_metadata, settings};
+-use litchi_core::Result;
++use crate::codec::content_source::{ContentSource, Scanner as ContentSourceScanner};
++use litchi_core::{Error, Result};
+ use quick_xml::{events::Event, reader::NsReader};
+ 
+ #[derive(Debug, PartialEq, Eq)]
+@@ -15,6 +16,15 @@
+     pub(crate) pages: page_metadata::Collection,
+ }
+ 
++/// The metadata projections and source-fragment skeleton collected from one
++/// namespace-aware `content.xml` traversal.
++#[derive(Debug)]
++pub(crate) struct Staged {
++    pub(crate) metadata: Metadata,
++    pub(crate) content_source: Result<Option<ContentSource>>,
++}
++
++#[cfg(test)]
+ pub(crate) fn parse(xml: &str) -> Result<Metadata> {
+     let mut settings = settings::Scanner::new(xml.len())?;
+     let mut declarations = declaration::Scanner::new(xml.len());
+@@ -54,9 +64,100 @@
+     })
+ }
+ 
++/// Collect transaction metadata and the retained source skeleton from one
++/// reader/event stream.
++///
++/// Metadata state machines keep their historical precedence: settings errors
++/// stop immediately, declaration errors are deferred until the settings pass
++/// finishes, and page errors are considered only after declarations. The
++/// source-fragment scanner is auxiliary to those projections, so its structural
++/// error is retained and applied only after every metadata finish step. This
++/// lets the caller perform its MIME and styles setup before applying the
++/// source result, matching the former staging order.
++pub(crate) fn parse_with_content_source(xml: &str) -> Result<Staged> {
++    let mut settings = settings::Scanner::new(xml.len())?;
++    let mut declarations = declaration::Scanner::new(xml.len());
++    let mut pages = page_metadata::Scanner::new(xml.len());
++    let (body, has_byte_order_mark) = ContentSource::source_body(xml);
++    let mut source_error = ContentSource::source_limit_error(xml);
++    let mut content_source = source_error
++        .is_none()
++        .then(|| ContentSourceScanner::new(body));
++    let mut reader = NsReader::from_str(body);
++    reader.config_mut().check_end_names = true;
++    reader.config_mut().trim_text(false);
++    let mut buffer = Vec::new();
++    loop {
++        // Settings historically owns the first complete XML traversal.
++        let event = reader
++            .read_event_into(&mut buffer)
++            .map_err(settings::xml_error)?;
++        if matches!(event, Event::Eof) {
++            break;
++        }
++        settings.step(&reader, &event)?;
++        if let Ok(scanner) = declarations.as_mut()
++            && let Err(error) = scanner.step(&reader, &event)
++        {
++            declarations = Err(error);
++        }
++        if declarations.is_ok()
++            && let Ok(scanner) = pages.as_mut()
++            && let Err(error) = scanner.step(&reader, &event)
++        {
++            pages = Err(error);
++        }
++        if source_error.is_none() {
++            let source_step = match content_source.as_mut() {
++                Some(scanner) => match usize::try_from(reader.buffer_position()) {
++                    Ok(end) => scanner.step(&reader, &event, end),
++                    Err(_error) => Err(Error::InvalidFormat(
++                        "presentation content.xml position exceeds platform limits".into(),
++                    )),
++                },
++                None => Ok(()),
++            };
++            if let Err(error) = source_step {
++                source_error = Some(error);
++                content_source = None;
++            }
++        }
++        buffer.clear();
++    }
++    let settings = settings.finish()?;
++    let declarations = declarations?.finish()?;
++    let pages = pages?.finish()?;
++    let metadata = Metadata {
++        settings,
++        declarations,
++        pages,
++    };
++    let content_source = match source_error {
++        Some(error) => Err(error),
++        None => content_source.map_or_else(
++            || {
++                Err(Error::InvalidFormat(
++                    "presentation content.xml source scanner was not initialized".into(),
++                ))
++            },
++            |scanner| scanner.finish(has_byte_order_mark),
++        ),
++    };
++    Ok(Staged {
++        metadata,
++        content_source,
++    })
++}
++
+ #[cfg(test)]
++#[allow(
++    clippy::panic,
++    clippy::expect_used,
++    reason = "fixture differential assertions panic on a mismatched corpus"
++)]
+ mod tests {
+-    use super::{Metadata, declaration, page_metadata, parse, settings};
++    use super::{Metadata, declaration, page_metadata, parse, parse_with_content_source, settings};
++    use crate::codec::content_source::ContentSource;
+     use litchi_core::Result;
+ 
+     fn reference(xml: &str) -> Result<Metadata> {
+@@ -89,6 +190,36 @@
+             page_metadata::parse(xml).map_err(|error| format!("{error:?}")),
+             page_metadata::parse_reference(xml).map_err(|error| format!("{error:?}")),
+         );
++
++        let normalize_fused = |value: Result<super::Staged>| {
++            value
++                .map(|staged| {
++                    let metadata = format!("{:?}", staged.metadata);
++                    let source = staged
++                        .content_source
++                        .map(|value| value.map(|source| format!("{source:?}")))
++                        .map_err(|error| format!("{error:?}"));
++                    (metadata, source)
++                })
++                .map_err(|error| format!("{error:?}"))
++        };
++        let normalize_reference = |value: Result<Metadata>| {
++            value
++                .map(|metadata| format!("{metadata:?}"))
++                .map_err(|error| format!("{error:?}"))
++        };
++        let fused = normalize_fused(parse_with_content_source(xml));
++        let expected_metadata = normalize_reference(reference(xml));
++        let expected_source = ContentSource::parse_reference(xml)
++            .map(|value| value.map(|source| format!("{source:?}")))
++            .map_err(|error| format!("{error:?}"));
++        match (fused, expected_metadata) {
++            (Ok((metadata, source)), Ok(expected_metadata)) => {
++                assert_eq!(metadata, expected_metadata, "{xml:.200}: fused metadata");
++                assert_eq!(source, expected_source, "{xml:.200}: fused source");
++            },
++            (fused, expected) => assert_eq!(fused.map(|value| value.0), expected, "{xml:.200}"),
++        }
+     }
+ 
+     fn wrap(body: &str) -> String {
+@@ -115,6 +246,7 @@
+             for right in fragments {
+                 let xml = wrap(&format!("{left}{right}"));
+                 compare(&xml);
++                compare(&format!("\u{feff}<?xml version=\"1.0\"?>{xml}"));
+                 compare(
+                     &xml.replace("o:", "office:")
+                         .replace("xmlns:o=", "xmlns:office="),
+@@ -167,4 +299,103 @@
+         assert!(parse(&pages).is_err());
+         compare(&pages);
+     }
++
++    #[test]
++    fn source_shape_errors_are_deferred_until_metadata_finishes() {
++        let staged = parse_with_content_source("<root/>")
++            .expect("metadata projections accept an unrelated XML root");
++        assert!(staged.content_source.is_err());
++
++        let xml = format!(
++            "<root/>{}",
++            wrap("<p:settings p:mouse-visible=\"invalid\"/>")
++        );
++        let expected = settings::parse_reference(&xml).unwrap_err().to_string();
++        assert_eq!(
++            parse_with_content_source(&xml).unwrap_err().to_string(),
++            expected
++        );
++
++        let declaration_xml = format!("<root/>{}", wrap("<p:header-decl/>"));
++        let expected = declaration::parse_reference(&declaration_xml)
++            .unwrap_err()
++            .to_string();
++        assert_eq!(
++            parse_with_content_source(&declaration_xml)
++                .unwrap_err()
++                .to_string(),
++            expected
++        );
++
++        let page_xml = format!("<root/>{}", wrap("<d:page d:id=\"one\" xml:id=\"two\"/>"));
++        let expected = page_metadata::parse_reference(&page_xml)
++            .unwrap_err()
++            .to_string();
++        assert_eq!(
++            parse_with_content_source(&page_xml)
++                .unwrap_err()
++                .to_string(),
++            expected
++        );
++
++        let malformed_xml = format!("<root/>{}", wrap("<d:page broken=\"unterminated></d:page>"));
++        let expected = reference(&malformed_xml).unwrap_err().to_string();
++        assert_eq!(
++            parse_with_content_source(&malformed_xml)
++                .unwrap_err()
++                .to_string(),
++            expected
++        );
++    }
++
++    #[test]
++    fn fused_source_preserves_bom_prologue_and_page_spans() {
++        let xml = format!(
++            "\u{feff}<?xml version=\"1.0\"?>{}",
++            wrap("<d:page d:name=\"bom\"/>")
++        );
++        let staged = parse_with_content_source(&xml).expect("BOM fixture stages");
++        let source = staged
++            .content_source
++            .expect("BOM source result")
++            .expect("BOM presentation skeleton");
++        let mut prologue = String::new();
++        source.write_prolog(&mut prologue);
++        assert_eq!(prologue, "\u{feff}<?xml version=\"1.0\"?>");
++        assert_eq!(source.page(0), Some("<d:page d:name=\"bom\"/>"));
++    }
++
++    #[test]
++    fn fused_staging_matches_independent_source_reference_on_native_fixtures() {
++        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/odf/odp");
++        for name in [
++            "cellspan.odp",
++            "text-in-image.odp",
++            "tdf102223.odp",
++            "tdf105502.odp",
++            "tdf169979.odp",
++        ] {
++            let path = root.join(name);
++            let presentation = crate::Presentation::open(&path)
++                .unwrap_or_else(|error| panic!("{name}: opening native fixture: {error}"));
++            let staged = presentation
++                .staging()
++                .unwrap_or_else(|error| panic!("{name}: fused staging: {error}"));
++            let fused_source = staged
++                .content_source
++                .map(|value| value.map(|source| format!("{source:?}")))
++                .map_err(|error| format!("{error:?}"));
++            let reference_source = ContentSource::parse_reference(presentation.content_xml())
++                .map(|value| value.map(|source| format!("{source:?}")))
++                .map_err(|error| format!("{error:?}"));
++            assert_eq!(fused_source, reference_source, "{name}: source projection");
++
++            let expected_metadata = reference(presentation.content_xml())
++                .unwrap_or_else(|error| panic!("{name}: metadata reference: {error}"));
++            assert_eq!(
++                staged.metadata, expected_metadata,
++                "{name}: metadata projection"
++            );
++        }
++    }
+ }
+--- a/crates/litchi-odp/src/package/presentation.rs
++++ b/crates/litchi-odp/src/package/presentation.rs
+@@ -263,9 +263,10 @@
+         settings::parse(self.package.content_xml())
+     }
+ 
+-    /// Read the auxiliary projections required to stage an edit in one traversal.
+-    pub(crate) fn staging_metadata(&self) -> Result<crate::model::staging::Metadata> {
+-        crate::model::staging::parse(self.package.content_xml())
++    /// Read the auxiliary projections and retained source skeleton required to
++    /// stage an edit in one traversal.
++    pub(crate) fn staging(&self) -> Result<crate::model::staging::Staged> {
++        crate::model::staging::parse_with_content_source(self.package.content_xml())
+     }
+ 
+     /// Inspect inert header, footer, date-time, and page-binding declarations.

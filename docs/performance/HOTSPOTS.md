@@ -1,5 +1,36 @@
 # Performance hotspot inventory
 
+## Change 0460: fused staging reduces transaction work
+
+0460 retains the private ODP fused staging/source scan after a 24-report,
+720-sample A1/B1/B2/A2 lifecycle matrix. Normal p50 candidate-minus-baseline
+deltas are -3.5430% / -3.8257% for tiny, -6.0849% / -5.0679% for medium, and
+-5.4732% / -5.8268% for large in R1/R2. The four medium/large keep-gate rows
+clear the 3% threshold with negative independent bootstrap upper bounds; no
+adverse >5% elapsed or process-RSS flag is present.
+
+Allocator p50 deltas are -4.7840% / -4.1309% for tiny, -7.3100% / -6.7785%
+for medium, and -7.3197% / -6.9282% for large. Every allocator lane reduces
+allocated bytes by 4,642, allocation calls by 16, reallocations by 12 and
+deallocations by 4, while regional peak above entry and retained-live deltas
+remain unchanged. This is operation-scoped allocator evidence, not a flat
+whole-process memory bound.
+
+The supplementary public phase clocks identify transaction as the main changed
+phase, with p50 deltas of -24.2681% / -24.0697% in R1/R2. Add is -1.6664% /
++0.8260%, snapshot-open +0.3413% / +0.0119%, commit +1.4977% / +1.3278%, and
+publication -0.1138% / -0.3100%. These phase clocks are separate mechanism
+evidence and do not turn the lifecycle result into API-attributed causal proof.
+Whole-process counters report instructions -6.1959%, cycles -4.9100% and branch
+misses +0.5503%; setup, warmups and checks are included.
+
+The source review confirms namespace-aware shared traversal while preserving
+validation/error order, BOM-relative spans, limits, source ownership and final
+readback. The corrected owner retry passes 371 tests and all-target warning-denied
+Clippy passes. No coverage is added (439 selectors / 36 defaults); the full
+non-iWork goal remains open and iWork remains outside scope. All builds, 387 harness tests (one ignored), documentation, boundaries,
+portable verification and owned temporary cleanup pass.
+
 ## Change 0459: source setup and candidate parsing dominate remaining work
 
 Resolved fp/DWARF profiles place candidate slide readback at about 59–60% of

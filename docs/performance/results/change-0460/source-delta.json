@@ -1,0 +1,71 @@
+{
+  "schema": "litchi-0460-source-delta-v1",
+  "files": [
+    {
+      "path": "crates/litchi-odp/src/authoring/mutable.rs",
+      "baseline": {
+        "path": "source-artifacts/baseline/crates/litchi-odp/src/authoring/mutable.rs.txt",
+        "bytes": 110284,
+        "sha256": "67ec979969e5757e306985d96a2df4e6e28909d4747cc71fdf31efa175388554"
+      },
+      "candidate": {
+        "path": "source-artifacts/candidate/crates/litchi-odp/src/authoring/mutable.rs.txt",
+        "bytes": 110286,
+        "sha256": "9c042d86c5e973119342b7d04739c6aca658010de99415582b5a02b00d7d48d1"
+      }
+    },
+    {
+      "path": "crates/litchi-odp/src/codec/content_source/mod.rs",
+      "baseline": {
+        "path": "source-artifacts/baseline/crates/litchi-odp/src/codec/content_source/mod.rs.txt",
+        "bytes": 20760,
+        "sha256": "67e55d7cd1ca01932a36b2dfd0784c330a0e40adaff7b7cd427cbfcf52e4d9fe"
+      },
+      "candidate": {
+        "path": "source-artifacts/candidate/crates/litchi-odp/src/codec/content_source/mod.rs.txt",
+        "bytes": 22777,
+        "sha256": "431de6b3ea4e3edc3f21e9fe63db487968fb4d1baf21774a2e0eec9f12963fca"
+      }
+    },
+    {
+      "path": "crates/litchi-odp/src/codec/content_source/scanner.rs",
+      "baseline": {
+        "path": "source-artifacts/baseline/crates/litchi-odp/src/codec/content_source/scanner.rs.txt",
+        "bytes": 20802,
+        "sha256": "a2126f16dff1213a3dfed878ddd85fd1973b137e69c2d6c60a3a4b3f1bbfa954"
+      },
+      "candidate": {
+        "path": "source-artifacts/candidate/crates/litchi-odp/src/codec/content_source/scanner.rs.txt",
+        "bytes": 20823,
+        "sha256": "427bbfd19fba52a45546fddf6d38f4ef35c232765efbcf83d01e4ccb352873a8"
+      }
+    },
+    {
+      "path": "crates/litchi-odp/src/model/staging.rs",
+      "baseline": {
+        "path": "source-artifacts/baseline/crates/litchi-odp/src/model/staging.rs.txt",
+        "bytes": 6838,
+        "sha256": "afeee1550d1ac6160c2a0534569afbb30441abd2f57ae91e5bf4693dbf364bd8"
+      },
+      "candidate": {
+        "path": "source-artifacts/candidate/crates/litchi-odp/src/model/staging.rs.txt",
+        "bytes": 16146,
+        "sha256": "fe674c7fb9d6c5ab007e9c013ffdff391f2b59e5134060350ccf908a111a9c11"
+      }
+    },
+    {
+      "path": "crates/litchi-odp/src/package/presentation.rs",
+      "baseline": {
+        "path": "source-artifacts/baseline/crates/litchi-odp/src/package/presentation.rs.txt",
+        "bytes": 27120,
+        "sha256": "796b5cd34862580422d6a6698f6518029bcab5a6c32e62b5e06432407e33aa75"
+      },
+      "candidate": {
+        "path": "source-artifacts/candidate/crates/litchi-odp/src/package/presentation.rs.txt",
+        "bytes": 27166,
+        "sha256": "b0437a9ee12ab6e3f6e67ceeef694a9001568de8654a0f0f246840095f607f77"
+      }
+    }
+  ],
+  "change": 460
+}

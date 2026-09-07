@@ -1,0 +1,13 @@
+{
+  "schema": "litchi-0460-decision-v1",
+  "change": 460,
+  "status": "accepted",
+  "production_change_retained": true,
+  "summary_sha256": "a5f9860b5f9b52dc3f517a012aa730b0b700797ba945d04f3d08db24eb0450ad",
+  "reason": "All four predeclared normal medium/large p50 targets improve at least 3%, with independent bootstrap 95% upper delta bounds below zero. No adverse timing/RSS flags or allocation increases. Source fusion removes repeated tokenization while 371 owner tests and strict all-target Clippy preserve correctness.",
+  "adverse_flags": [],
+  "allocation_increase_review_flags": [],
+  "memory_review": "Every allocator lane saves 4,642 requested bytes, 16 allocation calls and 12 reallocations. Peak above entry and retained live bytes are unchanged. This is a latency optimization, with only a small fixed allocation saving.",
+  "rss_review": "Process HWM differences range from -1.7075% to +3.6357%; none crosses +5%. No RSS reduction claim.",
+  "next_work": "Candidate slide readback and initial semantic parsing remain larger targets. Preserve all readback checks and measure other CRUD operations before extending performance claims."
+}

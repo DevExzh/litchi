@@ -1,5 +1,36 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0460: retained fused ODP staging within existing ADR boundaries
+
+0460 retains a private ODP staging/source-scanning optimization under the
+existing ownership and publication ADRs. The 24-report, 720-sample A1/B1/B2/A2
+matrix passes the predeclared scoped keep gate: all four normal medium/large
+rows improve p50 by more than 3%, and each independent bootstrap upper bound is
+below zero. No adverse >5% elapsed or process-RSS flag is present.
+
+The shared namespace-aware reader preserves settings, declaration and page
+state machines, immediate reader/settings errors, deferred declaration/page
+errors, source-error deferral until metadata/MIME/styles completion, BOM-relative
+spans, exact BOM output, limits, source ownership, candidate readback, patch
+identity and no-op behavior. No public API, dependency, executor, clock, pool,
+unsafe policy or iWork ownership change is asserted.
+
+Allocator evidence reduces each lane by 4,642 allocated bytes, 16 allocation
+calls, 12 reallocations and 4 deallocations; regional peak above entry and
+retained-live deltas are unchanged. Supplementary phase clocks and whole-process
+counters are diagnostic scopes, with setup/warmups/checks included; they do not
+establish causal API attribution, operation-only counter totals, cold-cache,
+range-source, scaling or native-application claims.
+
+The source review found no semantic blocker. The corrected owner retry passes
+371 tests and warning-denied all-target Clippy passes. The optimization is
+retained under the scoped evidence. No selector or corpus coverage is added;
+the registry remains 439 selectors / 36 defaults, the full non-iWork goal
+remains open, and iWork is excluded. All builds, 387 harness tests (one ignored), documentation, boundaries,
+portable verification and owned temporary cleanup pass. See the [ADR refresh](results/change-0460/adr-refresh.json), [comparison
+summary](results/change-0460/summary.json), [phase summary](results/change-0460/phase-summary.json),
+and [source review](results/change-0460/source-review.md).
+
 ## Change 0459: measured rejection preserves existing contracts
 
 Accepted ADR hashes remain unchanged. The tested lookup reorder changes only
